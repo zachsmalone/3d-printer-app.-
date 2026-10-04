@@ -1,5 +1,5 @@
 # PROPOSAL - single-VPS deployment (Option A in reports/operations.md).
-# Run from the repo root:
+# Run from the repo root (the Dockerfile now lives at the repo root, moved there by Engineering):
 #   cp .env.example .env && $EDITOR .env
 #   sudo install -d -o 10001 -g 10001 -m 750 /srv/zeim/data /srv/zeim/outputs
 #   docker compose -f reports/deploy/docker-compose.yml --env-file .env up -d --build
@@ -9,13 +9,19 @@ services:
   app:
     build:
       context: ../..                       # repo root
-      dockerfile: reports/deploy/Dockerfile
+      dockerfile: Dockerfile
     image: zeim:latest
     restart: unless-stopped
     env_file: ../../.env
     environment:
       PHOTO3D_DATA: /data
       PHOTO3D_OUT: /outputs
+      HOST: 0.0.0.0                                        # inside the container only; the app's default is 127.0.0.1. Not published to the host (see expose)
+      FORWARDED_ALLOW_IPS: "*"                              # trust X-Forwarded-* from Caddy on the private compose network only
+      PHOTO3D_MODE: ${PHOTO3D_MODE:-shared}                # shared = settings/printers need admin token or adult account
+      PHOTO3D_ADMIN_TOKEN: ${PHOTO3D_ADMIN_TOKEN:-}
+      PHOTO3D_SECRET_KEY: ${PHOTO3D_SECRET_KEY:-}
+      PHOTO3D_PUBLIC_BASE_URL: ${PHOTO3D_PUBLIC_BASE_URL:-https://${ZEIM_DOMAIN:-zeim.example.org}}
     volumes:
       - ${ZEIM_HOST_DIR:-/srv/zeim}/data:/data
       - ${ZEIM_HOST_DIR:-/srv/zeim}/outputs:/outputs
@@ -34,7 +40,7 @@ services:
     cpus: 2.0
     pids_limit: 512
     healthcheck:                           # same as the Dockerfile; repeated so it is visible/tunable here
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/', timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       start_period: 40s

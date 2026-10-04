@@ -1,13 +1,13 @@
 # ZEIM deployment proposals (DRAFT, by Ren / DevOps)
 
-Everything here is a **proposal**: nothing has been built, deployed, or pushed. No app code was changed.
-Validated so far: `bash -n` on both scripts, `docker compose config` (v5.6), `caddy validate` (v2.11) and a local
+Everything here is a **proposal** (the Dockerfile itself is now owned by Engineering at the repo root): nothing has been built, deployed, or pushed. No app code was changed.
+Validated so far (earlier draft): `bash -n` on both scripts, `docker compose config` (v5.6), `caddy validate` (v2.11) and a local
 backup, restore-drill, retention and checksum-failure test on a fake tree (incl. a WAL-mode SQLite DB).
 **Not** validated: `docker build` and a real boot of the container (no Docker daemon on the dev box).
 
 | File | Purpose |
 |---|---|
-| `Dockerfile` | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker |
+| `../../Dockerfile` (repo root; Engineering moved and edited it, history in git) | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker |
 | `docker-compose.yml` | `app` (internal port 8765 only) + `caddy` (80/443); bind-mounted `data/` and `outputs/`; read-only rootfs, caps dropped, mem/CPU limits |
 | `Caddyfile` | Automatic HTTPS, 55 MB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing |
 | `backup.sh` | Archives `data/` + `outputs/`, safe SQLite copies (`.backup`), sha256 sums, 14 daily + 8 weekly retention, optional `age` encryption and `rclone` off-site copy |
@@ -42,6 +42,16 @@ reports/deploy/restore.sh /srv/zeim-backups/daily/zeim-<stamp> --apply    # swap
 docker compose -f reports/deploy/docker-compose.yml start app
 ```
 
+## Network binding (important)
+
+- The app reads the env var **`HOST`** (`app/config.py`; also `PORT`, default 8765). Default is `127.0.0.1` (this computer only). Anything else logs a warning, because there is no real login yet.
+- In the container, `HOST=0.0.0.0` is set (Dockerfile and compose) so Caddy can reach it on the private compose network. The app port is **not** published to the host (`expose`, not `ports`); only Caddy publishes 80/443.
+- Want a host-only debug port? Add `ports: ["127.0.0.1:8765:8765"]` to `app`. Never `"8765:8765"`.
+
+## Local HTTPS test on a home network
+
+See `local-https/README.md` (for trying the share sheet from an iPhone/iPad).
+
 ## Assumptions
 
 - Single VPS (Option A), >= 2 vCPU / 4 GB RAM; app limited to 3 GB / 2 CPUs so Caddy and the OS keep headroom.
@@ -58,7 +68,7 @@ docker compose -f reports/deploy/docker-compose.yml start app
 ## Open questions
 
 1. **Hosting/region and domain** (Zach): placeholders `zeim.example.org` / `ops@example.org` must be replaced.
-2. **`/healthz`** does not exist; healthchecks hit `/`. Engineering ask #7 stands.
+2. ~~`/healthz`~~ now exists (`app/main.py`, answers `{"status":"ok"}`, no cookie). The Dockerfile, compose file and Caddy health check all use it.
 3. **Pinned dependencies**: `requirements.txt` is unpinned (today: fastapi 0.142, numpy 2.5, trimesh 5.1...). Builds are not reproducible and a new numpy/skimage can break things (tests already emit NumPy 2.5 deprecation warnings from scikit-image).
 4. **PrusaSlicer AGPL**: legal should confirm hosting obligations. The apt package adds roughly 1 GB (GUI libs); an alternative is a slimmer separate "slicer worker" image or the AppImage CLI.
 5. **Uploads and worker limits**: Caddy caps bodies at 55 MB; per-job memory/time caps and a queue still need Engineering (blocker #5). Compose limits are a stopgap.

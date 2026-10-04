@@ -1,0 +1,28 @@
+# PROPOSAL - local HTTPS for testing on a home network (iPhone/iPad Safari needs HTTPS for the share sheet).
+# NOT for production. Untested on real iOS devices.
+#
+# 1. Set ZEIM_LAN_NAME to this computer's home-network IP (e.g. 192.168.1.50), or its .local name (e.g. my-mac.local).
+# 2. Run from this folder:   ZEIM_LAN_NAME=192.168.1.50 caddy run --config Caddyfile.local --adapter caddyfile
+# Caddy makes its own private certificate authority ("tls internal"). Only devices where you trust that
+# authority will accept the certificate. Port 8443 is used so no admin rights are needed.
+{
+	# We only want the port below; no automatic redirects or public certificates.
+	auto_https disable_redirects
+	local_certs
+}
+
+https://{$ZEIM_LAN_NAME:192.168.1.50}:8443 {
+	tls internal
+
+	# ZEIM stays on this computer only (HOST left at its default 127.0.0.1). Only Caddy is reachable from the network.
+	reverse_proxy 127.0.0.1:8765 {
+		transport http {
+			response_header_timeout 660s
+			read_timeout 660s
+		}
+	}
+
+	request_body {
+		max_size 55MB
+	}
+}

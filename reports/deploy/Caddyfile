@@ -33,7 +33,7 @@
 			response_header_timeout 660s
 			read_timeout 660s
 		}
-		health_uri /
+		health_uri /healthz
 		health_interval 30s
 	}
 
