@@ -15,4 +15,4 @@ Log check on its own: `reports/deploy/iphone-test/check-logs.sh`
 
 The passcode and URL are saved in 0600 files in the run folder and never printed. Mr. Yami Kato sends them to Zach in a private DM, never in a group chat or a repo file.
 
-Known blocker: outbound port 7844 (used by cloudflared) times out from this box, so the tunnel may not connect. See RUNBOOK.md.
+Known blocker (confirmed 2026-10-04 by a probe): this box cannot open a working tunnel. Outbound port 7844 (used by cloudflared) is blocked, and other no-account tunnels fail too. Run the test from Zach's own computer or ask for egress to be opened. See iphone-test/RUNBOOK.md.

@@ -103,6 +103,14 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 [ -n "$URL" ] || fail "no tunnel address after 60 s"
+# An address alone does not mean the tunnel works (cloudflared allocates it over 443 before connecting to the edge on 7844).
+# Do not hand out a dead link: require a registered connection.
+for _ in $(seq 1 40); do
+  grep -q 'Registered tunnel connection' "$RUN/logs/cloudflared.log" 2>/dev/null && break
+  alive "$(cat "$RUN/pids/cloudflared.pid")" || fail "cloudflared exited (see $RUN/logs/cloudflared.log)"
+  sleep 1
+done
+grep -q 'Registered tunnel connection' "$RUN/logs/cloudflared.log" 2>/dev/null || fail "tunnel address allocated but cloudflared could not connect to Cloudflare (outbound 7844 blocked?). Nothing is public; see RUNBOOK 'Blocker'"
 printf '%s' "$URL" > "$RUN/url.txt"; chmod 600 "$RUN/url.txt"
 
 # ---- 3. ZEIM on 127.0.0.1, fresh data folders, base URL = the tunnel address ----

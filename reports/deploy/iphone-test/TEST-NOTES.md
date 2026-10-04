@@ -26,3 +26,8 @@ Setup: `ZEIM_CLOUDFLARED=<stand-in>`, `ZEIM_SKIP_PUBLIC_CHECK=1`, ports 18480/18
 | Existing `/workspace/photo3d/data` and `outputs` | not read or written by the test run (their contents changed during the window only because other agents use the live app) |
 
 NOT tested: real tunnel (blocked/unknown from this computer, see RUNBOOK), real iOS Safari, a photo build through the proxy, public-address 401 check (needs the real tunnel).
+
+## Update 2026-10-04 (probe run)
+- Real tunnel probe run (empty port, about 25 s per variant): cloudflared allocates an address but never registers (auto, http2 and quic all fail). The old probe/start logic gave a false "yes"; fixed to require `Registered tunnel connection`. Probe now correctly prints "no".
+- After the edit: `bash -n` OK on probe-tunnel.sh and start.sh. The new gate loop was checked on its own with fake logs (registered: proceeds; address only: fails safe). `start.sh` itself was NOT re-run end to end (not allowed), so an offline stand-in must now also print a line containing `Registered tunnel connection`.
+- Other tunnels (localtunnel, ssh-based, bore, Tunnelmole) fail from this computer: only TLS on port 443 gets out. See RUNBOOK.

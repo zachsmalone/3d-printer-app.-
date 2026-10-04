@@ -16,12 +16,18 @@ iPhone Safari --https--> Cloudflare quick tunnel --> Caddy 127.0.0.1:8480 (passc
 - Auto-shutoff after 120 minutes (change with `--max-minutes N`, 5 to 480). `stop.sh` stops it sooner.
 - Cloudflare **quick tunnels need no account and no money**. Tools live in `/workspace/tools` (not in git): `cloudflared` 2026.9.3 (SHA-256 checked against the official GitHub release: OK) and `caddy` 2.11.6.
 
-## Blocker to read first: this computer may not be able to open the tunnel
+## Blocker to read first: this computer cannot open a working tunnel (tested 2026-10-04)
 
-From this computer, TCP port 7844 (what `cloudflared` uses to reach Cloudflare) **times out**, while port 443 works. `ssh` is not installed, so the ssh-based alternatives (localhost.run, serveo, pinggy) cannot be used either, and port 22 is blocked. I did **not** run the tunnel (as instructed), so I can't say for certain that it fails. Options, in order:
-1. With Zach's OK, run `./probe-tunnel.sh --yes-open-a-probe-tunnel`. It opens a public address for about 20 seconds that points at an empty port (it can only show an error page, no ZEIM, no data) and prints yes/no. If yes, everything below works as written.
-2. If no: ask whoever controls this computer's network egress to allow outbound TCP/UDP 7844 to Cloudflare (`*.argotunnel.com`), or
-3. Run the same test from Zach's own computer using `reports/deploy/local-https/` (home Wi-Fi only, needs trusting a certificate on the phone), or an ssh-capable computer with `ssh -p 443 -R0:localhost:8480 free.pinggy.io` (free, time-limited; not tried).
+**Result: the tunnel does not connect from this computer.** The probe was run with Zach's and Mr. Yami Kato's OK (empty port, about 25 s, shut down, nothing served). Details:
+- `cloudflared` gets an address (that part uses port 443) but never logs `Registered tunnel connection`. Its own pre-check fails for QUIC/UDP and for HTTP/2 over TCP 7844. Tried `--protocol auto`, `http2` and `quic`: all fail. (`http2` also uses 7844, not 443, so there is no 443-only mode.)
+- **Why:** this computer's outbound network only passes TLS (HTTPS) traffic on port 443. Raw TCP on 443 (for example ssh), every other port (22, 80, 7844, 8083) and UDP time out. Hostnames resolve to a placeholder address handled by the egress proxy.
+- Other options checked: `localtunnel` (needs raw TCP to a high port: blocked), `pinggy`/`serveo`/`localhost.run` (need ssh; ssh-on-443 gets no reply because it is not TLS), `bore.pub` (port 7835: blocked), `Tunnelmole` (npm, no account; its client connects to `service.tunnelmole.com:8083`: blocked, so it never produced an address). `ngrok` and `tailscale funnel` need accounts, so they were not tried. A DIY WebSocket tunnel needs a public relay server, which we do not have.
+- Earlier versions of `probe-tunnel.sh` and `start.sh` treated "got an address" as success, which **gave a false yes**. Both now require `Registered tunnel connection`; `start.sh` fails safe and stops everything if it is missing.
+
+So `start.sh` will stop with "could not connect to Cloudflare" on this computer. Options, in order:
+1. Run the test from Zach's own computer (or any computer with open outbound internet): copy this folder and `/workspace/tools/{caddy,cloudflared}` equivalents, or use `reports/deploy/local-https/` (home Wi-Fi only; trust a certificate on the phone).
+2. Ask whoever controls this computer's network egress to allow outbound TCP 7844 (and ideally UDP 7844) to `*.argotunnel.com`, then re-run `./probe-tunnel.sh --yes-open-a-probe-tunnel`.
+3. On a computer with ssh: `ssh -p 443 -R0:localhost:8480 free.pinggy.io` (free, time-limited, run by Pinggy; not tried). Any third-party tunnel sees all traffic including uploaded photos; use sample images only.
 
 ## Preconditions (the gate)
 Do not start until **Haruto has confirmed in HQ** that the first-batch fixes are live: S-01 settings gate, signed-link/base-URL, camera button. `start.sh` refuses to run without `--haruto-confirmed`, so only add that flag after you have seen his confirmation. (Code check on 2026-10-04: the S-01 gate and `PHOTO3D_PUBLIC_BASE_URL` already exist in the repo; the camera button I did not look for.)
