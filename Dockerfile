@@ -1,5 +1,7 @@
-# PROPOSAL - ZEIM (photo3d) container image. Build from the repo root:
-#   docker build -f reports/deploy/Dockerfile -t zeim:dev .
+# ZEIM (photo3d) container image. Build from the repo root:
+#   docker build -t zeim:dev .
+# NOTE (Engineering): this file has NOT been built in CI or on the dev box yet (no docker available there). Treat as
+# reviewed-but-unbuilt until Ops runs the first build.
 #
 # Debian 13 "trixie" is used on purpose: its prusa-slicer package is 2.9.2 (same as the dev box).
 # Debian 12 ships 2.5.x, which may behave differently. Pin by digest before production.
@@ -28,10 +30,9 @@ RUN groupadd --system --gid 10001 zeim \
 
 WORKDIR /app
 
-# Dependencies first for better layer caching. requirements.txt is unpinned today (open question:
-# ask Engineering for a pinned file or lock file so builds are reproducible).
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+# Dependencies first for better layer caching. requirements.txt pins direct deps, constraints.txt pins the whole tree.
+COPY requirements.txt constraints.txt ./
+RUN pip install -r requirements.txt -c constraints.txt
 
 # Application code only (tests/, reports/, data/, outputs/, previews/ are excluded via .dockerignore).
 COPY app ./app
@@ -48,13 +49,15 @@ VOLUME ["/data", "/outputs"]
 USER zeim
 EXPOSE 8765
 
-# There is no /healthz yet (Engineering ask #7). "/" serves static/index.html and is cheap.
-# Switch to /healthz as soon as it exists.
+# /healthz: no auth, no data, no session cookie needed.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/', timeout=4).status==200 else 1)"
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=4).status==200 else 1)"
 
 # ONE worker on purpose: state is JSON files with in-process locks only (no cross-process locking).
 # --proxy-headers/--forwarded-allow-ips trust X-Forwarded-* from the Caddy container on the compose network.
 ENTRYPOINT ["tini", "--"]
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8765", \
-     "--proxy-headers", "--forwarded-allow-ips", "*", "--workers", "1"]
+# HOST=0.0.0.0 is deliberate here: inside the container the app must be reachable by the proxy on the compose network;
+# it is NOT published to the host (compose uses `expose`). The app logs a "no real authentication yet" warning at start-up.
+# FORWARDED_ALLOW_IPS="*" trusts X-Forwarded-* from the proxy container on the private compose network only.
+ENV HOST=0.0.0.0 FORWARDED_ALLOW_IPS="*"
+CMD ["python", "-m", "app.serve"]

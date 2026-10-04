@@ -6,7 +6,17 @@ from fastapi.staticfiles import StaticFiles
 from . import branding
 from .api import builds, community, edit, learn, printing
 from .api import settings as settings_api
+from . import config
 from .config import STATIC
+
+import logging as _logging
+
+_log = _logging.getLogger("uvicorn.error")
+if config.HOST not in config.LOOPBACK_HOSTS:
+    _log.warning("ZEIM is set to listen on %s (not just this computer). There is NO real authentication yet: "
+                 "anyone who can reach this address can use it. Use only on a trusted network.", config.HOST)
+if config.MODE == "local" and config.HOST not in config.LOOPBACK_HOSTS:
+    _log.warning("PHOTO3D_MODE=local while listening beyond this computer: printer/settings changes are open to everyone who can connect.")
 
 app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3")
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,

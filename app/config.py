@@ -66,3 +66,9 @@ SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
 # ---- age gate (Safety S-04) ----
 AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry
 SIGNUP_ATTEMPTS_PER_HOUR_IP = _int("PHOTO3D_SIGNUP_ATTEMPTS_PER_HOUR_IP", 30)
+
+# ---- network binding ----
+# Used by run.sh and `python -m app.serve`. Default = this computer only. 0.0.0.0 is opt-in and logs a warning at start-up.
+HOST = (os.environ.get("HOST") or "127.0.0.1").strip()
+PORT = _int("PORT", 8765)
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
