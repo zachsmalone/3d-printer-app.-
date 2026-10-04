@@ -112,6 +112,7 @@ function showBuild(r) {
   $("#stats").innerHTML = `<span class="pill">${MODE_LABEL[r.mode]}</span><span class="pill">${sz} mm</span>` +
     `<span class="pill">${st.triangles.toLocaleString()} triangles</span><span class="pill">${st.bodies.length} ${st.bodies.length > 1 ? "bodies" : "body"}</span>` +
     `<span class="pill ${st.watertight ? "ok" : "bad"}">${st.watertight ? "✔ watertight" : "✖ not watertight"}</span>`;
+  const bw = (r.info?.warnings || []); $("#buildWarn").hidden = !bw.length; $("#buildWarn").innerHTML = bw.map(w => "⚠ " + esc(w)).join("<br>");
   const notes = r.auto_notes || [];
   $("#autoBox").hidden = !notes.length;
   $("#autoTable").innerHTML = notes.map(n => `<tr><td>${n.label}</td><td><b>${n.value}</b></td><td>${n.why}</td></tr>`).join("");

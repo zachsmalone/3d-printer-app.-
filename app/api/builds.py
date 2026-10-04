@@ -197,6 +197,10 @@ def generate(
         raise HTTPException(400, imagesafe.UNREADABLE)
     if not (5 <= width_mm <= 1000):
         raise HTTPException(400, "width_mm must be 5..1000")
+    try:
+        geometry.check_params(im, mode, {"width_mm": width_mm})          # extreme shapes are refused BEFORE a history slot is touched
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
     with store.lock:  # serialise so concurrent builds can't exceed the cap
         try:

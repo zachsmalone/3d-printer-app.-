@@ -114,8 +114,11 @@ def analyze(m: trimesh.Trimesh) -> dict:
         com = m.center_mass.tolist() if wt and m.volume > 0 else m.centroid.tolist()
     except Exception:
         com = m.centroid.tolist()
+    voids = None
     try:
-        comps = len(m.split(only_watertight=False)) if n < 400_000 else None
+        pieces = m.split(only_watertight=False) if n < 400_000 else None
+        comps = len(pieces) if pieces is not None else None
+        voids = sum(1 for c in pieces if c.is_watertight and c.volume < 0) if pieces is not None else None   # sealed inner cavities
     except Exception:
         comps = None
     return {"triangles": int(n), "vertices": int(len(m.vertices)), "watertight": wt,
@@ -124,7 +127,7 @@ def analyze(m: trimesh.Trimesh) -> dict:
             "volume_mm3": round(vol, 2), "area_mm2": round(float(m.area), 2),
             "size_mm": (hi - lo).round(3).tolist(), "min_mm": lo.round(3).tolist(), "max_mm": hi.round(3).tolist(),
             "center_mm": ((lo + hi) / 2).round(3).tolist(), "center_of_mass_mm": np.round(com, 3).tolist(),
-            "components": comps}
+            "components": comps, "internal_voids": voids}
 
 
 def fill_boundary_loops(m: trimesh.Trimesh, max_loop=20000) -> int:
@@ -277,10 +280,29 @@ def op_simplify(m, p):
     keep = _num(p, "keep_ratio", 0.5, 0.02, 0.98)
     n0 = len(m.faces)
     target = max(8, int(n0 * keep))
-    out = m.simplify_quadric_decimation(face_count=target)
-    out = _check(_new(out.vertices, out.faces))
-    return out, {"before_triangles": n0, "after_triangles": int(len(out.faces)), "watertight": bool(out.is_watertight),
-                 "message": f"{n0:,} → {len(out.faces):,} triangles"}
+    was_ok = bool(m.is_watertight)
+    best = None
+    for agg in (7, 5, 3):                     # gentler settings first fall back when a setting breaks the surface
+        import fast_simplification as fs          # direct call: trimesh's wrapper returned a different (non-manifold) result on flat CAD meshes
+        ov, of = fs.simplify(np.asarray(m.vertices, float), np.asarray(m.faces, np.int64), target_reduction=1 - target / n0, agg=agg)
+        out = _check(_new(ov, of))
+        if out.is_watertight or not was_ok:
+            best = out; break
+    if best is None:
+        raise OpError("Simplify would break this model's surface (it would no longer be watertight), so it was left unchanged. "
+                      "Try Fix (repair) first, or a higher keep ratio.")
+    out = best
+    n1 = len(out.faces)
+    rep = {"before_triangles": n0, "after_triangles": int(n1), "watertight": bool(out.is_watertight),
+           "message": f"{n0:,} → {n1:,} triangles"}
+    wanted, got = 1 - keep, 1 - n1 / n0
+    if got < 0.5 * wanted:                    # the target was not met: say so instead of reporting success
+        rep["note"] = (f"You asked to keep {keep:.0%} of the triangles, but only {got:.0%} could be removed. This model couldn't "
+                       "be simplified further without changing its shape or breaking its surface, so it was left close to the original.")
+        rep["target_met"] = False
+    else:
+        rep["target_met"] = True
+    return out, rep
 
 
 # ------------------------------------------------------------------ booleans
@@ -404,14 +426,36 @@ def op_cut(m, p):
         mm = op_repair(m, {"keep_largest": False})[0]
     cap = bool(mm.is_watertight)
     warn = "" if cap else "Model isn't watertight so the cut faces were left open — run Fix first for a capped cut."
-    parts = []
+    parts, healed = [], False
+
+    def side(n):
+        """One side of the plane. trimesh's capping can leave the cut face open on toothed/holey cross-sections (seen on a gear):
+        then redo it as a boolean with a big box, which is exact; if even that fails the piece is kept and the result says it is open."""
+        nonlocal healed
+        a = mm.slice_plane(origin, n, cap=cap)
+        if a is None or not len(a.faces):
+            return None
+        if cap and not _new(a.vertices, a.faces).is_watertight and have_boolean():
+            try:
+                L = float(np.linalg.norm(mm.extents)) * 2 + 10
+                box = trimesh.creation.box(extents=(L, L, L))
+                box = _transform(_new(box.vertices, box.faces), trimesh.geometry.align_vectors([0, 0, 1], n))
+                box = _transform(box, _mat_translate(np.asarray(origin, float) + n * (L / 2)))
+                b2 = _boolean(mm, box, "intersection")
+                if b2.is_watertight:
+                    healed = True
+                    return b2
+            except OpError:
+                pass
+        return a
+
     if keep in ("above", "both"):
-        a = mm.slice_plane(origin, normal, cap=cap)
-        if a is not None and len(a.faces):
+        a = side(normal)
+        if a is not None:
             parts.append(("above", a, normal))
     if keep in ("below", "both"):
-        b = mm.slice_plane(origin, -normal, cap=cap)
-        if b is not None and len(b.faces):
+        b = side(-normal)
+        if b is not None:
             parts.append(("below", b, -normal))
     if not parts:
         raise OpError("The plane doesn't cut through the model (nothing left on the chosen side).")
@@ -434,10 +478,38 @@ def op_cut(m, p):
     else:
         out = trimesh.util.concatenate([x[1] for x in parts])
     out = _check(_new(out.vertices, out.faces))
-    return out, {"message": f"kept {keep}; {len(parts)} piece(s)" + ((" · " + warn) if warn else ""), "warning": warn}
+    if cap and not out.is_watertight and not warn:       # input was closed but the cut left it open: never report plain success
+        warn = "The cut left the model with an open face, so it is not watertight. Try Fix (repair) on the result, or cut at a different height."
+    return out, {"message": f"kept {keep}; {len(parts)} piece(s)" + ((" · " + warn) if warn else ""), "warning": warn, "watertight": bool(out.is_watertight)}
 
 
 # ------------------------------------------------------------------ hollow
+def _drop_slivers(m, min_cavity_vol: float):
+    """After a boolean: keep the outer solid(s) and real cavities; drop zero-volume bits and sealed pockets too small to matter."""
+    parts = m.split(only_watertight=False)
+    if len(parts) <= 1:
+        return m, 0
+    biggest = max(abs(c.volume) for c in parts)
+    keep = [c for c in parts if (c.volume > 0 and c.volume >= 0.001 * biggest) or (c.volume < 0 and -c.volume >= min_cavity_vol)]
+    if not keep or all(c.volume < 0 for c in keep):
+        return m, 0
+    if len(keep) == len(parts):
+        return m, 0
+    return _new(*(lambda t: (t.vertices, t.faces))(trimesh.util.concatenate(keep))), len(parts) - len(keep)
+
+
+def _measure_wall(outer, cavity, n=2500):
+    """Honest wall thickness: distance from points on the cavity surface to the outer surface (None if it cannot be measured)."""
+    try:
+        pts = cavity.vertices
+        if len(pts) > n:
+            pts = pts[np.random.default_rng(0).choice(len(pts), n, replace=False)]
+        _, dist, _ = trimesh.proximity.closest_point(outer, pts)
+        return float(dist.min())
+    except Exception:
+        return None
+
+
 def op_hollow(m, p):
     """Hollow with wall thickness via a distance field (voxel SDF → marching cubes → boolean difference).
     Accuracy is ~ one voxel, shown in the report. Optional drain hole at the lowest point of the cavity."""
@@ -473,7 +545,14 @@ def op_hollow(m, p):
         cav.invert()
     if not cav.is_watertight or len(cav.faces) == 0:
         raise OpError("Could not build a clean cavity for this shape. Try a different wall thickness.")
-    parts = [c for c in cav.split(only_watertight=False) if c.volume > 0]
+    # marching cubes leaves hundreds of tiny disconnected cavity fragments on thin/detailed shapes: each would become a sealed void
+    # (trapped air, slicer artefacts). Keep only cavity pieces big enough to matter; say how many were dropped.
+    min_cav = (1.5 * wall) ** 3
+    all_parts = [c for c in cav.split(only_watertight=False) if c.volume > 0]
+    parts = [c for c in all_parts if c.volume >= min_cav]
+    dropped = len(all_parts) - len(parts)
+    if not parts:
+        raise OpError("Nothing left to hollow with this wall thickness (only tiny pockets would remain). Try a thinner wall.")
     cav = trimesh.util.concatenate(parts) if len(parts) > 1 else parts[0]
     out = _boolean(mm, cav, "difference")
     if drain > 0:
@@ -483,10 +562,17 @@ def op_hollow(m, p):
         cyl = trimesh.creation.cylinder(radius=drain / 2, height=z1 - z0, sections=48)
         cyl = _new(cyl.vertices + [xy[0], xy[1], (z0 + z1) / 2], cyl.faces)
         out = _boolean(out, cyl, "difference")
+    out, floating = _drop_slivers(out, min_cav)
+    wall_min = _measure_wall(mm, cav)
+    rep_extra = {"cavity_fragments_dropped": dropped, "floating_pieces_dropped": floating,
+                 "thinnest_wall_mm": None if wall_min is None else round(wall_min, 2)}
+    if wall_min is not None and wall_min < 0.75 * wall:
+        rep_extra["note"] = (f"The thinnest wall is about {wall_min:.1f} mm, less than the {wall:g} mm you asked for "
+                             "(thin or very detailed parts of the shape). It may print badly: try a thicker wall or check it in your slicer.")
     saved = 100 * (1 - out.volume / mm.volume) if out.volume > 0 else 0
     return out, {"message": f"hollowed: wall {wall:g} mm, volume −{saved:.0f}% (resolution ≈ {pitch:.2f} mm)"
                  + (f", drain hole Ø{drain:g}" if drain else ""), "resolution_mm": round(pitch, 3),
-                 "volume_saved_pct": round(saved, 1)}
+                 "volume_saved_pct": round(saved, 1), **rep_extra}
 
 
 # ------------------------------------------------------------------ text

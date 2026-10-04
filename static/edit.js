@@ -85,7 +85,7 @@ function loadProject(p, keepCamera = false) {
   const a = p.analysis;
   $("#editStats").innerHTML = `<span class="pill">${a.size_mm.map(x => fmt(x)).join(" × ")} ${E.unit}</span><span class="pill">${a.triangles.toLocaleString()} triangles</span>` +
     `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${a.watertight ? "ok" : "bad"}">${a.watertight ? "✔ watertight" : "✖ not watertight"}</span>` +
-    (p.preview.decimated ? `<span class="pill" title="Exports use the full mesh">preview simplified</span>` : "");
+    (a.internal_voids ? `<span class="pill bad" title="A sealed hollow inside the model. Hollow with a drain hole is intended; unexpected voids trap air or resin">${a.internal_voids} sealed void${a.internal_voids > 1 ? "s" : ""}</span>` : "") + (a.components > 1 ? `<span class="pill" title="Separate pieces in this model">${a.components} pieces</span>` : "") + (p.preview.decimated ? `<span class="pill" title="Exports use the full mesh">preview simplified</span>` : "");
   $("#editVis").value = p.visibility || "private";
   $("#eUndo").disabled = !p.can_undo; $("#eRedo").disabled = !p.can_redo;
   const msgs = [...(p.warnings || [])]; if (p.report?.message) msgs.unshift(p.report.message);

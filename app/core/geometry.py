@@ -17,6 +17,10 @@ from scipy.cluster.vq import kmeans2
 from . import thumbnail
 
 MAX_RES = 600
+MAX_CELLS = MAX_RES * MAX_RES        # total grid cells (~2 triangles each, x2 for the base): a 10x1000 px strip used to make 4 million triangles
+MAX_ASPECT = 20.0                    # longer/shorter side: beyond this the picture is refused with a plain message
+WARN_ASPECT = 6.0
+MIN_BASE_MM = 0.2                    # a base thinner than this is not a printable layer
 
 
 @dataclass
@@ -62,6 +66,9 @@ def load_image(data: bytes) -> Image.Image:
 def _resize(im: Image.Image, nx: int) -> Image.Image:
     nx = int(np.clip(nx, 16, MAX_RES))
     ny = max(2, int(round(nx * im.height / im.width)))
+    if nx * ny > MAX_CELLS:                      # keep the proportions, lose detail instead of making a gigantic file
+        k = (MAX_CELLS / (nx * ny)) ** 0.5
+        nx, ny = max(16, int(nx * k)), max(2, int(ny * k))
     return im.resize((nx, ny), Image.LANCZOS)
 
 
@@ -184,11 +191,11 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
         g = 1 - g
     thick = max_thickness - (max_thickness - min_thickness) * g  # bright -> thin
     ny, nx = thick.shape
-    pitch = width_mm / (nx - 1)
     pad = 0
     if border_mm > 0:
-        pad = max(1, int(round(border_mm / pitch)))
+        pad = max(1, int(round(border_mm / (width_mm / (nx - 1)))))
         thick = np.pad(thick, pad, constant_values=max_thickness)
+    pitch = width_mm / (nx - 1 + 2 * pad)          # width_mm is the OUTSIDE width: picture + border together (it used to be picture only)
     v, f = heightfield_solid(thick, pitch)
     m = Model([Body("lithophane", v, f)], "lithophane")
     m.info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4), border_cells=pad)
@@ -313,4 +320,30 @@ def build(im: Image.Image, mode: str, params: dict) -> Model:
     fn = {"lithophane": lithophane, "relief": relief, "popart": popart}.get(mode)
     if fn is None:
         raise ValueError(f"unknown mode {mode!r}")
-    return fn(im, **params)
+    params, warnings = check_params(im, mode, params)
+    m = fn(im, **params)
+    if warnings:
+        m.info = {**(m.info or {}), "warnings": warnings}
+    return m
+
+
+def check_params(im: Image.Image, mode: str, params: dict) -> tuple[dict, list]:
+    """Refuse or warn about settings that silently produce something unprintable (mesh audit, Ren Ishikawa, 2026-10-04)."""
+    params = dict(params); warnings = []
+    long_, short = max(im.width, im.height), max(1, min(im.width, im.height))
+    ratio = long_ / short
+    if ratio > MAX_ASPECT:
+        raise ValueError(f"This picture is very long and thin ({im.width} × {im.height} pixels). Crop it to a shape that is less than "
+                         f"{MAX_ASPECT:g} times longer than wide, then try again.")
+    w = float(params.get("width_mm", 100.0))
+    if ratio > WARN_ASPECT:
+        shortmm = w * min(im.width, im.height) / max(im.width, im.height) if im.width >= im.height else w * im.width / im.height
+        warnings.append(f"This picture is long and thin, so the model is {w:g} × {w * im.height / im.width:.0f} mm "
+                        f"(or the other way round). Check that is the shape you want." + (f" The short side is only {shortmm:.1f} mm: fine details won't print." if shortmm < 10 else ""))
+    if mode in ("relief", "popart") and float(params.get("base_mm", 2.0)) < MIN_BASE_MM:
+        warnings.append(f"A base of {float(params.get('base_mm', 0)):g} mm can't be printed, so {MIN_BASE_MM:g} mm was used.")
+        params["base_mm"] = MIN_BASE_MM
+    nx = int(np.clip(params.get("resolution", 200), 16, MAX_RES)); ny = int(round(nx * im.height / im.width))
+    if nx * ny > MAX_CELLS:
+        warnings.append("Detail was reduced so the file stays a sensible size.")
+    return params, warnings
