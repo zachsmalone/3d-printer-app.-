@@ -33,6 +33,19 @@ def base_url(request) -> str:
     return config.PUBLIC_BASE_URL or load().get("public_base_url") or str(request.base_url).rstrip("/")
 
 
+def trusted_base_url(request) -> str | None:
+    """Like base_url(), but NEVER built from a client-supplied Host header unless that header is a loopback name
+    (someone browsing on this computer). None = nothing trustworthy is configured: ask an admin to set the public address."""
+    configured = config.PUBLIC_BASE_URL or load().get("public_base_url")
+    if configured:
+        return configured
+    host = (request.headers.get("host") or "").strip().lower()
+    host = host[1:host.index("]")] if host.startswith("[") and "]" in host else host.split(":")[0]
+    if host in config.LOOPBACK_HOSTS or host in config.LOCAL_HOSTS:
+        return str(request.base_url).rstrip("/")
+    return None
+
+
 def public(s: dict | None = None, redact: bool = False) -> dict:
     """Settings safe to send to the browser (API keys masked). `redact=True` (visitors without settings rights in
     shared mode, and class students) also hides printer addresses."""

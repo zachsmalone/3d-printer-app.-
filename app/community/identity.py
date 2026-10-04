@@ -45,11 +45,18 @@ def age_of(user: dict, today: date | None = None) -> int:
     return t.year - d.year - ((t.month, t.day) < (d.month, d.day))
 
 
+def cookie_args(request: Request) -> dict:
+    """Flags for every cookie we set: HttpOnly, SameSite=Lax, and Secure whenever the page came over https (PHOTO3D_COOKIE_SECURE=true|false|auto)."""
+    mode = config.COOKIE_SECURE
+    secure = True if mode in ("1", "true", "yes", "on") else False if mode in ("0", "false", "no", "off") else request.url.scheme == "https"
+    return {"httponly": True, "samesite": "lax", "secure": secure}
+
+
 def get_actor(request: Request, response: Response) -> Actor:
     sid = request.cookies.get(COOKIE)
     if not sid or len(sid) < 16:
         sid = secrets.token_urlsafe(24)
-        response.set_cookie(COOKIE, sid, max_age=3600 * 24 * 365, httponly=True, samesite="lax")
+        response.set_cookie(COOKIE, sid, max_age=3600 * 24 * 365, **cookie_args(request))
     return Actor(sid, USERS.read().get(sid))
 
 
@@ -63,12 +70,17 @@ def _blk(sid: str) -> str:
     return hashlib.sha256(("age:" + sid).encode()).hexdigest()[:24]
 
 
-def age_locked(sid: str, marker_cookie: str | None = None) -> bool:
-    """True if this browser session (or this browser's marker cookie) got a "can't sign up" result recently."""
+def _blk_ip(ip: str) -> str:
+    import hashlib
+    return hashlib.sha256(("ageip:" + ip).encode()).hexdigest()[:24]
+
+
+def age_locked(sid: str, marker_cookie: str | None = None, ip: str = "") -> bool:
+    """True if this browser session, this browser's marker cookie, or this network address got a "can't sign up" result recently."""
     import time
     from .store import AGE_BLOCKS
-    until = AGE_BLOCKS.read().get(_blk(sid), 0)
-    if until > time.time():
+    blocks = AGE_BLOCKS.read()
+    if blocks.get(_blk(sid), 0) > time.time() or (ip and config.AGE_IP_LOCK_MINUTES > 0 and blocks.get(_blk_ip(ip), 0) > time.time()):
         return True
     try:
         return bool(marker_cookie) and float(marker_cookie) > time.time()
@@ -76,16 +88,19 @@ def age_locked(sid: str, marker_cookie: str | None = None) -> bool:
         return False
 
 
-def lock_age(sid: str) -> float:
+def lock_age(sid: str, ip: str = "") -> float:
     import time
     from .store import AGE_BLOCKS
     until = time.time() + config.AGE_LOCK_HOURS * 3600
+    ip_until = time.time() + config.AGE_IP_LOCK_MINUTES * 60
 
     def f(d):
         now = time.time()
         for k in [k for k, v in d.items() if v < now]:      # forget expired locks
             del d[k]
         d[_blk(sid)] = until
+        if ip and config.AGE_IP_LOCK_MINUTES > 0:
+            d[_blk_ip(ip)] = ip_until              # hashed address, short: clearing cookies must not allow an instant retry
     AGE_BLOCKS.update(f)
     return until
 

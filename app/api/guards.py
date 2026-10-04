@@ -14,21 +14,50 @@ from ..community import classrooms
 from ..community.identity import Actor
 
 
+_PROXY_HEADERS = ("x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "forwarded", "x-real-ip", "cf-connecting-ip", "cf-ray", "via")
+
+
+def is_this_computer(request: Request) -> bool:
+    """True only for a request that really comes from the machine running ZEIM: loopback peer, loopback Host, no proxy/tunnel headers.
+    (A tunnel adds forwarding headers and a public Host, so it is never 'this computer'.)"""
+    if any(h in request.headers for h in _PROXY_HEADERS):
+        return False
+    host = (request.headers.get("host") or "").strip().lower()
+    host = host[1:host.index("]")] if host.startswith("[") and "]" in host else host.split(":")[0]
+    peer = request.client.host if request.client else ""
+    return host in config.LOCAL_HOSTS and peer in config.LOCAL_CLIENTS
+
+
+def is_owner(request: Request) -> bool:
+    """The machine's owner: local mode AND the request comes from this computer. (Local mode over a tunnel/LAN is NOT the owner.)"""
+    return config.MODE == "local" and is_this_computer(request)
+
+
 def is_admin(request: Request) -> bool:
     tok = request.headers.get("x-admin-token", "")
-    return bool(config.ADMIN_TOKEN) and hmac.compare_digest(tok.encode(), config.ADMIN_TOKEN.encode())
+    if not tok or not config.ADMIN_TOKEN:
+        return False
+    from ..core import ratelimit
+    from .textcap import ip
+    key = "admintok:" + ip(request)
+    if ratelimit.count(key, 600) >= config.ADMIN_FAIL_LIMIT:         # too many wrong guesses: even the right token waits
+        raise HTTPException(429, "Too many wrong admin tokens from this address. Try again in a few minutes.")
+    if hmac.compare_digest(tok.encode(), config.ADMIN_TOKEN.encode()):
+        return True
+    ratelimit.hit(key, 10 ** 6, 600)
+    return False
 
 
 def can_see_printer_urls(request: Request, actor: Actor) -> bool:
     if classrooms.is_student(actor.sid):
         return False
-    return config.MODE == "local" or is_admin(request)
+    return is_owner(request) or is_admin(request)
 
 
 def require_settings_admin(request: Request, actor: Actor):
     if classrooms.is_student(actor.sid):
         raise HTTPException(403, "Your teacher manages printers and settings.")
-    if config.MODE == "local" or is_admin(request):
+    if is_owner(request) or is_admin(request):
         return
     raise HTTPException(403, "Server settings can only be changed by the server admin (X-Admin-Token) on a shared server.")
 
@@ -40,7 +69,7 @@ def _role(request: Request, actor: Actor) -> str:
         return "student"
     if actor.user:
         return "adult" if actor.is_adult else "teen"
-    if is_admin(request) or config.MODE == "local":
+    if is_admin(request) or is_owner(request):
         return "adult"
     return "teen"
 

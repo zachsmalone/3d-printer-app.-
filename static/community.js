@@ -221,6 +221,7 @@ async function openTeacher() {
     rooms.map(r => `<div class="printer"><div class="row" style="justify-content:space-between"><b>${esc(r.name)}</b><span>Code: <code style="font-size:15px">${r.code}</code> <button class="btn small ghost" data-cp="${r.code}">Copy code</button> <button class="btn small ghost" data-cl="${r.code}">Copy join link</button></span></div>
       <div class="row"><img src="/api/classrooms/${r.code}/qr.svg" alt="QR code to join ${esc(r.name)}" width="120" height="120" style="background:#fff;border-radius:8px"><span class="help">Scan to open the join page for code <b>${r.code}</b>. Link: <code>${esc(location.origin)}/#join/${r.code}</code> · <a href="/api/classrooms/${r.code}/qr.svg" target="_blank">open QR to print</a></span></div>
       ${r.notifications.length ? `<div class="banner">${r.notifications.map(n => `🔔 ${esc(n.from_name)}: ${esc(n.text)}`).join("<br>")} <button class="btn small" data-rd="${r.code}">Mark read</button></div>` : ""}
+      ${r.failed_joins_last_hour ? `<div class="banner">${r.failed_joins_last_hour} wrong password tries in the last hour. If students can't get in, <button class="btn small" data-unlock="${r.code}">Unlock joining</button></div>` : ""}
       <div class="sendsw"><label class="sw"><input type="checkbox" role="switch" data-send="${r.code}" ${r.send_enabled ? "checked" : ""} aria-describedby="sw_${r.code}"> <b>Let students send files to other apps</b> <span class="state">${r.send_enabled ? "On" : "Off"}</span></label>
         <p class="help" id="sw_${r.code}">${r.send_enabled ? `On since ${esc(new Date(r.send_changed).toLocaleString())}. Turn off any time.` : "Off: students can download their own build and send it to you. Nothing else leaves ZEIM."} Why: a build made from a photo contains that photo. Students under 13 can never use outside apps, even if this is on.</p></div>
       <p class="help">Assign: ${ls.lessons.map(l => `<label class="inl"><input type="checkbox" data-as="${r.code}" value="${l.id}" ${r.assigned.includes(l.id) ? "checked" : ""}> ${esc(l.title)}</label>`).join(" ")}</p>
@@ -234,6 +235,7 @@ async function openTeacher() {
     const t = e.target;
     if (t.dataset.cp) navigator.clipboard?.writeText(t.dataset.cp), toast("Code copied", "ok");
     if (t.dataset.cl) navigator.clipboard?.writeText(location.origin + "/#join/" + t.dataset.cl), toast("Join link copied (password not included)", "ok");
+    if (t.dataset.unlock) { await api(`/api/classrooms/${t.dataset.unlock}/unlock-joins`, J("POST")); toast("Joining unlocked", "ok"); openTeacher(); }
     if (t.dataset.rd) { await api(`/api/classrooms/${t.dataset.rd}/notifications/read`, J("POST")); openTeacher(); }
     if (t.dataset.talk) { const [c, sid] = t.dataset.talk.split(":"); try { await api(`/api/classrooms/${c}/requests`, J("POST", { kind: "talk_next_class", to: sid })); toast("Request sent", "ok"); } catch (er) { toast(er.message, "err"); } }
     if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }

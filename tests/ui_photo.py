@@ -32,7 +32,7 @@ with sync_playwright() as p:
     ok("phone: Beginner auto-builds after choosing a photo", pg.locator("#result").is_visible())
     ok("phone: 'Change photo' link visible", pg.locator("#changePhoto").is_visible())
     pg.screenshot(path="previews/photo_phone_built.png")
-    pg.set_input_files("#sFile", heic); pg.wait_for_timeout(300); pg.wait_for_function("document.querySelector('#makingLine').hidden", timeout=60000)
+    pg.set_input_files("#sFile", heic); pg.wait_for_timeout(300); pg.wait_for_selector("#makingLine", state="hidden", timeout=60000)      # (no string eval: the page has a CSP without unsafe-eval)
     ok("phone: HEIC photo builds (no error message)", pg.locator("#sMsg").is_hidden())
     pg.set_input_files("#sFile", bad); pg.wait_for_selector("#sMsg:not([hidden])", timeout=30000); pg.wait_for_timeout(2500)
     ok("phone: unreadable photo -> persistent inline message", "couldn't open that photo" in pg.inner_text("#sMsg") and pg.locator("#sMsg").is_visible(), pg.inner_text("#sMsg"))

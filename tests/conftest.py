@@ -15,3 +15,13 @@ def _reset_rate_limits():
     ratelimit.reset()
     yield
     ratelimit.reset()
+
+
+@pytest.fixture(autouse=True)
+def _test_client_counts_as_this_computer(monkeypatch):
+    """In local mode only loopback requests are the owner; the TestClient presents itself as host 'testserver' / peer 'testclient'."""
+    from app import config
+    monkeypatch.setattr(config, "LOCAL_CLIENTS", tuple(config.LOCAL_CLIENTS) + ("testclient",))
+    monkeypatch.setattr(config, "LOCAL_HOSTS", tuple(config.LOCAL_HOSTS) + ("testserver",))
+    monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 0)       # the per-address age lock is tested explicitly; the many tests that share the address "testclient" must not trip it
+    yield

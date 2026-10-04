@@ -85,7 +85,9 @@ def room_qr(code: str, request: Request, actor: Actor = Depends(get_actor)):
         raise HTTPException(404)
     if role != "teacher":
         raise HTTPException(404)
-    base = settings.base_url(request)
+    base = settings.trusted_base_url(request)
+    if not base:
+        raise HTTPException(409, "Set the site's public address (Settings, or PHOTO3D_PUBLIC_BASE_URL) before making a QR code.")
     return Response(classrooms.qr_svg(base, room["code"]), media_type="image/svg+xml")
 
 
@@ -112,6 +114,15 @@ def class_send_switch(code: str, body: dict, actor: Actor = Depends(get_actor)):
         return classrooms.set_send(actor, code, on)
     except KeyError:
         raise HTTPException(404)
+
+
+@router.post("/classrooms/{code}/unlock-joins")
+def unlock_joins(code: str, actor: Actor = Depends(get_actor)):
+    try:
+        classrooms.unlock_joins(actor, code)
+    except KeyError:
+        raise HTTPException(404)
+    return {"ok": True}
 
 
 @router.post("/classrooms/{code}/assign")

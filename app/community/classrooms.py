@@ -88,31 +88,65 @@ def check_new_password(password):
 
 
 # ---- join-guess limiter: keyed by class code + network address (NOT by cookie: clearing cookies must not reset it) ----
-_LOCKS: dict = {}       # (code, ip) -> (locked_until, strikes)
-JOIN_FAILS, JOIN_WINDOW = 5, 600           # 5 wrong passwords in 10 min -> lockout for this address on this class
+# After a few wrong passwords the (class, address) pair goes into SLOW MODE: only one password try is evaluated per
+# SLOW_BASE seconds (doubling on each further wrong try, up to SLOW_MAX). The right password is NEVER refused outright:
+# a student who knows it gets in as soon as the next slot opens, so one prankster on a shared school address cannot lock a
+# class out, while the guessing rate stays at <= 2 tries a minute (and falls to 1 in 5 minutes under repeated misses).
+# Teachers can also press "Unlock joining" (unlock_joins).
+_LOCKS: dict = {}       # (code, ip) -> {"next_ok": ts, "strikes": n, "last_fail": ts}
+JOIN_FAILS, JOIN_WINDOW = 5, 600           # 5 wrong passwords in 10 min -> slow mode for this address on this class
 JOIN_IP_FAILS = 20                         # ...or 20 wrong guesses from one address across ALL classes in 10 min
-LOCK_BASE, LOCK_MAX = 300, 24 * 3600       # lockout 5 min, doubling on each repeat, at most 24 h
+SLOW_BASE, SLOW_MAX = 30, 300
 _DUMMY_HASH = None
 
 
+def _slow_state(code: str, ip: str):
+    st = _LOCKS.get((code, ip))
+    if st and time.time() - st["last_fail"] > JOIN_WINDOW + SLOW_MAX:      # quiet for a while: forgive
+        _LOCKS.pop((code, ip), None)
+        return None
+    return st
+
+
 def _locked_for(code: str, ip: str) -> float:
-    until, _ = _LOCKS.get((code, ip), (0, 0))
-    return max(0.0, until - time.time())
+    """Seconds until the next password try from this address on this class will be evaluated (0 = now)."""
+    st = _slow_state(code, ip)
+    return max(0.0, st["next_ok"] - time.time()) if st else 0.0
 
 
 def _note_fail(code: str, ip: str):
     from ..core import ratelimit
+    now = time.time()
+    st = _slow_state(code, ip)
+    ratelimit.hit(f"joinfail-code:{code}", 10 ** 6, 3600)       # only used to tell the teacher how many wrong tries there were
+    if st:                                                        # already in slow mode: back off further
+        st["strikes"] += 1
+        st["next_ok"] = now + min(SLOW_MAX, SLOW_BASE * 2 ** st["strikes"])
+        st["last_fail"] = now
+        return
     ratelimit.hit(f"joinfail:{code}:{ip}", 10 ** 6, JOIN_WINDOW)
     ratelimit.hit(f"joinfail-ip:{ip}", 10 ** 6, JOIN_WINDOW)
-    ratelimit.hit(f"joinfail-code:{code}", 10 ** 6, 3600)       # only used to tell the teacher how many wrong tries there were
     if (ratelimit.count(f"joinfail:{code}:{ip}", JOIN_WINDOW) >= JOIN_FAILS
             or ratelimit.count(f"joinfail-ip:{ip}", JOIN_WINDOW) >= JOIN_IP_FAILS):
-        _, strikes = _LOCKS.get((code, ip), (0, 0))
-        _LOCKS[(code, ip)] = (time.time() + min(LOCK_MAX, LOCK_BASE * 2 ** strikes), strikes + 1)
+        _LOCKS[(code, ip)] = {"next_ok": now + SLOW_BASE, "strikes": 0, "last_fail": now}
         ratelimit.clear(f"joinfail:{code}:{ip}")
         if len(_LOCKS) > 20000:
-            for k in [k for k, v in _LOCKS.items() if v[0] < time.time()][:5000]:
+            for k in [k for k, v in _LOCKS.items() if now - v["last_fail"] > JOIN_WINDOW + SLOW_MAX][:5000]:
                 _LOCKS.pop(k, None)
+
+
+def unlock_joins(actor: Actor, code: str):
+    """Teacher button: forget all wrong-password counts and slow modes for this class."""
+    from ..core import ratelimit
+    code = (code or "").strip().upper()
+    room = CLASSROOMS.read().get(code)
+    if not room or room["teacher_sid"] != actor.sid:
+        raise KeyError(code)
+    for k in [k for k in _LOCKS if k[0] == code]:
+        _LOCKS.pop(k, None)
+    ratelimit.clear_prefix(f"joinfail:{code}:")
+    ratelimit.clear(f"joinfail-code:{code}")
+    _audit.info("class joins unlocked: class=%s", code)
 
 
 def recent_failed_joins(code: str) -> int:
@@ -132,17 +166,18 @@ def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", 
     if not NICK.match(nick):
         raise ValueError("Nickname must be 2-20 letters/numbers. Do NOT use your real full name.")
     safety.filter_only(nick, "Nickname")
-    wait = _locked_for(code, ip)
-    if wait > 0:
-        raise PermissionError(f"Too many wrong passwords from this network. Try again in {int(wait // 60) + 1} minutes, or ask your teacher.")
-    # Check the password OUTSIDE the store lock (scrypt is slow), against a dummy hash for unknown classes (same timing/answer).
     room0 = CLASSROOMS.read().get(code)
+    wait = _locked_for(code, ip)
+    if wait > 0 and not (room0 and sid in room0["students"]):          # a student already in this class is never slowed down
+        raise PermissionError(f"Lots of wrong passwords were tried from this network. Please wait {int(wait) + 1} seconds and try again, or ask your teacher.")
+    # Check the password OUTSIDE the store lock (scrypt is slow), against a dummy hash for unknown classes (same timing/answer).
     if _DUMMY_HASH is None:
         _DUMMY_HASH = _hash("not-a-real-password")
     ok = _verify(password, room0["pw"] if room0 else _DUMMY_HASH) and room0 is not None
     if not ok:
         _note_fail(code, ip)
         raise KeyError(code)               # same answer for "no such class" and "wrong password"
+    _LOCKS.pop((code, ip), None)           # the right password proves the person knows it: no slow-down for the next student
     out = {}
 
     def f(d):

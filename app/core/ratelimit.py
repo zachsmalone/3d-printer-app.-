@@ -40,6 +40,12 @@ def clear(key: str):
         _hits.pop(key, None)
 
 
+def clear_prefix(prefix: str):
+    with _lock:
+        for k in [k for k in _hits if k.startswith(prefix)]:
+            _hits.pop(k, None)
+
+
 def reset():
     with _lock:
         _hits.clear()

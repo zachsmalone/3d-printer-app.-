@@ -36,12 +36,12 @@ def me(request: Request, actor: Actor = Depends(get_actor)):
     return {**idn.public_profile(actor), "send": guards.send_caps(request, actor)}
 
 
-def _age_refusal(actor: Actor, lock: bool):
+def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
     """Same neutral answer for 'too young' and 'already refused': no threshold, no hint that retrying differs."""
-    until = idn.lock_age(actor.sid) if lock else None
+    until = idn.lock_age(actor.sid, ip) if lock else None
     r = JSONResponse(status_code=403, content={"detail": idn.AGE_MESSAGE})
     if until:
-        r.set_cookie(idn.AGE_COOKIE, str(until), max_age=config.AGE_LOCK_HOURS * 3600, httponly=True, samesite="lax")
+        r.set_cookie(idn.AGE_COOKIE, str(until), max_age=config.AGE_LOCK_HOURS * 3600, **(idn.cookie_args(request) if request else {"httponly": True, "samesite": "lax"}))
     return r
 
 
@@ -49,14 +49,14 @@ def _age_refusal(actor: Actor, lock: bool):
 def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
     if not ratelimit.hit("signup:" + _ip(request), config.SIGNUP_ATTEMPTS_PER_HOUR_IP, 3600):
         raise HTTPException(429, "Too many tries from this network. Please wait a while.")
-    if not actor.user and idn.age_locked(actor.sid, request.cookies.get(idn.AGE_COOKIE)):
-        return _age_refusal(actor, lock=False)
+    if not actor.user and idn.age_locked(actor.sid, request.cookies.get(idn.AGE_COOKIE), _ip(request)):
+        return _age_refusal(actor, lock=False, request=request)
     try:
         name = text_in(body.get("display_name", ""), 40, "Display name")
         safety.filter_only(name, "Display name")
         idn.signup(actor, name, str(body.get("dob", ""))[:12])
     except PermissionError:
-        return _age_refusal(actor, lock=True)
+        return _age_refusal(actor, lock=True, ip=_ip(request), request=request)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return idn.public_profile(Actor(actor.sid, USERS.read()[actor.sid]))

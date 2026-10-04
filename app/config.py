@@ -64,6 +64,8 @@ RECOVERY_FAIL_LIMIT = _int("PHOTO3D_RECOVERY_FAIL_LIMIT", 5)         # wrong rec
 SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
 
 # ---- age gate (Safety S-04) ----
+AGE_IP_LOCK_MINUTES = _int("PHOTO3D_AGE_IP_LOCK_MINUTES", 30)  # ...and this network address can't retry for a while either (clearing cookies must not help).
+                                                             # Trade-off: a shared school address blocks other sign-ups for this long. 0 = off.
 AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry
 SIGNUP_ATTEMPTS_PER_HOUR_IP = _int("PHOTO3D_SIGNUP_ATTEMPTS_PER_HOUR_IP", 30)
 
@@ -72,3 +74,12 @@ SIGNUP_ATTEMPTS_PER_HOUR_IP = _int("PHOTO3D_SIGNUP_ATTEMPTS_PER_HOUR_IP", 30)
 HOST = (os.environ.get("HOST") or "127.0.0.1").strip()
 PORT = _int("PORT", 8765)
 LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1")
+# "local" mode only trusts a request that really comes from this computer: peer address AND Host header are loopback and there
+# are no proxy/tunnel headers. Anything else (a tunnel, a LAN visitor) is treated like shared mode.
+LOCAL_CLIENTS = ("127.0.0.1", "::1", "localhost")
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
+ADMIN_FAIL_LIMIT = _int("PHOTO3D_ADMIN_FAIL_LIMIT", 10)       # wrong admin tokens per 10 min per address, then 429 (even for the right one)
+
+# ---- web hardening (Safety re-check 1) ----
+API_DOCS = _flag("PHOTO3D_API_DOCS", False)            # /docs, /redoc, /openapi.json are off unless asked for (they list every route)
+COOKIE_SECURE = (os.environ.get("PHOTO3D_COOKIE_SECURE") or "auto").strip().lower()   # auto = Secure when the request arrived over https

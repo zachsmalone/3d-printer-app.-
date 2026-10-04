@@ -43,7 +43,8 @@ if not _aud.handlers:
     _h = _logging.StreamHandler(); _h.setFormatter(_logging.Formatter("%(asctime)s AUDIT %(message)s"))
     _aud.addHandler(_h); _aud.setLevel(_logging.INFO); _aud.propagate = False
 
-app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3")
+_docs = {} if config.API_DOCS else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3", **_docs)
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages):
     app.include_router(r)
@@ -72,6 +73,39 @@ async def limit_json_body(request: Request, call_next):
     return await call_next(request)
 
 
+def _inline_script_hashes() -> str:
+    """CSP hashes of the few inline <script> blocks our own pages have (the importmap, the share-test page) so no 'unsafe-inline' is needed for scripts."""
+    import base64, hashlib, re
+    out = []
+    for f in ("index.html", "sharetest.html"):
+        try:
+            html = (STATIC / f).read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S):
+            out.append("'sha256-" + base64.b64encode(hashlib.sha256(m.group(1).encode()).digest()).decode() + "'")
+    return " ".join(out)
+
+
+CSP = ("default-src 'self'; script-src 'self' " + _inline_script_hashes() + "; style-src 'self' 'unsafe-inline'; "
+       "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; worker-src 'self' blob:; "
+       "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    h = resp.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "no-referrer")
+    h.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=(), payment=()")
+    h.setdefault("Content-Security-Policy", CSP)
+    if request.url.scheme == "https":
+        h.setdefault("Strict-Transport-Security", "max-age=15552000")
+    return resp
+
+
 @app.middleware("http")
 async def ensure_session_cookie(request: Request, call_next):
     """Give every visitor a session id on their FIRST request (even if that request fails), so rate limits and
@@ -90,7 +124,8 @@ async def ensure_session_cookie(request: Request, call_next):
         raw.append((b"cookie", ((existing[0].decode() + "; ") if existing else "").encode() + f"{COOKIE}={new}".encode()))
     resp = await call_next(request)
     if new:
-        resp.set_cookie(COOKIE, new, max_age=3600 * 24 * 365, httponly=True, samesite="lax")
+        from .community.identity import cookie_args
+        resp.set_cookie(COOKIE, new, max_age=3600 * 24 * 365, **cookie_args(request))
     return resp
 
 

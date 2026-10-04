@@ -54,22 +54,53 @@ def test_s04_signup_attempts_rate_limited(monkeypatch):
 # ---------------------------------------------------------------- S-05 join guessing
 def test_s05_guesses_limited_per_class_and_address_not_per_cookie():
     t, code, pw = make_class()
-    codes = [join(TestClient(app), code, f"wrong-guess-{n}", "Robo9").status_code for n in range(7)]       # NEW cookie every time
-    assert codes[:5] == [404] * 5 and codes[5:] == [429, 429], codes
-    assert join(TestClient(app), code, pw, "Robo9").status_code == 429                                      # even the right password is refused while locked
+    codes = [join(TestClient(app), code, f"wrong-guess-{n}", "Robo9").status_code for n in range(8)]       # NEW cookie every time
+    assert codes[:5] == [404] * 5 and codes[5:] == [429] * 3, codes                                          # slow mode: no 6th guess is even evaluated
     assert t.get("/api/classrooms").json()["rooms"][0]["failed_joins_last_hour"] == 5                      # teacher can see it happened
+    classrooms._LOCKS.clear()
 
 
-def test_s05_lockout_backs_off_and_does_not_block_other_addresses(monkeypatch):
+def test_s05_slow_mode_never_locks_the_class_out_the_right_password_gets_in(monkeypatch):
+    """Kenji re-check: one prankster on a shared school address must not lock the class out."""
     t, code, pw = make_class()
     for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
-    assert classrooms._locked_for(code, "testclient") >= classrooms.LOCK_BASE - 5
-    assert classrooms._locked_for(code, "10.9.9.9") == 0                                                    # other students (other addresses) unaffected
-    ok = join(TestClient(app), code, pw, "Zed7"); assert ok.status_code == 429
-    # lock expires, then a repeat offence doubles it
-    real = time.time; monkeypatch.setattr(time, "time", lambda: real() + classrooms.LOCK_BASE + 5)
-    for n in range(5): join(TestClient(app), code, f"bad-guess-b{n}", "Zed7")
-    assert classrooms._locked_for(code, "testclient") > classrooms.LOCK_BASE * 1.5
+    assert 0 < classrooms._locked_for(code, "testclient") <= classrooms.SLOW_BASE
+    assert classrooms._locked_for(code, "10.9.9.9") == 0                                                    # other addresses unaffected
+    assert join(TestClient(app), code, pw, "Zed7").status_code == 429                                        # within the first slot: asked to wait, nothing evaluated
+    real = time.time; monkeypatch.setattr(time, "time", lambda: real() + classrooms.SLOW_BASE + 2)         # ...the next slot opens
+    assert join(TestClient(app), code, pw, "Zed7").status_code == 200                                        # the right password gets in
+    assert classrooms._locked_for(code, "testclient") == 0                                                   # and the slow-down is gone for the next student
+    assert join(TestClient(app), code, pw, "Zed8").status_code == 200
+
+
+def test_s05_slow_mode_keeps_guessing_slow_and_backs_off(monkeypatch):
+    t, code, pw = make_class()
+    for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
+    real = time.time; offset = [0]; monkeypatch.setattr(time, "time", lambda: real() + offset[0])
+    waits = []
+    for n in range(5):                                                                                       # an attacker who guesses at every slot
+        offset[0] += classrooms._locked_for(code, "testclient") + 1
+        assert join(TestClient(app), code, f"bad-again-{n}", "Zed7").status_code == 404                     # evaluated (wrong) ...
+        waits.append(round(classrooms._locked_for(code, "testclient")))                                            # ... and the next slot is further away
+    assert waits == sorted(waits) and waits[-1] <= classrooms.SLOW_MAX + 1 and waits[-1] > classrooms.SLOW_BASE * 3
+    classrooms._LOCKS.clear()
+
+
+def test_s05_teacher_can_unlock_joining_only_their_own_class():
+    t, code, pw = make_class()
+    for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
+    assert join(TestClient(app), code, pw, "Zed7").status_code == 429
+    assert client(ADULT).post(f"/api/classrooms/{code}/unlock-joins").status_code == 404                    # another adult can't
+    assert t.post(f"/api/classrooms/{code}/unlock-joins").status_code == 200
+    assert join(TestClient(app), code, pw, "Zed7").status_code == 200
+    assert t.get("/api/classrooms").json()["rooms"][0]["failed_joins_last_hour"] == 0
+
+
+def test_s05_a_student_already_in_the_class_is_never_slowed_down():
+    t, code, pw = make_class()
+    s = student(code, pw, "Kiwi9")
+    for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
+    assert join(s, code, pw, "Kiwi9x").status_code == 200                                                    # same session, same class: rename works during slow mode
     classrooms._LOCKS.clear()
 
 
