@@ -49,6 +49,15 @@ import { photoBlock, mountPhoto } from "/static/photo.js";
 $("#studioPhoto").innerHTML = photoBlock("s");
 const pick = mountPhoto("s", f => setFile(f));
 const MAX_PHOTO = 25 * 1024 * 1024;
+const DROP_HINT0 = $("#dropHint").innerHTML;
+/* QA-2: a photo the server refused is not "ready": forget it, restore the empty drop zone, disable Build */
+function clearFile() {
+  S.file = null;
+  const img = $("#dropPreview"); img.onerror = null; img.hidden = true; img.removeAttribute("src");
+  $("#dropHint").hidden = false; $("#dropHint").innerHTML = DROP_HINT0;
+  $("#photoChosen").hidden = true; $("#photoChosenName").textContent = "";
+  $("#btnBuild").disabled = true; $("#buildHint").textContent = "Choose or take a photo to begin.";
+}
 function setFile(f) {
   if (!f) return;
   if (f.size > MAX_PHOTO) { pick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG)."); return; }
@@ -87,6 +96,15 @@ function formData(autoDelete) {
   }
   return fd;
 }
+/* QA-4: on a phone the model is two screens below the photo area: scroll it into view and say so (respects reduced motion) */
+function revealResult() {
+  $("#buildHint").textContent = "Your 3D model is ready.";
+  if (!matchMedia("(max-width:768px)").matches) return;
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const r = $("#result"); r.setAttribute("tabindex", "-1"); r.focus({ preventScroll: true });
+  // wait until build() has put the page back (busy bar hidden) so the scroll target is final
+  setTimeout(() => { const v = $("#viewer"); v.style.scrollMarginTop = ($(".topbar").offsetHeight + 8) + "px"; v.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); }, 60);
+}
 async function build(autoDelete = false) {
   if (!S.file) return;
   S.pending = null;
@@ -95,11 +113,12 @@ async function build(autoDelete = false) {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
     showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Build again with these settings";
     toast("Model built ✔", "ok");
+    revealResult();
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
-    else if (e.status === 400 && /photo/i.test(e.message)) pick.msg(e.message);          // photo problems stay visible under the buttons
+    else if (e.status === 400 && /photo/i.test(e.message)) { clearFile(); pick.msg(e.message); }          // photo problems stay visible under the buttons; the refused photo is forgotten (QA-2)
     else toast("Build failed: " + e.message, "err");
-  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = false; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; S.building = false; }
+  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = !S.file; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; S.building = false; }
 }
 $("#btnBuild").onclick = () => build(false);
 
@@ -165,29 +184,31 @@ $("#btnRetry").onclick = () => { $("#dlgFull").close(); (S.pending || build)(fal
 $("#btnAutoDel").onclick = () => { $("#dlgFull").close(); (S.pending || build)(true); };
 
 /* ---------- print dialog ---------- */
-let printInfo = null, printId = null, printLabel = "";
+let printInfo = null, printId = null, printLabel = "", printB = null;
+const printBuild = () => printB;
 const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); if ($("#printerBlock") && !$("#printerBlock").hidden && $("#printerSel").value) fd.append("printer_id", $("#printerSel").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
-async function openPrint() {
-  const id = S.current.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
+async function openPrint(b) {
+  if (!b?.id) return toast("Build something first.", "err");
+  const id = b.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
   let caps = {};
   try { printInfo = await api(`/api/print/${id}/links`); caps = (await api("/api/me")).send || {}; } catch (e) { return toast(e.message, "err"); }
-  printId = id; printLabel = `${S.current.title || "build"} (${S.current.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[S.current.mode] || "Edit"})`;
+  printId = id; printB = b; printLabel = `${b.title || "build"} (${b.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[b.mode] || "Edit"})`;
   $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
   $("#slicerBtns").innerHTML = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
-    `<a class="btn ghost" href="${S.current.downloads["3mf"]}" download>${printInfo.slicers.length ? "…or download 3MF" : "Download 3MF"}</a>` +
+    `<a class="btn ghost" href="${b.downloads["3mf"]}" download>${printInfo.slicers.length ? "…or download 3MF" : "Download 3MF"}</a>` +
     (printInfo.slicer_links_disabled ? `<p class="muted small" style="flex-basis:100%">${esc(printInfo.slicer_links_disabled)}</p>` : "");
-  const b = printInfo.builtin_slicer;
-  $("#builtinState").textContent = b.available ? "(PrusaSlicer CLI detected)" : "(slicer not installed)";
-  $("#btnSlice").disabled = !b.available;
-  $("#s_up").checked = S.current.mode === "lithophane";
-  $("#sliceOut").textContent = b.available ? "" : b.message;
+  const bs = printInfo.builtin_slicer;
+  $("#builtinState").textContent = bs.available ? "(PrusaSlicer CLI detected)" : "(slicer not installed)";
+  $("#btnSlice").disabled = !bs.available;
+  $("#s_up").checked = b.mode === "lithophane";
+  $("#sliceOut").textContent = bs.available ? "" : bs.message;
   // SEND-6: the printer block exists only where it can really work (ZEIM on the user's own computer); hosted ZEIM promises nothing
   $("#printerBlock").hidden = !caps.printer_ui; $("#printerHosted").hidden = !!caps.printer_ui;
   startNowOff(); fillPrinterSel(); $("#sendOut").textContent = "";
   $("#dlgPrint").showModal();
 }
-$("#btnPrint").onclick = openPrint;
+$("#btnPrint").onclick = () => openPrint(S.current);          // Studio's own build; Edit passes its project (they used to share S.current: QA-1)
 const startNowOff = () => { $("#startNow").checked = false; };          // "Start print" is always a separate, unchecked choice
 const TYPE_LABEL = { octoprint: "OctoPrint", moonraker: "Moonraker (Klipper)" };
 function fillPrinterSel() {
@@ -297,4 +318,4 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, $, $$, esc, MODE_LABEL, ago, openPrint, loadHistory, renderHistory, openFull, applyLevel };
+export { S, api, toast, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel };

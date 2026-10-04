@@ -2,7 +2,7 @@
    The SERVER decides what a person may do (/api/me -> send{...}, enforced again on every route); this file only draws what the
    server allows. Download is the product. Share/Email use the system share sheet and stay OFF until the device spike (SEND-0)
    passed (server flag PHOTO3D_SEND_SHARE -> send.share_ui). No link is ever put in a share (no url field, no signed-link route). */
-import { S, api, toast, $, $$, esc, openPrint } from "/static/app.js";
+import { S, api, toast, $, $$, esc, openPrint, printBuild } from "/static/app.js";
 
 const FMTS = ["3mf", "stl", "obj"];
 const MIMES = { "3mf": ["model/3mf", "application/octet-stream"], stl: ["model/stl", "application/octet-stream"], obj: ["model/obj", "application/octet-stream"] };
@@ -127,7 +127,7 @@ document.addEventListener("click", async e => {
     if (X.fmt !== "stl") { X.fmt = "stl"; localStorage.sendFmt = "stl"; render(); await prepare(); $("#ssAlert").textContent = "Now STL is chosen. Tap the Shapr3D button again."; return; }
     if (X.file) doShare(X.file, t); return;
   }
-  if (t.id === "ssPrinter") { const b = X.b; $("#dlgSendSheet").close(); S.current = S.current?.id === b.id ? S.current : b; openPrint(); return; }
+  if (t.id === "ssPrinter") { const b = X.b; $("#dlgSendSheet").close(); openPrint(b); return; }
   if (t.id === "ssTeacher") {
     try { await api(`/api/classrooms/${X.caps.class_code}/projects`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ build_id: X.b.id }) });
       $("#ssStatus").textContent = "Sent. Your teacher can see it."; }
@@ -137,7 +137,7 @@ document.addEventListener("click", async e => {
 $("#dlgSendSheet").addEventListener("close", () => { X = null; });
 
 $("#btnSendSheet").onclick = () => openSend(S.current);
-$("#printToSend").onclick = () => { const b = S.current; $("#dlgPrint").close(); openSend(b); };
+$("#printToSend").onclick = () => { const b = printBuild(); $("#dlgPrint").close(); openSend(b); };
 $("#histList").addEventListener("click", async e => {
   const t = e.target.closest("[data-send]"); if (!t) return;
   openSend(S.history.find(x => x.id === t.dataset.send));

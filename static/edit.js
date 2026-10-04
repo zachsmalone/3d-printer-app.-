@@ -39,12 +39,17 @@ async function create(fd, retry) {
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
-    else if (e.status === 415 && /photo/i.test(e.message)) editPick.msg(e.message);       // photo problems stay under the photo buttons
+    else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) editPick.msg(e.message);       // photo problems stay under the photo buttons (QA-3)
     else toast(e.message, "err");
   } finally { busy(false); }
 }
+const PHOTO_RE = /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i;
 function fromFile(file) {
   if (!file) return;
+  E.photoTry = /^image\//.test(file.type) || PHOTO_RE.test(file.name || "");
+  if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
+  if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
+  editPick.msg("");
   const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("beginner", S.level === "beginner"); return fd; };
   create(mk(), mk);
 }
@@ -79,7 +84,6 @@ document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 /* ---------- applying a project payload ---------- */
 function loadProject(p, keepCamera = false) {
   E.p = p; E.measure = false; clearMeasure(); clearGhost();
-  S.current = { ...p, mode: "edit" };
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis;
@@ -112,7 +116,7 @@ $("#eUndo").onclick = () => act(`/api/edit/${E.p.id}/undo`, {});
 $("#eRedo").onclick = () => act(`/api/edit/${E.p.id}/redo`, {});
 $("#eReset").onclick = () => viewer?.reset();
 $("#eWire").onclick = () => viewer?.toggleWire();
-$("#editPrint").onclick = () => openPrint();
+$("#editPrint").onclick = () => E.p && openPrint({ ...E.p, mode: "edit" });
 $("#editSend").onclick = () => E.p && openSend({ ...E.p, kind: "edit" });
 $("#editVis").onchange = async e => { try { await api(`/api/builds/${E.p.id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Who can see this: " + e.target.value, "ok"); } catch (er) { toast(er.message, "err"); e.target.value = E.p.visibility; } };
 addEventListener("keydown", e => {

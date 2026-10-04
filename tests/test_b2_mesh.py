@@ -146,3 +146,33 @@ def test_lithophane_requested_width_is_the_outside_width_with_border():
         v = m.bodies[0].vertices
         assert abs((v[:, 0].max() - v[:, 0].min()) - 100.0) < 0.01, border      # was 106.3 for border 3
         if border: assert abs(m.info["border_cells"] * m.info["pitch_mm"] - border) < m.info["pitch_mm"]
+
+
+# ---------------------------------------------------------------- QA-6: text pushed past the face used to be accepted silently
+def _box():
+    return trimesh.creation.box(extents=(40, 30, 20))
+
+
+def test_qa6_text_completely_off_the_face_is_refused_both_modes():
+    for mode in ("emboss", "deboss"):
+        with pytest.raises(meshedit.OpError) as e:
+            meshedit.apply(_box(), "text", {"text": "HI", "mode": mode, "face": "top", "height": 6, "offset_u": 60})
+        assert "off this face" in str(e.value)
+
+
+def test_qa6_text_that_overhangs_the_edge_works_but_says_so():
+    out, rep = meshedit.apply(_box(), "text", {"text": "HELLO", "mode": "emboss", "face": "top", "height": 8, "offset_u": 10})
+    assert "past the edge" in rep["note"] and out.is_watertight
+
+
+def test_qa6_normal_text_still_works():
+    out, rep = meshedit.apply(_box(), "text", {"text": "OK", "mode": "emboss", "face": "top", "height": 6})
+    assert out.is_watertight and out.volume > _box().volume and "past the edge" not in rep["note"]
+    out, rep = meshedit.apply(_box(), "text", {"text": "OK", "mode": "deboss", "face": "top", "height": 6})
+    assert out.volume < _box().volume
+
+
+def test_qa6_letters_that_would_float_in_the_air_are_refused():
+    with pytest.raises(meshedit.OpError) as e:
+        meshedit.apply(_box(), "text", {"text": "HELLO", "mode": "emboss", "face": "top", "height": 8, "offset_u": 17})
+    assert "float free" in str(e.value)

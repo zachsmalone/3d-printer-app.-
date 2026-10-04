@@ -169,8 +169,10 @@ html{max-width:100%;overflow-x:hidden}body{max-width:100%;overflow-x:clip} /* bo
 .making{display:flex;align-items:center;gap:8px;color:var(--txt)}
 .spin.sm{width:16px;height:16px;border-width:2px;display:inline-block}
 @media (max-width:768px){
-  /* Expert mode: the Build button stays reachable above the iOS home bar */
-  #btnBuild{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:4;box-shadow:0 6px 20px #000a}
+  /* Expert mode: Build stays reachable on the whole Studio page (fixed, not sticky inside the controls panel: QA-5), above the iOS home bar.
+     Beginner builds on its own, so nothing covers the Style captions there. */
+  body[data-level=expert] #viewCreate:not([hidden]) #btnBuild{position:fixed;left:12px;right:12px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:4;box-shadow:0 6px 20px #000a;width:auto}
+  body[data-level=expert]{padding-bottom:calc(80px + env(safe-area-inset-bottom))}
 }
 .drop img{max-height:140px}
 

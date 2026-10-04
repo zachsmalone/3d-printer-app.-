@@ -637,8 +637,23 @@ def op_text(m, p):
     if np.linalg.det(np.array([u, v, n])) < 0:
         f = f[:, ::-1]
     tool = _new(world, f)
+    # Where does the text sit on the face? (QA-6: text pushed past the face used to be accepted as "success")
+    hu, hv = float(np.abs(u * half).sum()), float(np.abs(v * half).sum())
+    tx0, tx1, ty0, ty1 = float(x.min()), float(x.max()), float(y.min()), float(y.max())
+    if tx1 < -hu or tx0 > hu or ty1 < -hv or ty0 > hv:
+        raise OpError("The text is completely off this face, so it would not touch the model. Move it back with the shift boxes, or make it smaller.")
+    overhang = tx0 < -hu - 1e-6 or tx1 > hu + 1e-6 or ty0 < -hv - 1e-6 or ty1 > hv + 1e-6
     out = _boolean(m, tool, "union" if mode == "emboss" else "difference")
+    nominal = sum(g.area for g in polys) * depth
+    if mode == "deboss" and abs(float(m.volume) - float(out.volume)) < 1e-4 * max(nominal, 1e-9):
+        raise OpError("Nothing was cut: the text doesn't reach the model here (it may be over a curved or sloped part). Move it, or use emboss.")
+    if mode == "emboss" and len(m.faces) < 400_000 and len(out.faces) < 400_000:
+        if len(out.split(only_watertight=False)) > len(m.split(only_watertight=False)):
+            raise OpError("The raised text would float free of the model (it doesn't touch it here), so it was not added. Move it onto the model or make it smaller.")
     note = "Text is placed on the flat bounding-box face; on curved/sloped surfaces it may float or sink."
+    if overhang:
+        note = (f"Part of the text goes past the edge of the {face} face ({2 * hu:.0f} × {2 * hv:.0f} mm), so only the part over the model is "
+                + ("added" if mode == "emboss" else "cut") + (", and the raised part that overhangs hangs in the air" if mode == "emboss" else "") + ". " + note)
     return out, {"message": f"{mode} “{txt}” on {face}", "note": note}
 
 
