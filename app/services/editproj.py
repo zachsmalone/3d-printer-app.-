@@ -62,6 +62,8 @@ def mesh_at(bid: str, meta: dict | None = None, head: int | None = None) -> trim
         m = cache[start] if start is not None else _base(bid, meta)
         for k in range(start or 0, head):
             o = meta["ops"][k]
+            if not _replay_safe(o):
+                continue
             m, _ = meshedit.apply(m, o["op"], o["params"])
         cache[head] = m
         while len(cache) > 6:
@@ -76,7 +78,8 @@ def _stats(m: trimesh.Trimesh, title: str) -> dict:
 
 
 def as_model(m: trimesh.Trimesh, title: str) -> Model:
-    return Model(bodies=[Body(title[:40] or "model", m.vertices.copy(), m.faces.copy())], mode="edit")
+    # the object name inside exported OBJ/3MF is deliberately generic: the project title (user text) is never written into files
+    return Model(bodies=[Body("model", m.vertices.copy(), m.faces.copy())], mode="edit")
 
 
 def model(bid: str) -> Model:
@@ -145,7 +148,41 @@ def _commit(bid: str, meta: dict, head: int):
     store.cache.pop(bid, None)
 
 
+TEXT_MAX = 60       # characters for the emboss/deboss text (same as meshedit.op_text)
+
+
+def check_op_text(op: str, params: dict) -> dict:
+    """Free text that ends up in a model is gated like any other text others can read: length cap first, then the
+    language + personal-info filter. Raises safety.ChatBlocked (nothing is stored). Returns the params with text trimmed."""
+    from ..community import safety
+    out = dict(params)
+    for k, v in params.items():
+        if isinstance(v, str) and len(v) > 200:
+            raise ValueError(f"'{k}' is too long.")
+        if op == "text" and isinstance(v, (dict, list)):
+            raise ValueError(f"'{k}' must be a simple value.")
+    if op == "text":
+        txt = params.get("text", "")
+        if not isinstance(txt, str):
+            raise ValueError("Text must be text.")
+        if len(txt) > TEXT_MAX:
+            raise ValueError(f"Text must be 1-{TEXT_MAX} characters.")
+        out["text"] = safety.check(txt, "edit:text")
+    return out
+
+
+def _replay_safe(o: dict) -> bool:
+    """Ops stored before the filter existed (or by an older word list) are re-checked when a project is replayed:
+    a text step that no longer passes is skipped instead of being rendered into the mesh and its exports."""
+    if o.get("op") != "text":
+        return True
+    from ..community import safety
+    t = o.get("params", {}).get("text", "")
+    return isinstance(t, str) and len(t) <= TEXT_MAX and not safety.scan(t)
+
+
 def add_op(bid: str, op: str, params: dict) -> dict:
+    params = check_op_text(op, params)
     with _lock:
         meta = store.get(bid)
         cur = mesh_at(bid, meta)

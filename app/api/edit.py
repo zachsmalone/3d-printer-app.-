@@ -146,6 +146,10 @@ def _act(bid, actor, fn):
         rep = fn()
     except meshedit.OpError as e:
         raise HTTPException(422, str(e))
+    except safety.ChatBlocked as e:
+        return JSONResponse(status_code=e.status, content=e.payload)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return editproj.payload(bid, rep)
 
 
