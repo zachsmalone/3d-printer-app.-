@@ -50,7 +50,7 @@ with sync_playwright() as p:
     pg.screenshot(path="previews/photo_desktop_camera_live.png")
     pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.screenshot(path="previews/photo_desktop_camera_captured.png")
     ok("desktop: stream stopped right after capture", pg.evaluate("!document.querySelector('#sVideo').srcObject || document.querySelector('#sVideo').srcObject.getTracks().every(t => t.readyState === 'ended')"))
-    pg.click("#sRetake"); pg.wait_for_selector("#sSnap:not([hidden])", timeout=10000); pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.click("#sUse")
+    pg.click("#sRetake"); pg.wait_for_selector("#sSnap:not([hidden])", timeout=10000); pg.wait_for_timeout(1500); pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.click("#sUse")
     pg.wait_for_selector("#result:not([hidden])", timeout=60000)
     ok("desktop: camera photo -> built", pg.locator("#result").is_visible())
     pg.click("#sCamCancel") if pg.locator("#sCamPanel").is_visible() else None

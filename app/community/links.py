@@ -26,5 +26,7 @@ def clean(links: dict) -> dict:
             continue
         if not HANDLE.match(h):
             raise ValueError(f"{TEMPLATES[k][0]} handle may only contain letters, digits . _ - (2-30 chars)")
+        from . import safety
+        safety.check(h, f"{TEMPLATES[k][0]} handle")        # same language + personal-info filter as every other text (raises ChatBlocked)
         out[k] = {"handle": h, "url": TEMPLATES[k][1].format(h=h), "verified": False}
     return out

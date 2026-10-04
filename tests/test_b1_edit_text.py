@@ -71,7 +71,7 @@ def test_replay_skips_a_stored_text_step_that_no_longer_passes():
 
 def test_project_title_is_gated_and_not_written_into_exports():
     c = client()
-    assert c.post("/api/edit/new", files={"file": ("b.stl", box_stl(), "application/octet-stream")}, data={"title": "sh1t"}).status_code == 400
+    assert c.post("/api/edit/new", files={"file": ("b.stl", box_stl(), "application/octet-stream")}, data={"title": "sh1t"}).status_code == 422
     bid = new_edit(c, title="Zoe Private Title")
     for ext in ("3mf", "obj", "stl"):
         data = c.get(f"/api/download/{bid}/{ext}").content
@@ -83,11 +83,10 @@ def test_project_title_is_gated_and_not_written_into_exports():
 
 def test_studio_build_titles_are_gated():
     c = client()
-    assert gen(c, title="sh1t").status_code == 400
+    assert gen(c, title="sh1t").status_code == 422
     assert gen(c, title="Nice lamp").status_code == 200
 
 
-@pytest.mark.xfail(reason="obfuscated e-mail ('name at gmail dot com') is part of the filter PII work still queued", strict=False)
 def test_obfuscated_email_in_text_step_is_blocked():
     c = client(); bid = new_edit(c)
     assert text_op(c, bid, "name at gmail dot com").status_code == 422

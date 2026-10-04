@@ -129,6 +129,16 @@ async def ensure_session_cookie(request: Request, call_next):
     return resp
 
 
+from .community.safety import ChatBlocked as _ChatBlocked
+
+
+@app.exception_handler(_ChatBlocked)
+async def _chat_blocked(request: Request, exc: _ChatBlocked):
+    """ONE error shape for every refused text: HTTP 422 (413 too long, 503 filter unavailable) with code, message, context and detail."""
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=exc.status, content={**exc.payload, "detail": exc.payload.get("message", "")})
+
+
 @app.get("/sharetest", include_in_schema=False)
 def sharetest():
     """SEND-0: hidden, unlinked page for finding out what the iOS share sheet accepts. Adults only (the page checks /api/me; the file endpoint enforces it)."""

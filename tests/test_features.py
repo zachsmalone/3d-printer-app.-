@@ -489,10 +489,10 @@ def test_blocked_language_is_refused_everywhere_no_strikes():
     assert t.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "Great work!"}).status_code == 200
     assert len(s.get(f"/api/classrooms/{code}/projects").json()["projects"][0]["feedback"]) == 1        # blocked ones were never stored
     assert t.get("/api/me/safety").status_code == 404 and not hasattr(safety, "record_strike")
-    r = s.post("/api/classrooms/join", json={"code": code, "nickname": "fuck 123", "password": "pass-9999"}); assert r.status_code == 400 and msg in r.text
-    assert client().post("/api/me/signup", json={"display_name": "shithead", "dob": "1990-01-01"}).status_code == 400
+    r = s.post("/api/classrooms/join", json={"code": code, "nickname": "fuck 123", "password": "pass-9999"}); assert r.status_code == 422 and msg in r.text and r.json()["code"] == "language_blocked"   # one error shape for refused text
+    assert client().post("/api/me/signup", json={"display_name": "shithead", "dob": "1990-01-01"}).status_code == 422
     o = client(ADULT); clear(o); b = photo_build(o)
     r = publish(o, b, title="fuck lamp"); assert r.status_code == 422 and r.json()["message"] == msg
     r = publish(o, b, description="visit www.spam.com"); assert r.status_code == 422
     assert publish(o, b, title="Lovely lamp").status_code == 200
-    assert t.post("/api/classrooms", json={"name": "shit class", "password": "plum-otter-42"}).status_code == 400
+    assert t.post("/api/classrooms", json={"name": "shit class", "password": "plum-otter-42"}).status_code == 422
