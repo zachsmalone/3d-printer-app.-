@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Viewer } from "/static/viewer.js";
 import { S, api, toast, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
+import { photoBlock, mountPhoto } from "/static/photo.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
@@ -36,7 +37,8 @@ async function create(fd, retry) {
     S.history = r.history; renderHistory(); loadProject(r);
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
+    else if (e.status === 415 && /photo/i.test(e.message)) editPick.msg(e.message);       // photo problems stay under the photo buttons
     else toast(e.message, "err");
   } finally { busy(false); }
 }
@@ -46,7 +48,15 @@ function fromFile(file) {
   create(mk(), mk);
 }
 const drop = $("#editDrop");
-$("#editFile").onchange = e => fromFile(e.target.files[0]);
+$("#editChooseModel").onclick = () => $("#editFile").click();
+$("#editFile").onchange = e => { fromFile(e.target.files[0]); e.target.value = ""; };
+drop.addEventListener("click", () => $("#editFile").click());
+$("#editPhoto").innerHTML = photoBlock("e", { sample: true });
+const editPick = mountPhoto("e", f => fromFile(f));
+$("#eSample").onclick = async () => {
+  try { const b = await (await fetch("/static/sample.png")).blob(); fromFile(new File([b], "sample.png", { type: "image/png" })); }
+  catch { editPick.msg("We couldn't load the sample image. Please try again."); }
+};
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => fromFile(e.dataTransfer.files[0]));

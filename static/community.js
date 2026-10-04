@@ -192,7 +192,7 @@ async function openLesson(id) {
     const r = await api(`/api/learn/lessons/${id}/quiz`, J("POST", { choice: +v.value }));
     $("#qzOut").textContent = r.correct ? "✔ Correct!" : "Not quite — try again"; if (r.correct) setTimeout(() => openLesson(id), 700);
   };
-  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards .card").forEach(c => c.classList.toggle("on", c.dataset.mode === S.mode)); $("#btnSample").click(); toast("Sample photo loaded — press Build!", "ok"); };
+  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards .card").forEach(c => c.classList.toggle("on", c.dataset.mode === S.mode)); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
 }
 
 /* classroom */

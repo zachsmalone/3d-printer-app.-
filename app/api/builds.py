@@ -15,7 +15,7 @@ from ..community import privacy, safety
 from .textcap import text_in
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS, MAX_UPLOAD, PREVIEW_RES
-from ..core import autotune, exporters, geometry
+from ..core import autotune, exporters, geometry, imagesafe
 from ..services.history import HistoryFull, store
 
 router = APIRouter(prefix="/api")
@@ -179,9 +179,12 @@ def generate(
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
     try:
+        data, src_ext, _ = imagesafe.sanitize(data)       # HEIC -> JPEG, rotation applied, EXIF/GPS dropped, extension from content
         im = geometry.load_image(data)
-    except Exception as e:
-        raise HTTPException(400, f"cannot read image: {e}")
+    except imagesafe.ImageRefused as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, imagesafe.UNREADABLE)
     if not (5 <= width_mm <= 1000):
         raise HTTPException(400, "width_mm must be 5..1000")
 
@@ -217,7 +220,7 @@ def generate(
         bid = uuid.uuid4().hex[:12]
         d = store.dir(bid)
         d.mkdir(parents=True)
-        src = "source." + ((file.filename or "x.png").rsplit(".", 1)[-1].lower()[:4] if "." in (file.filename or "") else "png")
+        src = "source." + src_ext
         (d / src).write_bytes(data)
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(model))

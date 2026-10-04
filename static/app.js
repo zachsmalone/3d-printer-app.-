@@ -45,18 +45,32 @@ $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
 $("#width_mm").oninput = e => $("#widthRange").value = e.target.value;
 
 /* ---------- file ---------- */
+import { photoBlock, mountPhoto } from "/static/photo.js";
+$("#studioPhoto").innerHTML = photoBlock("s");
+const pick = mountPhoto("s", f => setFile(f));
+const MAX_PHOTO = 25 * 1024 * 1024;
 function setFile(f) {
   if (!f) return;
-  S.file = f;
-  const img = $("#dropPreview"); img.src = URL.createObjectURL(f); img.hidden = false; $("#dropHint").hidden = true;
-  $("#btnBuild").disabled = false; $("#buildHint").textContent = f.name;
+  if (f.size > MAX_PHOTO) { pick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG)."); return; }
+  if (!f.size) { pick.msg("We couldn't open that photo. Try a JPG or PNG."); return; }
+  S.file = f; S.pending = null;
+  const img = $("#dropPreview"); img.onerror = () => { img.hidden = true; $("#dropHint").hidden = false; $("#dropHint").innerHTML = "<b>Photo ready</b><span>(This browser can't preview it, ZEIM will still open it.)</span>"; };
+  img.src = URL.createObjectURL(f); img.hidden = false; $("#dropHint").hidden = true;
+  $("#btnBuild").disabled = false; $("#buildHint").textContent = "Photo ready: " + (f.name || "camera photo");
+  pick.msg(""); $("#photoChosen").hidden = false; $("#photoChosenName").textContent = "✔ " + (f.name || "camera photo");
+  if (S.level === "beginner") build(false);                         // Beginner: the photo builds straight away, no hidden second step
+  else $("#btnBuild").scrollIntoView({ block: "nearest", behavior: "smooth" });   // Expert: tune the settings, then press Build
 }
-$("#file").onchange = e => setFile(e.target.files[0]);
 const drop = $("#drop");
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
-$("#btnSample").onclick = async () => { const b = await (await fetch("/static/sample.png")).blob(); setFile(new File([b], "sample.png", { type: "image/png" })); };
+drop.addEventListener("click", () => pick.el("File").click());
+$("#changePhoto").onclick = () => pick.el("File").click();
+$("#sSample").onclick = async () => {
+  try { const b = await (await fetch("/static/sample.png")).blob(); setFile(new File([b], "sample.png", { type: "image/png" })); }
+  catch { pick.msg("We couldn't load the sample image. Please try again."); }
+};
 
 /* ---------- build ---------- */
 function formData(autoDelete) {
@@ -76,15 +90,16 @@ function formData(autoDelete) {
 async function build(autoDelete = false) {
   if (!S.file) return;
   S.pending = null;
-  $("#busy").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true;   // no printing a stale build mid-rebuild
+  $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true;   // no printing a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
-    showBuild(r); S.history = r.history; renderHistory();
+    showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Build again with these settings";
     toast("Model built ✔", "ok");
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
+    else if (e.status === 400 && /photo/i.test(e.message)) pick.msg(e.message);          // photo problems stay visible under the buttons
     else toast("Build failed: " + e.message, "err");
-  } finally { $("#busy").hidden = true; $("#btnBuild").disabled = false; $("#btnPrint").disabled = false; }
+  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = false; $("#btnPrint").disabled = false; }
 }
 $("#btnBuild").onclick = () => build(false);
 

@@ -1,2 +1,3 @@
-pytest
-playwright  # optional: tests/ui_smoke.py
+-r requirements.txt
+pytest==9.1.1
+playwright==1.63.0  # optional: only for tests/ui_*.py (browser smoke scripts)

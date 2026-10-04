@@ -593,7 +593,7 @@ def apply(m: trimesh.Trimesh, op: str, params: dict) -> tuple[trimesh.Trimesh, d
 
 # ------------------------------------------------------------------ import / validation
 ALLOWED = {"stl", "obj", "3mf"}
-IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "bmp", "gif"}
+IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "bmp", "gif", "heic", "heif"}
 
 
 def sniff(data: bytes, ext: str) -> str:

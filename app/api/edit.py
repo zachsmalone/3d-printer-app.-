@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from ..community import privacy, safety
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
-from ..core import autotune, exporters, geometry, meshedit
+from ..core import autotune, exporters, geometry, imagesafe, meshedit
 from ..services import editproj
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
@@ -101,16 +101,19 @@ def new_project(
             if not (20 <= width_mm <= 500):
                 raise HTTPException(400, "width_mm must be 20..500")
             try:
+                data, src_ext, _ = imagesafe.sanitize(data)
                 im = geometry.load_image(data)
-            except Exception as e:
-                raise HTTPException(415, f"cannot read image: {e}")
+            except imagesafe.ImageRefused as e:
+                raise HTTPException(415, str(e))
+            except Exception:
+                raise HTTPException(415, imagesafe.UNREADABLE)
             params, _ = autotune.autotune(im, photo_mode, width_mm, "standard")
             params["resolution"] = min(params.get("resolution", 200), 220)
             mdl = geometry.build(im, photo_mode, params)
             v, f = mdl.solid()
             mesh = trimesh.Trimesh(v, f, process=False)
             original, ext_o = exporters.to_stl(mdl), "stl"
-            source_image = (data, ext if ext != "jpeg" else "jpg")
+            source_image = (data, src_ext)
             base = {"type": "photo", "photo_mode": photo_mode, "width_mm": width_mm, "filename": name[:120], "params": params}
             ext = ext_o
             warnings.append(f"Photo converted to a {photo_mode} base mesh; edit it like any other model.")

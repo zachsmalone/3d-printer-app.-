@@ -31,12 +31,11 @@
   <aside class="panel controls">
     <section class="step">
       <h2><i>1</i> Photo</h2>
-      <label class="drop" id="drop">
-        <input type="file" id="file" accept="image/*" hidden>
-        <img id="dropPreview" alt="" hidden>
-        <div id="dropHint"><div class="big">📷</div><b>Drop a photo here</b><span>or click to browse · JPG / PNG · up to 25 MB</span></div>
-      </label>
-      <button class="btn small ghost" id="btnSample">Try a sample photo</button>
+      <div id="studioPhoto"></div>
+      <div class="drop" id="drop"><img id="dropPreview" alt="Your chosen photo" hidden>
+        <div id="dropHint"><div class="big" aria-hidden="true">📷</div><b>No photo yet</b><span>Take, choose or drop a photo · JPG, PNG or iPhone HEIC · up to 25 MB</span></div></div>
+      <p class="pp-chosen" id="photoChosen" hidden><span id="photoChosenName"></span> <button type="button" class="linkbtn" id="changePhoto">Change photo</button></p>
+      <p class="help making" id="makingLine" role="status" aria-live="polite" hidden><span class="spin sm" aria-hidden="true"></span> Making your 3D model…</p>
     </section>
 
     <section class="step">
@@ -94,7 +93,7 @@
     </section>
 
     <button class="btn primary big" id="btnBuild" disabled>✨ Build 3D model</button>
-    <p class="help center" id="buildHint">Choose a photo to begin.</p>
+    <p class="help center" id="buildHint" role="status" aria-live="polite">Choose or take a photo to begin.</p>
   </aside>
 
   <section class="stage">
@@ -133,10 +132,10 @@
   <aside class="panel controls" id="editSide">
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
-      <label class="drop" id="editDrop">
-        <input type="file" id="editFile" accept=".stl,.obj,.3mf,image/*" hidden>
-        <div><div class="big">📂</div><b>Drop an STL, OBJ or 3MF here</b><span>or click to browse · up to 50 MB · or drop a photo to start from a lithophane / relief base</span></div>
-      </label>
+      <div class="drop" id="editDrop"><div><div class="big" aria-hidden="true">📂</div><b>Drop an STL, OBJ or 3MF here</b><span>or press the button · up to 50 MB</span></div></div>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn big" id="editChooseModel">📂 Choose a 3D file</button><input type="file" id="editFile" accept=".stl,.obj,.3mf" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
+      <div id="editPhoto"></div>
       <div class="grid2" style="margin-top:10px">
         <div class="field"><label>Units in the file <em>STL / OBJ</em></label><select id="editUnits"><option value="mm">millimetres</option><option value="cm">centimetres</option><option value="in">inches</option><option value="m">metres</option></select></div>
         <div class="field"><label>If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>

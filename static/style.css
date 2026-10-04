@@ -151,3 +151,25 @@ html,body{max-width:100%;overflow-x:hidden}
   #levelSwitch button{font-size:13px}
   .layout{padding:10px;gap:10px}
 }
+
+/* photo picker */
+.pp{display:flex;flex-direction:column;gap:10px}
+.pp-actions{display:flex;gap:10px;flex-wrap:wrap}
+.pp-actions .btn.big{flex:1 1 140px;min-height:52px;font-size:16px;justify-content:center}
+.pp-sample .btn{min-height:44px;width:100%}
+.pp-msg{margin:0;padding:10px 12px;border-radius:10px;background:#2a2230;border:1px solid #6b4a5a;color:#ffd9e0}
+.pp-msg.ok{background:#16281f;border-color:#2c5a45;color:#c9f5df}
+.pp-note{margin:0;color:var(--mut);font-size:12px;line-height:1.5}
+.pp-cam{display:flex;flex-direction:column;gap:10px}
+.pp-cam video,.pp-cam canvas{width:100%;max-height:260px;object-fit:contain;background:#000;border-radius:10px}
+.sr-only:focus{clip:auto}
+.btn.big{min-height:44px}
+.linkbtn{background:none;border:0;color:var(--acc2);text-decoration:underline;cursor:pointer;font:inherit;min-height:44px;padding:0 8px}
+.pp-chosen{margin:0;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--mut)}
+.making{display:flex;align-items:center;gap:8px;color:var(--txt)}
+.spin.sm{width:16px;height:16px;border-width:2px;display:inline-block}
+@media (max-width:768px){
+  /* Expert mode: the Build button stays reachable above the iOS home bar */
+  #btnBuild{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:4;box-shadow:0 6px 20px #000a}
+}
+.drop img{max-height:140px}

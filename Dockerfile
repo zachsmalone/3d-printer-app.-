@@ -18,6 +18,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 #  - fonts-dejavu-core : the "add text" edit feature uses DejaVu Sans / Serif / Mono (app/core/meshedit.py).
 #  - fonts-dejavu-extra: bold variants.
 #  - curl is not installed; the healthcheck uses Python.
+# pillow-heif (iPhone HEIC photos) ships a manylinux wheel with libheif bundled, so no extra apt package is needed on this glibc base.
+#   (On Alpine/musl you would need libheif-dev - not supported here.)
 # All Python deps (numpy, scipy, trimesh, manifold3d, shapely, rtree, lxml ...) install from binary wheels
 # on cp313/manylinux, so no compiler or -dev packages are needed (verified with a clean venv on 3.13).
 RUN apt-get update \
