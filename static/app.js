@@ -187,6 +187,54 @@ $("#btnAutoDel").onclick = () => { $("#dlgFull").close(); (S.pending || build)(t
 let printInfo = null, printId = null, printLabel = "", printB = null;
 const printBuild = () => printB;
 const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); if ($("#printerBlock") && !$("#printerBlock").hidden && $("#printerSel").value) fd.append("printer_id", $("#printerSel").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
+const isPhone = () => matchMedia("(max-width:768px),(pointer:coarse)").matches;
+/* Print dialog body. Phones: the Creality Cloud app first (K1 owners), desktop-only slicer links tucked under "On a computer".
+   The Creality route is a plain authenticated download of the 3MF, then the phone's own share sheet - no link, no deep link, nothing
+   leaves ZEIM except what the person hands to the app they pick (reports/send-privacy.md). */
+function slicerArea(b, caps) {
+  const dl = b.downloads["3mf"];
+  const links = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
+    (printInfo.slicer_links_disabled ? `<p class="muted small" style="grid-column:1/-1">${esc(printInfo.slicer_links_disabled)}</p>` : "");
+  if (!isPhone()) {
+    // desktop: Creality Print has no verified deep link, so it is a plain download (open the file from your Downloads folder)
+    return `<a class="btn" id="crDl" href="${dl}" download="ZEIM-build.3mf" title="Saves a 3MF. Open it in Creality Print.">⬇ Download 3MF for Creality Print</a>` + links +
+      `<a class="btn ghost" href="${dl}" download>…or download 3MF for another slicer</a>`;
+  }
+  const share = caps.share_ui && navigator.share && navigator.canShare && isSecureContext
+    ? `<button type="button" class="btn" id="crShare" disabled>📤 Share… (choose Creality)</button>` : "";
+  return `<div class="cre" style="grid-column:1/-1">
+      <h5 style="margin:0 0 6px">★ Creality Cloud app <small class="help">(Creality K1 and other Creality printers)</small></h5>
+      <div class="row"><a class="btn primary def" id="crDl" href="${dl}" download="ZEIM-build.3mf">⬇ Download 3MF ★</a>${share}</div>
+      <ol class="help cre-steps"><li>Tap <b>Download 3MF</b>. It is saved in your <b>Files</b> or Downloads.</li>
+        <li>Open the file from there, tap <b>Share</b> (or <b>Open in…</b>), then choose <b>Creality</b>.</li>
+        <li>Slice and print from the Creality app.</li></ol>
+      <p class="help" id="crStatus" role="status" aria-live="polite">Button names differ between phones and app versions. ZEIM does not connect to Creality; the app you pick gets the file. The Creality K1 profile in Settings is <b>experimental</b>.</p>
+    </div>
+    <details class="more slicers-more" style="grid-column:1/-1"><summary>On a computer</summary>
+      <p class="help">These open a slicer installed on the <b>same computer</b> as this browser, so they don't work on a phone.</p>
+      <div class="slicers">${links}<a class="btn ghost" href="${dl}" download>Download 3MF</a></div></details>`;
+}
+let crFile = null;
+async function wireCreality(b, caps) {
+  crFile = null;
+  const btn = $("#crShare"); if (!btn) return;
+  const my = printId;
+  try {                               // pre-fetch with the cookie-checked download so share() runs straight from the tap
+    const blob = await (await fetch(b.downloads["3mf"], { credentials: "same-origin" })).blob();
+    if (my !== printId) return;
+    for (const t of ["model/3mf", "application/octet-stream"]) {
+      const f = new File([blob], "ZEIM-build.3mf", { type: t });
+      let ok = false; try { ok = navigator.canShare({ files: [f] }); } catch { ok = false; }
+      if (ok) { crFile = f; btn.disabled = false; return; }
+    }
+    btn.remove();
+  } catch { btn.remove(); }
+}
+document.addEventListener("click", async e => {
+  if (e.target.id !== "crShare" || !crFile) return;
+  try { await navigator.share({ files: [crFile], title: "My ZEIM build" }); $("#crStatus").textContent = "Sent to the app you chose."; }      // files + title only: no url, ever
+  catch (er) { if (er.name !== "AbortError") $("#crStatus").textContent = "That didn't work on this device. Use Download 3MF, then Share from the Files app."; }
+});
 async function openPrint(b) {
   if (!b?.id) return toast("Build something first.", "err");
   const id = b.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
@@ -195,9 +243,8 @@ async function openPrint(b) {
   printId = id; printB = b; printLabel = `${b.title || "build"} (${b.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[b.mode] || "Edit"})`;
   $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
-  $("#slicerBtns").innerHTML = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
-    `<a class="btn ghost" href="${b.downloads["3mf"]}" download>${printInfo.slicers.length ? "…or download 3MF" : "Download 3MF"}</a>` +
-    (printInfo.slicer_links_disabled ? `<p class="muted small" style="flex-basis:100%">${esc(printInfo.slicer_links_disabled)}</p>` : "");
+  $("#slicerBtns").innerHTML = slicerArea(b, caps);
+  wireCreality(b, caps);
   const bs = printInfo.builtin_slicer;
   $("#builtinState").textContent = bs.available ? "(PrusaSlicer CLI detected)" : "(slicer not installed)";
   $("#btnSlice").disabled = !bs.available;

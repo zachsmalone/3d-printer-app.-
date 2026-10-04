@@ -56,7 +56,7 @@ with sync_playwright() as p:
     pg.click("#sCamCancel") if pg.locator("#sCamPanel").is_visible() else None
     # Edit
     pg.click('#mainNav [data-view=edit]'); pg.wait_for_timeout(400)
-    ok("edit: 3D-file input only takes mesh files", pg.get_attribute("#editFile", "accept") == ".stl,.obj,.3mf")
+    ok("edit: 3D-file input has NO accept list (iOS greys out bare extensions); the type is checked by name in JS (tests/ui_files.py)", pg.get_attribute("#editFile", "accept") is None)
     ok("edit: photo buttons present", pg.locator("#eChoose").is_visible() and pg.locator("#eTake").is_visible())
     pg.screenshot(path="previews/photo_edit_start.png")
     pg.set_input_files("#eFile", heic); pg.wait_for_selector("#editPanel:not([hidden])", timeout=60000)

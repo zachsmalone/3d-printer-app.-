@@ -129,3 +129,13 @@ def test_start_up_errors_are_visible_and_a_clean_session_has_no_page_errors_in_c
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS webkit" in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_print_dialog_puts_creality_cloud_first_on_phones_and_demotes_desktop_slicers_chrome_and_webkit():
+    p1, u1 = _spawn("local", {"PHOTO3D_SEND_SHARE": "1"}); p2, u2 = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_creality.py"), u1, u2], cwd=ROOT, capture_output=True, text=True, timeout=500)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS webkit" in r.stdout, r.stdout + r.stderr
+    finally:
+        for p in (p1, p2):
+            p.terminate(); p.wait(10)
