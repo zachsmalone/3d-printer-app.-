@@ -312,3 +312,4 @@ function onPick(e) {
   }
 }
 window.__zeimEdit = E;
+window.__zeimEditStarted = true;               // (static/boot.js watchdog)

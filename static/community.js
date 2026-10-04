@@ -12,6 +12,7 @@ async function init() {
   $("#shTabs").innerHTML = Object.entries(CFG.showcase_tabs).map(([k, v]) => `<button data-tab="${k}" class="${k === shTab ? "on" : ""}">${esc(v)}</button>`).join("");
   await refreshMe();
   route();
+  window.__zeimStarted = true;                 // static/boot.js shows a visible error if this never happens
 }
 async function refreshMe() {
   ME = await api("/api/me");

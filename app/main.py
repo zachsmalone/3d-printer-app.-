@@ -96,6 +96,8 @@ CSP = ("default-src 'self'; script-src 'self' " + _inline_script_hashes() + "; s
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
     h = resp.headers
+    if request.url.path.startswith("/static/"):
+        h.setdefault("Cache-Control", "no-cache")     # always revalidate (ETag keeps it cheap): a phone must never mix old and new JS modules
     h.setdefault("X-Content-Type-Options", "nosniff")
     h.setdefault("X-Frame-Options", "DENY")
     h.setdefault("Referrer-Policy", "no-referrer")

@@ -120,3 +120,12 @@ def test_edit_file_picker_accepts_models_by_name_in_chrome_and_webkit():
         assert "PASS chrome" in r.stdout
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_start_up_errors_are_visible_and_a_clean_session_has_no_page_errors_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_boot.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS webkit" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
