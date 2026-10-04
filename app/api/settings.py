@@ -20,6 +20,7 @@ _base = settings.base_url
 def get_settings(request: Request, actor: Actor = Depends(get_actor)):
     from .. import config
     return {**settings.public(redact=not guards.can_see_printer_urls(request, actor)), "printer_types": printers.TYPES,
+            "printer_presets": [{"id": k, "label": v["label"], "type": v["type"], "bed": list(v["bed"]), "hint": v["hint"]} for k, v in printers.PROFILES.items()],
             "mode": config.MODE, "can_edit": _can_edit(request, actor)}
 
 

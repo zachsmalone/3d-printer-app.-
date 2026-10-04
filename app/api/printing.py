@@ -68,7 +68,7 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
                     "is remote). Links are signed, work for one file only, and expire after 10 minutes, so a private build stays private."}
 
 
-def _slice(bid, layer_height, fill_density, upright, supports, brim, bed):
+def _slice(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini=None):
     st = slicer.status()
     if not st["available"]:
         return st
@@ -77,14 +77,16 @@ def _slice(bid, layer_height, fill_density, upright, supports, brim, bed):
     except KeyError:
         raise HTTPException(404, "unknown build")
     return slicer.slice_model(model, store.dir(bid), layer_height, fill_density, upright, supports,
-                              brim, bed)
+                              brim, bed, profile_ini)
 
 
 @router.post("/slice/{bid}")
 def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float = Form(0.2), fill_density: int = Form(15),
-                upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0)):
+                upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0), printer_id: str = Form("")):
     meta_for(bid, actor, owner_only=True)
-    res = _slice(bid, layer_height, fill_density, upright, supports, brim, (250, 210))
+    pr = settings.get_printer(printer_id) if printer_id else None      # same bed/profile the "Send" of that printer will use
+    res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr))
+    res["bed"] = list(printers.bed_of(pr))
     if res.get("ok"):
         res["download"] = f"/files/{bid}/model.gcode"
     return JSONResponse(res)  # unavailable slicer -> 200 with available=false
@@ -101,12 +103,24 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
         raise HTTPException(404, "unknown printer")
     if pr["type"] not in printers.IMPLEMENTED:
         return JSONResponse(printers.send(pr, None, "", start))  # clear stub message
-    res = _slice(bid, layer_height, fill_density, upright, supports, brim,
-                 (pr.get("bed_x") or 250, pr.get("bed_y") or 210))
+    res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr))
     if not res.get("ok"):
         return JSONResponse({"ok": False, "stage": "slice", **res})
     out = printers.send(pr, store.dir(bid) / "model.gcode", f"photo3d_{bid}.gcode", start)
     return JSONResponse({**out, "stage": "upload", "slice": res})
+
+
+@router.post("/printers/{printer_id}/test")
+def test_printer(printer_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    """Connection test: read-only GET requests to the printer, NEVER a print or upload command. Same guard as /api/send, plus on a
+    shared server only the owner/admin (the server connects to whatever address was saved: keep that to the person who saved it)."""
+    guards.require_send(request, actor)
+    if not guards.can_see_printer_urls(request, actor):
+        raise HTTPException(403, "Only the person who manages this server can test printers.")
+    pr = settings.get_printer(printer_id)
+    if not pr:
+        raise HTTPException(404, "unknown printer")
+    return JSONResponse(printers.test(pr))
 
 
 # ---- SEND-0: tiny sample files for the hidden /sharetest page (adults only; nothing from any user's data)

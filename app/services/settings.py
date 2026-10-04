@@ -17,7 +17,7 @@ KEYFILE = DATA / ".settings.key"
 ENC_PREFIX = "enc:v1:"
 _lock = threading.Lock()
 DEFAULTS = {"public_base_url": "", "default_slicer": "prusaslicer", "printers": []}
-PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y")
+PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y", "profile")
 
 
 def _fernet():
@@ -110,6 +110,9 @@ def public(s: dict | None = None, redact: bool = False) -> dict:
     s = json.loads(json.dumps(s or load()))
     for p in s["printers"]:
         p["has_key"] = bool(p.get("api_key"))
+        pr = printers_mod.profile_of(p)
+        p["experimental"] = bool(pr and pr.get("experimental"))
+        p["profile_label"] = pr["label"] if pr else ""
         p.pop("api_key", None)
         if redact:
             p.pop("url", None)
@@ -149,8 +152,13 @@ def save_from_client(incoming: dict) -> dict:
             q["api_key"] = old.get(pid, {}).get("api_key", "")
         if q.get("url") and q.get("type") in printers_mod.IMPLEMENTED and not str(q["url"]).lower().startswith(("http://", "https://")):
             raise ValueError("Printer address must start with http:// or https://")
-        q["bed_x"] = float(q.get("bed_x") or 250)
-        q["bed_y"] = float(q.get("bed_y") or 210)
+        q["profile"] = q.get("profile") or ""
+        if q["profile"] and q["profile"] not in printers_mod.PROFILES:
+            raise ValueError("Unknown printer preset.")
+        if q["profile"] and printers_mod.PROFILES[q["profile"]]["type"] != q.get("type"):
+            raise ValueError(f"The preset '{printers_mod.PROFILES[q['profile']]['label']}' works with {printers_mod.PROFILES[q['profile']]['type']} printers.")
+        bx, by = printers_mod.bed_of({**q, "bed_x": q.get("bed_x") or None, "bed_y": q.get("bed_y") or None})
+        q["bed_x"], q["bed_y"] = float(bx), float(by)
         printers.append(q)
     new = {"public_base_url": cur.get("public_base_url", "") if config.PUBLIC_BASE_URL else clean_base_url(incoming.get("public_base_url")),
            "default_slicer": incoming.get("default_slicer") or "prusaslicer",

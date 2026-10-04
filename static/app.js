@@ -165,7 +165,7 @@ $("#btnAutoDel").onclick = () => { $("#dlgFull").close(); (S.pending || build)(t
 
 /* ---------- print dialog ---------- */
 let printInfo = null, printId = null, printLabel = "";
-const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
+const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); if ($("#printerBlock") && !$("#printerBlock").hidden && $("#printerSel").value) fd.append("printer_id", $("#printerSel").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
 async function openPrint() {
   const id = S.current.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
   let caps = {};
@@ -188,10 +188,10 @@ async function openPrint() {
 }
 $("#btnPrint").onclick = openPrint;
 const startNowOff = () => { $("#startNow").checked = false; };          // "Start print" is always a separate, unchecked choice
-const TYPE_LABEL = { octoprint: "OctoPrint", moonraker: "Moonraker (Klipper)", creality_k1: "Creality K1 (Experimental)" };
+const TYPE_LABEL = { octoprint: "OctoPrint", moonraker: "Moonraker (Klipper)" };
 function fillPrinterSel() {
   const ps = printInfo.printers;
-  $("#printerSel").innerHTML = ps.length ? ps.map(p => `<option value="${p.id}">${esc(p.name)} (${TYPE_LABEL[p.type] || p.type}${p.experimental ? ", experimental" : ""})</option>`).join("") : `<option value="">No printers configured — add one in Settings</option>`;
+  $("#printerSel").innerHTML = ps.length ? ps.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.profile_label || TYPE_LABEL[p.type] || p.type)})</option>`).join("") : `<option value="">No printers configured — add one in Settings</option>`;
   $("#btnSend").disabled = !ps.length;
 }
 $("#btnSlice").onclick = async () => {
@@ -209,7 +209,7 @@ $("#btnSlice").onclick = async () => {
   } catch (e) { $("#sliceOut").textContent = e.message; }
 };
 $("#btnSend").onclick = async () => {
-  const fd = sliceOpts(); fd.append("printer_id", $("#printerSel").value); fd.append("start", $("#startNow").checked);
+  const fd = sliceOpts(); fd.set("printer_id", $("#printerSel").value); fd.append("start", $("#startNow").checked);
   $("#sendOut").textContent = "Slicing and uploading…";
   try { const r = await api(`/api/send/${printId}`, { method: "POST", body: fd }); $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || r.log || "failed"); }
   catch (e) { $("#sendOut").textContent = "✖ " + e.message; }
@@ -229,10 +229,14 @@ function renderPrinters() {
       <div class="field"><label>Type</label><select data-f="type">${types.map(t => `<option value="${t.type}" ${t.type === p.type ? "selected" : ""}>${t.label}</option>`).join("")}</select></div>
       <div class="field"><label>URL</label><input data-f="url" value="${esc(p.url || "")}" placeholder="http://printer.local"></div>
       <div class="field"><label>API key ${p.has_key ? "<em>(stored — leave blank to keep)</em>" : ""}</label><input data-f="api_key" type="password" placeholder="${p.has_key ? "••••••••" : ""}"></div>
+      <div class="field"><label>Preset</label><select data-f="profile"><option value="">None (generic)</option>${(S.settings.printer_presets || []).map(x => `<option value="${x.id}" ${x.id === p.profile ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
       <div class="field"><label>Bed X mm</label><input data-f="bed_x" type="number" value="${p.bed_x || 250}"></div>
       <div class="field"><label>Bed Y mm</label><input data-f="bed_y" type="number" value="${p.bed_y || 210}"></div>
     </div><p class="help">${types.find(t => t.type === p.type)?.hint || ""}</p>
-    <button class="btn small danger" data-rm="${i}">Remove</button></div>`).join("") || `<p class="help">No printers yet.</p>`;
+    ${(S.settings.printer_presets || []).find(x => x.id === p.profile) ? `<p class="help"><b>Experimental.</b> ${esc(S.settings.printer_presets.find(x => x.id === p.profile).hint)}</p>` : ""}
+    <p class="help">Tested with a pretend printer only. Not tried on a real printer yet.</p>
+    <button class="btn small" data-test="${i}" ${p.id ? "" : "disabled title='Save first, then test'"}>Test connection</button> <button class="btn small danger" data-rm="${i}">Remove</button>
+    <p class="help" data-testout="${i}" role="status" aria-live="polite">${p.id ? "A test only asks the printer if it is there. It never starts a print." : "Save settings first, then you can test the connection."}</p></div>`).join("") || `<p class="help">No printers yet.</p>`;
 }
 function readPrinters() {
   return $$("#printerList .printer").map(el => {
@@ -240,7 +244,21 @@ function readPrinters() {
     $$("[data-f]", el).forEach(i => p[i.dataset.f] = i.value); return p;
   });
 }
-$("#printerList").onclick = e => { const r = e.target.closest("[data-rm]"); if (!r) return; S.settings.printers = readPrinters(); S.settings.printers.splice(+r.dataset.rm, 1); renderPrinters(); };
+$("#printerList").onclick = async e => {
+  const tb = e.target.closest("[data-test]");
+  if (tb) {
+    const i = +tb.dataset.test, out = $(`[data-testout="${i}"]`), id = S.settings.printers[i]?.id; out.textContent = "Testing…";
+    try { const r = await api(`/api/printers/${id}/test`, { method: "POST" }); out.textContent = (r.ok ? "✔ " : "✖ ") + r.message; } catch (er) { out.textContent = "✖ " + er.message; }
+    return;
+  }
+  const r = e.target.closest("[data-rm]"); if (!r) return; S.settings.printers = readPrinters(); S.settings.printers.splice(+r.dataset.rm, 1); renderPrinters(); };
+$("#printerList").addEventListener("change", e => {
+  if (!e.target.matches('[data-f="profile"]')) return;
+  const pre = (S.settings.printer_presets || []).find(x => x.id === e.target.value), el = e.target.closest(".printer"), i = +el.dataset.i;
+  S.settings.printers = readPrinters();
+  if (pre) Object.assign(S.settings.printers[i], { type: pre.type, bed_x: pre.bed[0], bed_y: pre.bed[1] });
+  renderPrinters();
+});
 $("#btnAddPrinter").onclick = () => { S.settings.printers = readPrinters(); S.settings.printers.push({ name: "My printer", type: "octoprint", url: "", bed_x: 250, bed_y: 210 }); renderPrinters(); };
 $("#btnSaveSettings").onclick = async () => {
   const body = { default_slicer: $("#set_slicer").value, public_base_url: $("#set_base").value.trim(), printers: readPrinters() };

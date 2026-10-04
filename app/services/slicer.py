@@ -59,7 +59,7 @@ def parse_stats(text: str) -> dict:
 
 
 def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
-                upright=False, supports=False, brim=0.0, bed=(250, 210)) -> dict:
+                upright=False, supports=False, brim=0.0, bed=(250, 210), profile_ini=None) -> dict:
     st = status()
     if not st["available"]:
         return st
@@ -77,6 +77,8 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
            "--fill-density", f"{int(fill_density)}%", "--filament-density", str(PLA_DENSITY), "--center", f"{bed[0] / 2},{bed[1] / 2}",
            "--bed-shape", f"0x0,{bed[0]}x0,{bed[0]}x{bed[1]},0x{bed[1]}",
            "--brim-width", str(brim), "-o", str(gcode), str(stl)]
+    if profile_ini:                                   # printer preset (e.g. Creality K1, experimental): its .ini first, our options override
+        cmd[1:1] = ["--load", str(profile_ini)]
     if supports:
         cmd.insert(2, "--support-material")
     try:
