@@ -1,0 +1,688 @@
+"""Mesh editing operations (trimesh / numpy / scipy / shapely; booleans via manifold3d when installed).
+
+Every operation is a pure function  (mesh, params) -> (new_mesh, report)  working in MILLIMETRES, Z up.
+Projects store the ORIGINAL upload untouched plus a list of {op, params}; the current mesh is the replay of
+that list (see services/editproj.py), which is what makes undo / redo / jump-to-step non-destructive.
+"""
+from __future__ import annotations
+
+import io
+import math
+import zipfile
+
+import numpy as np
+import trimesh
+
+MAX_FACES = 3_000_000
+UNIT_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "m": 1000.0}
+
+
+class OpError(ValueError):
+    """User-facing problem (bad parameter / geometry unsuitable for this operation)."""
+
+
+def have_boolean() -> bool:
+    try:
+        import manifold3d  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def have_simplify() -> bool:
+    try:
+        import fast_simplification  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def have_hollow() -> bool:
+    try:
+        import skimage  # noqa: F401
+        return have_boolean()
+    except Exception:
+        return False
+
+
+# ------------------------------------------------------------------ helpers
+def _num(p, key, default=None, lo=-1e6, hi=1e6):
+    v = p.get(key, default)
+    if v is None:
+        raise OpError(f"'{key}' is required")
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        raise OpError(f"'{key}' must be a number")
+    if not math.isfinite(v) or v < lo or v > hi:
+        raise OpError(f"'{key}' must be between {lo:g} and {hi:g}")
+    return v
+
+
+def _vec(p, key, default=(0, 0, 0), lo=-1e5, hi=1e5):
+    v = p.get(key, default)
+    if not isinstance(v, (list, tuple)) or len(v) != 3:
+        raise OpError(f"'{key}' must be [x, y, z]")
+    return np.array([_num({"v": x}, "v", lo=lo, hi=hi) for x in v], dtype=float)
+
+
+def _new(vertices, faces) -> trimesh.Trimesh:
+    return trimesh.Trimesh(np.asarray(vertices, float), np.asarray(faces, np.int64), process=False)
+
+
+def _check(m: trimesh.Trimesh) -> trimesh.Trimesh:
+    if len(m.faces) == 0:
+        raise OpError("The operation left nothing (empty mesh).")
+    if len(m.faces) > MAX_FACES:
+        raise OpError(f"Result has {len(m.faces):,} triangles (limit {MAX_FACES:,}). Simplify first.")
+    if not np.isfinite(m.vertices).all():
+        raise OpError("Result contains invalid (NaN/inf) coordinates.")
+    return m
+
+
+def _bounds(m):
+    return m.bounds[0], m.bounds[1]
+
+
+def _transform(m, T):
+    v = np.c_[m.vertices, np.ones(len(m.vertices))] @ np.asarray(T).T
+    f = m.faces.copy()
+    if np.linalg.det(np.asarray(T)[:3, :3]) < 0:   # mirrored -> keep outward-facing winding
+        f = f[:, ::-1]
+    return _new(v[:, :3], f)
+
+
+def _mat_translate(t):
+    T = np.eye(4); T[:3, 3] = t
+    return T
+
+
+def _drop(m):
+    return _transform(m, _mat_translate([0, 0, -m.bounds[0][2]]))
+
+
+def analyze(m: trimesh.Trimesh) -> dict:
+    """Health + size report (shown in the UI as the 'Measure / Info' panel)."""
+    n = len(m.faces)
+    edges = np.sort(m.edges, axis=1)
+    _, cnt = np.unique(edges, axis=0, return_counts=True) if n else (None, np.array([]))
+    boundary = int((cnt == 1).sum()); nonmanifold = int((cnt > 2).sum())
+    lo, hi = m.bounds if n else (np.zeros(3), np.zeros(3))
+    wt = bool(m.is_watertight)
+    vol = float(m.volume) if wt else float(abs(m.volume)) if n else 0.0
+    try:
+        com = m.center_mass.tolist() if wt and m.volume > 0 else m.centroid.tolist()
+    except Exception:
+        com = m.centroid.tolist()
+    try:
+        comps = len(m.split(only_watertight=False)) if n < 400_000 else None
+    except Exception:
+        comps = None
+    return {"triangles": int(n), "vertices": int(len(m.vertices)), "watertight": wt,
+            "winding_consistent": bool(m.is_winding_consistent), "boundary_edges": boundary,
+            "nonmanifold_edges": nonmanifold, "inverted": bool(wt and m.volume < 0),
+            "volume_mm3": round(vol, 2), "area_mm2": round(float(m.area), 2),
+            "size_mm": (hi - lo).round(3).tolist(), "min_mm": lo.round(3).tolist(), "max_mm": hi.round(3).tolist(),
+            "center_mm": ((lo + hi) / 2).round(3).tolist(), "center_of_mass_mm": np.round(com, 3).tolist(),
+            "components": comps}
+
+
+def fill_boundary_loops(m: trimesh.Trimesh, max_loop=20000) -> int:
+    """Close open boundary loops with a centroid fan (trimesh.fill_holes only handles tiny holes).
+    Returns the number of loops closed. Good for flat/gently curved holes; very concave holes may look rough."""
+    f = m.faces
+    de = np.vstack([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
+    key = np.sort(de, axis=1)
+    _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
+    bnd = de[cnt[inv.reshape(-1)] == 1]
+    if len(bnd) == 0:
+        return 0
+    rem: dict = {}
+    for a_, b_ in bnd:
+        rem.setdefault(int(a_), []).append(int(b_))
+    cycles = []
+    while True:
+        start = next((k for k, v in rem.items() if v), None)
+        if start is None:
+            break
+        cur = rem[start].pop()
+        path, pos = [start], {start: 0}
+        while True:
+            if cur in pos:                       # closed a simple cycle (handles bow-tie vertices)
+                i = pos[cur]
+                if len(path) - i >= 3:
+                    cycles.append(path[i:])
+                for v in path[i + 1:]:
+                    del pos[v]
+                path = path[:i + 1]
+            else:
+                pos[cur] = len(path)
+                path.append(cur)
+            outs = rem.get(cur)
+            if not outs:
+                break
+            cur = outs.pop()
+    new_faces, new_verts, loops = [], [], 0
+    base = len(m.vertices)
+    for loop in cycles:
+        if len(loop) > max_loop:
+            continue
+        c = m.vertices[loop].mean(0)
+        ci = base + len(new_verts)
+        new_verts.append(c)
+        for i, a_ in enumerate(loop):
+            new_faces.append([loop[(i + 1) % len(loop)], a_, ci])
+        loops += 1
+    if loops:
+        m.vertices = np.vstack([m.vertices, np.array(new_verts)])
+        m.faces = np.vstack([m.faces, np.array(new_faces, dtype=np.int64)])
+    return loops
+
+
+# ------------------------------------------------------------------ transforms
+def op_translate(m, p):
+    d = [_num(p, k, 0) for k in ("dx", "dy", "dz")]
+    return _transform(m, _mat_translate(d)), {}
+
+
+def op_rotate(m, p):
+    """Rotate about the bounding-box centre, X then Y then Z (degrees)."""
+    rx, ry, rz = (_num(p, k, 0, -3600, 3600) for k in ("rx", "ry", "rz"))
+    lo, hi = _bounds(m); c = (lo + hi) / 2
+    R = trimesh.transformations.euler_matrix(math.radians(rx), math.radians(ry), math.radians(rz), "sxyz")
+    T = _mat_translate(c) @ R @ _mat_translate(-c)
+    return _transform(m, T), {}
+
+
+def op_scale(m, p):
+    f = p.get("factor")
+    sx, sy, sz = ((_num(p, k, f if f is not None else 1.0, 1e-3, 1e3)) for k in ("sx", "sy", "sz"))
+    pivot = p.get("pivot", "base")
+    lo, hi = _bounds(m)
+    c = {"origin": np.zeros(3), "center": (lo + hi) / 2,
+         "base": np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])}.get(pivot)
+    if c is None:
+        raise OpError("pivot must be base | center | origin")
+    S = np.diag([sx, sy, sz, 1.0])
+    out = _transform(m, _mat_translate(c) @ S @ _mat_translate(-c))
+    if max(out.extents) > 5000:
+        raise OpError("Result would be larger than 5 m — check your units.")
+    return out, {}
+
+
+def op_mirror(m, p):
+    ax = {"x": 0, "y": 1, "z": 2}.get(str(p.get("axis", "")).lower())
+    if ax is None:
+        raise OpError("axis must be x | y | z")
+    lo, hi = _bounds(m); c = (lo + hi) / 2
+    S = np.eye(4); S[ax, ax] = -1
+    return _transform(m, _mat_translate(c) @ S @ _mat_translate(-c)), {}
+
+
+def op_place(m, p):
+    """Drop to bed (min Z = 0) and/or centre on the bed origin (X/Y)."""
+    t = np.zeros(3); lo, hi = _bounds(m)
+    if p.get("center_xy"):
+        t[:2] = -((lo + hi) / 2)[:2]
+    if p.get("drop", True):
+        t[2] = -lo[2]
+    return _transform(m, _mat_translate(t)), {}
+
+
+# ------------------------------------------------------------------ repair / simplify
+def op_repair(m, p):
+    before = analyze(m)
+    rep = {"before": {k: before[k] for k in ("triangles", "watertight", "boundary_edges", "nonmanifold_edges", "inverted")}}
+    m = m.copy()
+    steps = []
+    if p.get("remove_duplicates", True):
+        nf = len(m.faces)
+        m.merge_vertices()
+        m.update_faces(m.unique_faces())
+        m.update_faces(m.nondegenerate_faces())
+        m.remove_unreferenced_vertices()
+        steps.append(f"removed {nf - len(m.faces)} duplicate/degenerate faces, merged vertices")
+    if p.get("keep_largest", False) and len(m.faces):
+        parts = m.split(only_watertight=False)
+        if len(parts) > 1:
+            parts.sort(key=lambda x: len(x.faces), reverse=True)
+            steps.append(f"dropped {len(parts) - 1} small floating piece(s)")
+            m = parts[0]
+    if p.get("fix_normals", True):
+        trimesh.repair.fix_winding(m)
+        trimesh.repair.fix_inversion(m)
+        trimesh.repair.fix_normals(m, multibody=True)
+        steps.append("made face directions consistent / outward")
+    if p.get("fill_holes", True):
+        was = m.is_watertight
+        trimesh.repair.fill_holes(m)
+        if not m.is_watertight:
+            fill_boundary_loops(m)
+        trimesh.repair.fix_normals(m, multibody=True)
+        if not was:
+            steps.append("filled holes" + (" → now watertight" if m.is_watertight else " (some remain)"))
+    m = _check(m)
+    after = analyze(m)
+    rep["after"] = {k: after[k] for k in ("triangles", "watertight", "boundary_edges", "nonmanifold_edges", "inverted")}
+    rep["steps"] = steps
+    rep["message"] = ("Mesh is watertight ✔" if after["watertight"] else
+                      "Still not watertight — it may have complex holes or self-intersections; the slicer may still cope, "
+                      "or try Simplify/Hollow-free workflow in another tool.")
+    return m, rep
+
+
+def op_simplify(m, p):
+    if not have_simplify():
+        raise OpError("Simplify needs the 'fast-simplification' package (pip install fast-simplification).")
+    keep = _num(p, "keep_ratio", 0.5, 0.02, 0.98)
+    n0 = len(m.faces)
+    target = max(8, int(n0 * keep))
+    out = m.simplify_quadric_decimation(face_count=target)
+    out = _check(_new(out.vertices, out.faces))
+    return out, {"before_triangles": n0, "after_triangles": int(len(out.faces)), "watertight": bool(out.is_watertight),
+                 "message": f"{n0:,} → {len(out.faces):,} triangles"}
+
+
+# ------------------------------------------------------------------ booleans
+def _need_boolean():
+    if not have_boolean():
+        raise OpError("Boolean operations need the 'manifold3d' package (pip install manifold3d).")
+
+
+def _prep_solid(m, what="model"):
+    """Booleans need a closed, outward-oriented mesh: fix cheaply, otherwise explain."""
+    if not m.is_watertight or not m.is_winding_consistent:
+        m = m.copy(); m.merge_vertices(); trimesh.repair.fix_winding(m); trimesh.repair.fill_holes(m)
+        trimesh.repair.fix_normals(m)
+    if not m.is_watertight:
+        raise OpError(f"The {what} isn't watertight, so a boolean can't be computed. Run Fix (repair) first.")
+    if m.volume < 0:
+        m = m.copy(); m.invert()
+    return m
+
+
+def _boolean(a, b, kind):
+    _need_boolean()
+    a = _prep_solid(a); b = _prep_solid(b, "tool shape")
+    try:
+        r = {"union": trimesh.boolean.union, "difference": trimesh.boolean.difference,
+             "intersection": trimesh.boolean.intersection}[kind]([a, b], engine="manifold")
+    except Exception as e:
+        raise OpError(f"Boolean failed: {e}")
+    if r is None or len(r.faces) == 0:
+        raise OpError("The result is empty (shapes may not overlap).")
+    return _check(_new(r.vertices, r.faces))
+
+
+def primitive(spec: dict) -> trimesh.Trimesh:
+    t = spec.get("type")
+    pos = _vec(spec, "position")
+    if t == "box":
+        ext = _vec(spec, "size", (10, 10, 10), 0.01, 5000)
+        m = trimesh.creation.box(extents=ext)
+    elif t == "cylinder":
+        d = _num(spec, "diameter", 10, 0.01, 5000); h = _num(spec, "height", 10, 0.01, 5000)
+        m = trimesh.creation.cylinder(radius=d / 2, height=h, sections=64)
+        axis = spec.get("axis", "z")
+        if axis == "x":
+            m.apply_transform(trimesh.transformations.rotation_matrix(math.pi / 2, [0, 1, 0]))
+        elif axis == "y":
+            m.apply_transform(trimesh.transformations.rotation_matrix(math.pi / 2, [1, 0, 0]))
+        elif axis != "z":
+            raise OpError("cylinder axis must be x | y | z")
+    elif t == "sphere":
+        d = _num(spec, "diameter", 10, 0.01, 5000)
+        m = trimesh.creation.icosphere(subdivisions=4, radius=d / 2)
+    else:
+        raise OpError("primitive type must be box | cylinder | sphere")
+    m = _new(m.vertices + pos, m.faces)
+    return m
+
+
+def op_boolean(m, p):
+    kind = p.get("kind")
+    if kind not in ("union", "difference", "intersection"):
+        raise OpError("kind must be union | difference | intersection")
+    tool = primitive(p.get("primitive") or {})
+    out = _boolean(m, tool, kind)
+    return out, {"message": f"{kind} with {p['primitive']['type']}"}
+
+
+def op_base(m, p):
+    """Flat base plate (or thin brim) under the model. style: rect | round | outline (follows the footprint)."""
+    style = p.get("style", "outline")
+    margin = _num(p, "margin", 3, 0, 500); th = _num(p, "thickness", 2, 0.1, 100)
+    overlap = min(0.4, th / 2)
+    m = _drop(m); lo, hi = _bounds(m)
+    from shapely.geometry import Point, box as sbox
+    if style == "rect":
+        poly = sbox(lo[0] - margin, lo[1] - margin, hi[0] + margin, hi[1] + margin)
+    elif style == "round":
+        c = (lo + hi) / 2; r = math.hypot(*(hi - lo)[:2]) / 2 + margin
+        poly = Point(c[0], c[1]).buffer(r, 64)
+    elif style == "outline":
+        from shapely.ops import unary_union
+        from shapely.geometry import Polygon
+        tri = m.vertices[m.faces][:, :, :2]
+        # only footprint-relevant: whole silhouette, via triangles' XY projection (cheap sampling for huge meshes)
+        if len(tri) > 200_000:
+            tri = tri[np.random.default_rng(0).choice(len(tri), 200_000, replace=False)]
+        e1, e2 = tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]
+        area = np.abs(e1[:, 0] * e2[:, 1] - e1[:, 1] * e2[:, 0]) > 1e-9
+        polys = [Polygon(t) for t in tri[area]]
+        poly = unary_union(polys).buffer(margin, 32).simplify(0.05)
+        if poly.is_empty:
+            raise OpError("Could not compute the model footprint.")
+        if poly.geom_type == "MultiPolygon":
+            poly = poly.convex_hull        # separate islands: bridge them with one base
+        poly = poly.buffer(0)
+    else:
+        raise OpError("style must be rect | round | outline")
+    plate = trimesh.creation.extrude_polygon(poly, th + overlap)
+    plate = _new(plate.vertices + [0, 0, -th], plate.faces)    # spans z = -th .. +overlap
+    out = _boolean(m, plate, "union")
+    return _drop(out), {"message": f"added {th:g} mm {style} base (+{margin:g} mm margin)"}
+
+
+# ------------------------------------------------------------------ cut / split
+def op_cut(m, p):
+    axis = p.get("axis")
+    if axis in ("x", "y", "z"):
+        normal = np.eye(3)[{"x": 0, "y": 1, "z": 2}[axis]]
+        pos = _num(p, "position", None)
+        origin = normal * pos
+    else:
+        normal = _vec(p, "normal", (0, 0, 1)); origin = _vec(p, "origin")
+        if np.linalg.norm(normal) < 1e-9:
+            raise OpError("plane normal can't be zero")
+        normal = normal / np.linalg.norm(normal)
+    keep = p.get("keep", "above")
+    if keep not in ("above", "below", "both"):
+        raise OpError("keep must be above | below | both")
+    mm = m
+    if not m.is_watertight:
+        mm = op_repair(m, {"keep_largest": False})[0]
+    cap = bool(mm.is_watertight)
+    warn = "" if cap else "Model isn't watertight so the cut faces were left open — run Fix first for a capped cut."
+    parts = []
+    if keep in ("above", "both"):
+        a = mm.slice_plane(origin, normal, cap=cap)
+        if a is not None and len(a.faces):
+            parts.append(("above", a, normal))
+    if keep in ("below", "both"):
+        b = mm.slice_plane(origin, -normal, cap=cap)
+        if b is not None and len(b.faces):
+            parts.append(("below", b, -normal))
+    if not parts:
+        raise OpError("The plane doesn't cut through the model (nothing left on the chosen side).")
+    if keep == "both" and len(parts) == 2 and p.get("lay_flat", True):
+        gap = _num(p, "gap", 5, 0, 200)
+        placed, x = [], 0.0
+        for _, part, n in parts:           # rotate so the cut face (outward normal = -n) points down
+            R = trimesh.geometry.align_vectors(-n, [0, 0, -1])
+            q = _transform(_new(part.vertices, part.faces), R)
+            lo, hi = _bounds(q)
+            q = _transform(q, _mat_translate([x - lo[0], -(lo[1] + hi[1]) / 2, -lo[2]]))
+            x += (hi[0] - lo[0]) + gap
+            placed.append(q)
+        out = trimesh.util.concatenate(placed)
+    elif len(parts) == 1:
+        out = parts[0][1]
+        if p.get("lay_flat", True):
+            R = trimesh.geometry.align_vectors(-parts[0][2], [0, 0, -1])
+            out = _drop(_transform(_new(out.vertices, out.faces), R))
+    else:
+        out = trimesh.util.concatenate([x[1] for x in parts])
+    out = _check(_new(out.vertices, out.faces))
+    return out, {"message": f"kept {keep}; {len(parts)} piece(s)" + ((" · " + warn) if warn else ""), "warning": warn}
+
+
+# ------------------------------------------------------------------ hollow
+def op_hollow(m, p):
+    """Hollow with wall thickness via a distance field (voxel SDF → marching cubes → boolean difference).
+    Accuracy is ~ one voxel, shown in the report. Optional drain hole at the lowest point of the cavity."""
+    if not have_hollow():
+        raise OpError("Hollow needs 'manifold3d' and 'scikit-image'.")
+    from scipy import ndimage
+    from skimage import measure
+    wall = _num(p, "wall", 2, 0.2, 100); drain = _num(p, "drain_diameter", 0, 0, 100)
+    mm = _prep_solid(m)
+    ext = mm.extents
+    if wall * 2.2 >= ext.min():
+        raise OpError(f"Wall {wall:g} mm is too thick for this model (thinnest side is {ext.min():.1f} mm). "
+                      "Lithophanes and thin plates can't be hollowed.")
+    pitch = max(wall / 3.0, float((np.prod(ext + 2 * wall) / 6e6) ** (1 / 3)))
+    if pitch > wall / 1.5:
+        raise OpError(f"Wall {wall:g} mm is too thin for a model this big (needs ≈{pitch * 1.5:.1f} mm+). "
+                      "Increase the wall or scale the model down first.")
+    vox = mm.voxelized(pitch).fill()
+    inside = np.pad(vox.matrix, 2)
+    d_in = ndimage.distance_transform_edt(inside) * pitch
+    d_out = ndimage.distance_transform_edt(~inside) * pitch
+    sdf = np.where(inside, d_in - 0.5 * pitch, -(d_out - 0.5 * pitch))      # +ve inside, ≈ signed distance to surface
+    field = sdf - wall                                                       # cavity = points deeper than `wall`
+    if field.max() <= 0:
+        raise OpError("Nothing left to hollow with this wall thickness.")
+    verts, faces, _, _ = measure.marching_cubes(field, 0.0, spacing=(pitch, pitch, pitch))
+    # grid index -> world (voxel transform, minus the 2-voxel pad)
+    idx = verts / pitch - 2
+    world = trimesh.transform_points(idx, vox.transform)
+    cav = _new(world, faces[:, ::-1])
+    cav.merge_vertices(); trimesh.repair.fix_normals(cav); trimesh.repair.fill_holes(cav)
+    if cav.volume < 0:
+        cav.invert()
+    if not cav.is_watertight or len(cav.faces) == 0:
+        raise OpError("Could not build a clean cavity for this shape. Try a different wall thickness.")
+    parts = [c for c in cav.split(only_watertight=False) if c.volume > 0]
+    cav = trimesh.util.concatenate(parts) if len(parts) > 1 else parts[0]
+    out = _boolean(mm, cav, "difference")
+    if drain > 0:
+        low = cav.vertices[cav.vertices[:, 2] < cav.bounds[0][2] + pitch * 1.5]
+        xy = low[:, :2].mean(0)
+        z0 = mm.bounds[0][2] - 1.0; z1 = cav.bounds[0][2] + wall * 0.5 + pitch
+        cyl = trimesh.creation.cylinder(radius=drain / 2, height=z1 - z0, sections=48)
+        cyl = _new(cyl.vertices + [xy[0], xy[1], (z0 + z1) / 2], cyl.faces)
+        out = _boolean(out, cyl, "difference")
+    saved = 100 * (1 - out.volume / mm.volume) if out.volume > 0 else 0
+    return out, {"message": f"hollowed: wall {wall:g} mm, volume −{saved:.0f}% (resolution ≈ {pitch:.2f} mm)"
+                 + (f", drain hole Ø{drain:g}" if drain else ""), "resolution_mm": round(pitch, 3),
+                 "volume_saved_pct": round(saved, 1)}
+
+
+# ------------------------------------------------------------------ text
+FONTS = {"sans": ("DejaVu Sans", "normal"), "sans-bold": ("DejaVu Sans", "bold"),
+         "serif": ("DejaVu Serif", "normal"), "serif-bold": ("DejaVu Serif", "bold"),
+         "mono": ("DejaVu Sans Mono", "normal")}
+# face -> (normal, u (text right), v (text up)); right-handed so text reads correctly seen from outside
+FACES = {"top": ([0, 0, 1], [1, 0, 0], [0, 1, 0]), "bottom": ([0, 0, -1], [1, 0, 0], [0, -1, 0]),
+         "front": ([0, -1, 0], [1, 0, 0], [0, 0, 1]), "back": ([0, 1, 0], [-1, 0, 0], [0, 0, 1]),
+         "left": ([-1, 0, 0], [0, -1, 0], [0, 0, 1]), "right": ([1, 0, 0], [0, 1, 0], [0, 0, 1])}
+
+
+def text_polygon(text: str, font: str, height: float):
+    """Text outline as a shapely (Multi)Polygon, capital-letter height = `height` mm, centred on (0,0)."""
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.textpath import TextPath
+    from shapely.geometry import Polygon
+    from shapely import affinity
+    fam, weight = FONTS.get(font, FONTS["sans"])
+    fp = FontProperties(family=fam, weight=weight)
+    cap = TextPath((0, 0), "H", size=100, prop=fp).get_extents().height
+    tp = TextPath((0, 0), text, size=100 * height / cap, prop=fp)
+    rings = [r for r in tp.to_polygons(closed_only=True) if len(r) >= 3]
+    if not rings:
+        raise OpError("That text has no printable outlines (try letters/numbers).")
+    geom = None
+    for r in rings:                      # even-odd fill → holes in O, A, 8 …
+        pg = Polygon(r).buffer(0)
+        geom = pg if geom is None else geom.symmetric_difference(pg)
+    minx, miny, maxx, maxy = geom.bounds
+    return affinity.translate(geom, -(minx + maxx) / 2, -(miny + maxy) / 2)
+
+
+def op_text(m, p):
+    txt = str(p.get("text", "")).strip()
+    if not txt or len(txt) > 60:
+        raise OpError("Text must be 1–60 characters.")
+    if any(ord(c) < 32 for c in txt):
+        raise OpError("Text contains control characters.")
+    height = _num(p, "height", 8, 1, 500); depth = _num(p, "depth", 1, 0.1, 100)
+    mode = p.get("mode", "emboss")
+    face = p.get("face", "top")
+    if mode not in ("emboss", "deboss") or face not in FACES:
+        raise OpError("mode must be emboss|deboss and face one of " + "|".join(FACES))
+    ou, ov = _num(p, "offset_u", 0), _num(p, "offset_v", 0)
+    rot = _num(p, "rotation", 0, -360, 360)
+    poly = text_polygon(txt, p.get("font", "sans"), height)
+    n, u, v = (np.array(x, float) for x in FACES[face])
+    lo, hi = _bounds(m); c = (lo + hi) / 2
+    half = (hi - lo) / 2
+    face_pt = c + n * np.abs(n * half).sum()                 # centre of the bounding-box face
+    overlap = 0.3
+    z0, z1 = (-overlap, depth) if mode == "emboss" else (-depth, overlap + 0.2)
+    polys = [g for g in (poly.geoms if hasattr(poly, "geoms") else [poly]) if g.area > 1e-6]
+    solid = trimesh.util.concatenate([trimesh.creation.extrude_polygon(g, z1 - z0) for g in polys])
+    verts = solid.vertices + [0, 0, z0]
+    a = math.radians(rot)
+    x = verts[:, 0] * math.cos(a) - verts[:, 1] * math.sin(a) + ou
+    y = verts[:, 0] * math.sin(a) + verts[:, 1] * math.cos(a) + ov
+    world = face_pt + np.outer(x, u) + np.outer(y, v) + np.outer(verts[:, 2], n)
+    f = solid.faces
+    if np.linalg.det(np.array([u, v, n])) < 0:
+        f = f[:, ::-1]
+    tool = _new(world, f)
+    out = _boolean(m, tool, "union" if mode == "emboss" else "difference")
+    note = "Text is placed on the flat bounding-box face; on curved/sloped surfaces it may float or sink."
+    return out, {"message": f"{mode} “{txt}” on {face}", "note": note}
+
+
+OPS = {"translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
+       "repair": op_repair, "simplify": op_simplify, "cut": op_cut, "hollow": op_hollow, "base": op_base,
+       "boolean": op_boolean, "text": op_text}
+
+
+def label(op: str, p: dict) -> str:
+    g = lambda k, d="": p.get(k, d)
+    try:
+        return {
+            "translate": lambda: f"Move ({g('dx', 0):g}, {g('dy', 0):g}, {g('dz', 0):g}) mm",
+            "rotate": lambda: f"Rotate ({g('rx', 0):g}°, {g('ry', 0):g}°, {g('rz', 0):g}°)",
+            "scale": lambda: "Scale ×" + ("%g" % g('factor') if p.get('factor') is not None else f"({g('sx', 1):.3g}, {g('sy', 1):.3g}, {g('sz', 1):.3g})"),
+            "mirror": lambda: f"Mirror {str(g('axis')).upper()}",
+            "place": lambda: "Drop to bed" + (" + centre" if p.get("center_xy") else ""),
+            "repair": lambda: "Fix / repair",
+            "simplify": lambda: f"Simplify (keep {g('keep_ratio', 0.5) * 100:.0f}%)",
+            "cut": lambda: f"Cut {str(g('axis', 'plane')).upper()}={g('position', '')} keep {g('keep', 'above')}",
+            "hollow": lambda: f"Hollow {g('wall', 2):g} mm wall" + (f" + Ø{g('drain_diameter'):g} drain" if p.get('drain_diameter') else ""),
+            "base": lambda: f"Add base ({g('style', 'outline')}, {g('thickness', 2):g} mm)",
+            "boolean": lambda: f"{str(g('kind')).title()} {(p.get('primitive') or {}).get('type', '')}",
+            "text": lambda: f"{str(g('mode', 'emboss')).title()} “{g('text')}”",
+            "import": lambda: str(g("label", "Import")),
+        }[op]()
+    except Exception:
+        return op
+
+
+def apply(m: trimesh.Trimesh, op: str, params: dict) -> tuple[trimesh.Trimesh, dict]:
+    fn = OPS.get(op)
+    if not fn:
+        raise OpError(f"unknown operation '{op}'")
+    out, rep = fn(m, params or {})
+    return _check(out), rep
+
+
+# ------------------------------------------------------------------ import / validation
+ALLOWED = {"stl", "obj", "3mf"}
+IMAGE_EXT = {"png", "jpg", "jpeg", "webp", "bmp", "gif"}
+
+
+def sniff(data: bytes, ext: str) -> str:
+    """Validate that the bytes really are what the extension claims. Returns '' or an error message."""
+    if ext == "stl":
+        if len(data) >= 84:
+            n = int.from_bytes(data[80:84], "little")
+            if 84 + 50 * n == len(data):
+                return ""
+        head = data[:1024].lstrip().lower()
+        if head.startswith(b"solid") and b"facet" in data[:4096].lower():
+            return ""
+        return "This doesn't look like a valid STL file (neither binary nor ASCII STL)."
+    if ext == "obj":
+        try:
+            txt = data[:65536].decode("utf-8", "strict") if True else ""
+        except UnicodeDecodeError:
+            try:
+                txt = data[:65536].decode("latin-1")
+            except Exception:
+                return "This doesn't look like a text OBJ file."
+        if any(ord(ch) < 9 for ch in txt):
+            return "This doesn't look like a text OBJ file (binary data found)."
+        if "\nv " not in "\n" + txt:
+            return "No vertices found — not a valid OBJ file."
+        return ""
+    if ext == "3mf":
+        if not data.startswith(b"PK"):
+            return "This isn't a 3MF (zip) file."
+        try:
+            z = zipfile.ZipFile(io.BytesIO(data))
+            names = z.namelist()
+            if not any(n.lower().endswith(".model") for n in names):
+                return "3MF has no 3D model part."
+            if sum(i.file_size for i in z.infolist()) > 600 * 1024 * 1024:
+                return "3MF expands to an unreasonable size (possible zip bomb)."
+        except zipfile.BadZipFile:
+            return "Corrupt 3MF (bad zip)."
+        return ""
+    return f"Unsupported file type .{ext}"
+
+
+def _3mf_unit_scale(data: bytes) -> float:
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+        name = next(n for n in z.namelist() if n.lower().endswith(".model"))
+        head = z.read(name)[:2000].decode("utf-8", "ignore")
+        import re
+        mt = re.search(r'unit="(\w+)"', head)
+        return {"micron": 0.001, "millimeter": 1.0, "centimeter": 10.0, "inch": 25.4, "foot": 304.8, "meter": 1000.0}.get(mt.group(1), 1.0) if mt else 1.0
+    except Exception:
+        return 1.0
+
+
+def load_mesh(data: bytes, ext: str) -> tuple[trimesh.Trimesh, list[str]]:
+    """Parse STL/OBJ/3MF into ONE mesh (mm). Multiple objects are merged (colours/materials are dropped)."""
+    warnings = []
+    ft = ext.lower()
+    try:
+        obj = trimesh.load(io.BytesIO(data), file_type=ft, process=False, force="scene" if ft == "3mf" else "mesh",
+                           skip_materials=True) if ft != "3mf" else trimesh.load(io.BytesIO(data), file_type=ft, process=False)
+    except Exception as e:
+        raise OpError(f"Could not read the {ft.upper()} file: {e}")
+    if isinstance(obj, trimesh.Scene):
+        geoms = [g for g in obj.dump() if isinstance(g, trimesh.Trimesh)]       # applies build transforms
+        if not geoms:
+            raise OpError("The file contains no triangle meshes.")
+        if len(geoms) > 1:
+            warnings.append(f"{len(geoms)} objects were merged into one mesh (colours/materials are not kept).")
+        mesh = trimesh.util.concatenate(geoms)
+    else:
+        mesh = obj
+    if not isinstance(mesh, trimesh.Trimesh) or len(mesh.faces) == 0:
+        raise OpError("The file contains no triangles (maybe it is a curve/point file).")
+    if len(mesh.faces) > MAX_FACES:
+        raise OpError(f"{len(mesh.faces):,} triangles is above the {MAX_FACES:,} limit.")
+    mesh = _new(mesh.vertices, mesh.faces)
+    mesh.merge_vertices()
+    if not np.isfinite(mesh.vertices).all():
+        raise OpError("File contains invalid coordinates.")
+    k = 1.0
+    if ft == "3mf":
+        k = _3mf_unit_scale(data)
+        if k != 1.0:
+            mesh = _new(mesh.vertices * k, mesh.faces)
+            warnings.append(f"3MF declared units; converted to mm (×{k:g}).")
+    size = float(mesh.extents.max())
+    if size < 2:
+        warnings.append(f"The model is only {size:.3g} mm across — if it should be bigger, re-import with units set to inch/cm/m.")
+    elif size > 1500:
+        warnings.append(f"The model is {size:.0f} mm across — if that's wrong, re-import with units set to mm/in correctly.")
+    return mesh, warnings

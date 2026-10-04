@@ -1,0 +1,182 @@
+"""Visibility + follow-opt-out rules. ONE place decides who may see what; every route calls it.
+
+Levels (default PRIVATE for every build / upload / project):
+  private   - only the owner (browser session that created it)
+  followers - the owner + signed-in accounts that follow the owner's account (needs social = "on" on both sides)
+  public    - anyone (and, for Showcase projects, listed in Trending / Free / For You / search)
+
+Account options (users[sid]["privacy"]):
+  profile  : public | followers | private   who can see the profile page / its link-outs / follower count
+  social   : on | off                       "off" = fully opted out: cannot follow, cannot be followed, no follow
+                                            button, no follower count or list. Existing follows are removed at once.
+  default_visibility : visibility given to new builds / projects (teens: private by default, never "public")
+
+Checks run on every request against live data, so a change takes effect immediately.
+Denials are reported as 404 (not 403) so the existence of a private item is not leaked.
+"""
+from __future__ import annotations
+
+import hashlib
+import hmac
+import secrets
+import time
+
+from .. import config
+from .identity import Actor
+from .store import USERS
+
+LEVELS = ("private", "followers", "public")
+SOCIAL = ("on", "off")
+
+
+def defaults_for(user: dict | None, teen: bool) -> dict:
+    return {"profile": "private" if teen else "public", "social": "on", "default_visibility": "private"}
+
+
+def of(user: dict | None) -> dict:
+    """Stored options over defaults (accounts created before privacy existed get the teen/adult defaults)."""
+    teen = False
+    if user and user.get("dob"):
+        from .identity import age_of
+        teen = age_of(user) < config.ADULT_AGE
+    return {**defaults_for(user, teen), **((user or {}).get("privacy") or {})}
+
+
+def social_on(user: dict | None) -> bool:
+    return bool(user) and of(user)["social"] == "on"
+
+
+def effective(visibility: str | None, owner_user: dict | None) -> str:
+    """'followers' collapses to 'private' when the owner has opted out of following / has no account."""
+    v = visibility if visibility in LEVELS else "private"
+    if v == "followers" and not social_on(owner_user):
+        return "private"
+    return v
+
+
+def can_view(actor: Actor, owner_sid: str | None, visibility: str | None, users: dict | None = None) -> bool:
+    if owner_sid and actor.sid == owner_sid:
+        return True
+    if owner_sid is None:                 # curated / example content
+        return (visibility or "public") == "public"
+    users = USERS.read() if users is None else users
+    ou = users.get(owner_sid)
+    v = effective(visibility, ou)
+    if v == "public":
+        return True
+    if v == "followers":
+        me = users.get(actor.sid) if actor.sid else None
+        return bool(me) and social_on(me) and ou["id"] in me.get("following", [])
+    return False
+
+
+def can_view_profile(actor: Actor, target_uid: str, users: dict | None = None) -> bool:
+    users = USERS.read() if users is None else users
+    owner_sid = next((s for s, u in users.items() if u["id"] == target_uid), None)
+    if owner_sid is None:
+        return False
+    return can_view(actor, owner_sid, of(users[owner_sid])["profile"], users)
+
+
+def can_follow(actor: Actor, target_user: dict | None, target_is_example=False) -> bool:
+    if not actor.user or not social_on(actor.user):
+        return False
+    if target_is_example:
+        return True
+    return (bool(target_user) and social_on(target_user) and of(target_user)["profile"] != "private"
+            and target_user["id"] != actor.user["id"])
+
+
+def check_level(actor: Actor, level: str) -> str:
+    """Validate a visibility a user asks for. Raises ValueError/PermissionError with a friendly message."""
+    if level not in LEVELS:
+        raise ValueError(f"visibility must be one of {list(LEVELS)}")
+    if level != "private":
+        if not actor.user:
+            raise PermissionError("Create an account to share with followers or the public. Without one everything stays private.")
+        if level == "followers" and not social_on(actor.user):
+            raise PermissionError("You have opted out of following, so 'followers only' is unavailable. Turn following back on in Privacy settings, or choose Private/Public.")
+    return level
+
+
+def default_level(actor: Actor) -> str:
+    if not actor.user:
+        return "private"
+    d = of(actor.user)["default_visibility"]
+    if d == "public" and actor.is_teen:
+        return "private"
+    return d if d in LEVELS and not (d == "followers" and not social_on(actor.user)) else "private"
+
+
+def set_privacy(actor: Actor, body: dict) -> dict:
+    if not actor.user:
+        raise PermissionError("sign up first")
+    cur = of(actor.user)
+    new = dict(cur)
+    if "profile" in body:
+        if body["profile"] not in LEVELS:
+            raise ValueError("profile must be public | followers | private")
+        new["profile"] = body["profile"]
+    if "social" in body:
+        if body["social"] not in SOCIAL:
+            raise ValueError("social must be on | off")
+        new["social"] = body["social"]
+    if "default_visibility" in body:
+        if body["default_visibility"] not in LEVELS:
+            raise ValueError("default_visibility must be private | followers | public")
+        if body["default_visibility"] == "public" and actor.is_teen:
+            raise PermissionError("Accounts under 18 can't default to Public; choose Public per project instead.")
+        new["default_visibility"] = body["default_visibility"]
+    if new["social"] == "off":
+        if new["profile"] == "followers":
+            new["profile"] = "private"            # nobody can follow, so 'followers' would mean private
+        if new["default_visibility"] == "followers":
+            new["default_visibility"] = "private"
+    uid = actor.user["id"]
+
+    def f(d):
+        u = d[actor.sid]
+        u["privacy"] = new
+        if new["social"] == "off":                # opt out: remove follows in both directions, immediately
+            u["following"] = []
+            for other in d.values():
+                if uid in other.get("following", []):
+                    other["following"].remove(uid)
+    USERS.update(f)
+    return new
+
+
+def followers_of(uid: str) -> list[dict]:
+    return [{"id": u["id"], "display_name": u["display_name"]} for u in USERS.read().values()
+            if uid in u.get("following", []) and social_on(u)]
+
+
+# ---- signed, expiring file links (so a slicer on the owner's PC can fetch a PRIVATE build without cookies) ----
+_KEY_FILE = config.DATA / "link.key"
+
+
+def _key() -> bytes:
+    if not _KEY_FILE.exists():
+        _KEY_FILE.write_text(secrets.token_hex(32))
+        try:
+            _KEY_FILE.chmod(0o600)
+        except OSError:
+            pass
+    return _KEY_FILE.read_text().strip().encode()
+
+
+def make_token(bid: str, ttl=2 * 3600) -> str:
+    exp = int(time.time()) + ttl
+    sig = hmac.new(_key(), f"{bid}.{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{exp}-{sig}"
+
+
+def check_token(bid: str, token: str) -> bool:
+    try:
+        exp, sig = token.split("-", 1)
+        if int(exp) < time.time():
+            return False
+    except ValueError:
+        return False
+    good = hmac.new(_key(), f"{bid}.{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    return hmac.compare_digest(good, sig)

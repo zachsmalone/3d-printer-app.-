@@ -1,0 +1,370 @@
+{
+ "b2_quads_box.obj": {
+  "ops": {
+   "repair": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 12,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": "Mesh is watertight ✔"
+   },
+   "scale": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 12,
+    "watertight": true,
+    "size": [
+     15.0,
+     15.0,
+     15.0
+    ],
+    "msg": null
+   },
+   "rotate": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 12,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": null
+   },
+   "mirror": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 12,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": null
+   },
+   "place": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 12,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": null
+   },
+   "base": {
+    "status": 200,
+    "sec": 0.03,
+    "ok": true,
+    "tris": 120,
+    "watertight": true,
+    "size": [
+     15.993,
+     15.996,
+     12.0
+    ],
+    "msg": "added 2 mm outline base (+3 mm margin)"
+   },
+   "cut": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 20,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     5.0
+    ],
+    "msg": "kept above; 1 piece(s)"
+   },
+   "hollow": {
+    "status": 200,
+    "sec": 0.09,
+    "ok": true,
+    "tris": 1372,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": "hollowed: wall 2 mm, volume −30% (resolution ≈ 0.67 mm), drain hole Ø3"
+   },
+   "simplify": {
+    "status": 200,
+    "sec": 0.02,
+    "ok": true,
+    "tris": 8,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": "12 → 8 triangles"
+   },
+   "boolean": {
+    "status": 200,
+    "sec": 0.03,
+    "ok": true,
+    "tris": 272,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "msg": "difference with cylinder"
+   },
+   "text": {
+    "status": 200,
+    "sec": 0.04,
+    "ok": true,
+    "tris": 168,
+    "watertight": true,
+    "size": [
+     10.0,
+     10.0,
+     11.0
+    ],
+    "msg": "emboss “ZEIM” on top"
+   }
+  },
+  "exports": {
+   "imported": {
+    "stl": {
+     "status": 200,
+     "sec": 0.01,
+     "kb": 0,
+     "tris": 12,
+     "watertight": true,
+     "winding": true,
+     "size": [
+      10.0,
+      10.0,
+      10.0
+     ]
+    },
+    "obj": {
+     "status": 200,
+     "sec": 0.0,
+     "kb": 0,
+     "tris": 12,
+     "watertight": true,
+     "winding": true,
+     "size": [
+      10.0,
+      10.0,
+      10.0
+     ]
+    },
+    "3mf": {
+     "status": 200,
+     "sec": 0.0,
+     "kb": 1,
+     "tris": 12,
+     "watertight": true,
+     "winding": true,
+     "size": [
+      10.0,
+      10.0,
+      10.0
+     ]
+    }
+   },
+   "chain": {
+    "stl": {
+     "status": 200,
+     "sec": 0.0,
+     "kb": 7,
+     "tris": 152,
+     "watertight": true,
+     "winding": true,
+     "size": [
+      86.0,
+      86.0,
+      82.0
+     ]
+    },
+    "obj": {
+     "status": 200,
+     "sec": 0.0,
+     "kb": 3,
+     "tris": 152,
+     "watertight": true,
+     "winding": true,
+     "size": [
+      86.0,
+      86.0,
+      82.0
+     ]
+    },
+    "3mf": {
+     "status": 200,
+     "sec": 0.0,
+     "kb": 2,
+     "tris": 152,
+     "watertight": true,
+     "winding": true,
+     "size": [
+      86.0,
+      86.0,
+      82.0
+     ]
+    }
+   }
+  },
+  "slice": {
+   "imported": {
+    "status": 200,
+    "sec": 0.55,
+    "ok": true,
+    "msg": null,
+    "stats": {},
+    "log_tail": "10 => Processing triangulated mesh\n20 => Generating perimeters\n30 => Preparing infill\n45 => Making infill\n65 => Searching support spots\n69 => Alert if supports needed\n89 => Calculating overhanging perimeters\n88 => Generating skirt and brim\n90 => Exporting G-code to /tmp/zeim_qa/out/495650948ac0/model.gcode\nSlicing result exported to /tmp/zeim_qa/out/495650948ac0/model.gcode",
+    "gcode_kb": 161,
+    "gcode_layers": 50,
+    "raw_keys": [
+     "available",
+     "ok",
+     "gcode",
+     "layers",
+     "size_kb",
+     "stats",
+     "slicer",
+     "log",
+     "download"
+    ]
+   },
+   "chain": {
+    "status": 200,
+    "sec": 0.71,
+    "ok": true,
+    "msg": null,
+    "stats": {},
+    "log_tail": "10 => Processing triangulated mesh\n20 => Generating perimeters\n30 => Preparing infill\n45 => Making infill\n65 => Searching support spots\n69 => Alert if supports needed\n89 => Calculating overhanging perimeters\n88 => Generating skirt and brim\n90 => Exporting G-code to /tmp/zeim_qa/out/495650948ac0/model.gcode\nSlicing result exported to /tmp/zeim_qa/out/495650948ac0/model.gcode",
+    "gcode_kb": 1618,
+    "gcode_layers": 410,
+    "raw_keys": [
+     "available",
+     "ok",
+     "gcode",
+     "layers",
+     "size_kb",
+     "stats",
+     "slicer",
+     "log",
+     "download"
+    ]
+   }
+  },
+  "open": {
+   "ok": true,
+   "status": 200,
+   "sec": 0.41,
+   "warnings": [],
+   "analysis": {
+    "triangles": 12,
+    "watertight": true,
+    "winding_consistent": true,
+    "boundary_edges": 0,
+    "nonmanifold_edges": 0,
+    "inverted": false,
+    "size_mm": [
+     10.0,
+     10.0,
+     10.0
+    ],
+    "min_mm": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "components": 1
+   },
+   "preview_decimated": false,
+   "payload_kb": 2
+  },
+  "chain": [
+   [
+    "repair",
+    {
+     "status": 200,
+     "sec": 0.02,
+     "ok": true,
+     "tris": 12,
+     "watertight": true,
+     "size": [
+      10.0,
+      10.0,
+      10.0
+     ],
+     "msg": "Mesh is watertight ✔"
+    }
+   ],
+   [
+    "place",
+    {
+     "status": 200,
+     "sec": 0.02,
+     "ok": true,
+     "tris": 12,
+     "watertight": true,
+     "size": [
+      10.0,
+      10.0,
+      10.0
+     ],
+     "msg": null
+    }
+   ],
+   [
+    "scale",
+    {
+     "status": 200,
+     "sec": 0.02,
+     "ok": true,
+     "tris": 12,
+     "watertight": true,
+     "size": [
+      80.0,
+      80.0,
+      80.0
+     ],
+     "msg": null
+    }
+   ],
+   [
+    "base",
+    {
+     "status": 200,
+     "sec": 0.03,
+     "ok": true,
+     "tris": 152,
+     "watertight": true,
+     "size": [
+      86.0,
+      86.0,
+      82.0
+     ],
+     "msg": "added 2 mm outline base (+3 mm margin)"
+    }
+   ]
+  ]
+ }
+}

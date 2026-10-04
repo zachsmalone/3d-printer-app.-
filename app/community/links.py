@@ -1,0 +1,26 @@
+"""Profile link-outs to a creator's other accounts (unverified until OAuth verification exists)."""
+from __future__ import annotations
+
+import re
+
+TEMPLATES = {
+    "tiktok": ("TikTok", "https://www.tiktok.com/@{h}"),
+    "instagram": ("Instagram", "https://www.instagram.com/{h}"),
+    "reddit": ("Reddit", "https://www.reddit.com/user/{h}"),
+    "patreon": ("Patreon", "https://www.patreon.com/{h}"),
+}
+HANDLE = re.compile(r"^[A-Za-z0-9._-]{2,30}$")
+
+
+def clean(links: dict) -> dict:
+    out = {}
+    for k, v in (links or {}).items():
+        if k not in TEMPLATES:
+            raise ValueError(f"unknown platform {k}")
+        h = (v or "").strip().lstrip("@")
+        if not h:
+            continue
+        if not HANDLE.match(h):
+            raise ValueError(f"{TEMPLATES[k][0]} handle may only contain letters, digits . _ - (2-30 chars)")
+        out[k] = {"handle": h, "url": TEMPLATES[k][1].format(h=h), "verified": False}
+    return out

@@ -1,0 +1,12 @@
+# Multi-word allowlist: these exact phrases are removed before checking.
+ball bearing
+ball bearings
+ball joint
+ball joints
+ball screw
+hard core filament
+naked eye
+nut and bolt
+nuts and bolts
+hot end
+cock pit

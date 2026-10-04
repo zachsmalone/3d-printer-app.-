@@ -1,0 +1,94 @@
+# ZEIM additions to the blocked list (one word or phrase per line, '#' = comment, case/accents ignored).
+# Covers hate speech, slurs, sexual terms and unsafe-contact phrases that the LDNOOBW lists miss or only cover in
+# other forms. Editable - changes are picked up without a restart. Matching is on WORD BOUNDARIES (whole words).
+# --- hate / slurs / harassment
+retard
+retarded
+spaz
+mongoloid
+coon
+darkie
+jap
+paki
+raghead
+towelhead
+beaner
+wop
+dago
+polack
+halfbreed
+cripple
+dyke
+homo
+shemale
+heil hitler
+white power
+white pride
+sieg heil
+gas the
+kill yourself
+kys
+go die
+i hate you
+nobody likes you
+you are ugly
+you are stupid
+go back to your country
+# --- sexual terms
+porn
+porno
+pornography
+xxx
+nsfw
+hentai
+boob
+boobs
+boobies
+titties
+nude
+nudes
+horny
+orgasm
+masturbate
+masturbation
+blowjob
+handjob
+cumshot
+bukkake
+threesome
+incest
+sexting
+fetish
+erotic
+# --- child-safety / grooming phrases
+pedo
+pedophile
+paedophile
+paedo
+molest
+rapist
+send nudes
+send pics
+send me pictures
+are you alone
+dont tell your parents
+keep this secret
+meet me at
+meet up alone
+what school do you go
+where do you live
+how old are you
+dickhead
+scheisse
+scheiße
+scheiss
+shithead
+shitface
+dipshit
+horseshit
+dumbass
+jackass
+asswipe
+fuckface
+fuckhead
+motherfucker

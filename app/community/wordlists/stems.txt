@@ -1,0 +1,10 @@
+# Stems also caught when words are run together / split with spaces or symbols ("fu ck", "fuckyou", "f.u.c.k").
+# Keep these long and distinctive: they are matched inside letter-only text, so short stems would cause false positives.
+fuck
+bitch
+nigger
+nigga
+faggot
+motherfuck
+cocksucker
+bullshit

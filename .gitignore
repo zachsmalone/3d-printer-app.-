@@ -1,0 +1,32 @@
+.venv/
+__pycache__/
+outputs/
+data/
+server.log
+server.pid
+*.pyc
+.pytest_cache/
+
+# --- added by Ren (DevOps) ---
+# secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+# user data / generated output
+previews/
+venv/
+env/
+# generated QA sample meshes (regenerate with reports/qa_samples/make_samples.py)
+reports/qa_samples/*.stl
+reports/qa_samples/*.obj
+reports/qa_samples/*.3mf
+# tooling / OS
+*.log
+.DS_Store
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+# local backups
+backups/

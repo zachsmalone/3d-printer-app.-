@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZEIM</title>
+<link rel="icon" type="image/png" href="/static/favicon.png">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="stylesheet" href="/static/style.css">
+<script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="/" title="Home"><img src="/static/logo-header.png" alt="ZEIM" class="logoimg" id="logoImg"></a>
+  <nav class="nav" id="mainNav">
+    <button data-view="create" class="on"><span data-sec="create">Studio</span></button>
+    <button data-view="showcase"><span data-sec="discover">Showcase</span></button>
+    <button data-view="edit"><span data-sec="edit">Edit</span></button>
+    <button data-view="learn"><span data-sec="learn">Learn</span></button>
+  </nav>
+  <div class="seg" id="levelSwitch" role="tablist" aria-label="Experience level">
+    <button data-level="beginner" class="on">🌱 Beginner</button>
+    <button data-level="expert">🛠 Expert</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="btnAccount">👤 Sign up</button>
+  <button class="btn ghost" id="btnSettings">⚙ Settings</button>
+</header>
+
+<main class="layout" id="viewCreate">
+  <aside class="panel controls">
+    <section class="step">
+      <h2><i>1</i> Photo</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/*" hidden>
+        <img id="dropPreview" alt="" hidden>
+        <div id="dropHint"><div class="big">📷</div><b>Drop a photo here</b><span>or click to browse · JPG / PNG · up to 25 MB</span></div>
+      </label>
+      <button class="btn small ghost" id="btnSample">Try a sample photo</button>
+    </section>
+
+    <section class="step">
+      <h2><i>2</i> Style</h2>
+      <div class="cards" id="modeCards">
+        <button class="card on" data-mode="lithophane"><span class="ico">💡</span><b>Lithophane</b><small>Glows when backlit</small></button>
+        <button class="card" data-mode="relief"><span class="ico">⛰</span><b>Relief</b><small>3D print heightmap</small></button>
+        <button class="card" data-mode="popart"><span class="ico">🎨</span><b>Pop-art</b><small>Layers pop off the page</small></button>
+      </div>
+    </section>
+
+    <section class="step">
+      <h2><i>3</i> Size &amp; settings</h2>
+      <div class="field"><label for="width_mm">Width <em>mm</em></label>
+        <div class="range"><input type="range" id="widthRange" min="30" max="300" step="5" value="100"><input type="number" name="width_mm" id="width_mm" value="100" min="5" max="1000" step="1"></div></div>
+
+      <div id="beginnerOpts">
+        <div class="field"><label>Thickness</label>
+          <div class="seg wide" id="presetSeg">
+            <button data-preset="thin">Thin</button><button data-preset="standard" class="on">Standard</button><button data-preset="thick">Thick</button>
+          </div>
+          <p class="help" id="presetHelp"></p></div>
+        <p class="help sticky">All other settings are chosen automatically — you'll see what was picked after building.</p>
+      </div>
+
+      <div id="expertOpts" hidden>
+        <details open><summary>Image &amp; detail</summary>
+          <div class="grid2">
+            <div class="field"><label>Resolution <em>px wide</em></label><input type="number" name="resolution" value="200" min="16" max="600"></div>
+            <div class="field"><label>Smoothing <em>σ</em></label><input type="number" name="smooth" value="0.8" min="0" max="5" step="0.1"></div>
+            <div class="field"><label>Gamma</label><input type="number" name="gamma" value="1.0" min="0.2" max="3" step="0.05"></div>
+            <div class="field chk"><label><input type="checkbox" name="auto_contrast" checked> Auto contrast</label><label><input type="checkbox" name="invert"> Invert</label></div>
+          </div></details>
+        <details open data-modes="lithophane"><summary>Lithophane</summary>
+          <div class="grid2">
+            <div class="field"><label>Min thickness <em>mm</em></label><input type="number" name="min_thickness" value="0.8" min="0.2" step="0.1"></div>
+            <div class="field"><label>Max thickness <em>mm</em></label><input type="number" name="max_thickness" value="3.0" min="0.5" step="0.1"></div>
+            <div class="field"><label>Border / frame <em>mm</em></label><input type="number" name="border_mm" value="3" min="0" step="0.5"></div>
+          </div></details>
+        <details open data-modes="relief popart"><summary>Base &amp; height</summary>
+          <div class="grid2">
+            <div class="field"><label>Base plate <em>mm</em></label><input type="number" name="base_mm" value="2" min="0.2" step="0.2"></div>
+            <div class="field" data-modes="relief"><label>Relief height <em>mm</em></label><input type="number" name="relief_mm" value="6" min="0.2" step="0.5"></div>
+          </div></details>
+        <details open data-modes="popart"><summary>Pop-art layers</summary>
+          <div class="grid2">
+            <div class="field"><label>Colour layers</label><input type="number" name="levels" value="4" min="2" max="8"></div>
+            <div class="field"><label>Layer step <em>mm</em></label><input type="number" name="layer_mm" value="1" min="0.2" step="0.1"></div>
+            <div class="field"><label>Style</label><select name="style"><option value="posterize">Posterize</option><option value="halftone">Halftone dots</option></select></div>
+            <div class="field"><label>Dot size <em>px</em></label><input type="number" name="halftone_cell" value="6" min="2" step="0.5"></div>
+            <div class="field chk wide2"><label><input type="checkbox" name="multi_body" checked> One body per colour (multi-colour printing)</label></div>
+            <div class="field wide2"><label>Custom palette <em>hex, dark→light</em></label><input type="text" name="palette" placeholder="#1b1b3a,#b5179e,#ff9e00,#fff3b0"></div>
+          </div></details>
+      </div>
+    </section>
+
+    <button class="btn primary big" id="btnBuild" disabled>✨ Build 3D model</button>
+    <p class="help center" id="buildHint">Choose a photo to begin.</p>
+  </aside>
+
+  <section class="stage">
+    <div class="viewer" id="viewer">
+      <div class="empty" id="viewerEmpty"><div class="big">🧊</div><b>Your 3D preview appears here</b><span>Drag to rotate · scroll to zoom · right-drag to pan</span></div>
+      <div class="busy" id="busy" hidden><div class="spin"></div>Building…</div>
+      <div class="vtools" id="vtools" hidden>
+        <button class="btn small ghost" id="vReset">⟲ Reset view</button>
+        <button class="btn small ghost" id="vWire">▦ Wireframe</button>
+      </div>
+    </div>
+
+    <div class="result" id="result" hidden>
+      <div class="resbar">
+        <div class="stats" id="stats"></div>
+        <div class="actions">
+          <div class="dl" id="downloads"></div>
+          <label class="inl" title="Who can open this build's files"><select id="resVis"><option value="private">🔒 Private</option><option value="followers">👥 Followers</option><option value="public">🌐 Public</option></select></label>
+          <button class="btn" id="btnEditThis" title="Open this model in the Edit workspace">✏ Edit this</button>
+          <button class="btn" id="btnPublish">🌐 Share to Showcase</button>
+          <button class="btn primary" id="btnPrint">🖨 Print…</button>
+        </div>
+      </div>
+      <details class="auto" id="autoBox" hidden open><summary>🌱 Auto-chosen settings <small>(Beginner mode)</small></summary><table id="autoTable"></table></details>
+    </div>
+
+    <section class="history">
+      <div class="hhead"><h3 data-sec="history">Recent builds</h3><span id="histCount" class="pill">0 / 5</span></div>
+      <div class="hlist" id="histList"></div>
+    </section>
+  </section>
+</main>
+
+
+<main class="layout" id="viewEdit" hidden>
+  <aside class="panel controls" id="editSide">
+    <section id="editStart">
+      <h2><i>1</i> Open a model</h2>
+      <label class="drop" id="editDrop">
+        <input type="file" id="editFile" accept=".stl,.obj,.3mf,image/*" hidden>
+        <div><div class="big">📂</div><b>Drop an STL, OBJ or 3MF here</b><span>or click to browse · up to 50 MB · or drop a photo to start from a lithophane / relief base</span></div>
+      </label>
+      <div class="grid2" style="margin-top:10px">
+        <div class="field"><label>Units in the file <em>STL / OBJ</em></label><select id="editUnits"><option value="mm">millimetres</option><option value="cm">centimetres</option><option value="in">inches</option><option value="m">metres</option></select></div>
+        <div class="field"><label>If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>
+      </div>
+      <div class="row"><button class="btn" id="editSample">Try a sample model</button></div>
+      <h2 style="margin-top:16px"><i>or</i> Edit a Studio build</h2>
+      <div class="row"><select id="editFromBuild" style="flex:1"></select><button class="btn" id="editFromBuildGo">Edit it</button></div>
+      <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your 5 recent builds. Colours from multi-colour builds/3MF files are merged into one mesh.</p>
+    </section>
+    <section id="editPanel" hidden></section>
+  </aside>
+
+  <section class="stage">
+    <div class="viewer" id="editViewer">
+      <div class="empty" id="editEmpty"><div class="big">🛠</div><b>Your model appears here</b><span>Drag to rotate · scroll to zoom · right-drag to pan</span></div>
+      <div class="busy" id="editBusy" hidden><div class="spin"></div><span id="editBusyText">Working…</span></div>
+      <div class="vtools" id="editVtools" hidden>
+        <button class="btn small ghost" id="eUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button class="btn small ghost" id="eRedo" title="Redo (Ctrl+Y)">↷ Redo</button>
+        <button class="btn small ghost" id="eMeasure" title="Click two points on the model">📏 Measure</button>
+        <button class="btn small ghost" id="eWire">▦ Wireframe</button>
+        <button class="btn small ghost" id="eReset">⟲ View</button>
+      </div>
+      <div class="measure" id="eMeasureOut" hidden></div>
+    </div>
+    <div class="result" id="editResult" hidden>
+      <div class="resbar">
+        <div class="stats" id="editStats"></div>
+        <div class="actions">
+          <div class="dl" id="editDownloads"></div>
+          <label class="inl" title="Who can open this project's files"><select id="editVis"><option value="private">🔒 Private</option><option value="followers">👥 Followers</option><option value="public">🌐 Public</option></select></label>
+          <button class="btn primary" id="editPrint">🖨 Print…</button>
+        </div>
+      </div>
+      <p class="help" id="editMsg"></p>
+      <details class="auto" open><summary>🧾 Steps <small id="editHeadNote"></small></summary><ol class="oplist" id="editOps"></ol></details>
+    </div>
+  </section>
+</main>
+
+<!-- Print dialog -->
+<dialog id="dlgPrint"><div class="dlg">
+  <header><h3>🖨 Print this build</h3><button class="x" data-close>✕</button></header>
+  <div class="body">
+    <h4>Open in your slicer</h4>
+    <p class="help" id="printHint"></p>
+    <div class="slicers" id="slicerBtns"></div>
+    <hr>
+    <h4>Slice here <small id="builtinState"></small></h4>
+    <div class="grid3">
+      <div class="field"><label>Layer height</label><input type="number" id="s_layer" value="0.2" step="0.05" min="0.05"></div>
+      <div class="field"><label>Infill %</label><input type="number" id="s_fill" value="15" min="0" max="100"></div>
+      <div class="field"><label>Brim mm</label><input type="number" id="s_brim" value="0" min="0" step="1"></div>
+      <div class="field chk"><label><input type="checkbox" id="s_up"> Stand upright (lithophane)</label></div>
+      <div class="field chk"><label><input type="checkbox" id="s_sup"> Supports</label></div>
+    </div>
+    <div class="row"><button class="btn" id="btnSlice">Slice to G-code</button><span id="sliceOut" class="help"></span></div>
+    <hr>
+    <h4>Send to a network printer</h4>
+    <div class="row"><select id="printerSel"></select>
+      <label class="inl"><input type="checkbox" id="startNow"> Start print immediately</label>
+      <button class="btn" id="btnSend">Send</button></div>
+    <p class="help" id="sendOut"></p>
+  </div>
+</div></dialog>
+
+<!-- Settings dialog -->
+<dialog id="dlgSettings"><div class="dlg wide">
+  <header><h3>⚙ Settings</h3><button class="x" data-close>✕</button></header>
+  <div class="body">
+    <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
+    <div id="tPrint" class="tab">
+      <div class="grid2">
+        <div class="field"><label>Default slicer</label><select id="set_slicer"><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
+        <div class="field"><label>Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
+      </div>
+      <h4>Printers</h4><div id="printerList"></div>
+      <button class="btn small" id="btnAddPrinter">+ Add printer</button>
+      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are labeled stubs. API keys are stored in <code>data/settings.json</code> on the server.</p>
+    </div>
+    <div id="tAcc" class="tab" hidden>
+      <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built (teen accounts never show link-outs publicly).</p>
+      <div class="grid2" id="linkInputs"></div>
+      <button class="btn small" id="btnSaveLinks">Save link-outs</button>
+      <h4>OAuth connections <small>(scaffold — sharing not implemented)</small></h4>
+      <p class="help" id="accNote"></p>
+      <div id="accList"></div>
+    </div>
+  </div>
+  <footer><button class="btn primary" id="btnSaveSettings">Save</button></footer>
+</div></dialog>
+
+<!-- History full dialog -->
+<dialog id="dlgFull"><div class="dlg">
+  <header><h3>Build history is full</h3><button class="x" data-close>✕</button></header>
+  <div class="body">
+    <p>You can keep <b>5 builds</b>. Delete one yourself, or let ZEIM remove the oldest.</p>
+    <div id="fullList" class="fulllist"></div>
+  </div>
+  <footer><button class="btn" id="btnRetry" disabled>Build now</button><button class="btn primary" id="btnAutoDel">Auto-delete oldest &amp; build</button></footer>
+</div></dialog>
+
+
+<main class="page" id="viewShowcase" hidden>
+  <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Family-friendly community projects. Everything is free to download.</p></div>
+    <div class="row"><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px"><button class="btn" id="btnMyData">🔒 My data</button></div></div>
+  <div class="seg" id="shTabs"></div>
+  <p class="help" id="shNotice"></p>
+  <div class="grid" id="shGrid"></div>
+</main>
+
+<main class="page" id="viewLearn" hidden>
+  <div class="pagehead"><div><h1><span data-sec="learn">Learn</span></h1><p class="help">Classroom-friendly lessons for students, teachers and hobbyists. Curated content only — no chat, no user uploads, no external links.</p></div>
+    <div class="row"><button class="btn" id="btnJoinClass">🎒 Join a class</button><button class="btn" id="btnTeacher">🍎 Teacher tools</button></div></div>
+  <div id="classBanner"></div>
+  <div class="grid lessons" id="lessonGrid"></div>
+  <div id="lessonDetail" class="lesson" hidden></div>
+</main>
+
+<dialog id="dlgAccount"><div class="dlg">
+  <header><h3>👤 Your profile</h3><button class="x" data-close>✕</button></header>
+  <div class="body" id="accBody"></div>
+</div></dialog>
+
+<dialog id="dlgPublish"><div class="dlg">
+  <header><h3>🌐 Share this build to the Showcase</h3><button class="x" data-close>✕</button></header>
+  <div class="body">
+    <p class="help">Free for everyone to download. Family-friendly projects only.</p>
+    <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
+    <div class="field"><label>Title</label><input id="pub_title" maxlength="80"></div>
+    <div class="field"><label>Description</label><input id="pub_desc" maxlength="500"></div>
+    <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
+    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context).</label>
+  </div>
+  <footer><button class="btn primary" id="btnDoPublish">Publish</button></footer>
+</div></dialog>
+
+<dialog id="dlgItem"><div class="dlg">
+  <header><h3 id="itTitle"></h3><button class="x" data-close>✕</button></header>
+  <div class="body" id="itBody"></div>
+</div></dialog>
+
+<dialog id="dlgData"><div class="dlg">
+  <header><h3>🔒 My personalization data</h3><button class="x" data-close>✕</button></header>
+  <div class="body" id="dataBody"></div>
+  <footer><button class="btn" id="btnToggleP13n"></button><button class="btn danger" id="btnClearData">Clear all my data</button></footer>
+</div></dialog>
+
+<dialog id="dlgTeacher"><div class="dlg wide">
+  <header><h3>🍎 Teacher tools</h3><button class="x" data-close>✕</button></header>
+  <div class="body" id="teacherBody"></div>
+</div></dialog>
+
+<dialog id="dlgJoin"><div class="dlg">
+  <header><h3>🎒 Join a class</h3><button class="x" data-close>✕</button></header>
+  <div class="body">
+    <p class="help">No account needed. Use a nickname — <b>not your real full name</b>.</p>
+    <div class="field"><label>Class code</label><input id="j_code" maxlength="6" style="text-transform:uppercase"></div>
+    <div class="field"><label>Class password <em>from your teacher</em></label><input id="j_pw" type="password" autocomplete="off"></div>
+    <div class="field"><label>Nickname</label><input id="j_nick" maxlength="20"></div>
+  </div>
+  <footer><button class="btn primary" id="btnDoJoin">Join</button></footer>
+</div></dialog>
+
+<div id="toasts"></div>
+<script type="module" src="/static/app.js"></script>
+<script type="module" src="/static/community.js"></script>
+<script type="module" src="/static/edit.js"></script>
+</body></html>
