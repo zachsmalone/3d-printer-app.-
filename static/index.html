@@ -135,7 +135,8 @@
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
       <div class="drop" id="editDrop"><div><div class="big" aria-hidden="true">📂</div><b>Drop an STL, OBJ or 3MF here</b><span>or press the button · up to 50 MB</span></div></div>
-      <div class="row" style="margin-top:8px"><button type="button" class="btn big" id="editChooseModel">📂 Choose a 3D file</button><input type="file" id="editFile" accept=".stl,.obj,.3mf" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn big" id="editChooseModel">📂 Choose a 3D file</button><input type="file" id="editFile" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <p class="help" id="editModelMsg" role="alert" hidden></p>
       <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
       <div id="editPhoto"></div>
       <div class="grid2" style="margin-top:10px">

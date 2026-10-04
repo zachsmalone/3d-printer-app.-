@@ -98,3 +98,25 @@ def test_ren_qa_findings_in_a_real_browser_phone_viewport():
         assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_no_file_input_lists_bare_extensions_so_ios_does_not_grey_files_out():
+    """iOS Safari greys out files whose type it can't map from `accept=".stl,.obj,.3mf"`. Photo inputs may use image/* (+ image extensions)."""
+    import re
+    img = {"heic", "heif", "png", "jpg", "jpeg", "webp", "gif", "bmp"}
+    for fn in ("index.html", "app.js", "edit.js", "photo.js", "send.js", "community.js"):
+        src = open(os.path.join(ROOT, "static", fn)).read()
+        for m in re.finditer(r"""accept\s*=\s*["']([^"']*)["']""", src):
+            for tok in [t.strip().lower() for t in m.group(1).split(",") if t.strip()]:
+                assert "/" in tok or tok.lstrip(".") in img, f"{fn}: accept token {tok!r} would grey files out on iOS"
+    assert 'id="editFile" accept' not in open(os.path.join(ROOT, "static", "index.html")).read()
+
+
+def test_edit_file_picker_accepts_models_by_name_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_files.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=300)
+        assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
+        assert "PASS chrome" in r.stdout
+    finally:
+        p.terminate(); p.wait(10)

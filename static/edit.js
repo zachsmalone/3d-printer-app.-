@@ -44,9 +44,15 @@ async function create(fd, retry) {
   } finally { busy(false); }
 }
 const PHOTO_RE = /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i;
+const MODEL_RE = /\.(stl|obj|3mf)$/i;
+// iOS greys out files in the picker when `accept` lists bare extensions it can't map to a type, so #editFile has NO accept list:
+// the file type is checked here by its name (any MIME, including empty or application/octet-stream), and again by the server.
+function modelMsg(t) { const m = $("#editModelMsg"); m.textContent = t || ""; m.hidden = !t; }
 function fromFile(file) {
+  modelMsg("");
   if (!file) return;
   E.photoTry = /^image\//.test(file.type) || PHOTO_RE.test(file.name || "");
+  if (!E.photoTry && !MODEL_RE.test(file.name || "")) return modelMsg("That doesn't look like a 3D model. Choose an .stl, .obj or .3mf file, or start from a photo below.");
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
