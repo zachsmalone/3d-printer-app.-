@@ -173,3 +173,11 @@ html,body{max-width:100%;overflow-x:hidden}
   #btnBuild{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));z-index:4;box-shadow:0 6px 20px #000a}
 }
 .drop img{max-height:140px}
+
+/* SEND-1: the server decides who may use outside apps; the page hides what would be refused */
+body[data-links="0"] #btnPrint { display: none; }
+.sendsw { margin: 8px 0; padding: 8px 10px; background: #f6f8fb; border-radius: 10px; }
+.sw { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.sw input[type=checkbox] { width: 24px; height: 24px; }
+.sw .state { font-weight: 700; margin-left: auto; }
+#dlgSend { max-width: 440px; }

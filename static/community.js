@@ -16,6 +16,8 @@ async function init() {
 async function refreshMe() {
   ME = await api("/api/me");
   $("#btnAccount").textContent = ME.signed_up ? "👤 " + ME.display_name : "👤 Sign up";
+  document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
+  document.body.dataset.role = ME.send?.role || "";
 }
 
 /* ---------- views ---------- */
@@ -202,15 +204,25 @@ $("#btnDoJoin").onclick = async () => {
   catch (e) { toast(e.message, "err"); }
 };
 $("#btnTeacher").onclick = openTeacher;
+document.addEventListener("click", async e => {
+  if (e.target.id === "sendCancel") $("#dlgSend").close();
+  if (e.target.id === "sendOn") {
+    const code = $("#dlgSend").dataset.code;
+    try { await api(`/api/classrooms/${code}/send`, J("PUT", { enabled: true, confirm: true })); } catch (er) { toast(er.message, "err"); }
+    $("#dlgSend").close(); openTeacher();
+  }
+});
 async function openTeacher() {
   if (!ME.signed_up || ME.age_group !== "adult") { toast("Teacher tools need an adult account — sign up first.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
   const [{ rooms }, ls] = await Promise.all([api("/api/classrooms"), api("/api/learn/lessons")]);
   $("#dlgTeacher").querySelector("h3").textContent = "🍎 Teacher tools";
-  $("#teacherBody").innerHTML = `<div class="row"><input id="cr_name" placeholder="New class name"><input id="cr_pw" placeholder="Join password (4+ chars)"><button class="btn primary" id="cr_go">Create class</button></div>
+  $("#teacherBody").innerHTML = `<div class="row"><input id="cr_name" placeholder="New class name"><input id="cr_pw" placeholder="Join password (8+ chars)"><button class="btn primary" id="cr_go">Create class</button></div>
     <p class="help">Students join with the class code (or the QR / link below) + your password + a nickname — no accounts, no personal data. Class projects are private to the class. Hand out the password separately; it is not in the QR code.</p>` +
     rooms.map(r => `<div class="printer"><div class="row" style="justify-content:space-between"><b>${esc(r.name)}</b><span>Code: <code style="font-size:15px">${r.code}</code> <button class="btn small ghost" data-cp="${r.code}">Copy code</button> <button class="btn small ghost" data-cl="${r.code}">Copy join link</button></span></div>
       <div class="row"><img src="/api/classrooms/${r.code}/qr.svg" alt="QR code to join ${esc(r.name)}" width="120" height="120" style="background:#fff;border-radius:8px"><span class="help">Scan to open the join page for code <b>${r.code}</b>. Link: <code>${esc(location.origin)}/#join/${r.code}</code> · <a href="/api/classrooms/${r.code}/qr.svg" target="_blank">open QR to print</a></span></div>
       ${r.notifications.length ? `<div class="banner">${r.notifications.map(n => `🔔 ${esc(n.from_name)}: ${esc(n.text)}`).join("<br>")} <button class="btn small" data-rd="${r.code}">Mark read</button></div>` : ""}
+      <div class="sendsw"><label class="sw"><input type="checkbox" role="switch" data-send="${r.code}" ${r.send_enabled ? "checked" : ""} aria-describedby="sw_${r.code}"> <b>Let students send files to other apps</b> <span class="state">${r.send_enabled ? "On" : "Off"}</span></label>
+        <p class="help" id="sw_${r.code}">${r.send_enabled ? `On since ${esc(new Date(r.send_changed).toLocaleString())}. Turn off any time.` : "Off: students can download their own build and send it to you. Nothing else leaves ZEIM."} Why: a build made from a photo contains that photo. Students under 13 can never use outside apps, even if this is on.</p></div>
       <p class="help">Assign: ${ls.lessons.map(l => `<label class="inl"><input type="checkbox" data-as="${r.code}" value="${l.id}" ${r.assigned.includes(l.id) ? "checked" : ""}> ${esc(l.title)}</label>`).join(" ")}</p>
       <table class="studs"><tr><th>Student</th><th>Progress</th><th></th></tr>${r.students.map(s => `<tr><td>${esc(s.nickname)}</td><td>${s.lessons.map(x => `${x.completed ? "✅" : `${x.done_steps}/${x.steps}`}`).join(" · ")}</td><td><button class="btn small ghost" data-talk="${r.code}:${s.id}" title="${esc(r.canned.talk_next_class)}">🗨 Talk next class</button> <button class="btn small ghost" data-mu="${r.code}:${s.id}:${s.muted ? 0 : 1}">${s.muted ? "Unmute" : "Mute"}</button> <button class="btn small ghost danger" data-rs="${r.code}:${s.id}">Remove</button></td></tr>`).join("") || "<tr><td colspan=3 class='help'>No students yet</td></tr>"}</table>
       <h4>Student projects <small class="help">(private to this class)</small></h4>
@@ -229,7 +241,16 @@ async function openTeacher() {
     if (t.dataset.rs) { const [c, s] = t.dataset.rs.split(":"); await api(`/api/classrooms/${c}/students/${s}`, { method: "DELETE" }); openTeacher(); }
     if (t.dataset.dr && confirm("Delete this class and all student progress in it?")) { await api("/api/classrooms/" + t.dataset.dr, { method: "DELETE" }); openTeacher(); }
   };
-  $("#teacherBody").onchange = async e => { const t = e.target; if (!t.dataset.as) return; const ids = $$(`[data-as="${t.dataset.as}"]`).filter(x => x.checked).map(x => x.value); await api(`/api/classrooms/${t.dataset.as}/assign`, J("POST", { lesson_ids: ids })); };
+  $("#teacherBody").onchange = async e => { const t = e.target;
+    if (t.dataset.send) {
+      const code = t.dataset.send;
+      if (!t.checked) { try { await api(`/api/classrooms/${code}/send`, J("PUT", { enabled: false })); } catch (er) { toast(er.message, "err"); } return openTeacher(); }
+      t.checked = false;                                  // only turns on after the dialog's explicit Turn on
+      const d = $("#dlgSend"); d.dataset.code = code;
+      $("#dlgSendName").textContent = (rooms.find(r => r.code === code) || {}).name || code;
+      d.showModal(); $("#sendCancel").focus(); return;
+    }
+    if (!t.dataset.as) return; const ids = $$(`[data-as="${t.dataset.as}"]`).filter(x => x.checked).map(x => x.value); await api(`/api/classrooms/${t.dataset.as}/assign`, J("POST", { lesson_ids: ids })); };
 }
 
 async function submitToClass(code) {

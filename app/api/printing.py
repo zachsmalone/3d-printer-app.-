@@ -52,6 +52,7 @@ def serve_file_token(token: str, bid: str, name: str):
 
 @router.get("/print/{bid}/links")
 def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
+    guards.require_links(request, actor)
     meta_for(bid, actor, owner_only=True)
     s = settings.load()
     # Shared server with no configured public address: the request's Host header is attacker-controlled and would end up
@@ -106,3 +107,18 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
         return JSONResponse({"ok": False, "stage": "slice", **res})
     out = printers.send(pr, store.dir(bid) / "model.gcode", f"photo3d_{bid}.gcode", start)
     return JSONResponse({**out, "stage": "upload", "slice": res})
+
+
+# ---- SEND-0: tiny sample files for the hidden /sharetest page (adults only; nothing from any user's data)
+@router.get("/sharetest/file.{fmt}")
+def sharetest_file(fmt: str, request: Request, actor: Actor = Depends(get_actor)):
+    import io
+    import trimesh
+    from fastapi.responses import Response
+    if not guards.send_caps(request, actor)["share"]:
+        raise HTTPException(403, "The share test page is for adult accounts.")
+    if fmt not in ("stl", "obj", "3mf"):
+        raise HTTPException(404)
+    data = trimesh.creation.box(extents=(20, 20, 20)).export(file_type={"stl": "stl", "obj": "obj", "3mf": "3mf"}[fmt])
+    data = data.encode() if isinstance(data, str) else data
+    return Response(data, media_type="application/octet-stream", headers={"Cache-Control": "no-store"})

@@ -30,6 +30,7 @@ from .store import CLASSROOMS
 
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 NICK = re.compile(r"^[A-Za-z0-9 _-]{2,20}$")
+_audit = __import__('logging').getLogger('zeim.audit')
 CDIR = DATA / "classroom_projects"
 CDIR.mkdir(exist_ok=True)
 MAX_FEEDBACK = 500
@@ -67,7 +68,7 @@ def create(actor: Actor, name: str, password: str = "") -> dict:
     room = {"code": code, "name": name, "teacher_sid": actor.sid, "teacher": actor.user["display_name"],
             "teacher_uid": actor.user["id"], "pw": _hash(password),
             "created": datetime.now(timezone.utc).isoformat(), "assigned": [], "students": {},
-            "projects": [], "notifications": []}
+            "projects": [], "notifications": [], "send_enabled": False}
     CLASSROOMS.update(lambda d: d.__setitem__(code, room))
     return {"code": code, "name": name, "join_path": f"/#join/{code}"}
 
@@ -166,6 +167,33 @@ def is_student(sid: str) -> bool:
     return any(sid in room["students"] for room in CLASSROOMS.read().values())
 
 
+def room_of(sid: str):
+    """The classroom this browser session is a student in, or None."""
+    for room in CLASSROOMS.read().values():
+        if sid in room["students"]:
+            return room
+    return None
+
+
+def send_allowed(sid: str) -> bool:
+    """Has the teacher switched on 'students may send files to other apps' for this student's class? (default: no)"""
+    room = room_of(sid)
+    return bool(room and room.get("send_enabled", False))
+
+
+def set_send(actor: Actor, code: str, on: bool) -> dict:
+    """Teacher-only per-class switch. Logged with the class code and time only - never student names (Kenji)."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    def f(d):
+        room = _own(d, actor, code)
+        room["send_enabled"] = bool(on)
+        room["send_changed"] = now
+    CLASSROOMS.update(f)
+    _audit.info("class send switch: class=%s enabled=%s at=%s", (code or "").upper(), bool(on), now)
+    return {"send_enabled": bool(on), "send_changed": now}
+
+
 def student_view(sid: str):
     for room in CLASSROOMS.read().values():
         if sid in room["students"]:
@@ -198,7 +226,8 @@ def teacher_rooms(actor: Actor) -> list[dict]:
                     "join_path": f"/#join/{r['code']}", "projects": [project_public(p, r) for p in r["projects"]],
                     "notifications": [n for n in r["notifications"] if n["to"] == "teacher" and not n["read"]],
                     "canned": {k: safety.CANNED[k] for k in safety.TEACHER_CANNED},
-                    "failed_joins_last_hour": recent_failed_joins(r["code"])})
+                    "failed_joins_last_hour": recent_failed_joins(r["code"]),
+                    "send_enabled": bool(r.get("send_enabled", False)), "send_changed": r.get("send_changed", "")})
     return out
 
 

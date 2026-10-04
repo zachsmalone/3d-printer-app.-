@@ -13,6 +13,7 @@ from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS
 from ..core import ratelimit
+from . import guards
 from .textcap import ip as _ip, text_in
 
 router = APIRouter(prefix="/api")
@@ -31,8 +32,8 @@ def get_config():
 
 # ---------------- identity ----------------
 @router.get("/me")
-def me(actor: Actor = Depends(get_actor)):
-    return idn.public_profile(actor)
+def me(request: Request, actor: Actor = Depends(get_actor)):
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor)}
 
 
 def _age_refusal(actor: Actor, lock: bool):

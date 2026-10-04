@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>ZEIM share test (hidden)</title>
+<style>
+body{font:16px/1.45 system-ui,sans-serif;margin:0;padding:16px;max-width:720px}
+.warn{background:#fff4d6;border:1px solid #e0b84a;border-radius:10px;padding:10px 12px}
+table{border-collapse:collapse;width:100%;margin:12px 0}td,th{border:1px solid #ccd;padding:6px 8px;text-align:left;font-size:14px;vertical-align:top}
+button{font:inherit;min-height:44px;padding:6px 14px;border-radius:10px;border:1px solid #556;background:#fff}
+textarea{width:100%;min-height:140px;font:13px monospace}
+</style></head><body>
+<h1>ZEIM share test <small>(hidden page)</small></h1>
+<p class="warn"><b>UNTESTED on real devices.</b> This page exists to find out whether the iPhone/iPad share sheet accepts 3D files (STL, OBJ, 3MF) from a web page. Nobody on the team has tried it yet. It is not linked from anywhere, needs an adult account, and sends nothing to ZEIM. It shares a plain 20&nbsp;mm cube made on the server. Never your photos or builds.</p>
+<div id="env"></div>
+<p>Tap each <b>Share</b> button. When the share sheet opens, note which apps are listed (Mail, Files, Shapr3D, Creality…), then cancel or pick one. Then copy the results below and send them to Haruto/Yami.</p>
+<table id="tbl"><tr><th>File</th><th>Type tried</th><th>canShare</th><th>Result</th><th></th></tr></table>
+<p><button id="copy">Copy results</button></p>
+<textarea id="out" readonly aria-label="Results to copy"></textarea>
+<script>
+const FMT = { stl: ["model/stl", "application/sla", "application/octet-stream"], obj: ["model/obj", "text/plain", "application/octet-stream"], "3mf": ["model/3mf", "application/vnd.ms-package.3dmanufacturing-3dmodel+xml", "application/octet-stream"] };
+const res = [];
+const env = document.getElementById("env");
+const hasShare = !!navigator.share, hasCan = !!navigator.canShare;
+env.innerHTML = `<p><b>Device:</b> ${navigator.userAgent.replace(/</g, "&lt;")}<br><b>Secure context (HTTPS):</b> ${isSecureContext}<br><b>navigator.share:</b> ${hasShare} · <b>navigator.canShare:</b> ${hasCan}</p>`;
+function render() { document.getElementById("out").value = `ZEIM share test ${new Date().toISOString()}\nUA: ${navigator.userAgent}\nsecure: ${isSecureContext} share:${hasShare} canShare:${hasCan}\n` + res.map(r => `${r.file} | ${r.type} | canShare=${r.can} | ${r.result}`).join("\n"); }
+(async () => {
+  const me = await (await fetch("/api/me")).json();
+  if (!me.send?.share) { document.body.insertAdjacentHTML("beforeend", "<p class='warn'>This page is for adult accounts. Sign up as an adult in ZEIM first, then reload.</p>"); document.getElementById("tbl").hidden = true; return; }
+  for (const [fmt, types] of Object.entries(FMT)) {
+    const blob = await (await fetch(`/api/sharetest/file.${fmt}`)).blob();
+    for (const t of types) {
+      const f = new File([blob], `ZEIM-test.${fmt}`, { type: t });
+      let can = "n/a"; try { can = hasCan ? navigator.canShare({ files: [f] }) : "no canShare"; } catch (e) { can = "error: " + e.name; }
+      const row = { file: f.name, type: t, can, result: "not tried" }; res.push(row);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${f.name}</td><td>${t}</td><td>${can}</td><td class="r">not tried</td><td><button ${hasShare ? "" : "disabled"}>Share</button></td>`;
+      tr.querySelector("button").onclick = async () => {
+        try { await navigator.share({ files: [f], title: "ZEIM share test" }); row.result = "share resolved"; }   // no url/text on purpose
+        catch (e) { row.result = "share " + e.name + (e.message ? ": " + e.message.slice(0, 80) : ""); }
+        tr.querySelector(".r").textContent = row.result; render();
+      };
+      document.getElementById("tbl").appendChild(tr);
+    }
+  }
+  render();
+})();
+document.getElementById("copy").onclick = () => { const o = document.getElementById("out"); o.select(); navigator.clipboard?.writeText(o.value); };
+</script></body></html>

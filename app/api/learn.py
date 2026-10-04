@@ -102,6 +102,18 @@ def join_room(request: Request, body: dict, actor: Actor = Depends(get_actor)):
         raise HTTPException(400, str(e))
 
 
+@router.put("/classrooms/{code}/send")
+def class_send_switch(code: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Teacher-only. Turning ON needs an explicit confirm (the page shows the warning dialog first)."""
+    on = body.get("enabled") is True
+    if on and body.get("confirm") is not True:
+        raise HTTPException(400, "Please confirm that you want to turn this on.")
+    try:
+        return classrooms.set_send(actor, code, on)
+    except KeyError:
+        raise HTTPException(404)
+
+
 @router.post("/classrooms/{code}/assign")
 def assign(code: str, body: dict, actor: Actor = Depends(get_actor)):
     try:

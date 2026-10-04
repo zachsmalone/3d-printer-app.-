@@ -38,6 +38,11 @@ for _n in ("uvicorn.access", "uvicorn.error", "uvicorn"):
     if not any(isinstance(f, RedactTokens) for f in _lg.filters):
         _lg.addFilter(RedactTokens())
 
+_aud = _logging.getLogger("zeim.audit")      # settings changes that matter for safety (class code + time, never names)
+if not _aud.handlers:
+    _h = _logging.StreamHandler(); _h.setFormatter(_logging.Formatter("%(asctime)s AUDIT %(message)s"))
+    _aud.addHandler(_h); _aud.setLevel(_logging.INFO); _aud.propagate = False
+
 app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3")
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages):
@@ -87,6 +92,12 @@ async def ensure_session_cookie(request: Request, call_next):
     if new:
         resp.set_cookie(COOKIE, new, max_age=3600 * 24 * 365, httponly=True, samesite="lax")
     return resp
+
+
+@app.get("/sharetest", include_in_schema=False)
+def sharetest():
+    """SEND-0: hidden, unlinked page for finding out what the iOS share sheet accepts. Adults only (the page checks /api/me; the file endpoint enforces it)."""
+    return FileResponse(STATIC / "sharetest.html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
 
 
 @app.get("/healthz", include_in_schema=False)

@@ -30,6 +30,9 @@ http://127.0.0.1:@@PROXY_PORT@@ {
 	}
 
 	reverse_proxy 127.0.0.1:@@APP_PORT@@ {
+		# Overwrite (never append to) what the client sent, so a forged X-Forwarded-For cannot reach the app.
+		header_up X-Forwarded-For {client_ip}
+		header_up -X-Real-IP
 		transport http {
 			response_header_timeout 300s
 			read_timeout 300s

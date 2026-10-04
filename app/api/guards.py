@@ -33,9 +33,46 @@ def require_settings_admin(request: Request, actor: Actor):
     raise HTTPException(403, "Server settings can only be changed by the server admin (X-Admin-Token) on a shared server.")
 
 
-def require_send(request: Request, actor: Actor):
+def _role(request: Request, actor: Actor) -> str:
+    """'student' | 'teen' | 'adult'. Visitors who have NOT passed the age gate count as teens on a shared server (Download
+    only); on a local server (one person's own machine) they are treated as the owner, like before."""
     if classrooms.is_student(actor.sid):
+        return "student"
+    if actor.user:
+        return "adult" if actor.is_adult else "teen"
+    if is_admin(request) or config.MODE == "local":
+        return "adult"
+    return "teen"
+
+
+def send_caps(request: Request, actor: Actor) -> dict:
+    """What this visitor may do to get a build OUT of ZEIM (design-ios-send.md section 2.2). The server decides; the page only reflects it.
+    download: save the file to this device.  teacher: class 'send to my teacher'.  share: hand the file to another app.
+    printer: send straight to a network printer.  links: signed slicer links (/api/print/<id>/links).
+    Class students without an account have no known age, so they count as under 13: never share. A signed-up 13+ student gets
+    share only if the teacher switched it on for that class."""
+    role = _role(request, actor)
+    caps = {"download": True, "teacher": False, "share": False, "printer": False, "links": False, "role": role}
+    if role == "student":
+        caps["teacher"] = True
+        caps["share"] = bool(classrooms.send_allowed(actor.sid) and actor.user
+                             and actor.age is not None and actor.age >= 13)
+        caps["class_switch_on"] = classrooms.send_allowed(actor.sid)
+    elif role == "adult":
+        caps.update(share=True, printer=True, links=True)
+    return caps
+
+
+def require_links(request: Request, actor: Actor):
+    """Minting signed links that carry a build outside ZEIM: adults only (and never class students / under-13 / teens)."""
+    if not send_caps(request, actor)["links"]:
+        raise HTTPException(403, "Sending to other apps isn't available for your account. You can download your build.")
+
+
+def require_send(request: Request, actor: Actor):
+    role = _role(request, actor)
+    if role == "student":
         raise HTTPException(403, "Sending to a printer is done by your teacher.")
-    if config.MODE == "local" or is_admin(request) or actor.is_adult:
-        return
-    raise HTTPException(403, "Sending to a printer needs an adult account on a shared server.")
+    if role == "teen":
+        raise HTTPException(403, "Sending to a printer needs an adult account.")
+    return

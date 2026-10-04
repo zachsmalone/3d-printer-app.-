@@ -41,3 +41,21 @@ def test_no_horizontal_scroll_and_nav_reachable_at_320_375_390_768(live):
 def test_photo_start_upload_camera_heic_errors_in_a_real_browser(live):
     code, out = run("ui_photo.py", live)
     assert code == 0, out
+
+
+def test_teacher_send_switch_dialog_and_teen_print_hidden():
+    import socket as _s, tempfile as _t
+    s = _s.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
+    d = _t.mkdtemp(prefix="zeim-ui-")
+    env = {**os.environ, "PORT": str(port), "HOST": "127.0.0.1", "PHOTO3D_DATA": d + "/d", "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "shared"}
+    p = subprocess.Popen([sys.executable, "-m", "app.serve"], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        for _ in range(80):
+            try:
+                _s.create_connection(("127.0.0.1", port), timeout=0.3).close(); break
+            except OSError:
+                time.sleep(0.25)
+        code, out = run("ui_send.py", f"http://127.0.0.1:{port}")
+        assert code == 0, out
+    finally:
+        p.terminate(); p.wait(10)
