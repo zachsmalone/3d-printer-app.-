@@ -33,7 +33,7 @@ def get_config():
 # ---------------- identity ----------------
 @router.get("/me")
 def me(request: Request, actor: Actor = Depends(get_actor)):
-    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor)}
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor), "class_showcase": classrooms.showcase_policy(actor.sid)}
 
 
 def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
@@ -77,6 +77,7 @@ def set_links(body: dict, actor: Actor = Depends(get_actor)):
 
 @router.get("/users/{uid}")
 def public_user(uid: str, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     """Profile. Private / followers-only profiles look like 404 to anyone not allowed to see them."""
     _, u = idn.user_by_id(uid)
     if not u:
@@ -151,6 +152,7 @@ def unfollow(uid: str, actor: Actor = Depends(get_actor)):
 # ---------------- showcase ----------------
 @router.get("/showcase")
 def showcase(tab: str = "trending", q: str = "", actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     if tab not in branding.SHOWCASE_TABS:
         raise HTTPException(400, "unknown tab")
     prefs = personalization.get(actor.sid)
@@ -183,6 +185,7 @@ def showcase(tab: str = "trending", q: str = "", actor: Actor = Depends(get_acto
 
 @router.get("/showcase/{iid}")
 def showcase_item(iid: str, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     try:
         i = catalog.get(iid, actor)
     except catalog.Denied as e:
@@ -227,6 +230,7 @@ def item_visibility(iid: str, body: dict, actor: Actor = Depends(get_actor)):
 
 @router.post("/showcase/{iid}/like")
 def like(iid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor, likes=True)
     """Toggle like (or set with {"liked": true|false}). Public projects only. There is deliberately no dislike."""
     try:
         i = catalog.get(iid, actor)
@@ -240,6 +244,7 @@ def like(iid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
 
 @router.get("/showcase/{iid}/thumb")
 def item_thumb(iid: str, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     try:
         p = catalog.thumb_path(catalog.get(iid, actor))
     except catalog.Denied as e:
@@ -251,6 +256,7 @@ def item_thumb(iid: str, actor: Actor = Depends(get_actor)):
 
 @router.get("/showcase/{iid}/files/{name}")
 def item_file(iid: str, name: str, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     try:
         i = catalog.get(iid, actor)
     except catalog.Denied as e:
@@ -270,6 +276,7 @@ def item_file(iid: str, name: str, actor: Actor = Depends(get_actor)):
 
 @router.post("/showcase/{iid}/report")
 def report(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     try:
         catalog.get(iid, actor)
         return moderation.report(iid, actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"))

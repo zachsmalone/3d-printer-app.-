@@ -123,7 +123,7 @@ async def ensure_session_cookie(request: Request, call_next):
         raw[:] = [(k, v) for k, v in raw if k != b"cookie"]
         raw.append((b"cookie", ((existing[0].decode() + "; ") if existing else "").encode() + f"{COOKIE}={new}".encode()))
     resp = await call_next(request)
-    if new:
+    if new and not any(k.lower() == b"set-cookie" and v.startswith(COOKIE.encode() + b"=") for k, v in resp.raw_headers):     # (a "shared computer" join already set a session-only one)
         from .community.identity import cookie_args
         resp.set_cookie(COOKIE, new, max_age=3600 * 24 * 365, **cookie_args(request))
     return resp

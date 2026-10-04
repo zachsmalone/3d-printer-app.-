@@ -60,6 +60,12 @@ def get_actor(request: Request, response: Response) -> Actor:
     return Actor(sid, USERS.read().get(sid))
 
 
+def session_only_cookie(request: Request, response: Response, sid: str):
+    """Re-issue the session cookie WITHOUT an expiry, so a shared computer forgets it when the browser closes."""
+    response.raw_headers[:] = [(k, v) for k, v in response.raw_headers if not (k.lower() == b"set-cookie" and v.startswith(COOKIE.encode() + b"="))]
+    response.set_cookie(COOKIE, sid, **cookie_args(request))
+
+
 AGE_COOKIE = "p3d_ag"
 AGE_MESSAGE = ("We can't create an account for you right now. If you're learning with a class, ask your teacher for "
                "the class code and password - you don't need an account for that.")

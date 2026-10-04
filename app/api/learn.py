@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from .. import branding
 from ..community import catalog, classrooms, education, moderation, privacy, safety
 from ..services import settings
+from . import guards
 from .textcap import ip as ip_of
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
@@ -92,10 +93,13 @@ def room_qr(code: str, request: Request, actor: Actor = Depends(get_actor)):
 
 
 @router.post("/classrooms/join")
-def join_room(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+def join_room(request: Request, response: Response, body: dict, actor: Actor = Depends(get_actor)):
     try:
-        return classrooms.join(actor.sid, body.get("code", ""), body.get("nickname", ""), body.get("password", ""),
-                               ip=ip_of(request), seat_code=body.get("seat_code", ""))
+        out = classrooms.join(actor.sid, body.get("code", ""), body.get("nickname", ""), body.get("password", ""),
+                              ip=ip_of(request), seat_code=body.get("seat_code", ""))
+        if body.get("shared_computer") is True:
+            idn.session_only_cookie(request, response, actor.sid)     # CR-4: forgotten when the browser closes
+        return out
     except KeyError:
         raise HTTPException(404, "Wrong class code or password")
     except PermissionError as e:
@@ -114,6 +118,36 @@ def class_send_switch(code: str, body: dict, actor: Actor = Depends(get_actor)):
         return classrooms.set_send(actor, code, on)
     except KeyError:
         raise HTTPException(404)
+
+
+@router.put("/classrooms/{code}/showcase")
+def class_showcase_switch(code: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Teacher-only. Showcase is OFF for a class's students unless this is on; likes are a second switch (CR-3)."""
+    try:
+        return classrooms.set_showcase(actor, code, enabled=body.get("enabled") if "enabled" in body else None,
+                                       likes=body.get("likes") if "likes" in body else None)
+    except KeyError:
+        raise HTTPException(404)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/classrooms/{code}/students/{who}/reset")
+def reset_seat(code: str, who: str, actor: Actor = Depends(get_actor)):
+    """Teacher-only 'Reset seat' (CR-4). Returns a ONE-TIME seat code to read out to that student; the old browser loses the seat."""
+    try:
+        return classrooms.reset_seat(actor, code, who)
+    except KeyError:
+        raise HTTPException(404)
+
+
+@router.delete("/me/class-data")
+def delete_my_class_data(actor: Actor = Depends(get_actor)):
+    """A class student erases their builds (with photos), lesson progress and projects sent to the class (CR-2)."""
+    try:
+        return classrooms.delete_my_data(actor.sid)
+    except KeyError:
+        raise HTTPException(404, "You are not in a class.")
 
 
 @router.post("/classrooms/{code}/unlock-joins")
@@ -284,6 +318,7 @@ def lesson_page(lid: str):
 
 @pages.get("/p/{pid}", response_class=HTMLResponse)
 def project_page(pid: str, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     try:
         i = catalog.get(pid, actor)
     except catalog.Denied:
@@ -300,6 +335,7 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
 
 @pages.get("/u/{uid}", response_class=HTMLResponse)
 def user_page(uid: str, actor: Actor = Depends(get_actor)):
+    guards.showcase_gate(actor)
     _, u = idn.user_by_id(uid)
     if not u and uid not in catalog.CREATORS:
         raise HTTPException(404)

@@ -114,3 +114,15 @@ def require_send(request: Request, actor: Actor):
     if role == "teen":
         raise HTTPException(403, "Sending to a printer needs an adult account.")
     return
+
+
+def showcase_gate(actor: Actor, likes: bool = False):
+    """Class students see the public Showcase only if their teacher switched it on (and may like only if a second switch is on).
+    Everyone who is not a class student is unaffected. (Education CR-3)"""
+    pol = classrooms.showcase_policy(actor.sid)
+    if pol is None:
+        return
+    if not pol["enabled"]:
+        raise HTTPException(404, "Your teacher has turned this off.")
+    if likes and not pol["likes"]:
+        raise HTTPException(403, "Your teacher has turned likes off.")

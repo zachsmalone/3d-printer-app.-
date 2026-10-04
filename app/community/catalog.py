@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor
-from . import privacy
+from . import classrooms, privacy
 from .store import ENGAGEMENT, LISTINGS, MODERATION, USERS
 
 LDIR = DATA / "projects"
@@ -113,7 +113,7 @@ def public(i: dict, actor: Actor) -> dict:
     return {"likes": i.get("_likes", 0) if show_counts else None, "liked": bool(pub and actor.sid in i.get("_likers", [])),
             "liked_by_others": bool(pub and i.get("owner_sid") == actor.sid and i.get("_likes", 0) > 0),
             "counts_hidden": bool(pub and not show_counts),
-            "can_like": bool(pub and i.get("owner_sid") != actor.sid),
+            "can_like": bool(pub and i.get("owner_sid") != actor.sid and (classrooms.showcase_policy(actor.sid) or {"likes": True})["likes"]),
             "visibility": privacy.effective(i.get("visibility", "private"), users.get(i.get("owner_sid"))) if i.get("owner_sid") else "public",
             "can_follow": privacy.can_follow(actor, tu, bool(i.get("example"))),"id": i["id"], "title": i["title"], "creator": i["creator"], "creator_id": i["creator_id"],
             "example": i.get("example", False), "tags": i["tags"], "mode": i["mode"],

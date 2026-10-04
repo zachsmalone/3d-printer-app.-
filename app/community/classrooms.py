@@ -68,7 +68,8 @@ def create(actor: Actor, name: str, password: str = "") -> dict:
     room = {"code": code, "name": name, "teacher_sid": actor.sid, "teacher": actor.user["display_name"],
             "teacher_uid": actor.user["id"], "pw": _hash(password),
             "created": datetime.now(timezone.utc).isoformat(), "assigned": [], "students": {},
-            "projects": [], "notifications": [], "send_enabled": False}
+            "projects": [], "notifications": [], "send_enabled": False,
+            "showcase_enabled": False, "likes_enabled": False, "seat_resets": {}}
     CLASSROOMS.update(lambda d: d.__setitem__(code, room))
     return {"code": code, "name": name, "join_path": f"/#join/{code}"}
 
@@ -180,6 +181,8 @@ def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", 
     _LOCKS.pop((code, ip), None)           # the right password proves the person knows it: no slow-down for the next student
     out = {}
 
+    claim = {}
+
     def f(d):
         room = d.get(code)
         if not room:
@@ -187,13 +190,105 @@ def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", 
         others = [s["nickname"].lower() for k, s in room["students"].items() if k != sid]
         if sid not in room["students"] and len(room["students"]) >= 60:
             raise ValueError("classroom is full")
+        resets = room.setdefault("seat_resets", {})
+        rs = resets.get(nick.lower())
         if nick.lower() in others:
             raise ValueError("That nickname is taken in this class - pick another.")
+        if rs:                                   # CR-4: this nickname is a seat the teacher reset - only its one-time seat code gets it back
+            good = bool(seat_code) and rs["expires"] > time.time() and hmac.compare_digest(rs["hash"], _seat_hash(seat_code))
+            if not good:
+                claim["wrong"] = bool(seat_code)      # counted below (this call raises, so nothing written here would be saved)
+                raise ValueError("That nickname is taken in this class - pick another.")
+            resets.pop(nick.lower())
+            claim.update(parked=rs["parked"], joined=rs["joined"], muted=rs.get("muted", False))
         prev = room["students"].get(sid, {})
-        room["students"][sid] = {"nickname": nick, "joined": prev.get("joined") or datetime.now(timezone.utc).isoformat(),
-                                 "muted": prev.get("muted", False)}
+        room["students"][sid] = {"nickname": nick, "joined": claim.get("joined") or prev.get("joined") or datetime.now(timezone.utc).isoformat(),
+                                 "muted": claim.get("muted", prev.get("muted", False))}
+        if claim.get("parked"):
+            _move_in_room(room, claim["parked"], sid)
         out.update(name=room["name"], code=code, assigned=room["assigned"], teacher=room["teacher"])
+    try:
+        CLASSROOMS.update(f)
+    except ValueError:
+        if claim.get("wrong"):                    # persist the wrong-code counter even though the join was refused
+            def g(d):
+                rs = (d.get(code) or {}).get("seat_resets", {}).get(nick.lower())
+                if rs:
+                    rs["tries"] = rs.get("tries", 0) + 1
+                    if rs["tries"] >= SEAT_TRIES:
+                        rs["expires"] = 0         # too many wrong seat codes: the code is dead, the teacher issues a new one
+            CLASSROOMS.update(g)
+        raise
+    if claim.get("parked"):
+        _move_owner(claim["parked"], sid)
+        out["seat_restored"] = True
+    return out
+
+
+# ---------------------------------------------------------------- CR-4: seat reset
+SEAT_TTL, SEAT_TRIES = 24 * 3600, 5
+
+
+def _seat_hash(code: str) -> str:
+    return hashlib.sha256(("seat:" + (code or "").strip().upper().replace("-", "").replace(" ", "")).encode()).hexdigest()
+
+
+def _move_in_room(room: dict, old: str, new: str):
+    for p in room["projects"]:
+        if p["student_sid"] == old:
+            p["student_sid"] = new
+    for n in room["notifications"]:
+        if n["to"] == old[:8]:
+            n["to"] = new[:8]
+        if n["from"] == old[:8]:
+            n["from"] = new[:8]
+
+
+def _move_owner(old: str, new: str):
+    """Builds/Edit projects + lesson progress follow the seat to its new browser session."""
+    from ..services.history import store
+    from .store import PROGRESS
+    with store.lock:
+        for m in store.list(old):
+            m["owner_sid"] = new
+            store.save(m)
+
+    def f(d):
+        if old in d:
+            d[new] = d.pop(old)
+    PROGRESS.update(f)
+
+
+def reset_seat(actor: Actor, code: str, who: str) -> dict:
+    """Teacher button 'Reset seat'. `who` = a student's id (first 8 chars of the session id) or the nickname of a seat that is already waiting.
+    The student's old browser session is detached (it loses the class, and the builds/progress/projects are parked under the seat, not
+    deleted). The nickname can then be taken again ONLY by someone with the one-time seat code (24 h, 5 wrong tries kill it)."""
+    out = {}
+    seat = "".join(secrets.choice(ALPHABET) for _ in range(6))
+    old_sid = {}
+
+    def f(d):
+        room = _own(d, actor, code)
+        resets = room.setdefault("seat_resets", {})
+        hit = [k for k in room["students"] if who and k.startswith(who)]
+        if len(hit) == 1:
+            sid = hit[0]; st = room["students"].pop(sid)
+            parked = secrets.token_hex(12)
+            _move_in_room(room, sid, parked)
+            old_sid.update(old=sid, parked=parked)
+            resets[st["nickname"].lower()] = {"nickname": st["nickname"], "parked": parked, "joined": st["joined"], "muted": st.get("muted", False)}
+            key = st["nickname"].lower()
+        elif not hit and (who or "").lower() in resets:
+            key = who.lower()
+        else:
+            raise KeyError(who)
+        rs = resets[key]
+        rs.update(hash=_seat_hash(seat), expires=time.time() + SEAT_TTL, tries=0)
+        out.update(nickname=rs["nickname"], seat_code=seat, expires_hours=SEAT_TTL // 3600)
     CLASSROOMS.update(f)
+    if old_sid:
+        _move_owner(old_sid["old"], old_sid["parked"])
+    _audit.info("class seat reset: class=%s", (code or "").upper())
     return out
 
 
@@ -229,6 +324,36 @@ def set_send(actor: Actor, code: str, on: bool) -> dict:
     return {"send_enabled": bool(on), "send_changed": now}
 
 
+def showcase_policy(sid: str):
+    """None = not a class student (nothing changes for them). Otherwise {'enabled', 'likes'}: Showcase is OFF for class students
+    unless their teacher turned it on, and likes need a second switch (Education CR-3)."""
+    room = room_of(sid)
+    if not room:
+        return None
+    on = bool(room.get("showcase_enabled", False))
+    return {"enabled": on, "likes": bool(on and room.get("likes_enabled", False))}
+
+
+def set_showcase(actor: Actor, code: str, enabled=None, likes=None) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+
+    def f(d):
+        room = _own(d, actor, code)
+        if enabled is not None:
+            room["showcase_enabled"] = bool(enabled)
+            if not enabled:
+                room["likes_enabled"] = False
+        if likes is not None:
+            if likes and not room.get("showcase_enabled", False):
+                raise ValueError("Turn on Showcase for the class first; likes are a second switch.")
+            room["likes_enabled"] = bool(likes)
+        room["showcase_changed"] = now
+        return {"showcase_enabled": bool(room.get("showcase_enabled", False)), "likes_enabled": bool(room.get("likes_enabled", False))}
+    out = CLASSROOMS.update(f)
+    _audit.info("class showcase switch: class=%s %s at=%s", (code or "").upper(), out, now)
+    return {**out, "showcase_changed": now}
+
+
 def student_view(sid: str):
     for room in CLASSROOMS.read().values():
         if sid in room["students"]:
@@ -262,7 +387,9 @@ def teacher_rooms(actor: Actor) -> list[dict]:
                     "notifications": [n for n in r["notifications"] if n["to"] == "teacher" and not n["read"]],
                     "canned": {k: safety.CANNED[k] for k in safety.TEACHER_CANNED},
                     "failed_joins_last_hour": recent_failed_joins(r["code"]),
-                    "send_enabled": bool(r.get("send_enabled", False)), "send_changed": r.get("send_changed", "")})
+                    "send_enabled": bool(r.get("send_enabled", False)), "send_changed": r.get("send_changed", ""),
+                    "showcase_enabled": bool(r.get("showcase_enabled", False)), "likes_enabled": bool(r.get("likes_enabled", False)),
+                    "pending_seats": [{"nickname": v["nickname"], "expires": v["expires"]} for v in r.get("seat_resets", {}).values() if v["expires"] > time.time()]})
     return out
 
 
@@ -279,15 +406,49 @@ def _purge_projects(room, only_sid=None):
             room["projects"].remove(p)
 
 
+def purge_builds(sid: str) -> int:
+    """Delete every build / Edit project (source photo included) that this browser session owns. Returns how many."""
+    from ..services.history import store
+    n = 0
+    for m in store.list(sid):
+        store.delete(m["id"]); n += 1
+    return n
+
+
+def delete_my_data(sid: str) -> dict:
+    """A class student erases their own stuff: builds (and their photos), lesson progress, projects they sent to the class.
+    They stay in the class (the teacher can still remove them)."""
+    room = room_of(sid)
+    if not room:
+        raise KeyError(sid)
+    builds = purge_builds(sid)
+    education.reset(sid)
+    out = {}
+
+    def f(d):
+        r = d[room["code"]]
+        before = len(r["projects"])
+        _purge_projects(r, sid)
+        out["projects"] = before - len(r["projects"])
+    CLASSROOMS.update(f)
+    _audit.info("class student erased own data: class=%s builds=%d projects=%d", room["code"], builds, out["projects"])
+    return {"ok": True, "builds": builds, "projects": out["projects"]}
+
+
 def remove_student(actor: Actor, code: str, sid_prefix: str):
     def f(d):
         room = _own(d, actor, code)
         for sid in list(room["students"]):
-            if sid.startswith(sid_prefix):
+            if sid_prefix and sid.startswith(sid_prefix):
                 del room["students"][sid]
                 education.reset(sid)
+                purge_builds(sid)
                 _purge_projects(room, sid)
                 room["notifications"] = [n for n in room["notifications"] if sid[:8] not in (n["to"], n["from"])]
+        rs = room.get("seat_resets", {}).pop((sid_prefix or "").lower(), None)         # a seat that was waiting to be reclaimed
+        if rs:
+            education.reset(rs["parked"]); purge_builds(rs["parked"]); _purge_projects(room, rs["parked"])
+            room["notifications"] = [n for n in room["notifications"] if rs["parked"][:8] not in (n["to"], n["from"])]
     CLASSROOMS.update(f)
 
 
@@ -311,6 +472,7 @@ def delete(actor: Actor, code: str):
         room = _own(d, actor, code)
         for sid in room["students"]:
             education.reset(sid)
+            purge_builds(sid)
         _purge_projects(room)
         shutil.rmtree(CDIR / room["code"], ignore_errors=True)
         del d[room["code"]]
