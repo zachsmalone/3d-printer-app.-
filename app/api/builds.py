@@ -46,13 +46,23 @@ def preview_payload(model: geometry.Model) -> dict:
     } for b in model.bodies]}
 
 
+NO_STORE = {"Cache-Control": "no-store"}     # SEND-8: model files may be pictures of people; keep them out of shared/proxy caches
+
+
 def summary(meta: dict) -> dict:
     """Metadata for history cards (no heavy data)."""
     bid = meta["id"]
     return {**{k: meta[k] for k in ("id", "created", "mode", "beginner", "title", "stats")},
             "kind": meta.get("kind", "photo"), "visibility": meta.get("visibility", "private"),
             "thumb": f"/files/{bid}/thumb.png",
-            "downloads": {e: f"/files/{bid}/model.{e}" for e in exporters.WRITERS}}
+            "downloads": {e: f"/files/{bid}/model.{e}" for e in exporters.WRITERS},
+            "sizes": _sizes(bid)}
+
+
+def _sizes(bid: str) -> dict:
+    """Bytes of each export that exists on disk (the Send sheet shows them next to the file types; absent = not written yet)."""
+    d = store.dir(bid)
+    return {e: (d / f"model.{e}").stat().st_size for e in exporters.WRITERS if (d / f"model.{e}").exists()}
 
 
 def load_model(bid: str) -> geometry.Model:
@@ -247,4 +257,4 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     p = store.dir(bid) / f"model.{ext}"
     if not p.exists():
         raise HTTPException(404, "unknown build")
-    return FileResponse(p, filename=f"photo3d_{bid}.{ext}")
+    return FileResponse(p, filename=f"photo3d_{bid}.{ext}", headers=NO_STORE)

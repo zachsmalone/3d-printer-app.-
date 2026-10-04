@@ -20,7 +20,7 @@ def caps(c):
 
 def test_adult_gets_everything_teen_and_unknown_get_download_only(shared):
     a, t, anon = client(ADULT), client(TEEN), client()
-    assert caps(a) == {"download": True, "teacher": False, "share": True, "printer": True, "links": True, "role": "adult"}
+    k = caps(a); assert {x: k[x] for x in ("download", "teacher", "share", "printer", "links", "role")} == {"download": True, "teacher": False, "share": True, "printer": True, "links": True, "role": "adult"}
     for c, role in ((t, "teen"), (anon, "teen")):          # visitors who have not passed the age gate count as teens
         k = caps(c)
         assert k["role"] == role and k["download"] and not (k["share"] or k["printer"] or k["links"] or k["teacher"])

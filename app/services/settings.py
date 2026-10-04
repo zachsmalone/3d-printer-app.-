@@ -13,18 +13,76 @@ from . import printers as printers_mod
 from ..config import DATA
 
 FILE = DATA / "settings.json"
+KEYFILE = DATA / ".settings.key"
+ENC_PREFIX = "enc:v1:"
 _lock = threading.Lock()
 DEFAULTS = {"public_base_url": "", "default_slicer": "prusaslicer", "printers": []}
 PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y")
+
+
+def _fernet():
+    """Printer API keys are stored encrypted (Fernet). Key: env PHOTO3D_SECRET_KEY (a Fernet key) or a random 0600 file next to the
+    data. HONEST LIMIT: with the key file on the same disk this protects settings.json when it is copied, backed up, or shown on
+    its own - not against someone who owns the whole machine. Put the key in the environment for more."""
+    from cryptography.fernet import Fernet
+    import os
+    k = os.environ.get("PHOTO3D_SECRET_KEY", "").strip()
+    if not k:
+        if not KEYFILE.exists():
+            KEYFILE.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(KEYFILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "w") as f:
+                f.write(Fernet.generate_key().decode())
+        k = KEYFILE.read_text().strip()
+    return Fernet(k.encode())
+
+
+def encrypt_secret(v: str) -> str:
+    if not v or v.startswith(ENC_PREFIX):
+        return v or ""
+    return ENC_PREFIX + _fernet().encrypt(v.encode()).decode()
+
+
+def decrypt_secret(v: str) -> str:
+    if not v or not v.startswith(ENC_PREFIX):
+        return v or ""          # legacy plain text: still readable, re-written encrypted on the next load()
+    from cryptography.fernet import InvalidToken
+    try:
+        return _fernet().decrypt(v[len(ENC_PREFIX):].encode()).decode()
+    except InvalidToken:
+        return ""               # wrong/lost key: behave as "no key saved" rather than crash or leak the ciphertext
+
+
+def _write(d: dict):
+    out = json.loads(json.dumps(d))
+    for p in out.get("printers", []):
+        p["api_key"] = encrypt_secret(p.get("api_key") or "")
+    FILE.write_text(json.dumps(out, indent=2))
+    try:
+        FILE.chmod(0o600)
+    except OSError:
+        pass
 
 
 def load() -> dict:
     with _lock:
         if FILE.exists():
             try:
-                return {**DEFAULTS, **json.loads(FILE.read_text())}
+                d = {**DEFAULTS, **json.loads(FILE.read_text())}
             except Exception:
-                pass
+                return json.loads(json.dumps(DEFAULTS))
+            legacy = False
+            for p in d.get("printers", []):
+                k = p.get("api_key") or ""
+                if k and not k.startswith(ENC_PREFIX):
+                    legacy = True
+                p["api_key"] = decrypt_secret(k)
+            if legacy:
+                try:
+                    _write(d)          # migrate plain-text keys in place
+                except OSError:
+                    pass
+            return d
         return json.loads(json.dumps(DEFAULTS))
 
 
@@ -98,11 +156,7 @@ def save_from_client(incoming: dict) -> dict:
            "default_slicer": incoming.get("default_slicer") or "prusaslicer",
            "printers": printers}
     with _lock:
-        FILE.write_text(json.dumps(new, indent=2))
-        try:
-            FILE.chmod(0o600)
-        except OSError:
-            pass
+        _write(new)
     return new
 
 

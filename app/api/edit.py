@@ -193,4 +193,4 @@ def original(bid: str, actor: Actor = Depends(get_actor)):
     f = next(store.dir(bid).glob("original.*"), None)
     if not f:
         raise HTTPException(404)
-    return FileResponse(f, filename=f"original_{bid}{f.suffix}")
+    return FileResponse(f, filename=f"original_{bid}{f.suffix}", headers={"Cache-Control": "no-store"})

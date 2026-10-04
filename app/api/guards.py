@@ -87,8 +87,17 @@ def send_caps(request: Request, actor: Actor) -> dict:
         caps["share"] = bool(classrooms.send_allowed(actor.sid) and actor.user
                              and actor.age is not None and actor.age >= 13)
         caps["class_switch_on"] = classrooms.send_allowed(actor.sid)
+        room = classrooms.room_of(actor.sid)
+        caps["class_code"] = room.get("code") if room else None
     elif role == "adult":
         caps.update(share=True, printer=True, links=True)
+    # What the PAGE may draw (the policy above is what the server enforces):
+    #  share_ui   - the share-sheet rows exist only after the device spike passed (flag PHOTO3D_SEND_SHARE)
+    #  printer_ui - direct-to-printer only where it can really work: ZEIM running on the user's own computer (local mode).
+    #               A hosted https page cannot call an http:// printer on someone's LAN, so hosted ZEIM does not promise it.
+    caps["share_ui"] = bool(caps["share"] and config.SEND_SHARE_UI)
+    caps["printer_ui"] = bool(caps["printer"] and config.MODE == "local")
+    caps["mode"] = config.MODE
     return caps
 
 

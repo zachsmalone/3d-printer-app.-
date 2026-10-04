@@ -64,6 +64,8 @@ RECOVERY_FAIL_LIMIT = _int("PHOTO3D_RECOVERY_FAIL_LIMIT", 5)         # wrong rec
 SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
 
 # ---- age gate (Safety S-04) ----
+# SEND-3: the "Share..." / "Email it to myself" rows stay OFF until the share-sheet spike (/sharetest, SEND-0) has passed on a real iPhone/iPad.
+SEND_SHARE_UI = _flag("PHOTO3D_SEND_SHARE", False)
 AGE_IP_LOCK_MINUTES = _int("PHOTO3D_AGE_IP_LOCK_MINUTES", 30)  # ...and this network address can't retry for a while either (clearing cookies must not help).
                                                              # Trade-off: a shared school address blocks other sign-ups for this long. 0 = off.
 AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry

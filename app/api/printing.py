@@ -31,7 +31,7 @@ def _send_file(bid: str, name: str):
     p = store.dir(bid) / name
     if not p.exists():
         raise HTTPException(404)
-    return FileResponse(p, filename=f"photo3d_{bid}.{name.split('.')[-1]}" if name != "thumb.png" else None)
+    return FileResponse(p, filename=f"photo3d_{bid}.{name.split('.')[-1]}" if name != "thumb.png" else None, headers={"Cache-Control": "no-store"})
 
 
 @files_router.get("/files/{bid}/{name}")
