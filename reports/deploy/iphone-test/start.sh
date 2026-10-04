@@ -7,6 +7,9 @@
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib.sh"
+# The box environment has a stray NGROK_AUTHTOKEN (wrong value). Do not let Caddy, ZEIM or the timer inherit it; ngrok gets the
+# real token from the 0600 file via an explicit per-command assignment below.
+unset NGROK_AUTHTOKEN
 
 CONFIRMED=0; SNAPSHOT=0
 while [ $# -gt 0 ]; do
