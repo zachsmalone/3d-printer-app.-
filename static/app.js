@@ -174,7 +174,8 @@ async function openPrint() {
   $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
   $("#slicerBtns").innerHTML = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
-    `<a class="btn ghost" href="${S.current.downloads["3mf"]}" download>…or download 3MF</a>`;
+    `<a class="btn ghost" href="${S.current.downloads["3mf"]}" download>${printInfo.slicers.length ? "…or download 3MF" : "Download 3MF"}</a>` +
+    (printInfo.slicer_links_disabled ? `<p class="muted small" style="flex-basis:100%">${esc(printInfo.slicer_links_disabled)}</p>` : "");
   const b = printInfo.builtin_slicer;
   $("#builtinState").textContent = b.available ? "(PrusaSlicer CLI detected)" : "(slicer not installed)";
   $("#btnSlice").disabled = !b.available;

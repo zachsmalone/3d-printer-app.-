@@ -13,10 +13,11 @@ SLICERS = {
 }
 
 
-def links(base_url: str, jid: str, token: str = "") -> list[dict]:
+def links(base_url: str, jid: str, make_token=None) -> list[dict]:
+    """`make_token(file_name)` -> a signed token for that one file (None = plain /files/ URL)."""
     out = []
     for key, (label, scheme, fmt, note) in SLICERS.items():
-        file_url = (f"{base_url.rstrip('/')}/f/{token}/{jid}/model.{fmt}" if token
+        file_url = (f"{base_url.rstrip('/')}/f/{make_token(f'model.{fmt}')}/{jid}/model.{fmt}" if make_token
                     else f"{base_url.rstrip('/')}/files/{jid}/model.{fmt}")
         out.append({"slicer": key, "label": label, "format": fmt, "file_url": file_url,
                     "url": scheme + quote(file_url, safe=""), "note": note})

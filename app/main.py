@@ -18,6 +18,26 @@ if config.HOST not in config.LOOPBACK_HOSTS:
 if config.MODE == "local" and config.HOST not in config.LOOPBACK_HOSTS:
     _log.warning("PHOTO3D_MODE=local while listening beyond this computer: printer/settings changes are open to everyone who can connect.")
 
+import re as _re
+
+
+class RedactTokens(_logging.Filter):
+    """Signed /f/<token>/... links must not be readable in server.log (anyone with log access could replay them while live)."""
+    _PAT = _re.compile(r"(/f/)[^/\s?\"]+")
+
+    def filter(self, record):
+        if isinstance(record.args, tuple):
+            record.args = tuple(self._PAT.sub(r"\1[redacted]", a) if isinstance(a, str) else a for a in record.args)
+        if isinstance(record.msg, str):
+            record.msg = self._PAT.sub(r"\1[redacted]", record.msg)
+        return True
+
+
+for _n in ("uvicorn.access", "uvicorn.error", "uvicorn"):
+    _lg = _logging.getLogger(_n)
+    if not any(isinstance(f, RedactTokens) for f in _lg.filters):
+        _lg.addFilter(RedactTokens())
+
 app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3")
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages):

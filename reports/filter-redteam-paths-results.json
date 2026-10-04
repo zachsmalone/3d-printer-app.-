@@ -1,0 +1,782 @@
+{
+ "stem_word_masked": "b****",
+ "nonstem_word_masked": "a*****",
+ "rows": [
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "plain",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow that language. Please"
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "ZWSP mid",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow that language. Please"
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "plain email",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow sharing contact detai"
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "obfuscated email 'x at gmail dot com'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "10-digit phone",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow sharing contact detai"
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "URL no scheme .com",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow sharing contact detai"
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "URL no scheme .xyz",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "bare @handle",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/me/signup",
+   "field": "display_name",
+   "variant": "'snap me'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "instagram",
+   "variant": "plain",
+   "http": 200,
+   "result": "accepted",
+   "note": "(only a charset regex [A-Za-z0-9._-] is applied)"
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "instagram",
+   "variant": "Cyrillic homoglyph",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "{\"detail\":\"Instagram handle may only contain lette"
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "instagram",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": "(only a charset regex [A-Za-z0-9._-] is applied)"
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "instagram",
+   "variant": "10-digit phone",
+   "http": 200,
+   "result": "accepted",
+   "note": "(only a charset regex [A-Za-z0-9._-] is applied)"
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "instagram",
+   "variant": "bare @handle",
+   "http": 200,
+   "result": "accepted",
+   "note": "(only a charset regex [A-Za-z0-9._-] is applied)"
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "tiktok",
+   "variant": "10-digit phone as handle",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "PUT /api/me/links",
+   "field": "reddit",
+   "variant": "domain-like handle",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms",
+   "field": "name",
+   "variant": "plain",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms",
+   "field": "name",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms",
+   "field": "name",
+   "variant": "ZWSP mid",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms",
+   "field": "name",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms",
+   "field": "name",
+   "variant": "plain email",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms",
+   "field": "name",
+   "variant": "10-digit phone",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/join",
+   "field": "nickname",
+   "variant": "plain",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow that language. Please use app"
+  },
+  {
+   "path": "POST /api/classrooms/join",
+   "field": "nickname",
+   "variant": "Cyrillic homoglyph",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Nickname must be 2-20 letters/numbers. Do NOT us"
+  },
+  {
+   "path": "POST /api/classrooms/join",
+   "field": "nickname",
+   "variant": "ZWSP mid",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Nickname must be 2-20 letters/numbers. Do NOT us"
+  },
+  {
+   "path": "POST /api/classrooms/join",
+   "field": "nickname",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/join",
+   "field": "nickname",
+   "variant": "10-digit phone",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow sharing contact details or li"
+  },
+  {
+   "path": "POST /api/classrooms/join",
+   "field": "nickname",
+   "variant": "URL no scheme .com",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Nickname must be 2-20 letters/numbers. Do NOT us"
+  },
+  {
+   "path": "POST /api/generate",
+   "field": "title",
+   "variant": "plain (private build)",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "{\"detail\":\"Chat doesn't allow that language. Please use appr"
+  },
+  {
+   "path": "POST /api/generate",
+   "field": "upload filename",
+   "variant": "plain (becomes default title)",
+   "http": 200,
+   "result": "accepted",
+   "note": "(accepted)"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "plain",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "ZWSP mid",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "plain email",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "obfuscated email 'x at gmail dot com'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "10-digit phone",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "URL no scheme .com",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "URL no scheme .xyz",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "bare @handle",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "title",
+   "variant": "'snap me'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "plain",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "ZWSP mid",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "plain email",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "obfuscated email 'x at gmail dot com'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "10-digit phone",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "URL no scheme .com",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "URL no scheme .xyz",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "bare @handle",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "description",
+   "variant": "'snap me'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "plain",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "ZWSP mid",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "plain email",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "obfuscated email 'x at gmail dot com'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "10-digit phone",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "URL no scheme .com",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "URL no scheme .xyz",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "bare @handle",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tag",
+   "variant": "'snap me'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tags (string)",
+   "variant": "tags given as a str",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase",
+   "field": "tags (non-str)",
+   "variant": "tags with non-str items",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects",
+   "field": "title",
+   "variant": "plain",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects",
+   "field": "title",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects",
+   "field": "title",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects",
+   "field": "title",
+   "variant": "plain email",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects",
+   "field": "title",
+   "variant": "empty -> falls back to build title",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects",
+   "field": "title (from filename)",
+   "variant": "plain via default title",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "plain",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "Cyrillic homoglyph",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "ZWSP mid",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "mid-split with '-'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "plain email",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "obfuscated email 'x at gmail dot com'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "10-digit phone",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "URL no scheme .xyz",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/classrooms/{c}/projects/{p}/feedback",
+   "field": "comment",
+   "variant": "'snap me'",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase/{id}/report",
+   "field": "details",
+   "variant": "plain (moderator-only)",
+   "http": 200,
+   "result": "accepted",
+   "note": "(stored unfiltered, max 1000 chars; reaches moderators only)"
+  },
+  {
+   "path": "POST /api/edit/new",
+   "field": "title",
+   "variant": "plain (private)",
+   "http": 400,
+   "result": "BLOCKED",
+   "note": "Chat doesn't allow that language. Please use app"
+  },
+  {
+   "path": "POST /api/edit/new",
+   "field": "upload filename",
+   "variant": "plain (default title)",
+   "http": 200,
+   "result": "accepted",
+   "note": ""
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "description",
+   "variant": "Material: PLA, 0.2 mm layers. More i",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "title",
+   "variant": "Rabbit chair",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "description",
+   "variant": "A bit chunky but it prints fine",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "title",
+   "variant": "Mini game tokens",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "tag",
+   "variant": "hard",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "description",
+   "variant": "Print is hard but I've gotten better",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "title",
+   "variant": "Map of Niger and Nigeria",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=language_blocked"
+  },
+  {
+   "path": "POST /api/showcase (benign)",
+   "field": "description",
+   "variant": "Snap fit lid, no supports",
+   "http": 422,
+   "result": "BLOCKED",
+   "note": "code=contact_blocked"
+  }
+ ],
+ "error_shapes": {
+  "signup display_name": [
+   "detail",
+   400
+  ],
+  "classroom name": [
+   "detail",
+   400
+  ],
+  "nickname": [
+   "detail",
+   400
+  ],
+  "showcase title": [
+   "code",
+   "context",
+   "message",
+   422
+  ],
+  "feedback": [
+   "code",
+   "context",
+   "message",
+   422
+  ],
+  "student project title": [
+   "code",
+   "context",
+   "message",
+   422
+  ]
+ }
+}

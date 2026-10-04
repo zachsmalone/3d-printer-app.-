@@ -1,0 +1,244 @@
+[
+ {
+  "id": "glow-card",
+  "title": "Start here: Glow Card (your first lithophane)",
+  "emoji": "💡",
+  "minutes": 45,
+  "age": "9+ (teacher-led for ages 5-8)",
+  "summary": "Choose a safe photo, predict how thickness changes light, and build a picture that glows.",
+  "objective": "Students choose a photo they have the right to use, predict where a lithophane will be thick or thin, and compare the preview with their prediction.",
+  "teacher_notes": "START HERE lesson. The printer is operated by the teacher or a trained adult; students design and preview only. Printing takes time (test one on your own printer first and write the real number on the board; do not rely on a generic estimate). Offer a school-safe image pack (pets, landscapes, objects, student drawings, public-domain images) so no one has to use a personal photo. Use LED tea-lights only.",
+  "steps": [
+   {
+    "title": "Pick a photo you are allowed to use",
+    "body": "Choose a photo you took yourself, a drawing you made, or one from the class image pack. Do not use a photo of another person unless they said yes (and for school use, ask your teacher first). Good picks: a pet, a plant, a toy, a landscape, your own drawing. Do not use photos that show your home address, school name or a license plate."
+   },
+   {
+    "title": "Predict before you build",
+    "body": "Look at your photo. Which parts are dark? Which are bright? Sketch or say: where will the plastic be thick, and where thin? Remember: thick blocks light (looks dark), thin lets light through (looks bright)."
+   },
+   {
+    "title": "Build it",
+    "body": "In the Studio choose Lithophane, keep Beginner mode, pick Standard, and press Build. Check that the preview shows your picture."
+   },
+   {
+    "title": "Compare with your prediction",
+    "body": "Was your prediction right? Try Thin and Thick and compare. Write one sentence: what changed when the plastic got thicker?"
+   },
+   {
+    "title": "Ask your teacher to print it",
+    "body": "Tell your teacher your model is ready. Your teacher runs the printer. Stay away from hot parts and keep your hands off the printer while it works."
+   },
+   {
+    "title": "Light it safely",
+    "body": "Put a small LED tea-light behind the finished panel. Never use a hot bulb: plastic can bend or melt."
+   }
+  ],
+  "quiz": {
+   "q": "Which choice is a good photo for this project?",
+   "options": [
+    "A classmate's face, taken without asking",
+    "Your own drawing or a pet photo you took",
+    "A picture showing your home address on a sign"
+   ],
+   "answer": 1
+  },
+  "try": {
+   "mode": "lithophane",
+   "preset": "standard",
+   "label": "Build a Glow Card"
+  }
+ },
+ {
+  "id": "height-detectives",
+  "title": "Height Detectives: feel a picture",
+  "emoji": "🖐️",
+  "minutes": 30,
+  "age": "5-7 (teacher-led)",
+  "summary": "Learn that bright can mean tall by drawing a bold shape and touching the printed relief.",
+  "objective": "Students describe a relief as 'taller in some places, flatter in others' and match a drawing to the raised shape they feel.",
+  "teacher_notes": "Teacher-led, one device at the front. Students draw with thick dark marker on white paper; the teacher photographs/scans a few drawings (no faces, no names on the paper). Pre-print one tactile relief. Offers a tactile route in for students who learn by touch, including students with low vision; check with your vision specialist.",
+  "steps": [
+   {
+    "title": "Touch first",
+    "body": "Pass around a printed relief. Close your eyes if you like. Where does it feel tall? Where does it feel flat?"
+   },
+   {
+    "title": "Draw a bold shape",
+    "body": "Draw one big, simple shape (a star, a fish, a house) with a thick marker. Keep it high-contrast."
+   },
+   {
+    "title": "Teacher builds it",
+    "body": "Your teacher puts the drawing into the Studio as Relief. Watch the picture turn into a 3D shape on the screen."
+   },
+   {
+    "title": "Match it",
+    "body": "Which drawing became which shape? Point to the tall part and the flat part."
+   }
+  ],
+  "quiz": {
+   "q": "In a relief made from a picture, what do bright parts usually become?",
+   "options": [
+    "Taller parts",
+    "Holes",
+    "The same height as dark parts"
+   ],
+   "answer": 0
+  },
+  "try": {
+   "mode": "relief",
+   "preset": "thin",
+   "label": "Open a starter relief"
+  }
+ },
+ {
+  "id": "name-tag-engineers",
+  "title": "Name Tag Engineers: measure, base, initials",
+  "emoji": "📏",
+  "minutes": 50,
+  "age": "8-10",
+  "summary": "Measure in millimetres, add a base, and emboss initials (not full names) on a small tag.",
+  "objective": "Students measure a model in millimetres, explain why a flat base helps a print stand or stick, and test one change at a time.",
+  "teacher_notes": "Uses the Edit workspace (scale, base, text, measure). Use INITIALS or a team symbol, not full names, if tags will be displayed. A ruler per pair. Note: the Spark Lab 'Try it' button currently opens the Studio only; open Edit from the top navigation.",
+  "steps": [
+   {
+    "title": "Measure a real thing",
+    "body": "Use a ruler to measure your pencil case in centimetres, then in millimetres. Which number is bigger? Why?"
+   },
+   {
+    "title": "Open the sample",
+    "body": "In Edit choose 'Open sample'. Use the Measure tool to find how wide the model is in mm."
+   },
+   {
+    "title": "Scale it",
+    "body": "Scale the model so it is about 40 mm wide. Check with Measure."
+   },
+   {
+    "title": "Add a base",
+    "body": "Press 'Add base'. Why do you think a flat base helps?"
+   },
+   {
+    "title": "Add initials",
+    "body": "Add text with your initials. Change only ONE thing, then look at the result."
+   },
+   {
+    "title": "Share a result",
+    "body": "Tell a partner one thing you changed and what happened."
+   }
+  ],
+  "quiz": {
+   "q": "A tag is 40 mm wide. How many centimetres is that?",
+   "options": [
+    "0.4 cm",
+    "4 cm",
+    "400 cm"
+   ],
+   "answer": 1
+  },
+  "try": {
+   "mode": "relief",
+   "preset": "thin",
+   "label": "Open the Studio (then use Edit)"
+  }
+ },
+ {
+  "id": "layer-cake-posters",
+  "title": "Layer Cake Posters: pop-art colours as height",
+  "emoji": "🎨",
+  "minutes": 55,
+  "age": "11-14",
+  "summary": "Reduce a picture to a few colour layers, stack them, and critique designs kindly.",
+  "objective": "Students explain how a picture can be simplified into N flat layers, predict how layer count and step height change total height, and give specific, kind feedback using a protocol.",
+  "teacher_notes": "Use class-pack or student-created images. Teach the critique protocol 'I notice... I wonder... What if...' before students look at each other's work. Math tie-in: total height = layers x step. Feedback stays inside the class; do not publish student work.",
+  "steps": [
+   {
+    "title": "Choose a bold image",
+    "body": "Pick an image with clear shapes from the class pack or your own artwork."
+   },
+   {
+    "title": "Predict the layers",
+    "body": "If you use 4 colours, how many layers will stack? If each layer is 1 mm, how tall will the poster be?"
+   },
+   {
+    "title": "Build it",
+    "body": "In the Studio choose Pop-art. Try 3, 4 and 6 colours. Compare."
+   },
+   {
+    "title": "Check your maths",
+    "body": "Open the model details. Does the height match your prediction?"
+   },
+   {
+    "title": "Kind critique",
+    "body": "With a partner use: I notice... I wonder... What if...? Give one specific, kind comment each."
+   },
+   {
+    "title": "Revise",
+    "body": "Change one setting based on the feedback and rebuild."
+   }
+  ],
+  "quiz": {
+   "q": "A pop-art model has 5 layers of 1 mm each. About how tall are the layers together?",
+   "options": [
+    "1 mm",
+    "5 mm",
+    "50 mm"
+   ],
+   "answer": 1
+  },
+  "try": {
+   "mode": "popart",
+   "preset": "standard",
+   "label": "Build a pop-art poster"
+  }
+ },
+ {
+  "id": "fit-check",
+  "title": "Fit Check: measure, tolerance, redesign",
+  "emoji": "🔧",
+  "minutes": 90,
+  "age": "14-18",
+  "summary": "Design a part that has to fit a real object, test the fit, and document one redesign.",
+  "objective": "Students measure a real object, design a part with a stated tolerance, test it, and justify one design change with evidence.",
+  "teacher_notes": "Engineering design cycle: define, measure, make, test, improve. Use a safe, non-hazardous target object (a pencil, a marker cap, a USB stick cover). Provide calipers if available. Teacher or trained student operator runs the printer. This lesson needs two print cycles; plan extra days for printer errors.",
+  "steps": [
+   {
+    "title": "Define the problem",
+    "body": "Pick a small object that needs a holder, cap or cover. Write the requirement in one sentence and one number (for example: 'must slide on with about 0.3 mm of space')."
+   },
+   {
+    "title": "Measure",
+    "body": "Measure the object in mm at least twice and record the numbers."
+   },
+   {
+    "title": "Design",
+    "body": "In Edit start from the sample or a photo base, use scale, base, and a boolean cut to make the opening. Record your numbers."
+   },
+   {
+    "title": "Check and repair",
+    "body": "Run Repair, then Measure again. Does the model match your plan?"
+   },
+   {
+    "title": "Print and test",
+    "body": "Your teacher prints it. Test the fit and write what you observe."
+   },
+   {
+    "title": "Redesign",
+    "body": "Change ONE dimension, explain why using your measurements, and print again if time allows."
+   }
+  ],
+  "quiz": {
+   "q": "Why change only one dimension per test?",
+   "options": [
+    "It is faster to type",
+    "So you know which change caused the result",
+    "Printers only accept one change"
+   ],
+   "answer": 1
+  },
+  "try": {
+   "mode": "relief",
+   "preset": "thin",
+   "label": "Open the Studio (then use Edit)"
+  }
+ }
+]

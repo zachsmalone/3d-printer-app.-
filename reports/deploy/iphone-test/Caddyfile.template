@@ -1,0 +1,57 @@
+# ZEIM iPhone test - Caddy config TEMPLATE. start.sh renders the @@...@@ placeholders into <run dir>/Caddyfile.
+# Caddy listens on 127.0.0.1 only; the passcode (basic auth) is checked HERE, in front of the app.
+# The tunnel points at this port and never at the app. UNTESTED ON REAL iOS.
+{
+	admin off
+	auto_https off
+	persist_config off
+	# Only the tunnel program on THIS computer (loopback) may tell us the real client address / https scheme.
+	servers {
+		trusted_proxies static 127.0.0.1/32
+		trusted_proxies_strict
+	}
+	log {
+		output file @@RUN@@/logs/caddy-runtime.log
+		level WARN
+	}
+}
+
+http://127.0.0.1:@@PROXY_PORT@@ {
+	bind 127.0.0.1
+
+	# Every path, including /healthz, needs the passcode. The bcrypt hash comes from the environment
+	# (ZEIM_AUTH_HASH), so it is never written into this file.
+	basic_auth {
+		@@USER@@ {$ZEIM_AUTH_HASH}
+	}
+
+	request_body {
+		max_size 30MB
+	}
+
+	reverse_proxy 127.0.0.1:@@APP_PORT@@ {
+		transport http {
+			response_header_timeout 300s
+			read_timeout 300s
+		}
+	}
+
+	# Access log WITHOUT query strings, signed-link tokens, cookies or credentials.
+	log {
+		output file @@RUN@@/logs/caddy-access.log {
+			roll_size 5MiB
+			roll_keep 3
+		}
+		format filter {
+			wrap json
+			fields {
+				request>uri regexp "\?.*" "?REDACTED"
+				request>uri regexp "/f/[^/]+/" "/f/REDACTED/"
+				request>headers>Authorization delete
+				request>headers>Cookie delete
+				request>headers>Referer delete
+				resp_headers>Set-Cookie delete
+			}
+		}
+	}
+}

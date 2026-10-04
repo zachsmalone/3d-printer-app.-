@@ -1,0 +1,2667 @@
+{
+ "iphone14_portrait": {
+  "studio_empty": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 7,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     230,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     104,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     104,
+     32
+    ],
+    [
+     "button[Thick]",
+     104,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ]
+   ],
+   "fsCount": 2,
+   "headerH": 100,
+   "viewerH": 490
+  },
+  "studio_built": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 22,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     230,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     104,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     104,
+     32
+    ],
+    [
+     "button[Thick]",
+     104,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 490
+  },
+  "print_dialog": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 35,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     230,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     104,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     104,
+     32
+    ],
+    [
+     "button[Thick]",
+     104,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ],
+    [
+     "#s_layer",
+     14
+    ],
+    [
+     "#s_fill",
+     14
+    ],
+    [
+     "#s_brim",
+     14
+    ],
+    [
+     "#s_up",
+     13.3333
+    ],
+    [
+     "#s_sup",
+     13.3333
+    ],
+    [
+     "#printerSel[No printers config]",
+     14
+    ],
+    [
+     "#startNow",
+     13.3333
+    ]
+   ],
+   "fsCount": 10,
+   "headerH": 100,
+   "viewerH": 490
+  },
+  "edit": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#editUnits[millimetrescentime]",
+     157,
+     37
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     157,
+     37
+    ],
+    [
+     "#editSample[Try a sample model]",
+     158,
+     38
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     247,
+     37
+    ],
+    [
+     "#editFromBuildGo[Edit it]",
+     67,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#editUnits[millimetrescentime]",
+     14
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     14
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "showcase": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#shSearch",
+     220,
+     31
+    ],
+    [
+     "#btnMyData[\ud83d\udd12 My data]",
+     104,
+     38
+    ],
+    [
+     "button.on[Trending]",
+     87,
+     32
+    ],
+    [
+     "button[Free]",
+     57,
+     32
+    ],
+    [
+     "button[For You]",
+     78,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#shSearch",
+     13.3333
+    ]
+   ],
+   "fsCount": 1,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "learn": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 3,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnJoinClass[\ud83c\udf92 Join a class]",
+     122,
+     38
+    ],
+    [
+     "#btnTeacher[\ud83c\udf4e Teacher tools]",
+     139,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [],
+   "fsCount": 0,
+   "headerH": 100,
+   "viewerH": 0
+  }
+ },
+ "iphone14_landscape": {
+  "studio_empty": {
+   "scrollW": 844,
+   "vw": 844,
+   "small": 11,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Learn]",
+     67,
+     34
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     684,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     255,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     255,
+     32
+    ],
+    [
+     "button[Thick]",
+     255,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ]
+   ],
+   "fsCount": 2,
+   "headerH": 100,
+   "viewerH": 340
+  },
+  "studio_built": {
+   "scrollW": 844,
+   "vw": 844,
+   "small": 22,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     684,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     255,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     255,
+     32
+    ],
+    [
+     "button[Thick]",
+     255,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 340
+  },
+  "print_dialog": {
+   "scrollW": 844,
+   "vw": 844,
+   "small": 37,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     684,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     255,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     255,
+     32
+    ],
+    [
+     "button[Thick]",
+     255,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ],
+    [
+     "#s_layer",
+     14
+    ],
+    [
+     "#s_fill",
+     14
+    ],
+    [
+     "#s_brim",
+     14
+    ],
+    [
+     "#s_up",
+     13.3333
+    ],
+    [
+     "#s_sup",
+     13.3333
+    ],
+    [
+     "#printerSel[No printers config]",
+     14
+    ],
+    [
+     "#startNow",
+     13.3333
+    ]
+   ],
+   "fsCount": 10,
+   "headerH": 100,
+   "viewerH": 340
+  },
+  "edit": {
+   "scrollW": 844,
+   "vw": 844,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#editUnits[millimetrescentime]",
+     384,
+     37
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     384,
+     37
+    ],
+    [
+     "#editSample[Try a sample model]",
+     158,
+     38
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     701,
+     37
+    ],
+    [
+     "#editFromBuildGo[Edit it]",
+     67,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#editUnits[millimetrescentime]",
+     14
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     14
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "showcase": {
+   "scrollW": 844,
+   "vw": 844,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#shSearch",
+     220,
+     31
+    ],
+    [
+     "#btnMyData[\ud83d\udd12 My data]",
+     104,
+     38
+    ],
+    [
+     "button.on[Trending]",
+     87,
+     32
+    ],
+    [
+     "button[Free]",
+     57,
+     32
+    ],
+    [
+     "button[For You]",
+     78,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#shSearch",
+     13.3333
+    ]
+   ],
+   "fsCount": 1,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "learn": {
+   "scrollW": 844,
+   "vw": 844,
+   "small": 3,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnJoinClass[\ud83c\udf92 Join a class]",
+     122,
+     38
+    ],
+    [
+     "#btnTeacher[\ud83c\udf4e Teacher tools]",
+     139,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [],
+   "fsCount": 0,
+   "headerH": 100,
+   "viewerH": 0
+  }
+ },
+ "ipad_portrait": {
+  "studio_empty": {
+   "scrollW": 820,
+   "vw": 820,
+   "small": 11,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Learn]",
+     67,
+     34
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     660,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     247,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     247,
+     32
+    ],
+    [
+     "button[Thick]",
+     247,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ]
+   ],
+   "fsCount": 2,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "studio_built": {
+   "scrollW": 820,
+   "vw": 820,
+   "small": 22,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     660,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     247,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     247,
+     32
+    ],
+    [
+     "button[Thick]",
+     247,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "print_dialog": {
+   "scrollW": 820,
+   "vw": 820,
+   "small": 37,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     660,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     247,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     247,
+     32
+    ],
+    [
+     "button[Thick]",
+     247,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ],
+    [
+     "#s_layer",
+     14
+    ],
+    [
+     "#s_fill",
+     14
+    ],
+    [
+     "#s_brim",
+     14
+    ],
+    [
+     "#s_up",
+     13.3333
+    ],
+    [
+     "#s_sup",
+     13.3333
+    ],
+    [
+     "#printerSel[No printers config]",
+     14
+    ],
+    [
+     "#startNow",
+     13.3333
+    ]
+   ],
+   "fsCount": 10,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "edit": {
+   "scrollW": 820,
+   "vw": 820,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#editUnits[millimetrescentime]",
+     372,
+     37
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     372,
+     37
+    ],
+    [
+     "#editSample[Try a sample model]",
+     158,
+     38
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     677,
+     37
+    ],
+    [
+     "#editFromBuildGo[Edit it]",
+     67,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#editUnits[millimetrescentime]",
+     14
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     14
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "showcase": {
+   "scrollW": 820,
+   "vw": 820,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#shSearch",
+     220,
+     31
+    ],
+    [
+     "#btnMyData[\ud83d\udd12 My data]",
+     104,
+     38
+    ],
+    [
+     "button.on[Trending]",
+     87,
+     32
+    ],
+    [
+     "button[Free]",
+     57,
+     32
+    ],
+    [
+     "button[For You]",
+     78,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#shSearch",
+     13.3333
+    ]
+   ],
+   "fsCount": 1,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "learn": {
+   "scrollW": 820,
+   "vw": 820,
+   "small": 3,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnJoinClass[\ud83c\udf92 Join a class]",
+     122,
+     38
+    ],
+    [
+     "#btnTeacher[\ud83c\udf4e Teacher tools]",
+     139,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [],
+   "fsCount": 0,
+   "headerH": 100,
+   "viewerH": 0
+  }
+ },
+ "ipad_landscape": {
+  "studio_empty": {
+   "scrollW": 1180,
+   "vw": 1180,
+   "small": 15,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Learn]",
+     67,
+     34
+    ],
+    [
+     "button.on[\ud83c\udf31 Beginner]",
+     109,
+     32
+    ],
+    [
+     "button[\ud83d\udee0 Expert]",
+     88,
+     32
+    ],
+    [
+     "#btnAccount[\ud83d\udc64 Sign up]",
+     101,
+     38
+    ],
+    [
+     "#btnSettings[\u2699 Settings]",
+     99,
+     38
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     252,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     111,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     111,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ]
+   ],
+   "fsCount": 2,
+   "headerH": 61,
+   "viewerH": 476
+  },
+  "studio_built": {
+   "scrollW": 1180,
+   "vw": 1180,
+   "small": 30,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Spark Lab]",
+     95,
+     34
+    ],
+    [
+     "button.on[\ud83c\udf31 Beginner]",
+     109,
+     32
+    ],
+    [
+     "button[\ud83d\udee0 Expert]",
+     88,
+     32
+    ],
+    [
+     "#btnAccount[\ud83d\udc64 Sign up]",
+     101,
+     38
+    ],
+    [
+     "#btnSettings[\u2699 Settings]",
+     99,
+     38
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     252,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     111,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     111,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 61,
+   "viewerH": 476
+  },
+  "print_dialog": {
+   "scrollW": 1180,
+   "vw": 1180,
+   "small": 45,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Spark Lab]",
+     95,
+     34
+    ],
+    [
+     "button.on[\ud83c\udf31 Beginner]",
+     109,
+     32
+    ],
+    [
+     "button[\ud83d\udee0 Expert]",
+     88,
+     32
+    ],
+    [
+     "#btnAccount[\ud83d\udc64 Sign up]",
+     101,
+     38
+    ],
+    [
+     "#btnSettings[\u2699 Settings]",
+     99,
+     38
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     252,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     111,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     111,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ],
+    [
+     "#s_layer",
+     14
+    ],
+    [
+     "#s_fill",
+     14
+    ],
+    [
+     "#s_brim",
+     14
+    ],
+    [
+     "#s_up",
+     13.3333
+    ],
+    [
+     "#s_sup",
+     13.3333
+    ],
+    [
+     "#printerSel[No printers config]",
+     14
+    ],
+    [
+     "#startNow",
+     13.3333
+    ]
+   ],
+   "fsCount": 10,
+   "headerH": 61,
+   "viewerH": 476
+  },
+  "edit": {
+   "scrollW": 1180,
+   "vw": 1180,
+   "small": 14,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button.on[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Spark Lab]",
+     95,
+     34
+    ],
+    [
+     "button.on[\ud83c\udf31 Beginner]",
+     109,
+     32
+    ],
+    [
+     "button[\ud83d\udee0 Expert]",
+     88,
+     32
+    ],
+    [
+     "#btnAccount[\ud83d\udc64 Sign up]",
+     101,
+     38
+    ],
+    [
+     "#btnSettings[\u2699 Settings]",
+     99,
+     38
+    ],
+    [
+     "#editUnits[millimetrescentime]",
+     168,
+     37
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     168,
+     37
+    ],
+    [
+     "#editSample[Try a sample model]",
+     158,
+     38
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     269,
+     37
+    ],
+    [
+     "#editFromBuildGo[Edit it]",
+     67,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#editUnits[millimetrescentime]",
+     14
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     14
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 61,
+   "viewerH": 0
+  },
+  "showcase": {
+   "scrollW": 1180,
+   "vw": 1180,
+   "small": 14,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button[Studio]",
+     72,
+     34
+    ],
+    [
+     "button.on[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Spark Lab]",
+     95,
+     34
+    ],
+    [
+     "button.on[\ud83c\udf31 Beginner]",
+     109,
+     32
+    ],
+    [
+     "button[\ud83d\udee0 Expert]",
+     88,
+     32
+    ],
+    [
+     "#btnAccount[\ud83d\udc64 Sign up]",
+     101,
+     38
+    ],
+    [
+     "#btnSettings[\u2699 Settings]",
+     99,
+     38
+    ],
+    [
+     "#shSearch",
+     220,
+     31
+    ],
+    [
+     "#btnMyData[\ud83d\udd12 My data]",
+     104,
+     38
+    ],
+    [
+     "button.on[Trending]",
+     87,
+     32
+    ],
+    [
+     "button[Free]",
+     57,
+     32
+    ],
+    [
+     "button[For You]",
+     78,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#shSearch",
+     13.3333
+    ]
+   ],
+   "fsCount": 1,
+   "headerH": 61,
+   "viewerH": 0
+  },
+  "learn": {
+   "scrollW": 1180,
+   "vw": 1180,
+   "small": 11,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button.on[Spark Lab]",
+     95,
+     34
+    ],
+    [
+     "button.on[\ud83c\udf31 Beginner]",
+     109,
+     32
+    ],
+    [
+     "button[\ud83d\udee0 Expert]",
+     88,
+     32
+    ],
+    [
+     "#btnAccount[\ud83d\udc64 Sign up]",
+     101,
+     38
+    ],
+    [
+     "#btnSettings[\u2699 Settings]",
+     99,
+     38
+    ],
+    [
+     "#btnJoinClass[\ud83c\udf92 Join a class]",
+     122,
+     38
+    ],
+    [
+     "#btnTeacher[\ud83c\udf4e Teacher tools]",
+     139,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [],
+   "fsCount": 0,
+   "headerH": 61,
+   "viewerH": 0
+  }
+ },
+ "ipad_splitview_third": {
+  "studio_empty": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 11,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Learn]",
+     67,
+     34
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     160,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     77,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     88,
+     32
+    ],
+    [
+     "button[Thick]",
+     77,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ]
+   ],
+   "fsCount": 2,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "studio_built": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 21,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     160,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     77,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     88,
+     32
+    ],
+    [
+     "button[Thick]",
+     77,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "print_dialog": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 31,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     160,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     77,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     88,
+     32
+    ],
+    [
+     "button[Thick]",
+     77,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ],
+    [
+     "#s_layer",
+     14
+    ],
+    [
+     "#s_fill",
+     14
+    ],
+    [
+     "#s_brim",
+     14
+    ],
+    [
+     "#s_up",
+     13.3333
+    ],
+    [
+     "#s_sup",
+     13.3333
+    ],
+    [
+     "#printerSel[No printers config]",
+     14
+    ],
+    [
+     "#startNow",
+     13.3333
+    ]
+   ],
+   "fsCount": 10,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "edit": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#editUnits[millimetrescentime]",
+     122,
+     37
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     122,
+     37
+    ],
+    [
+     "#editSample[Try a sample model]",
+     158,
+     38
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     177,
+     37
+    ],
+    [
+     "#editFromBuildGo[Edit it]",
+     67,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#editUnits[millimetrescentime]",
+     14
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     14
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "showcase": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#shSearch",
+     220,
+     31
+    ],
+    [
+     "#btnMyData[\ud83d\udd12 My data]",
+     104,
+     38
+    ],
+    [
+     "button.on[Trending]",
+     87,
+     32
+    ],
+    [
+     "button[Free]",
+     57,
+     32
+    ],
+    [
+     "button[For You]",
+     78,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#shSearch",
+     13.3333
+    ]
+   ],
+   "fsCount": 1,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "learn": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 3,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnJoinClass[\ud83c\udf92 Join a class]",
+     122,
+     38
+    ],
+    [
+     "#btnTeacher[\ud83c\udf4e Teacher tools]",
+     139,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [],
+   "fsCount": 0,
+   "headerH": 100,
+   "viewerH": 0
+  }
+ },
+ "ipad_slideover": {
+  "studio_empty": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 11,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "button.on[Studio]",
+     72,
+     34
+    ],
+    [
+     "button[Showcase]",
+     95,
+     34
+    ],
+    [
+     "button[Edit]",
+     54,
+     34
+    ],
+    [
+     "button[Learn]",
+     67,
+     34
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     215,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     99,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     99,
+     32
+    ],
+    [
+     "button[Thick]",
+     99,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ]
+   ],
+   "fsCount": 2,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "studio_built": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 22,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     215,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     99,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     99,
+     32
+    ],
+    [
+     "button[Thick]",
+     99,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "print_dialog": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 34,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnSample[Try a sample photo]",
+     130,
+     29
+    ],
+    [
+     "#widthRange",
+     215,
+     16
+    ],
+    [
+     "#width_mm",
+     80,
+     36
+    ],
+    [
+     "button[Thin]",
+     99,
+     32
+    ],
+    [
+     "button.on[Standard]",
+     99,
+     32
+    ],
+    [
+     "button[Thick]",
+     99,
+     32
+    ],
+    [
+     "#vReset[\u27f2 Reset view]",
+     95,
+     29
+    ],
+    [
+     "#vWire[\u25a6 Wireframe]",
+     96,
+     29
+    ],
+    [
+     "a.btn[\u2b07 STL]",
+     68,
+     38
+    ],
+    [
+     "a.btn[\u2b07 OBJ]",
+     69,
+     38
+    ],
+    [
+     "a.btn[\u2b07 3MF]",
+     73,
+     38
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     124,
+     37
+    ],
+    [
+     "#btnEditThis[\u270f Edit this]",
+     98,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#widthRange",
+     13.3333
+    ],
+    [
+     "#width_mm",
+     14
+    ],
+    [
+     "#resVis[\ud83d\udd12 Private\ud83d\udc65 Follo]",
+     14
+    ],
+    [
+     "#s_layer",
+     14
+    ],
+    [
+     "#s_fill",
+     14
+    ],
+    [
+     "#s_brim",
+     14
+    ],
+    [
+     "#s_up",
+     13.3333
+    ],
+    [
+     "#s_sup",
+     13.3333
+    ],
+    [
+     "#printerSel[No printers config]",
+     14
+    ],
+    [
+     "#startNow",
+     13.3333
+    ]
+   ],
+   "fsCount": 10,
+   "headerH": 100,
+   "viewerH": 560
+  },
+  "edit": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#editUnits[millimetrescentime]",
+     150,
+     37
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     150,
+     37
+    ],
+    [
+     "#editSample[Try a sample model]",
+     158,
+     38
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     232,
+     37
+    ],
+    [
+     "#editFromBuildGo[Edit it]",
+     67,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#editUnits[millimetrescentime]",
+     14
+    ],
+    [
+     "#editPhotoMode[Lithophane baseRel]",
+     14
+    ],
+    [
+     "#editFromBuild[sample (lithophane]",
+     14
+    ]
+   ],
+   "fsCount": 3,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "showcase": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 6,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#shSearch",
+     220,
+     31
+    ],
+    [
+     "#btnMyData[\ud83d\udd12 My data]",
+     104,
+     38
+    ],
+    [
+     "button.on[Trending]",
+     87,
+     32
+    ],
+    [
+     "button[Free]",
+     57,
+     32
+    ],
+    [
+     "button[For You]",
+     78,
+     32
+    ]
+   ],
+   "off": [],
+   "fsSmall": [
+    [
+     "#shSearch",
+     13.3333
+    ]
+   ],
+   "fsCount": 1,
+   "headerH": 100,
+   "viewerH": 0
+  },
+  "learn": {
+   "scrollW": 809,
+   "vw": 809,
+   "small": 3,
+   "smallSample": [
+    [
+     "a.brand",
+     99,
+     36
+    ],
+    [
+     "#btnJoinClass[\ud83c\udf92 Join a class]",
+     122,
+     38
+    ],
+    [
+     "#btnTeacher[\ud83c\udf4e Teacher tools]",
+     139,
+     38
+    ]
+   ],
+   "off": [],
+   "fsSmall": [],
+   "fsCount": 0,
+   "headerH": 100,
+   "viewerH": 0
+  }
+ }
+}

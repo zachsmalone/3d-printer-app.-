@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
+from .. import config
 from ..services import handoff, printers, settings, slicer
 from ..services.history import store
 from ..community import privacy
@@ -42,9 +43,9 @@ def serve_file(bid: str, name: str, actor: Actor = Depends(get_actor)):
 
 @files_router.get("/f/{token}/{bid}/{name}")
 def serve_file_token(token: str, bid: str, name: str):
-    """Signed, expiring (2 h) link used by slicer deep links so a PRIVATE build can be opened by the owner's
-    slicer (which has no browser cookie). Token is bound to one build id; useless for any other build."""
-    if not privacy.check_token(bid, token):
+    """Signed, short-lived (10 min) link used by slicer deep links so a PRIVATE build can be opened by the owner's
+    slicer (which has no browser cookie). The token is bound to ONE build and ONE file name; useless for anything else."""
+    if not privacy.check_token(bid, name, token):
         raise HTTPException(404)
     return _send_file(bid, name)
 
@@ -53,13 +54,17 @@ def serve_file_token(token: str, bid: str, name: str):
 def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
     meta_for(bid, actor, owner_only=True)
     s = settings.load()
+    # Shared server with no configured public address: the request's Host header is attacker-controlled and would end up
+    # inside signed links, so no slicer deep links are offered until an admin sets the public base URL.
+    no_base = config.MODE == "shared" and not (config.PUBLIC_BASE_URL or s.get("public_base_url"))
     return {"base_url": base_url(request), "default_slicer": s["default_slicer"],
-            "slicers": handoff.links(base_url(request), bid, privacy.make_token(bid)),
+            "slicers": [] if no_base else handoff.links(base_url(request), bid, lambda n: privacy.make_token(bid, n)),
+            "slicer_links_disabled": ("Slicer links are off until the site's public address is set in Settings. You can still download the file." if no_base else ""),
             "printers": settings.public(s, redact=not guards.can_see_printer_urls(request, actor))["printers"], "printer_types": printers.TYPES,
             "builtin_slicer": slicer.status(),
             "hint": "Deep links need the slicer installed on the SAME computer as your browser, and the "
                     "file URL must be reachable from it (set 'Public base URL' in Settings if the server "
-                    "is remote). Links are signed and expire after 2 hours, so a private build stays private."}
+                    "is remote). Links are signed, work for one file only, and expire after 10 minutes, so a private build stays private."}
 
 
 def _slice(bid, layer_height, fill_density, upright, supports, brim, bed):

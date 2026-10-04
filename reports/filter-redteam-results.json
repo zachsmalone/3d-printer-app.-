@@ -1,0 +1,9592 @@
+{
+ "fixed": [
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Print bed adhesion tips",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "My nozzle is clogged",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Set infill to 20 percent",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cockpit canopy for my plane model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bed leveling and first layer",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Retraction and stringing settings",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Support structures and overhangs",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Raft vs brim",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hot end temperature 210C",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cooling fan duct for the hotend",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Extruder gear and idler",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Layer height 0.2 mm",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Belt tensioner for the Y axis",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Linear rail and lead screw",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Stepper motor mount NEMA17",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Print speed jerk and acceleration",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Klipper jerk settings",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Butt joint vs lap joint",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Butt weld style seam",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Nipple fitting for pneumatic tube",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Master and slave cylinder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Thrust bearing holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Male and female connector",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dovetail joint",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Knob for the printer control",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cable tie and tight fit tolerance",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hard stop for the limit switch",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Screw hole and bolt pattern",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Nut and bolt organiser",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Threaded rod coupler",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Rubber feet for the bed",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Spool holder for PLA",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Glass bed with PEI sheet",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Brass nozzle 0.4",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hardened steel nozzle",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bowden tube clip",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snap fit lid",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snap-fit enclosure",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snap together puzzle",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Click and snap lock",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Print in place hinge",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pin and socket joint",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Peg board hooks",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Shaft collar",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pulley and idler",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Chicken breast cookie cutter",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Breast cancer awareness ribbon",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Rooster weathervane",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cock robin bird feeder",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Woodpecker bird house",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Peacock feather lamp",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Blue tit nest box",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Raccoon planter",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dike and levee model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bastard file holder",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Spic and span cleaning caddy",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Gas pipe cap",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Shiitake mushroom stamp",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hancock bridge model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Scunthorpe railway station",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Penistone viaduct",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Middlesex county map",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sussex cathedral",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Essex lighthouse",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cockermouth castle",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Assassin's Creed helmet",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Assembly instructions",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Assess your print quality",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Class project: bridge",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Classroom organiser",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Compass holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bass guitar stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Grass planter",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Mass of the object 150 g",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Analysis of failed prints",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cucumber slicer",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Document holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Therapist office sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pass the filament please",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Embassy gate model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Harass is not allowed",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Passion project",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Arsenal FC badge",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Butterfly keychain",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Button cell holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hitchcock film reel",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dickens quote stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Titanic ship model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sextant model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sextuple pack organiser",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cumbria map",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Matsushita robot",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Shitennoji temple model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bangkok skyline",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Wankel engine model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pennsylvania state keychain",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Lake Titicaca map",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fukushima map",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fukuoka tower",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Nagasaki dome",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kanazawa castle",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Tsukuba science city",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cumberland sausage stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cummings desk sign",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sexton house sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hoare Street sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Blowfish pencil holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Blow molding explained",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Shooting star ornament",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Shoot the moon",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kill switch for the printer",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kill the process and restart the slicer",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dead pixel tester",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Execute the gcode",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Abort print",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hang the ornament",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hole punch and cut",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hell yeah, it worked!",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Damn, the print failed",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "What the heck",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Crap, I ran out of filament",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bloody brilliant benchy",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I'm gay and proud, rainbow flag stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "My friend is gay",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Lesbian flag keychain",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Transgender pride flag stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Jewish menorah model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Muslim prayer beads",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Black history month sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Asian food stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Mexican hat planter",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Indian elephant statue",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "White rabbit figurine",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Gypsy moth model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Chinese dragon",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Polish pottery stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Turkish delight box",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Nazi Germany history project",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Holocaust memorial model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "World War II tank",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Slave trade history",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Civil rights march",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Abortion debate",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Drug awareness project",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Suicide prevention hotline sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Shot glass holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Whiskey barrel planter",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Beer mug",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Wine rack",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Cigarette holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Weed whacker bracket",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pot holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Crack in the print",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bone china",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Boner",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bondage tape",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Rim of the wheel",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dyke Road",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fanny pack clip",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Randy Pausch",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dick Van Dyke",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Richard",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Moby Dick",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Peter Piper",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Willy Wonka",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Wang Wei",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kim Fuk",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hunter Bates",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Lipschitz constant",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Gaylord Texas",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Anne Hoare",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Michael Cox",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Ben Dover",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Mike Rotch",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Seymour Butts",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Jackson Pollock",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Matt Cockburn",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fucik",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Brandon Cummings",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kuntz family",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Niggle",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Niggardly",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snigger",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fart-proof lid",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Poop emoji bin",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pee cup holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Toilet paper holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Booger",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Butt cheek",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Underpants",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sexy beast statue",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sex education class",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sexual education project",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Puberty education",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Breast pump bracket",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Condom dispenser sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Penis",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Vagina",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Reproductive system model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Anatomy lesson: heart and lungs",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Ball bearing holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Ball joint",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Balls of filament",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Golf balls rack",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Nuts and bolts",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hard core filament",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Naked eye astronomy",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Naked mole rat",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Gift box",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kind regards",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Rock climbing wall",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hose clamp",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fart",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Puta madre",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pipi",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Caca de vaca",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sexo",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Coger la pelota",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pene",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Verga",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Chinga",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Fick",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Mist",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Gift",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Arsch",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kot",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Schwul",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bad",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Sein",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kind",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hoch",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Con",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Merde alors",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pute",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Bite",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Con amor",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Print time 12:30 on 2026-10-04 12:45",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Printed 1234567890 layers",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Version 1.2.3.4.5.6.7",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Temps 200 210 220 230 240",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Weighs 1,234,567 grams",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Model has 1.4 M triangles",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Size 150 x 150 x 150 mm",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "0.2 0.2 0.2 0.2 0.2 0.2 0.2",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Order 66",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Room 101",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Grade 5 class 3B",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Year 2026 week 40 day 4 hour 16",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Coordinates 41.8781 -87.6298",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "G-code: G1 X10.5 Y20.25 Z0.2 F1500",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Pi is 3.14159265358979",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "1 2 3 4 5 6 7 8 9 10 steps",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Serial no 12 34 56 78 90",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Budget $1,000,000",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Weight 12345 67890",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Price 19.99 29.99 39.99 49.99",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I like it.Me too",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Great print.Dev",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Done.Me and my brother printed it",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Version 2.io",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "The result is good.App works",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "He said hello.Org chart attached",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Look at this.Tv stand",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Ok.Gg wp",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I love snapchat filters",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I love Instagram reels",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Discord is fun",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "My brother uses TikTok videos",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Telegram was invented in 1844",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "WhatsApp is popular",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Kik is a game",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Insta ready photo",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snap fit joints are strong",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snap the two halves together",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "snap off the support",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Snapchat vs Instagram essay",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Discord bot project for class",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Instagram post about my print",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Email me later is not allowed",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "The at symbol",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Dot com bubble history",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Meet at noon",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Please text me in class",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Call of Duty fan art",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Phone stand",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Phone case",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Email icon",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Mail box",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Contact sheet",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Gmail icon keychain",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Links in a chain",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Chain link fence",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Hyperlink icon",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Website tips",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Name tag",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "My address book holder",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Home sweet home sign",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Street sign model",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Main Street USA diorama",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "Oak Street",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I live in Texas",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "My school is great",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I am 12 years old",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I'm in 6th grade",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "False positive",
+   "class": "benign phrase",
+   "input": "I'm ten and I love Minecraft",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "plain email",
+   "input": "mail me at john.smith@gmail.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'name at gmail dot com'",
+   "input": "email me john smith at gmail dot com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'name AT gmail DOT com'",
+   "input": "johnsmith AT gmail DOT com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "name (at) gmail (dot) com",
+   "input": "johnsmith (at) gmail (dot) com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "name [at] gmail [dot] com",
+   "input": "johnsmith [at] gmail [dot] com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "name{at}gmail{dot}com",
+   "input": "johnsmith{at}gmail{dot}com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "name <at> gmail <dot> com",
+   "input": "johnsmith <at> gmail <dot> com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'name @ gmail . com' spaced",
+   "input": "johnsmith @ gmail . com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "name @gmail (no TLD)",
+   "input": "johnsmith@gmail",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "fullwidth @ symbol",
+   "input": "johnsmith＠gmail.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "small-commercial-at U+FE6B",
+   "input": "johnsmith﹫gmail.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "ZWSP inside address",
+   "input": "johnsmith@gm​ail.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "ZWSP inside domain+TLD",
+   "input": "johnsmith@gmail.c​om",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'name at gmail' no dot",
+   "input": "my email is johnsmith at gmail",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'gmail: name'",
+   "input": "gmail: johnsmith2012",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "spelled domain 'g mail'",
+   "input": "johnsmith at g mail dot com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'dot' only",
+   "input": "johnsmith@gmail dot com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'at' only with real dot",
+   "input": "johnsmith at gmail.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "name+tag@sub.domain.co.uk",
+   "input": "a+b@mail.school.co.uk",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "unicode IDN domain",
+   "input": "kid@пример.рф",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "obfuscated 'name-at-domain-dot-tld'",
+   "input": "johnsmith-at-gmail-dot-com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "uppercase/mixed",
+   "input": "JohnSmith@GMAIL.COM",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'shift-2' hint",
+   "input": "johnsmith shift 2 gmail dot com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "hotmail/outlook/yahoo word only",
+   "input": "my hotmail is coolkid_99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'at' in reverse language (arroba)",
+   "input": "johnsmith arroba gmail punto com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: email",
+   "class": "'chez' style FR",
+   "input": "johnsmith arobase gmail point com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "US 10-digit dashes",
+   "input": "call 555-123-4567",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "US 10-digit plain",
+   "input": "call 5551234567",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "(555) 123-4567",
+   "input": "call (555) 123-4567",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "+1 country code",
+   "input": "call +1 555 123 4567",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "7-digit local number",
+   "input": "call 555-1234",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "7-digit local number plain",
+   "input": "my number is 5551234",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "dotted 555.123.4567",
+   "input": "555.123.4567",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "comma separated digits",
+   "input": "555,123,4567",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "slash separated digits",
+   "input": "555/123/4567",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "underscore separated digits",
+   "input": "555_123_4567",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "middle-dot separated",
+   "input": "555·123·4567",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "digits split by letters",
+   "input": "5a5a5a1a2a3a4a5a6a7",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "digits split by emoji",
+   "input": "5🔥5🔥5🔥1🔥2🔥3🔥4🔥5🔥6🔥7",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled-out digits (words)",
+   "input": "five five five one two three four five six seven",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled-out with dashes",
+   "input": "five-five-five-one-two-three-four-five-six-seven",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled-out uppercase",
+   "input": "FIVE FIVE FIVE ONE TWO THREE FOUR FIVE SIX SEVEN",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "mixed digits and words",
+   "input": "5 5 5 one two three 4 5 6 7",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled with 'oh' for zero",
+   "input": "five oh five one two three four five six seven",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled with 'double'/'triple'",
+   "input": "triple five one two three four five six seven",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled out Spanish",
+   "input": "cinco cinco cinco uno dos tres cuatro cinco seis siete",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled out German",
+   "input": "fünf fünf fünf eins zwei drei vier fünf sechs sieben",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "spelled out French",
+   "input": "cinq cinq cinq un deux trois quatre cinq six sept",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "fullwidth digits",
+   "input": "５５５１２３４５６７",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "Arabic-Indic digits",
+   "input": "٥٥٥١٢٣٤٥٦٧",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "keycap emoji digits",
+   "input": "5️⃣5️⃣5️⃣1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "math-bold digits",
+   "input": "𝟓𝟓𝟓𝟏𝟐𝟑𝟒𝟓𝟔𝟕",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "digits split across 2 messages-style (first half)",
+   "input": "my number starts with 555 123",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "leet-letter digits (S=5 O=0)",
+   "input": "S5S l23 4S67",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "UK mobile",
+   "input": "07700 900123",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "international long",
+   "input": "+44 7700 900123",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "digits with ZWSP",
+   "input": "555​123​4567",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "'call me on' + 3+3+4 words+digits",
+   "input": "call me on 555 123 four five six seven",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: phone",
+   "class": "text 'five five five' only 3 groups",
+   "input": "five five five",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "https URL",
+   "input": "see https://example.com/x",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "www prefix",
+   "input": "see www.example.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .com",
+   "input": "see example.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .net/.org",
+   "input": "example.net example.org",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .co.uk",
+   "input": "see example.co.uk",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .ru",
+   "input": "see example.ru",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .xyz",
+   "input": "see example.xyz",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .info",
+   "input": "see example.info",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .us/.uk/.ca/.de",
+   "input": "see example.de and example.uk",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .be (youtu.be)",
+   "input": "youtu.be/abc123",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .gl (goo.gl)",
+   "input": "goo.gl/abc123",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .link / .page / .site / .online",
+   "input": "see example.link example.site example.online",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .fm/.cc/.to/.ws/.co",
+   "input": "see example.cc and example.to",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bare .ly shortener",
+   "input": "bit.ly/abc",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "discord invite",
+   "input": "discord.gg/abcd",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "'dot com' spelled",
+   "input": "example dot com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "'(dot)' spelled",
+   "input": "example (dot) com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "spaced dot",
+   "input": "example . com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "dot with fullwidth period",
+   "input": "example。com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "dot with fullwidth full stop U+FF0E",
+   "input": "example．com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "hxxp defang",
+   "input": "hxxps://example[.]com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "bracketed dot",
+   "input": "example[.]com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "ZWSP before TLD",
+   "input": "example.​com",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "IPv4 address",
+   "input": "go to 192.168.1.20:8765",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "IPv4 w/ spaces",
+   "input": "192 168 1 20",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "localhost",
+   "input": "localhost:8765",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "ftp scheme",
+   "input": "ftp://host/file",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "mailto scheme",
+   "input": "mailto:kid@example.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "javascript scheme",
+   "input": "javascript:alert(1)",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "data scheme",
+   "input": "data:text/html,hi",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "uppercase scheme",
+   "input": "HTTPS://EXAMPLE.COM",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "homoglyph in scheme",
+   "input": "httрs://example.com",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "Cyrillic o in .com",
+   "input": "example.cоm",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "'tinyurl' path only",
+   "input": "tinyurl com abc",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: link",
+   "class": "QR / 'search for' hint",
+   "input": "search for zeim on youtube channel coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "bare @handle",
+   "input": "follow me @coolkid_99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "@handle alone",
+   "input": "@coolkid_99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "snap: name",
+   "input": "snap: coolkid99",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'my snap is name'",
+   "input": "my snap is coolkid99",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'add me on snap' w/o name",
+   "input": "add me on snap",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'snap me'",
+   "input": "snap me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'snap me later'",
+   "input": "snap me later",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'sc: name' abbreviation",
+   "input": "sc: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'ig: name' abbreviation",
+   "input": "ig: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'insta' with name",
+   "input": "insta coolkid99",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'IG' @",
+   "input": "IG @coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "discord name#1234",
+   "input": "discord coolkid#1234",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "bare name#1234",
+   "input": "coolkid#1234",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "kik name",
+   "input": "kik: coolkid99",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "whatsapp me",
+   "input": "whatsapp me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'dm me'",
+   "input": "dm me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'text me'",
+   "input": "text me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "'pm me'",
+   "input": "pm me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "youtube channel",
+   "input": "youtube: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "twitter / x handle",
+   "input": "twitter: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "x.com handle",
+   "input": "x dot com slash coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "facebook name",
+   "input": "facebook: cool kid",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "fb abbreviation",
+   "input": "fb: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "roblox username",
+   "input": "roblox username coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "minecraft username",
+   "input": "minecraft: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "steam friend code",
+   "input": "steam id coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "twitch name",
+   "input": "twitch: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "reddit u/",
+   "input": "reddit u/coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "bare u/ handle",
+   "input": "u/coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "signal / viber / wechat / line",
+   "input": "wechat: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "skype",
+   "input": "skype: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "imessage / facetime",
+   "input": "facetime me at coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "gamertag",
+   "input": "xbox gamertag coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "platform split by ZWSP",
+   "input": "dis​cord: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "platform with homoglyph",
+   "input": "dіscord: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "platform leet",
+   "input": "d1scord: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "platform w/ separator > 12 chars",
+   "input": "my discord username is the following: coolkid99",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "platform with dot-separated letters",
+   "input": "s.n.a.p: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "snap spelled s-n-a-p",
+   "input": "s n a p coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: handle",
+   "class": "bare username 'user:'",
+   "input": "username: coolkid99",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "street address",
+   "input": "I live at 42 Oak Street",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "street w/ city/state/zip",
+   "input": "42 Oak St, Springfield, IL 62704",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "PO Box",
+   "input": "P.O. Box 1234",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "'Ave'/'Blvd'/'Rd' abbreviations",
+   "input": "17 Maple Ave and 9 Elm Blvd and 3 Pine Rd",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "ZIP only",
+   "input": "I'm in 62704",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "UK postcode",
+   "input": "SW1A 1AA",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "GPS coordinates",
+   "input": "41.8781, -87.6298",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "school + town",
+   "input": "I go to Lincoln Middle School in Springfield",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "'I live in <town>'",
+   "input": "I live in Springfield Illinois",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "address spelled digits",
+   "input": "four two oak street",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "what3words style",
+   "input": "///filled.count.soap",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "maps link",
+   "input": "maps.google.com/?q=42+Oak",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "plus code",
+   "input": "86HJV99C+W9",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "full name + age",
+   "input": "My name is Emily Johnson and I am 11",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "age disclosure",
+   "input": "I am 11 years old",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "birthday disclosure",
+   "input": "my birthday is march 3 2014",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "PII: address",
+   "class": "home alone disclosure",
+   "input": "I'm home alone today",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "how old are you",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "what is your age",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "asl?",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "a/s/l",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "age?",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "are you a boy or a girl",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "what grade are you in",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "when is your birthday",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "how tall are you",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "do you have a boyfriend",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "are you single",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "you seem very mature for your age",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "hw old r u",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "how.old.are.you",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "how o l d are you",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "h0w 0ld @re y0u",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "hоw оld are yоu",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "how old​ are you",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "cuántos años tienes",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "quel âge as-tu",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: age / personal question",
+   "class": "age / personal question",
+   "input": "wie alt bist du",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "where do you live",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "where are you from",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what city are you in",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what is your address",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what school do you go to",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "which school are you at",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what state do you live in",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "which town are you in",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "where r u",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "wh3re d0 y0u l1ve",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "where do you l​ive",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "where do u live",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "where do you live?? ",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "wherever you live, which neighborhood",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "dónde vives",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "où habites-tu",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "wo wohnst du",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what's your zip code",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what is your last name",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what is your real name",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: location question",
+   "class": "location question",
+   "input": "what's your full name",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "let's talk on discord",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "move to discord",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "chat with me somewhere else",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "add me on snap",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "snap me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "message me on whatsapp",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "find me on roblox",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "let's talk in private",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "pm me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "dm me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "text me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "call me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "email me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "I'll give you my number",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "give me your number",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "what's your snap",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "what's your insta",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "do you have discord",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "do you have snapchat",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "hit me up on telegram",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "i have a better app for chatting",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "let's go private",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "this chat is monitored, let's talk elsewhere",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "s n a p me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "sn4p me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "snаp me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: move off-platform",
+   "class": "move off-platform",
+   "input": "snaaaap me",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "don't tell your parents",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "dont tell ur parents",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "this is our little secret",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "keep this between us",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "are you alone",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "are your parents home",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "is anyone home with you",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "delete this message",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "no one has to know",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "your teacher doesn't need to know",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "are you home alone",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "when do your parents get home",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "dont tell your teacher",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "don't tell anyone",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: secrecy / isolation",
+   "class": "secrecy / isolation",
+   "input": "don’t tell your parents",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "send me a pic",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "send me a photo of yourself",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "send pics",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "show me your face",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "turn on your camera",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "let's video chat",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "what do you look like",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "let's meet up",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "come to my house",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "I can pick you up from school",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "what are you wearing",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "you're so cute",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "can I see a selfie",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "I'll buy you robux if you",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "I'll send you a gift card",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "meet me after school",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "do you want to hang out irl",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "I love you, you are my girlfriend",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "can we meet in person",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "pic of u?",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: images / camera / meeting",
+   "class": "images / camera / meeting",
+   "input": "send me a pic of your feet",
+   "expect": "block",
+   "actual": "allowed",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "How old is this design? It was made in 2019",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "Where do I find the infill setting?",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "What age group is this lesson for?",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "Which school project is due?",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "Can you send me the STL file in class?",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "Let's meet at the printer after lunch",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "Call it a day and clean the bed",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "Are you alone on that printer or sharing?",
+   "expect": "pass",
+   "actual": "blocked",
+   "ok": false,
+   "note": ""
+  },
+  {
+   "cat": "Minor-safety: benign class talk (must pass)",
+   "class": "benign class talk (must pass)",
+   "input": "I'm from Chicago, our school printer is the Prusa",
+   "expect": "pass",
+   "actual": "allowed",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Abusive control",
+   "class": "stem word in sentence",
+   "input": "y** a** s*** a f***",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Abusive control",
+   "class": "stem word + punctuation",
+   "input": "f******",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  },
+  {
+   "cat": "Abusive control",
+   "class": "stem word then URL-ish",
+   "input": "f*******",
+   "expect": "block",
+   "actual": "blocked",
+   "ok": true,
+   "note": ""
+  }
+ ],
+ "generated": [],
+ "sweeps": {
+  "_source": {
+   "ascii_single_words": 295,
+   "baseline_detected": 295,
+   "with_stem": 14,
+   "without_stem": 281
+  },
+  "transforms": {
+   "spaced letters (x y z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "dotted letters (x.y.z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "dashed letters (x-y-z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "underscore letters (x_y_z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "comma letters (x,y,z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "slash letters (x/y/z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "asterisk letters (x*y*z)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "mid split with space (xy z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "mid split with dot (xy.z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "mid split with hyphen (xy-z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "mid split with asterisk (xy*z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "mid split with underscore (xy_z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "mid split with slash (xy/z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "mid split with emoji (xy🔥z)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "every letter + emoji": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "vowel -> * (f*ck style)": {
+    "all": {
+     "n": 295,
+     "blocked": 5,
+     "missed": 290,
+     "block_rate": 0.017,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 2,
+     "missed": 12,
+     "block_rate": 0.143,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 3,
+     "missed": 278,
+     "block_rate": 0.011,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "vowel -> # ": {
+    "all": {
+     "n": 295,
+     "blocked": 5,
+     "missed": 290,
+     "block_rate": 0.017,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 2,
+     "missed": 12,
+     "block_rate": 0.143,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 3,
+     "missed": 278,
+     "block_rate": 0.011,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "vowel -> _ ": {
+    "all": {
+     "n": 295,
+     "blocked": 5,
+     "missed": 290,
+     "block_rate": 0.017,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 2,
+     "missed": 12,
+     "block_rate": 0.143,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 3,
+     "missed": 278,
+     "block_rate": 0.011,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "vowels dropped (fck style)": {
+    "all": {
+     "n": 295,
+     "blocked": 4,
+     "missed": 291,
+     "block_rate": 0.014,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 4,
+     "missed": 277,
+     "block_rate": 0.014,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "reversed": {
+    "all": {
+     "n": 295,
+     "blocked": 2,
+     "missed": 293,
+     "block_rate": 0.007,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 2,
+     "missed": 279,
+     "block_rate": 0.007,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "leet digits (all)": {
+    "all": {
+     "n": 295,
+     "blocked": 289,
+     "missed": 6,
+     "block_rate": 0.98,
+     "missed_examples_masked": [
+      "b***",
+      "b******",
+      "b****"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 275,
+     "missed": 6,
+     "block_rate": 0.979,
+     "missed_examples_masked": [
+      "b***",
+      "b******",
+      "b****"
+     ]
+    }
+   },
+   "leet symbols (@ ! $ +)": {
+    "all": {
+     "n": 295,
+     "blocked": 293,
+     "missed": 2,
+     "block_rate": 0.993,
+     "missed_examples_masked": [
+      "t***",
+      "t******"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 279,
+     "missed": 2,
+     "block_rate": 0.993,
+     "missed_examples_masked": [
+      "t***",
+      "t******"
+     ]
+    }
+   },
+   "leet 1 first replaceable": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "leet ascii-art (( |< ph vv |)": {
+    "all": {
+     "n": 295,
+     "blocked": 2,
+     "missed": 293,
+     "block_rate": 0.007,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 2,
+     "missed": 279,
+     "block_rate": 0.007,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "leet ascii-art single char": {
+    "all": {
+     "n": 295,
+     "blocked": 21,
+     "missed": 274,
+     "block_rate": 0.071,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 4,
+     "missed": 10,
+     "block_rate": 0.286,
+     "missed_examples_masked": [
+      "b*******",
+      "f*****",
+      "f***"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 17,
+     "missed": 264,
+     "block_rate": 0.06,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "stretch every letter x2": {
+    "all": {
+     "n": 295,
+     "blocked": 80,
+     "missed": 215,
+     "block_rate": 0.271,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 4,
+     "missed": 10,
+     "block_rate": 0.286,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "c**********"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 76,
+     "missed": 205,
+     "block_rate": 0.27,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "stretch vowels x3": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "stretch last letter x4": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "stretch first letter x4": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "double one mid letter (xyyz)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 10,
+     "missed": 4,
+     "block_rate": 0.714,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 42,
+     "missed": 239,
+     "block_rate": 0.149,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Cyrillic lookalikes (all)": {
+    "all": {
+     "n": 295,
+     "blocked": 0,
+     "missed": 295,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Cyrillic lookalike (1 char)": {
+    "all": {
+     "n": 295,
+     "blocked": 2,
+     "missed": 293,
+     "block_rate": 0.007,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 2,
+     "missed": 12,
+     "block_rate": 0.143,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Greek lookalikes (all)": {
+    "all": {
+     "n": 295,
+     "blocked": 1,
+     "missed": 294,
+     "block_rate": 0.003,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 1,
+     "missed": 280,
+     "block_rate": 0.004,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Greek lookalike (1 char)": {
+    "all": {
+     "n": 295,
+     "blocked": 3,
+     "missed": 292,
+     "block_rate": 0.01,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 2,
+     "missed": 12,
+     "block_rate": 0.143,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 1,
+     "missed": 280,
+     "block_rate": 0.004,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "small-caps letters": {
+    "all": {
+     "n": 295,
+     "blocked": 0,
+     "missed": 295,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Latin-ext lookalikes (ł ø đ ı)": {
+    "all": {
+     "n": 295,
+     "blocked": 13,
+     "missed": 282,
+     "block_rate": 0.044,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 8,
+     "missed": 6,
+     "block_rate": 0.571,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 5,
+     "missed": 276,
+     "block_rate": 0.018,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "zero-width space mid (U+200B)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "zero-width space every letter": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "zero-width joiner mid (U+200D)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "zero-width non-joiner mid": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "soft hyphen mid (U+00AD)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "word joiner mid (U+2060)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "BOM / ZWNBSP mid (U+FEFF)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "LRM/RLM mid (U+200E)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "bidi override wrap (U+202E)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "variation selector mid (U+FE0F)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Mongolian VS mid (U+180B)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "tag char mid (U+E0041)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "invisible separator mid (U+2063)": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "Hangul filler mid (U+3164)": {
+    "all": {
+     "n": 295,
+     "blocked": 5,
+     "missed": 290,
+     "block_rate": 0.017,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 5,
+     "missed": 9,
+     "block_rate": 0.357,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "combining acute on every letter": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "zalgo (3 marks per letter)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "enclosing circle U+20DD mid": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "combining grapheme joiner mid": {
+    "all": {
+     "n": 295,
+     "blocked": 52,
+     "missed": 243,
+     "block_rate": 0.176,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 38,
+     "missed": 243,
+     "block_rate": 0.135,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "NBSP between letters": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "ideographic space between letters": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "fullwidth Latin": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "math bold": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "math double-struck": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "circled letters": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "parenthesized letters": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "squared letters": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "negative squared letters": {
+    "all": {
+     "n": 295,
+     "blocked": 0,
+     "missed": 295,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "regional-indicator letters": {
+    "all": {
+     "n": 295,
+     "blocked": 0,
+     "missed": 295,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "negative circled letters": {
+    "all": {
+     "n": 295,
+     "blocked": 0,
+     "missed": 295,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 0,
+     "missed": 14,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "b****",
+      "b******",
+      "b*******"
+     ]
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "prefix glue (superXYZ)": {
+    "all": {
+     "n": 295,
+     "blocked": 14,
+     "missed": 281,
+     "block_rate": 0.047,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "suffix glue (XYZhead)": {
+    "all": {
+     "n": 295,
+     "blocked": 16,
+     "missed": 279,
+     "block_rate": 0.054,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 2,
+     "missed": 279,
+     "block_rate": 0.007,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "suffix glue (XYZface)": {
+    "all": {
+     "n": 295,
+     "blocked": 15,
+     "missed": 280,
+     "block_rate": 0.051,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 1,
+     "missed": 280,
+     "block_rate": 0.004,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "digits glued (XYZ123)": {
+    "all": {
+     "n": 295,
+     "blocked": 14,
+     "missed": 281,
+     "block_rate": 0.047,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "double-wrapped (xxXYZxx)": {
+    "all": {
+     "n": 295,
+     "blocked": 14,
+     "missed": 281,
+     "block_rate": 0.047,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "CamelCase compound": {
+    "all": {
+     "n": 295,
+     "blocked": 14,
+     "missed": 281,
+     "block_rate": 0.047,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "hyphen-glued to word (big-XYZ)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "repeated ('XYZ XYZ' baseline)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "uppercase": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "alternating case": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "plural (-s)": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "-ing": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "-ed": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "-er": {
+    "all": {
+     "n": 295,
+     "blocked": 294,
+     "missed": 1,
+     "block_rate": 0.997,
+     "missed_examples_masked": [
+      "b***"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 280,
+     "missed": 1,
+     "block_rate": 0.996,
+     "missed_examples_masked": [
+      "b***"
+     ]
+    }
+   },
+   "-y": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   },
+   "-ness": {
+    "all": {
+     "n": 295,
+     "blocked": 14,
+     "missed": 281,
+     "block_rate": 0.047,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "-ish": {
+    "all": {
+     "n": 295,
+     "blocked": 14,
+     "missed": 281,
+     "block_rate": 0.047,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 0,
+     "missed": 281,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a*************",
+      "a***",
+      "a********"
+     ]
+    }
+   },
+   "-ly": {
+    "all": {
+     "n": 295,
+     "blocked": 19,
+     "missed": 276,
+     "block_rate": 0.064,
+     "missed_examples_masked": [
+      "a*************",
+      "a********",
+      "a***"
+     ]
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 5,
+     "missed": 276,
+     "block_rate": 0.018,
+     "missed_examples_masked": [
+      "a*************",
+      "a********",
+      "a***"
+     ]
+    }
+   },
+   "in sentence ('you are a XYZ')": {
+    "all": {
+     "n": 295,
+     "blocked": 295,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "stem_words": {
+     "n": 14,
+     "blocked": 14,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "non_stem_words": {
+     "n": 281,
+     "blocked": 281,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    }
+   }
+  },
+  "phrases": {
+   "total_listed_phrases": 529,
+   "baseline_detected": 529,
+   "variants": {
+    "baseline": {
+     "n": 529,
+     "blocked": 529,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "glued (no spaces)": {
+     "n": 529,
+     "blocked": 18,
+     "missed": 511,
+     "block_rate": 0.034,
+     "missed_examples_masked": [
+      "a a****** m******* m**** m******* s****** t* c******** a** s******",
+      "a a**********",
+      "a f** t** a******** o* d**** t*** p***** l****** d*** n** a**"
+     ]
+    },
+    "hyphenated": {
+     "n": 529,
+     "blocked": 529,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "underscored": {
+     "n": 529,
+     "blocked": 529,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "dots instead of spaces": {
+     "n": 529,
+     "blocked": 529,
+     "missed": 0,
+     "block_rate": 1.0,
+     "missed_examples_masked": []
+    },
+    "leet digits": {
+     "n": 529,
+     "blocked": 329,
+     "missed": 200,
+     "block_rate": 0.622,
+     "missed_examples_masked": [
+      "a a**********",
+      "a********* a*******",
+      "a**** s**** b* i********** i* a m***** t*** t* t** e*****"
+     ]
+    },
+    "Cyrillic lookalikes": {
+     "n": 529,
+     "blocked": 0,
+     "missed": 529,
+     "block_rate": 0.0,
+     "missed_examples_masked": [
+      "a a****** m******* m**** m******* s****** t* c******** a** s******",
+      "a a**********",
+      "a f** t** a******** o* d**** t*** p***** l****** d*** n** a**"
+     ]
+    },
+    "ZWSP in each word": {
+     "n": 529,
+     "blocked": 8,
+     "missed": 521,
+     "block_rate": 0.015,
+     "missed_examples_masked": [
+      "a a****** m******* m**** m******* s****** t* c******** a** s******",
+      "a a**********",
+      "a f** t** a******** o* d**** t*** p***** l****** d*** n** a**"
+     ]
+    },
+    "doubled letters": {
+     "n": 529,
+     "blocked": 18,
+     "missed": 511,
+     "block_rate": 0.034,
+     "missed_examples_masked": [
+      "a a****** m******* m**** m******* s****** t* c******** a** s******",
+      "a a**********",
+      "a f** t** a******** o* d**** t*** p***** l****** d*** n** a**"
+     ]
+    },
+    "each word spaced out": {
+     "n": 529,
+     "blocked": 19,
+     "missed": 510,
+     "block_rate": 0.036,
+     "missed_examples_masked": [
+      "a a****** m******* m**** m******* s****** t* c******** a** s******",
+      "a a**********",
+      "a f** t** a******** o* d**** t*** p***** l****** d*** n** a**"
+     ]
+    },
+    "word order swapped (last first)": {
+     "n": 529,
+     "blocked": 218,
+     "missed": 311,
+     "block_rate": 0.412,
+     "missed_examples_masked": [
+      "a a**********",
+      "a********* a*******",
+      "a**** s**** b* i********** i* a m***** t*** t* t** e*****"
+     ]
+    },
+    "extra filler word between": {
+     "n": 529,
+     "blocked": 220,
+     "missed": 309,
+     "block_rate": 0.416,
+     "missed_examples_masked": [
+      "a a**********",
+      "a********* a*******",
+      "a**** s**** b* i********** i* a m***** t*** t* t** e*****"
+     ]
+    },
+    "contraction/slang dropped vowels": {
+     "n": 529,
+     "blocked": 14,
+     "missed": 515,
+     "block_rate": 0.026,
+     "missed_examples_masked": [
+      "a a****** m******* m**** m******* s****** t* c******** a** s******",
+      "a a**********",
+      "a f** t** a******** o* d**** t*** p***** l****** d*** n** a**"
+     ]
+    }
+   },
+   "baseline_not_detected_masked": []
+  },
+  "list_integrity": {
+   "cs": {
+    "entries": 41,
+    "not_blocked_short_foreign": 0,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "da": {
+    "entries": 20,
+    "not_blocked_short_foreign": 3,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "de": {
+    "entries": 66,
+    "not_blocked_short_foreign": 0,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "en": {
+    "entries": 403,
+    "not_blocked_short_foreign": 0,
+    "not_blocked_allowlisted": 1,
+    "not_blocked_other": 1,
+    "other_examples_masked": [
+     "🖕"
+    ]
+   },
+   "es": {
+    "entries": 68,
+    "not_blocked_short_foreign": 1,
+    "not_blocked_allowlisted": 3,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "extra": {
+    "entries": 88,
+    "not_blocked_short_foreign": 0,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "fi": {
+    "entries": 130,
+    "not_blocked_short_foreign": 0,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "fr": {
+    "entries": 91,
+    "not_blocked_short_foreign": 2,
+    "not_blocked_allowlisted": 3,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "hu": {
+    "entries": 96,
+    "not_blocked_short_foreign": 2,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "it": {
+    "entries": 168,
+    "not_blocked_short_foreign": 0,
+    "not_blocked_allowlisted": 5,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "nl": {
+    "entries": 190,
+    "not_blocked_short_foreign": 9,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "no": {
+    "entries": 40,
+    "not_blocked_short_foreign": 2,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "pl": {
+    "entries": 54,
+    "not_blocked_short_foreign": 3,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "pt": {
+    "entries": 76,
+    "not_blocked_short_foreign": 2,
+    "not_blocked_allowlisted": 2,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "ru": {
+    "entries": 151,
+    "not_blocked_short_foreign": 3,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "sv": {
+    "entries": 43,
+    "not_blocked_short_foreign": 5,
+    "not_blocked_allowlisted": 1,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   },
+   "tr": {
+    "entries": 142,
+    "not_blocked_short_foreign": 4,
+    "not_blocked_allowlisted": 0,
+    "not_blocked_other": 0,
+    "other_examples_masked": []
+   }
+  },
+  "license_file_loaded_as_list": {
+   "loaded_file": "LICENSE-CC-BY-4.0.txt",
+   "single_word_entries_added": 10,
+   "multi_word_entries_added": 289,
+   "ordinary_words_now_blocked": [
+    "license",
+    "licensor",
+    "material",
+    "rights",
+    "warranties"
+   ],
+   "sample_blocked_phrases_3word_prefix": [
+    "information available on",
+    "warranties regarding its",
+    "terms and conditions",
+    "fullest extent possible",
+    "conditions that creators",
+    "considerations for licensors",
+    "irrevocable licensors should",
+    "and conditions of",
+    "licensors should also",
+    "applying our licenses",
+    "material as expected",
+    "material not subject",
+    "licensed material or",
+    "licenses a licensor",
+    "licensed material under"
+   ]
+  },
+  "other_languages": {
+   "ru: baseline Cyrillic": {
+    "n": 52,
+    "blocked": 52,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "ru: Latin transliteration": {
+    "n": 52,
+    "blocked": 2,
+    "missed": 50,
+    "block_rate": 0.038,
+    "missed_examples_masked": [
+     "б******",
+     "б*****",
+     "б********"
+    ]
+   },
+   "ru: Cyrillic written w/ Latin lookalikes": {
+    "n": 52,
+    "blocked": 1,
+    "missed": 51,
+    "block_rate": 0.019,
+    "missed_examples_masked": [
+     "б******",
+     "б*****",
+     "б********"
+    ]
+   },
+   "ru: spaced letters": {
+    "n": 52,
+    "blocked": 52,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "ru: stretched (x3 vowels)": {
+    "n": 52,
+    "blocked": 52,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "ru: ZWSP mid": {
+    "n": 52,
+    "blocked": 1,
+    "missed": 51,
+    "block_rate": 0.019,
+    "missed_examples_masked": [
+     "б******",
+     "б*****",
+     "б********"
+    ]
+   },
+   "ru: dotted letters": {
+    "n": 52,
+    "blocked": 52,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "de: umlaut words typed ASCII-style (ae/oe/ue/ss)": {
+    "n": 1,
+    "blocked": 1,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "es: leet digits": {
+    "n": 54,
+    "blocked": 54,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "es: spaced letters": {
+    "n": 54,
+    "blocked": 54,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "es: Cyrillic lookalikes": {
+    "n": 54,
+    "blocked": 0,
+    "missed": 54,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a********",
+     "a***",
+     "b*******"
+    ]
+   },
+   "es: ZWSP mid": {
+    "n": 54,
+    "blocked": 3,
+    "missed": 51,
+    "block_rate": 0.056,
+    "missed_examples_masked": [
+     "a********",
+     "a***",
+     "b*******"
+    ]
+   },
+   "es: suffix glue (+head)": {
+    "n": 54,
+    "blocked": 0,
+    "missed": 54,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a********",
+     "a***",
+     "b*******"
+    ]
+   },
+   "es: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 54,
+    "blocked": 54,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "fr: leet digits": {
+    "n": 74,
+    "blocked": 73,
+    "missed": 1,
+    "block_rate": 0.986,
+    "missed_examples_masked": [
+     "b****"
+    ]
+   },
+   "fr: spaced letters": {
+    "n": 74,
+    "blocked": 74,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "fr: Cyrillic lookalikes": {
+    "n": 74,
+    "blocked": 0,
+    "missed": 74,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "b*****",
+     "b*****",
+     "b*********"
+    ]
+   },
+   "fr: ZWSP mid": {
+    "n": 74,
+    "blocked": 1,
+    "missed": 73,
+    "block_rate": 0.014,
+    "missed_examples_masked": [
+     "b*****",
+     "b*****",
+     "b*********"
+    ]
+   },
+   "fr: suffix glue (+head)": {
+    "n": 74,
+    "blocked": 0,
+    "missed": 74,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "b*****",
+     "b*****",
+     "b*********"
+    ]
+   },
+   "fr: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 74,
+    "blocked": 74,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "de: leet digits": {
+    "n": 66,
+    "blocked": 66,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "de: spaced letters": {
+    "n": 66,
+    "blocked": 66,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "de: Cyrillic lookalikes": {
+    "n": 66,
+    "blocked": 0,
+    "missed": 66,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a*********",
+     "a****",
+     "a**********"
+    ]
+   },
+   "de: ZWSP mid": {
+    "n": 66,
+    "blocked": 5,
+    "missed": 61,
+    "block_rate": 0.076,
+    "missed_examples_masked": [
+     "a*********",
+     "a****",
+     "a********"
+    ]
+   },
+   "de: suffix glue (+head)": {
+    "n": 66,
+    "blocked": 1,
+    "missed": 65,
+    "block_rate": 0.015,
+    "missed_examples_masked": [
+     "a*********",
+     "a****",
+     "a**********"
+    ]
+   },
+   "de: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 66,
+    "blocked": 66,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "it: leet digits": {
+    "n": 152,
+    "blocked": 148,
+    "missed": 4,
+    "block_rate": 0.974,
+    "missed_examples_masked": [
+     "b******",
+     "b***",
+     "b*****"
+    ]
+   },
+   "it: spaced letters": {
+    "n": 152,
+    "blocked": 152,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "it: Cyrillic lookalikes": {
+    "n": 152,
+    "blocked": 0,
+    "missed": 152,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a*******",
+     "a**********",
+     "a****"
+    ]
+   },
+   "it: ZWSP mid": {
+    "n": 152,
+    "blocked": 2,
+    "missed": 150,
+    "block_rate": 0.013,
+    "missed_examples_masked": [
+     "a*******",
+     "a**********",
+     "a****"
+    ]
+   },
+   "it: suffix glue (+head)": {
+    "n": 152,
+    "blocked": 0,
+    "missed": 152,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a*******",
+     "a**********",
+     "a****"
+    ]
+   },
+   "it: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 152,
+    "blocked": 152,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "pt: leet digits": {
+    "n": 60,
+    "blocked": 58,
+    "missed": 2,
+    "block_rate": 0.967,
+    "missed_examples_masked": [
+     "b***",
+     "b****"
+    ]
+   },
+   "pt: spaced letters": {
+    "n": 60,
+    "blocked": 60,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "pt: Cyrillic lookalikes": {
+    "n": 60,
+    "blocked": 0,
+    "missed": 60,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a*****",
+     "a*****",
+     "a***"
+    ]
+   },
+   "pt: ZWSP mid": {
+    "n": 60,
+    "blocked": 3,
+    "missed": 57,
+    "block_rate": 0.05,
+    "missed_examples_masked": [
+     "a*****",
+     "a*****",
+     "a***"
+    ]
+   },
+   "pt: suffix glue (+head)": {
+    "n": 60,
+    "blocked": 0,
+    "missed": 60,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a*****",
+     "a*****",
+     "a***"
+    ]
+   },
+   "pt: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 60,
+    "blocked": 60,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "nl: leet digits": {
+    "n": 154,
+    "blocked": 154,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "nl: spaced letters": {
+    "n": 154,
+    "blocked": 154,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "nl: Cyrillic lookalikes": {
+    "n": 154,
+    "blocked": 0,
+    "missed": 154,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a******",
+     "a*********",
+     "a*******"
+    ]
+   },
+   "nl: ZWSP mid": {
+    "n": 154,
+    "blocked": 3,
+    "missed": 151,
+    "block_rate": 0.019,
+    "missed_examples_masked": [
+     "a******",
+     "a*********",
+     "a*******"
+    ]
+   },
+   "nl: suffix glue (+head)": {
+    "n": 154,
+    "blocked": 1,
+    "missed": 153,
+    "block_rate": 0.006,
+    "missed_examples_masked": [
+     "a******",
+     "a*********",
+     "a*******"
+    ]
+   },
+   "nl: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 154,
+    "blocked": 154,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "tr: leet digits": {
+    "n": 94,
+    "blocked": 91,
+    "missed": 3,
+    "block_rate": 0.968,
+    "missed_examples_masked": [
+     "g***",
+     "g****",
+     "t*****"
+    ]
+   },
+   "tr: spaced letters": {
+    "n": 94,
+    "blocked": 94,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "tr: Cyrillic lookalikes": {
+    "n": 94,
+    "blocked": 0,
+    "missed": 94,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a****",
+     "c******",
+     "c********"
+    ]
+   },
+   "tr: ZWSP mid": {
+    "n": 94,
+    "blocked": 6,
+    "missed": 88,
+    "block_rate": 0.064,
+    "missed_examples_masked": [
+     "a****",
+     "c******",
+     "c********"
+    ]
+   },
+   "tr: suffix glue (+head)": {
+    "n": 94,
+    "blocked": 0,
+    "missed": 94,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "a****",
+     "c******",
+     "c********"
+    ]
+   },
+   "tr: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 94,
+    "blocked": 94,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "pl: leet digits": {
+    "n": 40,
+    "blocked": 40,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "pl: spaced letters": {
+    "n": 40,
+    "blocked": 40,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   },
+   "pl: Cyrillic lookalikes": {
+    "n": 40,
+    "blocked": 0,
+    "missed": 40,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "b*****",
+     "b*********",
+     "c***"
+    ]
+   },
+   "pl: ZWSP mid": {
+    "n": 40,
+    "blocked": 0,
+    "missed": 40,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "b*****",
+     "b*********",
+     "c***"
+    ]
+   },
+   "pl: suffix glue (+head)": {
+    "n": 40,
+    "blocked": 0,
+    "missed": 40,
+    "block_rate": 0.0,
+    "missed_examples_masked": [
+     "b*****",
+     "b*********",
+     "c***"
+    ]
+   },
+   "pl: in sentence w/ Spanish/French inflection (-s/-es)": {
+    "n": 40,
+    "blocked": 40,
+    "missed": 0,
+    "block_rate": 1.0,
+    "missed_examples_masked": []
+   }
+  },
+  "unlisted_language_probes": [
+   {
+    "class": "Japanese (common profanity, kana)",
+    "masked": "く*",
+    "blocked": false
+   },
+   {
+    "class": "Japanese (kill-yourself, kanji)",
+    "masked": "死*",
+    "blocked": false
+   },
+   {
+    "class": "Chinese (profanity, hanzi)",
+    "masked": "他**",
+    "blocked": false
+   },
+   {
+    "class": "Chinese (vulgar insult, hanzi)",
+    "masked": "傻*",
+    "blocked": false
+   },
+   {
+    "class": "Korean (profanity, hangul)",
+    "masked": "씨*",
+    "blocked": false
+   },
+   {
+    "class": "Greek (insult)",
+    "masked": "μ*****",
+    "blocked": false
+   },
+   {
+    "class": "Arabic (insult)",
+    "masked": "ا********",
+    "blocked": false
+   },
+   {
+    "class": "Hindi (vulgar insult)",
+    "masked": "च*****",
+    "blocked": false
+   },
+   {
+    "class": "Vietnamese (profanity)",
+    "masked": "đ****",
+    "blocked": false
+   },
+   {
+    "class": "Indonesian (insult)",
+    "masked": "b******",
+    "blocked": false
+   },
+   {
+    "class": "Tagalog (profanity)",
+    "masked": "p***** i**",
+    "blocked": false
+   },
+   {
+    "class": "Romaji Japanese (profanity)",
+    "masked": "k***",
+    "blocked": false
+   },
+   {
+    "class": "Romaji Japanese (shine = die)",
+    "masked": "s****",
+    "blocked": false
+   }
+  ],
+  "dictionary": {
+   "en": {
+    "words_tested": 57363,
+    "flagged": 351,
+    "flagged_benign_looking": [
+     "hard",
+     "information",
+     "rights",
+     "conditions",
+     "material",
+     "peter",
+     "materials",
+     "harder",
+     "license",
+     "fingers",
+     "finger",
+     "gotten",
+     "nigeria",
+     "designated",
+     "stake",
+     "agreements",
+     "nigerian",
+     "stakes",
+     "moses",
+     "hardy",
+     "licenses",
+     "spicy",
+     "pitt",
+     "frances",
+     "peters",
+     "anita",
+     "regina",
+     "spices",
+     "escorted",
+     "francs",
+     "cummings",
+     "harding",
+     "niger",
+     "scatter",
+     "materially",
+     "inferno",
+     "shenanigans",
+     "nigerians",
+     "franc",
+     "spiced",
+     "butters",
+     "warranties",
+     "gerber",
+     "nicht",
+     "comer",
+     "comers",
+     "pippa",
+     "licensees",
+     "pele",
+     "rosette",
+     "informations",
+     "pina",
+     "minigames",
+     "pica"
+    ],
+    "flagged_other_masked": [
+     "s***",
+     "f***",
+     "f******",
+     "s**",
+     "a**",
+     "s*****",
+     "b****",
+     "d***",
+     "f*****",
+     "p***",
+     "r***",
+     "b*******",
+     "s***",
+     "s***",
+     "s****",
+     "a******",
+     "f*****",
+     "b***",
+     "n***",
+     "p****",
+     "c***",
+     "s*******",
+     "p****",
+     "c**",
+     "s*****",
+     "e*****",
+     "n***",
+     "t***",
+     "h*******",
+     "s********",
+     "a***",
+     "n****",
+     "s****",
+     "b****",
+     "f****",
+     "b******",
+     "s******",
+     "c***",
+     "s*****",
+     "w****",
+     "b******",
+     "v*****",
+     "a****",
+     "h****",
+     "s***",
+     "e*****",
+     "x*",
+     "n****",
+     "r*******",
+     "x**",
+     "h*********",
+     "a*******",
+     "h*****",
+     "d*********",
+     "f*****",
+     "o*****",
+     "p******",
+     "p**********",
+     "s****",
+     "b*******",
+     "d****",
+     "n****",
+     "r*****",
+     "h***",
+     "m***********",
+     "n***",
+     "i**********",
+     "f*****",
+     "n******",
+     "s*****",
+     "p******",
+     "d******",
+     "p******",
+     "r*****",
+     "b****",
+     "s*****",
+     "f*****",
+     "s*******",
+     "t**",
+     "b******",
+     "c****",
+     "m***********",
+     "n*****",
+     "f******",
+     "s****",
+     "e******",
+     "b***",
+     "d****",
+     "s*******",
+     "c****",
+     "h***********",
+     "m***",
+     "n*****",
+     "s****",
+     "d***",
+     "k****",
+     "r*****",
+     "i*****",
+     "p****",
+     "r****",
+     "t******",
+     "b******",
+     "n*****",
+     "w*****",
+     "r******",
+     "b***",
+     "c****",
+     "j******",
+     "t********",
+     "f**",
+     "h**********",
+     "m***********",
+     "p********",
+     "t***",
+     "a***",
+     "d*******",
+     "m************",
+     "m************",
+     "n****",
+     "o***",
+     "t******",
+     "v*****",
+     "p******",
+     "c******",
+     "h*****",
+     "b****",
+     "c******",
+     "g*******",
+     "h******",
+     "b*******",
+     "o******",
+     "s****",
+     "b**",
+     "m*********",
+     "s******",
+     "p*****",
+     "m*******",
+     "n*****",
+     "p****",
+     "s*****",
+     "v*******",
+     "c***",
+     "b*******",
+     "b*****",
+     "b****",
+     "c***",
+     "l*****",
+     "f********",
+     "p*********",
+     "n******",
+     "f****",
+     "s*****",
+     "t****",
+     "p******",
+     "b******",
+     "e********",
+     "j**",
+     "m***",
+     "b****",
+     "p******",
+     "s******",
+     "s********",
+     "t*****",
+     "n******",
+     "p****",
+     "s*******",
+     "h*****",
+     "r*****",
+     "s*****",
+     "s*******",
+     "c*******",
+     "w*****",
+     "b*******",
+     "f******",
+     "f***",
+     "p***",
+     "w***",
+     "c*****",
+     "t****",
+     "e**********",
+     "s***",
+     "v******",
+     "s******",
+     "d****",
+     "m********",
+     "p****",
+     "r******",
+     "b****",
+     "b*******",
+     "s***",
+     "w**",
+     "m****",
+     "h******",
+     "p*********",
+     "s*******",
+     "p***",
+     "d******",
+     "e*****",
+     "c*****",
+     "a*******",
+     "d*****",
+     "b***********",
+     "h********",
+     "j***",
+     "m****",
+     "f******",
+     "s******",
+     "s*******",
+     "b*******",
+     "v****",
+     "d********",
+     "d****",
+     "h******",
+     "m*****",
+     "s*******",
+     "m*******",
+     "s****",
+     "g****",
+     "p****",
+     "v*****",
+     "s******",
+     "b******",
+     "p******",
+     "s****",
+     "t*****",
+     "w******",
+     "f*******",
+     "a*****",
+     "d*********",
+     "f******",
+     "b******",
+     "f*****",
+     "b*********",
+     "c***",
+     "t****",
+     "u*********",
+     "g*******",
+     "m*****",
+     "s****",
+     "c*****",
+     "e******",
+     "m***********",
+     "p******",
+     "w******",
+     "b*****",
+     "d********",
+     "p***",
+     "c*******",
+     "l*********",
+     "m***",
+     "s*****",
+     "v********",
+     "n*****",
+     "c******",
+     "s******",
+     "c******",
+     "c*******",
+     "t*********",
+     "c****",
+     "p**********",
+     "y***",
+     "f*****",
+     "h*******",
+     "m**********",
+     "s*****",
+     "i********",
+     "p***",
+     "s******",
+     "f*******",
+     "j***",
+     "m******",
+     "p***",
+     "d*****",
+     "h************",
+     "p***",
+     "s********",
+     "r*******",
+     "b******",
+     "j****",
+     "s****",
+     "t*******",
+     "c*********",
+     "m********",
+     "p****",
+     "s*******",
+     "b*****",
+     "e****",
+     "h*********",
+     "a*****",
+     "d******",
+     "j*******",
+     "p***",
+     "s**********",
+     "s****",
+     "a********",
+     "k***",
+     "s***"
+    ]
+   },
+   "es": {
+    "words_tested": 59535,
+    "flagged": 209,
+    "flagged_benign_looking": [
+     "comer",
+     "material",
+     "peter",
+     "nigeria",
+     "martillo",
+     "pica",
+     "frances",
+     "anita",
+     "hard",
+     "regina",
+     "information",
+     "pitt",
+     "rights",
+     "hardy",
+     "peters",
+     "moses",
+     "pina",
+     "harding",
+     "franc",
+     "niger",
+     "pele",
+     "butters",
+     "license",
+     "cummings",
+     "gerber",
+     "inferno",
+     "finger"
+    ],
+    "flagged_other_masked": [
+     "m*****",
+     "n****",
+     "p***",
+     "f******",
+     "c***",
+     "s*****",
+     "a********",
+     "m*********",
+     "d*****",
+     "n*****",
+     "p***",
+     "i*******",
+     "i*****",
+     "c***",
+     "p****",
+     "s*******",
+     "x*",
+     "d****",
+     "p****",
+     "a*****",
+     "v****",
+     "c*****",
+     "p******",
+     "a*********",
+     "m******",
+     "s***",
+     "p*****",
+     "c*****",
+     "i******",
+     "n***",
+     "d******",
+     "c****",
+     "n****",
+     "i******",
+     "c********",
+     "r******",
+     "h*********",
+     "h***********",
+     "p*******",
+     "p****",
+     "c******",
+     "m*******",
+     "c***",
+     "b****",
+     "p**********",
+     "p***",
+     "c*******",
+     "v*****",
+     "g*********",
+     "o****",
+     "r*******",
+     "p*********",
+     "p******",
+     "a***",
+     "c*****",
+     "m******",
+     "h******",
+     "m****",
+     "i********",
+     "d***",
+     "h***",
+     "s**",
+     "a*****",
+     "c*****",
+     "g****",
+     "m*****",
+     "f*****",
+     "m*****",
+     "s****",
+     "c****",
+     "f***",
+     "x**",
+     "a******",
+     "p****",
+     "p****",
+     "m******",
+     "p******",
+     "c***",
+     "p*****",
+     "p****",
+     "h***********",
+     "i******",
+     "c******",
+     "p***",
+     "h*************",
+     "a*****",
+     "f******",
+     "c**",
+     "h*******",
+     "v*****",
+     "b*****",
+     "n****",
+     "b*******",
+     "m******",
+     "p******",
+     "z*****",
+     "b****",
+     "l*****",
+     "b********",
+     "s***",
+     "e******",
+     "t*******",
+     "a**",
+     "p****",
+     "s****",
+     "b*****",
+     "c****",
+     "p*********",
+     "p****",
+     "t********",
+     "m********",
+     "s****",
+     "a***",
+     "i********",
+     "b****",
+     "p****",
+     "c*******",
+     "m*******",
+     "v*****",
+     "p***",
+     "p****",
+     "e*****",
+     "m***",
+     "c****",
+     "d****",
+     "n*******",
+     "m******",
+     "h*******",
+     "p******",
+     "k***",
+     "p****",
+     "n******",
+     "n********",
+     "c****",
+     "h*****",
+     "p****",
+     "t******",
+     "f****",
+     "b*******",
+     "c****",
+     "p***",
+     "v*******",
+     "s*****",
+     "m********",
+     "v****",
+     "b****",
+     "n****",
+     "p*****",
+     "p**********",
+     "m******",
+     "m*****",
+     "s****",
+     "b***",
+     "n***",
+     "n****",
+     "i********",
+     "r***",
+     "c******",
+     "e******",
+     "p*****",
+     "m*****",
+     "v******",
+     "f******",
+     "q***",
+     "r*****",
+     "b***",
+     "h******",
+     "l********",
+     "n********",
+     "y***",
+     "z*****",
+     "d******",
+     "d****",
+     "s********",
+     "c******",
+     "n*********",
+     "s******",
+     "f****",
+     "j**",
+     "s******",
+     "b*****",
+     "a****"
+    ]
+   },
+   "fr": {
+    "words_tested": 59362,
+    "flagged": 225,
+    "flagged_benign_looking": [
+     "conditions",
+     "information",
+     "informations",
+     "balle",
+     "peter",
+     "balles",
+     "franc",
+     "francs",
+     "hard",
+     "nigeria",
+     "niger",
+     "pitt",
+     "regina",
+     "hardy",
+     "rights",
+     "gerber",
+     "anita",
+     "frances",
+     "peters",
+     "harding",
+     "rosette",
+     "moses",
+     "license",
+     "nicht",
+     "pina",
+     "material",
+     "cummings",
+     "finger",
+     "materials",
+     "fingers",
+     "inferno",
+     "pippa",
+     "bitte"
+    ],
+    "flagged_other_masked": [
+     "m****",
+     "p*****",
+     "g*****",
+     "r*****",
+     "b*****",
+     "f*****",
+     "c****",
+     "b*****",
+     "s***",
+     "f****",
+     "p***",
+     "s*****",
+     "c******",
+     "c*******",
+     "d*********",
+     "p****",
+     "c*****",
+     "n****",
+     "s**",
+     "b*****",
+     "p****",
+     "f***",
+     "h***",
+     "n***",
+     "m***",
+     "e*****",
+     "s****",
+     "p****",
+     "d*****",
+     "s****",
+     "g******",
+     "d***",
+     "c*******",
+     "j****",
+     "p*****",
+     "p******",
+     "p****",
+     "x*",
+     "m*****",
+     "f*****",
+     "c****",
+     "h*******",
+     "d*******",
+     "r******",
+     "i********",
+     "n****",
+     "p****",
+     "d******",
+     "a***",
+     "d******",
+     "r*******",
+     "s***",
+     "e*******",
+     "x**",
+     "s***",
+     "p******",
+     "a***",
+     "b******",
+     "p*****",
+     "c*******",
+     "e******",
+     "b******",
+     "e*******",
+     "s*****",
+     "s******",
+     "p***",
+     "p********",
+     "n*****",
+     "a**",
+     "m****",
+     "s******",
+     "c*******",
+     "e******",
+     "b*****",
+     "m***********",
+     "b******",
+     "p*********",
+     "p******",
+     "h****",
+     "f******",
+     "c**",
+     "b*****",
+     "n******",
+     "b******",
+     "g****",
+     "p*****",
+     "b********",
+     "m****",
+     "n****",
+     "z***",
+     "a****",
+     "n****",
+     "p***",
+     "e*****",
+     "p*****",
+     "t**",
+     "p****",
+     "m***",
+     "p******",
+     "v*****",
+     "e*****",
+     "n*******",
+     "c*******",
+     "t*******",
+     "b****",
+     "t******",
+     "m****",
+     "j**",
+     "p***",
+     "l*****",
+     "b***",
+     "c******",
+     "b*******",
+     "v*****",
+     "é**********",
+     "m******",
+     "p***",
+     "d******",
+     "p****",
+     "s*********",
+     "b********",
+     "e*******",
+     "s***",
+     "c*****",
+     "p****",
+     "o*******",
+     "r*****",
+     "n********",
+     "p****",
+     "b*****",
+     "n***",
+     "r***",
+     "h*****",
+     "b*******",
+     "c***",
+     "b****",
+     "r*******",
+     "m*********",
+     "m****",
+     "n*****",
+     "b******",
+     "c******",
+     "n********",
+     "n*******",
+     "g*****",
+     "a*****",
+     "b******",
+     "g*****",
+     "t********",
+     "b*******",
+     "t*******",
+     "b******",
+     "e*******",
+     "p***",
+     "s*****",
+     "t******",
+     "t*****",
+     "b***",
+     "c**********",
+     "d*******",
+     "n*****",
+     "e*******",
+     "c***",
+     "n*******",
+     "t***",
+     "n***",
+     "h*****",
+     "n******",
+     "c****",
+     "e*********",
+     "r***",
+     "s****",
+     "f****",
+     "e********",
+     "b****",
+     "d**********",
+     "b*****",
+     "r*****",
+     "f*****",
+     "n*********",
+     "c*****",
+     "n********",
+     "v******",
+     "f*****",
+     "f******",
+     "c********",
+     "e******",
+     "h*******",
+     "m***",
+     "n*****",
+     "é****",
+     "b**"
+    ]
+   },
+   "de": {
+    "words_tested": 59470,
+    "flagged": 188,
+    "flagged_benign_looking": [
+     "nicht",
+     "bitte",
+     "weniger",
+     "peter",
+     "material",
+     "finger",
+     "gottes",
+     "information",
+     "dritter",
+     "hard",
+     "peters",
+     "regina",
+     "nigeria",
+     "moses",
+     "materials",
+     "anita",
+     "informations",
+     "hardy",
+     "rights",
+     "pitt",
+     "gerber",
+     "franc",
+     "niger",
+     "inferno",
+     "francs",
+     "frances",
+     "rosette",
+     "fingers",
+     "harder",
+     "harding",
+     "reiniger",
+     "pina",
+     "conditions",
+     "cummings",
+     "pippa"
+    ],
+    "flagged_other_masked": [
+     "n*****",
+     "s*******",
+     "s**",
+     "s******",
+     "a****",
+     "n****",
+     "e******",
+     "f*****",
+     "f***",
+     "n***",
+     "s***",
+     "d***",
+     "a********",
+     "n****",
+     "f***",
+     "p****",
+     "h********",
+     "t*****",
+     "s*******",
+     "f***",
+     "p****",
+     "e************",
+     "a**",
+     "m*****",
+     "p***",
+     "s***",
+     "k****",
+     "c**",
+     "h*******",
+     "a***",
+     "j**",
+     "p*****",
+     "x**",
+     "d*****",
+     "h***",
+     "n*******",
+     "d******",
+     "f****",
+     "h***",
+     "p****",
+     "v*****",
+     "f******",
+     "m***",
+     "a**********",
+     "o*******",
+     "b*******",
+     "x*",
+     "b******",
+     "v*****",
+     "n****",
+     "b****",
+     "d*****",
+     "n*****",
+     "d****",
+     "b*****",
+     "n******",
+     "s****",
+     "w******",
+     "n****",
+     "b******",
+     "w******",
+     "v*****",
+     "p******",
+     "d****",
+     "m***",
+     "p*****",
+     "k*****",
+     "b*****",
+     "k*****",
+     "b****",
+     "l****",
+     "b***",
+     "p******",
+     "b**",
+     "n*****",
+     "m***********",
+     "w**********",
+     "p*****",
+     "s*********",
+     "g*******",
+     "e*****",
+     "a***",
+     "c*******",
+     "n******",
+     "v*******",
+     "f*****",
+     "p*****",
+     "a*********",
+     "m***",
+     "h*****",
+     "t**",
+     "v**********",
+     "n***",
+     "m******",
+     "t*****",
+     "n****",
+     "p*****",
+     "p*****",
+     "s******",
+     "c*****",
+     "h******",
+     "m****",
+     "s*****",
+     "n***",
+     "n*****",
+     "s*****",
+     "b***",
+     "b******",
+     "c***",
+     "p****",
+     "n*********",
+     "l*****",
+     "c******",
+     "s*******",
+     "t***",
+     "f*****",
+     "s******",
+     "b******",
+     "l*****",
+     "s******",
+     "v*****",
+     "k*****",
+     "n****",
+     "d****",
+     "f*****",
+     "w*****",
+     "a********",
+     "d*****",
+     "a****",
+     "w***********",
+     "f********",
+     "r***",
+     "h****",
+     "m****",
+     "v****",
+     "l*****",
+     "n*************",
+     "s*****",
+     "p***",
+     "f******",
+     "h*****",
+     "s********",
+     "p*******",
+     "z*******",
+     "n************",
+     "o********",
+     "b*******",
+     "f*****",
+     "w*****",
+     "b****",
+     "f*****",
+     "f**",
+     "n******"
+    ]
+   }
+  },
+  "performance": [
+   {
+    "input": "1000 x 'a' (one long word)",
+    "chars": 1000,
+    "seconds": 0.016
+   },
+   {
+    "input": "500 x 'a ' (spaced single letters)",
+    "chars": 1000,
+    "seconds": 0.002
+   },
+   {
+    "input": "200 x 'word ' (plain text)",
+    "chars": 1000,
+    "seconds": 0.011
+   },
+   {
+    "input": "5000 x 'a' (one long word)",
+    "chars": 5000,
+    "seconds": 0.411
+   },
+   {
+    "input": "2500 x 'a ' (spaced single letters)",
+    "chars": 5000,
+    "seconds": 0.009
+   },
+   {
+    "input": "1000 x 'word ' (plain text)",
+    "chars": 5000,
+    "seconds": 0.063
+   },
+   {
+    "input": "10000 x 'a' (one long word)",
+    "chars": 10000,
+    "seconds": 1.541
+   },
+   {
+    "input": "5000 x 'a ' (spaced single letters)",
+    "chars": 10000,
+    "seconds": 0.016
+   },
+   {
+    "input": "2000 x 'word ' (plain text)",
+    "chars": 10000,
+    "seconds": 0.126
+   },
+   {
+    "input": "20000 x 'a' w/o '@' (email regex backtracking)",
+    "chars": 20000,
+    "seconds": 6.333
+   },
+   {
+    "input": "30000 x '1 ' digits (phone regex)",
+    "chars": 30000,
+    "seconds": 0.002
+   },
+   {
+    "input": "20000 x 'a.' (url regex)",
+    "chars": 20000,
+    "seconds": 5.915
+   },
+   {
+    "input": "5000 x 'snap ' (handle regex)",
+    "chars": 25000,
+    "seconds": 0.004
+   },
+   {
+    "input": "30000 x 'a' + '@' (email regex)",
+    "chars": 30001,
+    "seconds": 14.074
+   },
+   {
+    "input": "20000 chars of 'x' fullwidth (one word)",
+    "chars": 20000,
+    "seconds": 6.914
+   },
+   {
+    "input": "200000 chars, normal prose with spaces",
+    "chars": 199992,
+    "seconds": 2.29
+   }
+  ],
+  "odd_inputs_crashes": []
+ },
+ "summary": {
+  "False positive": {
+   "ok": 236,
+   "FAIL": 69
+  },
+  "PII: email": {
+   "ok": 11,
+   "FAIL": 15
+  },
+  "PII: phone": {
+   "ok": 11,
+   "FAIL": 22
+  },
+  "PII: link": {
+   "ok": 11,
+   "FAIL": 24
+  },
+  "PII: handle": {
+   "FAIL": 33,
+   "ok": 7
+  },
+  "PII: address": {
+   "FAIL": 16,
+   "ok": 1
+  },
+  "Minor-safety: age / personal question": {
+   "ok": 5,
+   "FAIL": 16
+  },
+  "Minor-safety: location question": {
+   "ok": 3,
+   "FAIL": 18
+  },
+  "Minor-safety: move off-platform": {
+   "FAIL": 27
+  },
+  "Minor-safety: secrecy / isolation": {
+   "FAIL": 14,
+   "ok": 1
+  },
+  "Minor-safety: images / camera / meeting": {
+   "FAIL": 20,
+   "ok": 1
+  },
+  "Minor-safety: benign class talk (must pass)": {
+   "ok": 8,
+   "FAIL": 1
+  },
+  "Abusive control": {
+   "ok": 3
+  }
+ }
+}

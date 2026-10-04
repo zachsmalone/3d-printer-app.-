@@ -238,18 +238,22 @@ def _key() -> bytes:
     return _KEY_FILE.read_text().strip().encode()
 
 
-def make_token(bid: str, ttl=2 * 3600) -> str:
+LINK_TTL = 10 * 60          # slicer links only need to live long enough to open the file
+
+
+def make_token(bid: str, name: str, ttl: int = LINK_TTL) -> str:
+    """Signed, short-lived link bound to ONE build AND ONE file name (e.g. model.3mf): useless for anything else."""
     exp = int(time.time()) + ttl
-    sig = hmac.new(_key(), f"{bid}.{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    sig = hmac.new(_key(), f"{bid}.{name}.{exp}".encode(), hashlib.sha256).hexdigest()[:32]
     return f"{exp}-{sig}"
 
 
-def check_token(bid: str, token: str) -> bool:
+def check_token(bid: str, name: str, token: str) -> bool:
     try:
         exp, sig = token.split("-", 1)
         if int(exp) < time.time():
             return False
     except ValueError:
         return False
-    good = hmac.new(_key(), f"{bid}.{exp}".encode(), hashlib.sha256).hexdigest()[:32]
+    good = hmac.new(_key(), f"{bid}.{name}.{exp}".encode(), hashlib.sha256).hexdigest()[:32]
     return hmac.compare_digest(good, sig)

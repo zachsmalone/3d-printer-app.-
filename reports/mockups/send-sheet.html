@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZEIM Send sheet - design mockups (static, not wired)</title>
+<style>
+:root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2330;--line:#6b7a96;--soft:#2a3344;--txt:#e6eaf2;--mut:#a3aec4;--acc:#6a4bf0;--acc2:#22d3ee;--ok:#34d399;--warn:#fbbf24}
+*{box-sizing:border-box}body{margin:0;background:#05070b;color:var(--txt);font:16px/1.4 system-ui,-apple-system,sans-serif;padding:20px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+h2{font-size:13px;color:var(--mut);margin:0 0 8px;font-weight:600;max-width:340px}
+.phone{width:360px;height:700px;background:var(--bg);border:2px solid var(--soft);border-radius:28px;position:relative;overflow:hidden}
+.dim{position:absolute;inset:0;background:#000a}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--panel);border-radius:20px 20px 0 0;padding:10px 16px calc(16px + 20px);border-top:1px solid var(--soft)}
+.grab{width:40px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 8px}
+.sheet h3{margin:4px 0 2px;font-size:20px}.sub{color:var(--mut);font-size:14px;margin:0 0 10px}
+.opt{display:flex;gap:12px;align-items:center;min-height:56px;width:100%;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--txt);padding:8px 12px;margin-bottom:8px;font:inherit}
+.opt.pri{background:linear-gradient(135deg,#5b3fe0,#3f6fe0);border:0;font-weight:600}
+.opt .ic{font-size:22px;width:28px;text-align:center}.opt small{display:block;color:var(--mut);font-size:13px;font-weight:400}.opt.pri small{color:#e6e9ff}
+.opt[disabled]{opacity:.55}
+.fmt{display:flex;gap:6px;margin:6px 0 10px}.fmt span{flex:1;min-height:44px;display:grid;place-items:center;border:1px solid var(--line);border-radius:10px;font-weight:600}
+.fmt span.on{background:var(--acc);border-color:var(--acc)}
+.note{background:#1a2236;border-radius:10px;padding:8px 10px;font-size:13px;color:var(--mut);margin:6px 0}
+.close{min-height:48px;width:100%;background:none;border:0;color:var(--mut);font:inherit}
+.bar{padding:14px;font-size:13px;color:var(--mut)}.bar b{display:block;color:var(--txt);font-size:16px}
+.sw{display:flex;align-items:center;gap:12px;min-height:56px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:8px 0}
+.tg{width:52px;height:32px;border-radius:99px;background:#3b4560;position:relative;flex:none}.tg i{position:absolute;left:3px;top:3px;width:26px;height:26px;border-radius:50%;background:#fff}
+.tg.on{background:var(--ok)}.tg.on i{left:23px}
+.hdr{padding:14px 16px;font-weight:700;border-bottom:1px solid var(--soft)}
+</style></head><body>
+
+<div><h2>A. Adult, iPhone portrait. All options feature-detected; this is the "everything works" case (not yet proven on iOS).</h2>
+<div class="phone"><div class="bar"><b>Your build is ready</b>Lithophane · 10.0 × 7.5 cm · ✔ Ready to print</div><div class="dim"></div>
+<div class="sheet" role="dialog" aria-label="Send your build"><div class="grab"></div>
+<h3>Send your build</h3><p class="sub">Choose a file type, then where to send it.</p>
+<div class="fmt" role="radiogroup" aria-label="File type"><span class="on">3MF</span><span>STL</span><span>OBJ</span></div>
+<button class="opt pri"><span class="ic">⬇</span><span>Save to this device<small>Goes to your Files / Downloads.</small></span></button>
+<button class="opt"><span class="ic">📤</span><span>Share…<small>Opens the iPhone share sheet.</small></span></button>
+<button class="opt"><span class="ic">✉</span><span>Email it to myself<small>Your Mail app sends it. ZEIM doesn't.</small></span></button>
+<button class="opt"><span class="ic">🧊</span><span>Share as STL for Shapr3D…<small>Pick Shapr3D on the next screen. It opens as a reference shape, not editable.</small></span></button>
+<div class="note">ZEIM sends nothing to other apps. The app you pick gets the file.</div>
+<button class="close">Close</button></div></div></div>
+
+<div><h2>B. Class student or teen, iPhone portrait. Send switch off (default): no third-party options, no format menu.</h2>
+<div class="phone"><div class="bar"><b>Your build is ready</b>Glow Card · 10.0 × 7.5 cm · ✔ Ready to print</div><div class="dim"></div>
+<div class="sheet" role="dialog" aria-label="Save your build"><div class="grab"></div>
+<h3>Save your build</h3><p class="sub">Your teacher can see your build when you send it to them.</p>
+<button class="opt pri"><span class="ic">⬇</span><span>Download my build<small>Saves a 3MF file on this device.</small></span></button>
+<button class="opt"><span class="ic">🍎</span><span>Send to my teacher<small>Only your teacher can see it.</small></span></button>
+<div class="note">Sending to other apps is turned off for this class.</div>
+<button class="close">Close</button></div></div></div>
+
+<div><h2>C. Teacher, class settings. The per-class Send switch (default OFF, enforced on the server).</h2>
+<div class="phone"><div class="hdr">Class: Room 12 · Safety</div><div style="padding:16px">
+<div class="sw"><span class="tg"><i></i></span><span><b>Let students send files to other apps</b><br><small style="color:var(--mut)">Off. Students can only download their own build and send it to you.</small></span></div>
+<div class="note">When this is off, students do not see Share, Email or Open in… Nothing leaves ZEIM except a download the student starts. Teens and under-13 students are never offered cloud or Creality links.</div>
+<div class="sw"><span class="tg on"><i></i></span><span><b>Example: after switching ON</b><br><small style="color:var(--mut)">Students (13+ only) may use Share. Under-13 students still cannot.</small></span></div>
+<div class="note">Turning it on asks: “Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Turn on?” [Cancel] [Turn on]</div>
+</div></div></div>
+
+<div><h2>D. Share fell back (this device can't share STL/OBJ/3MF). "Share…" row is simply absent; a calm note explains.</h2>
+<div class="phone"><div class="bar"><b>Your build is ready</b>Relief · 8.0 × 8.0 cm</div><div class="dim"></div>
+<div class="sheet"><div class="grab"></div><h3>Send your build</h3><p class="sub">Choose a file type, then where to send it.</p>
+<div class="fmt"><span class="on">3MF</span><span>STL</span><span>OBJ</span></div>
+<button class="opt pri"><span class="ic">⬇</span><span>Save to this device<small>Goes to your Files / Downloads.</small></span></button>
+<div class="note"><b>Want it in another app?</b> Save it first, then open the Files app, press and hold the file, and tap Share. This browser can't pass a file straight to other apps.</div>
+<button class="close">Close</button></div></div></div>
+</body></html>
