@@ -8,7 +8,7 @@ from tests import b1
 
 
 def _setup():
-    c = b1.client()
+    c = b1.client(b1.ADULT)
     return c, b1.photo_build(c)
 
 

@@ -79,6 +79,11 @@ def test_slice_and_handoff():
         assert "message" in r
 
 
+def _free_port():
+    import socket
+    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
+
+
 def _mock_printer(port):
     m = FastAPI(); seen = {}
     @m.post("/api/files/local")
@@ -88,7 +93,10 @@ def _mock_printer(port):
     async def moon(file: UploadFile):
         seen["moon"] = len(await file.read()); return {"item": {}}
     srv = uvicorn.Server(uvicorn.Config(m, port=port, log_level="error"))
-    threading.Thread(target=srv.run, daemon=True).start(); time.sleep(1)
+    threading.Thread(target=srv.run, daemon=True).start()
+    for _ in range(100):                      # wait until it is really listening
+        if srv.started: break
+        time.sleep(0.1)
     return seen
 
 
@@ -96,10 +104,11 @@ def test_printer_send():
     from app.services import slicer
     if not slicer.find_slicer():
         pytest.skip("no slicer")
-    seen = _mock_printer(18991)
+    port = _free_port()                       # not a fixed port: other test runs on the same box may hold it
+    seen = _mock_printer(port)
     c.put("/api/settings", json={"printers": [
-        {"name": "o", "type": "octoprint", "url": "http://127.0.0.1:18991", "api_key": "k"},
-        {"name": "m", "type": "moonraker", "url": "http://127.0.0.1:18991"},
+        {"name": "o", "type": "octoprint", "url": f"http://127.0.0.1:{port}", "api_key": "k"},
+        {"name": "m", "type": "moonraker", "url": f"http://127.0.0.1:{port}"},
         {"name": "b", "type": "bambu", "url": "x"}]})
     ps = c.get("/api/settings").json()["printers"]; assert "api_key" not in ps[0] and ps[0]["has_key"]
     clear(); bid = build(resolution="60").json()["id"]

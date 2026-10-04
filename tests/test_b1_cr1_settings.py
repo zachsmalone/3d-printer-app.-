@@ -43,7 +43,7 @@ def test_cr1_shared_mode_settings_and_send_locked(shared):
     assert s.put("/api/settings", json=body, headers=ADMIN).status_code == 403   # a student's browser never gets settings rights
     pid = anon.get("/api/settings", headers=ADMIN).json()["printers"][0]["id"]
     assert s.post(f"/api/send/{bid}", data={"printer_id": pid}).status_code == 403
-    assert "url" not in json.dumps(s.get(f"/api/print/{bid}/links").json()["printers"])
+    assert s.get(f"/api/print/{bid}/links").status_code == 403          # SEND-1: students get no slicer links (and so no printer list) at all
     # anonymous visitor cannot send either (no adult account / admin token)
     abid = photo_build(anon)
     assert anon.post(f"/api/send/{abid}", data={"printer_id": pid}).status_code == 403
