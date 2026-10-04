@@ -214,3 +214,20 @@ body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-ri
 }
 @media (orientation:landscape) and (max-height:500px) { .viewer{height:calc(100dvh - 120px);min-height:240px} }
 .touch-hint{display:none;margin:6px 0 0;color:var(--mut);font-size:13px}
+
+/* ---- SEND-2: the Send sheet. Bottom sheet on phones, centred dialog elsewhere ---- */
+#dlgSendSheet{max-width:440px}
+.sheet-rows{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.sheet-row{display:flex !important;flex-direction:column;align-items:flex-start !important;gap:2px;text-align:left;min-height:56px;padding:10px 14px;text-decoration:none;white-space:normal}
+.sheet-row small{font-weight:400;opacity:.85;line-height:1.35}
+.fmt{display:flex;gap:6px;margin:6px 0}
+.fmt button{flex:1;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--line);background:var(--panel2);color:var(--txt);border-radius:10px;cursor:pointer;font:inherit;font-weight:700}
+.fmt button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.fmt button small{font-weight:400;font-size:12px;opacity:.9}
+.help.bad{color:var(--bad);min-height:0}
+.row.end{justify-content:flex-end;margin-top:8px}
+details.more{margin:8px 0}
+@media (max-width:600px){
+  #dlgSendSheet{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;border-radius:16px 16px 0 0;max-height:90dvh;overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
+}
+body[data-links="0"] #editPrint { display: none; }

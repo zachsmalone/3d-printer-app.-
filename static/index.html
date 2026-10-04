@@ -111,11 +111,11 @@
       <div class="resbar">
         <div class="stats" id="stats"></div>
         <div class="actions">
-          <div class="dl" id="downloads"></div>
+          <button class="btn primary" id="btnSendSheet" title="Save this build or send it somewhere">⬆ Send</button>
           <label class="inl" title="Who can open this build's files"><select id="resVis"><option value="private">🔒 Private</option><option value="followers">👥 Followers</option><option value="public">🌐 Public</option></select></label>
           <button class="btn" id="btnEditThis" title="Open this model in the Edit workspace">✏ Edit this</button>
           <button class="btn" id="btnPublish">🌐 Share to Showcase</button>
-          <button class="btn primary" id="btnPrint">🖨 Print…</button>
+          <button class="btn" id="btnPrint">🖨 Print…</button>
         </div>
       </div>
       <details class="auto" id="autoBox" hidden open><summary>🌱 Auto-chosen settings <small>(Beginner mode)</small></summary><table id="autoTable"></table></details>
@@ -166,9 +166,9 @@
       <div class="resbar">
         <div class="stats" id="editStats"></div>
         <div class="actions">
-          <div class="dl" id="editDownloads"></div>
+          <button class="btn primary" id="editSend" title="Save this model or send it somewhere">⬆ Send</button>
           <label class="inl" title="Who can open this project's files"><select id="editVis"><option value="private">🔒 Private</option><option value="followers">👥 Followers</option><option value="public">🌐 Public</option></select></label>
-          <button class="btn primary" id="editPrint">🖨 Print…</button>
+          <button class="btn" id="editPrint">🖨 Print…</button>
         </div>
       </div>
       <p class="help" id="editMsg"></p>
@@ -181,8 +181,9 @@
 <dialog id="dlgPrint"><div class="dlg">
   <header><h3>🖨 Print this build</h3><button class="x" data-close>✕</button></header>
   <div class="body">
-    <h4>Open in your slicer</h4>
     <p class="help"><b id="printWhich"></b></p>
+    <div class="row"><span class="help">Just need the file?</span> <button class="btn small ghost" id="printToSend">Send…</button></div>
+    <h4>Open in your slicer</h4>
     <p class="help" id="printHint"></p>
     <div class="slicers" id="slicerBtns"></div>
     <hr>
@@ -196,12 +197,23 @@
     </div>
     <div class="row"><button class="btn" id="btnSlice">Slice to G-code</button><span id="sliceOut" class="help"></span></div>
     <hr>
+    <div id="printerBlock">
     <h4>Send to a network printer</h4>
-    <div class="row"><select id="printerSel"></select>
+    <p class="help" id="printerHonest">Tested with a pretend printer only. Not tried on a real printer yet.</p>
+    <div class="row"><select id="printerSel" aria-label="Printer"></select>
       <label class="inl"><input type="checkbox" id="startNow"> Start print immediately</label>
       <button class="btn" id="btnSend">Send</button></div>
+    <p class="help">Check the printer and stay nearby while it prints.</p>
     <p class="help" id="sendOut"></p>
+    </div>
+    <p class="help" id="printerHosted" hidden>Printing from this version of ZEIM: download the file, then open it in your slicer or your printer's own page.</p>
   </div>
+</div></dialog>
+
+<!-- SEND-2: one Send sheet for Studio, Edit, history cards and Print (bottom sheet on phones) -->
+<dialog id="dlgSendSheet" class="sheet" aria-labelledby="ssTitle"><div class="dlg">
+  <header><h3 id="ssTitle">Send your build</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body" id="ssBody"></div>
 </div></dialog>
 
 <!-- Settings dialog -->
@@ -216,7 +228,7 @@
       </div>
       <h4>Printers</h4><div id="printerList"></div>
       <button class="btn small" id="btnAddPrinter">+ Add printer</button>
-      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are labeled stubs. API keys are stored in <code>data/settings.json</code> on the server.</p>
+      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are labeled stubs. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
     </div>
     <div id="tAcc" class="tab" hidden>
       <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built (teen accounts never show link-outs publicly).</p>

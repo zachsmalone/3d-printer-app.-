@@ -64,3 +64,27 @@ def test_teacher_send_switch_dialog_and_teen_print_hidden():
 def test_ios2_touch_targets_16px_inputs_safe_area_and_viewer_does_not_trap_scroll(live):
     code, out = run("ui_touch.py", live)
     assert code == 0, out
+
+
+def _spawn(mode, extra=None):
+    import socket as _s, tempfile as _t
+    s = _s.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
+    d = _t.mkdtemp(prefix="zeim-ui-")
+    env = {**os.environ, "PORT": str(port), "HOST": "127.0.0.1", "PHOTO3D_DATA": d + "/d", "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": mode, **(extra or {})}
+    p = subprocess.Popen([sys.executable, "-m", "app.serve"], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(80):
+        try:
+            _s.create_connection(("127.0.0.1", port), timeout=0.3).close(); break
+        except OSError:
+            time.sleep(0.25)
+    return p, f"http://127.0.0.1:{port}"
+
+
+def test_send_sheet_rows_per_audience_share_states_and_printer_honesty_in_a_real_browser():
+    p1, u1 = _spawn("local", {"PHOTO3D_SEND_SHARE": "1"}); p2, u2 = _spawn("shared")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_sendsheet.py"), u1, u2], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0, r.stdout + r.stderr
+    finally:
+        for p in (p1, p2):
+            p.terminate(); p.wait(10)

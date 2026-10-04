@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Viewer } from "/static/viewer.js";
+import { openSend } from "/static/send.js";
 import { S, api, toast, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 
@@ -85,7 +86,6 @@ function loadProject(p, keepCamera = false) {
   $("#editStats").innerHTML = `<span class="pill">${a.size_mm.map(x => fmt(x)).join(" × ")} ${E.unit}</span><span class="pill">${a.triangles.toLocaleString()} triangles</span>` +
     `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${a.watertight ? "ok" : "bad"}">${a.watertight ? "✔ watertight" : "✖ not watertight"}</span>` +
     (p.preview.decimated ? `<span class="pill" title="Exports use the full mesh">preview simplified</span>` : "");
-  $("#editDownloads").innerHTML = Object.entries(p.downloads).map(([k, u]) => `<a class="btn" href="${u}" download>⬇ ${k.toUpperCase()}</a>`).join("") + `<a class="btn ghost" href="${p.original}" download title="Your upload, unchanged">⬇ Original</a>`;
   $("#editVis").value = p.visibility || "private";
   $("#eUndo").disabled = !p.can_undo; $("#eRedo").disabled = !p.can_redo;
   const msgs = [...(p.warnings || [])]; if (p.report?.message) msgs.unshift(p.report.message);
@@ -113,6 +113,7 @@ $("#eRedo").onclick = () => act(`/api/edit/${E.p.id}/redo`, {});
 $("#eReset").onclick = () => viewer?.reset();
 $("#eWire").onclick = () => viewer?.toggleWire();
 $("#editPrint").onclick = () => openPrint();
+$("#editSend").onclick = () => E.p && openSend({ ...E.p, kind: "edit" });
 $("#editVis").onchange = async e => { try { await api(`/api/builds/${E.p.id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Who can see this: " + e.target.value, "ok"); } catch (er) { toast(er.message, "err"); e.target.value = E.p.visibility; } };
 addEventListener("keydown", e => {
   if ($("#viewEdit").hidden || !E.p || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;

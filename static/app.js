@@ -90,7 +90,7 @@ function formData(autoDelete) {
 async function build(autoDelete = false) {
   if (!S.file) return;
   S.pending = null;
-  $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true;   // no printing a stale build mid-rebuild
+  $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; S.building = true;   // no printing/sending a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
     showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Build again with these settings";
@@ -99,7 +99,7 @@ async function build(autoDelete = false) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
     else if (e.status === 400 && /photo/i.test(e.message)) pick.msg(e.message);          // photo problems stay visible under the buttons
     else toast("Build failed: " + e.message, "err");
-  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = false; $("#btnPrint").disabled = false; }
+  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = false; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; S.building = false; }
 }
 $("#btnBuild").onclick = () => build(false);
 
@@ -112,7 +112,6 @@ function showBuild(r) {
   $("#stats").innerHTML = `<span class="pill">${MODE_LABEL[r.mode]}</span><span class="pill">${sz} mm</span>` +
     `<span class="pill">${st.triangles.toLocaleString()} triangles</span><span class="pill">${st.bodies.length} ${st.bodies.length > 1 ? "bodies" : "body"}</span>` +
     `<span class="pill ${st.watertight ? "ok" : "bad"}">${st.watertight ? "✔ watertight" : "✖ not watertight"}</span>`;
-  $("#downloads").innerHTML = Object.entries(r.downloads).map(([k, u]) => `<a class="btn" href="${u}" download>⬇ ${k.toUpperCase()}</a>`).join("");
   const notes = r.auto_notes || [];
   $("#autoBox").hidden = !notes.length;
   $("#autoTable").innerHTML = notes.map(n => `<tr><td>${n.label}</td><td><b>${n.value}</b></td><td>${n.why}</td></tr>`).join("");
@@ -134,7 +133,7 @@ function renderHistory() {
       <img src="${b.thumb}" alt="" data-open="${b.id}" title="Open">
       <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Expert"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
-        ${Object.entries(b.downloads).map(([k, u]) => `<a href="${u}" download>${k.toUpperCase()}</a>`).join("")}
+        <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
         <button data-del="${b.id}">🗑</button></div></div>`);
   while (cards.length < S.max) cards.push(`<div class="hslot">Empty slot</div>`);
   $("#histList").innerHTML = cards.join("");
@@ -169,7 +168,8 @@ let printInfo = null, printId = null, printLabel = "";
 const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
 async function openPrint() {
   const id = S.current.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
-  try { printInfo = await api(`/api/print/${id}/links`); } catch (e) { return toast(e.message, "err"); }
+  let caps = {};
+  try { printInfo = await api(`/api/print/${id}/links`); caps = (await api("/api/me")).send || {}; } catch (e) { return toast(e.message, "err"); }
   printId = id; printLabel = `${S.current.title || "build"} (${S.current.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[S.current.mode] || "Edit"})`;
   $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
@@ -181,13 +181,17 @@ async function openPrint() {
   $("#btnSlice").disabled = !b.available;
   $("#s_up").checked = S.current.mode === "lithophane";
   $("#sliceOut").textContent = b.available ? "" : b.message;
-  fillPrinterSel(); $("#sendOut").textContent = "";
+  // SEND-6: the printer block exists only where it can really work (ZEIM on the user's own computer); hosted ZEIM promises nothing
+  $("#printerBlock").hidden = !caps.printer_ui; $("#printerHosted").hidden = !!caps.printer_ui;
+  startNowOff(); fillPrinterSel(); $("#sendOut").textContent = "";
   $("#dlgPrint").showModal();
 }
 $("#btnPrint").onclick = openPrint;
+const startNowOff = () => { $("#startNow").checked = false; };          // "Start print" is always a separate, unchecked choice
+const TYPE_LABEL = { octoprint: "OctoPrint", moonraker: "Moonraker (Klipper)", creality_k1: "Creality K1 (Experimental)" };
 function fillPrinterSel() {
   const ps = printInfo.printers;
-  $("#printerSel").innerHTML = ps.length ? ps.map(p => `<option value="${p.id}">${esc(p.name)} (${p.type})</option>`).join("") : `<option value="">No printers configured — add one in Settings</option>`;
+  $("#printerSel").innerHTML = ps.length ? ps.map(p => `<option value="${p.id}">${esc(p.name)} (${TYPE_LABEL[p.type] || p.type}${p.experimental ? ", experimental" : ""})</option>`).join("") : `<option value="">No printers configured — add one in Settings</option>`;
   $("#btnSend").disabled = !ps.length;
 }
 $("#btnSlice").onclick = async () => {
