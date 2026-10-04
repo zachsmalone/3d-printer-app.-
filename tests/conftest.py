@@ -1,6 +1,9 @@
 """Shared test setup: temp data dirs + local mode by default (individual tests switch to shared mode explicitly)."""
-import os, tempfile
-_tmp = tempfile.mkdtemp(prefix="zeim-tests-")
+import atexit, os, shutil, tempfile
+_root = tempfile.mkdtemp(prefix="zeim-tests-")        # EVERY temp dir of this run lives under one root that is removed at exit (a run used to leave ~165 MB behind)
+atexit.register(shutil.rmtree, _root, ignore_errors=True)
+tempfile.tempdir = _root
+_tmp = tempfile.mkdtemp(prefix="data-")
 os.environ.setdefault("PHOTO3D_OUT", _tmp + "/out")
 os.environ.setdefault("PHOTO3D_DATA", _tmp + "/data")
 os.environ.setdefault("PHOTO3D_ADMIN_TOKEN", "t0k")
