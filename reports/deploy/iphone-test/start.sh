@@ -89,7 +89,7 @@ port_busy "$PROXY_PORT" || fail "Caddy did not start"
 # ---- 2. tunnel -> Caddy only ----
 # cloudflared talks to Cloudflare on port 7844 (not 443). Some sandboxes block that; warn early (not fatal: it may use UDP).
 if [ "${ZEIM_SKIP_EDGE_PRECHECK:-0}" != 1 ] && ! timeout 6 bash -c 'echo > /dev/tcp/region1.v2.argotunnel.com/7844' 2>/dev/null; then
-  echo "WARNING: TCP port 7844 to Cloudflare looks blocked from this computer; the tunnel may not connect (see RUNBOOK 'If the tunnel will not start')." >&2
+  echo "WARNING: TCP port 7844 to Cloudflare looks blocked from this computer; the tunnel may not connect (see RUNBOOK 'Blocker to read first')." >&2
 fi
 : > "$RUN/cloudflared-empty-config.yml"
 setsid nohup "$ZEIM_CLOUDFLARED" tunnel --no-autoupdate --config "$RUN/cloudflared-empty-config.yml" \
