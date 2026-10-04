@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the TEMPORARY passcode-protected HTTPS test address for ZEIM. UNTESTED ON REAL iOS.
+# Start the TEMPORARY passcode-protected HTTPS test address for ZEIM (ngrok free tunnel -> Caddy passcode -> ZEIM). UNTESTED ON REAL iOS.
 #   ./start.sh --haruto-confirmed [--max-minutes 120] [--snapshot]
 # Refuses to run without --haruto-confirmed (Haruto must have confirmed in HQ that S-01, signed-link/base-URL
 # and the camera-button fixes are live). Never prints the passcode or the URL; they are saved 0600 in the run dir.
@@ -24,8 +24,9 @@ fi
 case "$MAX_MINUTES" in ''|*[!0-9]*) echo "--max-minutes must be a whole number" >&2; exit 2 ;; esac
 [ "$MAX_MINUTES" -ge 5 ] && [ "$MAX_MINUTES" -le 480 ] || { echo "--max-minutes must be 5..480" >&2; exit 2; }
 
-for b in "$ZEIM_CADDY" "$ZEIM_CLOUDFLARED" "$ZEIM_PYTHON"; do [ -x "$b" ] || { echo "missing executable: $b" >&2; exit 4; }; done
+for b in "$ZEIM_CADDY" "$ZEIM_NGROK" "$ZEIM_PYTHON"; do [ -x "$b" ] || { echo "missing executable: $b" >&2; exit 4; }; done
 command -v ss >/dev/null && command -v curl >/dev/null && command -v setsid >/dev/null || { echo "need ss, curl, setsid" >&2; exit 4; }
+[ -s "$NGROK_TOKEN_FILE" ] || { echo "missing ngrok authtoken file ($NGROK_TOKEN_FILE). Not starting." >&2; exit 4; }
 
 # Already running? Then stop it first (one test at a time).
 if [ -L "$CURRENT" ] || [ -e "$CURRENT" ]; then
@@ -58,7 +59,8 @@ fi
   echo "working_tree_dirty_app_static=$(git -C "$ZEIM_APP_DIR" status --short -- app static 2>/dev/null | wc -l)";
   echo "max_minutes=$MAX_MINUTES"; echo "started=$(date -Is)"; } > "$RUN/run-info.txt"
 
-fail() { echo "start failed: $1 - stopping everything" >&2; "$DIR/stop.sh" --quiet || true; exit 1; }
+# On failure stop everything but KEEP the ngrok token file, so a fixed script can be re-run. A deliberate ./stop.sh (or the timer) shreds it.
+fail() { echo "start failed: $1 - stopping everything" >&2; "$DIR/stop.sh" --quiet --keep-token || true; exit 1; }
 
 # ---- passcode (never echoed) + bcrypt hash ----
 "$ZEIM_PYTHON" - > "$RUN/passcode.txt" <<'PY'
@@ -86,32 +88,48 @@ unset ZEIM_AUTH_HASH
 for _ in $(seq 1 20); do port_busy "$PROXY_PORT" && break; sleep 0.5; done
 port_busy "$PROXY_PORT" || fail "Caddy did not start"
 
-# ---- 2. tunnel -> Caddy only ----
-# cloudflared talks to Cloudflare on port 7844 (not 443). Some sandboxes block that; warn early (not fatal: it may use UDP).
-if [ "${ZEIM_SKIP_EDGE_PRECHECK:-0}" != 1 ] && ! timeout 6 bash -c 'echo > /dev/tcp/region1.v2.argotunnel.com/7844' 2>/dev/null; then
-  echo "WARNING: TCP port 7844 to Cloudflare looks blocked from this computer; the tunnel may not connect (see RUNBOOK 'Blocker to read first')." >&2
-fi
-: > "$RUN/cloudflared-empty-config.yml"
-setsid nohup "$ZEIM_CLOUDFLARED" tunnel --no-autoupdate --config "$RUN/cloudflared-empty-config.yml" \
-  --url "http://127.0.0.1:$PROXY_PORT" >"$RUN/logs/cloudflared.log" 2>&1 < /dev/null &
-echo $! > "$RUN/pids/cloudflared.pid"
+# ---- 2. tunnel -> Caddy only (ngrok) ----
+# Per-run ngrok config: NO token in it. agent.crl_url: ngrok checks certificate revocation over plain http:80 by default, which this
+# computer's egress blocks; the same official list is fetched over https instead (check stays ON). web_addr: false = local
+# inspector/API not started at all.
+cat > "$RUN/ngrok.yml" <<'YML'
+version: "3"
+agent:
+  crl_url: https://crl.ngrok-agent.com/ngrok.crl
+  web_addr: false
+  update_check: false
+  console_ui: false
+YML
+chmod 600 "$RUN/ngrok.yml"
+# The token is passed through the environment of the ngrok process ONLY (VAR=value before the command, inside this subshell).
+# Not exported to anything else, not in argv. ngrok redacts it in its own log.
+(
+  NGROK_AUTHTOKEN="$(tr -d '\r\n ' < "$NGROK_TOKEN_FILE")" \
+  setsid nohup "$ZEIM_NGROK" http "127.0.0.1:$PROXY_PORT" --config "$RUN/ngrok.yml" --log=stdout --log-format=json \
+    >"$RUN/logs/ngrok.log" 2>&1 < /dev/null &
+  echo $! > "$RUN/pids/ngrok.pid"
+)
+# (log file is created 0600 by the umask above)
 URL=""
 for _ in $(seq 1 60); do
-  URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "$RUN/logs/cloudflared.log" 2>/dev/null | head -n1 || true)"
+  URL="$(grep -m1 '"msg":"started tunnel"' "$RUN/logs/ngrok.log" 2>/dev/null | "$ZEIM_PYTHON" -c 'import sys,json
+try:
+    u=json.loads(sys.stdin.readline()).get("url","")
+    print(u if u.startswith("https://") else "")
+except Exception:
+    print("")' || true)"
   [ -n "$URL" ] && break
-  alive "$(cat "$RUN/pids/cloudflared.pid")" || fail "cloudflared exited (see $RUN/logs/cloudflared.log)"
+  alive "$(cat "$RUN/pids/ngrok.pid")" || { E="$(grep -oE 'ERR_NGROK_[0-9]+' "$RUN/logs/ngrok.log" | head -n1)"; fail "ngrok exited (${E:-no error code}; see $RUN/logs/ngrok.log)"; }
   sleep 1
 done
-[ -n "$URL" ] || fail "no tunnel address after 60 s"
-# An address alone does not mean the tunnel works (cloudflared allocates it over 443 before connecting to the edge on 7844).
-# Do not hand out a dead link: require a registered connection.
-for _ in $(seq 1 40); do
-  grep -q 'Registered tunnel connection' "$RUN/logs/cloudflared.log" 2>/dev/null && break
-  alive "$(cat "$RUN/pids/cloudflared.pid")" || fail "cloudflared exited (see $RUN/logs/cloudflared.log)"
-  sleep 1
-done
-grep -q 'Registered tunnel connection' "$RUN/logs/cloudflared.log" 2>/dev/null || fail "tunnel address allocated but cloudflared could not connect to Cloudflare (outbound 7844 blocked?). Nothing is public; see RUNBOOK 'Blocker'"
+[ -n "$URL" ] || fail "no ngrok tunnel after 60 s (see $RUN/logs/ngrok.log)"
 printf '%s' "$URL" > "$RUN/url.txt"; chmod 600 "$RUN/url.txt"
+# The token must never appear in ngrok's own log. Count only; if found, destroy the log and stop.
+if [ "$(grep -cF -- "$(tr -d '\r\n ' < "$NGROK_TOKEN_FILE")" "$RUN/logs/ngrok.log" 2>/dev/null)" != 0 ]; then
+  shred -u "$RUN/logs/ngrok.log" 2>/dev/null || rm -f "$RUN/logs/ngrok.log"; fail "authtoken text found in the ngrok log (log destroyed)"
+fi
+# local inspector must not exist
+ss -H -ltn 'sport = :4040' | grep -q . && fail "something is listening on port 4040 (ngrok inspector should be off)"
 
 # ---- 3. ZEIM on 127.0.0.1, fresh data folders, base URL = the tunnel address ----
 (
@@ -141,16 +159,26 @@ code_auth="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -K "$RUN/.curlr
 rm -f "$RUN/.curlrc"
 [ "$code_noauth" = 401 ] || fail "local gate check: expected 401 without passcode, got $code_noauth"
 [ "$code_auth" = 200 ] || fail "local gate check: expected 200 with passcode, got $code_auth"
-pub=""
+pub=""; pubauth=""
+# The address and credentials go through a 0600 curl config file so they never show up in `ps`. ngrok's free-plan browser warning page
+# is skipped for scripts with the ngrok-skip-browser-warning header (Zach's iPhone WILL see the page once: tap "Visit Site").
+umask 077
+printf 'url = "%s/healthz"\nheader = "ngrok-skip-browser-warning: 1"\n' "$URL" > "$RUN/.pubcurl-noauth"
+printf 'url = "%s/healthz"\nheader = "ngrok-skip-browser-warning: 1"\nuser = "%s:%s"\n' "$URL" "$AUTH_USER" "$(cat "$RUN/passcode.txt")" > "$RUN/.pubcurl-auth"
 # ZEIM_SKIP_PUBLIC_CHECK=1 is for offline tests with a stand-in tunnel only (there is no real public address to ask)
 for _ in $(seq 1 15); do
   [ "${ZEIM_SKIP_PUBLIC_CHECK:-0}" = 1 ] && { pub=skipped; break; }
-  pub="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "$URL/healthz" || true)"
+  pub="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -K "$RUN/.pubcurl-noauth" || true)"
   [ "$pub" = 401 ] && break
-  [ "$pub" = 200 ] && fail "PUBLIC address answered 200 WITHOUT a passcode"
+  [ "$pub" = 200 ] && { rm -f "$RUN"/.pubcurl-*; fail "PUBLIC address answered 200 WITHOUT a passcode"; }
   sleep 2
 done
-PUBNOTE="public gate check: 401 without passcode (OK)"
+if [ "$pub" = 401 ]; then
+  pubauth="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -K "$RUN/.pubcurl-auth" || true)"
+fi
+rm -f "$RUN"/.pubcurl-*
+if [ "$pub" = 401 ] && [ "$pubauth" != 200 ]; then fail "public check: 401 without passcode but ${pubauth:-no answer} (not 200) with it - tunnel path to the app is broken"; fi
+PUBNOTE="public gate check: 401 without passcode, 200 with it (OK)"
 [ "$pub" = skipped ] && PUBNOTE="public gate check skipped (test mode)"
 [ "$pub" = 401 ] || [ "$pub" = skipped ] || PUBNOTE="WARNING public gate check could not be completed (last status ${pub:-none}); try the address from your phone data connection"
 echo "$PUBNOTE" > "$RUN/gate-check.txt"

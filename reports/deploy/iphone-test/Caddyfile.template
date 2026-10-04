@@ -16,7 +16,9 @@
 	}
 }
 
-http://127.0.0.1:@@PROXY_PORT@@ {
+# Match ANY Host header (the tunnel forwards the public host name, not 127.0.0.1); the listener itself is loopback-only (bind).
+# A host-specific address here made Caddy answer unmatched hosts with an empty 200 BEFORE the passcode check (found 2026-10-04).
+http://:@@PROXY_PORT@@ {
 	bind 127.0.0.1
 
 	# Every path, including /healthz, needs the passcode. The bcrypt hash comes from the environment

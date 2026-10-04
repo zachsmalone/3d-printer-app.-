@@ -9,6 +9,8 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN="$(readlink -f "${1:-$CURRENT}" 2>/dev/null || true)"
 [ -n "$RUN" ] && [ -d "$RUN/logs" ] || { echo "no run dir with logs: ${1:-$CURRENT}" >&2; exit 2; }
 
+# ngrok authtoken (if the file still exists): counted only, never printed. Passed through a variable, not argv of any visible command.
+NGT=""; [ -f "$NGROK_TOKEN_FILE" ] && NGT="$(tr -d '\r\n ' < "$NGROK_TOKEN_FILE")"
 PASS=""; [ -f "$RUN/passcode.txt" ] && PASS="$(cat "$RUN/passcode.txt")"
 B64=""; [ -n "$PASS" ] && B64="$(printf '%s:%s' "$AUTH_USER" "$PASS" | base64 -w0)"
 BAD=0
@@ -18,7 +20,7 @@ countF() { [ -f "$1" ] && [ -n "$2" ] && { grep -cF -- "$2" "$1" 2>/dev/null || 
 
 echo "Log check for $(basename "$RUN") - counts of matching LINES (values are never printed)"
 printf '%-24s %9s %9s %9s %9s %9s %9s\n' "log" "link-token" "bare-tok" "query?" "sens-qry" "auth-hdr" "passcode"
-for f in app.log caddy-access.log caddy-runtime.log caddy-stdout.log cloudflared.log; do
+for f in app.log caddy-access.log caddy-runtime.log caddy-stdout.log ngrok.log timer.log; do
   p="$RUN/logs/$f"; [ -f "$p" ] || continue
   a=$(count "$p" '/f/[0-9]{9,}-[0-9a-fA-F]{32}')          # unredacted signed-link URL
   b=$(count "$p" '[0-9]{9,}-[0-9a-f]{32}')                # token-shaped string anywhere
@@ -26,6 +28,7 @@ for f in app.log caddy-access.log caddy-runtime.log caddy-stdout.log cloudflared
   s=$(count "$p" '[?&](token|sig|signature|code|state|key|api_key|password|passcode|secret|access_token)=')
   h=$(count "$p" '[Aa]uthorization.{0,6}[Bb]asic +[A-Za-z0-9+/=]{8,}')
   pw=$(countF "$p" "$PASS"); [ -n "$B64" ] && pw=$((pw + $(countF "$p" "$B64")))
+  if [ -n "$NGT" ]; then nt=$(countF "$p" "$NGT"); pw=$((pw + nt)); fi
   printf '%-24s %9s %9s %9s %9s %9s %9s\n' "$f" "$a" "$b" "$q" "$s" "$h" "$pw"
   # caddy-access.log is supposed to be redacted: a query string there means the redaction failed.
   if [ "$f" = caddy-access.log ]; then
@@ -40,6 +43,6 @@ if [ -d "$RUN/data" ]; then
   n=$(grep -rIlE '[0-9]{9,}-[0-9a-f]{32}' "$RUN/data" 2>/dev/null | wc -l)
   echo "Data-folder files containing a token-shaped string: $n"
 fi
-echo "Note: cloudflared.log legitimately contains the random trycloudflare address; the tunnel provider and Cloudflare can see traffic. Keep logs private (run dir is mode 700)."
+echo "Note: ngrok.log legitimately contains the random ngrok address until stop.sh blanks it; ngrok can see traffic. Keep logs private (run dir is mode 700). The last column also counts the ngrok authtoken."
 if [ "$BAD" = 1 ]; then echo "RESULT: FOUND token-like or credential-like values in logs (see non-zero counts). Treat the link/passcode as exposed, do not reuse, and tell Mr. Yami Kato."; exit 1; fi
 echo "RESULT: no unredacted signed-link tokens, credentials or passcode found in the logs."

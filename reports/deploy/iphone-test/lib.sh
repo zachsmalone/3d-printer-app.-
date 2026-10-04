@@ -2,7 +2,10 @@
 ZEIM_APP_DIR="${ZEIM_APP_DIR:-/workspace/photo3d}"
 ZEIM_PYTHON="${ZEIM_PYTHON:-$ZEIM_APP_DIR/.venv/bin/python}"
 ZEIM_CADDY="${ZEIM_CADDY:-/workspace/tools/caddy}"
-ZEIM_CLOUDFLARED="${ZEIM_CLOUDFLARED:-/workspace/tools/cloudflared}"
+ZEIM_NGROK="${ZEIM_NGROK:-/workspace/tools/ngrok}"
+# Zach's ngrok authtoken lives ONLY in this 0600 file. It is read inside start.sh for the ngrok process alone
+# (never exported, never on a command line, never logged). stop.sh shreds it. The NGROK_AUTHTOKEN env var is NOT used.
+NGROK_TOKEN_FILE="${ZEIM_NGROK_TOKEN_FILE:-/workspace/tools/.ngrok-authtoken}"
 RUN_ROOT="${ZEIM_RUN_ROOT:-/workspace/zeim-test-run}"
 CURRENT="$RUN_ROOT/CURRENT"
 PROXY_PORT="${ZEIM_PROXY_PORT:-8480}"      # Caddy (the only thing the tunnel talks to)
