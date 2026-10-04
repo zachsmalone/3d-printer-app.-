@@ -6,7 +6,7 @@ URL = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:8765"
 bad = []
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
-    for w in (320, 360, 390, 768):
+    for w in (320, 375, 390, 768):
         pg = b.new_page(viewport={"width": w, "height": 800}); pg.goto(URL); pg.wait_for_timeout(600)
         for view in ("create", "showcase", "edit", "learn"):
             pg.click(f"#mainNav [data-view={view}]"); pg.wait_for_timeout(300)
