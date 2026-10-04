@@ -1,0 +1,44 @@
+# PROPOSAL - Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# Replace the placeholder domain (ZEIM_DOMAIN in .env). DNS A/AAAA must point at this host and 80/443 must be open.
+{
+	email {$ACME_EMAIL}
+	# Use the staging CA while testing to avoid rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$ZEIM_DOMAIN:zeim.example.org} {
+	encode zstd gzip
+
+	# Largest legit upload is a 50 MB mesh (MAX_UPLOAD_EDIT) plus multipart overhead.
+	# Caddy rejects larger bodies with 413 before they reach the Python process.
+	request_body {
+		max_size 55MB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000" # add "; includeSubDomains; preload" only when sure
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Report-Only first: the UI loads three.js as a module from /static, uses blob:/data: previews and
+		# inline style attributes. Watch the browser console, then promote to Content-Security-Policy.
+		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# Slicing/meshing requests can take minutes (PrusaSlicer timeout is 600 s in app/services/slicer.py).
+	reverse_proxy app:8765 {
+		transport http {
+			response_header_timeout 660s
+			read_timeout 660s
+		}
+		health_uri /
+		health_interval 30s
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

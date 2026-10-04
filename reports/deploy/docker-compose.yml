@@ -1,0 +1,73 @@
+# PROPOSAL - single-VPS deployment (Option A in reports/operations.md).
+# Run from the repo root:
+#   cp .env.example .env && $EDITOR .env
+#   sudo install -d -o 10001 -g 10001 -m 750 /srv/zeim/data /srv/zeim/outputs
+#   docker compose -f reports/deploy/docker-compose.yml --env-file .env up -d --build
+name: zeim
+
+services:
+  app:
+    build:
+      context: ../..                       # repo root
+      dockerfile: reports/deploy/Dockerfile
+    image: zeim:latest
+    restart: unless-stopped
+    env_file: ../../.env
+    environment:
+      PHOTO3D_DATA: /data
+      PHOTO3D_OUT: /outputs
+    volumes:
+      - ${ZEIM_HOST_DIR:-/srv/zeim}/data:/data
+      - ${ZEIM_HOST_DIR:-/srv/zeim}/outputs:/outputs
+    expose:
+      - "8765"                             # internal only; NOT published to the host
+    # Hardening
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g                       # trimesh/matplotlib/PrusaSlicer scratch space
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Heavy jobs (meshing, hollow, slicing) must not take the whole VPS down. Tune after a load test.
+    mem_limit: 3g
+    cpus: 2.0
+    pids_limit: 512
+    healthcheck:                           # same as the Dockerfile; repeated so it is visible/tunable here
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"                      # HTTP/3
+    environment:
+      ZEIM_DOMAIN: ${ZEIM_DOMAIN:-zeim.example.org}
+      ACME_EMAIL: ${ACME_EMAIL:-ops@example.org}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                   # certificates - keep this volume or you will re-issue (rate limits)
+      - caddy_config:/config
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+volumes:
+  caddy_data:
+  caddy_config:
