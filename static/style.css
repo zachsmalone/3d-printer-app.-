@@ -1,5 +1,5 @@
 :root{--bg:#0e1117;--panel:#161b24;--panel2:#1c2330;--line:#2a3344;--txt:#e6eaf2;--mut:#8b97ad;--acc:#7c5cff;--acc2:#22d3ee;--ok:#34d399;--warn:#fbbf24;--bad:#f87171;--r:12px}
-*{box-sizing:border-box}html,body{height:100%}
+*{box-sizing:border-box}html{height:100%}body{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
 .topbar{display:flex;align-items:center;gap:16px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
 .brand{font-size:19px;letter-spacing:.2px}.brand b{color:var(--acc2)}.logo{color:var(--acc);margin-right:4px}.spacer{flex:1}
@@ -129,7 +129,7 @@ details.tool>summary{display:flex;justify-content:space-between}
 .empty{display:flex;flex-direction:column;gap:10px;align-items:flex-start;padding:12px 0}
 
 /* ---- phones and small tablets (T1): the top bar wraps, nothing scrolls sideways, targets >= 44px ---- */
-html,body{max-width:100%;overflow-x:hidden}
+html{max-width:100%;overflow-x:hidden}body{max-width:100%;overflow-x:clip} /* body must NOT be the scroller (overflow-x:hidden + height:100% made it one: iOS toolbar/overscroll and window.scrollY broke) */
 @media (max-width:768px){
   .topbar{flex-wrap:wrap;gap:8px 10px;padding:8px 12px}
   .topbar .spacer{display:none}
@@ -181,3 +181,36 @@ body[data-links="0"] #btnPrint { display: none; }
 .sw input[type=checkbox] { width: 24px; height: 24px; }
 .sw .state { font-weight: 700; margin-left: auto; }
 #dlgSend { max-width: 440px; }
+
+
+/* ---- IOS-2: touch targets >= 44px, inputs 16px (iOS zooms into smaller ones), safe areas, viewer vs page scroll ---- */
+@media (max-width:768px), (pointer:coarse) {
+  .brand{display:inline-flex;align-items:center}
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]),select,textarea{font-size:16px;min-height:44px}
+  button,.btn,.btn.small,.btn.ghost,summary,.seg button,.tabs button,.nav button,.x,.linkbtn,.oplist li,.hcard .row2 a,.hcard .row2 button,
+  .brand,.card,.bigtool,a.btn,[role=button],label.chk,#vtools .btn{min-height:44px;min-width:44px}
+  .btn.small,.hcard .row2 a,.hcard .row2 button{padding:10px 12px;font-size:14px}
+  summary{display:flex;align-items:center}
+  label.inl,.lesson li.st label,.sw{min-height:44px;align-items:center}
+  input[type=checkbox],input[type=radio]{width:24px;height:24px;margin:10px}
+  input[type=range]{height:44px;min-height:44px;margin:0}
+  .hcard .row2{gap:6px;flex-wrap:wrap}
+  .x{font-size:22px}
+  /* toasts go to the top, away from the home indicator and bottom bars */
+  #toasts{top:calc(8px + env(safe-area-inset-top));bottom:auto;left:12px;right:12px}
+  .toast{max-width:calc(100vw - 24px)}
+  dialog{max-height:calc(100dvh - 24px);overflow:auto}
+}
+/* safe areas (needs viewport-fit=cover): keep content out from under the notch / home bar in landscape and standalone mode */
+body{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
+.topbar{padding-top:calc(10px + env(safe-area-inset-top))}
+/* 3D viewer: dvh where "visible height" is meant; a 16px strip on each side lets a finger scroll the page, the middle still rotates */
+.viewer{height:min(58vh,560px);height:min(58dvh,560px)}
+@media (pointer:coarse), (max-width:768px) {
+  .viewer::before,.viewer::after{content:"";position:absolute;top:0;bottom:0;width:16px;z-index:3;touch-action:pan-y}
+  .viewer::before{left:0}.viewer::after{right:0}
+  .viewer .vtools{z-index:4}
+  .touch-hint{display:block}
+}
+@media (orientation:landscape) and (max-height:500px) { .viewer{height:calc(100dvh - 120px);min-height:240px} }
+.touch-hint{display:none;margin:6px 0 0;color:var(--mut);font-size:13px}

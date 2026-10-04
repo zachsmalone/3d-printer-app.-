@@ -59,3 +59,8 @@ def test_teacher_send_switch_dialog_and_teen_print_hidden():
         assert code == 0, out
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_ios2_touch_targets_16px_inputs_safe_area_and_viewer_does_not_trap_scroll(live):
+    code, out = run("ui_touch.py", live)
+    assert code == 0, out
