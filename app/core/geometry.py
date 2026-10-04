@@ -115,18 +115,23 @@ def heightfield_solid(top: np.ndarray, pitch: float, bottom: float = 0.0):
 
 
 def fix_checkers(mask: np.ndarray) -> np.ndarray:
-    """Fill diagonal-only contacts so the extruded mask is 2-manifold."""
+    """Fill diagonal-only contacts so the extruded mask is 2-manifold.
+
+    A 2x2 block with only one diagonal set (`a&d` or `b&c`) makes the extruded prisms touch along a single edge that
+    four faces share (non-manifold). We add one cell from the empty diagonal: the top-right cell `b` for the a/d case, the
+    top-left cell `a` for the b/c case (the old code filled `b` for both, which is already set in the b/c case, so that
+    contact was never repaired). Filling can create new contacts next door, so repeat until stable."""
     m = mask.copy()
-    for _ in range(64):
+    for _ in range(max(64, mask.shape[0] + mask.shape[1])):
         a, b = m[:-1, :-1], m[:-1, 1:]
         c, d = m[1:, :-1], m[1:, 1:]
         diag1 = a & d & ~b & ~c
         diag2 = b & c & ~a & ~d
         if not (diag1.any() or diag2.any()):
             break
-        # fill the top-right cell of each offending 2x2 block
         fill = np.zeros_like(m)
-        fill[:-1, 1:] |= diag1 | diag2
+        fill[:-1, 1:] |= diag1          # b
+        fill[:-1, :-1] |= diag2         # a
         m |= fill
     return m
 

@@ -16,6 +16,6 @@ SECTIONS = {
     "edit": "Edit",                 # upload + modify existing 3D files
     "history": "Recent builds",
 }
-SHOWCASE_TABS = {"trending": "Trending", "free": "Free", "foryou": "For You"}
+SHOWCASE_TABS = {"trending": "Trending", "free": "Newest", "foryou": "For You"}   # key "free" kept for stored data/API stability; everything is free anyway
 GROUP_NAME = "Build Plate"          # one hobbyist group
 GROUP_NAME_PLURAL = "Build Plates"  # hobbyist groups (not built yet - see ROADMAP)

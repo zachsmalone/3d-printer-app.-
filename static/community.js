@@ -71,16 +71,33 @@ function renderAccount() {
 const MODE_ICON = { lithophane: "🖼️", relief: "⛰️", popart: "🎨", edit: "✏️" };
 async function loadShowcase() {
   const q = $("#shSearch").value.trim();
+  $("#shClear").hidden = !q;
   let r;
   try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}`); } catch (e) { toast(e.message, "err"); return; }
-  $("#shNotice").textContent = r.hint || r.example_notice || "";
+  $("#shNotice").textContent = r.example_notice || "";
+  $("#shSub").textContent = r.subtitle || "";
+  $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
+  // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
   $("#shGrid").innerHTML = r.items.map(i => `<div class="pcard" data-item="${i.id}"><div class="ph">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
-    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("")
-    || `<p class="help">Nothing here yet.</p>`;
+    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}${i.liked_by_others ? " · ♥ liked" : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("");
+  if (!r.items.length) {
+    const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
+    $("#shGrid").innerHTML = `<div class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</div>`;
+  }
 }
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => x.classList.toggle("on", x === b)); loadShowcase(); };
 $("#shGrid").onclick = e => { const c = e.target.closest("[data-item]"); if (c) openItem(c.dataset.item); };
-let shTimer; $("#shSearch").oninput = () => { clearTimeout(shTimer); shTimer = setTimeout(loadShowcase, 300); };
+$("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };            // Search button, Enter and touch-keyboard "Go" all end up here
+$("#shClear").onclick = () => { $("#shSearch").value = ""; loadShowcase(); $("#shSearch").focus(); };
+$("#shSearch").oninput = () => { $("#shClear").hidden = !$("#shSearch").value; };
+$("#shGrid").addEventListener("click", e => {
+  const b = e.target.closest("[data-empty]"); if (!b) return;
+  const d = b.dataset.empty;
+  if (d === "clear") { $("#shClear").click(); }
+  else if (d === "trending" || d === "free") { $(`#shTabs [data-tab="${d}"]`)?.click(); }
+  else if (d === "mydata") { $("#btnMyData").click(); }
+  else if (d === "studio") { location.hash = "create"; }
+});
 
 async function openItem(id) {
   const i = await api("/api/showcase/" + id);
@@ -197,7 +214,7 @@ async function openTeacher() {
       <p class="help">Assign: ${ls.lessons.map(l => `<label class="inl"><input type="checkbox" data-as="${r.code}" value="${l.id}" ${r.assigned.includes(l.id) ? "checked" : ""}> ${esc(l.title)}</label>`).join(" ")}</p>
       <table class="studs"><tr><th>Student</th><th>Progress</th><th></th></tr>${r.students.map(s => `<tr><td>${esc(s.nickname)}</td><td>${s.lessons.map(x => `${x.completed ? "✅" : `${x.done_steps}/${x.steps}`}`).join(" · ")}</td><td><button class="btn small ghost" data-talk="${r.code}:${s.id}" title="${esc(r.canned.talk_next_class)}">🗨 Talk next class</button> <button class="btn small ghost" data-mu="${r.code}:${s.id}:${s.muted ? 0 : 1}">${s.muted ? "Unmute" : "Mute"}</button> <button class="btn small ghost danger" data-rs="${r.code}:${s.id}">Remove</button></td></tr>`).join("") || "<tr><td colspan=3 class='help'>No students yet</td></tr>"}</table>
       <h4>Student projects <small class="help">(private to this class)</small></h4>
-      ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No submissions yet.</p>"}
+      ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
       <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
   if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
   $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { toast(e.message, "err"); } };
@@ -222,7 +239,7 @@ async function submitToClass(code) {
 }
 async function openClassProjects(code) {
   const r = await api(`/api/classrooms/${code}/projects`);
-  $("#teacherBody").innerHTML = `<p class="help">Projects here are private to your class.</p>` + (r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.teacher)}: ${esc(f.comment)}</small>`).join("") || "<br><small class='help'>No feedback yet</small>"}</span></div>`).join("") || "<p class='help'>Nothing submitted yet.</p>");
+  $("#teacherBody").innerHTML = `<p class="help">Projects here are private to your class.</p>` + (r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.teacher)}: ${esc(f.comment)}</small>`).join("") || "<br><small class='help'>No feedback yet</small>"}</span></div>`).join("") || "<p class='help'>Nothing here yet. Check back soon.</p>");
   $("#dlgTeacher").querySelector("h3").textContent = "📝 Class projects & feedback"; $("#dlgTeacher").showModal();
 }
 

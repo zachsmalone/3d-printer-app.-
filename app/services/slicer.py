@@ -38,6 +38,26 @@ def status():
     return {"available": True, "path": p, "version": first[0] if first else ""}
 
 
+PLA_DENSITY = 1.24      # g/cm3 - PrusaSlicer's default profile has density 0, which made every weight "0.00 g"
+_STAT_PATTERNS = {
+    "print_time": r"^; estimated printing time \(normal mode\) = (.+)$",
+    "filament_mm": r"^; filament used \[mm\] = ([\d.]+)",
+    "filament_cm3": r"^; filament used \[cm3\] = ([\d.]+)",
+    "filament_g": r"^; total filament used \[g\] = ([\d.]+)",
+}
+
+
+def parse_stats(text: str) -> dict:
+    """Print time / filament from the G-code comments. PrusaSlicer 2.9 writes them BEFORE its big config block, so the
+    WHOLE file is searched (the old version only looked at the last 8 KB and found nothing)."""
+    stats = {}
+    for key, pat in _STAT_PATTERNS.items():
+        m = re.search(pat, text, re.M)
+        if m:
+            stats[key] = m.group(1).strip()
+    return stats
+
+
 def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
                 upright=False, supports=False, brim=0.0, bed=(250, 210)) -> dict:
     st = status()
@@ -54,7 +74,7 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
     gcode = outdir / "model.gcode"
     cmd = [st["path"], "--export-gcode", "--layer-height", str(layer_height),
            "--first-layer-height", str(max(layer_height, 0.2)),
-           "--fill-density", f"{int(fill_density)}%", "--center", f"{bed[0] / 2},{bed[1] / 2}",
+           "--fill-density", f"{int(fill_density)}%", "--filament-density", str(PLA_DENSITY), "--center", f"{bed[0] / 2},{bed[1] / 2}",
            "--bed-shape", f"0x0,{bed[0]}x0,{bed[0]}x{bed[1]},0x{bed[1]}",
            "--brim-width", str(brim), "-o", str(gcode), str(stl)]
     if supports:
@@ -67,18 +87,9 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
     if r.returncode != 0 or not gcode.exists():
         return {"available": True, "ok": False, "message": "slicer failed", "log": log[-2000:]}
     text = gcode.read_text(errors="ignore")
-    tail = text[-8000:]
-    stats = {}
-    for key, pat in {
-        "print_time": r"estimated printing time \(normal mode\) = (.+)",
-        "filament_mm": r"filament used \[mm\] = ([\d.]+)",
-        "filament_g": r"total filament used \[g\] = ([\d.]+)",
-        "filament_cm3": r"filament used \[cm3\] = ([\d.]+)",
-    }.items():
-        m = re.search(pat, tail)
-        if m:
-            stats[key] = m.group(1).strip()
+    stats = parse_stats(text)
     layers = len(re.findall(r"^;LAYER_CHANGE", text, re.M))
     return {"available": True, "ok": True, "gcode": "model.gcode", "layers": layers,
             "size_kb": round(gcode.stat().st_size / 1024), "stats": stats,
+            "stats_note": f"Estimates from the slicer using PLA ({PLA_DENSITY} g/cm³). Your filament, printer and settings will change them.",
             "slicer": st.get("version", ""), "log": log[-500:]}

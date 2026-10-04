@@ -76,7 +76,7 @@ function formData(autoDelete) {
 async function build(autoDelete = false) {
   if (!S.file) return;
   S.pending = null;
-  $("#busy").hidden = false; $("#btnBuild").disabled = true;
+  $("#busy").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true;   // no printing a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
     showBuild(r); S.history = r.history; renderHistory();
@@ -84,7 +84,7 @@ async function build(autoDelete = false) {
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); }
     else toast("Build failed: " + e.message, "err");
-  } finally { $("#busy").hidden = true; $("#btnBuild").disabled = false; }
+  } finally { $("#busy").hidden = true; $("#btnBuild").disabled = false; $("#btnPrint").disabled = false; }
 }
 $("#btnBuild").onclick = () => build(false);
 
@@ -150,11 +150,13 @@ $("#btnRetry").onclick = () => { $("#dlgFull").close(); (S.pending || build)(fal
 $("#btnAutoDel").onclick = () => { $("#dlgFull").close(); (S.pending || build)(true); };
 
 /* ---------- print dialog ---------- */
-let printInfo = null;
+let printInfo = null, printId = null, printLabel = "";
 const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
 async function openPrint() {
-  const id = S.current.id;
+  const id = S.current.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
   try { printInfo = await api(`/api/print/${id}/links`); } catch (e) { return toast(e.message, "err"); }
+  printId = id; printLabel = `${S.current.title || "build"} (${S.current.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[S.current.mode] || "Edit"})`;
+  $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
   $("#slicerBtns").innerHTML = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
     `<a class="btn ghost" href="${S.current.downloads["3mf"]}" download>…or download 3MF</a>`;
@@ -175,16 +177,21 @@ function fillPrinterSel() {
 $("#btnSlice").onclick = async () => {
   $("#sliceOut").textContent = "Slicing…";
   try {
-    const r = await api(`/api/slice/${S.current.id}`, { method: "POST", body: sliceOpts() });
+    const r = await api(`/api/slice/${printId}`, { method: "POST", body: sliceOpts() });
     if (!r.available) $("#sliceOut").textContent = r.message;
     else if (!r.ok) $("#sliceOut").textContent = "Slicer failed: " + (r.log || r.message);
-    else $("#sliceOut").innerHTML = `Done: ${r.layers} layers, ${r.stats.print_time || "?"}, ${r.stats.filament_g || "?"} g · <a href="${r.download}" download>download G-code</a>`;
+    else {
+      const t = r.stats.print_time, g = r.stats.filament_g;
+      const est = [t ? "about " + esc(t) : "", g ? "about " + Number(g).toFixed(1) + " g of filament" : ""].filter(Boolean).join(", ");
+      $("#sliceOut").innerHTML = `Done: ${r.layers} layers${est ? ", " + est : " (the slicer gave no time/filament estimate)"} · <a href="${r.download}" download>download G-code</a>` +
+        `<br><small>${esc(r.stats_note || "")}</small>`;
+    }
   } catch (e) { $("#sliceOut").textContent = e.message; }
 };
 $("#btnSend").onclick = async () => {
   const fd = sliceOpts(); fd.append("printer_id", $("#printerSel").value); fd.append("start", $("#startNow").checked);
   $("#sendOut").textContent = "Slicing and uploading…";
-  try { const r = await api(`/api/send/${S.current.id}`, { method: "POST", body: fd }); $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || r.log || "failed"); }
+  try { const r = await api(`/api/send/${printId}`, { method: "POST", body: fd }); $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || r.log || "failed"); }
   catch (e) { $("#sendOut").textContent = "✖ " + e.message; }
 };
 

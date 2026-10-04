@@ -122,3 +122,8 @@ details.tool>summary{display:flex;justify-content:space-between}
 .info-table{width:100%;font-size:12px;border-collapse:collapse}.info-table td{padding:3px 6px;border-top:1px solid var(--line)}.info-table td:first-child{color:var(--mut)}
 .note{background:#24305a;border-radius:8px;padding:6px 10px;margin-top:6px}
 .warn{color:var(--warn)}
+
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#shGo,#shClear{min-height:44px;min-width:44px}
+@media (max-width:600px){#shGo .lbl{display:none}}
+.empty{display:flex;flex-direction:column;gap:10px;align-items:flex-start;padding:12px 0}

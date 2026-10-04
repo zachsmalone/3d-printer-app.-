@@ -182,6 +182,7 @@
   <header><h3>🖨 Print this build</h3><button class="x" data-close>✕</button></header>
   <div class="body">
     <h4>Open in your slicer</h4>
+    <p class="help"><b id="printWhich"></b></p>
     <p class="help" id="printHint"></p>
     <div class="slicers" id="slicerBtns"></div>
     <hr>
@@ -242,8 +243,10 @@
 
 <main class="page" id="viewShowcase" hidden>
   <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Family-friendly community projects. Everything is free to download.</p></div>
-    <div class="row"><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px"><button class="btn" id="btnMyData">🔒 My data</button></div></div>
+    <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><span aria-hidden="true">🔍</span> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
   <div class="seg" id="shTabs"></div>
+  <p class="help" id="shSub"></p>
+  <p class="help" id="shCount" role="status" aria-live="polite"></p>
   <p class="help" id="shNotice"></p>
   <div class="grid" id="shGrid"></div>
 </main>

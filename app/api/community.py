@@ -157,11 +157,26 @@ def showcase(tab: str = "trending", q: str = "", actor: Actor = Depends(get_acto
     if q:
         personalization.record_search(actor.sid, q, catalog.known_tags(actor))
     items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {})
-    out = {"tab": tab, "items": [catalog.public(i, actor) for i in items],
-           "example_notice": "Items marked EXAMPLE are placeholder seed data, not real creator content. Everything here is free."}
+    out = {"tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
+           "subtitle": "Newest projects first." if tab == "free" else "",
+           "example_notice": "Examples help you see how ZEIM looks. They are not made by real people."}
     if tab == "foryou" and not out["items"]:
         out["hint"] = ("Personalization is off." if not prefs["enabled"] else
                        "Search or open projects to teach For You what you like. Data stays on this server and you can clear it any time.")
+    if not items:
+        quiet = actor.is_teen or classrooms.is_student(actor.sid)       # no "share one" nudge for teens or class students
+        if q:
+            out["empty"] = {"text": f'No projects match "{q}". Try a shorter word like "relief" or "lamp", or look in Trending.',
+                            "action": {"label": "Clear search", "do": "clear"}}
+        elif quiet:
+            out["empty"] = {"text": "Nothing here yet. Check back soon.", "action": None}
+        elif tab == "foryou" and not prefs["enabled"]:
+            out["empty"] = {"text": "For You is off. You can turn it on under My data.", "action": {"label": "Open My data", "do": "mydata"}}
+        elif tab == "foryou":
+            out["empty"] = {"text": "For You fills up as you look around. Search for something or open a few projects, and ideas will show up here.",
+                            "action": {"label": "Look at Trending", "do": "trending"}}
+        else:
+            out["empty"] = {"text": "No projects here yet. Be the first to share one when you are ready.", "action": {"label": "Go to Studio", "do": "studio"}}
     return out
 
 

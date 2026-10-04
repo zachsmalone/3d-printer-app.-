@@ -9,6 +9,7 @@ import secrets
 import shutil
 from datetime import datetime, timezone
 
+from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor
 from . import privacy
@@ -55,8 +56,10 @@ def _all() -> list[dict]:
         # base = example seed numbers (or legacy counters); plus ONE per distinct visitor session
         i["_likers"] = eng["likes"].get(i["id"], [])
         i["_dlers"] = eng["downloads"].get(i["id"], [])
-        i["_likes"] = int(i.get("likes", 0)) + len(i["_likers"])
-        i["_downloads"] = int(i.get("downloads", 0)) + len(i["_dlers"])
+        # EXAMPLE seed items carry invented numbers: they never take part in ranking (and are not shown) unless the flag says so
+        seed_ok = not i.get("example") or config.SHOW_COUNTS_FOR_EXAMPLES
+        i["_likes"] = (int(i.get("likes", 0)) if seed_ok else 0) + len(i["_likers"])
+        i["_downloads"] = (int(i.get("downloads", 0)) if seed_ok else 0) + len(i["_dlers"])
     return items
 
 
@@ -91,17 +94,30 @@ def _visible(actor: Actor, users: dict):
     return lambda i: (not i["hidden"]) and privacy.can_view(actor, i.get("owner_sid"), i.get("visibility", "private"), users)
 
 
+def counts_visible(i: dict, users: dict) -> bool:
+    """May like/download numbers for this item be shown to people? (Examples: only if the flag says so; minors: not by default.)"""
+    if not is_public(i, users):
+        return False
+    if i.get("example") and not config.SHOW_COUNTS_FOR_EXAMPLES:
+        return False
+    owner_u = users.get(i.get("owner_sid")) if i.get("owner_sid") else None
+    return not (config.HIDE_COUNTS_FOR_MINORS and privacy.is_minor(owner_u))
+
+
 def public(i: dict, actor: Actor) -> dict:
     following = bool(actor.user and i["creator_id"] in actor.user.get("following", []))
     users = USERS.read()
     tu = next((u for u in users.values() if u["id"] == i["creator_id"]), None)
     pub = is_public(i, users)
-    return {"likes": i.get("_likes", 0) if pub else None, "liked": bool(pub and actor.sid in i.get("_likers", [])),
+    show_counts = counts_visible(i, users)
+    return {"likes": i.get("_likes", 0) if show_counts else None, "liked": bool(pub and actor.sid in i.get("_likers", [])),
+            "liked_by_others": bool(pub and i.get("owner_sid") == actor.sid and i.get("_likes", 0) > 0),
+            "counts_hidden": bool(pub and not show_counts),
             "can_like": bool(pub and i.get("owner_sid") != actor.sid),
             "visibility": privacy.effective(i.get("visibility", "private"), users.get(i.get("owner_sid"))) if i.get("owner_sid") else "public",
             "can_follow": privacy.can_follow(actor, tu, bool(i.get("example"))),"id": i["id"], "title": i["title"], "creator": i["creator"], "creator_id": i["creator_id"],
             "example": i.get("example", False), "tags": i["tags"], "mode": i["mode"],
-            "downloads": i.get("_downloads", 0) if pub else None, "description": i["description"], "created": i["created"],
+            "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],
             "owned": bool(i.get("owner_sid") and i["owner_sid"] == actor.sid), "following_creator": following,
             "share_url": f"/p/{i['id']}",
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
@@ -132,7 +148,9 @@ def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None)
         return sorted(items, key=lambda i: i["created"], reverse=True)
     users = USERS.read()   # Trending: public projects only, ranked by likes + downloads with recency decay
     now = datetime.now(timezone.utc)
-    return sorted([i for i in items if is_public(i, users)], key=lambda i: -trending_score(i, now))
+    # score ties (e.g. examples without counts, brand-new projects) fall back to newest first
+    pubs = sorted([i for i in items if is_public(i, users)], key=lambda i: i["created"], reverse=True)
+    return sorted(pubs, key=lambda i: -trending_score(i, now))
 
 
 def known_tags(actor: Actor) -> set[str]:
@@ -244,6 +262,8 @@ def set_like(i: dict, actor: Actor, liked: bool | None = None) -> dict:
         if not want and actor.sid in lst:
             lst.remove(actor.sid)
         res["liked"] = actor.sid in lst
-        res["likes"] = int(i.get("likes", 0)) + len(lst)
+        res["likes"] = (int(i.get("likes", 0)) if (not i.get("example") or config.SHOW_COUNTS_FOR_EXAMPLES) else 0) + len(lst)
     ENGAGEMENT.update(f)
+    if not counts_visible(i, USERS.read()):
+        res["likes"] = None
     return res
