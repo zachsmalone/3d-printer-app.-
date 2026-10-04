@@ -1,0 +1,42 @@
+# PROPOSAL (Ren / DevOps) - not active until a remote with GitHub Actions exists.
+# Runs the two fast, browser-free test modules on every push / PR.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"   # matches the project's .venv (3.13.x) and the planned Docker image
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      # requirements.txt is currently unpinned; once Engineering pins it, caching becomes reliable.
+      # playwright (requirements-dev.txt) is intentionally NOT installed: tests/ui_*.py are not run here.
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      # Optional: tests/test_app.py has one slicer test that skips when no slicer CLI is present.
+      # Uncomment to exercise it (adds ~1 min and a large apt download):
+      # - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends prusa-slicer
+
+      - name: Run tests
+        run: pytest tests/test_app.py tests/test_features.py -q
