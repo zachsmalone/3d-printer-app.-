@@ -29,6 +29,25 @@ LEVELS = ("private", "followers", "public")
 SOCIAL = ("on", "off")
 
 
+def is_minor(user: dict | None) -> bool:
+    """Under ADULT_AGE (13-17 for anyone who could sign up). Computed live from the stored date of birth."""
+    if not user or not user.get("dob"):
+        return False
+    from .identity import age_of
+    return age_of(user) < config.ADULT_AGE
+
+
+def clamp_for_minor(level: str) -> str:
+    """The most open level a 13-17 account is allowed right now (launch posture: private only)."""
+    if level == "public":
+        if config.TEEN_PUBLIC_ENABLED:
+            return "public"
+        level = "followers"
+    if level == "followers" and not config.TEEN_FOLLOWERS_ENABLED:
+        return "private"
+    return level
+
+
 def defaults_for(user: dict | None, teen: bool) -> dict:
     return {"profile": "private" if teen else "public", "social": "on", "default_visibility": "private"}
 
@@ -39,7 +58,11 @@ def of(user: dict | None) -> dict:
     if user and user.get("dob"):
         from .identity import age_of
         teen = age_of(user) < config.ADULT_AGE
-    return {**defaults_for(user, teen), **((user or {}).get("privacy") or {})}
+    out = {**defaults_for(user, teen), **((user or {}).get("privacy") or {})}
+    if teen:      # stored values from before the teen rules existed (or from a looser flag setting) can never be looser than allowed now
+        out["profile"] = clamp_for_minor(out["profile"])
+        out["default_visibility"] = clamp_for_minor(out["default_visibility"])
+    return out
 
 
 def social_on(user: dict | None) -> bool:
@@ -49,6 +72,8 @@ def social_on(user: dict | None) -> bool:
 def effective(visibility: str | None, owner_user: dict | None) -> str:
     """'followers' collapses to 'private' when the owner has opted out of following / has no account."""
     v = visibility if visibility in LEVELS else "private"
+    if is_minor(owner_user):
+        v = clamp_for_minor(v)
     if v == "followers" and not social_on(owner_user):
         return "private"
     return v
@@ -83,6 +108,8 @@ def can_follow(actor: Actor, target_user: dict | None, target_is_example=False) 
         return False
     if target_is_example:
         return True
+    if is_minor(target_user) and not config.TEEN_FOLLOWERS_ENABLED:      # nobody follows a teen at launch (adults or teens)
+        return False
     return (bool(target_user) and social_on(target_user) and of(target_user)["profile"] != "private"
             and target_user["id"] != actor.user["id"])
 
@@ -91,6 +118,9 @@ def check_level(actor: Actor, level: str) -> str:
     """Validate a visibility a user asks for. Raises ValueError/PermissionError with a friendly message."""
     if level not in LEVELS:
         raise ValueError(f"visibility must be one of {list(LEVELS)}")
+    if level != "private" and actor.is_teen and clamp_for_minor(level) != level:
+        raise PermissionError("Accounts under 18 keep their projects Private for now. "
+                              "Your work is still saved and you can download it any time.")
     if level != "private":
         if not actor.user:
             raise PermissionError("Create an account to share with followers or the public. Without one everything stays private.")
@@ -103,8 +133,8 @@ def default_level(actor: Actor) -> str:
     if not actor.user:
         return "private"
     d = of(actor.user)["default_visibility"]
-    if d == "public" and actor.is_teen:
-        return "private"
+    if actor.is_teen:
+        d = clamp_for_minor(d)
     return d if d in LEVELS and not (d == "followers" and not social_on(actor.user)) else "private"
 
 
@@ -116,6 +146,8 @@ def set_privacy(actor: Actor, body: dict) -> dict:
     if "profile" in body:
         if body["profile"] not in LEVELS:
             raise ValueError("profile must be public | followers | private")
+        if actor.is_teen and clamp_for_minor(body["profile"]) != body["profile"]:
+            raise PermissionError("Accounts under 18 keep their profile Private for now.")
         new["profile"] = body["profile"]
     if "social" in body:
         if body["social"] not in SOCIAL:
@@ -124,8 +156,8 @@ def set_privacy(actor: Actor, body: dict) -> dict:
     if "default_visibility" in body:
         if body["default_visibility"] not in LEVELS:
             raise ValueError("default_visibility must be private | followers | public")
-        if body["default_visibility"] == "public" and actor.is_teen:
-            raise PermissionError("Accounts under 18 can't default to Public; choose Public per project instead.")
+        if actor.is_teen and clamp_for_minor(body["default_visibility"]) != body["default_visibility"]:
+            raise PermissionError("Accounts under 18 keep their projects Private for now.")
         new["default_visibility"] = body["default_visibility"]
     if new["social"] == "off":
         if new["profile"] == "followers":
@@ -147,8 +179,49 @@ def set_privacy(actor: Actor, body: dict) -> dict:
 
 
 def followers_of(uid: str) -> list[dict]:
+    """Followers who are adults (a teen's name is never listed on someone else's follower list)."""
     return [{"id": u["id"], "display_name": u["display_name"]} for u in USERS.read().values()
-            if uid in u.get("following", []) and social_on(u)]
+            if uid in u.get("following", []) and social_on(u) and not is_minor(u)]
+
+
+def migrate_minors() -> dict:
+    """One-time/idempotent: make existing 13-17 data match the current teen posture (runs at startup).
+    Rewrites stored profile/default/project/build visibility down to what is allowed, and removes follows of teens."""
+    from .. import config as cfg
+    from .store import LISTINGS
+    changed = {"users": 0, "projects": 0, "builds": 0, "follows": 0}
+    users = USERS.read()
+    minors = {sid for sid, u in users.items() if is_minor(u)}
+    minor_ids = {users[s]["id"] for s in minors}
+
+    def fu(d):
+        for sid, u in d.items():
+            pv = u.get("privacy")
+            if sid in minors and pv:
+                for k in ("profile", "default_visibility"):
+                    if pv.get(k) and clamp_for_minor(pv[k]) != pv[k]:
+                        pv[k] = clamp_for_minor(pv[k]); changed["users"] += 1
+            if not cfg.TEEN_FOLLOWERS_ENABLED:
+                keep = [x for x in u.get("following", []) if x not in minor_ids]
+                if len(keep) != len(u.get("following", [])):
+                    changed["follows"] += len(u["following"]) - len(keep); u["following"] = keep
+    USERS.update(fu)
+
+    def fl(items):
+        for i in items:
+            if i.get("owner_sid") in minors and clamp_for_minor(i.get("visibility", "private")) != i.get("visibility", "private"):
+                i["visibility"] = clamp_for_minor(i["visibility"]); changed["projects"] += 1
+    LISTINGS.update(fl)
+    try:
+        for m in cfg.OUT.glob("*/meta.json"):
+            import json
+            meta = json.loads(m.read_text())
+            if meta.get("owner_sid") in minors and clamp_for_minor(meta.get("visibility", "private")) != meta.get("visibility", "private"):
+                meta["visibility"] = clamp_for_minor(meta["visibility"])
+                m.write_text(json.dumps(meta, indent=1, default=str)); changed["builds"] += 1
+    except Exception:
+        pass
+    return changed
 
 
 # ---- signed, expiring file links (so a slicer on the owner's PC can fetch a PRIVATE build without cookies) ----

@@ -12,6 +12,12 @@ app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3")
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages):
     app.include_router(r)
+try:
+    from .community import privacy as _privacy
+    _privacy.migrate_minors()          # existing 13-17 data -> current teen posture (idempotent)
+except Exception:                      # never block start-up on a migration problem
+    import logging
+    logging.getLogger("zeim").exception("minor data migration failed")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

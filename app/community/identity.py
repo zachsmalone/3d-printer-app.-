@@ -105,5 +105,5 @@ def user_by_id(uid: str):
 
 
 def follower_count(uid: str) -> int:
-    from .privacy import social_on
-    return sum(1 for u in USERS.read().values() if uid in u.get("following", []) and social_on(u))
+    from .privacy import is_minor, social_on
+    return sum(1 for u in USERS.read().values() if uid in u.get("following", []) and social_on(u) and not is_minor(u))

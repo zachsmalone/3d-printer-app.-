@@ -49,7 +49,9 @@ LIKES_REQUIRE_ACCOUNT = _flag("PHOTO3D_LIKES_REQUIRE_ACCOUNT", False)
 LIKE_LIMIT_PER_HOUR = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR", 30)        # per browser session
 LIKE_LIMIT_PER_HOUR_IP = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR_IP", 300)  # per network address (a whole school may share one)
 SHOW_COUNTS_FOR_EXAMPLES = _flag("PHOTO3D_SHOW_COUNTS_FOR_EXAMPLES", False)   # invented numbers on EXAMPLE items
-TEEN_PUBLIC_ENABLED = _flag("PHOTO3D_TEEN_PUBLIC_ENABLED", False)    # accounts 13-17 may publish Public
+TEEN_PUBLIC_ENABLED = _flag("PHOTO3D_TEEN_PUBLIC_ENABLED", False)    # accounts 13-17 may choose Public (items, profile)
+TEEN_FOLLOWERS_ENABLED = _flag("PHOTO3D_TEEN_FOLLOWERS_ENABLED", False)  # 13-17: Followers-only items/profile, and being followed.
+                                                                    # With both teen flags off (launch posture) teens are PRIVATE ONLY.
 HIDE_COUNTS_FOR_MINORS = _flag("PHOTO3D_HIDE_COUNTS_FOR_MINORS", True)  # no like/download numbers on under-18 creators' items
 
 # ---- Education CR-5 ----

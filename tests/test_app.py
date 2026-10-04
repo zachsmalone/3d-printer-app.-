@@ -117,7 +117,9 @@ def test_accounts_not_configured():
     assert c.get("/api/accounts/reddit/connect", follow_redirects=False).status_code == 409
 
 
-def test_community_flow():
+def test_community_flow(monkeypatch):
+    from app import config
+    monkeypatch.setattr(config, "TEEN_PUBLIC_ENABLED", True)   # launch default is OFF (tests/test_b1_teen_posture.py); this flow exercises the Showcase with the flag reopened
     clear()
     cl = TestClient(app)                                  # fresh browser session
     bid = cl.post("/api/generate", files={"file": ("s.png", open(SAMPLE, "rb"), "image/png")},
