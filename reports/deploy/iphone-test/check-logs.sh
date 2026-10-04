@@ -35,6 +35,7 @@ for f in app.log caddy-access.log caddy-runtime.log caddy-stdout.log cloudflared
 done
 redacted=$(count "$RUN/logs/caddy-access.log" '/f/REDACTED/')
 echo "Caddy access-log lines with a redacted signed link: $redacted"
+echo "App-log lines with a redacted signed link (app/main.py RedactTokens): $(count "$RUN/logs/app.log" '/f/\[redacted\]')"
 if [ -d "$RUN/data" ]; then
   n=$(grep -rIlE '[0-9]{9,}-[0-9a-f]{32}' "$RUN/data" 2>/dev/null | wc -l)
   echo "Data-folder files containing a token-shaped string: $n"
