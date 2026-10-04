@@ -84,7 +84,7 @@ def room_qr(code: str, request: Request, actor: Actor = Depends(get_actor)):
         raise HTTPException(404)
     if role != "teacher":
         raise HTTPException(404)
-    base = settings.load().get("public_base_url") or str(request.base_url).rstrip("/")
+    base = settings.base_url(request)
     return Response(classrooms.qr_svg(base, room["code"]), media_type="image/svg+xml")
 
 

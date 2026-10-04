@@ -8,14 +8,14 @@ from ..services import handoff, printers, settings, slicer
 from ..services.history import store
 from ..community import privacy
 from ..community.identity import Actor, get_actor
+from . import guards
 from .builds import load_model, meta_for
 
 router = APIRouter(prefix="/api")
 files_router = APIRouter()
 
 
-def base_url(request: Request) -> str:
-    return settings.load().get("public_base_url") or str(request.base_url).rstrip("/")
+base_url = settings.base_url
 
 
 FILE_NAMES = ("model.stl", "model.obj", "model.3mf", "thumb.png", "model.gcode")
@@ -55,7 +55,7 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
     s = settings.load()
     return {"base_url": base_url(request), "default_slicer": s["default_slicer"],
             "slicers": handoff.links(base_url(request), bid, privacy.make_token(bid)),
-            "printers": settings.public(s)["printers"], "printer_types": printers.TYPES,
+            "printers": settings.public(s, redact=not guards.can_see_printer_urls(request, actor))["printers"], "printer_types": printers.TYPES,
             "builtin_slicer": slicer.status(),
             "hint": "Deep links need the slicer installed on the SAME computer as your browser, and the "
                     "file URL must be reachable from it (set 'Public base URL' in Settings if the server "
@@ -85,9 +85,10 @@ def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float
 
 
 @router.post("/send/{bid}")
-def send_to_printer(bid: str, actor: Actor = Depends(get_actor), printer_id: str = Form(...), start: bool = Form(False),
+def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor), printer_id: str = Form(...), start: bool = Form(False),
                     layer_height: float = Form(0.2), fill_density: int = Form(15),
                     upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0)):
+    guards.require_send(request, actor)
     meta_for(bid, actor, owner_only=True)
     pr = settings.get_printer(printer_id)
     if not pr:

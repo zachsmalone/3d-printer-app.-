@@ -21,6 +21,8 @@ async def ensure_session_cookie(request: Request, call_next):
     ownership checks always see a stable identity."""
     from .community.identity import COOKIE
     import secrets
+    if request.url.path == "/healthz":          # health probes must not mint sessions
+        return await call_next(request)
     sid = request.cookies.get(COOKIE)
     new = None
     if not sid or len(sid) < 16:
@@ -33,6 +35,12 @@ async def ensure_session_cookie(request: Request, call_next):
     if new:
         resp.set_cookie(COOKIE, new, max_age=3600 * 24 * 365, httponly=True, samesite="lax")
     return resp
+
+
+@app.get("/healthz", include_in_schema=False)
+def healthz():
+    """Liveness probe for containers / uptime monitors: no auth, no cookies, no user data."""
+    return {"status": "ok"}
 
 
 @app.get("/")

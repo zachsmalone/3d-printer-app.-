@@ -104,6 +104,11 @@ def join(sid: str, code: str, nickname: str, password: str = "") -> dict:
     return out
 
 
+def is_student(sid: str) -> bool:
+    """True if this browser session is a member (student) of any classroom."""
+    return any(sid in room["students"] for room in CLASSROOMS.read().values())
+
+
 def student_view(sid: str):
     for room in CLASSROOMS.read().values():
         if sid in room["students"]:
