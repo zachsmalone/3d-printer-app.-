@@ -33,7 +33,6 @@ NICK = re.compile(r"^[A-Za-z0-9 _-]{2,20}$")
 CDIR = DATA / "classroom_projects"
 CDIR.mkdir(exist_ok=True)
 MAX_FEEDBACK = 500
-_FAILS: dict = {}          # (sid, code) -> [timestamps]  (in-memory join-guess limiter)
 
 
 def _code():
@@ -57,12 +56,13 @@ def _verify(pw: str, stored: str) -> bool:
 def create(actor: Actor, name: str, password: str = "") -> dict:
     if not actor.user or not actor.is_adult:
         raise PermissionError("Only adult accounts can create a classroom.")
-    name = (name or "").strip()[:60]
+    if not isinstance(name, str) or len(name) > 60:
+        raise ValueError("Class name must be text of at most 60 characters.")
+    name = name.strip()
     if not name:
         raise ValueError("classroom name required")
     safety.filter_only(name, "Class name")
-    if not (4 <= len(password or "") <= 40):
-        raise ValueError("Set a join password of 4-40 characters for your class.")
+    check_new_password(password)
     code = _code()
     room = {"code": code, "name": name, "teacher_sid": actor.sid, "teacher": actor.user["display_name"],
             "teacher_uid": actor.user["id"], "pw": _hash(password),
@@ -72,35 +72,92 @@ def create(actor: Actor, name: str, password: str = "") -> dict:
     return {"code": code, "name": name, "join_path": f"/#join/{code}"}
 
 
-def join(sid: str, code: str, nickname: str, password: str = "") -> dict:
-    code = (code or "").strip().upper()
-    nick = (nickname or "").strip()
+MIN_PASSWORD, MAX_PASSWORD = 8, 64
+_WEAK = {"password", "12345678", "123456789", "1234567890", "11111111", "00000000", "qwertyui", "qwerty123", "abcdefgh",
+         "password1", "letmein1", "iloveyou", "student1", "classroom", "teacher1", "12341234"}
+
+
+def check_new_password(password):
+    """Class join passwords: 8-64 characters, not an obvious one. (Guessing is also rate-limited per class and address.)"""
+    if not isinstance(password, str) or not (MIN_PASSWORD <= len(password) <= MAX_PASSWORD):
+        raise ValueError(f"Set a join password of {MIN_PASSWORD}-{MAX_PASSWORD} characters for your class "
+                         "(a few words with a number, like plum-otter-42, works well).")
+    if password.lower() in _WEAK or len(set(password)) < 4:
+        raise ValueError("That password is too easy to guess. Try a few words with a number, like plum-otter-42.")
+
+
+# ---- join-guess limiter: keyed by class code + network address (NOT by cookie: clearing cookies must not reset it) ----
+_LOCKS: dict = {}       # (code, ip) -> (locked_until, strikes)
+JOIN_FAILS, JOIN_WINDOW = 5, 600           # 5 wrong passwords in 10 min -> lockout for this address on this class
+JOIN_IP_FAILS = 20                         # ...or 20 wrong guesses from one address across ALL classes in 10 min
+LOCK_BASE, LOCK_MAX = 300, 24 * 3600       # lockout 5 min, doubling on each repeat, at most 24 h
+_DUMMY_HASH = None
+
+
+def _locked_for(code: str, ip: str) -> float:
+    until, _ = _LOCKS.get((code, ip), (0, 0))
+    return max(0.0, until - time.time())
+
+
+def _note_fail(code: str, ip: str):
+    from ..core import ratelimit
+    ratelimit.hit(f"joinfail:{code}:{ip}", 10 ** 6, JOIN_WINDOW)
+    ratelimit.hit(f"joinfail-ip:{ip}", 10 ** 6, JOIN_WINDOW)
+    ratelimit.hit(f"joinfail-code:{code}", 10 ** 6, 3600)       # only used to tell the teacher how many wrong tries there were
+    if (ratelimit.count(f"joinfail:{code}:{ip}", JOIN_WINDOW) >= JOIN_FAILS
+            or ratelimit.count(f"joinfail-ip:{ip}", JOIN_WINDOW) >= JOIN_IP_FAILS):
+        _, strikes = _LOCKS.get((code, ip), (0, 0))
+        _LOCKS[(code, ip)] = (time.time() + min(LOCK_MAX, LOCK_BASE * 2 ** strikes), strikes + 1)
+        ratelimit.clear(f"joinfail:{code}:{ip}")
+        if len(_LOCKS) > 20000:
+            for k in [k for k, v in _LOCKS.items() if v[0] < time.time()][:5000]:
+                _LOCKS.pop(k, None)
+
+
+def recent_failed_joins(code: str) -> int:
+    from ..core import ratelimit
+    return ratelimit.count(f"joinfail-code:{code}", 3600)
+
+
+def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", seat_code: str = "") -> dict:
+    global _DUMMY_HASH
+    if not all(isinstance(x, str) for x in (code or "", nickname or "", password or "", seat_code or "")):
+        raise ValueError("Join details must be text.")
+    code, nickname, password, seat_code = code or "", nickname or "", password or "", seat_code or ""
+    if len(code) > 12 or len(nickname) > 60 or len(password) > MAX_PASSWORD or len(seat_code) > 20:
+        raise ValueError("Nickname must be 2-20 letters/numbers. Do NOT use your real full name.")
+    code = code.strip().upper()
+    nick = nickname.strip()
     if not NICK.match(nick):
         raise ValueError("Nickname must be 2-20 letters/numbers. Do NOT use your real full name.")
     safety.filter_only(nick, "Nickname")
-    now = time.time()
-    fails = [t for t in _FAILS.get((sid, code), []) if now - t < 600]
-    if len(fails) >= 5:
-        raise PermissionError("Too many wrong passwords. Wait a few minutes and ask your teacher.")
+    wait = _locked_for(code, ip)
+    if wait > 0:
+        raise PermissionError(f"Too many wrong passwords from this network. Try again in {int(wait // 60) + 1} minutes, or ask your teacher.")
+    # Check the password OUTSIDE the store lock (scrypt is slow), against a dummy hash for unknown classes (same timing/answer).
+    room0 = CLASSROOMS.read().get(code)
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = _hash("not-a-real-password")
+    ok = _verify(password, room0["pw"] if room0 else _DUMMY_HASH) and room0 is not None
+    if not ok:
+        _note_fail(code, ip)
+        raise KeyError(code)               # same answer for "no such class" and "wrong password"
     out = {}
 
     def f(d):
         room = d.get(code)
-        if not room or not _verify(password or "", room["pw"]):
-            fails.append(now)
-            _FAILS[(sid, code)] = fails
-            raise KeyError(code)               # same answer for "no such class" and "wrong password"
-        if sid not in room["students"]:
-            if len(room["students"]) >= 60:
-                raise ValueError("classroom is full")
-            if any(s["nickname"].lower() == nick.lower() for s in room["students"].values()):
-                raise ValueError("That nickname is taken in this class - pick another.")
+        if not room:
+            raise KeyError(code)
+        others = [s["nickname"].lower() for k, s in room["students"].items() if k != sid]
+        if sid not in room["students"] and len(room["students"]) >= 60:
+            raise ValueError("classroom is full")
+        if nick.lower() in others:
+            raise ValueError("That nickname is taken in this class - pick another.")
         prev = room["students"].get(sid, {})
         room["students"][sid] = {"nickname": nick, "joined": prev.get("joined") or datetime.now(timezone.utc).isoformat(),
                                  "muted": prev.get("muted", False)}
         out.update(name=room["name"], code=code, assigned=room["assigned"], teacher=room["teacher"])
     CLASSROOMS.update(f)
-    _FAILS.pop((sid, code), None)
     return out
 
 
@@ -140,7 +197,8 @@ def teacher_rooms(actor: Actor) -> list[dict]:
         out.append({"code": r["code"], "name": r["name"], "assigned": r["assigned"], "students": studs,
                     "join_path": f"/#join/{r['code']}", "projects": [project_public(p, r) for p in r["projects"]],
                     "notifications": [n for n in r["notifications"] if n["to"] == "teacher" and not n["read"]],
-                    "canned": {k: safety.CANNED[k] for k in safety.TEACHER_CANNED}})
+                    "canned": {k: safety.CANNED[k] for k in safety.TEACHER_CANNED},
+                    "failed_joins_last_hour": recent_failed_joins(r["code"])})
     return out
 
 
@@ -263,6 +321,8 @@ def add_feedback(actor: Actor, code: str, pid: str, comment: str) -> dict:
     role, room = membership(actor, code)
     if role != "teacher":
         raise PermissionError("Only the teacher can give feedback.")
+    if not isinstance(comment, str) or len(comment) > 4 * MAX_FEEDBACK:
+        raise ValueError(f"Keep feedback under {MAX_FEEDBACK} characters.")
     comment = (comment or "").strip()
     if not comment:
         raise ValueError("Write a comment.")

@@ -10,7 +10,7 @@ from PIL import Image
 from app import config
 from app.main import app
 from app.community import classrooms, moderation
-from app.core import ratelimit
+from app.core import ratelimit  # noqa
 from tests.make_sample import make
 
 SAMPLE = make(_tmp + "/s3.png")
@@ -58,3 +58,7 @@ def jpeg_with_gps():
     b = io.BytesIO(); im.save(b, "JPEG", exif=ex); return b.getvalue()
 
 
+
+
+def box_stl():
+    return trimesh.creation.box([10, 10, 10]).export(file_type="stl")

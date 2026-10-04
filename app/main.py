@@ -22,6 +22,22 @@ app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
 @app.middleware("http")
+async def limit_json_body(request: Request, call_next):
+    """JSON endpoints never need big bodies; refuse them before they are parsed (uploads use multipart and have their own caps)."""
+    from fastapi.responses import JSONResponse
+    from .api.textcap import MAX_JSON_BODY
+    ct = request.headers.get("content-type", "")
+    if ct.startswith("application/json"):
+        try:
+            n = int(request.headers.get("content-length", "0") or 0)
+        except ValueError:
+            n = 0
+        if n > MAX_JSON_BODY:
+            return JSONResponse(status_code=413, content={"detail": "Request too large."})
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def ensure_session_cookie(request: Request, call_next):
     """Give every visitor a session id on their FIRST request (even if that request fails), so rate limits and
     ownership checks always see a stable identity."""

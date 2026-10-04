@@ -38,7 +38,8 @@ TEACHER_CANNED = ["talk_next_class", "thanks"]
 STUDENT_CANNED = ["talk_next_class", "need_help", "finished", "thanks"]
 
 _LEET = {"0": "o", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "9": "g", "@": "a", "$": "s", "!": "i", "|": "i", "+": "t"}
-_EMAIL = re.compile(r"[\w.+-]+\s*(@|\(at\)|\[at\])\s*[\w-]+\s*(\.|\(dot\)|\[dot\])\s*\w{2,}", re.I)
+MAX_SCAN_CHARS = 2000      # nothing longer is ever scanned (callers cap their own fields much lower); longer = refused
+_EMAIL = re.compile(r"[\w.+-]{1,64}\s{0,3}(@|\(at\)|\[at\])\s{0,3}[\w-]{1,63}\s{0,3}(\.|\(dot\)|\[dot\])\s{0,3}\w{2,}", re.I)
 _PHONE = re.compile(r"(\+?\d[\d\s().-]{8,}\d)")
 _URL = re.compile(r"(https?://|www\.|\b[\w-]+\.(com|net|org|io|gg|me|ly|tv|app|dev)\b)", re.I)
 _HANDLE = re.compile(r"\b(snap(chat)?|insta(gram)?|discord|tiktok|whatsapp|kik|telegram)\b.{0,12}[:@ ]\s*[\w.]{3,}", re.I)
@@ -225,6 +226,8 @@ def scan_contact(text: str) -> str | None:
 
 
 def scan(text: str) -> str | None:
+    if len(text or "") > MAX_SCAN_CHARS:
+        return "too_long"
     return scan_language(text) or scan_contact(text)
 
 
@@ -232,6 +235,8 @@ def check(text: str, context: str = "") -> str:
     """Return the cleaned text, or raise ChatBlocked(422) with the user-facing message. Nothing is stored/sent on a block."""
     text = (text or "").strip()
     r = scan(text)
+    if r == "too_long":
+        raise ChatBlocked(413, {"code": "too_long", "message": "That text is too long. Please make it shorter.", "context": context})
     if r:
         msg = BLOCK_MESSAGE if r == "language" else CONTACT_MESSAGE
         raise ChatBlocked(422, {"code": "language_blocked" if r == "language" else "contact_blocked",

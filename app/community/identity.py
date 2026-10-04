@@ -53,7 +53,45 @@ def get_actor(request: Request, response: Response) -> Actor:
     return Actor(sid, USERS.read().get(sid))
 
 
+AGE_COOKIE = "p3d_ag"
+AGE_MESSAGE = ("We can't create an account for you right now. If you're learning with a class, ask your teacher for "
+               "the class code and password - you don't need an account for that.")
+
+
+def _blk(sid: str) -> str:
+    import hashlib
+    return hashlib.sha256(("age:" + sid).encode()).hexdigest()[:24]
+
+
+def age_locked(sid: str, marker_cookie: str | None = None) -> bool:
+    """True if this browser session (or this browser's marker cookie) got a "can't sign up" result recently."""
+    import time
+    from .store import AGE_BLOCKS
+    until = AGE_BLOCKS.read().get(_blk(sid), 0)
+    if until > time.time():
+        return True
+    try:
+        return bool(marker_cookie) and float(marker_cookie) > time.time()
+    except ValueError:
+        return False
+
+
+def lock_age(sid: str) -> float:
+    import time
+    from .store import AGE_BLOCKS
+    until = time.time() + config.AGE_LOCK_HOURS * 3600
+
+    def f(d):
+        now = time.time()
+        for k in [k for k, v in d.items() if v < now]:      # forget expired locks
+            del d[k]
+        d[_blk(sid)] = until
+    AGE_BLOCKS.update(f)
+    return until
+
+
 def signup(actor: Actor, display_name: str, dob: str) -> dict:
+    """Nothing about the date of birth is stored unless every check passes."""
     if actor.user:
         raise ValueError("account already exists for this browser")
     try:
@@ -63,8 +101,7 @@ def signup(actor: Actor, display_name: str, dob: str) -> dict:
     if d > datetime.now(timezone.utc).date() or d.year < 1900:
         raise ValueError("invalid date of birth")
     if age_of({"dob": dob}) < config.MIN_SIGNUP_AGE:
-        raise PermissionError(f"Accounts need age {config.MIN_SIGNUP_AGE}+. Younger learners can use the "
-                              "education center with a classroom code from their teacher - no account needed.")
+        raise PermissionError(AGE_MESSAGE)           # neutral: never states the age limit
     name = (display_name or "").strip()[:40]
     if not name:
         raise ValueError("display name required")

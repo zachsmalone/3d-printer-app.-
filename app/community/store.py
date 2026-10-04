@@ -43,3 +43,4 @@ MODERATION = JsonFile("moderation.json", {"hidden": [], "reports": []})
 CLASSROOMS = JsonFile("classrooms.json", {})  # code -> classroom
 PROGRESS = JsonFile("education_progress.json", {})
 ENGAGEMENT = JsonFile("engagement.json", {"likes": {}, "downloads": {}})   # item id -> [visitor sids] (one each)
+AGE_BLOCKS = JsonFile("age_blocks.json", {})   # sha256(sid)[:24] -> unix time the lock ends (no DOB, no age is ever stored here)

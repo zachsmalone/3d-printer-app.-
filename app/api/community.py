@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 
 import trimesh
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
@@ -12,6 +12,8 @@ from ..community import catalog, classrooms, links, moderation, personalization,
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS
+from ..core import ratelimit
+from .textcap import ip as _ip, text_in
 
 router = APIRouter(prefix="/api")
 
@@ -23,8 +25,7 @@ def D(e: catalog.Denied):
 @router.get("/config")
 def get_config():
     return {"product": branding.PRODUCT_NAME, "tagline": branding.TAGLINE, "sections": branding.SECTIONS,
-            "showcase_tabs": branding.SHOWCASE_TABS, "min_signup_age": config.MIN_SIGNUP_AGE,
-            "max_builds": config.MAX_BUILDS, "group_name": branding.GROUP_NAME,
+            "showcase_tabs": branding.SHOWCASE_TABS, "max_builds": config.MAX_BUILDS, "group_name": branding.GROUP_NAME,
             "group_name_plural": branding.GROUP_NAME_PLURAL, "chat_block_message": safety.BLOCK_MESSAGE}
 
 
@@ -34,13 +35,27 @@ def me(actor: Actor = Depends(get_actor)):
     return idn.public_profile(actor)
 
 
+def _age_refusal(actor: Actor, lock: bool):
+    """Same neutral answer for 'too young' and 'already refused': no threshold, no hint that retrying differs."""
+    until = idn.lock_age(actor.sid) if lock else None
+    r = JSONResponse(status_code=403, content={"detail": idn.AGE_MESSAGE})
+    if until:
+        r.set_cookie(idn.AGE_COOKIE, str(until), max_age=config.AGE_LOCK_HOURS * 3600, httponly=True, samesite="lax")
+    return r
+
+
 @router.post("/me/signup")
-def signup(body: dict, actor: Actor = Depends(get_actor)):
+def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    if not ratelimit.hit("signup:" + _ip(request), config.SIGNUP_ATTEMPTS_PER_HOUR_IP, 3600):
+        raise HTTPException(429, "Too many tries from this network. Please wait a while.")
+    if not actor.user and idn.age_locked(actor.sid, request.cookies.get(idn.AGE_COOKIE)):
+        return _age_refusal(actor, lock=False)
     try:
-        safety.filter_only(body.get("display_name", ""), "Display name")
-        idn.signup(actor, body.get("display_name", ""), body.get("dob", ""))
-    except PermissionError as e:
-        raise HTTPException(403, str(e))
+        name = text_in(body.get("display_name", ""), 40, "Display name")
+        safety.filter_only(name, "Display name")
+        idn.signup(actor, name, str(body.get("dob", ""))[:12])
+    except PermissionError:
+        return _age_refusal(actor, lock=True)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return idn.public_profile(Actor(actor.sid, USERS.read()[actor.sid]))
@@ -53,7 +68,7 @@ def set_links(body: dict, actor: Actor = Depends(get_actor)):
         raise HTTPException(401, "sign up first")
     try:
         cleaned = links.clean(body)
-    except ValueError as e:
+    except (ValueError, AttributeError) as e:
         raise HTTPException(400, str(e))
     USERS.update(lambda d: d[actor.sid].__setitem__("links", cleaned))
     return {"links": cleaned}
@@ -163,13 +178,21 @@ def showcase_item(iid: str, actor: Actor = Depends(get_actor)):
 @router.post("/showcase")
 def publish(body: dict, actor: Actor = Depends(get_actor)):
     try:
-        for fld in ("title", "description"):
-            body[fld] = safety.gate(actor, str(body.get(fld) or ""), "showcase:" + fld)
-        body["tags"] = [safety.gate(actor, str(t), "showcase:tag") for t in (body.get("tags") or [])][:8]
+        title = text_in(body.get("title"), 80, "Title")
+        desc = text_in(body.get("description"), 500, "Description")
+        raw_tags = body.get("tags") or []
+        if not isinstance(raw_tags, list) or len(raw_tags) > 20:
+            raise ValueError("Use at most 8 tags.")
+        tags = [text_in(t, 30, "Each tag") for t in raw_tags][:8]
+        body["title"] = safety.gate(actor, title, "showcase:title")
+        body["description"] = safety.gate(actor, desc, "showcase:description")
+        body["tags"] = [safety.gate(actor, t, "showcase:tag") for t in tags]
         i = catalog.create_project(actor, title=body.get("title"), description=body.get("description", ""),
-                                   tags=body.get("tags") or [], build_id=str(body.get("build_id", "")),
+                                   tags=body.get("tags") or [], build_id=str(body.get("build_id", ""))[:40],
                                    accept_guidelines=bool(body.get("accept_guidelines")),
                                    visibility=body.get("visibility"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:
         return JSONResponse(status_code=e.status, content=e.payload)
     except catalog.Denied as e:
@@ -233,7 +256,7 @@ def item_file(iid: str, name: str, actor: Actor = Depends(get_actor)):
 def report(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     try:
         catalog.get(iid, actor)
-        return moderation.report(iid, actor.sid, body.get("reason", ""), body.get("details", ""))
+        return moderation.report(iid, actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"))
     except catalog.Denied as e:
         raise D(e)
     except ValueError as e:

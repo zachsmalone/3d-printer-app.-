@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from .. import branding
 from ..community import catalog, classrooms, education, moderation, privacy, safety
 from ..services import settings
+from .textcap import ip as ip_of
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 
@@ -89,9 +90,10 @@ def room_qr(code: str, request: Request, actor: Actor = Depends(get_actor)):
 
 
 @router.post("/classrooms/join")
-def join_room(body: dict, actor: Actor = Depends(get_actor)):
+def join_room(request: Request, body: dict, actor: Actor = Depends(get_actor)):
     try:
-        return classrooms.join(actor.sid, body.get("code", ""), body.get("nickname", ""), body.get("password", ""))
+        return classrooms.join(actor.sid, body.get("code", ""), body.get("nickname", ""), body.get("password", ""),
+                               ip=ip_of(request), seat_code=body.get("seat_code", ""))
     except KeyError:
         raise HTTPException(404, "Wrong class code or password")
     except PermissionError as e:

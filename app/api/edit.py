@@ -6,13 +6,14 @@ import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
-from ..community import privacy
+from ..community import privacy, safety
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
 from ..core import autotune, exporters, geometry, meshedit
 from ..services import editproj
 from ..services.history import HistoryFull, store
-from .builds import load_model, meta_for, summary
+from .builds import _safe_title, load_model, meta_for, summary
+from .textcap import text_in
 
 router = APIRouter(prefix="/api/edit")
 
@@ -49,6 +50,12 @@ def new_project(
     width_mm: float = Form(100.0),
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
+    try:
+        title = text_in(title, 80, "Title")
+        if title:
+            safety.filter_only(title, "Title")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     if units not in meshedit.UNIT_MM:
         raise HTTPException(400, f"units must be one of {list(meshedit.UNIT_MM)}")
     warnings: list[str] = []
@@ -109,7 +116,7 @@ def new_project(
             warnings.append(f"Photo converted to a {photo_mode} base mesh; edit it like any other model.")
         else:
             raise HTTPException(415, "Unsupported file type. Upload .stl, .obj or .3mf (or a .png/.jpg photo).")
-        title = title or name.rsplit(".", 1)[0]
+        title = title or _safe_title(name.rsplit(".", 1)[0][:80])
     else:
         raise HTTPException(400, "Choose a file to upload or a build to edit.")
 

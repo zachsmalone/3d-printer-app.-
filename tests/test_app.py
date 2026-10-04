@@ -125,7 +125,7 @@ def test_community_flow(monkeypatch):
     bid = cl.post("/api/generate", files={"file": ("s.png", open(SAMPLE, "rb"), "image/png")},
                   data={"mode": "lithophane", "width_mm": "60", "resolution": "50"}).json()["id"]
     assert cl.get("/api/me").json()["signed_up"] is False
-    assert cl.post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"}).status_code == 403   # under 13
+    assert TestClient(app).post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"}).status_code == 403   # under 13 (own cookie: the age lock is per browser session now, see test_b1_safety_high.py)
     assert cl.post("/api/me/signup", json={"display_name": "Teen", "dob": "2011-01-01"}).status_code == 200
     me = cl.get("/api/me").json(); assert me["age_group"] == "teen" and not me["restrictions"]["dm_from_strangers"]
     cl.put("/api/me/links", json={"tiktok": "teen.maker"})

@@ -62,3 +62,7 @@ REPORT_LIMIT_PER_MIN = _int("PHOTO3D_REPORT_LIMIT_PER_MIN", 10)      # per brows
 REPORT_LIMIT_PER_MIN_IP = _int("PHOTO3D_REPORT_LIMIT_PER_MIN_IP", 60)
 RECOVERY_FAIL_LIMIT = _int("PHOTO3D_RECOVERY_FAIL_LIMIT", 5)         # wrong recovery codes per 10 min (session and address)
 SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
+
+# ---- age gate (Safety S-04) ----
+AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry
+SIGNUP_ATTEMPTS_PER_HOUR_IP = _int("PHOTO3D_SIGNUP_ATTEMPTS_PER_HOUR_IP", 30)

@@ -325,8 +325,8 @@ def test_showcase_visibility_everywhere():
 
 
 def test_lesson_pages_leak_no_user_data():
-    t = client(ADULT); room = t.post("/api/classrooms", json={"name": "Hidden Class", "password": "sesame1"}).json()
-    s = client(); s.post("/api/classrooms/join", json={"code": room["code"], "nickname": "Quietkid", "password": "sesame1"})
+    t = client(ADULT); room = t.post("/api/classrooms", json={"name": "Hidden Class", "password": "sesame-12"}).json()
+    s = client(); s.post("/api/classrooms/join", json={"code": room["code"], "nickname": "Quietkid", "password": "sesame-12"})
     html = client().get("/l/lithophanes").text
     assert "Quietkid" not in html and "Hidden Class" not in html and room["code"] not in html
 
@@ -480,8 +480,8 @@ def test_wordlist_files_are_editable_and_attributed(tmp_path, monkeypatch):
 def test_blocked_language_is_refused_everywhere_no_strikes():
     msg = "Chat doesn't allow that language. Please use appropriate language."
     t = client(ADULT); s = client()
-    room = t.post("/api/classrooms", json={"name": "Lang", "password": "pass-99"}).json(); code = room["code"]
-    s.post("/api/classrooms/join", json={"code": code, "nickname": "Kid9", "password": "pass-99"})
+    room = t.post("/api/classrooms", json={"name": "Lang", "password": "pass-9999"}).json(); code = room["code"]
+    s.post("/api/classrooms/join", json={"code": code, "nickname": "Kid9", "password": "pass-9999"})
     clear(s); p = s.post(f"/api/classrooms/{code}/projects", json={"build_id": photo_build(s)}).json()
     for _ in range(5):                                       # repeated blocks never escalate: no strikes, no bans
         r = t.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "this is sh1t"})
@@ -489,10 +489,10 @@ def test_blocked_language_is_refused_everywhere_no_strikes():
     assert t.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "Great work!"}).status_code == 200
     assert len(s.get(f"/api/classrooms/{code}/projects").json()["projects"][0]["feedback"]) == 1        # blocked ones were never stored
     assert t.get("/api/me/safety").status_code == 404 and not hasattr(safety, "record_strike")
-    r = s.post("/api/classrooms/join", json={"code": code, "nickname": "fuck 123", "password": "pass-99"}); assert r.status_code == 400 and msg in r.text
+    r = s.post("/api/classrooms/join", json={"code": code, "nickname": "fuck 123", "password": "pass-9999"}); assert r.status_code == 400 and msg in r.text
     assert client().post("/api/me/signup", json={"display_name": "shithead", "dob": "1990-01-01"}).status_code == 400
     o = client(ADULT); clear(o); b = photo_build(o)
     r = publish(o, b, title="fuck lamp"); assert r.status_code == 422 and r.json()["message"] == msg
     r = publish(o, b, description="visit www.spam.com"); assert r.status_code == 422
     assert publish(o, b, title="Lovely lamp").status_code == 200
-    assert t.post("/api/classrooms", json={"name": "shit class", "password": "abcdef"}).status_code == 400
+    assert t.post("/api/classrooms", json={"name": "shit class", "password": "plum-otter-42"}).status_code == 400

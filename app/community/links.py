@@ -17,6 +17,10 @@ def clean(links: dict) -> dict:
     for k, v in (links or {}).items():
         if k not in TEMPLATES:
             raise ValueError(f"unknown platform {k}")
+        if not isinstance(v, str) and v is not None:
+            raise ValueError(f"{TEMPLATES[k][0]} handle must be text")
+        if v and len(v) > 100:
+            raise ValueError(f"{TEMPLATES[k][0]} handle is too long (2-30 chars)")
         h = (v or "").strip().lstrip("@")
         if not h:
             continue

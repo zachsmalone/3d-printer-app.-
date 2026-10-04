@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image
 
-from ..community import privacy
+from ..community import privacy, safety
+from .textcap import text_in
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS, MAX_UPLOAD, PREVIEW_RES
 from ..core import autotune, exporters, geometry
@@ -80,6 +81,11 @@ def meta_for(bid: str, actor: Actor, owner_only: bool = False) -> dict:
     if owner_only or not privacy.can_view(actor, meta.get("owner_sid"), meta.get("visibility", "private")):
         raise HTTPException(404, "unknown build")
     return meta
+
+
+def _safe_title(derived: str) -> str:
+    """A title made from the uploaded file's name: replaced by 'Untitled' if the name itself would not pass the language gate."""
+    return derived if derived and not safety.scan(derived) else "Untitled"
 
 
 @router.get("/builds")
@@ -163,6 +169,12 @@ def generate(
 ):
     if mode not in ("lithophane", "relief", "popart"):
         raise HTTPException(400, f"unknown mode {mode}")
+    try:
+        title = text_in(title, 80, "Title")
+        if title:
+            safety.filter_only(title, "Title")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     data = file.file.read(MAX_UPLOAD + 1)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
@@ -212,7 +224,7 @@ def generate(
         Image.fromarray(model.thumb).save(d / "thumb.png")
         stats = mesh_stats(model)
         meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
-                "title": title.strip() or (file.filename or "Untitled").rsplit(".", 1)[0][:40],
+                "title": title.strip() or _safe_title((file.filename or "Untitled").rsplit(".", 1)[0][:40]),
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor)}
         store.save(meta)

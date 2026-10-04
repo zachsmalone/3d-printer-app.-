@@ -39,7 +39,7 @@ addEventListener("hashchange", route);
 $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
 function renderAccount() {
   if (!ME.signed_up) {
-    $("#accBody").innerHTML = `<p class="help">An account lets you share projects and follow creators. You must be <b>${CFG.min_signup_age}+</b>. Younger learners don't need one — join a class in the ${esc(CFG.sections.learn)}.</p>
+    $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Learning with a class? You don't need an account — ask your teacher for the class code and join in the ${esc(CFG.sections.learn)}.</p>
       <div class="field"><label>Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label>Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
       <button class="btn primary" id="su_go">Create account</button>`;
@@ -52,8 +52,9 @@ function renderAccount() {
     $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> <span class="pill">${ME.age_group}</span></p>
       <p class="help">Public page: <a href="/u/${ME.id}" target="_blank">/u/${ME.id}</a> (only if your profile is visible to the viewer)</p>
       <h4>🔒 Privacy</h4>
-      <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
-      <div class="field"><label>Default for new builds &amp; projects</label><select id="pv_def">${[["private", "Private — only me"], ["followers", "Followers only"], ["public", "Public"]].map(([v, t]) => `<option value="${v}" ${pv.default_visibility === v ? "selected" : ""} ${v === "public" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""} ${v !== "private" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Default for new builds &amp; projects</label><select id="pv_def">${[["private", "Private — only me"], ["followers", "Followers only"], ["public", "Public"]].map(([v, t]) => `<option value="${v}" ${pv.default_visibility === v ? "selected" : ""} ${v !== "private" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
+      ${ME.age_group === "teen" ? '<p class="help">For now, accounts under 18 keep everything <b>Private</b>. You can still make, edit and download your projects.</p>' : ""}
       <label class="inl"><input type="checkbox" id="pv_social" ${pv.social === "on" ? "checked" : ""}> Allow following (I can follow others and others can follow me)</label>
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
       <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button></div>
