@@ -50,3 +50,7 @@ What per-student data existed: ticked **steps per lesson** (no timestamps, no "c
 
 ### Known gaps after Batch B
 Public profile page still shows an adult's display name; moderators see display names; no email field/verification; `confirm()` still used for delete-class actions; no sign-out button exists in the app (the Teacher fallback is tested by dropping the session cookie); all phone/screen-reader/printer/Creality Cloud/Shapr3D behaviour is untested on real hardware.
+
+### Batch B merge
+Full suite on `haruto/work` at `9e2bf24` (clean tree): **518 passed, 0 failed** (11 min 13 s, finished about 10:45 PM CT, Oct 4 2026). The run before it found one stale source-check test (`test_b1_hq.py::test_examples_ui_shows_no_numbers_when_null`, grepping for the old like markup); updated in `9e2bf24`. Merged into main as `daeba01` (no conflicts; code identical to `9e2bf24`). Report files in main untouched apart from this log; `reports/originals_progress.md` had someone else's uncommitted edit and was left as it was.
+Still untested: real iPhone/iPad Safari (camera, share sheet, Creality Cloud, Shapr3D, Mail), real screen readers, real printers (pretend printer only), real teachers and children, axe in WebKit, 200% zoom. The dev server on port 8765 in this tree has to be restarted before it runs the new Python (that is not my call to make).
