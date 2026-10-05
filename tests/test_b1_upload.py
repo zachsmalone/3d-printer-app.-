@@ -81,10 +81,10 @@ def test_exif_rotation_is_applied_before_metadata_is_dropped():
 
 
 def test_unreadable_oversized_and_huge_images_get_clear_messages_fast():
+    big = io.BytesIO(); Image.new("RGB", (12000, 12000), (200, 10, 10)).save(big, "PNG")          # 144 MP, tiny file (the B-14 case); made BEFORE the clock starts (making it takes ~4 s)
     c = client(); t0 = time.time()
     for name, data in (("a.jpg", b"not an image at all"), ("b.png", b""), ("c.jpg", b"\x89PNG\r\n\x1a\n" + b"0" * 50), ("d.txt", b"hello")):
         r = gen(c, name=name, data=data, ctype="image/jpeg"); assert r.status_code == 400 and r.json()["detail"] == UNREADABLE, (name, r.text)
-    big = io.BytesIO(); Image.new("RGB", (12000, 12000), (200, 10, 10)).save(big, "PNG")          # 144 MP, tiny file (the B-14 case)
     r = gen(c, name="huge.png", data=big.getvalue()); assert r.status_code == 400 and "very large" in r.json()["detail"]
     assert time.time() - t0 < 5
     wide = io.BytesIO(); Image.new("RGB", (6000, 3000), (10, 120, 200)).save(wide, "PNG")
