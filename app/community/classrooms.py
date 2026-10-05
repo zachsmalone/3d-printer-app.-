@@ -23,6 +23,7 @@ import shutil
 import time
 from datetime import datetime, timezone
 
+from ..core import ratelimit
 from ..config import DATA
 from . import education, safety
 from .identity import Actor
@@ -155,6 +156,9 @@ def recent_failed_joins(code: str) -> int:
     return ratelimit.count(f"joinfail-code:{code}", 3600)
 
 
+LOCKED_CHECK_S = 30        # while an address is in slow mode, one password check per this many seconds per (class, address)
+
+
 def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", seat_code: str = "") -> dict:
     global _DUMMY_HASH
     if not all(isinstance(x, str) for x in (code or "", nickname or "", password or "", seat_code or "")):
@@ -170,7 +174,10 @@ def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", 
     room0 = CLASSROOMS.read().get(code)
     wait = _locked_for(code, ip)
     if wait > 0 and not (room0 and sid in room0["students"]):          # a student already in this class is never slowed down
-        raise PermissionError(f"Lots of wrong passwords were tried from this network. Please wait {int(wait) + 1} seconds and try again, or ask your teacher.")
+        # Slow mode (Edge 5): guesses from a busy address are throttled to one check per LOCKED_CHECK_S, but the CORRECT password still gets in,
+        # so one child's wrong tries never lock the rest of a school out.
+        if not ratelimit.hit(f"lockedjoin:{code}:{ip}", 1, LOCKED_CHECK_S):
+            raise PermissionError(f"Lots of wrong passwords were tried from this network. Please wait {int(min(wait, LOCKED_CHECK_S)) + 1} seconds and try again, or ask your teacher.")
     # Check the password OUTSIDE the store lock (scrypt is slow), against a dummy hash for unknown classes (same timing/answer).
     if _DUMMY_HASH is None:
         _DUMMY_HASH = _hash("not-a-real-password")
@@ -520,6 +527,8 @@ def submit_project(actor: Actor, code: str, build_dir, title: str) -> dict:
     d.mkdir(parents=True)
     for n in ("model.stl", "model.3mf", "thumb.png"):
         shutil.copy(build_dir / n, d / n)
+    from ..services.history import store as _bs
+    _bs.set_saved(build_dir.name)
     p = {"id": pid, "student_sid": actor.sid, "nickname": room["students"][actor.sid]["nickname"], "title": title,
          "created": datetime.now(timezone.utc).isoformat(), "feedback": []}
     CLASSROOMS.update(lambda dd: dd[room["code"]]["projects"].append(p))
@@ -566,6 +575,21 @@ def add_feedback(actor: Actor, code: str, pid: str, comment: str) -> dict:
         out.update(project_public(pr, d[room["code"]]))
     CLASSROOMS.update(f)
     return out
+
+
+def feedback_preview(item_id: str) -> dict | None:
+    """What a moderator needs to see for a reported feedback comment ('fb:<code>:<project>:<comment>')."""
+    try:
+        _, code, pid, fid = item_id.split(":")
+    except ValueError:
+        return None
+    room = CLASSROOMS.read().get(code)
+    for p in (room or {}).get("projects", []):
+        if p["id"] == pid:
+            for fb in p["feedback"]:
+                if fb["id"] == fid:
+                    return {"kind": "class feedback", "title": p["title"], "text": fb["comment"], "class": code, "hidden": bool(fb.get("hidden"))}
+    return None
 
 
 def hide_feedback(item_id: str):

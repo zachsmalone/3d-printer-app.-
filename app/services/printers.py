@@ -25,12 +25,12 @@ TYPES = [
      "hint": "URL like http://octopi.local ; API key from OctoPrint > Settings > API"},
     {"type": "moonraker", "label": "Moonraker (Klipper / Mainsail / Fluidd)", "implemented": True,
      "hint": "URL like http://printer.local:7125 ; API key only if auth is enabled"},
-    {"type": "prusalink", "label": "PrusaLink (stub)", "implemented": False,
-     "hint": "Not implemented yet - use the slicer hand-off or download G-code"},
-    {"type": "bambu", "label": "Bambu Lab LAN (stub)", "implemented": False,
-     "hint": "Needs MQTT+FTPS with access code - not implemented yet"},
-    {"type": "duet", "label": "Duet / RepRapFirmware (stub)", "implemented": False, "hint": "Not implemented yet"},
-    {"type": "repetier", "label": "Repetier-Server (stub)", "implemented": False, "hint": "Not implemented yet"},
+    {"type": "prusalink", "label": "PrusaLink (Coming soon)", "implemented": False,
+     "hint": "Coming soon. For now use the slicer hand-off or download the G-code."},
+    {"type": "bambu", "label": "Bambu Lab LAN (Coming soon)", "implemented": False,
+     "hint": "Coming soon. (It will need the printer's LAN access code.)"},
+    {"type": "duet", "label": "Duet / RepRapFirmware (Coming soon)", "implemented": False, "hint": "Coming soon."},
+    {"type": "repetier", "label": "Repetier-Server (Coming soon)", "implemented": False, "hint": "Coming soon."},
 ]
 IMPLEMENTED = {t["type"] for t in TYPES if t["implemented"]}
 

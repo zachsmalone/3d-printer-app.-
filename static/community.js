@@ -1,4 +1,4 @@
-import { S, api, toast, $, $$, esc, MODE_LABEL, ago } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago } from "/static/app.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -12,6 +12,7 @@ async function init() {
   $("#shTabs").innerHTML = Object.entries(CFG.showcase_tabs).map(([k, v]) => `<button data-tab="${k}" class="${k === shTab ? "on" : ""}">${esc(v)}</button>`).join("");
   await refreshMe();
   route();
+  window.__zeimStarted = true;                 // static/boot.js shows a visible error if this never happens
 }
 async function refreshMe() {
   ME = await api("/api/me");
@@ -43,15 +44,30 @@ function renderAccount() {
   if (!ME.signed_up) {
     $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Learning with a class? You don't need an account — ask your teacher for the class code and join in the ${esc(CFG.sections.learn)}.</p>
       <div class="field"><label>Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
+      <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
       <div class="field"><label>Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
       <button class="btn primary" id="su_go">Create account</button>`;
     $("#su_go").onclick = async () => {
-      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value })); await refreshMe(); renderAccount(); toast("Account created", "ok"); }
-      catch (e) { toast(e.message, "err"); }
+      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim() })); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
+      catch (e) {
+        if (e.status === 403 && /^We can't create an account/.test(e.message)) {     // the neutral age refusal: a calm panel instead of an unchanged form
+          $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still join a class with a code from your teacher.</p><button class="btn primary" id="suJoin">Join a class</button></div>`;
+          $("#suJoin").onclick = () => { $("#dlgAccount").close(); $("#dlgJoin").showModal(); };
+          $("#accBody .calm").focus();
+        } else inlineMsg($("#su_go"), e.message);
+      }
     };
   } else {
     const r = ME.restrictions, pv = ME.privacy;
+    const nextUn = ME.username_next_change ? new Date(ME.username_next_change).toLocaleDateString() : null;
     $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> <span class="pill">${ME.age_group}</span></p>
+      <h4>Your username</h4>
+      <p>Credit for what you share goes to <b id="un_now">@${esc(ME.username || "")}</b>. Your email is never shown to anyone.</p>
+      <div class="field"><label for="un_new">New username</label><input id="un_new" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" ${nextUn ? "disabled" : ""}>
+        <small class="help" id="un_help">${nextUn ? "You can change your username again on " + esc(nextUn) + "." : "3 to 20 letters, numbers or underscores. You can change it once every 90 days. The old name stays saved for you, so nobody else can take it. Please don't use your real name."}</small></div>
+      <div class="row"><button class="btn small" id="un_save" ${nextUn ? "disabled" : ""}>Change username</button><button class="btn small ghost" id="un_suggest" ${nextUn ? "disabled" : ""}>Suggest names</button></div>
+      <div class="row" id="un_sugg"></div>
       <p class="help">Public page: <a href="/u/${ME.id}" target="_blank">/u/${ME.id}</a> (only if your profile is visible to the viewer)</p>
       <h4>🔒 Privacy</h4>
       <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""} ${v !== "private" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
@@ -60,10 +76,19 @@ function renderAccount() {
       <label class="inl"><input type="checkbox" id="pv_social" ${pv.social === "on" ? "checked" : ""}> Allow following (I can follow others and others can follow me)</label>
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
       <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button></div>
-      <ul class="help"><li>Direct messages from strangers: <b>off</b> (free-text messaging isn't built)</li>
+      <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li>
       <li>Classroom tools: <b>${r.can_create_classroom ? "available" : "adults only"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>`;
+    $("#un_save").onclick = async () => {
+      try { const r = await api("/api/me/username", J("PUT", { username: $("#un_new").value.trim() })); await refreshMe(); renderAccount(); toast("Your username is now @" + r.username, "ok"); }
+      catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
+    };
+    $("#un_suggest").onclick = async () => {
+      try { const r = await api("/api/me/username/suggest", J("POST", {})); $("#un_sugg").innerHTML = r.suggestions.map(n => `<button class="btn small ghost" data-un="${esc(n)}">${esc(n)}</button>`).join("");
+        $("#un_sugg").querySelectorAll("[data-un]").forEach(b => b.onclick = () => { $("#un_new").value = b.dataset.un; $("#un_new").focus(); }); }
+      catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
+    };
     $("#pv_save").onclick = async () => { try { await api("/api/me/privacy", J("PUT", { profile: $("#pv_profile").value, default_visibility: $("#pv_def").value, social: $("#pv_social").checked ? "on" : "off" })); await refreshMe(); renderAccount(); toast("Privacy saved", "ok"); } catch (e) { toast(e.message, "err"); } };
     $("#pv_followers").onclick = async () => { const f = await api("/api/me/followers"); toast(!f.enabled ? "Following is off, so there are no followers." : f.followers.length ? "Followers: " + f.followers.map(x => x.display_name).join(", ") : "No followers yet."); };
   }
@@ -81,7 +106,7 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
   $("#shGrid").innerHTML = r.items.map(i => `<div class="pcard" data-item="${i.id}"><div class="ph">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
-    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}${i.liked_by_others ? " · ♥ liked" : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("");
+    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}${i.liked_by_others ? " · ♥ liked" : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("");
   if (!r.items.length) {
     const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
     $("#shGrid").innerHTML = `<div class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</div>`;
@@ -107,23 +132,32 @@ async function openItem(id) {
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
     ${i.thumb ? `<img src="${i.thumb}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
-    <p class="help">by <a href="/u/${i.creator_id}" target="_blank">${esc(i.creator)}</a> · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
+    <p class="help">by <a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a> · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
+    ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
-    <div class="row">${i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
+    <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
       ${i.likes != null ? `<button class="btn ${i.liked ? "primary" : ""}" id="itLike" ${i.can_like ? "" : "disabled"} title="${i.can_like ? "Like this model" : "You can't like your own model"}">♥ ${i.liked ? "Liked" : "Like"} · ${i.likes}</button>` : ""}
-      ${i.can_follow ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
+      ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
-      <button class="btn ghost danger" id="itReport">⚑ Report</button></div>
-    <p class="help">Likes and downloads are counted once per visitor and only for public projects. Follow is scaffolding — a feed of followed creators isn't built yet.</p>`;
+      ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}</div>
+    <p class="help">Likes and downloads are counted once per visitor and only for public projects. A feed of the creators you follow: <b>Coming soon</b>.</p>`;
   if ($("#itLike")) $("#itLike").onclick = async () => { try { await api(`/api/showcase/${id}/like`, J("POST", {})); openItem(id); loadShowcase(); } catch (e) { toast(e.message, "err"); } };
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
-  $("#itReport").onclick = async () => {
-    const reason = prompt("Report reason: minor_safety, not_family_friendly, copyright, harassment, personal_info, other", "not_family_friendly");
-    if (!reason) return;
-    try { const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details: prompt("Details (optional)") || "" })); toast(r.auto_hidden ? "Reported — hidden pending review. Thank you." : "Report received. Thank you.", "ok"); if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); } }
-    catch (e) { toast(e.message, "err"); }
+  if ($("#itReport")) $("#itReport").onclick = () => {
+    $$("#dlgReport [name=repReason]").forEach(r => r.checked = false); $("#repDetails").value = ""; clearInline($("#repSend"));
+    $("#repSend").disabled = false; $("#dlgReport").showModal();
+    $("#repSend").onclick = async () => {
+      const reason = $("#dlgReport [name=repReason]:checked")?.value;
+      if (!reason) return inlineMsg($("#repSend"), "Please choose what the problem is.");
+      $("#repSend").disabled = true;
+      try {
+        const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details: $("#repDetails").value }));
+        $("#dlgReport").close(); toast(r.auto_hidden ? "Thank you. The project is hidden while a grown-up looks at it." : "Thank you. We got your report.", "ok");
+        if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); }
+      } catch (e) { inlineMsg($("#repSend"), e.message); } finally { $("#repSend").disabled = false; }
+    };
   };
   $("#dlgItem").showModal();
 }
@@ -137,8 +171,8 @@ $("#btnDoPublish").onclick = async () => {
   try {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
       tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value }));
-    $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
-  } catch (e) { toast(e.message, "err"); }
+    clearInline($("#btnDoPublish")); $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
+  } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
 };
 
 /* my data */
@@ -200,8 +234,8 @@ async function openLesson(id) {
 /* classroom */
 $("#btnJoinClass").onclick = () => $("#dlgJoin").showModal();
 $("#btnDoJoin").onclick = async () => {
-  try { const r = await api("/api/classrooms/join", J("POST", { code: $("#j_code").value, nickname: $("#j_nick").value, password: $("#j_pw").value })); $("#dlgJoin").close(); toast("Joined " + r.name, "ok"); loadLearn(); }
-  catch (e) { toast(e.message, "err"); }
+  try { const r = await api("/api/classrooms/join", J("POST", { code: $("#j_code").value, nickname: $("#j_nick").value, password: $("#j_pw").value })); clearInline($("#btnDoJoin")); $("#dlgJoin").close(); toast("Joined " + r.name, "ok"); loadLearn(); }
+  catch (e) { inlineMsg($("#btnDoJoin"), e.message); }
 };
 $("#btnTeacher").onclick = openTeacher;
 document.addEventListener("click", async e => {
@@ -230,7 +264,7 @@ async function openTeacher() {
       ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
       <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
   if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
-  $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { toast(e.message, "err"); } };
+  $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { inlineMsg($("#cr_go"), e.message); } };
   $("#teacherBody").onclick = async e => {
     const t = e.target;
     if (t.dataset.cp) navigator.clipboard?.writeText(t.dataset.cp), toast("Code copied", "ok");
@@ -239,7 +273,7 @@ async function openTeacher() {
     if (t.dataset.rd) { await api(`/api/classrooms/${t.dataset.rd}/notifications/read`, J("POST")); openTeacher(); }
     if (t.dataset.talk) { const [c, sid] = t.dataset.talk.split(":"); try { await api(`/api/classrooms/${c}/requests`, J("POST", { kind: "talk_next_class", to: sid })); toast("Request sent", "ok"); } catch (er) { toast(er.message, "err"); } }
     if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }
-    if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); const comment = prompt("Feedback for this project (text only, max 500 characters):"); if (comment) { try { await api(`/api/classrooms/${c}/projects/${pid}/feedback`, J("POST", { comment })); toast("Feedback saved", "ok"); openTeacher(); } catch (er) { toast(er.message, "err"); } } }
+    if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); openFeedback(c, pid); }
     if (t.dataset.rs) { const [c, s] = t.dataset.rs.split(":"); await api(`/api/classrooms/${c}/students/${s}`, { method: "DELETE" }); openTeacher(); }
     if (t.dataset.dr && confirm("Delete this class and all student progress in it?")) { await api("/api/classrooms/" + t.dataset.dr, { method: "DELETE" }); openTeacher(); }
   };
@@ -255,10 +289,26 @@ async function openTeacher() {
     if (!t.dataset.as) return; const ids = $$(`[data-as="${t.dataset.as}"]`).filter(x => x.checked).map(x => x.value); await api(`/api/classrooms/${t.dataset.as}/assign`, J("POST", { lesson_ids: ids })); };
 }
 
+function openFeedback(code, pid) {
+  const d = $("#dlgFeedback"); $("#fbText").value = ""; clearInline($("#fbSave").parentElement);
+  $("#fbSave").onclick = async () => {
+    const comment = $("#fbText").value.trim();
+    if (!comment) return inlineMsg($("#fbSave").parentElement, "Please write a little feedback first.");
+    try { await api(`/api/classrooms/${code}/projects/${pid}/feedback`, J("POST", { comment })); d.close(); toast("Feedback saved", "ok"); openTeacher(); }
+    catch (er) { inlineMsg($("#fbSave").parentElement, er.message); }            // the box keeps what was typed
+  };
+  d.showModal(); $("#fbText").focus();
+}
 async function submitToClass(code) {
-  const b = S.history.filter(x => true); if (!b.length) return toast("Build something in the Studio first.", "err");
-  const pick = prompt("Which build? Type a number:\n" + b.map((x, i) => `${i + 1}. ${x.title}`).join("\n"), "1"); const x = b[(+pick || 0) - 1]; if (!x) return;
-  try { await api(`/api/classrooms/${code}/projects`, J("POST", { build_id: x.id })); toast("Submitted — only your class can see it.", "ok"); } catch (e) { toast(e.message, "err"); }
+  const b = S.history; if (!b.length) return toast("Build something in the Studio first.", "err");
+  const d = $("#dlgPickBuild"); clearInline($("#pbSend").parentElement);
+  $("#pbList").innerHTML = b.map((x, i) => `<label class="choice"><input type="radio" name="pbBuild" value="${esc(x.id)}" ${i === 0 ? "checked" : ""}> <span>${esc(x.title)}</span></label>`).join("");
+  $("#pbSend").onclick = async () => {
+    const id = (document.querySelector('input[name="pbBuild"]:checked') || {}).value; if (!id) return inlineMsg($("#pbSend").parentElement, "Please pick a build.");
+    try { await api(`/api/classrooms/${code}/projects`, J("POST", { build_id: id })); d.close(); toast("Submitted — only your class can see it.", "ok"); }
+    catch (e) { inlineMsg($("#pbSend").parentElement, e.message); }
+  };
+  d.showModal(); document.querySelector('input[name="pbBuild"]')?.focus();
 }
 async function openClassProjects(code) {
   const r = await api(`/api/classrooms/${code}/projects`);

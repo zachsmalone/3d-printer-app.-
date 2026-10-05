@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 
@@ -25,8 +26,13 @@ class JsonFile:
             return json.loads(json.dumps(self.default))
 
     def write(self, data):
+        """Atomic (temp file + rename) and private: only the account that runs the server can read these files (mode 600)."""
         with _lock:
-            self.path.write_text(json.dumps(data, indent=1, default=str))
+            tmp = self.path.with_name(self.path.name + ".tmp")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as fh:
+                fh.write(json.dumps(data, indent=1, default=str))
+            os.replace(tmp, self.path)
 
     def update(self, fn):
         with _lock:

@@ -55,8 +55,8 @@ def test_s04_signup_attempts_rate_limited(monkeypatch):
 def test_s05_guesses_limited_per_class_and_address_not_per_cookie():
     t, code, pw = make_class()
     codes = [join(TestClient(app), code, f"wrong-guess-{n}", "Robo9").status_code for n in range(8)]       # NEW cookie every time
-    assert codes[:5] == [404] * 5 and codes[5:] == [429] * 3, codes                                          # slow mode: no 6th guess is even evaluated
-    assert t.get("/api/classrooms").json()["rooms"][0]["failed_joins_last_hour"] == 5                      # teacher can see it happened
+    assert codes[:5] == [404] * 5 and codes[5] == 404 and codes[6:] == [429] * 2, codes                      # slow mode: one check per window, the rest are not evaluated
+    assert t.get("/api/classrooms").json()["rooms"][0]["failed_joins_last_hour"] >= 5                      # teacher can see it happened
     classrooms._LOCKS.clear()
 
 
@@ -66,11 +66,20 @@ def test_s05_slow_mode_never_locks_the_class_out_the_right_password_gets_in(monk
     for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
     assert 0 < classrooms._locked_for(code, "testclient") <= classrooms.SLOW_BASE
     assert classrooms._locked_for(code, "10.9.9.9") == 0                                                    # other addresses unaffected
-    assert join(TestClient(app), code, pw, "Zed7").status_code == 429                                        # within the first slot: asked to wait, nothing evaluated
-    real = time.time; monkeypatch.setattr(time, "time", lambda: real() + classrooms.SLOW_BASE + 2)         # ...the next slot opens
-    assert join(TestClient(app), code, pw, "Zed7").status_code == 200                                        # the right password gets in
+    assert join(TestClient(app), code, pw, "Zed7").status_code == 200                                        # Edge 5: the first check in slow mode is evaluated, so the RIGHT password gets in at once
     assert classrooms._locked_for(code, "testclient") == 0                                                   # and the slow-down is gone for the next student
     assert join(TestClient(app), code, pw, "Zed8").status_code == 200
+
+
+def test_s05_a_student_with_the_right_password_gets_in_even_while_a_prankster_keeps_the_address_in_slow_mode(monkeypatch):
+    """Same school address: wrong guesses are limited to one check per LOCKED_CHECK_S, but a correct password is never refused outright."""
+    t, code, pw = make_class()
+    for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
+    assert join(TestClient(app), code, "still-wrong-1", "Zed7").status_code == 404                           # evaluated (and counted)
+    assert join(TestClient(app), code, "still-wrong-2", "Zed7").status_code == 429                          # a second guess inside the window is not evaluated at all
+    real = time.time; monkeypatch.setattr(time, "time", lambda: real() + classrooms.LOCKED_CHECK_S + 1)
+    assert join(TestClient(app), code, pw, "Zed9").status_code == 200                                        # the student types the right password: in, within ~30 s
+    assert classrooms._locked_for(code, "testclient") == 0
 
 
 def test_s05_slow_mode_keeps_guessing_slow_and_backs_off(monkeypatch):
@@ -89,7 +98,8 @@ def test_s05_slow_mode_keeps_guessing_slow_and_backs_off(monkeypatch):
 def test_s05_teacher_can_unlock_joining_only_their_own_class():
     t, code, pw = make_class()
     for n in range(5): join(TestClient(app), code, f"bad-guess-{n}", "Zed7")
-    assert join(TestClient(app), code, pw, "Zed7").status_code == 429
+    assert join(TestClient(app), code, "wrong-once", "Zed7").status_code == 404
+    assert join(TestClient(app), code, pw, "Zed7").status_code == 429                                          # inside the 30 s check window
     assert client(ADULT).post(f"/api/classrooms/{code}/unlock-joins").status_code == 404                    # another adult can't
     assert t.post(f"/api/classrooms/{code}/unlock-joins").status_code == 200
     assert join(TestClient(app), code, pw, "Zed7").status_code == 200

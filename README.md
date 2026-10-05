@@ -61,3 +61,21 @@ Not production-ready: no real auth/passwords (identity is an anonymous session c
 - Class-join guessing is limited per class + network address (slow mode, never a hard lock-out; a teacher can press *Unlock joining*), but the address comes from the proxy's `X-Forwarded-For`: behind a proxy that does not overwrite that header the limit can be dodged. Not verified through a real tunnel.
 - The language/contact filter is word-list and pattern based: no grooming-phrase detection, many languages unlisted, bare 10-digit numbers pass, addresses are best effort. Not tested on real devices or with real users.
 Safety/legal: see `static/COMMUNITY_GUIDELINES.md` and `ROADMAP.md` → *Legal & safety* (a kids-oriented platform needs legal review before launch).
+
+## How long ZEIM keeps build files, and what happens when the disk is nearly full
+
+Each build lives in its own folder under the per-build data folder (`PHOTO3D_OUT`, default `outputs/`).
+
+| What | Kept | Setting |
+|---|---|---|
+| A build the person **starred ★** | until they delete it (or use "Delete everything I made" / "Delete my stuff"). Never removed by age, by the cap or by a low disk | – |
+| A build **shared to the Showcase or sent to a class** | 30 days | `PHOTO3D_KEEP_SAVED_DAYS` |
+| Any other build | 7 days | `PHOTO3D_KEEP_UNSAVED_DAYS` |
+| A folder that never finished (no `meta.json`) | 1 day | – |
+| Builds per person | 20; the oldest un-starred one rolls off, and if all 20 are starred ZEIM asks the person to un-star or delete one | `PHOTO3D_MAX_BUILDS` |
+
+Clean-up runs at start-up and every hour. It only looks at the direct sub-folders of the per-build folder and refuses to run on `library/`,
+`static/` or the code. Logs say how many were removed, never which.
+If free space drops below `PHOTO3D_DISK_MIN_FREE_MB` (500), ZEIM first removes expired builds, then the oldest un-starred ones (not from the last
+10 minutes) until `PHOTO3D_DISK_TARGET_FREE_MB` (1000) is free. If that is still not enough it refuses new heavy builds with a clear message
+rather than touching a starred build.

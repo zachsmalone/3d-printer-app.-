@@ -45,9 +45,24 @@ if not _aud.handlers:
 
 _docs = {} if config.API_DOCS else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3", **_docs)
+from .services import credits as _credits
+_credits.assert_launch_ready()
+
+
+@app.on_event("startup")
+def _start_retention():
+    """Clean up expired build files now and every hour (starred builds are never touched; see services/retention.py)."""
+    from .services import retention
+    retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages):
     app.include_router(r)
+try:
+    from .community import usernames as _usernames
+    _usernames.migrate()               # accounts made before usernames existed get one (adults keep their display name if it is free)
+except Exception:
+    import logging
+    logging.getLogger("zeim").exception("username migration failed")
 try:
     from .community import privacy as _privacy
     _privacy.migrate_minors()          # existing 13-17 data -> current teen posture (idempotent)
@@ -55,6 +70,9 @@ except Exception:                      # never block start-up on a migration pro
     import logging
     logging.getLogger("zeim").exception("minor data migration failed")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+MAX_MULTIPART_BODY = 56 * 1024 * 1024
 
 
 @app.middleware("http")
@@ -70,6 +88,25 @@ async def limit_json_body(request: Request, call_next):
             n = 0
         if n > MAX_JSON_BODY:
             return JSONResponse(status_code=413, content={"detail": "Request too large."})
+        if "content-length" not in request.headers:                      # chunked body: count bytes as they arrive, stop at the cap
+            got = 0
+            chunks = []
+            async for part in request.stream():
+                got += len(part)
+                if got > MAX_JSON_BODY:
+                    return JSONResponse(status_code=413, content={"detail": "Request too large."})
+                chunks.append(part)
+            request._body = b"".join(chunks)
+    if ct.startswith("multipart/"):
+        # uploads: the biggest legitimate one is a 50 MB 3D file, so nothing above MAX_MULTIPART_BODY is read; a body with no declared length is refused
+        try:
+            n = int(request.headers.get("content-length", "-1"))
+        except ValueError:
+            n = -1
+        if n < 0:
+            return JSONResponse(status_code=411, content={"detail": "Please try again from the ZEIM page."})
+        if n > MAX_MULTIPART_BODY:
+            return JSONResponse(status_code=413, content={"detail": "That file is too large."})
     return await call_next(request)
 
 
@@ -96,6 +133,8 @@ CSP = ("default-src 'self'; script-src 'self' " + _inline_script_hashes() + "; s
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
     h = resp.headers
+    if request.url.path.startswith("/static/"):
+        h.setdefault("Cache-Control", "no-cache")     # always revalidate (ETag keeps it cheap): a phone must never mix old and new JS modules
     h.setdefault("X-Content-Type-Options", "nosniff")
     h.setdefault("X-Frame-Options", "DENY")
     h.setdefault("Referrer-Policy", "no-referrer")

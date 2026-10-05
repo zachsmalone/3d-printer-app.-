@@ -66,7 +66,8 @@ with sync_playwright() as p:
         # print dialog (local mode)
         if pg.locator("#btnPrint").is_visible():
             pg.click("#btnPrint"); pg.wait_for_timeout(500); audit(pg, tag + " print-dialog")
-            pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+            if pg.evaluate("document.querySelector('#dlgPrint').open"): pg.click("#dlgPrint [data-close]"); pg.wait_for_timeout(200)       # (under heavy load Chrome ignores Escape when the dialog opened after the tap's activation expired)
         for view in ("edit", "showcase"):
             pg.click(f"#mainNav [data-view={view}]"); pg.wait_for_timeout(600); audit(pg, f"{tag} {view}")
         pg.screenshot(path=f"previews/ui_touch_{w}.png")

@@ -7,6 +7,7 @@
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/static/style.css">
+<script src="/static/boot.js"></script>
 <script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
 </head>
 <body>
@@ -123,7 +124,8 @@
     </div>
 
     <section class="history">
-      <div class="hhead"><h3 data-sec="history">Recent builds</h3><span id="histCount" class="pill">0 / 5</span></div>
+      <div class="hhead"><h3 data-sec="history">Recent builds</h3><span id="histCount" class="pill">0 / 20</span></div>
+      <p class="help" id="histNote"></p>
       <div class="hlist" id="histList"></div>
     </section>
   </section>
@@ -135,7 +137,8 @@
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
       <div class="drop" id="editDrop"><div><div class="big" aria-hidden="true">📂</div><b>Drop an STL, OBJ or 3MF here</b><span>or press the button · up to 50 MB</span></div></div>
-      <div class="row" style="margin-top:8px"><button type="button" class="btn big" id="editChooseModel">📂 Choose a 3D file</button><input type="file" id="editFile" accept=".stl,.obj,.3mf" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn big" id="editChooseModel">📂 Choose a 3D file</button><input type="file" id="editFile" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <p class="help" id="editModelMsg" role="alert" hidden></p>
       <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
       <div id="editPhoto"></div>
       <div class="grid2" style="margin-top:10px">
@@ -224,18 +227,18 @@
     <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
     <div id="tPrint" class="tab">
       <div class="grid2">
-        <div class="field"><label>Default slicer</label><select id="set_slicer"><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
+        <div class="field"><label>Default slicer</label><select id="set_slicer"><option value="auto">Automatic (Creality on phones and with a K1)</option><option value="creality">Creality Print / Creality Cloud</option><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
         <div class="field"><label>Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
       </div>
       <h4>Printers</h4><div id="printerList"></div>
       <button class="btn small" id="btnAddPrinter">+ Add printer</button>
-      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are labeled stubs. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
+      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are marked Coming soon. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
     </div>
     <div id="tAcc" class="tab" hidden>
       <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built (teen accounts never show link-outs publicly).</p>
       <div class="grid2" id="linkInputs"></div>
       <button class="btn small" id="btnSaveLinks">Save link-outs</button>
-      <h4>OAuth connections <small>(scaffold — sharing not implemented)</small></h4>
+      <h4>OAuth connections <small>Coming soon</small></h4>
       <p class="help" id="accNote"></p>
       <div id="accList"></div>
     </div>
@@ -247,7 +250,7 @@
 <dialog id="dlgFull"><div class="dlg">
   <header><h3>Build history is full</h3><button class="x" data-close>✕</button></header>
   <div class="body">
-    <p>You can keep <b>5 builds</b>. Delete one yourself, or let ZEIM remove the oldest.</p>
+    <p id="fullMsg"></p>
     <div id="fullList" class="fulllist"></div>
   </div>
   <footer><button class="btn" id="btnRetry" disabled>Build now</button><button class="btn primary" id="btnAutoDel">Auto-delete oldest &amp; build</button></footer>
@@ -282,10 +285,10 @@
   <div class="body">
     <p class="help">Free for everyone to download. Family-friendly projects only.</p>
     <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
-    <div class="field"><label>Title</label><input id="pub_title" maxlength="80"></div>
+    <div class="field"><label>Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, school names, phone numbers or addresses.</small></div>
     <div class="field"><label>Description</label><input id="pub_desc" maxlength="500"></div>
     <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
-    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context).</label>
+    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
   </div>
   <footer><button class="btn primary" id="btnDoPublish">Publish</button></footer>
 </div></dialog>
@@ -317,11 +320,43 @@
   <footer><button class="btn primary" id="btnDoJoin">Join</button></footer>
 </div></dialog>
 
+<dialog id="dlgReport" aria-labelledby="repTitle"><div class="dlg">
+  <header><h3 id="repTitle">Report this project</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body">
+    <fieldset class="reasons"><legend>What is the problem?</legend>
+      <label class="choice"><input type="radio" name="repReason" value="minor_safety"> <span>Something about a person or a child is not safe</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="not_family_friendly"> <span>Not family-friendly</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="harassment"> <span>Mean or unkind</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="personal_info"> <span>Shares private information</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="copyright"> <span>Copyright, or someone's work without credit</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="other"> <span>Something else</span></label>
+    </fieldset>
+    <div class="field"><label for="repDetails">Anything you want to add? <em>optional</em></label><textarea id="repDetails" maxlength="500" rows="3"></textarea>
+      <small class="help">Please don't put names, phone numbers, emails or links here.</small></div>
+    <p class="help">A person reads every report. A report about someone's safety hides the project straight away.</p>
+    <p class="help"><a href="/static/COMMUNITY_GUIDELINES.html" target="_blank" rel="noopener">Rules</a> · <a href="/static/privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="/static/terms.html" target="_blank" rel="noopener">Terms</a></p>
+  </div>
+  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="repSend">Send report</button></footer>
+</div></dialog>
+
+<dialog id="dlgFeedback" aria-labelledby="fbTitle"><div class="dlg">
+  <header><h3 id="fbTitle">Feedback for this project</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body"><div class="field"><label for="fbText">Your feedback <em>text only, up to 500 characters</em></label><textarea id="fbText" maxlength="500" rows="4"></textarea>
+    <small class="help">Please don't put names, phone numbers, emails or links here.</small></div></div>
+  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="fbSave">Save feedback</button></footer>
+</div></dialog>
+<dialog id="dlgPickBuild" aria-labelledby="pbTitle"><div class="dlg">
+  <header><h3 id="pbTitle">Which build do you want to send?</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body"><fieldset class="reasons"><legend>Pick one</legend><div id="pbList"></div></fieldset>
+    <p class="help">Only you and your class can see it.</p></div>
+  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></footer>
+</div></dialog>
 <div id="toasts"></div>
 <dialog id="dlgSend" aria-labelledby="dlgSendTitle"><h3 id="dlgSendTitle">Let students send files out of ZEIM?</h3>
   <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>
   <p>Turn this on for <b id="dlgSendName"></b>?</p>
   <div class="row"><button class="btn" id="sendCancel">Cancel</button> <button class="btn primary" id="sendOn">Turn on</button></div></dialog>
+<footer class="sitefoot"><a href="/static/COMMUNITY_GUIDELINES.html">Rules</a><a href="/static/privacy.html">Privacy</a><a href="/static/terms.html">Terms</a><a href="/credits">Thank you &amp; credits</a></footer>
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/community.js"></script>
 <script type="module" src="/static/edit.js"></script>

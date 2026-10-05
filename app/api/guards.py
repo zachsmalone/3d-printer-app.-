@@ -57,7 +57,14 @@ def can_see_printer_urls(request: Request, actor: Actor) -> bool:
 def require_settings_admin(request: Request, actor: Actor):
     if classrooms.is_student(actor.sid):
         raise HTTPException(403, "Your teacher manages printers and settings.")
-    if is_owner(request) or is_admin(request):
+    if is_owner(request):
+        origin = request.headers.get("origin")                     # S-01 local mode: another web page open in the owner's browser must not change settings
+        if origin and origin != "null" and origin.split("://", 1)[-1].lower() != (request.headers.get("host") or "").lower():
+            raise HTTPException(403, "Settings can only be changed from ZEIM's own page.")
+        if origin == "null":
+            raise HTTPException(403, "Settings can only be changed from ZEIM's own page.")
+        return
+    if is_admin(request):
         return
     raise HTTPException(403, "Server settings can only be changed by the server admin (X-Admin-Token) on a shared server.")
 

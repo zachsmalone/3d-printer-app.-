@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
-import { S, api, toast, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -44,13 +44,19 @@ async function create(fd, retry) {
   } finally { busy(false); }
 }
 const PHOTO_RE = /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i;
+const MODEL_RE = /\.(stl|obj|3mf)$/i;
+// iOS greys out files in the picker when `accept` lists bare extensions it can't map to a type, so #editFile has NO accept list:
+// the file type is checked here by its name (any MIME, including empty or application/octet-stream), and again by the server.
+function modelMsg(t) { const m = $("#editModelMsg"); m.textContent = t || ""; m.hidden = !t; }
 function fromFile(file) {
+  modelMsg("");
   if (!file) return;
   E.photoTry = /^image\//.test(file.type) || PHOTO_RE.test(file.name || "");
+  if (!E.photoTry && !MODEL_RE.test(file.name || "")) return modelMsg("That doesn't look like a 3D model. Choose an .stl, .obj or .3mf file, or start from a photo below.");
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
-  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("beginner", S.level === "beginner"); return fd; };
+  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked()); fd.append("beginner", S.level === "beginner"); return fd; };
   create(mk(), mk);
 }
 const drop = $("#editDrop");
@@ -104,14 +110,14 @@ function loadProject(p, keepCamera = false) {
 function renderHistoryCard() { loadHistory().catch(() => { }); }
 $("#editOps").onclick = e => { const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 
-async function act(url, body, text = "Working…") {
+async function act(url, body, text = "Working…", near = null) {
   if (!E.p) return;
   busy(true, text);
-  try { loadProject(await api(url, J("POST", body)), true); }
-  catch (e) { toast(e.message, "err"); }
+  try { loadProject(await api(url, J("POST", body)), true); clearInline(near); }
+  catch (e) { near ? inlineMsg(near, e.message) : toast(e.message, "err"); }
   finally { busy(false); }
 }
-const doOp = (op, params, text) => act(`/api/edit/${E.p.id}/op`, { op, params }, text);
+const doOp = (op, params, text, near) => act(`/api/edit/${E.p.id}/op`, { op, params }, text, near);
 $("#eUndo").onclick = () => act(`/api/edit/${E.p.id}/undo`, {});
 $("#eRedo").onclick = () => act(`/api/edit/${E.p.id}/redo`, {});
 $("#eReset").onclick = () => viewer?.reset();
@@ -225,7 +231,7 @@ $("#editPanel").addEventListener("submit", e => {
   }[kind];
   if (!P) return;
   clearGhost();
-  doOp(kind, P(), ({ hollow: "Hollowing…", boolean: "Computing boolean…", text: "Building text…", base: "Adding base…", simplify: "Simplifying…" })[kind]);
+  doOp(kind, P(), ({ hollow: "Hollowing…", boolean: "Computing boolean…", text: "Building text…", base: "Adding base…", simplify: "Simplifying…" })[kind], f.querySelector("button:not([type=button])"));
 });
 function primSpec(f) {
   const shape = val(f, "shape"), pos = [len(f, "px"), len(f, "py"), len(f, "pz")];
@@ -306,3 +312,4 @@ function onPick(e) {
   }
 }
 window.__zeimEdit = E;
+window.__zeimEditStarted = true;               // (static/boot.js watchdog)

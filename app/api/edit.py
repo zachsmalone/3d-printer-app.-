@@ -31,10 +31,8 @@ def capabilities():
 
 
 def _full(actor):
-    return JSONResponse(status_code=409, content={
-        "code": "history_full", "max": MAX_BUILDS,
-        "message": f"Build history is full ({MAX_BUILDS}/{MAX_BUILDS}). Delete a build or auto-delete the oldest to continue.",
-        "builds": [summary(m) for m in store.list(actor.sid)]})
+    from .builds import full_response
+    return full_response(actor)
 
 
 @router.post("/new")
@@ -48,6 +46,7 @@ def new_project(
     auto_delete_oldest: bool = Form(False),
     photo_mode: str = Form("lithophane"),
     width_mm: float = Form(100.0),
+    photo_ack: bool = Form(False),
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -60,6 +59,7 @@ def new_project(
         raise HTTPException(400, f"units must be one of {list(meshedit.UNIT_MM)}")
     warnings: list[str] = []
     source_image = None
+    ack = None
     scale, base = 1.0, {}
     if from_build:                                              # ---- bring a ZEIM build into the editor
         meta = meta_for(from_build, actor, owner_only=True)
@@ -76,6 +76,7 @@ def new_project(
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
         limit = editproj.MAX_UPLOAD_EDIT
         data = file.file.read(limit + 1)
+        sample_title = imagesafe.builtin_title(data)
         if len(data) > limit:
             raise HTTPException(413, f"File too large (max {limit // 2**20} MB).")
         if not data:
@@ -92,7 +93,7 @@ def new_project(
             original = data
             if ext != "3mf":
                 scale = meshedit.UNIT_MM[units]
-            base = {"type": "upload", "filename": name[:120], "format": ext, "units": units if ext != "3mf" else "from file"}
+            base = {"type": "upload", "format": ext, "units": units if ext != "3mf" else "from file"}
         elif ext in meshedit.IMAGE_EXT:                         # photo / lithophane base
             if len(data) > 25 * 2**20:
                 raise HTTPException(413, "Photo too large (max 25 MB).")
@@ -101,6 +102,7 @@ def new_project(
             if not (20 <= width_mm <= 500):
                 raise HTTPException(400, "width_mm must be 20..500")
             try:
+                ack = imagesafe.check_ack(data, photo_ack)      # CR-5
                 data, src_ext, _ = imagesafe.sanitize(data)
                 im = geometry.load_image(data)
             except imagesafe.ImageRefused as e:
@@ -114,15 +116,17 @@ def new_project(
             mesh = trimesh.Trimesh(v, f, process=False)
             original, ext_o = exporters.to_stl(mdl), "stl"
             source_image = (data, src_ext)
-            base = {"type": "photo", "photo_mode": photo_mode, "width_mm": width_mm, "filename": name[:120], "params": params}
+            base = {"type": "photo", "photo_mode": photo_mode, "width_mm": width_mm, "params": params}
             ext = ext_o
             warnings.append(f"Photo converted to a {photo_mode} base mesh; edit it like any other model.")
         else:
             raise HTTPException(415, "Unsupported file type. Upload .stl, .obj or .3mf (or a .png/.jpg photo).")
-        title = title or _safe_title(name.rsplit(".", 1)[0][:80])
+        title = title or sample_title or ("My photo build" if base.get("type") == "photo" else "My model")      # never from the file name
     else:
         raise HTTPException(400, "Choose a file to upload or a build to edit.")
 
+    from .builds import disk_guard
+    disk_guard()
     with store.lock:
         try:
             store.reserve(actor.sid, auto_delete_oldest)
@@ -134,6 +138,8 @@ def new_project(
                                    warnings=warnings, import_scale=scale, import_units=units, source_image=source_image)
         except meshedit.OpError as e:
             raise HTTPException(422, str(e))
+        if ack is not None:
+            meta["photo_ack"] = ack; store.save(meta)
     return {**editproj.payload(meta["id"]), "history": [summary(m) for m in store.list(actor.sid)]}
 
 
@@ -164,6 +170,9 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     params = body.get("params") or {}
     if not isinstance(params, dict):
         raise HTTPException(400, "params must be an object")
+    if op in ("hollow", "boolean", "text", "base"):                      # the heavy ones write big new meshes
+        from .builds import disk_guard
+        disk_guard()
     return _act(bid, actor, lambda: editproj.add_op(bid, op, params))
 
 

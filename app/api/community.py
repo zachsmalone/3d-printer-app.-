@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
-from ..community import catalog, classrooms, links, moderation, personalization, privacy, safety
+from ..community import catalog, classrooms, links, moderation, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS
@@ -54,12 +54,68 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
     try:
         name = text_in(body.get("display_name", ""), 40, "Display name")
         safety.filter_only(name, "Display name")
-        idn.signup(actor, name, str(body.get("dob", ""))[:12])
+        user = idn.signup(actor, name, str(body.get("dob", ""))[:12])
+        try:
+            usernames.assign_new(actor.sid, user, str(body.get("username") or "")[:40] or None, minor=idn.age_of(user) < config.ADULT_AGE)
+        except usernames.UsernameError as e:
+            USERS.update(lambda d: d.pop(actor.sid, None))          # nothing is kept from a sign-up that did not complete
+            raise HTTPException(400, str(e))
     except PermissionError:
         return _age_refusal(actor, lock=True, ip=_ip(request), request=request)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return idn.public_profile(Actor(actor.sid, USERS.read()[actor.sid]))
+    me_now = Actor(actor.sid, USERS.read()[actor.sid])
+    out = idn.public_profile(me_now)
+    if me_now.is_adult:                                     # CR-15: shown ONCE, only a hash is kept
+        out["recovery_code"] = recovery.issue(actor.sid)
+        out["recovery"] = {"has_code": True, "issued": USERS.read()[actor.sid]["recovery_issued"]}
+    return out
+
+
+@router.put("/me/username")
+def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    """Change my username. Server-enforced: 3-20 chars, unique ignoring case, passes the chat filter, no email/phone-like text."""
+    if not actor.user:
+        raise HTTPException(401, "Create an account first.")
+    if not ratelimit.hit("username:" + actor.sid, 20, 3600) or not ratelimit.hit("usernameip:" + _ip(request), 200, 3600):
+        raise HTTPException(429, "Too many tries. Please wait a while.")
+    try:
+        return {"username": usernames.change(actor.sid, str(body.get("username", ""))[:60])}
+    except usernames.UsernameWait as e:
+        raise HTTPException(429, str(e))
+    except usernames.UsernameError as e:
+        raise HTTPException(409 if "taken" in str(e) else 400, str(e))
+
+
+@router.post("/me/username/suggest")
+def suggest_username(actor: Actor = Depends(get_actor)):
+    if not actor.user:
+        raise HTTPException(401, "Create an account first.")
+    if not ratelimit.hit("usersuggest:" + actor.sid, 60, 3600):
+        raise HTTPException(429, "Too many tries. Please wait a while.")
+    return {"suggestions": usernames.suggestions()}
+
+
+@router.post("/me/recover")
+def recover_account(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    """Get a teacher account back in a new browser with its recovery code (CR-15). The old browser loses it."""
+    try:
+        user, new_code = recovery.recover(actor, str(body.get("code", ""))[:60], _ip(request))
+    except recovery.Locked:
+        raise HTTPException(429, "Too many wrong codes. Please wait ten minutes, then try again.")
+    except KeyError:
+        raise HTTPException(404, "That code didn't work. Check it and try again.")
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return {**idn.public_profile(Actor(actor.sid, user)), "recovery_code": new_code}
+
+
+@router.post("/me/recovery-code")
+def new_recovery_code(actor: Actor = Depends(get_actor)):
+    """Make a fresh recovery code (the old one stops working). Adult accounts only."""
+    if not actor.user or not actor.is_adult:
+        raise HTTPException(403, "Recovery codes are for adult (teacher) accounts.")
+    return {"recovery_code": recovery.issue(actor.sid)}
 
 
 @router.put("/me/links")
@@ -89,7 +145,7 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404, "unknown user")
     teen = idn.age_of(u) < config.ADULT_AGE
     social = privacy.social_on(u)
-    return {"id": u["id"], "display_name": u["display_name"],
+    return {"id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
             "followers": idn.follower_count(uid) if social else None,   # opted out -> no count at all
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
@@ -262,20 +318,22 @@ def item_file(iid: str, name: str, actor: Actor = Depends(get_actor)):
     except catalog.Denied as e:
         raise D(e)
     p = catalog.file_path(i, name)
+    if not p:
+        raise HTTPException(404, "No model yet.")
     catalog.count_download(i, actor)
     personalization.record_view(actor.sid, i["tags"], 2.0)
-    if p:
-        return FileResponse(p, filename=name)
-    if i.get("example"):  # seed items have no real file: serve a small placeholder cube
-        buf = io.BytesIO()
-        trimesh.creation.box((20, 20, 5)).export(buf, file_type="stl")
-        return Response(buf.getvalue(), media_type="model/stl",
-                        headers={"Content-Disposition": 'attachment; filename="example_placeholder.stl"'})
-    raise HTTPException(404)
+    return FileResponse(p, filename=name)
+
+
+def report_limit(request: Request, actor: Actor):
+    """CR-11 b: at most REPORT_LIMIT_PER_MIN reports a minute per browser session (and a larger cap per network address)."""
+    if not (ratelimit.hit("report:" + actor.sid, config.REPORT_LIMIT_PER_MIN, 60) and ratelimit.hit("reportip:" + _ip(request), config.REPORT_LIMIT_PER_MIN_IP, 60)):
+        raise HTTPException(429, "That's a lot of reports in one minute. Please wait a little, then try again.")
 
 
 @router.post("/showcase/{iid}/report")
-def report(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+def report(iid: str, request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    report_limit(request, actor)
     guards.showcase_gate(actor)
     try:
         catalog.get(iid, actor)
@@ -300,6 +358,19 @@ def clear_data(actor: Actor = Depends(get_actor)):
     return {"ok": True}
 
 
+@router.delete("/me/builds")
+def delete_everything_i_made(actor: Actor = Depends(get_actor)):
+    """'Delete everything I made': every build / Edit project (starred ones too, photos included) and every project this person shared to the Showcase."""
+    import shutil as _sh
+    from ..community.store import LISTINGS as _L
+    builds = classrooms.purge_builds(actor.sid)
+    mine = [i["id"] for i in _L.read() if i.get("owner_sid") == actor.sid]
+    for pid in mine:
+        _sh.rmtree(catalog.LDIR / pid, ignore_errors=True)
+    _L.update(lambda l: l.__setitem__(slice(None), [i for i in l if i.get("owner_sid") != actor.sid]))
+    return {"ok": True, "builds": builds, "shared": len(mine)}
+
+
 @router.put("/me/personalization")
 def set_personalization(body: dict, actor: Actor = Depends(get_actor)):
     personalization.set_enabled(actor.sid, bool(body.get("enabled")))
@@ -307,22 +378,51 @@ def set_personalization(body: dict, actor: Actor = Depends(get_actor)):
 
 
 # ---------------- moderation (stub; admin token) ----------------
-def _admin(token: str):
+def _admin(token: str, request: Request | None = None):
+    import hmac
     if not config.ADMIN_TOKEN:
         raise HTTPException(403, "moderation queue disabled: set PHOTO3D_ADMIN_TOKEN")
-    if token != config.ADMIN_TOKEN:
+    key = "admintok:" + (_ip(request) if request else "-")
+    if ratelimit.count(key, 600) >= config.ADMIN_FAIL_LIMIT:            # same guess limiter as the other admin routes
+        raise HTTPException(429, "Too many wrong admin tokens from this address. Try again in a few minutes.")
+    if not hmac.compare_digest((token or "").encode(), config.ADMIN_TOKEN.encode()):
+        ratelimit.hit(key, 10 ** 6, 600)
         raise HTTPException(403, "bad admin token")
 
 
+def _preview(item_id: str) -> dict:
+    fb = classrooms.feedback_preview(item_id) if item_id.startswith("fb:") else None
+    if fb:
+        return fb
+    i = next((x for x in catalog._all() if x["id"] == item_id), None)
+    if not i:
+        return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
+    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": i["creator"], "hidden": bool(i["hidden"]),
+            "thumb": f"/api/moderation/item/{item_id}/thumb" if i.get("has_thumb") else None}
+
+
 @router.get("/moderation/queue")
-def mod_queue(x_admin_token: str = Header("")):
-    _admin(x_admin_token)
-    return {"reports": moderation.queue()}
+def mod_queue(request: Request, x_admin_token: str = Header("")):
+    """Open reports, OLDEST FIRST, with a preview of the item and the age of the oldest one. (The reporter's session id is never sent.)"""
+    _admin(x_admin_token, request)
+    q = sorted(moderation.queue(), key=lambda r: r["created"])
+    return {"reports": [{k: v for k, v in r.items() if k != "reporter"} | {"preview": _preview(r["item_id"])} for r in q],
+            "oldest_open_age_s": moderation.oldest_open_age_s()}
+
+
+@router.get("/moderation/item/{iid}/thumb")
+def mod_thumb(iid: str, request: Request, x_admin_token: str = Header("")):
+    _admin(x_admin_token, request)
+    i = next((x for x in catalog._all() if x["id"] == iid), None)
+    p = catalog.thumb_path(i) if i else None
+    if not p:
+        raise HTTPException(404)
+    return FileResponse(p, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/moderation/{rid}/resolve")
-def mod_resolve(rid: str, body: dict, x_admin_token: str = Header("")):
-    _admin(x_admin_token)
+def mod_resolve(rid: str, body: dict, request: Request, x_admin_token: str = Header("")):
+    _admin(x_admin_token, request)
     try:
         out = moderation.resolve(rid, body.get("action", ""))
         if body.get("action") == "hide" and str(out.get("item_id", "")).startswith("fb:"):

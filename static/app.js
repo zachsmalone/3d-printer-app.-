@@ -12,6 +12,15 @@ function toast(msg, kind = "") {
   const t = document.createElement("div"); t.className = "toast " + kind; t.textContent = msg;
   $("#toasts").append(t); setTimeout(() => t.remove(), kind === "err" ? 8000 : 4500);
 }
+/* A refusal belongs INSIDE the dialog, next to the button, and stays until the next try (toasts vanish behind the scrim). Typed text is never cleared. */
+function inlineMsg(near, msg, kind = "err") {
+  if (!near) return toast(msg, kind);
+  let p = near.previousElementSibling;
+  if (!(p && p.classList.contains("inline-msg"))) { p = document.createElement("p"); p.setAttribute("role", "alert"); near.before(p); }
+  p.className = "inline-msg " + kind; p.textContent = msg;
+  p.scrollIntoView?.({ block: "nearest" });
+}
+function clearInline(near) { const p = near?.previousElementSibling; if (p?.classList.contains("inline-msg")) p.remove(); }
 const api = async (url, opt) => {
   const r = await fetch(url, opt); let j = null;
   try { j = await r.json(); } catch { }
@@ -73,7 +82,7 @@ function setFile(f) {
 const drop = $("#drop");
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (pick.allowed(f)) setFile(f); });
 drop.addEventListener("click", () => pick.el("File").click());
 $("#changePhoto").onclick = () => pick.el("File").click();
 $("#sSample").onclick = async () => {
@@ -84,7 +93,7 @@ $("#sSample").onclick = async () => {
 /* ---------- build ---------- */
 function formData(autoDelete) {
   const fd = new FormData();
-  fd.append("file", S.file); fd.append("mode", S.mode);
+  fd.append("file", S.file); fd.append("mode", S.mode); fd.append("photo_ack", pick.acked());      // CR-5 (the built-in sample needs no tick: the server knows that file)
   fd.append("beginner", S.level === "beginner"); fd.append("preset", S.preset);
   fd.append("width_mm", $("#width_mm").value);
   if (autoDelete) fd.append("auto_delete_oldest", "true");
@@ -154,28 +163,36 @@ function renderHistory() {
       <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Expert"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
-        <button data-del="${b.id}">🗑</button></div></div>`);
-  while (cards.length < S.max) cards.push(`<div class="hslot">Empty slot</div>`);
+        <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? "★" : "☆"}</button>
+        <button data-del="${b.id}" aria-label="Delete this build">🗑</button></div></div>`);
+  while (cards.length < Math.min(S.max, 5)) cards.push(`<div class="hslot">Empty slot</div>`);
+  const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap ☆ to keep one.`;
   $("#histList").innerHTML = cards.join("");
 }
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 $("#histList").onclick = async e => {
-  const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
+  const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]"), f = e.target.closest("[data-fav]");
+  if (f) { const b = S.history.find(x => x.id === f.dataset.fav); try { await api(`/api/builds/${f.dataset.fav}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: !b?.favorite }) }); await loadHistory(); } catch (er) { toast(er.message, "err"); } return; }
   if (o) { try {
     const hb = S.history.find(x => x.id === o.dataset.open);
     if (hb?.kind === "edit") { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: hb.id })); location.hash = "edit"; return; }
     const r = await api("/api/builds/" + o.dataset.open); S.mode = r.mode; applyMode(); showBuild(r); } catch (er) { toast(er.message, "err"); } }
   if (d && confirm("Delete this build and its files?")) { await api("/api/builds/" + d.dataset.del, { method: "DELETE" }); await loadHistory(); }
 };
-async function loadHistory() { const r = await api("/api/builds"); S.history = r.builds; S.max = r.max; renderHistory(); }
+async function loadHistory() { const r = await api("/api/builds"); S.history = r.builds; S.max = r.max; S.keepDays = r.keep_days; renderHistory(); }
 
 /* ---------- history-full dialog ---------- */
 function openFull() { renderFull(); $("#dlgFull").showModal(); }
 function renderFull() {
-  $("#fullList").innerHTML = S.history.map(b => `<div class="fl"><img src="${b.thumb}"><span><b>${esc(b.title)}</b><br><small>${MODE_LABEL[b.mode]} · ${ago(b.created)}</small></span><button class="btn small danger" data-fdel="${b.id}">Delete</button></div>`).join("");
+  const allStar = S.history.length > 0 && S.history.every(b => b.favorite);
+  $("#fullMsg").innerHTML = allStar ? `All <b>${S.max}</b> of your builds are starred ★, and ZEIM never removes a starred build. Un-star or delete one to make room.` : `You can keep <b>${S.max} builds</b>. Delete one yourself, or let ZEIM remove the oldest one that isn't starred.`;
+  $("#btnAutoDel").hidden = allStar;
+  $("#fullList").innerHTML = S.history.map(b => `<div class="fl"><img src="${b.thumb}" alt=""><span><b>${b.favorite ? "★ " : ""}${esc(b.title)}</b><br><small>${MODE_LABEL[b.mode]} · ${ago(b.created)}</small></span>${b.favorite ? `<button class="btn small" data-funstar="${b.id}">Un-star</button>` : ""}<button class="btn small danger" data-fdel="${b.id}">Delete</button></div>`).join("");
   $("#btnRetry").disabled = S.history.length >= S.max;
 }
 $("#fullList").onclick = async e => {
+  const u = e.target.closest("[data-funstar]");
+  if (u) { await api(`/api/builds/${u.dataset.funstar}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: false }) }); await loadHistory(); renderFull(); return; }
   const d = e.target.closest("[data-fdel]"); if (!d) return;
   await api("/api/builds/" + d.dataset.fdel, { method: "DELETE" }); await loadHistory(); renderFull();
 };
@@ -187,6 +204,56 @@ $("#btnAutoDel").onclick = () => { $("#dlgFull").close(); (S.pending || build)(t
 let printInfo = null, printId = null, printLabel = "", printB = null;
 const printBuild = () => printB;
 const sliceOpts = () => { const fd = new FormData(); fd.append("layer_height", $("#s_layer").value); fd.append("fill_density", $("#s_fill").value); fd.append("brim", $("#s_brim").value); if ($("#printerBlock") && !$("#printerBlock").hidden && $("#printerSel").value) fd.append("printer_id", $("#printerSel").value); fd.append("upright", $("#s_up").checked); fd.append("supports", $("#s_sup").checked); return fd; };
+const isPhone = () => matchMedia("(max-width:768px),(pointer:coarse)").matches;
+/* Print dialog body. Phones: the Creality Cloud app first (K1 owners), desktop-only slicer links tucked under "On a computer".
+   The Creality route is a plain authenticated download of the 3MF, then the phone's own share sheet - no link, no deep link, nothing
+   leaves ZEIM except what the person hands to the app they pick (reports/send-privacy.md). */
+/* "Default slicer": Automatic = Creality Print / Cloud on phones or when a K1 printer is set up, else PrusaSlicer. */
+function slicerDefault() { const v = printInfo.default_slicer; return v === "auto" ? (isPhone() ? "creality" : printInfo.effective_slicer) : v; }
+function slicerArea(b, caps) {
+  const dl = b.downloads["3mf"];
+  const links = printInfo.slicers.map(s => `<a class="btn ${s.slicer === slicerDefault() ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === slicerDefault() ? " ★" : ""}</a>`).join("") +
+    (printInfo.slicer_links_disabled ? `<p class="muted small" style="grid-column:1/-1">${esc(printInfo.slicer_links_disabled)}</p>` : "");
+  if (!isPhone()) {
+    // desktop: Creality Print has no verified deep link, so it is a plain download (open the file from your Downloads folder)
+    return `<a class="btn ${slicerDefault() === "creality" ? "def" : ""}" id="crDl" href="${dl}" download="ZEIM-build.3mf" title="Saves a 3MF. Open it in Creality Print.">⬇ Download 3MF for Creality Print${slicerDefault() === "creality" ? " ★" : ""}</a>` + links +
+      `<a class="btn ghost" href="${dl}" download>…or download 3MF for another slicer</a>`;
+  }
+  const share = caps.share_ui && navigator.share && navigator.canShare && isSecureContext
+    ? `<button type="button" class="btn" id="crShare" disabled>📤 Share… (choose Creality)</button>` : "";
+  return `<div class="cre" style="grid-column:1/-1">
+      <h5 style="margin:0 0 6px">★ Creality Cloud app <small class="help">(Creality K1 and other Creality printers)</small></h5>
+      <div class="row"><a class="btn primary def" id="crDl" href="${dl}" download="ZEIM-build.3mf">⬇ Download 3MF ★</a>${share}</div>
+      <ol class="help cre-steps"><li>Tap <b>Download 3MF</b>. It is saved in your <b>Files</b> or Downloads.</li>
+        <li>Open the file from there, tap <b>Share</b> (or <b>Open in…</b>), then choose <b>Creality</b>.</li>
+        <li>Slice and print from the Creality app.</li></ol>
+      <p class="help" id="crStatus" role="status" aria-live="polite">Button names differ between phones and app versions. ZEIM does not connect to Creality; the app you pick gets the file. The Creality K1 profile in Settings is <b>experimental</b>.</p>
+    </div>
+    <details class="more slicers-more" style="grid-column:1/-1"><summary>On a computer</summary>
+      <p class="help">These open a slicer installed on the <b>same computer</b> as this browser, so they don't work on a phone.</p>
+      <div class="slicers">${links}<a class="btn ghost" href="${dl}" download>Download 3MF</a></div></details>`;
+}
+let crFile = null;
+async function wireCreality(b, caps) {
+  crFile = null;
+  const btn = $("#crShare"); if (!btn) return;
+  const my = printId;
+  try {                               // pre-fetch with the cookie-checked download so share() runs straight from the tap
+    const blob = await (await fetch(b.downloads["3mf"], { credentials: "same-origin" })).blob();
+    if (my !== printId) return;
+    for (const t of ["model/3mf", "application/octet-stream"]) {
+      const f = new File([blob], "ZEIM-build.3mf", { type: t });
+      let ok = false; try { ok = navigator.canShare({ files: [f] }); } catch { ok = false; }
+      if (ok) { crFile = f; btn.disabled = false; return; }
+    }
+    btn.remove();
+  } catch { btn.remove(); }
+}
+document.addEventListener("click", async e => {
+  if (e.target.id !== "crShare" || !crFile) return;
+  try { await navigator.share({ files: [crFile], title: "My ZEIM build" }); $("#crStatus").textContent = "Sent to the app you chose."; }      // files + title only: no url, ever
+  catch (er) { if (er.name !== "AbortError") $("#crStatus").textContent = "That didn't work on this device. Use Download 3MF, then Share from the Files app."; }
+});
 async function openPrint(b) {
   if (!b?.id) return toast("Build something first.", "err");
   const id = b.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
@@ -195,9 +262,8 @@ async function openPrint(b) {
   printId = id; printB = b; printLabel = `${b.title || "build"} (${b.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[b.mode] || "Edit"})`;
   $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
-  $("#slicerBtns").innerHTML = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
-    `<a class="btn ghost" href="${b.downloads["3mf"]}" download>${printInfo.slicers.length ? "…or download 3MF" : "Download 3MF"}</a>` +
-    (printInfo.slicer_links_disabled ? `<p class="muted small" style="flex-basis:100%">${esc(printInfo.slicer_links_disabled)}</p>` : "");
+  $("#slicerBtns").innerHTML = slicerArea(b, caps);
+  wireCreality(b, caps);
   const bs = printInfo.builtin_slicer;
   $("#builtinState").textContent = bs.available ? "(PrusaSlicer CLI detected)" : "(slicer not installed)";
   $("#btnSlice").disabled = !bs.available;
@@ -303,7 +369,7 @@ async function renderAccounts() {
   const r = await api("/api/accounts"); $("#accNote").textContent = r.note;
   const label = { not_configured: "Not configured", disconnected: "Ready to connect", connected: "Connected" };
   $("#accList").innerHTML = r.providers.map(p => `<div class="acc"><div class="info"><b>${p.label}</b> <span class="pill ${p.state === "connected" ? "ok" : ""}">${label[p.state]}</span>
-    <small>${p.purpose} · posting/verification: <i>not implemented yet</i></small>
+    <small>${p.purpose} · posting/verification: <i>Coming soon</i></small>
     ${p.state === "not_configured" ? `<small>Set <code>${p.env_vars[0]}</code> and <code>${p.env_vars[1]}</code>, then restart the server.</small>` : ""}</div>
     ${p.state === "connected" ? `<button class="btn small" data-disc="${p.id}">Disconnect</button>` : `<a class="btn small ${p.state === "not_configured" ? "" : "primary"}" ${p.state === "not_configured" ? 'style="pointer-events:none;opacity:.4"' : `href="/api/accounts/${p.id}/connect"`}>Connect</a>`}</div>`).join("");
 }
@@ -318,4 +384,4 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel };
+export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel };

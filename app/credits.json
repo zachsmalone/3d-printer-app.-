@@ -1,0 +1,150 @@
+{
+  "title": "Thank you",
+  "intro": "ZEIM stands on the work of many people. This page says thank you to the people and projects behind it: the free tools it runs on, the makers whose models you can print, and the people who tested it. If we have missed you or got something wrong, please tell us and we will fix it.",
+  "tools": {
+    "heading": "Tools and libraries we use",
+    "blurb": "ZEIM is built with free and open-source software. The versions and licences below are read from what is installed on this server, not typed in by hand. If a licence cannot be read it says so, and the project link is the place to check.",
+    "python": {
+      "fastapi": "Runs the ZEIM server and its API.",
+      "uvicorn": "Serves ZEIM to your browser.",
+      "httpx": "Talks to your own printer (Moonraker / OctoPrint) when you ask it to.",
+      "python-multipart": "Receives the photos and files you upload.",
+      "cryptography": "Keeps saved printer keys encrypted on disk.",
+      "pillow": "Reads and cleans photos (and strips location data from them).",
+      "pillow-heif": "Opens iPhone HEIC photos.",
+      "numpy": "Does the number-crunching that turns pixels into shapes.",
+      "scipy": "Smooths and measures shapes.",
+      "scikit-image": "Image clean-up and surface extraction.",
+      "matplotlib": "Draws text for Edit's raised and cut lettering.",
+      "shapely": "Handles 2D outlines for bases, letters and lithophane borders.",
+      "mapbox-earcut": "Fills 2D outlines with triangles (used through trimesh).",
+      "networkx": "Finds connected pieces of a model (used through trimesh).",
+      "rtree": "Fast neighbour look-ups inside meshes (used through trimesh).",
+      "lxml": "Reads and writes the XML inside 3MF files (used through trimesh).",
+      "trimesh": "Loads, checks, repairs and saves 3D models.",
+      "manifold3d": "Cuts, hollows and combines solids without breaking them.",
+      "fast-simplification": "Makes a model lighter (Simplify).",
+      "segno": "Draws the QR code teachers print for their class."
+    },
+    "system_heading": "Programs ZEIM calls on the computer",
+    "system": [
+      {
+        "name": "PrusaSlicer",
+        "command": "prusa-slicer",
+        "dpkg": "prusa-slicer",
+        "what": "Turns a model into printer instructions (G-code) when you choose \"Slice here\".",
+        "url": "https://github.com/prusa3d/PrusaSlicer"
+      }
+    ],
+    "bundled_heading": "Code that ships inside ZEIM's pages",
+    "bundled": [
+      {
+        "name": "three.js",
+        "file": "vendor/three.module.min.js",
+        "what": "Draws the 3D viewer.",
+        "url": "https://threejs.org/"
+      },
+      {
+        "name": "three.js OrbitControls",
+        "file": "vendor/OrbitControls.js",
+        "what": "Lets you spin and zoom the model with a finger or mouse.",
+        "url": "https://threejs.org/"
+      }
+    ],
+    "others": "ZEIM uses other open-source packages that these depend on. Their names and licences are in the repository's constraints.txt."
+  },
+  "creators": {
+    "heading": "Makers and their models",
+    "blurb": "Every model you can download from ZEIM's free library or Showcase is somebody's work. Each one carries its maker's name and licence, here and next to the download.",
+    "manifests": [
+      "library/manifest.json"
+    ],
+    "empty": "The names of the makers of ZEIM's free library will be listed here, with their licences. Coming soon.",
+    "originals_note": "ZEIM Originals are made by the ZEIM team and its friends; each one names its author."
+  },
+  "testers": {
+    "heading": "Testers",
+    "blurb": "People who tried ZEIM on their own phones and printers and told us what broke.",
+    "people": [],
+    "empty": "We will list our testers here by name, once they say they are happy to be named. Coming soon."
+  },
+  "teachers": {
+    "heading": "Teachers",
+    "blurb": "Teachers who gave their time and honest advice.",
+    "people": [],
+    "empty": "We will list the teachers who helped us here, once they say they are happy to be named. Coming soon."
+  },
+  "trademarks": {
+    "heading": "Names that belong to others",
+    "text": "Creality, Creality K1, Creality Cloud, Creality Print, PrusaSlicer, Bambu Lab, OrcaSlicer, Cura, Shapr3D, Apple, iPhone, iPad, Safari and other product names belong to their owners. ZEIM is not affiliated with, endorsed by or sponsored by them. We use their names only so you can tell which app or file we mean."
+  },
+  "takedown": {
+    "heading": "Something wrong? Tell us.",
+    "text": "If you made something shown on ZEIM and would like it credited differently, or taken down, or if we have missed a credit, please tell us and we will put it right quickly and kindly. You can use the Report button on any project, or contact the person who runs this ZEIM.",
+    "contact": "",
+    "contact_placeholder": "Contact address: Coming soon."
+  },
+  "licences": {
+    "_note": "Fixed table (attribution standard, section 2/7). Licence names and links come from here, never from free text. Anything not in this table is blocked from public lists.",
+    "cc0-1.0": {
+      "name": "CC0 1.0",
+      "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "share_alike": false
+    },
+    "public-domain": {
+      "name": "Public domain",
+      "url": "",
+      "share_alike": false
+    },
+    "public-domain-us-gov": {
+      "name": "Public domain (US government work)",
+      "url": "",
+      "share_alike": false
+    },
+    "unlicense": {
+      "name": "Unlicense (public domain)",
+      "url": "https://unlicense.org/",
+      "share_alike": false
+    },
+    "cc-by-4.0": {
+      "name": "CC BY 4.0",
+      "url": "https://creativecommons.org/licenses/by/4.0/",
+      "share_alike": false
+    },
+    "cc-by-sa-4.0": {
+      "name": "CC BY-SA 4.0",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "share_alike": true
+    },
+    "zeim-original-placeholder": {
+      "name": "ZEIM Original",
+      "url": "",
+      "share_alike": false,
+      "placeholder": true
+    },
+    "private": {
+      "name": "Private",
+      "url": "",
+      "share_alike": false
+    },
+    "class-only": {
+      "name": "Class only",
+      "url": "",
+      "share_alike": false
+    }
+  },
+  "hold": {
+    "_note": "ONE SWITCH. While enabled, models matching these rules are left off every public list, including this page, until the safety lead clears them. Set enabled to false to release them.",
+    "enabled": true,
+    "license_ids": [
+      "cc-by-sa-4.0"
+    ],
+    "creator_contains": [
+      "NASA"
+    ],
+    "source_contains": [
+      "nasa/NASA-3D-Resources",
+      "nasa.gov"
+    ]
+  }
+}

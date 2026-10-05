@@ -92,9 +92,123 @@ def test_send_sheet_rows_per_audience_share_states_and_printer_honesty_in_a_real
 
 def test_ren_qa_findings_in_a_real_browser_phone_viewport():
     """QA-1 (Print/Send open the right model, both directions), QA-2, QA-3, QA-4, QA-5 and the Edit drop zone at the 5-build cap."""
-    p, u = _spawn("local")
+    p, u = _spawn("local", {"PHOTO3D_MAX_BUILDS": "5"})
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_qa.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
         assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_no_file_input_lists_bare_extensions_so_ios_does_not_grey_files_out():
+    """iOS Safari greys out files whose type it can't map from `accept=".stl,.obj,.3mf"`. Photo inputs may use image/* (+ image extensions)."""
+    import re
+    img = {"heic", "heif", "png", "jpg", "jpeg", "webp", "gif", "bmp"}
+    for fn in ("index.html", "app.js", "edit.js", "photo.js", "send.js", "community.js"):
+        src = open(os.path.join(ROOT, "static", fn)).read()
+        for m in re.finditer(r"""accept\s*=\s*["']([^"']*)["']""", src):
+            for tok in [t.strip().lower() for t in m.group(1).split(",") if t.strip()]:
+                assert "/" in tok or tok.lstrip(".") in img, f"{fn}: accept token {tok!r} would grey files out on iOS"
+    assert 'id="editFile" accept' not in open(os.path.join(ROOT, "static", "index.html")).read()
+
+
+def test_edit_file_picker_accepts_models_by_name_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_files.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=300)
+        assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
+        assert "PASS chrome" in r.stdout
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_start_up_errors_are_visible_and_a_clean_session_has_no_page_errors_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_boot.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS webkit" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_print_dialog_puts_creality_cloud_first_on_phones_and_demotes_desktop_slicers_chrome_and_webkit():
+    p1, u1 = _spawn("local", {"PHOTO3D_SEND_SHARE": "1"}); p2, u2 = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_creality.py"), u1, u2], cwd=ROOT, capture_output=True, text=True, timeout=500)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS webkit" in r.stdout, r.stdout + r.stderr
+    finally:
+        for p in (p1, p2):
+            p.terminate(); p.wait(10)
+
+
+def test_photo_permission_box_in_studio_and_edit_in_a_real_browser():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_cr5.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_credits_page_and_showcase_credit_at_phone_width_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_credits.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_refusals_are_inline_persistent_and_keep_typed_text_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_inline.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_report_is_a_dialog_with_choices_at_phone_width_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_report.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_settings_sheet_fields_are_dark_and_readable_on_a_phone_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_settings.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_star_keeps_a_build_at_phone_width_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_favs.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_username_is_chosen_changed_once_and_locked_in_the_account_dialog_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_username.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_no_native_prompt_boxes_left_class_send_and_teacher_feedback_are_dialogs_in_chrome_and_webkit():
+    assert "prompt(" not in open(os.path.join(ROOT, "static", "community.js"), encoding="utf-8").read()
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_prompts.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)

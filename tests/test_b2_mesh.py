@@ -172,7 +172,10 @@ def test_qa6_normal_text_still_works():
     assert out.volume < _box().volume
 
 
-def test_qa6_letters_that_would_float_in_the_air_are_refused():
-    with pytest.raises(meshedit.OpError) as e:
-        meshedit.apply(_box(), "text", {"text": "HELLO", "mode": "emboss", "face": "top", "height": 8, "offset_u": 17})
+def test_qa6_text_that_touches_nowhere_is_refused_and_partly_floating_text_is_flagged():
+    ball = trimesh.creation.icosphere(subdivisions=4, radius=20)
+    with pytest.raises(meshedit.OpError) as e:                                   # far down the side of a ball: nothing touches
+        meshedit.apply(ball, "text", {"text": "HI", "mode": "emboss", "face": "top", "height": 6, "offset_u": 15})
     assert "float free" in str(e.value)
+    out, rep = meshedit.apply(ball, "text", {"text": "ZEIM", "mode": "emboss", "face": "top", "height": 6})   # centred on the top of a ball: some letters float
+    assert "do not touch the model" in rep["note"]

@@ -647,13 +647,17 @@ def op_text(m, p):
     nominal = sum(g.area for g in polys) * depth
     if mode == "deboss" and abs(float(m.volume) - float(out.volume)) < 1e-4 * max(nominal, 1e-9):
         raise OpError("Nothing was cut: the text doesn't reach the model here (it may be over a curved or sloped part). Move it, or use emboss.")
+    floating = 0
     if mode == "emboss" and len(m.faces) < 400_000 and len(out.faces) < 400_000:
-        if len(out.split(only_watertight=False)) > len(m.split(only_watertight=False)):
+        floating = len(out.split(only_watertight=False)) - len(m.split(only_watertight=False))
+        if floating >= len(polys):
             raise OpError("The raised text would float free of the model (it doesn't touch it here), so it was not added. Move it onto the model or make it smaller.")
     note = "Text is placed on the flat bounding-box face; on curved/sloped surfaces it may float or sink."
     if overhang:
         note = (f"Part of the text goes past the edge of the {face} face ({2 * hu:.0f} × {2 * hv:.0f} mm), so only the part over the model is "
                 + ("added" if mode == "emboss" else "cut") + (", and the raised part that overhangs hangs in the air" if mode == "emboss" else "") + ". " + note)
+    if floating > 0:
+        note = f"{floating} separate piece{'s' if floating != 1 else ''} of the text (e.g. letters over a curved part) do not touch the model and would float in the air. Make the text smaller or move it. " + note
     return out, {"message": f"{mode} “{txt}” on {face}", "note": note}
 
 

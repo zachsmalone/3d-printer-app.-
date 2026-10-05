@@ -7,6 +7,10 @@ from playwright.sync_api import sync_playwright
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8799"
 T = tempfile.mkdtemp(); R = []
 def ok(name, cond, extra=""): R.append((name, bool(cond), extra)); print(("PASS " if cond else "FAIL ") + name, extra)
+def up(pg, sel, ack, f):
+    """CR-5: an uploaded photo needs the permission box ticked first."""
+    if not pg.is_checked(ack): pg.check(ack)
+    pg.set_input_files(sel, f)
 
 jpg = T + "/p.jpg"; Image.open(os.path.join(os.path.dirname(__file__), "sample.png")).convert("RGB").save(jpg, "JPEG")
 import pillow_heif; pillow_heif.register_heif_opener()
@@ -27,14 +31,14 @@ with sync_playwright() as p:
     ok("phone: privacy + permission lines under the buttons", "stay private to you" in pg.inner_text("#sPick") and "ask first" in pg.inner_text("#sPick"))
     ok("phone: capture input present", pg.locator('#sCam[capture="environment"]').count() == 1)
     pg.screenshot(path="previews/photo_phone_start.png")
-    pg.set_input_files("#sFile", jpg)
+    up(pg, "#sFile", "#sAck", jpg)
     pg.wait_for_selector("#result:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
     ok("phone: Beginner auto-builds after choosing a photo", pg.locator("#result").is_visible())
     ok("phone: 'Change photo' link visible", pg.locator("#changePhoto").is_visible())
     pg.screenshot(path="previews/photo_phone_built.png")
-    pg.set_input_files("#sFile", heic); pg.wait_for_timeout(300); pg.wait_for_selector("#makingLine", state="hidden", timeout=60000)      # (no string eval: the page has a CSP without unsafe-eval)
+    up(pg, "#sFile", "#sAck", heic); pg.wait_for_timeout(300); pg.wait_for_selector("#makingLine", state="hidden", timeout=60000)      # (no string eval: the page has a CSP without unsafe-eval)
     ok("phone: HEIC photo builds (no error message)", pg.locator("#sMsg").is_hidden())
-    pg.set_input_files("#sFile", bad); pg.wait_for_selector("#sMsg:not([hidden])", timeout=30000); pg.wait_for_timeout(2500)
+    up(pg, "#sFile", "#sAck", bad); pg.wait_for_selector("#sMsg:not([hidden])", timeout=30000); pg.wait_for_timeout(2500)
     ok("phone: unreadable photo -> persistent inline message", "couldn't open that photo" in pg.inner_text("#sMsg") and pg.locator("#sMsg").is_visible(), pg.inner_text("#sMsg"))
     pg.screenshot(path="previews/photo_phone_error.png")
     ok("phone: no horizontal scroll", pg.evaluate("document.documentElement.scrollWidth") <= 390)
@@ -50,16 +54,19 @@ with sync_playwright() as p:
     pg.screenshot(path="previews/photo_desktop_camera_live.png")
     pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.screenshot(path="previews/photo_desktop_camera_captured.png")
     ok("desktop: stream stopped right after capture", pg.evaluate("!document.querySelector('#sVideo').srcObject || document.querySelector('#sVideo').srcObject.getTracks().every(t => t.readyState === 'ended')"))
-    pg.click("#sRetake"); pg.wait_for_selector("#sSnap:not([hidden])", timeout=10000); pg.wait_for_timeout(1500); pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.click("#sUse")
+    # CR-5: a camera photo needs the permission box too - without it nothing is built and a plain message says why
+    pg.click("#sUse"); pg.wait_for_selector("#sMsg:not([hidden])", timeout=10000)
+    ok("desktop: camera photo without the permission box is not built, and says why", "tick the box" in pg.inner_text("#sMsg") and pg.locator("#result").is_hidden())
+    pg.check("#sAck"); pg.click("#sTake"); pg.wait_for_selector("#sCamPanel:not([hidden])", timeout=10000); pg.wait_for_timeout(1500); pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.click("#sUse")
     pg.wait_for_selector("#result:not([hidden])", timeout=60000)
     ok("desktop: camera photo -> built", pg.locator("#result").is_visible())
     pg.click("#sCamCancel") if pg.locator("#sCamPanel").is_visible() else None
     # Edit
     pg.click('#mainNav [data-view=edit]'); pg.wait_for_timeout(400)
-    ok("edit: 3D-file input only takes mesh files", pg.get_attribute("#editFile", "accept") == ".stl,.obj,.3mf")
+    ok("edit: 3D-file input has NO accept list (iOS greys out bare extensions); the type is checked by name in JS (tests/ui_files.py)", pg.get_attribute("#editFile", "accept") is None)
     ok("edit: photo buttons present", pg.locator("#eChoose").is_visible() and pg.locator("#eTake").is_visible())
     pg.screenshot(path="previews/photo_edit_start.png")
-    pg.set_input_files("#eFile", heic); pg.wait_for_selector("#editPanel:not([hidden])", timeout=60000)
+    up(pg, "#eFile", "#eAck", heic); pg.wait_for_selector("#editPanel:not([hidden])", timeout=60000)
     ok("edit: HEIC photo opens as a project", pg.locator("#editPanel").is_visible())
     ok("desktop: no page errors", not errs, str(errs))
     ctx.close(); b.close()

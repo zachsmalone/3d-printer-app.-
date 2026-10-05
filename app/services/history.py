@@ -15,7 +15,7 @@ from ..config import MAX_BUILDS, OUT
 
 
 class HistoryFull(Exception):
-    pass
+    """Every build slot is taken AND every build is starred: nothing may be removed automatically."""
 
 
 class BuildStore:
@@ -50,10 +50,30 @@ class BuildStore:
     def reserve(self, owner: str, auto_delete_oldest=False):
         """Call under `self.lock` before building. Raises HistoryFull when `owner` is at capacity."""
         items = self.list(owner)
-        if len(items) >= self.limit:
-            if not auto_delete_oldest:
+        while len(items) >= self.limit:
+            loose = [m for m in items if not m.get("favorite")]       # starred builds are never rolled off
+            if not loose:
                 raise HistoryFull()
-            self.delete(items[0]["id"])
+            self.delete(loose[0]["id"])                                 # oldest un-starred build rolls off
+            items = self.list(owner)
+
+    def set_saved(self, bid: str):
+        """Shared to the Showcase or sent to a class: kept longer than an ordinary build (see services/retention.py)."""
+        with self.lock:
+            try:
+                meta = self.get(bid)
+            except KeyError:
+                return
+            if not meta.get("saved"):
+                meta["saved"] = True
+                self.save(meta)
+
+    def set_favorite(self, bid: str, fav: bool) -> dict:
+        with self.lock:
+            meta = self.get(bid)
+            meta["favorite"] = bool(fav)
+            self.save(meta)
+            return meta
 
     def save(self, meta: dict):
         meta.setdefault("created", datetime.now(timezone.utc).isoformat())

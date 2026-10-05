@@ -58,7 +58,7 @@ def test_age_gate_holds_for_a_client_with_no_cookies_from_the_same_address(monke
     from app.api import community as _c
     monkeypatch.setattr(_c, "_ip", lambda r: r.headers.get("x-test-ip", "10.0.0.1"))                # the TestClient has no real addresses
     young = {"display_name": "kid", "dob": "2018-01-01"}; old = {"display_name": "Ada", "dob": "1985-05-05"}
-    a = TestClient(app).post("/api/me/signup", json=young); assert a.status_code == 403
+    for _ in range(config.AGE_IP_LOCK_AFTER + 1): a = TestClient(app).post("/api/me/signup", json=young); assert a.status_code == 403
     b = TestClient(app).post("/api/me/signup", json=old)                                          # brand-new browser, same address
     assert b.status_code == 403 and b.json() == a.json()                                           # identical neutral answer
     other = TestClient(app, headers={"X-Test-Ip": "198.51.100.7"})                           # a different address is unaffected
@@ -70,9 +70,23 @@ def test_age_gate_holds_for_a_client_with_no_cookies_from_the_same_address(monke
 def test_age_ip_lock_expires(monkeypatch):
     import time
     monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 30)
-    TestClient(app).post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"})
+    for _ in range(config.AGE_IP_LOCK_AFTER + 1): TestClient(app).post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"})
     real = time.time; monkeypatch.setattr(time, "time", lambda: real() + 31 * 60)
     assert TestClient(app).post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"}).status_code == 200
+
+
+def test_one_under_13_refusal_does_not_lock_a_teen_or_adult_on_the_same_school_address(monkeypatch):
+    """Edge 5: a school sits behind one public address. A single refusal locks that child's browser only."""
+    monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 30)
+    from app.api import community as _c
+    from app.core import ratelimit; ratelimit.reset()
+    monkeypatch.setattr(_c, "_ip", lambda r: "203.0.113.9")
+    kid = TestClient(app)
+    assert kid.post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"}).status_code == 403
+    assert kid.post("/api/me/signup", json={"display_name": "kid", "dob": "1985-01-01"}).status_code == 403       # same browser stays locked (cookie + session)
+    assert TestClient(app).post("/api/me/signup", json={"display_name": "Alex", "dob": "2010-01-01"}).status_code == 200   # teen, same address
+    assert TestClient(app).post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"}).status_code == 200   # adult, same address
+    ratelimit.reset()
 
 
 # ------------------------------------------------------------------ admin token guessing

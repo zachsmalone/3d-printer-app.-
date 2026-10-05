@@ -189,11 +189,20 @@ def test_edit_from_build_photo_and_history_cap():
                data={"photo_mode": "lithophane", "width_mm": "60", "auto_delete_oldest": "true"})
     assert r.status_code == 200 and r.json()["base"]["type"] == "photo"
     pid = r.json()["id"]; assert op(c, pid, "base", style="rect", margin=2, thickness=2).status_code == 200
-    # edit projects count toward the cap of 5
-    clear(c)
-    for _ in range(5): new_edit(c)
-    r = c.post("/api/edit/new", files={"file": ("a.stl", box())}); assert r.status_code == 409 and r.json()["code"] == "history_full"
-    assert c.post("/api/edit/new", files={"file": ("a.stl", box())}, data={"auto_delete_oldest": "true"}).status_code == 200
+    # edit projects count toward the cap (oldest un-starred rolls off; all starred -> 409)
+    from app.services.history import store as _st
+    old = _st.limit; _st.limit = 5
+    try:
+        clear(c)
+        for _ in range(5): new_edit(c)
+        assert c.post("/api/edit/new", files={"file": ("a.stl", box())}).status_code == 200
+        assert len(c.get("/api/builds").json()["builds"]) == 5
+        for b in c.get("/api/builds").json()["builds"]: c.post(f"/api/builds/{b['id']}/favorite", json={"favorite": True})
+        r = c.post("/api/edit/new", files={"file": ("a.stl", box())}); assert r.status_code == 409 and r.json()["code"] == "history_full"
+        c.delete("/api/builds/" + c.get("/api/builds").json()["builds"][0]["id"])
+        assert c.post("/api/edit/new", files={"file": ("a.stl", box())}).status_code == 200
+    finally:
+        _st.limit = old
     assert len(c.get("/api/builds").json()["builds"]) == 5
     assert c.get("/api/builds").json()["builds"][0]["kind"] in ("edit", "photo")
 
