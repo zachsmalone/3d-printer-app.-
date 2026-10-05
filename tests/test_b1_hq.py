@@ -139,7 +139,7 @@ def test_example_counts_come_back_only_when_the_flag_says_so(monkeypatch):
 
 def test_examples_ui_shows_no_numbers_when_null():
     js = (config.STATIC / "community.js").read_text()
-    assert "i.likes != null" in js and "i.downloads != null" in js
+    assert "i.example || i.no_nozzle) return \"\"" in js and "i.likes == null ? null" in js and "i.downloads != null" in js      # examples: no nozzle button, no number; null counts: no number
 
 
 def test_hq2_free_tab_is_called_newest_and_sorted_by_date():
