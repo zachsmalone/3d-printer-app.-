@@ -54,7 +54,10 @@ with sync_playwright() as p:
     pg.screenshot(path="previews/photo_desktop_camera_live.png")
     pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.screenshot(path="previews/photo_desktop_camera_captured.png")
     ok("desktop: stream stopped right after capture", pg.evaluate("!document.querySelector('#sVideo').srcObject || document.querySelector('#sVideo').srcObject.getTracks().every(t => t.readyState === 'ended')"))
-    pg.click("#sRetake"); pg.wait_for_selector("#sSnap:not([hidden])", timeout=10000); pg.wait_for_timeout(1500); pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.click("#sUse")
+    # CR-5: a camera photo needs the permission box too - without it nothing is built and a plain message says why
+    pg.click("#sUse"); pg.wait_for_selector("#sMsg:not([hidden])", timeout=10000)
+    ok("desktop: camera photo without the permission box is not built, and says why", "tick the box" in pg.inner_text("#sMsg") and pg.locator("#result").is_hidden())
+    pg.check("#sAck"); pg.click("#sTake"); pg.wait_for_selector("#sCamPanel:not([hidden])", timeout=10000); pg.wait_for_timeout(1500); pg.click("#sSnap"); pg.wait_for_selector("#sUse:not([hidden])"); pg.click("#sUse")
     pg.wait_for_selector("#result:not([hidden])", timeout=60000)
     ok("desktop: camera photo -> built", pg.locator("#result").is_visible())
     pg.click("#sCamCancel") if pg.locator("#sCamPanel").is_visible() else None
