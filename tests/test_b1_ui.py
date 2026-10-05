@@ -202,3 +202,13 @@ def test_username_is_chosen_changed_once_and_locked_in_the_account_dialog_in_chr
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_no_native_prompt_boxes_left_class_send_and_teacher_feedback_are_dialogs_in_chrome_and_webkit():
+    assert "prompt(" not in open(os.path.join(ROOT, "static", "community.js"), encoding="utf-8").read()
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_prompts.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)

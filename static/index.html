@@ -339,6 +339,18 @@
   <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="repSend">Send report</button></footer>
 </div></dialog>
 
+<dialog id="dlgFeedback" aria-labelledby="fbTitle"><div class="dlg">
+  <header><h3 id="fbTitle">Feedback for this project</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body"><div class="field"><label for="fbText">Your feedback <em>text only, up to 500 characters</em></label><textarea id="fbText" maxlength="500" rows="4"></textarea>
+    <small class="help">Please don't put names, phone numbers, emails or links here.</small></div></div>
+  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="fbSave">Save feedback</button></footer>
+</div></dialog>
+<dialog id="dlgPickBuild" aria-labelledby="pbTitle"><div class="dlg">
+  <header><h3 id="pbTitle">Which build do you want to send?</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body"><fieldset class="reasons"><legend>Pick one</legend><div id="pbList"></div></fieldset>
+    <p class="help">Only you and your class can see it.</p></div>
+  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></footer>
+</div></dialog>
 <div id="toasts"></div>
 <dialog id="dlgSend" aria-labelledby="dlgSendTitle"><h3 id="dlgSendTitle">Let students send files out of ZEIM?</h3>
   <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>

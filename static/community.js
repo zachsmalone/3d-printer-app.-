@@ -273,7 +273,7 @@ async function openTeacher() {
     if (t.dataset.rd) { await api(`/api/classrooms/${t.dataset.rd}/notifications/read`, J("POST")); openTeacher(); }
     if (t.dataset.talk) { const [c, sid] = t.dataset.talk.split(":"); try { await api(`/api/classrooms/${c}/requests`, J("POST", { kind: "talk_next_class", to: sid })); toast("Request sent", "ok"); } catch (er) { toast(er.message, "err"); } }
     if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }
-    if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); const comment = prompt("Feedback for this project (text only, max 500 characters):"); if (comment) { try { await api(`/api/classrooms/${c}/projects/${pid}/feedback`, J("POST", { comment })); toast("Feedback saved", "ok"); openTeacher(); } catch (er) { toast(er.message, "err"); } } }
+    if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); openFeedback(c, pid); }
     if (t.dataset.rs) { const [c, s] = t.dataset.rs.split(":"); await api(`/api/classrooms/${c}/students/${s}`, { method: "DELETE" }); openTeacher(); }
     if (t.dataset.dr && confirm("Delete this class and all student progress in it?")) { await api("/api/classrooms/" + t.dataset.dr, { method: "DELETE" }); openTeacher(); }
   };
@@ -289,10 +289,26 @@ async function openTeacher() {
     if (!t.dataset.as) return; const ids = $$(`[data-as="${t.dataset.as}"]`).filter(x => x.checked).map(x => x.value); await api(`/api/classrooms/${t.dataset.as}/assign`, J("POST", { lesson_ids: ids })); };
 }
 
+function openFeedback(code, pid) {
+  const d = $("#dlgFeedback"); $("#fbText").value = ""; clearInline($("#fbSave").parentElement);
+  $("#fbSave").onclick = async () => {
+    const comment = $("#fbText").value.trim();
+    if (!comment) return inlineMsg($("#fbSave").parentElement, "Please write a little feedback first.");
+    try { await api(`/api/classrooms/${code}/projects/${pid}/feedback`, J("POST", { comment })); d.close(); toast("Feedback saved", "ok"); openTeacher(); }
+    catch (er) { inlineMsg($("#fbSave").parentElement, er.message); }            // the box keeps what was typed
+  };
+  d.showModal(); $("#fbText").focus();
+}
 async function submitToClass(code) {
-  const b = S.history.filter(x => true); if (!b.length) return toast("Build something in the Studio first.", "err");
-  const pick = prompt("Which build? Type a number:\n" + b.map((x, i) => `${i + 1}. ${x.title}`).join("\n"), "1"); const x = b[(+pick || 0) - 1]; if (!x) return;
-  try { await api(`/api/classrooms/${code}/projects`, J("POST", { build_id: x.id })); toast("Submitted — only your class can see it.", "ok"); } catch (e) { toast(e.message, "err"); }
+  const b = S.history; if (!b.length) return toast("Build something in the Studio first.", "err");
+  const d = $("#dlgPickBuild"); clearInline($("#pbSend").parentElement);
+  $("#pbList").innerHTML = b.map((x, i) => `<label class="choice"><input type="radio" name="pbBuild" value="${esc(x.id)}" ${i === 0 ? "checked" : ""}> <span>${esc(x.title)}</span></label>`).join("");
+  $("#pbSend").onclick = async () => {
+    const id = (document.querySelector('input[name="pbBuild"]:checked') || {}).value; if (!id) return inlineMsg($("#pbSend").parentElement, "Please pick a build.");
+    try { await api(`/api/classrooms/${code}/projects`, J("POST", { build_id: id })); d.close(); toast("Submitted — only your class can see it.", "ok"); }
+    catch (e) { inlineMsg($("#pbSend").parentElement, e.message); }
+  };
+  d.showModal(); document.querySelector('input[name="pbBuild"]')?.focus();
 }
 async function openClassProjects(code) {
   const r = await api(`/api/classrooms/${code}/projects`);
