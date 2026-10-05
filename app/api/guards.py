@@ -132,4 +132,4 @@ def showcase_gate(actor: Actor, likes: bool = False):
     if not pol["enabled"]:
         raise HTTPException(404, "Your teacher has turned this off.")
     if likes and not pol["likes"]:
-        raise HTTPException(403, "Your teacher has turned likes off.")
+        raise HTTPException(403, "Your teacher turned nozzles off for your class.")

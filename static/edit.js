@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
-import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -56,7 +56,7 @@ function fromFile(file) {
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
-  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked()); fd.append("beginner", S.level === "beginner"); return fd; };
+  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked()); fd.append("beginner", !isExpert()); return fd; };
   create(mk(), mk);
 }
 const drop = $("#editDrop");
@@ -74,7 +74,7 @@ $("#eSample").onclick = async () => {
 drop.addEventListener("drop", e => fromFile(e.dataTransfer.files[0]));
 $("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_vase.stl")); };
 function fromBuild(id) {
-  const mk = () => { const fd = new FormData(); fd.append("from_build", id); fd.append("beginner", S.level === "beginner"); return fd; };
+  const mk = () => { const fd = new FormData(); fd.append("from_build", id); fd.append("beginner", !isExpert()); return fd; };
   create(mk(), mk);
 }
 $("#editFromBuildGo").onclick = () => { const v = $("#editFromBuild").value; if (v) fromBuild(v); };
@@ -136,7 +136,7 @@ function renderTools() {
   const a = A(), cap = E.p.capabilities, sz = a.size_mm, ctr = a.center_mm;
   const unitSel = `<div class="row" style="justify-content:space-between"><b>${esc(E.p.title)}</b><span class="seg" id="unitSeg">${Object.keys(UNITS).map(u => `<button data-unit="${u}" class="${u === E.unit ? "on" : ""}">${u}</button>`).join("")}</span></div>`;
   const beginner = `<div data-lvl="beginner">
-    <p class="help">Pick a job. ZEIM chooses sensible settings — switch to Expert for every tool.</p>
+    <p class="help">Pick a job. ZEIM chooses sensible settings — switch to Experienced mode for every tool.</p>
     <div class="bigtools">
       <button class="bigtool ${E.tool === "fix" ? "on" : ""}" data-big="fix"><span class="ico">🩹</span><b>Fix</b><small>Repair holes &amp; flipped faces, put it on the bed</small></button>
       <button class="bigtool ${E.tool === "scale" ? "on" : ""}" data-big="scale"><span class="ico">↔</span><b>Scale</b><small>Make it bigger or smaller</small></button>
@@ -180,7 +180,7 @@ function renderTools() {
       <tr><td>Pieces</td><td>${a.components ?? "n/a"}</td></tr><tr><td>Bounds min</td><td>${a.min_mm.map(fmt).join(", ")}</td></tr><tr><td>Bounds max</td><td>${a.max_mm.map(fmt).join(", ")}</td></tr><tr><td>Centre of mass</td><td>${a.center_of_mass_mm.map(fmt).join(", ")}</td></tr></table></details>
   </div>`;
   $("#editPanel").innerHTML = unitSel + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px">＋ Open another model</button>`;
-  if (E.tool && S.level === "beginner") renderDrawer();
+  if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
 }
 $("#editPanel").addEventListener("click", e => {

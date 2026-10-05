@@ -39,10 +39,10 @@ with sync_playwright() as p:
     top = pg.evaluate("document.querySelector('#viewer').getBoundingClientRect().top")
     tb = pg.evaluate("document.querySelector('.topbar').offsetHeight")
     ok("QA-4: after the build the viewer is on screen, below the top bar (phone)", tb - 3 <= top < 400, f"top={top} bar={tb}")
-    ok("QA-4: focus + status say the model is ready", pg.evaluate("document.activeElement.id") == "result" and "ready" in pg.inner_text("#buildHint"))
+    ok("QA-4: focus + status say the model is ready", pg.evaluate("document.activeElement.id") == "resultH" and "ready" in pg.inner_text("#buildHint"))
     # ---- QA-2: refused photo is forgotten
     pg.reload(); pg.wait_for_timeout(600)
-    pg.click("#levelSwitch [data-level=expert]")
+    pg.select_option("#modeSel", "expert")
     up(pg, "#sFile", "#sAck", T + "/fake.jpg"); pg.wait_for_timeout(400)
     pg.click("#btnBuild"); pg.wait_for_selector("#sMsg:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
     ok("QA-2: refused photo -> inline message, no check-mark row, Build disabled", "couldn't open" in pg.inner_text("#sMsg") and not pg.is_visible("#photoChosen") and pg.is_disabled("#btnBuild"), pg.inner_text("#sMsg"))
@@ -53,7 +53,7 @@ with sync_playwright() as p:
     pg.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)"); pg.wait_for_timeout(300)
     r = pg.evaluate("(()=>{const b=document.querySelector('#btnBuild').getBoundingClientRect();return [b.top,b.bottom,innerHeight]})()")
     ok("QA-5: Expert Build stays on screen at the bottom of the page", pos == "fixed" and 0 < r[0] and r[1] <= r[2] + 1, f"{pos} {r}")
-    pg.evaluate("window.scrollTo(0,0)"); pg.click("#levelSwitch [data-level=beginner]"); pg.wait_for_timeout(300)
+    pg.evaluate("window.scrollTo(0,0)"); pg.select_option("#modeSel", "beginner"); pg.wait_for_timeout(300)
     ok("QA-5: Beginner Build is not floating over the Style cards", pg.evaluate("getComputedStyle(document.querySelector('#btnBuild')).position") != "fixed")
     # ---- QA-3: Edit photo errors are inline
     pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)

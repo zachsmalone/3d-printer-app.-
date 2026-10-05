@@ -38,8 +38,8 @@ with sync_playwright() as p:
         if "viewport-fit=cover" not in meta: bad.append((w, "viewport", meta))
         tag = f"{w}"
         audit(pg, tag + " studio-empty")
-        pg.click("#levelSwitch [data-level=expert]"); pg.wait_for_timeout(300); audit(pg, tag + " studio-expert-empty")
-        pg.click("#levelSwitch [data-level=beginner]"); pg.wait_for_timeout(200)
+        pg.select_option("#modeSel", "expert"); pg.wait_for_timeout(300); audit(pg, tag + " studio-expert-empty")
+        pg.select_option("#modeSel", "beginner"); pg.wait_for_timeout(200)
         # build a sample so the result bar, history card and viewer tools exist
         pg.click("#sSample"); pg.wait_for_timeout(400)
         if pg.locator("#btnBuild").is_enabled(): pg.click("#btnBuild")

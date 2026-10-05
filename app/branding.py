@@ -14,7 +14,7 @@ SECTIONS = {
     "learn": "Spark Lab",           # classroom-friendly education center
     "groups": "Build Plates",       # hobbyist groups (plural); singular below
     "edit": "Edit",                 # upload + modify existing 3D files
-    "history": "Recent builds",
+    "history": "Pick up where you left off",
 }
 SHOWCASE_TABS = {"trending": "Trending", "free": "Newest", "foryou": "For You"}   # key "free" kept for stored data/API stability; everything is free anyway
 GROUP_NAME = "Build Plate"          # one hobbyist group

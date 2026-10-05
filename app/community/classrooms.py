@@ -352,7 +352,7 @@ def set_showcase(actor: Actor, code: str, enabled=None, likes=None) -> dict:
                 room["likes_enabled"] = False
         if likes is not None:
             if likes and not room.get("showcase_enabled", False):
-                raise ValueError("Turn on Showcase for the class first; likes are a second switch.")
+                raise ValueError("Turn on Showcase for the class first; nozzles are a second switch.")
             room["likes_enabled"] = bool(likes)
         room["showcase_changed"] = now
         return {"showcase_enabled": bool(room.get("showcase_enabled", False)), "likes_enabled": bool(room.get("likes_enabled", False))}
@@ -361,13 +361,17 @@ def set_showcase(actor: Actor, code: str, enabled=None, likes=None) -> dict:
     return {**out, "showcase_changed": now}
 
 
+STUDENT_NOTICE = ("Your teacher can see your nickname, which lesson step you are on, your model's name, and when you last did something. "
+                  "They cannot see your photos here.")
+
+
 def student_view(sid: str):
     for room in CLASSROOMS.read().values():
         if sid in room["students"]:
             return {"name": room["name"], "code": room["code"], "teacher": room["teacher"],
                     "assigned": room["assigned"], "nickname": room["students"][sid]["nickname"],
                     "notifications": [n for n in room["notifications"] if n["to"] == sid[:8] and not n["read"]],
-                    "canned": {k: safety.CANNED[k] for k in safety.STUDENT_CANNED}}
+                    "canned": {k: safety.CANNED[k] for k in safety.STUDENT_CANNED}, "notice": STUDENT_NOTICE}
     return None
 
 
@@ -652,5 +656,61 @@ def mark_read(actor: Actor, code: str):
     def f(d):
         for n in d[room["code"]]["notifications"]:
             if n["to"] == me:
+                n["read"] = True
+    CLASSROOMS.update(f)
+
+
+# ---------------------------------------------------------------- Teacher Live view (view-only roster; reports/education-live-view-spec.md)
+def _model_name(sid: str) -> tuple[str, str]:
+    """(title of the student's newest build, its created time). Title only - never a thumbnail or file name - and only if it passes the same text filter."""
+    from ..services.history import store
+    mine = [m for m in store.list(sid) if m.get("created")]
+    if not mine:
+        return "", ""
+    m = max(mine, key=lambda x: x["created"])
+    title = (m.get("title") or "").strip()[:40]
+    if not title or safety.scan(title):
+        title = ""
+    return title, m["created"]
+
+
+def live_roster(actor: Actor, code: str) -> dict:
+    """Teacher of THIS class only (anyone else, including other teachers and students: KeyError -> 404). Stable order = join order.
+    Fields are exactly: id, nickname, lesson{title,done_steps,steps}, model, last_active, hand. No photos, thumbnails, file names, ids beyond the 8-char row id."""
+    role, room = membership(actor, code)
+    if role != "teacher":
+        raise KeyError(code)
+    prog_all = education.PROGRESS.read()
+    hands = {n["from"] for n in room["notifications"] if n["to"] == "teacher" and n["kind"] == "need_help" and not n["read"]}
+    lessons = {l["id"]: l for l in education.LESSONS}
+    pool = [lid for lid in (room["assigned"] or []) if lid in lessons] or list(lessons)
+    rows = []
+    for sid, st in room["students"].items():
+        prog = prog_all.get(sid, {})
+        best, best_at = None, ""
+        for lid in pool:
+            at = prog.get(lid, {}).get("last_step_at", "")
+            if best is None or at > best_at:
+                best, best_at = lid, at
+        lesson = None
+        if best:
+            p = prog.get(best, {})
+            lesson = {"title": lessons[best]["title"], "done_steps": len(p.get("steps_done", [])), "steps": len(lessons[best]["steps"])}
+        model, built_at = _model_name(sid)
+        last = max([x for x in (best_at, built_at, st.get("joined", "")) if x] or [""])
+        rows.append({"id": sid[:8], "nickname": st["nickname"], "lesson": lesson, "model": model, "last_active": last, "hand": sid[:8] in hands})
+    return {"code": room["code"], "name": room["name"], "as_of": datetime.now(timezone.utc).isoformat(), "students": rows,
+            "note": "Lesson progress is the number of steps a student has ticked. Last activity is their last tick, last model, or joining."}
+
+
+def helped(actor: Actor, code: str, student_id: str) -> None:
+    """Teacher clears a raised hand (marks that student's unread 'I need help' requests as read)."""
+    role, room = membership(actor, code)
+    if role != "teacher" or not any(s.startswith(student_id) and len(student_id) >= 6 for s in room["students"]):
+        raise KeyError(student_id)
+
+    def f(d):
+        for n in d[room["code"]]["notifications"]:
+            if n["to"] == "teacher" and n["kind"] == "need_help" and n["from"].startswith(student_id[:8]):
                 n["read"] = True
     CLASSROOMS.update(f)

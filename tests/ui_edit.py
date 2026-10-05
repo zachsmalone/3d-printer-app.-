@@ -18,7 +18,7 @@ with sync_playwright() as p:
     pg.screenshot(path="previews/ui_edit_beginner.png")
     pg.click('[data-big=fix]'); pg.wait_for_timeout(2500)
     pg.click('[data-big=hollow]'); pg.wait_for_timeout(300); pg.click('#bHollowGo'); pg.wait_for_function("document.querySelectorAll('#editOps li').length>=4", timeout=60000); pg.wait_for_timeout(1500)
-    pg.click('#levelSwitch [data-level=expert]'); pg.wait_for_timeout(600)
+    pg.select_option("#modeSel", "expert"); pg.wait_for_timeout(600)
     pg.click('#editPanel details.tool:nth-of-type(2) summary')            # cut
     pg.fill('form[data-form=cut] [name=position]', '20'); pg.wait_for_timeout(300)
     pg.screenshot(path="previews/ui_edit.png")

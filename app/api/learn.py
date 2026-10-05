@@ -290,6 +290,24 @@ def send_request(code: str, body: dict, actor: Actor = Depends(get_actor)):
         raise HTTPException(400, str(e))
 
 
+@router.get("/classrooms/{code}/live")
+def live_view(code: str, actor: Actor = Depends(get_actor)):
+    """Teacher Live view: view-only roster, owner of the class only (404 for everyone else)."""
+    try:
+        return classrooms.live_roster(actor, code)
+    except KeyError:
+        raise HTTPException(404)
+
+
+@router.post("/classrooms/{code}/students/{sid}/helped")
+def hand_helped(code: str, sid: str, actor: Actor = Depends(get_actor)):
+    try:
+        classrooms.helped(actor, code, sid)
+    except KeyError:
+        raise HTTPException(404)
+    return {"ok": True}
+
+
 @router.get("/classrooms/{code}/notifications")
 def notifications(code: str, actor: Actor = Depends(get_actor)):
     try:
@@ -343,7 +361,8 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
     thumb = f"<img src='/api/showcase/{pid}/thumb' class=sharethumb alt=''>" if i.get("has_thumb") else ""
     ex = "<p class=pill>EXAMPLE seed data - not a real creator project</p>" if i.get("example") else ""
     files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
-    eng = f" · ♥ {catalog.public(i, actor)['likes']} · ⬇ {catalog.public(i, actor)['downloads']}" if catalog.public(i, actor)["likes"] is not None else ""
+    _pub = catalog.public(i, actor)
+    eng = f" · {_pub['likes']} {'nozzle' if _pub['likes'] == 1 else 'nozzles'} · ⬇ {_pub['downloads']}" if _pub["likes"] is not None else ""
     cl = credits.credit_line(i)
     credit = (f"<p class=credit>Credit: <b>{escape(cl['creator'])}</b>" + (f" · Licence: {_lic(cl['licence'], cl['licence_url'])}" if cl["licence"] else "") + " · <a href='/credits'>Thank you &amp; credits</a></p>") if cl else ""
     body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{thumb}"

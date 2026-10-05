@@ -2,6 +2,7 @@
    The page is wired by modules (app.js, community.js, edit.js); if one is missing, stale or broken, every button is dead and the
    page still LOOKS fine. So: if the app has not reported "started" in a few seconds, or a script fails first, say so out loud. */
 (function () {
+  try { if (localStorage.theme === "dark") document.documentElement.setAttribute("data-theme", "dark"); } catch (e) { }   // warm light is the default; Dark is a choice
   var errors = (window.__zeimErrors = []);
   var shown = false;
   function started() { return window.__zeimStarted === true && window.__zeimEditStarted === true; }

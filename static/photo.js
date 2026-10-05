@@ -16,7 +16,7 @@ export function photoBlock(p, { sample = true } = {}) {
     <button type="button" class="btn big" id="${p}Take" hidden><span aria-hidden="true">📷</span> Take a photo</button>
     <button type="button" class="btn big primary" id="${p}Choose"><span aria-hidden="true">🖼</span> Choose a photo</button>
   </div>
-  ${sample ? `<div class="pp-sample"><button type="button" class="btn" id="${p}Sample"><span aria-hidden="true">✨</span> Use a sample image</button></div>` : ""}
+  ${sample ? `<div class="pp-sample"><button type="button" class="btn" id="${p}Sample"><span aria-hidden="true">✨</span> Try a sample photo</button></div>` : ""}
   <p class="pp-msg" id="${p}Msg" role="status" aria-live="polite" hidden></p>
   <div class="pp-cam" id="${p}CamPanel" hidden>
     <video id="${p}Video" playsinline muted autoplay aria-label="Camera preview"></video>
