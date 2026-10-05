@@ -63,7 +63,7 @@ for f in passcode.txt url.txt auth.hash .curlrc .pubcurl-auth .pubcurl-noauth; d
 done
 say "passcode, address and hash files deleted"
 echo "stopped=$(date -Is)" >> "$RUN/run-info.txt"
-if [ "$PURGE" = 1 ]; then rm -rf "$RUN/data" "$RUN/outputs" "$RUN/app-snapshot"; say "test data and outputs deleted"
+if [ "$PURGE" = 1 ]; then rm -rf "$RUN/data" "$RUN/outputs" "$RUN/app-snapshot" "$RUN"/app-snapshot-* "$RUN"/data-prev-* "$RUN"/outputs-prev-*; say "test data and outputs deleted"
 else say "test data kept in $RUN/data and $RUN/outputs (use --purge-data to delete; they may hold photos)"; fi
 rm -f "$CURRENT"
 [ "$LEFT" = 0 ]

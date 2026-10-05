@@ -3,7 +3,7 @@
 #   ./start.sh --haruto-confirmed [--max-minutes 120] [--snapshot]
 # Refuses to run without --haruto-confirmed (Haruto must have confirmed in HQ that S-01, signed-link/base-URL
 # and the camera-button fixes are live). Never prints the passcode or the URL; they are saved 0600 in the run dir.
-#   --snapshot   run the last COMMITTED code (git archive HEAD) instead of the working tree
+#   --snapshot [commit]   run COMMITTED code (git archive of <commit>, default HEAD) in a private copy instead of the working tree
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/lib.sh"
@@ -11,11 +11,13 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # real token from the 0600 file via an explicit per-command assignment below.
 unset NGROK_AUTHTOKEN
 
-CONFIRMED=0; SNAPSHOT=0
+CONFIRMED=0; SNAPSHOT=0; SNAP_REV=HEAD
 while [ $# -gt 0 ]; do
   case "$1" in
     --haruto-confirmed) CONFIRMED=1 ;;
-    --snapshot) SNAPSHOT=1 ;;
+    --snapshot) SNAPSHOT=1
+      # optional commit after --snapshot (hex id, 7..40 chars); default HEAD of $ZEIM_APP_DIR (any branch's commit works: shared object store)
+      case "${2:-}" in ''|*[!0-9a-f]*) ;; *) [ ${#2} -ge 7 ] && [ ${#2} -le 40 ] && { SNAP_REV="$2"; shift; } ;; esac ;;
     --max-minutes) shift; MAX_MINUTES="${1:-}" ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac; shift
@@ -27,6 +29,7 @@ fi
 case "$MAX_MINUTES" in ''|*[!0-9]*) echo "--max-minutes must be a whole number" >&2; exit 2 ;; esac
 [ "$MAX_MINUTES" -ge 5 ] && [ "$MAX_MINUTES" -le 480 ] || { echo "--max-minutes must be 5..480" >&2; exit 2; }
 
+[ "$SNAPSHOT" = 1 ] && { git -C "$ZEIM_APP_DIR" cat-file -e "$SNAP_REV^{commit}" 2>/dev/null || { echo "commit $SNAP_REV not found in $ZEIM_APP_DIR" >&2; exit 4; }; }
 for b in "$ZEIM_CADDY" "$ZEIM_NGROK" "$ZEIM_PYTHON"; do [ -x "$b" ] || { echo "missing executable: $b" >&2; exit 4; }; done
 command -v ss >/dev/null && command -v curl >/dev/null && command -v setsid >/dev/null || { echo "need ss, curl, setsid" >&2; exit 4; }
 [ -s "$NGROK_TOKEN_FILE" ] || { echo "missing ngrok authtoken file ($NGROK_TOKEN_FILE). Not starting." >&2; exit 4; }
@@ -55,12 +58,12 @@ ln -sfn "$RUN" "$CURRENT"
 
 if [ "$SNAPSHOT" = 1 ]; then
   mkdir -p "$RUN/app-snapshot"
-  git -C "$ZEIM_APP_DIR" archive HEAD | tar -x -C "$RUN/app-snapshot"
+  git -C "$ZEIM_APP_DIR" archive "$SNAP_REV" | tar -x -C "$RUN/app-snapshot"
   SRC="$RUN/app-snapshot"
 fi
 { echo "app_dir=$SRC"; echo "git_head=$(git -C "$ZEIM_APP_DIR" rev-parse --short HEAD 2>/dev/null || echo ?)";
   echo "working_tree_dirty_app_static=$(git -C "$ZEIM_APP_DIR" status --short -- app static 2>/dev/null | wc -l)";
-  echo "max_minutes=$MAX_MINUTES"; echo "started=$(date -Is)"; } > "$RUN/run-info.txt"
+  echo "snapshot_rev=$([ "$SNAPSHOT" = 1 ] && git -C "$ZEIM_APP_DIR" rev-parse --short "$SNAP_REV" 2>/dev/null || echo none)"; echo "max_minutes=$MAX_MINUTES"; echo "started=$(date -Is)"; } > "$RUN/run-info.txt"
 
 # On failure stop everything but KEEP the ngrok token file, so a fixed script can be re-run. A deliberate ./stop.sh (or the timer) shreds it.
 fail() { echo "start failed: $1 - stopping everything" >&2; "$DIR/stop.sh" --quiet --keep-token || true; exit 1; }

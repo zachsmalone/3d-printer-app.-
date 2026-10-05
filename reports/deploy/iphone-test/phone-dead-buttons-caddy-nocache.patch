@@ -1,0 +1,15 @@
+--- Caddyfile.template	2026-10-04 18:15:56.924308341 -0500
++++ Caddyfile.template	2026-10-04 18:32:01.260308341 -0500
+@@ -31,6 +31,12 @@
+ 		max_size 30MB
+ 	}
+ 
++	# Phone-test fix (2026-10-04): the app sends ETag + Last-Modified but NO Cache-Control for /static, so Safari reuses
++	# old JS modules without asking. During a live test an edited app.js then ran against stale cached modules. no-cache means
++	# "revalidate every time" (a cheap 304 when unchanged), so a reload always gets a matching set of files.
++	@zeimstatic path /static/* /favicon.ico /
++	header @zeimstatic Cache-Control "no-cache"
++
+ 	reverse_proxy 127.0.0.1:@@APP_PORT@@ {
+ 		# Overwrite (never append to) what the client sent, so a forged X-Forwarded-For cannot reach the app.
+ 		header_up X-Forwarded-For {client_ip}
