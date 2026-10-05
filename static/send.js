@@ -36,23 +36,24 @@ function shareAllowed() {
 function render() {
   const { b, caps, adult } = X, fmt = X.fmt, sizes = b.sizes || {};
   const photo = b.kind !== "edit";
-  $("#ssTitle").textContent = adult ? "Send your build" : "Save your build";
+  $("#ssTitle").textContent = adult ? "Send or save your model" : "Save your model";
   const chooser = adult ? `<div class="fmt" role="radiogroup" aria-label="File type">${FMTS.map(f =>
     `<button type="button" role="radio" aria-checked="${f === fmt}" class="${f === fmt ? "on" : ""}" data-fmt="${f}">${f.toUpperCase()}${sizes[f] ? `<small>${mb(sizes[f])}</small>` : ""}</button>`).join("")}</div>
     <p class="help" id="ssFmtHint">${{ "3mf": "Best for most slicers. Smallest file.", stl: "Works almost everywhere. Use this one for Shapr3D.", obj: "For other 3D apps." }[fmt]}</p>` : "";
   const fileLine = !adult ? "" : !isExpert()
     ? `<div class="help">File: 3D print file (3MF)<details class="inl"><summary>Different file type?</summary>${chooser}</details></div>` : chooser;
-  const rows = [];
-  rows.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "⬇ Save to this device" : "⬇ Download my build"}</b>
+  const save = [], other = [], print = [];
+  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "⬇ Save to this device" : "⬇ Download my model"}</b>
     <small>${adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
-  if (caps.teacher && caps.class_code) rows.push(`<button type="button" class="btn sheet-row" id="ssTeacher"><b>⬆ Send to my teacher</b><small>Your teacher can see it.</small></button>`);
+  if (caps.teacher && caps.class_code) save.push(`<button type="button" class="btn sheet-row" id="ssTeacher"><b>⬆ Send to my teacher</b><small>Your teacher can see it.</small></button>`);
+  if (b.original) save.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b>⬇ Your original file</b><small>The file you opened, unchanged.</small></a>`);
   if (adult && shareAllowed()) {
-    rows.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b>📤 Share…</b><small>Opens the ${shareLabel()} share sheet.</small></button>`);
-    rows.push(`<button type="button" class="btn sheet-row" id="ssEmail" disabled><b>✉ Email it to myself</b><small>Your Mail app sends it. ZEIM doesn't.</small></button>`);
-    rows.push(`<button type="button" class="btn sheet-row" id="ssShapr" disabled><b>🧊 Share as STL for Shapr3D…</b><small>Opens as a reference shape, not editable. When Shapr3D asks, choose <b>millimetres</b>. Pick Shapr3D on the next screen.</small></button>`);
+    other.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b>📤 Share… <span class="untested">untested</span></b><small>Opens the ${shareLabel()} share sheet, where you pick the app (Files, Mail and more). Not tried on a real iPhone or iPad yet.</small></button>`);
+    other.push(`<button type="button" class="btn sheet-row" id="ssEmail" disabled><b>✉ Email it to myself <span class="untested">untested</span></b><small>Your Mail app sends it. ZEIM doesn't. Not tried on a real iPhone or iPad yet.</small></button>`);
+    other.push(`<button type="button" class="btn sheet-row" id="ssShapr" disabled><b>🧊 Share as STL for Shapr3D… <span class="untested">untested</span></b><small>Opens as a reference shape, not editable. When Shapr3D asks, choose <b>millimetres</b>. Pick Shapr3D on the next screen. Not tried with the real app yet.</small></button>`);
   }
-  if (caps.printer_ui) rows.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b>🖨 Send to my printer</b><small>Opens the printer step in Print.</small></button>`);
-  if (b.original) rows.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b>⬇ Your original file</b><small>The file you opened, unchanged.</small></a>`);
+  if (caps.printer_ui) print.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b>🖨 Send to my printer</b><small>Opens the printer step in Print. Tested with a pretend printer only.</small></button>`);
+  const group = (title, items, id) => items.length ? `<h3 class="group" id="${id}">${title}</h3><ul class="rows" aria-labelledby="${id}">${items.map(h => `<li>${h}</li>`).join("")}</ul>` : "";
   const notes = [];
   if (caps.role === "teen") notes.push("Sending to other apps isn't available for your account. You can download your build.");
   if (caps.role === "student" && !caps.share) notes.push("Sending to other apps is turned off for this class. You can download your build or send it to your teacher.");
@@ -64,13 +65,13 @@ function render() {
   notes.push(adult ? "ZEIM sends nothing to other apps. The app you pick gets the file. Only send photos you have permission to use."
                    : "Only share photos and builds you made, or have permission to use.");
   if (adult) notes.push("If you delete this build in ZEIM, copies you already sent stay where they are.");
-  const more = adult ? `<details class="more"><summary>More places</summary><p><a href="https://www.crealitycloud.com/" target="_blank" rel="noopener noreferrer">Creality Cloud ↗</a><br>
-    <small>This opens the Creality Cloud website. You upload there yourself, and their rules apply. ZEIM does not connect to Creality.</small></p></details>` : "";
+  const more = adult ? `<details class="more"><summary>More places</summary><p><a href="https://www.crealitycloud.com/" target="_blank" rel="noopener noreferrer">Creality Cloud ↗ (opens their website)</a><br>
+    <small>This only opens the Creality Cloud website. You upload there yourself, and their rules apply. ZEIM does not connect to Creality, and we have not tested uploading a ZEIM file there yet.</small></p></details>` : "";
   $("#ssBody").innerHTML = `<p class="help">${adult ? "Choose a file type, then where to send it." : "Your build is a file. You can save it on this device."}</p>
     <p class="help"><b id="ssWhich">Sending: ${esc(X.label)}</b></p>
     ${fileLine}
     <p class="help" id="ssStatus" role="status" aria-live="polite"></p><p class="help bad" id="ssAlert" role="alert"></p>
-    <div class="sheet-rows">${rows.join("")}</div>${more}
+    <div class="sheet-rows">${group("Save it", save, "ssG1")}${group("Send to another app", other, "ssG2")}${group("Print", print, "ssG3")}</div>${more}
     ${notes.filter(Boolean).map(n => `<p class="help">${n}</p>`).join("")}
     <div class="row end"><button type="button" class="btn" data-close-sheet>Close</button></div>`;
   $("#ssSave").focus();
