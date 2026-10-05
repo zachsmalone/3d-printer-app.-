@@ -255,3 +255,6 @@ a.creator-link{color:var(--acc2);text-decoration:underline;text-underline-offset
 .inline-msg{margin:.6rem 0;padding:.6rem .8rem;border-left:4px solid #ff8a8a;background:rgba(255,138,138,.12);color:#fff;font-size:16px;line-height:1.4;border-radius:6px}
 .inline-msg.ok{border-left-color:#7ddc9a;background:rgba(125,220,154,.12)}.calm{padding:.4rem 0}.calm p{margin:.4rem 0}
 .sharepage p.help a{display:inline-block;min-height:44px;line-height:44px;padding:0 8px}
+fieldset.reasons{border:0;padding:0;margin:0 0 12px}fieldset.reasons legend{font-weight:600;margin-bottom:6px}
+label.choice{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:8px;cursor:pointer}label.choice:hover{background:rgba(255,255,255,.06)}
+label.choice input{width:22px;height:22px;flex:none}#repDetails{width:100%;font-size:16px}

@@ -319,6 +319,24 @@
   <footer><button class="btn primary" id="btnDoJoin">Join</button></footer>
 </div></dialog>
 
+<dialog id="dlgReport" aria-labelledby="repTitle"><div class="dlg">
+  <header><h3 id="repTitle">Report this project</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="body">
+    <fieldset class="reasons"><legend>What is the problem?</legend>
+      <label class="choice"><input type="radio" name="repReason" value="minor_safety"> <span>Something about a person or a child is not safe</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="not_family_friendly"> <span>Not family-friendly</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="harassment"> <span>Mean or unkind</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="personal_info"> <span>Shares private information</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="copyright"> <span>Copyright, or someone's work without credit</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="other"> <span>Something else</span></label>
+    </fieldset>
+    <div class="field"><label for="repDetails">Anything you want to add? <em>optional</em></label><textarea id="repDetails" maxlength="500" rows="3"></textarea>
+      <small class="help">Please don't put names, phone numbers, emails or links here.</small></div>
+    <p class="help">A person reads every report. A report about someone's safety hides the project straight away.</p>
+  </div>
+  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="repSend">Send report</button></footer>
+</div></dialog>
+
 <div id="toasts"></div>
 <dialog id="dlgSend" aria-labelledby="dlgSendTitle"><h3 id="dlgSendTitle">Let students send files out of ZEIM?</h3>
   <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>

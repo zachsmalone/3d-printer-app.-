@@ -119,19 +119,27 @@ async function openItem(id) {
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
       ${i.likes != null ? `<button class="btn ${i.liked ? "primary" : ""}" id="itLike" ${i.can_like ? "" : "disabled"} title="${i.can_like ? "Like this model" : "You can't like your own model"}">♥ ${i.liked ? "Liked" : "Like"} · ${i.likes}</button>` : ""}
-      ${i.can_follow ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
+      ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
-      <button class="btn ghost danger" id="itReport">⚑ Report</button></div>
+      ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}</div>
     <p class="help">Likes and downloads are counted once per visitor and only for public projects. A feed of the creators you follow: <b>Coming soon</b>.</p>`;
   if ($("#itLike")) $("#itLike").onclick = async () => { try { await api(`/api/showcase/${id}/like`, J("POST", {})); openItem(id); loadShowcase(); } catch (e) { toast(e.message, "err"); } };
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
-  $("#itReport").onclick = async () => {
-    const reason = prompt("Report reason: minor_safety, not_family_friendly, copyright, harassment, personal_info, other", "not_family_friendly");
-    if (!reason) return;
-    try { const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details: prompt("Details (optional)") || "" })); toast(r.auto_hidden ? "Reported — hidden pending review. Thank you." : "Report received. Thank you.", "ok"); if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); } }
-    catch (e) { toast(e.message, "err"); }
+  if ($("#itReport")) $("#itReport").onclick = () => {
+    $$("#dlgReport [name=repReason]").forEach(r => r.checked = false); $("#repDetails").value = ""; clearInline($("#repSend"));
+    $("#repSend").disabled = false; $("#dlgReport").showModal();
+    $("#repSend").onclick = async () => {
+      const reason = $("#dlgReport [name=repReason]:checked")?.value;
+      if (!reason) return inlineMsg($("#repSend"), "Please choose what the problem is.");
+      $("#repSend").disabled = true;
+      try {
+        const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details: $("#repDetails").value }));
+        $("#dlgReport").close(); toast(r.auto_hidden ? "Thank you. The project is hidden while a grown-up looks at it." : "Thank you. We got your report.", "ok");
+        if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); }
+      } catch (e) { inlineMsg($("#repSend"), e.message); } finally { $("#repSend").disabled = false; }
+    };
   };
   $("#dlgItem").showModal();
 }
