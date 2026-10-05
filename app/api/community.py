@@ -110,6 +110,19 @@ def recover_account(request: Request, body: dict, actor: Actor = Depends(get_act
     return {**idn.public_profile(Actor(actor.sid, user)), "recovery_code": new_code}
 
 
+@router.post("/me/signout")
+def signout(request: Request, actor: Actor = Depends(get_actor)):
+    """Sign out of THIS browser: it gets a brand-new empty session. The account itself is kept on the server; an adult gets back in with their
+    recovery code (POST /me/recover). There are no passwords yet, so the page tells people that before they press it."""
+    if not actor.user:
+        raise HTTPException(400, "You're not signed in.")
+    import logging, secrets as _s
+    logging.getLogger("zeim.audit").info("signout: account=%s", actor.user.get("id"))
+    r = JSONResponse({"signed_out": True})
+    r.set_cookie(idn.COOKIE, _s.token_urlsafe(24), max_age=3600 * 24 * 365, **idn.cookie_args(request))
+    return r
+
+
 @router.post("/me/recovery-code")
 def new_recovery_code(actor: Actor = Depends(get_actor)):
     """Make a fresh recovery code (the old one stops working). Adult accounts only."""

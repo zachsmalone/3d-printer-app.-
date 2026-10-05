@@ -62,7 +62,18 @@ function renderAccount() {
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
       <div class="field"><label>Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
-      <button class="btn primary" id="su_go">Create account</button>`;
+      <button class="btn primary" id="su_go">Create account</button>
+      <details class="recover"><summary>Signed out before? Get your account back with a recovery code</summary>
+        <div class="field"><label for="rc_code">Recovery code</label><input id="rc_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+        <button class="btn" id="rc_go">Get my account back</button></details>`;
+    $("#rc_go").onclick = async () => {
+      try {
+        const r = await api("/api/me/recover", J("POST", { code: $("#rc_code").value }));
+        $("#accBody").innerHTML = `<div class="calm" role="status" tabindex="-1"><p>Welcome back, <b>@${esc(r.username || "")}</b>.</p><p>Your new recovery code is <b class="code">${esc(r.recovery_code)}</b>. The old one no longer works. Write this one down and keep it like a password.</p><button class="btn primary" id="rc_done">Done</button></div>`;
+        $("#accBody .calm").focus();
+        $("#rc_done").onclick = () => location.reload();
+      } catch (e) { inlineMsg($("#rc_go"), e.message); }
+    };
     $("#su_go").onclick = async () => {
       try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim() })); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
@@ -94,7 +105,10 @@ function renderAccount() {
       <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li>
       <li>Classroom tools: <b>${r.can_create_classroom ? "available" : "adults only"}</b></li></ul>
-      <p class="help">Add link-outs in Settings → Promote your accounts.</p>`;
+      <p class="help">Add link-outs in Settings → Promote your accounts.</p>
+      <h4>Sign out</h4><p class="help">Signing out makes this browser forget your account. Use it on a shared computer.</p>
+      <button class="btn small" id="so_open">Sign out…</button>`;
+    $("#so_open").onclick = () => openSignout();
     $("#un_save").onclick = async () => {
       try { const r = await api("/api/me/username", J("PUT", { username: $("#un_new").value.trim() })); await refreshMe(); renderAccount(); toast("Your username is now @" + r.username, "ok"); }
       catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
@@ -108,6 +122,30 @@ function renderAccount() {
     $("#pv_followers").onclick = async () => { const f = await api("/api/me/followers"); toast(!f.enabled ? "Following is off, so there are no followers." : f.followers.length ? "Followers: " + f.followers.map(x => x.display_name).join(", ") : "No followers yet."); };
   }
 }
+
+/* ---------- Sign out (there are no passwords yet, so say plainly how to get back in before anyone presses it) ---------- */
+function openSignout() {
+  const adult = ME.age_group === "adult", body = $("#soBody"), go = $("#soGo");
+  go.disabled = true; clearInline(go.parentElement);
+  body.innerHTML = adult
+    ? `<p>ZEIM has no passwords yet. To open this account again later, here or on another device, you need a <b>recovery code</b>.</p>
+       <p class="help">Showing a new code makes any older code stop working.</p>
+       <button type="button" class="btn" id="soCodeBtn">Show my recovery code</button><p id="soCode" role="status"></p>
+       <label class="inl"><input type="checkbox" id="soOk" disabled> I have written down my recovery code</label>`
+    : `<p>Accounts under 18 don't have recovery codes yet, so after you sign out <b>this account can't be opened again</b>. Your projects stay private.</p>
+       <label class="inl"><input type="checkbox" id="soOk"> I understand I can't get this account back</label>`;
+  $("#soOk").onchange = e => { go.disabled = !e.target.checked; };
+  if (adult) $("#soCodeBtn").onclick = async () => {
+    try { const r = await api("/api/me/recovery-code", J("POST")); $("#soCode").innerHTML = `Your recovery code: <b class="code">${esc(r.recovery_code)}</b>`; $("#soOk").disabled = false; }
+    catch (e) { $("#soCode").textContent = e.message; }
+  };
+  go.onclick = async () => {
+    try { await api("/api/me/signout", J("POST")); try { sessionStorage.zeimSignedOut = "1"; } catch { } location.reload(); }
+    catch (e) { inlineMsg(go.parentElement, e.message); }
+  };
+  $("#dlgSignout").showModal();
+}
+try { if (sessionStorage.zeimSignedOut) { delete sessionStorage.zeimSignedOut; setTimeout(() => toast("You're signed out. This browser no longer has your account.", "ok"), 300); } } catch { }
 
 /* ---------- showcase grid ---------- */
 const MODE_ICON = { lithophane: "🖼️", relief: "⛰️", popart: "🎨", edit: "✏️" };
