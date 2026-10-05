@@ -53,5 +53,10 @@ export class Viewer {
     this.camera.far = r * 20; this.camera.updateProjectionMatrix();
     this.controls.target.copy(c); this.controls.update();
   }
+  /* Turn left / right buttons (a keyboard- and touch-friendly alternative to dragging): spin the camera round the model's centre (Z is up here). */
+  turn(deg) {
+    const t = this.controls.target, v = this.camera.position.clone().sub(t), a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+    this.camera.position.set(t.x + v.x * c - v.y * sn, t.y + v.x * sn + v.y * c, t.z + v.z); this.controls.update();
+  }
   toggleWire() { this.wire = !this.wire; this.group.children.forEach(m => m.material.wireframe = this.wire); }
 }

@@ -90,14 +90,25 @@ document.addEventListener("zeim:me", e => {
   if (S.level === "teacher" && !S.canTeach) { S.level = "beginner"; applyLevel(false); if (S.teacherSeen) say("Back to Beginner mode."); S.teacherSeen = false; }
 });
 function applyMode() {
-  $$("#modeCards .card").forEach(c => c.classList.toggle("on", c.dataset.mode === S.mode));
+  $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); });
+  $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
 }
-$$("#modeCards .card").forEach(c => c.onclick = () => { S.mode = c.dataset.mode; applyMode(); });
-$$("#presetSeg button").forEach(b => b.onclick = () => { S.preset = b.dataset.preset; $$("#presetSeg button").forEach(x => x.classList.toggle("on", x === b)); applyMode(); });
+$("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked
+$("#presetSeg").onchange = () => { S.preset = ($("#presetSeg input:checked") || {}).value || "standard"; applyMode(); };
 $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
 $("#width_mm").oninput = e => $("#widthRange").value = e.target.value;
+
+/* ---------- the three-step path: Photo -> Preview -> Print-ready (ticks AND a border, never colour alone; changes announced politely) ---------- */
+function setPath(step, say) {
+  $$("#path li").forEach(li => {
+    const n = +li.dataset.step; li.classList.toggle("done", n < step); li.classList.toggle("cur", n === step);
+    if (n === step) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+    li.querySelector(".n").textContent = n < step ? "✓" : String(n);
+  });
+  if (say) $("#pathSay").textContent = say;
+}
 
 /* ---------- file ---------- */
 import { photoBlock, mountPhoto } from "/static/photo.js";
@@ -111,7 +122,7 @@ function clearFile() {
   const img = $("#dropPreview"); img.onerror = null; img.hidden = true; img.removeAttribute("src");
   $("#dropHint").hidden = false; $("#dropHint").innerHTML = DROP_HINT0;
   $("#photoChosen").hidden = true; $("#photoChosenName").textContent = "";
-  $("#btnBuild").disabled = true; $("#buildHint").textContent = "Choose or take a photo to begin.";
+  $("#btnBuild").disabled = true; $("#buildHint").textContent = "Choose or take a photo to begin."; setPath(1, "Step 1 of 3: choose a photo.");
 }
 function setFile(f) {
   if (!f) return;
@@ -121,7 +132,7 @@ function setFile(f) {
   const img = $("#dropPreview"); img.onerror = () => { img.hidden = true; $("#dropHint").hidden = false; $("#dropHint").innerHTML = "<b>Photo ready</b><span>(This browser can't preview it, ZEIM will still open it.)</span>"; };
   img.src = URL.createObjectURL(f); img.hidden = false; $("#dropHint").hidden = true;
   $("#btnBuild").disabled = false; $("#buildHint").textContent = "Photo ready: " + (f.name || "camera photo");
-  pick.msg(""); $("#photoChosen").hidden = false; $("#photoChosenName").textContent = "✔ " + (f.name || "camera photo");
+  setPath(1, "Photo chosen."); pick.msg(""); $("#photoChosen").hidden = false; $("#photoChosenName").textContent = "✔ " + (f.name || "camera photo");
   if (!isExpert()) build(false);                         // Beginner: the photo builds straight away, no hidden second step
   else $("#btnBuild").scrollIntoView({ block: "nearest", behavior: "smooth" });   // Expert: tune the settings, then press Build
 }
@@ -154,25 +165,26 @@ function formData(autoDelete) {
 /* QA-4: on a phone the model is two screens below the photo area: scroll it into view and say so (respects reduced motion) */
 function revealResult() {
   $("#buildHint").textContent = "Your 3D model is ready.";
-  if (!matchMedia("(max-width:768px)").matches) return;
+  if (!matchMedia("(max-width:768px)").matches) { $("#resultH").focus({ preventScroll: true }); return; }
   const calm = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const r = $("#result"); r.setAttribute("tabindex", "-1"); r.focus({ preventScroll: true });
+  const r = $("#resultH"); r.focus({ preventScroll: true });
   // wait until build() has put the page back (busy bar hidden) so the scroll target is final
   setTimeout(() => { const v = $("#viewer"); v.style.scrollMarginTop = ($(".topbar").offsetHeight + 8) + "px"; v.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); }, 60);
 }
 async function build(autoDelete = false) {
   if (!S.file) return;
   S.pending = null;
-  $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; S.building = true;   // no printing/sending a stale build mid-rebuild
+  setPath(2, "Making your 3D model. Step 2 of 3."); $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; S.building = true;   // no printing/sending a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
-    showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Build again with these settings";
-    toast("Model built ✔", "ok");
+    showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Make it again with these settings";
+    setPath(3, "Model ready. Step 3 of 3: save or print it.");
+    toast("Your model is ready ✔", "ok");
     revealResult();
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
     else if (e.status === 400 && /photo/i.test(e.message)) { clearFile(); pick.msg(e.message); }          // photo problems stay visible under the buttons; the refused photo is forgotten (QA-2)
-    else toast("Build failed: " + e.message, "err");
+    else { setPath(S.file ? 1 : 1, "That didn't work. Your photo is still here, so you can try again."); toast("We couldn't make your model: " + (e.message || "something went wrong") + " Your photo is still here. Try again.", "err"); }
   } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = !S.file; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; S.building = false; }
 }
 $("#btnBuild").onclick = () => build(false);
@@ -198,20 +210,22 @@ $("#resVis").onchange = async e => {
   catch (er) { toast(er.message, "err"); e.target.value = S.current.visibility || "private"; }
 };
 $("#vReset").onclick = () => viewer?.reset();
+$("#vLeft").onclick = () => viewer?.turn(-30);
+$("#vRight").onclick = () => viewer?.turn(30);
 $("#vWire").onclick = () => viewer?.toggleWire();
 
 /* ---------- history ---------- */
 function renderHistory() {
   $("#histCount").textContent = `${S.history.length} / ${S.max}`;
   const cards = S.history.slice().reverse().map(b => `
-    <div class="hcard ${S.current?.id === b.id ? "cur" : ""}" data-id="${b.id}">
-      <img src="${b.thumb}" alt="" data-open="${b.id}" title="Open">
+    <li class="hcard ${S.current?.id === b.id ? "cur" : ""}" data-id="${b.id}">
+      <button type="button" class="thumbbtn" data-open="${b.id}" aria-label="Open ${esc(b.title)}"><img src="${b.thumb}" alt=""></button>
       <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
         <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? "★" : "☆"}</button>
-        <button data-del="${b.id}" aria-label="Delete this build">🗑</button></div></div>`);
-  while (cards.length < Math.min(S.max, 5)) cards.push(`<div class="hslot">Empty slot</div>`);
+        <button data-del="${b.id}" aria-label="Delete this build">🗑</button></div></li>`);
+  while (cards.length < Math.min(S.max, 5)) cards.push(`<li class="hslot">Empty slot</li>`);
   const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap ☆ to keep one.`;
   $("#histList").innerHTML = cards.join("");
 }
@@ -430,4 +444,19 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, isExpert };
+export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert };
+
+/* ---------- Look: Warm (default) or Dark. Remembered on this device; nothing is sent anywhere. ---------- */
+(() => {
+  const b = $("#themeBtn"); if (!b) return;
+  const paint = () => { const dark = document.documentElement.dataset.theme === "dark"; b.textContent = "Look: " + (dark ? "Dark" : "Warm"); b.setAttribute("aria-pressed", String(dark)); b.setAttribute("aria-label", "Look: " + (dark ? "Dark" : "Warm") + ". Press to switch to " + (dark ? "Warm" : "Dark")); };
+  b.onclick = () => { const dark = document.documentElement.dataset.theme !== "dark"; if (dark) document.documentElement.dataset.theme = "dark"; else delete document.documentElement.dataset.theme; try { localStorage.theme = dark ? "dark" : "warm"; } catch { } paint(); };
+  paint();
+})();
+
+/* Every Experienced-mode field gets a real label link (the markup puts the label text beside the box, not around it). */
+$$("#expertOpts .field").forEach((f, i) => {
+  const lab = f.querySelector(":scope > label"), inp = f.querySelector("input:not([type=checkbox]),select");
+  if (lab && inp && !lab.htmlFor && !lab.contains(inp)) { inp.id = inp.id || "xo_" + (inp.name || i); lab.htmlFor = inp.id; }
+});
+$("#widthRange").setAttribute("aria-label", "Width in millimetres (slider)");

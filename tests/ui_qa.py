@@ -39,7 +39,7 @@ with sync_playwright() as p:
     top = pg.evaluate("document.querySelector('#viewer').getBoundingClientRect().top")
     tb = pg.evaluate("document.querySelector('.topbar').offsetHeight")
     ok("QA-4: after the build the viewer is on screen, below the top bar (phone)", tb - 3 <= top < 400, f"top={top} bar={tb}")
-    ok("QA-4: focus + status say the model is ready", pg.evaluate("document.activeElement.id") == "result" and "ready" in pg.inner_text("#buildHint"))
+    ok("QA-4: focus + status say the model is ready", pg.evaluate("document.activeElement.id") == "resultH" and "ready" in pg.inner_text("#buildHint"))
     # ---- QA-2: refused photo is forgotten
     pg.reload(); pg.wait_for_timeout(600)
     pg.select_option("#modeSel", "expert")

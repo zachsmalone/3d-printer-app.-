@@ -1,4 +1,4 @@
-import { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, applyMode } from "/static/app.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -38,7 +38,7 @@ $("#btnTeacherTools").onclick = () => $("#btnTeacher").click();
 
 /* ---------- views ---------- */
 function show(view) {
-  $$("#mainNav button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
+  $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === view); if (b.dataset.view === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   $("#viewCreate").hidden = view !== "create"; $("#viewShowcase").hidden = view !== "showcase"; $("#viewLearn").hidden = view !== "learn"; $("#viewEdit").hidden = view !== "edit";
   if (view === "edit") document.dispatchEvent(new CustomEvent("zeim:edit-shown"));
   if (view === "showcase") loadShowcase();
@@ -243,7 +243,7 @@ async function openLesson(id) {
     const r = await api(`/api/learn/lessons/${id}/quiz`, J("POST", { choice: +v.value }));
     $("#qzOut").textContent = r.correct ? "✔ Correct!" : "Not quite — try again"; if (r.correct) setTimeout(() => openLesson(id), 700);
   };
-  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards .card").forEach(c => c.classList.toggle("on", c.dataset.mode === S.mode)); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
+  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
 }
 
 /* classroom */

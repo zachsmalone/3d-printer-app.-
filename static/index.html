@@ -13,7 +13,7 @@
 <body>
 <header class="topbar">
   <a class="brand" href="/" title="Home"><img src="/static/logo-header.png" alt="ZEIM" class="logoimg" id="logoImg"></a>
-  <nav class="nav" id="mainNav">
+  <nav class="nav" id="mainNav" aria-label="Main">
     <button data-view="create" class="on"><span data-sec="create">Studio</span></button>
     <button data-view="showcase"><span data-sec="discover">Showcase</span></button>
     <button data-view="edit"><span data-sec="edit">Edit</span></button>
@@ -38,24 +38,32 @@
   <button class="btn" type="button" id="btnTeacherTools">Teacher tools</button></div>
 
 <main class="layout" id="viewCreate">
-  <aside class="panel controls">
+  <section class="hero" aria-labelledby="h1">
+    <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
+    <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
+    <div id="studioPhoto"></div>
+    <p class="teachline" data-lvl="teacher">Teaching with ZEIM? Start with the <a href="#learn">Make a lithophane lesson</a>, or open Teacher tools in the bar above.</p>
+  </section>
+  <nav class="pathnav" aria-label="Your progress">
+    <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Print-ready</li></ol>
+    <p class="help" id="pathSay" role="status" aria-live="polite">Step 1 of 3: choose a photo.</p>
+  </nav>
+  <aside class="panel controls" aria-label="Make a 3D model">
     <p class="modeline" id="modeLine"></p>
     <section class="step">
-      <h2><i>1</i> Photo</h2>
-      <div id="studioPhoto"></div>
+      <h2><i>1</i> Your photo</h2>
       <div class="drop" id="drop"><img id="dropPreview" alt="Your chosen photo" hidden>
-        <div id="dropHint"><div class="big" aria-hidden="true">📷</div><b>No photo yet</b><span>Take, choose or drop a photo · JPG, PNG or iPhone HEIC · up to 25 MB</span></div></div>
+        <div id="dropHint"><div class="big" aria-hidden="true">📷</div><b>No photo yet</b><span>Use the buttons above, or drop a photo here. JPG, PNG or iPhone photos, up to 25 MB.</span></div></div>
       <p class="pp-chosen" id="photoChosen" hidden><span id="photoChosenName"></span> <button type="button" class="linkbtn" id="changePhoto">Change photo</button></p>
       <p class="help making" id="makingLine" role="status" aria-live="polite" hidden><span class="spin sm" aria-hidden="true"></span> Making your 3D model…</p>
     </section>
 
     <section class="step">
-      <h2><i>2</i> Style</h2>
-      <div class="cards" id="modeCards">
-        <button class="card on" data-mode="lithophane"><span class="ico">💡</span><b>Lithophane</b><small>Glows when backlit</small></button>
-        <button class="card" data-mode="relief"><span class="ico">⛰</span><b>Relief</b><small>3D print heightmap</small></button>
-        <button class="card" data-mode="popart"><span class="ico">🎨</span><b>Pop-art</b><small>Layers pop off the page</small></button>
-      </div>
+      <fieldset class="cards" id="modeCards"><legend><i>2</i> Style</legend>
+        <label class="card" data-mode="lithophane"><input type="radio" name="style" value="lithophane" checked><span class="ico" aria-hidden="true">💡</span><b>Lithophane</b><small>A picture that glows with a light behind it</small></label>
+        <label class="card" data-mode="relief"><input type="radio" name="style" value="relief"><span class="ico" aria-hidden="true">⛰</span><b>Relief</b><small>Your picture as raised hills and valleys</small></label>
+        <label class="card" data-mode="popart"><input type="radio" name="style" value="popart"><span class="ico" aria-hidden="true">🎨</span><b>Pop-art</b><small>Flat colour layers stacked up</small></label>
+      </fieldset>
     </section>
 
     <section class="step">
@@ -64,12 +72,11 @@
         <div class="range"><input type="range" id="widthRange" min="30" max="300" step="5" value="100"><input type="number" name="width_mm" id="width_mm" value="100" min="5" max="1000" step="1"></div></div>
 
       <div id="beginnerOpts">
-        <div class="field"><label>Thickness</label>
-          <div class="seg wide" id="presetSeg">
-            <button data-preset="thin">Thin</button><button data-preset="standard" class="on">Standard</button><button data-preset="thick">Thick</button>
-          </div>
-          <p class="help" id="presetHelp"></p></div>
-        <p class="help sticky">All other settings are chosen automatically — you'll see what was picked after building.</p>
+        <fieldset class="field seg wide" id="presetSeg"><legend>Thickness</legend>
+          <label data-preset="thin"><input type="radio" name="preset" value="thin">Thin</label><label data-preset="standard"><input type="radio" name="preset" value="standard" checked>Standard</label><label data-preset="thick"><input type="radio" name="preset" value="thick">Thick</label>
+        </fieldset>
+        <p class="help" id="presetHelp"></p>
+        <p class="help sticky">ZEIM picks the other settings for you. After your model is made you can see what it picked.</p>
       </div>
 
       <div id="expertOpts" hidden>
@@ -103,26 +110,28 @@
       </div>
     </section>
 
-    <button class="btn primary big" id="btnBuild" disabled>✨ Build 3D model</button>
+    <button class="btn primary big" id="btnBuild" disabled>✨ Make my 3D model</button>
     <p class="help center" id="buildHint" role="status" aria-live="polite">Choose or take a photo to begin.</p>
   </aside>
 
   <section class="stage">
-    <div class="viewer" id="viewer">
-      <div class="empty" id="viewerEmpty"><div class="big">🧊</div><b>Your 3D preview appears here</b><span>Drag to rotate · scroll to zoom · right-drag to pan</span></div>
-      <div class="busy" id="busy" hidden><div class="spin"></div>Building…</div>
-      <div class="vtools" id="vtools" hidden>
+    <div class="viewer" id="viewer" role="img" aria-label="3D preview of your model. Use the Turn left, Turn right and Reset view buttons to look around it.">
+      <div class="empty" id="viewerEmpty"><div class="big" aria-hidden="true">🧊</div><b>Your 3D preview appears here</b><span>Drag to turn it. Scroll or pinch to zoom.</span></div>
+      <div class="busy" id="busy" hidden><div class="spin"></div>Making your 3D model…</div>
+    </div>
+    <div class="vtools2" id="vtools" hidden role="group" aria-label="Look around your model">
+        <button class="btn small" id="vLeft" type="button">↶ Turn left</button><button class="btn small" id="vRight" type="button">Turn right ↷</button>
         <button class="btn small ghost" id="vReset">⟲ Reset view</button>
         <button class="btn small ghost" id="vWire">▦ Wireframe</button>
-      </div>
     </div>
 
     <p class="touch-hint" id="touchHint">Drag the model to turn it. To scroll the page, swipe on the thin edge strips beside it.</p>
     <div class="result" id="result" hidden>
+      <h2 id="resultH" tabindex="-1">Your model is ready</h2>
       <div class="resbar">
         <div class="stats" id="stats"></div>
         <div class="actions">
-          <button class="btn primary" id="btnSendSheet" title="Save this build or send it somewhere">⬆ Send</button>
+          <button class="btn primary" id="btnSendSheet" aria-haspopup="dialog" title="Save this model or send it somewhere">⬆ Send or save</button>
           <label class="inl" title="Who can open this build's files"><select id="resVis"><option value="private">🔒 Private</option><option value="followers">👥 Followers</option><option value="public">🌐 Public</option></select></label>
           <button class="btn" id="btnEditThis" title="Open this model in the Edit workspace">✏ Edit this</button>
           <button class="btn" id="btnPublish">🌐 Share to Showcase</button>
@@ -130,19 +139,28 @@
         </div>
       </div>
       <p class="help" id="buildWarn" role="status" hidden></p>
-      <details class="auto" id="autoBox" hidden open><summary>🌱 Auto-chosen settings <small>(Beginner and Teacher modes)</small></summary><table id="autoTable"></table></details>
+      <details class="auto" id="autoBox" hidden open><summary>🌱 Settings ZEIM picked <small>(Beginner and Teacher modes)</small></summary><table id="autoTable"></table></details>
     </div>
 
     <section class="history">
-      <div class="hhead"><h3 data-sec="history">Recent builds</h3><span id="histCount" class="pill">0 / 20</span></div>
+      <div class="hhead"><h2 data-sec="history">Pick up where you left off</h2><span id="histCount" class="pill">0 / 20</span></div>
       <p class="help" id="histNote"></p>
-      <div class="hlist" id="histList"></div>
+      <ul class="hlist" id="histList"></ul>
+    </section>
+    <section class="explore" data-lvl="beginner" aria-labelledby="exH">
+      <h2 id="exH">Keep exploring</h2>
+      <ul class="tiles">
+        <li><a class="tile" href="#showcase"><b>See what others made</b><span>Family-friendly projects from the community</span></a></li>
+        <li><a class="tile" href="#learn"><b>Learn to make things</b><span>Short lessons for students, teachers and hobbyists</span></a></li>
+        <li><a class="tile" href="#edit"><b>Fix or change a 3D file</b><span>Open an STL, OBJ or 3MF and get it ready to print</span></a></li>
+      </ul>
     </section>
   </section>
 </main>
 
 
 <main class="layout" id="viewEdit" hidden>
+  <h1 class="sr-only">Edit a 3D model</h1>
   <aside class="panel controls" id="editSide">
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
@@ -180,7 +198,7 @@
       <div class="resbar">
         <div class="stats" id="editStats"></div>
         <div class="actions">
-          <button class="btn primary" id="editSend" title="Save this model or send it somewhere">⬆ Send</button>
+          <button class="btn primary" id="editSend" aria-haspopup="dialog" title="Save this model or send it somewhere">⬆ Send or save</button>
           <label class="inl" title="Who can open this project's files"><select id="editVis"><option value="private">🔒 Private</option><option value="followers">👥 Followers</option><option value="public">🌐 Public</option></select></label>
           <button class="btn" id="editPrint">🖨 Print…</button>
         </div>
@@ -193,7 +211,7 @@
 
 <!-- Print dialog -->
 <dialog id="dlgPrint"><div class="dlg">
-  <header><h3>🖨 Print this build</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>🖨 Print this build</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <p class="help"><b id="printWhich"></b></p>
     <div class="row"><span class="help">Just need the file?</span> <button class="btn small ghost" id="printToSend">Send…</button></div>
@@ -226,13 +244,13 @@
 
 <!-- SEND-2: one Send sheet for Studio, Edit, history cards and Print (bottom sheet on phones) -->
 <dialog id="dlgSendSheet" class="sheet" aria-labelledby="ssTitle"><div class="dlg">
-  <header><h3 id="ssTitle">Send your build</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="dh"><h3 id="ssTitle">Send your build</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body" id="ssBody"></div>
 </div></dialog>
 
 <!-- Settings dialog -->
 <dialog id="dlgSettings"><div class="dlg wide">
-  <header><h3>⚙ Settings</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>⚙ Settings</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
     <div id="tPrint" class="tab">
@@ -253,17 +271,17 @@
       <div id="accList"></div>
     </div>
   </div>
-  <footer><button class="btn primary" id="btnSaveSettings">Save</button></footer>
+  <div class="df"><button class="btn primary" id="btnSaveSettings">Save</button></div>
 </div></dialog>
 
 <!-- History full dialog -->
 <dialog id="dlgFull"><div class="dlg">
-  <header><h3>Build history is full</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>Build history is full</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <p id="fullMsg"></p>
     <div id="fullList" class="fulllist"></div>
   </div>
-  <footer><button class="btn" id="btnRetry" disabled>Build now</button><button class="btn primary" id="btnAutoDel">Auto-delete oldest &amp; build</button></footer>
+  <div class="df"><button class="btn" id="btnRetry" disabled>Build now</button><button class="btn primary" id="btnAutoDel">Auto-delete oldest &amp; build</button></div>
 </div></dialog>
 
 
@@ -286,12 +304,12 @@
 </main>
 
 <dialog id="dlgAccount"><div class="dlg">
-  <header><h3>👤 Your profile</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>👤 Your profile</h3><button class="x" data-close>✕</button></div>
   <div class="body" id="accBody"></div>
 </div></dialog>
 
 <dialog id="dlgPublish"><div class="dlg">
-  <header><h3>🌐 Share this build to the Showcase</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>🌐 Share this build to the Showcase</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <p class="help">Free for everyone to download. Family-friendly projects only.</p>
     <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
@@ -300,38 +318,38 @@
     <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
     <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
   </div>
-  <footer><button class="btn primary" id="btnDoPublish">Publish</button></footer>
+  <div class="df"><button class="btn primary" id="btnDoPublish">Publish</button></div>
 </div></dialog>
 
 <dialog id="dlgItem"><div class="dlg">
-  <header><h3 id="itTitle"></h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3 id="itTitle"></h3><button class="x" data-close>✕</button></div>
   <div class="body" id="itBody"></div>
 </div></dialog>
 
 <dialog id="dlgData"><div class="dlg">
-  <header><h3>🔒 My personalization data</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>🔒 My personalization data</h3><button class="x" data-close>✕</button></div>
   <div class="body" id="dataBody"></div>
-  <footer><button class="btn" id="btnToggleP13n"></button><button class="btn danger" id="btnClearData">Clear all my data</button></footer>
+  <div class="df"><button class="btn" id="btnToggleP13n"></button><button class="btn danger" id="btnClearData">Clear all my data</button></div>
 </div></dialog>
 
 <dialog id="dlgTeacher"><div class="dlg wide">
-  <header><h3>🍎 Teacher tools</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>🍎 Teacher tools</h3><button class="x" data-close>✕</button></div>
   <div class="body" id="teacherBody"></div>
 </div></dialog>
 
 <dialog id="dlgJoin"><div class="dlg">
-  <header><h3>🎒 Join a class</h3><button class="x" data-close>✕</button></header>
+  <div class="dh"><h3>🎒 Join a class</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <p class="help">No account needed. Use a nickname — <b>not your real full name</b>.</p>
     <div class="field"><label>Class code</label><input id="j_code" maxlength="6" style="text-transform:uppercase"></div>
     <div class="field"><label>Class password <em>from your teacher</em></label><input id="j_pw" type="password" autocomplete="off"></div>
     <div class="field"><label>Nickname</label><input id="j_nick" maxlength="20"></div>
   </div>
-  <footer><button class="btn primary" id="btnDoJoin">Join</button></footer>
+  <div class="df"><button class="btn primary" id="btnDoJoin">Join</button></div>
 </div></dialog>
 
 <dialog id="dlgReport" aria-labelledby="repTitle"><div class="dlg">
-  <header><h3 id="repTitle">Report this project</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="dh"><h3 id="repTitle">Report this project</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body">
     <fieldset class="reasons"><legend>What is the problem?</legend>
       <label class="choice"><input type="radio" name="repReason" value="minor_safety"> <span>Something about a person or a child is not safe</span></label>
@@ -346,20 +364,20 @@
     <p class="help">A person reads every report. A report about someone's safety hides the project straight away.</p>
     <p class="help"><a href="/static/COMMUNITY_GUIDELINES.html" target="_blank" rel="noopener">Rules</a> · <a href="/static/privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="/static/terms.html" target="_blank" rel="noopener">Terms</a></p>
   </div>
-  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="repSend">Send report</button></footer>
+  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="repSend">Send report</button></div>
 </div></dialog>
 
 <dialog id="dlgFeedback" aria-labelledby="fbTitle"><div class="dlg">
-  <header><h3 id="fbTitle">Feedback for this project</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="dh"><h3 id="fbTitle">Feedback for this project</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body"><div class="field"><label for="fbText">Your feedback <em>text only, up to 500 characters</em></label><textarea id="fbText" maxlength="500" rows="4"></textarea>
     <small class="help">Please don't put names, phone numbers, emails or links here.</small></div></div>
-  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="fbSave">Save feedback</button></footer>
+  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="fbSave">Save feedback</button></div>
 </div></dialog>
 <dialog id="dlgPickBuild" aria-labelledby="pbTitle"><div class="dlg">
-  <header><h3 id="pbTitle">Which build do you want to send?</h3><button class="x" data-close aria-label="Close">✕</button></header>
+  <div class="dh"><h3 id="pbTitle">Which build do you want to send?</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body"><fieldset class="reasons"><legend>Pick one</legend><div id="pbList"></div></fieldset>
     <p class="help">Only you and your class can see it.</p></div>
-  <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></footer>
+  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></div>
 </div></dialog>
 <div id="toasts"></div>
 <div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -367,7 +385,7 @@
   <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>
   <p>Turn this on for <b id="dlgSendName"></b>?</p>
   <div class="row"><button class="btn" id="sendCancel">Cancel</button> <button class="btn primary" id="sendOn">Turn on</button></div></dialog>
-<footer class="sitefoot"><a href="/static/COMMUNITY_GUIDELINES.html">Rules</a><a href="/static/privacy.html">Privacy</a><a href="/static/terms.html">Terms</a><a href="/credits">Thank you &amp; credits</a></footer>
+<footer class="sitefoot"><button type="button" class="linkbtn" id="themeBtn" aria-pressed="false">Look: Warm</button><a href="/static/COMMUNITY_GUIDELINES.html">Rules</a><a href="/static/privacy.html">Privacy</a><a href="/static/terms.html">Terms</a><a href="/credits">Thank you &amp; credits</a></footer>
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/community.js"></script>
 <script type="module" src="/static/edit.js"></script>

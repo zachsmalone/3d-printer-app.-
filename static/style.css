@@ -19,9 +19,10 @@ body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-ap
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .card{background:var(--panel2);border:1px solid var(--ctl);border-radius:10px;color:var(--txt);padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s}
 .card .ico{font-size:22px}.card small{color:var(--mut);font-size:11px;text-align:center}
+.card:has(input:checked){border-color:var(--accink);background:var(--tint);box-shadow:0 0 0 1px var(--accink) inset}
 .card:hover{border-color:var(--ctl)}.card.on{border-color:var(--accink);background:var(--tint);box-shadow:0 0 0 1px var(--accink) inset}
 .field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
-.field label{font-size:12px;color:var(--mut)}.field label em{font-style:normal;opacity:.65;margin-left:4px}
+.field label{font-size:12px;color:var(--mut)}.field label em{font-style:normal;margin-left:4px}
 .field.chk{justify-content:flex-end;gap:6px}.field.chk label{color:var(--txt);display:flex;gap:6px;align-items:center;font-size:13px}
 .wide2{grid-column:1/-1}
 input[type=number],input[type=text],input:not([type]),select,textarea{background:var(--panel);border:1px solid var(--ctl);border-radius:8px;color:var(--txt);padding:7px 9px;width:100%;font:inherit}
@@ -32,9 +33,9 @@ details{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;paddin
 summary{cursor:pointer;padding:8px 0;font-weight:600;font-size:13px}details[open]>summary{margin-bottom:6px}
 .help{color:var(--mut);font-size:12px;margin:4px 0}.help.center{text-align:center}.sticky{background:var(--panel2);border-radius:8px;padding:8px 10px}
 .seg{display:inline-flex;background:var(--bg);border:1px solid var(--ctl);border-radius:10px;padding:3px;gap:2px}
-.seg.wide{display:flex}.seg.wide button{flex:1}
-.seg button{background:none;border:0;color:var(--mut);padding:6px 14px;border-radius:8px;cursor:pointer;font:inherit}
-.seg button.on{background:var(--tint);color:var(--txt);box-shadow:inset 0 0 0 2px var(--accink)}
+.seg.wide{display:flex}.seg.wide button,.seg.wide label{flex:1;text-align:center}
+.seg button,.seg label{background:none;border:0;color:var(--mut);padding:6px 14px;border-radius:8px;cursor:pointer;font:inherit}
+.seg button.on,.seg label.on,.seg label:has(input:checked){background:var(--tint);color:var(--txt);box-shadow:inset 0 0 0 2px var(--accink)}
 .btn{background:var(--panel2);border:1px solid var(--ctl);color:var(--txt);padding:8px 14px;border-radius:9px;cursor:pointer;font:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:.15s}
 .btn:hover:not(:disabled){border-color:var(--acc)}.btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.primary{background:var(--acc);border:2px solid var(--accink);color:var(--on-acc);font-weight:600}
@@ -44,7 +45,7 @@ summary{cursor:pointer;padding:8px 0;font-weight:600;font-size:13px}details[open
 .viewer{position:relative;height:min(58vh,560px);min-height:340px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);background:radial-gradient(circle at 50% 30%,var(--stage1),var(--stage2));color:#E6EAF2}
 .viewer canvas{display:block;width:100%;height:100%}
 .empty{position:absolute;inset:0;display:grid;place-content:center;text-align:center;color:var(--mut);gap:4px}
-.viewer .empty{color:#C5CEDF}
+.viewer .empty{color:#C5CEDF;position:absolute;inset:0;display:grid;place-content:center;justify-items:center;text-align:center;gap:4px;padding:0}
 .empty span{font-size:12px}
 .busy{position:absolute;inset:0;background:#0b0e14cc;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;z-index:3}
 .spin{width:36px;height:36px;border:4px solid var(--line);border-top-color:var(--acc2);border-radius:50%;animation:sp .8s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
@@ -68,8 +69,8 @@ summary{cursor:pointer;padding:8px 0;font-weight:600;font-size:13px}details[open
 dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--txt);padding:0;width:min(560px,94vw)}
 dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
 .dlg.wide{width:min(760px,94vw)}dialog:has(.wide){width:min(760px,94vw)}
-.dlg header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.dlg h3{margin:0}
-.dlg .body{padding:14px 16px;max-height:70vh;overflow:auto}.dlg h4{margin:12px 0 6px}.dlg footer{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+.dlg .dh{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.dlg h3{margin:0}
+.dlg .body{padding:14px 16px;max-height:70vh;overflow:auto}.dlg h4{margin:12px 0 6px}.dlg .df{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
 .x{background:none;border:0;color:var(--mut);font-size:18px;cursor:pointer}hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 .slicers{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slicers a{justify-content:center}.slicers a.def{border-color:var(--acc)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.inl{display:flex;gap:5px;align-items:center;color:var(--mut)}
@@ -135,13 +136,13 @@ details.tool>summary{display:flex;justify-content:space-between}
 /* ---- phones and small tablets (T1): the top bar wraps, nothing scrolls sideways, targets >= 44px ---- */
 html{max-width:100%;overflow-x:hidden}body{max-width:100%;overflow-x:clip} /* body must NOT be the scroller (overflow-x:hidden + height:100% made it one: iOS toolbar/overscroll and window.scrollY broke) */
 @media (max-width:768px){
-  .topbar{flex-wrap:wrap;gap:8px 10px;padding:8px 12px}
+  .topbar{flex-wrap:wrap;gap:6px 10px;padding:6px 12px}
   .topbar .spacer{display:none}
   .brand{order:1;margin-right:auto}
-  .modepick{order:2}
-  #btnAccount{order:3}#btnSettings{order:4}
+  .modepick{order:4;flex:1 0 100%}
+  #btnAccount{order:2}#btnSettings{order:3}
   .topbar .nav{order:5;flex:1 0 100%;display:flex;gap:4px}
-  .topbar .nav button{flex:1 1 0;min-width:0;min-height:44px;padding:8px 6px;font-size:14px}
+  .topbar .nav button{flex:1 1 0;min-width:0;min-height:44px;padding:0 6px;font-size:14px}
   .topbar .btn{min-height:44px;min-width:44px}
   .pagehead{flex-wrap:wrap;gap:8px}
   .pagehead .row,#shForm{flex-wrap:wrap}
@@ -191,7 +192,7 @@ body[data-links="0"] #btnPrint { display: none; }
 @media (max-width:768px), (pointer:coarse) {
   .brand{display:inline-flex;align-items:center}
   input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]),select,textarea{font-size:16px;min-height:44px}
-  button,.btn,.btn.small,.btn.ghost,summary,.seg button,.tabs button,.nav button,.x,.linkbtn,.oplist li,.hcard .row2 a,.hcard .row2 button,
+  button,.btn,.btn.small,.btn.ghost,summary,.seg button,.seg label,.tabs button,.nav button,.x,.linkbtn,.oplist li,.hcard .row2 a,.hcard .row2 button,
   .brand,.card,.bigtool,a.btn,[role=button],label.chk,#vtools .btn{min-height:44px;min-width:44px}
   .btn.small,.hcard .row2 a,.hcard .row2 button{padding:10px 12px;font-size:14px}
   summary{display:flex;align-items:center}
@@ -269,7 +270,7 @@ input::placeholder,textarea::placeholder{color:var(--mut);opacity:1}
 .fl{flex-wrap:wrap;gap:6px}
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-@media (forced-colors:active){.seg button.on,.card.on,.fmt button.on{outline:2px solid Highlight}}
+@media (forced-colors:active){.seg button.on,.card.on,.seg label:has(input:checked),.fmt button.on{outline:2px solid Highlight}}
 
 .modepick{display:flex;align-items:center;gap:6px}.modepick label{font-weight:600;font-size:13px}
 .modepick select{min-height:44px;min-width:150px;font-size:16px;width:auto}
@@ -277,3 +278,44 @@ input::placeholder,textarea::placeholder{color:var(--mut);opacity:1}
 .tnote{margin:8px auto 0;max-width:1100px;background:var(--tint);border:2px solid var(--accink);border-radius:var(--r);padding:12px 16px}.tnote h2{margin:0 0 4px;font-size:16px}.tnote p{margin:0 0 8px}
 .classbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--warmtint);border-bottom:2px solid var(--warm);padding:8px 16px;color:var(--txt)}
 .classbar .code{font:700 18px ui-monospace,monospace;letter-spacing:.14em;background:var(--panel);border:1px solid var(--ctl);border-radius:6px;padding:1px 8px}
+
+/* ---- Home redesign (Batch B3) ---- */
+.layout>.hero,.layout>.pathnav{grid-column:1/-1}
+.hero{background:linear-gradient(135deg,var(--panel2),var(--warmtint));border:1px solid var(--line);border-radius:var(--r);padding:20px 18px;display:flex;flex-direction:column;gap:12px}
+.hero h1{margin:0;font-size:clamp(24px,5.5vw,36px);line-height:1.15;color:var(--txt)}
+.hero .lede{margin:0;font-size:17px;line-height:1.45;color:var(--txt);max-width:60ch}
+.hero .teachline{margin:0}.hero a,.explore a{color:var(--accink)}
+body:not([data-level=teacher]) [data-lvl=teacher]{display:none!important}
+.hero .pp-actions .btn.big{min-height:56px}
+.hero .pp-sample .btn{background:none;border:0;color:var(--accink);text-decoration:underline;min-height:44px;width:auto;padding:0 6px}
+.hero .pp-ack,.hero .pp-note{max-width:60ch}
+body[data-level=expert] .hero{padding:8px 14px;background:none;border:0}
+.pathnav{margin:0}.path{list-style:none;margin:0;padding:0;display:flex;gap:8px;flex-wrap:wrap}
+.path li{display:flex;align-items:center;gap:6px;padding:8px 12px;border:2px solid var(--line);border-radius:99px;background:var(--panel);color:var(--mut);font-weight:600;min-height:44px}
+.path li .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;border:2px solid var(--ctl);font-size:13px}
+.path li.cur{border-color:var(--accink);background:var(--tint);color:var(--txt)}
+.path li.done{border-color:var(--ok);background:var(--okbg);color:var(--txt)}.path li.done .n{border-color:var(--ok);color:var(--ok)}
+.pathnav .help{margin:6px 2px 0}
+fieldset.cards{border:0;padding:0;margin:0;min-width:0}fieldset.cards legend{padding:0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:8px;font-weight:700}
+fieldset.cards legend i{font-style:normal;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:11px;margin-right:6px}
+.card input,.seg input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.card{position:relative}
+.card:has(input:focus-visible),.seg label:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
+fieldset.seg{margin:0;min-width:0}fieldset.seg legend{font-size:13px;color:var(--mut);padding:0 0 4px;float:left;width:100%}
+fieldset.seg label{position:relative;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;padding:6px 14px}
+.vtools2{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+#result h2{margin:0 0 8px;font-size:18px}#result h2:focus{outline:none}
+.hlist{list-style:none;margin:0;padding:0}.thumbbtn{display:block;width:100%;padding:0;border:0;background:none;cursor:pointer}
+.hhead h2{margin:0;font-size:16px}
+.explore{margin-top:16px}.explore h2{font-size:16px;margin:0 0 8px}
+.tiles{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.tile{display:flex;flex-direction:column;gap:2px;min-height:64px;padding:12px 14px;background:var(--panel);border:2px solid var(--ctl);border-radius:var(--r);text-decoration:none;color:var(--txt)}
+.tile b{color:var(--accink)}.tile span{color:var(--mut);font-size:14px}
+.sitefoot .linkbtn{min-height:44px;padding:0 12px;color:var(--accink)}
+
+.sheet-rows h3.group{margin:12px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+.sheet-rows ul.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.sheet-row{border:2px solid var(--ctl)}
+.untested{font-size:11px;font-weight:700;border:1px solid var(--warn);color:var(--warn);border-radius:99px;padding:0 7px;margin-left:4px;white-space:nowrap}
+.hero .pp-actions .btn.big{flex:0 1 360px}
+@media(max-width:600px){.hero .pp-actions .btn.big{flex:1 1 100%}}

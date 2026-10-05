@@ -40,7 +40,7 @@ LESSONS = [
          {"title": "What is a lithophane?", "body": "A lithophane is a thin plastic picture. Thick parts block light (dark), thin parts let more light through (bright)."},
          {"title": "Pick a photo", "body": "High-contrast photos with a clear subject (a pet or a face) work best. Busy backgrounds look muddy."},
          {"title": "Build it", "body": "Choose Lithophane in the Studio, keep Beginner mode, pick Standard thickness and build."},
-         {"title": "Check the preview", "body": "Your 'Recent builds' card shows a glowing preview. Does it look like your photo?"},
+         {"title": "Check the preview", "body": "Under 'Pick up where you left off', your model's card shows a glowing preview. Does it look like your photo?"},
          {"title": "Print and light it", "body": "Print it standing up, then put a small LED light behind it. Never use a hot bulb — plastic can melt!"},
      ],
      "quiz": {"q": "Which part of a lithophane lets the most light through?",
