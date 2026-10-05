@@ -116,3 +116,21 @@ def test_slice_and_send_use_the_same_bed_and_profile(local, monkeypatch):
 def test_k1_profile_keeps_the_values_from_the_research_file():
     ini = printers.PROFILES["creality_k1"]["ini"].read_text()
     assert "bed_shape = 0x0,220x0,220x220,0x220" in ini and "gcode_flavor = klipper" in ini and "START_PRINT" in ini
+
+
+# ---- Settings polish: default slicer + stub labels ----------------------------------------------------------------------------------
+def test_default_slicer_auto_means_creality_with_a_k1_preset_and_old_values_still_work():
+    from app.services import settings
+    assert settings.DEFAULTS["default_slicer"] == "auto"
+    assert settings.effective_slicer({"default_slicer": "auto", "printers": []}) == "prusaslicer"
+    assert settings.effective_slicer({"default_slicer": "auto", "printers": []}, phone=True) == "creality"
+    assert settings.effective_slicer({"default_slicer": "auto", "printers": [{"profile": "creality_k1"}]}) == "creality"
+    assert settings.effective_slicer({"default_slicer": "cura", "printers": [{"profile": "creality_k1"}]}) == "cura"       # a deliberate choice wins
+
+
+def test_settings_accept_creality_and_ignore_unknown_slicers_and_stubs_say_coming_soon():
+    assert all("Coming soon" in t["label"] and "stub" not in t["label"].lower() for t in printers.TYPES if not t["implemented"])
+    assert all("not implemented" not in t["hint"].lower() for t in printers.TYPES)
+    assert settings.save_from_client({"default_slicer": "creality", "printers": []})["default_slicer"] == "creality"
+    assert settings.save_from_client({"default_slicer": "evil://x", "printers": []})["default_slicer"] == "auto"
+    assert settings.save_from_client({"printers": []})["default_slicer"] == "auto"

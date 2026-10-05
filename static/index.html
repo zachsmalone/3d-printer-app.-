@@ -226,12 +226,12 @@
     <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
     <div id="tPrint" class="tab">
       <div class="grid2">
-        <div class="field"><label>Default slicer</label><select id="set_slicer"><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
+        <div class="field"><label>Default slicer</label><select id="set_slicer"><option value="auto">Automatic (Creality on phones and with a K1)</option><option value="creality">Creality Print / Creality Cloud</option><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
         <div class="field"><label>Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
       </div>
       <h4>Printers</h4><div id="printerList"></div>
       <button class="btn small" id="btnAddPrinter">+ Add printer</button>
-      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are labeled stubs. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
+      <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are marked Coming soon. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
     </div>
     <div id="tAcc" class="tab" hidden>
       <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built (teen accounts never show link-outs publicly).</p>

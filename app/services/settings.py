@@ -16,7 +16,17 @@ FILE = DATA / "settings.json"
 KEYFILE = DATA / ".settings.key"
 ENC_PREFIX = "enc:v1:"
 _lock = threading.Lock()
-DEFAULTS = {"public_base_url": "", "default_slicer": "prusaslicer", "printers": []}
+SLICER_CHOICES = ("auto", "creality", "prusaslicer", "bambustudio", "orcaslicer", "cura")   # "auto": Creality Print / Cloud on phones and with a K1, else PrusaSlicer
+DEFAULTS = {"public_base_url": "", "default_slicer": "auto", "printers": []}
+
+
+def effective_slicer(s: dict, phone: bool = False) -> str:
+    """What 'Default slicer' means right now. 'auto' picks Creality Print / Creality Cloud on a phone or when a Creality K1 printer is set up."""
+    v = s.get("default_slicer") or "auto"
+    if v != "auto":
+        return v if v in SLICER_CHOICES else "prusaslicer"
+    k1 = any(p.get("profile") == "creality_k1" for p in s.get("printers", []))
+    return "creality" if (phone or k1) else "prusaslicer"
 PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y", "profile")
 
 
@@ -161,7 +171,7 @@ def save_from_client(incoming: dict) -> dict:
         q["bed_x"], q["bed_y"] = float(bx), float(by)
         printers.append(q)
     new = {"public_base_url": cur.get("public_base_url", "") if config.PUBLIC_BASE_URL else clean_base_url(incoming.get("public_base_url")),
-           "default_slicer": incoming.get("default_slicer") or "prusaslicer",
+           "default_slicer": incoming.get("default_slicer") if incoming.get("default_slicer") in SLICER_CHOICES else "auto",
            "printers": printers}
     with _lock:
         _write(new)

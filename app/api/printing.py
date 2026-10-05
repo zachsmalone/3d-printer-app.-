@@ -58,7 +58,7 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
     # Shared server with no configured public address: the request's Host header is attacker-controlled and would end up
     # inside signed links, so no slicer deep links are offered until an admin sets the public base URL.
     no_base = config.MODE == "shared" and not (config.PUBLIC_BASE_URL or s.get("public_base_url"))
-    return {"base_url": settings.trusted_base_url(request) or "", "default_slicer": s["default_slicer"],
+    return {"base_url": settings.trusted_base_url(request) or "", "default_slicer": s["default_slicer"], "effective_slicer": settings.effective_slicer(s),
             "slicers": [] if no_base else handoff.links(base_url(request), bid, lambda n: privacy.make_token(bid, n)),
             "slicer_links_disabled": ("Slicer links are off until the site's public address is set in Settings. You can still download the file." if no_base else ""),
             "printers": settings.public(s, redact=not guards.can_see_printer_urls(request, actor))["printers"], "printer_types": printers.TYPES,

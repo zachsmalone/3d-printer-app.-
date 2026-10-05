@@ -258,3 +258,8 @@ a.creator-link{color:var(--acc2);text-decoration:underline;text-underline-offset
 fieldset.reasons{border:0;padding:0;margin:0 0 12px}fieldset.reasons legend{font-weight:600;margin-bottom:6px}
 label.choice{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 8px;border-radius:8px;cursor:pointer}label.choice:hover{background:rgba(255,255,255,.06)}
 label.choice input{width:22px;height:22px;flex:none}#repDetails{width:100%;font-size:16px}
+/* every text-like field is dark on dark (a bare type=password / date / textarea used to render as a bright white box on iPhone) */
+input[type=password],input[type=date],input[type=email],input[type=url],input[type=tel],input[type=search],textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:7px 9px;width:100%;font:inherit;color-scheme:dark}
+input[type=password]:focus,input[type=date]:focus,input[type=search]:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px}
+input::placeholder,textarea::placeholder{color:#9aa4b2;opacity:1}
+@media (max-width:768px),(pointer:coarse){input[type=password],input[type=date],input[type=email],input[type=url],input[type=tel],input[type=search],textarea{font-size:16px;min-height:44px}}

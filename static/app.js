@@ -200,13 +200,15 @@ const isPhone = () => matchMedia("(max-width:768px),(pointer:coarse)").matches;
 /* Print dialog body. Phones: the Creality Cloud app first (K1 owners), desktop-only slicer links tucked under "On a computer".
    The Creality route is a plain authenticated download of the 3MF, then the phone's own share sheet - no link, no deep link, nothing
    leaves ZEIM except what the person hands to the app they pick (reports/send-privacy.md). */
+/* "Default slicer": Automatic = Creality Print / Cloud on phones or when a K1 printer is set up, else PrusaSlicer. */
+function slicerDefault() { const v = printInfo.default_slicer; return v === "auto" ? (isPhone() ? "creality" : printInfo.effective_slicer) : v; }
 function slicerArea(b, caps) {
   const dl = b.downloads["3mf"];
-  const links = printInfo.slicers.map(s => `<a class="btn ${s.slicer === printInfo.default_slicer ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === printInfo.default_slicer ? " ★" : ""}</a>`).join("") +
+  const links = printInfo.slicers.map(s => `<a class="btn ${s.slicer === slicerDefault() ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === slicerDefault() ? " ★" : ""}</a>`).join("") +
     (printInfo.slicer_links_disabled ? `<p class="muted small" style="grid-column:1/-1">${esc(printInfo.slicer_links_disabled)}</p>` : "");
   if (!isPhone()) {
     // desktop: Creality Print has no verified deep link, so it is a plain download (open the file from your Downloads folder)
-    return `<a class="btn" id="crDl" href="${dl}" download="ZEIM-build.3mf" title="Saves a 3MF. Open it in Creality Print.">⬇ Download 3MF for Creality Print</a>` + links +
+    return `<a class="btn ${slicerDefault() === "creality" ? "def" : ""}" id="crDl" href="${dl}" download="ZEIM-build.3mf" title="Saves a 3MF. Open it in Creality Print.">⬇ Download 3MF for Creality Print${slicerDefault() === "creality" ? " ★" : ""}</a>` + links +
       `<a class="btn ghost" href="${dl}" download>…or download 3MF for another slicer</a>`;
   }
   const share = caps.share_ui && navigator.share && navigator.canShare && isSecureContext
