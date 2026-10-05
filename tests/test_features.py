@@ -346,7 +346,7 @@ def test_likes_downloads_trending():
     b1, b2 = photo_build(o), photo_build(o)
     p1 = publish(o, b1, "public", title="Alpha lamp").json(); p2 = publish(o, b2, "public", title="Beta lamp").json()
     pr = publish(o, photo_build(o), "private", title="Hidden lamp").json()
-    v1, v2, v3 = client(), client(), client()
+    v1, v2, v3 = (client({"display_name": f"Liker{n}", "dob": "1990-01-01"}) for n in (1, 2, 3))      # nozzles need an account
     r = v1.post(f"/api/showcase/{p1['id']}/like", json={}).json(); assert r == {"liked": True, "likes": r["likes"]}
     base = r["likes"]
     assert v1.post(f"/api/showcase/{p1['id']}/like", json={}).json()["liked"] is False        # toggle off

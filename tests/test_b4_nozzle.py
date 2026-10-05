@@ -14,8 +14,22 @@ def _publish_one(with_owner=False):
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def V(n="Viewer"):
+    return client({"display_name": n, "dob": "1990-01-01"})
+
+
+def test_a_signed_out_visitor_cannot_nozzle_and_gets_a_plain_401():
+    iid = _publish_one(); anon = client()
+    r = anon.post(f"/api/showcase/{iid}/like", json={"liked": True})
+    assert r.status_code == 401 and r.json()["detail"] == "Make a free account to nozzle projects."
+    assert anon.get(f"/api/showcase/{iid}").json()["liked"] is False and client().get(f"/api/showcase/{iid}").status_code == 200   # looking still works
+    assert anon.post("/api/showcase/ex01/like", json={}).status_code == 401
+    # a private / unknown project is still a plain 404, not a hint that it exists
+    assert anon.post("/api/showcase/nope123/like", json={}).status_code == 404
+
+
 def test_press_is_idempotent_with_an_explicit_state_and_an_old_empty_body_still_toggles():
-    iid = _publish_one(); v = client()
+    iid = _publish_one(); v = V()
     a = v.post(f"/api/showcase/{iid}/like", json={"liked": True}).json()
     b = v.post(f"/api/showcase/{iid}/like", json={"liked": True}).json()          # a double tap sends the same wish twice: still one nozzle
     assert a["liked"] and b["liked"] and a["likes"] == b["likes"]
@@ -28,7 +42,7 @@ def test_press_is_idempotent_with_an_explicit_state_and_an_old_empty_body_still_
 
 def test_there_is_no_dislike_route_and_the_owner_cannot_nozzle_their_own_project():
     iid, owner = _publish_one(True)
-    v = client()
+    v = V()
     for path in ("dislike", "downvote", "unlike"):
         assert v.post(f"/api/showcase/{iid}/{path}", json={}).status_code in (404, 405)
     r = owner.post(f"/api/showcase/{iid}/like", json={"liked": True})
@@ -49,7 +63,7 @@ def test_can_like_reason_says_why_a_button_would_not_work():
 
 def test_class_students_see_no_nozzle_or_download_numbers_even_on_adults_projects_but_can_still_nozzle_when_allowed():
     iid = _publish_one()
-    v = client(); v.post(f"/api/showcase/{iid}/like", json={"liked": True})
+    v = V(); v.post(f"/api/showcase/{iid}/like", json={"liked": True})
     seen = client().get(f"/api/showcase/{iid}").json()
     assert seen["likes"] is not None and seen["likes"] >= 1                          # an ordinary visitor sees the number
     t, code, pw = make_class(); s = student(code, pw, "Fox")
@@ -69,7 +83,7 @@ def test_example_items_still_show_no_numbers():
 
 
 def test_project_page_and_teacher_list_say_nozzles_not_hearts():
-    iid = _publish_one(); client().post(f"/api/showcase/{iid}/like", json={"liked": True})
+    iid = _publish_one(); V().post(f"/api/showcase/{iid}/like", json={"liked": True})
     page = client().get(f"/p/{iid}").text
     assert "♥" not in page and "nozzle" in page
     t, code, pw = make_class(); s = student(code, pw, "Fox")

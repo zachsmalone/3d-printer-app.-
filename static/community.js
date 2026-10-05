@@ -186,7 +186,8 @@ document.addEventListener("click", async e => {
     nzSay((r.liked ? "Nozzled." : "Nozzle removed.") + (r.likes != null ? ` ${r.likes} ${r.likes === 1 ? "nozzle" : "nozzles"}.` : ""));
   } catch (er) {
     nzPaint(id, was.liked, was.n, false);                                    // roll back to exactly what it was
-    if (er.status === 403 && /teacher/i.test(er.message)) nzSay(er.message, true);
+    if (er.status === 401) { window.__nzOpener = b; $("#dlgNzAcct").showModal(); }                // the server says this session has no account (e.g. it expired)
+    else if (er.status === 403 && /teacher/i.test(er.message)) nzSay(er.message, true);
     else { nzSay("Couldn't save your nozzle. Check your connection and try again.", true); toast("Couldn't save your nozzle. Check your connection and try again.", "err"); }
   } finally { $$(`.nz[data-nz="${CSS.escape(id)}"]`).forEach(x => delete x.dataset.busy); }
 }, true);

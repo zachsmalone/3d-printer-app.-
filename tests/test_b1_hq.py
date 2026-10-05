@@ -115,7 +115,7 @@ def test_hq3_popart_exports_are_watertight_in_every_format(fmt, beginner):
 
 # ---------------------------------------------------------------- HQ-2/3/4 + EXAMPLE counts
 def test_examples_serve_null_counts_and_stay_out_of_ranking():
-    v = client()
+    v = client({"display_name": "Looker", "dob": "1990-01-01"})          # nozzles need an account
     for tab in ("trending", "free", "foryou"):
         for i in v.get(f"/api/showcase?tab={tab}").json()["items"]:
             if i["example"]: assert i["likes"] is None and i["downloads"] is None, (tab, i["id"])
@@ -128,7 +128,7 @@ def test_examples_serve_null_counts_and_stay_out_of_ranking():
     # a real project with a single like outranks every example
     o = client(ADULT); p = o.post("/api/showcase", json={"build_id": photo_build(o), "title": "Real lamp", "accept_guidelines": True, "visibility": "public"}).json()
     v.post(f"/api/showcase/{p['id']}/like", json={"liked": True}); v.post(f"/api/showcase/{p['id']}/like", json={"liked": True}) if False else None
-    w = client(); w.post(f"/api/showcase/{p['id']}/like", json={"liked": True})
+    w = client({"display_name": "Looker2", "dob": "1990-01-01"}); w.post(f"/api/showcase/{p['id']}/like", json={"liked": True})
     assert v.get("/api/showcase?tab=trending").json()["items"][0]["id"] == p["id"]
 
 

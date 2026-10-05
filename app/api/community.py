@@ -289,7 +289,9 @@ def like(iid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor, likes=True)
     """Toggle like (or set with {"liked": true|false}). Public projects only. There is deliberately no dislike."""
     try:
-        i = catalog.get(iid, actor)
+        i = catalog.get(iid, actor)                      # private / followers-only stay 404 for everyone not allowed to see them
+        if not actor.user and classrooms.showcase_policy(actor.sid) is None:
+            raise HTTPException(401, "Make a free account to nozzle projects.")      # signed-out visitors can look, not nozzle (class students use their class session)
         res = catalog.set_like(i, actor, (body or {}).get("liked"))
     except catalog.Denied as e:
         raise D(e)
