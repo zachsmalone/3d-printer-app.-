@@ -348,3 +348,12 @@ ul.grid{list-style:none;padding:0;margin:14px 0 0}
 .nz-note{font-size:14px;color:var(--mut);margin:0}
 .itrow .nzwrap,.row .nzwrap{display:inline-flex;flex-direction:column;gap:2px}
 @media (forced-colors:active){.nz[aria-pressed=true]{outline:3px solid Highlight}}
+
+/* ---- Teacher Live view ---- */
+.tablewrap{overflow-x:auto;max-width:100%}
+table.live{width:100%;border-collapse:collapse;margin-top:8px}
+table.live th,table.live td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.live thead th{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+table.live tr.hand{background:var(--warmtint)}.needs{font-weight:700;color:var(--warn)}
+@media(max-width:600px){table.live thead{position:absolute;left:-9999px}table.live,table.live tbody,table.live tr,table.live th,table.live td{display:block;width:100%}
+ table.live tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 4px}table.live td::before{content:attr(data-l) ": ";color:var(--mut)}}

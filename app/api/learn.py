@@ -290,6 +290,24 @@ def send_request(code: str, body: dict, actor: Actor = Depends(get_actor)):
         raise HTTPException(400, str(e))
 
 
+@router.get("/classrooms/{code}/live")
+def live_view(code: str, actor: Actor = Depends(get_actor)):
+    """Teacher Live view: view-only roster, owner of the class only (404 for everyone else)."""
+    try:
+        return classrooms.live_roster(actor, code)
+    except KeyError:
+        raise HTTPException(404)
+
+
+@router.post("/classrooms/{code}/students/{sid}/helped")
+def hand_helped(code: str, sid: str, actor: Actor = Depends(get_actor)):
+    try:
+        classrooms.helped(actor, code, sid)
+    except KeyError:
+        raise HTTPException(404)
+    return {"ok": True}
+
+
 @router.get("/classrooms/{code}/notifications")
 def notifications(code: str, actor: Actor = Depends(get_actor)):
     try:

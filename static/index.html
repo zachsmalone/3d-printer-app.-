@@ -382,6 +382,12 @@
 <div id="toasts"></div>
 <div id="nzStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div><div id="nzAlert" class="sr-only" role="alert"></div>
 <div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<dialog id="dlgLive" aria-labelledby="liveH"><div class="dlg wide"><div class="dh"><h3 id="liveH">Live view</h3><button class="x" data-close aria-label="Close live view">✕</button></div>
+  <div class="body"><p class="help" id="liveNote">View only. This shows each student's nickname, the lesson and how many steps they have ticked, their newest model's name (no pictures), and when they last did something. It refreshes about every 12 seconds while this window is open.</p>
+    <label class="inl"><input type="checkbox" id="liveSort"> Show students who need help first</label>
+    <p class="help" id="liveAsOf"></p><p class="sr-only" id="liveSay" role="status" aria-live="polite"></p>
+    <div class="tablewrap"><table class="live"><caption class="sr-only">Students in this class</caption><thead><tr><th scope="col">Nickname</th><th scope="col">Lesson and steps ticked</th><th scope="col">Newest model</th><th scope="col">Last activity</th><th scope="col">Hand</th></tr></thead><tbody id="liveRows"></tbody></table></div>
+    <p class="help" id="liveEmpty" hidden>No students have joined yet.</p></div></div></dialog>
 <dialog id="dlgNzAcct" aria-labelledby="nzAcctH"><div class="dlg"><div class="dh"><h3 id="nzAcctH">Make a free account to nozzle</h3></div>
   <div class="body"><p>A nozzle is a way to say "nice work" to a maker. You need a free ZEIM account to give one. It takes a minute and costs nothing.</p></div>
   <div class="df"><button type="button" class="btn" id="nzAcctLater">Not now</button><button type="button" class="btn primary" id="nzAcctMake">Make an account</button></div></div></dialog>

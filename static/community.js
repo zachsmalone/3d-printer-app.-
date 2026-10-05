@@ -261,6 +261,7 @@ async function loadLearn() {
   const r = await api("/api/learn/lessons");
   const cls = r.classroom;
   $("#classBanner").innerHTML = cls ? `<div class="banner">🎒 You're in <b>${esc(cls.name)}</b> (teacher: ${esc(cls.teacher)}) as <b>${esc(cls.nickname)}</b>. ${cls.assigned.length ? "Assigned lessons are marked ⭐." : ""}
+    <p class="help" id="classNotice">${esc(cls.notice || "")}</p>
     ${cls.notifications.map(n => `<div class="note">🔔 ${esc(n.from_name)}: ${esc(n.text)}</div>`).join("")}
     <div class="row" style="margin-top:6px"><span class="help">Quick message to your teacher (pre-set only):</span>${Object.entries(cls.canned).map(([k, t]) => `<button class="btn small" data-req="${k}">${esc(t)}</button>`).join("")}
     <button class="btn small ghost" id="clsFeedback">📝 My projects &amp; feedback</button><button class="btn small ghost" id="clsSubmit">⬆ Submit a build</button></div></div>` : "";
@@ -298,6 +299,52 @@ async function openLesson(id) {
   $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
 }
 
+
+/* ---------- Teacher Live view: view-only roster, polled every ~12 s while the window is open ---------- */
+let liveTimer = null, liveCode = "", liveHands = new Set(), liveData = null;
+const liveAgo = iso => { if (!iso) return "no activity yet"; const m = (Date.now() - new Date(iso)) / 60000; return m < 1 ? "just now" : m < 15 ? Math.floor(m) + " min ago" : "inactive 15+ min"; };
+function liveRender() {
+  const body = $("#liveRows"), rows = liveData.students.slice();
+  if ($("#liveSort").checked) rows.sort((a, b) => (b.hand - a.hand));            // only when the teacher asks; otherwise join order, so rows never jump
+  $("#liveEmpty").hidden = rows.length > 0;
+  const keep = new Set(rows.map(r => r.id));
+  $$("tr[data-sid]", body).forEach(tr => { if (!keep.has(tr.dataset.sid)) tr.remove(); });
+  rows.forEach((r, idx) => {
+    let tr = body.querySelector(`tr[data-sid="${r.id}"]`);
+    if (!tr) { tr = document.createElement("tr"); tr.dataset.sid = r.id; tr.innerHTML = `<th scope="row" class="c-n"></th><td class="c-l" data-l="Lesson"></td><td class="c-m" data-l="Newest model"></td><td class="c-a" data-l="Last activity"></td><td class="c-h" data-l="Hand"></td>`; body.append(tr); }
+    tr.querySelector(".c-n").textContent = r.nickname;
+    tr.querySelector(".c-l").textContent = r.lesson ? `${r.lesson.title}: ${r.lesson.done_steps} of ${r.lesson.steps} steps` : "No lesson yet";
+    tr.querySelector(".c-m").textContent = r.model || "none yet";
+    tr.querySelector(".c-a").textContent = liveAgo(r.last_active);
+    const h = tr.querySelector(".c-h");
+    if (r.hand && !h.dataset.up) h.innerHTML = `<span class="needs">✋ Needs help</span> <button type="button" class="btn small" data-helped="${r.id}">Helped<span class="sr-only"> ${esc(r.nickname)}</span></button>`;
+    if (!r.hand && h.dataset.up) h.textContent = "";
+    h.dataset.up = r.hand ? "1" : "";
+    tr.classList.toggle("hand", !!r.hand);
+    if ($("#liveSort").checked && body.children[idx] !== tr) body.insertBefore(tr, body.children[idx] || null);
+  });
+  const now = new Set(rows.filter(r => r.hand).map(r => r.id)), fresh = rows.filter(r => r.hand && !liveHands.has(r.id));
+  if (fresh.length) $("#liveSay").textContent = fresh.map(r => r.nickname).join(", ") + (fresh.length === 1 ? " needs help." : " need help.");
+  liveHands = now;
+  $("#liveAsOf").textContent = "Updated " + new Date(liveData.as_of).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ".";
+}
+async function livePoll() {
+  try { liveData = await api(`/api/classrooms/${liveCode}/live`); liveRender(); }
+  catch (e) { $("#liveAsOf").textContent = "Couldn't refresh just now. " + (e.message || "") + " Trying again soon."; }
+}
+async function openLive(code) {
+  liveCode = code; liveHands = new Set(); $("#liveRows").innerHTML = ""; $("#liveSay").textContent = ""; liveData = null;
+  $("#dlgTeacher").close(); $("#dlgLive").showModal();
+  await livePoll(); clearInterval(liveTimer); liveTimer = setInterval(() => { if (!document.hidden) livePoll(); }, 12000);
+}
+$("#dlgLive").addEventListener("close", () => { clearInterval(liveTimer); liveTimer = null; });           // stop asking the server when the teacher closes the screen
+$("#liveSort").onchange = () => { if (liveData) liveRender(); };
+$("#liveRows").onclick = async e => {
+  const b = e.target.closest("[data-helped]"); if (!b) return;
+  try { await api(`/api/classrooms/${liveCode}/students/${b.dataset.helped}/helped`, J("POST")); await livePoll(); $("#liveSay").textContent = "Marked as helped."; } catch (er) { toast(er.message, "err"); }
+};
+window.__liveTimer = () => liveTimer;
+
 /* classroom */
 $("#btnJoinClass").onclick = () => $("#dlgJoin").showModal();
 $("#btnDoJoin").onclick = async () => {
@@ -329,7 +376,7 @@ async function openTeacher() {
       <table class="studs"><tr><th>Student</th><th>Progress</th><th></th></tr>${r.students.map(s => `<tr><td>${esc(s.nickname)}</td><td>${s.lessons.map(x => `${x.completed ? "✅" : `${x.done_steps}/${x.steps}`}`).join(" · ")}</td><td><button class="btn small ghost" data-talk="${r.code}:${s.id}" title="${esc(r.canned.talk_next_class)}">🗨 Talk next class</button> <button class="btn small ghost" data-mu="${r.code}:${s.id}:${s.muted ? 0 : 1}">${s.muted ? "Unmute" : "Mute"}</button> <button class="btn small ghost danger" data-rs="${r.code}:${s.id}">Remove</button></td></tr>`).join("") || "<tr><td colspan=3 class='help'>No students yet</td></tr>"}</table>
       <h4>Student projects <small class="help">(private to this class)</small></h4>
       ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
-      <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
+      <button class="btn small" data-live="${r.code}">Live view</button> <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
   if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
   $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { inlineMsg($("#cr_go"), e.message); } };
   $("#teacherBody").onclick = async e => {
@@ -337,6 +384,7 @@ async function openTeacher() {
     if (t.dataset.cp) navigator.clipboard?.writeText(t.dataset.cp), toast("Code copied", "ok");
     if (t.dataset.cl) navigator.clipboard?.writeText(location.origin + "/#join/" + t.dataset.cl), toast("Join link copied (password not included)", "ok");
     if (t.dataset.unlock) { await api(`/api/classrooms/${t.dataset.unlock}/unlock-joins`, J("POST")); toast("Joining unlocked", "ok"); openTeacher(); }
+    if (t.dataset.live) { openLive(t.dataset.live); return; }
     if (t.dataset.rd) { await api(`/api/classrooms/${t.dataset.rd}/notifications/read`, J("POST")); openTeacher(); }
     if (t.dataset.talk) { const [c, sid] = t.dataset.talk.split(":"); try { await api(`/api/classrooms/${c}/requests`, J("POST", { kind: "talk_next_class", to: sid })); toast("Request sent", "ok"); } catch (er) { toast(er.message, "err"); } }
     if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }

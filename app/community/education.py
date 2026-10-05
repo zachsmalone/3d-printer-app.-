@@ -88,6 +88,7 @@ def mark_step(sid: str, lid: str, idx: int, done: bool):
         s = set(p.get("steps_done", []))
         (s.add if done else s.discard)(idx)
         p["steps_done"] = sorted(s)
+        p["last_step_at"] = datetime.now(timezone.utc).isoformat()       # only used by the teacher's Live view ("last activity"); deleted with the progress
         _maybe_complete(l, p)
     PROGRESS.update(f)
 
