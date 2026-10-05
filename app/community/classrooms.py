@@ -568,6 +568,21 @@ def add_feedback(actor: Actor, code: str, pid: str, comment: str) -> dict:
     return out
 
 
+def feedback_preview(item_id: str) -> dict | None:
+    """What a moderator needs to see for a reported feedback comment ('fb:<code>:<project>:<comment>')."""
+    try:
+        _, code, pid, fid = item_id.split(":")
+    except ValueError:
+        return None
+    room = CLASSROOMS.read().get(code)
+    for p in (room or {}).get("projects", []):
+        if p["id"] == pid:
+            for fb in p["feedback"]:
+                if fb["id"] == fid:
+                    return {"kind": "class feedback", "title": p["title"], "text": fb["comment"], "class": code, "hidden": bool(fb.get("hidden"))}
+    return None
+
+
 def hide_feedback(item_id: str):
     """Moderator action for a reported feedback comment (item id 'fb:<code>:<project>:<comment>')."""
     try:

@@ -76,3 +76,33 @@ def sanitize(data: bytes) -> tuple[bytes, str, Image.Image]:
         return out.getvalue(), "jpg", clean
     clean.save(out, "PNG", optimize=True)
     return out.getvalue(), "png", clean
+
+
+# ---- CR-5: photo-permission acknowledgement --------------------------------------------------------------------------------
+ACK_REFUSED = ("Please tick the box that says this is your photo or you have permission from everyone in it, then try again.")
+
+
+def _sample_hash() -> str:
+    import hashlib
+    from ..config import STATIC
+    try:
+        return hashlib.sha256((STATIC / "sample.png").read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
+
+def is_builtin_sample(raw: bytes) -> bool:
+    import hashlib
+    h = _sample_hash()
+    return bool(h) and hashlib.sha256(raw).hexdigest() == h
+
+
+def check_ack(raw: bytes, ack: bool):
+    """Every uploaded photo needs the permission box ticked (config.PHOTO_ACK_REQUIRED); ZEIM's own sample photo does not.
+    Returns what to record in meta.json: True (ticked), 'sample' (built-in sample) or False (check switched off). Raises ImageRefused."""
+    from .. import config
+    if is_builtin_sample(raw):
+        return "sample"
+    if config.PHOTO_ACK_REQUIRED and not ack:
+        raise ImageRefused(ACK_REFUSED)
+    return bool(ack)

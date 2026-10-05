@@ -73,7 +73,7 @@ function setFile(f) {
 const drop = $("#drop");
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => setFile(e.dataTransfer.files[0]));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (pick.allowed(f)) setFile(f); });
 drop.addEventListener("click", () => pick.el("File").click());
 $("#changePhoto").onclick = () => pick.el("File").click();
 $("#sSample").onclick = async () => {
@@ -84,7 +84,7 @@ $("#sSample").onclick = async () => {
 /* ---------- build ---------- */
 function formData(autoDelete) {
   const fd = new FormData();
-  fd.append("file", S.file); fd.append("mode", S.mode);
+  fd.append("file", S.file); fd.append("mode", S.mode); fd.append("photo_ack", pick.acked());      // CR-5 (the built-in sample needs no tick: the server knows that file)
   fd.append("beginner", S.level === "beginner"); fd.append("preset", S.preset);
   fd.append("width_mm", $("#width_mm").value);
   if (autoDelete) fd.append("auto_delete_oldest", "true");
@@ -350,7 +350,7 @@ async function renderAccounts() {
   const r = await api("/api/accounts"); $("#accNote").textContent = r.note;
   const label = { not_configured: "Not configured", disconnected: "Ready to connect", connected: "Connected" };
   $("#accList").innerHTML = r.providers.map(p => `<div class="acc"><div class="info"><b>${p.label}</b> <span class="pill ${p.state === "connected" ? "ok" : ""}">${label[p.state]}</span>
-    <small>${p.purpose} · posting/verification: <i>not implemented yet</i></small>
+    <small>${p.purpose} · posting/verification: <i>Coming soon</i></small>
     ${p.state === "not_configured" ? `<small>Set <code>${p.env_vars[0]}</code> and <code>${p.env_vars[1]}</code>, then restart the server.</small>` : ""}</div>
     ${p.state === "connected" ? `<button class="btn small" data-disc="${p.id}">Disconnect</button>` : `<a class="btn small ${p.state === "not_configured" ? "" : "primary"}" ${p.state === "not_configured" ? 'style="pointer-events:none;opacity:.4"' : `href="/api/accounts/${p.id}/connect"`}>Connect</a>`}</div>`).join("");
 }

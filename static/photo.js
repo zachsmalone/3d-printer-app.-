@@ -30,6 +30,7 @@ export function photoBlock(p, { sample = true } = {}) {
   </div>
   <input type="file" id="${p}File" accept="image/*,.heic,.heif" class="sr-only" tabindex="-1" aria-hidden="true">
   <input type="file" id="${p}Cam" accept="image/*" capture="environment" class="sr-only" tabindex="-1" aria-hidden="true">
+  <label class="inl pp-ack"><input type="checkbox" id="${p}Ack"> <span>This is my photo or drawing, or I have permission from everyone in it. No addresses, school names or license plates.</span></label>
   <p class="pp-note">Photos stay private to you unless you choose to share.<br>Use your own photo or drawing, or ask first. No addresses, school names or plates.</p>
 </div>`;
 }
@@ -39,7 +40,16 @@ export function mountPhoto(p, onFile) {
   const msg = (t) => { const m = el("Msg"); m.textContent = t || ""; m.hidden = !t; };
   let stream = null;
   const stop = () => { stream?.getTracks().forEach(t => t.stop()); stream = null; };
-  const give = f => { if (!f) return; msg(""); onFile(f); };
+  // CR-5: an uploaded photo needs the permission box ticked first (never pre-ticked; the sample image is exempt and does not come through here)
+  const ackBox = el("Ack");
+  const allowed = f => {
+    if (!f) return false;
+    if (ackBox.checked) return true;
+    msg("Please tick the box below that says this is your photo (or you have permission), then choose the photo again.");
+    ackBox.focus(); return false;
+  };
+  ackBox.addEventListener("change", () => { if (ackBox.checked) msg(""); });
+  const give = f => { if (!allowed(f)) return; msg(""); onFile(f); };
 
   el("Choose").onclick = () => el("File").click();
   el("File").onchange = e => { give(e.target.files[0]); e.target.value = ""; };
@@ -82,5 +92,5 @@ export function mountPhoto(p, onFile) {
   };
   el("CamCancel").onclick = () => { stop(); el("CamPanel").hidden = true; };
   addEventListener("pagehide", stop);
-  return { msg, el, stop };
+  return { msg, el, stop, allowed, acked: () => ackBox.checked };
 }

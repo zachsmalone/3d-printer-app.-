@@ -56,7 +56,7 @@ function fromFile(file) {
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
-  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("beginner", S.level === "beginner"); return fd; };
+  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked()); fd.append("beginner", S.level === "beginner"); return fd; };
   create(mk(), mk);
 }
 const drop = $("#editDrop");

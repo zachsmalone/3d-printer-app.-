@@ -61,7 +61,7 @@ function renderAccount() {
       <label class="inl"><input type="checkbox" id="pv_social" ${pv.social === "on" ? "checked" : ""}> Allow following (I can follow others and others can follow me)</label>
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
       <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button></div>
-      <ul class="help"><li>Direct messages from strangers: <b>off</b> (free-text messaging isn't built)</li>
+      <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li>
       <li>Classroom tools: <b>${r.can_create_classroom ? "available" : "adults only"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>`;
@@ -82,7 +82,7 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
   $("#shGrid").innerHTML = r.items.map(i => `<div class="pcard" data-item="${i.id}"><div class="ph">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
-    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}${i.liked_by_others ? " · ♥ liked" : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("");
+    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}${i.liked_by_others ? " · ♥ liked" : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("");
   if (!r.items.length) {
     const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
     $("#shGrid").innerHTML = `<div class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</div>`;
@@ -108,14 +108,15 @@ async function openItem(id) {
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
     ${i.thumb ? `<img src="${i.thumb}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
-    <p class="help">by <a href="/u/${i.creator_id}" target="_blank">${esc(i.creator)}</a> · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
+    <p class="help">by <a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a> · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
+    ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
-    <div class="row">${i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
+    <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
       ${i.likes != null ? `<button class="btn ${i.liked ? "primary" : ""}" id="itLike" ${i.can_like ? "" : "disabled"} title="${i.can_like ? "Like this model" : "You can't like your own model"}">♥ ${i.liked ? "Liked" : "Like"} · ${i.likes}</button>` : ""}
       ${i.can_follow ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
       <button class="btn ghost danger" id="itReport">⚑ Report</button></div>
-    <p class="help">Likes and downloads are counted once per visitor and only for public projects. Follow is scaffolding — a feed of followed creators isn't built yet.</p>`;
+    <p class="help">Likes and downloads are counted once per visitor and only for public projects. A feed of the creators you follow: <b>Coming soon</b>.</p>`;
   if ($("#itLike")) $("#itLike").onclick = async () => { try { await api(`/api/showcase/${id}/like`, J("POST", {})); openItem(id); loadShowcase(); } catch (e) { toast(e.message, "err"); } };
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };

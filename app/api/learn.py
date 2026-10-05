@@ -7,9 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from .. import branding
+from ..config import STATIC as STATIC_DIR
 from ..community import catalog, classrooms, education, moderation, privacy, safety
-from ..services import settings
+from ..services import credits, settings
 from . import guards
+from .community import report_limit
 from .textcap import ip as ip_of
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
@@ -250,8 +252,22 @@ def give_feedback(code: str, pid: str, body: dict, actor: Actor = Depends(get_ac
         return _blocked(e)
 
 
+@router.get("/classrooms/{code}/reports")
+def class_reports(code: str, actor: Actor = Depends(get_actor)):
+    """CR-11 e: the TEACHER sees reports about their own class's comments first (before the site moderator's queue)."""
+    try:
+        role, room = classrooms.membership(actor, code)
+    except KeyError:
+        raise HTTPException(404)
+    if role != "teacher":
+        raise HTTPException(404)
+    mine = [r for r in moderation.queue() if r["item_id"].startswith(f"fb:{room['code']}:")]
+    return {"reports": [{"id": r["id"], "reason": r["reason"], "created": r["created"], "preview": classrooms.feedback_preview(r["item_id"])} for r in sorted(mine, key=lambda r: r["created"])]}
+
+
 @router.post("/classrooms/{code}/projects/{pid}/feedback/{fid}/report")
-def report_feedback(code: str, pid: str, fid: str, body: dict, actor: Actor = Depends(get_actor)):
+def report_feedback(code: str, pid: str, fid: str, request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    report_limit(request, actor)
     try:
         classrooms.membership(actor, code)
         return moderation.report(f"fb:{code.upper()}:{pid}:{fid}", actor.sid, body.get("reason", "other"), body.get("details", ""))
@@ -327,9 +343,11 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
     ex = "<p class=pill>EXAMPLE seed data - not a real creator project</p>" if i.get("example") else ""
     files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
     eng = f" · ♥ {catalog.public(i, actor)['likes']} · ⬇ {catalog.public(i, actor)['downloads']}" if catalog.public(i, actor)["likes"] is not None else ""
-    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{thumb}"
+    cl = credits.credit_line(i)
+    credit = (f"<p class=credit>Credit: <b>{escape(cl['creator'])}</b>" + (f" · Licence: {_lic(cl['licence'], cl['licence_url'])}" if cl["licence"] else "") + " · <a href='/credits'>Thank you &amp; credits</a></p>") if cl else ""
+    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{thumb}"
             f"<p>{escape(i['description'])}</p><p>{' '.join('<span class=pill>' + escape(t) + '</span>' for t in i['tags'])}</p>"
-            f"<h3>Free downloads</h3><ul>{files}</ul>")
+            f"<h3>Free downloads</h3>{('<ul>' + files + '</ul>') if files else '<p class=help>No model yet.</p>'}")
     return _page(i["title"], body, i["description"])
 
 
@@ -350,3 +368,54 @@ def user_page(uid: str, actor: Actor = Depends(get_actor)):
     body = (f"<h1>{escape(name)}</h1><h3>Projects</h3><ul>{projs or '<li>None yet</li>'}</ul>"
             f"{'<h3>Also find me on</h3><ul>' + lk + '</ul>' if lk else ''}")
     return _page(name, body)
+
+
+@pages.get("/admin/moderation", response_class=HTMLResponse)
+def moderation_page():
+    """The page itself holds no data: it asks for the admin token and then calls the token-protected API."""
+    return FileResponse(STATIC_DIR / "moderation.html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
+
+
+def _lic(name, url):
+    if not name:
+        return ""
+    return f"<a href='{escape(url)}' rel='noopener noreferrer' target=_blank>{escape(name)}</a>" if str(url).startswith("https://") else escape(name)
+
+
+@pages.get("/credits", response_class=HTMLResponse)
+def credits_page():
+    """Thank you / Credits. Every word comes from app/credits.json; versions and licences are read from what is installed."""
+    d = credits.data()
+    t = d["tools"]
+
+    def rows(items):
+        return "".join(
+            f"<tr><td>{('<a href=\'' + escape(i['url']) + '\' rel=\'noopener noreferrer\' target=_blank>' + escape(i['name']) + '</a>') if i.get('url', '').startswith('https://') else escape(i['name'])}</td>"
+            f"<td>{escape(i.get('version') or '')}</td><td>{escape(i['licence'])}</td><td>{escape(i['what'])}</td></tr>" for i in items)
+
+    def table(items):
+        return ("<div class=tablewrap><table class=credits><thead><tr><th scope=col>Name</th><th scope=col>Version</th><th scope=col>Licence</th><th scope=col>What it does for ZEIM</th></tr></thead>"
+                f"<tbody>{rows(items)}</tbody></table></div>")
+
+    def people(sec):
+        ps = sec.get("people") or []
+        return ("<ul>" + "".join(f"<li>{escape(x)}</li>" for x in ps) + "</ul>") if ps else f"<p class=help>{escape(sec['empty'])}</p>"
+
+    mk = credits.makers()
+    mk_html = ("".join(
+        f"<details class=maker><summary><b>{escape(m['creator'])}</b> <span class=help>({len(m['models'])} model{'s' if len(m['models']) != 1 else ''})</span></summary><ul>"
+        + "".join(f"<li>{escape(x['title'])} · {_lic(x['licence'], x['licence_url'])}</li>" for x in m["models"]) + "</ul></details>" for m in mk)
+        if mk else f"<p class=help>{escape(d['creators']['empty'])}</p>")
+    tk = d["takedown"]
+    contact = " " + escape(("Contact: " + tk["contact"]) if tk.get("contact") else tk.get("contact_placeholder", ""))
+    body = (f"<h1>{escape(d['title'])}</h1><p>{escape(d['intro'])}</p>"
+            f"<h2>{escape(t['heading'])}</h2><p class=help>{escape(t['blurb'])}</p>{table(credits.python_packages())}"
+            f"<h3>{escape(t['system_heading'])}</h3>{table(credits.system_tools())}"
+            f"<h3>{escape(t['bundled_heading'])}</h3>{table(credits.bundled())}<p class=help>{escape(t['others'])}</p>"
+            f"<h2>{escape(d['creators']['heading'])}</h2><p class=help>{escape(d['creators']['blurb'])}</p>{mk_html}<p class=help>{escape(d['creators']['originals_note'])}</p>"
+            f"<h2>{escape(d['testers']['heading'])}</h2><p class=help>{escape(d['testers']['blurb'])}</p>{people(d['testers'])}"
+            f"<h2>{escape(d['teachers']['heading'])}</h2><p class=help>{escape(d['teachers']['blurb'])}</p>{people(d['teachers'])}"
+            f"<h2>{escape(d['trademarks']['heading'])}</h2><p>{escape(d['trademarks']['text'])}</p>"
+            f"<h2>{escape(tk['heading'])}</h2><p>{escape(tk['text'])}{contact}</p>"
+            f"<p><a class='btn primary' href='/'>Back to {escape(branding.PRODUCT_NAME)}</a></p>")
+    return _page("Thank you", body, "The people and projects behind ZEIM.")

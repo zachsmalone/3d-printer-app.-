@@ -152,7 +152,8 @@ def public_profile(actor: Actor) -> dict:
         return {"signed_up": False, "restrictions": restrictions(actor)}
     return {"signed_up": True, "id": u["id"], "display_name": u["display_name"],
             "age_group": "adult" if actor.is_adult else "teen", "links": u.get("links", {}),
-            "following": u.get("following", []), "privacy": _priv(u), "restrictions": restrictions(actor)}
+            "following": u.get("following", []), "privacy": _priv(u), "restrictions": restrictions(actor),
+            "recovery": {"has_code": bool(u.get("recovery")), "issued": u.get("recovery_issued")} if actor.is_adult else None}
 
 
 def user_by_id(uid: str):

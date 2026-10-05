@@ -45,6 +45,8 @@ if not _aud.handlers:
 
 _docs = {} if config.API_DOCS else {"docs_url": None, "redoc_url": None, "openapi_url": None}
 app = FastAPI(title=f"{branding.PRODUCT_NAME} (photo3d)", version="0.3", **_docs)
+from .services import credits as _credits
+_credits.assert_launch_ready()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages):
     app.include_router(r)

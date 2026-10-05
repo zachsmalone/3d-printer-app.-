@@ -139,3 +139,21 @@ def test_print_dialog_puts_creality_cloud_first_on_phones_and_demotes_desktop_sl
     finally:
         for p in (p1, p2):
             p.terminate(); p.wait(10)
+
+
+def test_photo_permission_box_in_studio_and_edit_in_a_real_browser():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_cr5.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_credits_page_and_showcase_credit_at_phone_width_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_credits.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)

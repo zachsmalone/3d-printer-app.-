@@ -48,6 +48,7 @@ def new_project(
     auto_delete_oldest: bool = Form(False),
     photo_mode: str = Form("lithophane"),
     width_mm: float = Form(100.0),
+    photo_ack: bool = Form(False),
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -60,6 +61,7 @@ def new_project(
         raise HTTPException(400, f"units must be one of {list(meshedit.UNIT_MM)}")
     warnings: list[str] = []
     source_image = None
+    ack = None
     scale, base = 1.0, {}
     if from_build:                                              # ---- bring a ZEIM build into the editor
         meta = meta_for(from_build, actor, owner_only=True)
@@ -101,6 +103,7 @@ def new_project(
             if not (20 <= width_mm <= 500):
                 raise HTTPException(400, "width_mm must be 20..500")
             try:
+                ack = imagesafe.check_ack(data, photo_ack)      # CR-5
                 data, src_ext, _ = imagesafe.sanitize(data)
                 im = geometry.load_image(data)
             except imagesafe.ImageRefused as e:
@@ -134,6 +137,8 @@ def new_project(
                                    warnings=warnings, import_scale=scale, import_units=units, source_image=source_image)
         except meshedit.OpError as e:
             raise HTTPException(422, str(e))
+        if ack is not None:
+            meta["photo_ack"] = ack; store.save(meta)
     return {**editproj.payload(meta["id"]), "history": [summary(m) for m in store.list(actor.sid)]}
 
 

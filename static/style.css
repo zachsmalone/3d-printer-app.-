@@ -240,3 +240,15 @@ body[data-links="0"] #editPrint { display: none; }
 .cre-steps{margin:8px 0 4px;padding-left:20px}
 .slicers-more{border:1px dashed var(--line);border-radius:10px;padding:2px 10px}
 .slicers-more summary{min-height:44px;display:flex;align-items:center}
+
+/* footer link + Thank-you page */
+.sitefoot{padding:16px 20px calc(24px + env(safe-area-inset-bottom));text-align:center}
+.sitefoot a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0 14px}
+table.credits{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+table.credits th,table.credits td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.sharepage details.maker summary{min-height:44px;display:flex;align-items:center;gap:6px}
+.sharepage .credit{margin:4px 0 10px}
+.credit-line{font-size:13px;margin:2px 0}
+.credit-line a,.sharepage a{color:var(--acc2)}
+a.creator-link{color:var(--acc2);text-decoration:underline;text-underline-offset:3px}a.creator-link:visited{color:var(--acc2)}a.creator-link:hover{color:#fff}

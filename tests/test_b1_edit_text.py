@@ -51,7 +51,8 @@ def test_text_added_to_an_existing_project_and_from_a_studio_build_is_checked_to
     e = c.post("/api/edit/new", data={"from_build": b}); assert e.status_code == 200, e.text
     bid = e.json()["id"]
     assert text_op(c, bid, "sh1t").status_code == 422
-    assert text_op(c, bid, "Hello").status_code == 200
+    r = text_op(c, bid, "Hello"); assert r.status_code == 422 and "float free" in r.text        # top of a relief is bumpy: raised text touches nothing there, so it is refused (QA-6) - not a filter problem
+    assert text_op(c, bid, "Hello", face="bottom").status_code == 200                          # the flat underside takes it
     # later edit of the same project: undo, then a second bad step is still refused, history intact
     c.post(f"/api/edit/{bid}/undo")
     assert text_op(c, bid, "me@example.com").status_code == 422

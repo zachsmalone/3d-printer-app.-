@@ -176,6 +176,7 @@ def generate(
     halftone_cell: float = Form(6.0),
     multi_body: bool = Form(True),
     palette: str = Form(""),
+    photo_ack: bool = Form(False),
 ):
     if mode not in ("lithophane", "relief", "popart"):
         raise HTTPException(400, f"unknown mode {mode}")
@@ -189,6 +190,7 @@ def generate(
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
     try:
+        ack = imagesafe.check_ack(data, photo_ack)        # CR-5: "this is my photo / I have permission" (built-in sample exempt)
         data, src_ext, _ = imagesafe.sanitize(data)       # HEIC -> JPEG, rotation applied, EXIF/GPS dropped, extension from content
         im = geometry.load_image(data)
     except imagesafe.ImageRefused as e:
@@ -243,7 +245,7 @@ def generate(
         meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
                 "title": title.strip() or _safe_title((file.filename or "Untitled").rsplit(".", 1)[0][:40]),
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
-                "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor)}
+                "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
     return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,

@@ -5,6 +5,10 @@ from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
 R = []
 def ok(n, c, x=""): R.append(bool(c)); print(("PASS " if c else "FAIL ") + n, x)
+def up(pg, sel, ack, f):
+    """CR-5: an uploaded photo needs the permission box ticked first."""
+    if not pg.is_checked(ack): pg.check(ack)
+    pg.set_input_files(sel, f)
 T = tempfile.mkdtemp()
 open(T + "/fake.jpg", "wb").write(b"this is not a jpeg" * 20)
 open(T + "/empty.jpg", "wb").close()
@@ -39,7 +43,7 @@ with sync_playwright() as p:
     # ---- QA-2: refused photo is forgotten
     pg.reload(); pg.wait_for_timeout(600)
     pg.click("#levelSwitch [data-level=expert]")
-    pg.set_input_files("#sFile", T + "/fake.jpg"); pg.wait_for_timeout(400)
+    up(pg, "#sFile", "#sAck", T + "/fake.jpg"); pg.wait_for_timeout(400)
     pg.click("#btnBuild"); pg.wait_for_selector("#sMsg:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
     ok("QA-2: refused photo -> inline message, no check-mark row, Build disabled", "couldn't open" in pg.inner_text("#sMsg") and not pg.is_visible("#photoChosen") and pg.is_disabled("#btnBuild"), pg.inner_text("#sMsg"))
     ok("QA-2: drop zone is empty again (no 'Photo ready')", "Photo ready" not in pg.inner_text("#drop"))
@@ -54,9 +58,9 @@ with sync_playwright() as p:
     # ---- QA-3: Edit photo errors are inline
     pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)
     for f, want in (("empty.jpg", "couldn't open"), ("big.jpg", "over 25 MB")):
-        pg.set_input_files("#eFile", T + "/" + f); pg.wait_for_timeout(600)
+        up(pg, "#eFile", "#eAck", T + "/" + f); pg.wait_for_timeout(600)
         ok(f"QA-3: Edit {f} -> inline message under the photo buttons", want in pg.inner_text("#eMsg") and pg.locator(".toast").count() == 0, pg.inner_text("#eMsg"))
-    pg.set_input_files("#eFile", T + "/fake.jpg"); pg.wait_for_timeout(1500)
+    up(pg, "#eFile", "#eAck", T + "/fake.jpg"); pg.wait_for_timeout(1500)
     ok("QA-3: Edit unreadable photo -> inline too", "couldn't open" in pg.inner_text("#eMsg"), pg.inner_text("#eMsg"))
     ctx.close()
     # ---- Edit drop zone at the 5-build cap (item 6)

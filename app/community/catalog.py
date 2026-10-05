@@ -13,6 +13,7 @@ from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor
 from . import classrooms, privacy
+from ..services.credits import credit_line
 from .store import ENGAGEMENT, LISTINGS, MODERATION, USERS
 
 LDIR = DATA / "projects"
@@ -32,7 +33,8 @@ def _seed():
     def it(i, who, title, tags, mode, dl, desc, day):
         return {"id": f"ex{i:02d}", "title": title, "creator": CREATORS[who], "creator_id": who, "example": True,
                 "tags": tags, "mode": mode, "downloads": dl, "likes": dl // 9, "description": desc,
-                "created": f"2026-09-{day:02d}T00:00:00+00:00", "files": [{"name": "example_model.stl", "size_kb": 1}],
+                "created": f"2026-09-{day:02d}T00:00:00+00:00", "files": [],            # examples have no model yet: nothing to download until a real Original is attached
+                
                 "owner_sid": None, "visibility": "public", "hidden": False}
     return [
         it(1, "ex-ada", "Sunset Landscape Lithophane", ["landscape", "lithophane", "nightlight"], "lithophane", 1840, "A warm sunset panel tuned for backlit display.", 2),
@@ -120,6 +122,7 @@ def public(i: dict, actor: Actor) -> dict:
             "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],
             "owned": bool(i.get("owner_sid") and i["owner_sid"] == actor.sid), "following_creator": following,
             "share_url": f"/p/{i['id']}",
+            "credit": credit_line(i), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
                        "url": f"/api/showcase/{i['id']}/files/{f['name']}"} for f in i["files"]]}

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Moderation · ZEIM</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body><main class="sharepage" style="max-width:860px;margin:0 auto;padding:16px">
+<h1>Moderation queue</h1>
+<p class="help">For the site moderator only. Enter the admin token to load the queue. It is sent only as a request header and is not stored.</p>
+<form id="tokForm" class="row" autocomplete="off"><label for="tok">Admin token</label> <input type="password" id="tok" autocomplete="off" style="min-width:240px"> <button class="btn primary" type="submit">Load queue</button></form>
+<p id="msg" class="help" role="status" aria-live="polite"></p>
+<p id="age" class="help"></p>
+<div id="list"></div>
+</main><script src="/static/moderation.js"></script></body></html>

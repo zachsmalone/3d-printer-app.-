@@ -26,5 +26,6 @@ def _test_client_counts_as_this_computer(monkeypatch):
     from app import config
     monkeypatch.setattr(config, "LOCAL_CLIENTS", tuple(config.LOCAL_CLIENTS) + ("testclient",))
     monkeypatch.setattr(config, "LOCAL_HOSTS", tuple(config.LOCAL_HOSTS) + ("testserver",))
+    monkeypatch.setattr(config, "PHOTO_ACK_REQUIRED", False)     # most tests post photos without the permission box; test_b2_cr.py switches it on explicitly (CR-5)
     monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 0)       # the per-address age lock is tested explicitly; the many tests that share the address "testclient" must not trip it
     yield
