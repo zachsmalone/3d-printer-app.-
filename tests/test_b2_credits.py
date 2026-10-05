@@ -170,3 +170,23 @@ def test_credit_strings_are_escaped_on_the_credits_and_share_pages():
     from app.services import credits
     page = client().get("/credits").text
     assert "<script>alert" not in page
+
+
+def test_held_quarantined_unverified_models_are_never_named_and_one_switch_releases_the_hold(tmp_path, monkeypatch):
+    (tmp_path / "library").mkdir()
+    ms = [{"id": "ok", "title": "Fine one", "creator": "Okay Maker", "verified": True, "license_id": "cc0-1.0", "license": {"name": "CC0 1.0", "url": ""}},
+          {"id": "sa", "title": "SA one", "creator": "Share Alike Person", "verified": True, "license_id": "cc-by-sa-4.0", "license": {"name": "CC BY-SA 4.0", "url": ""}},
+          {"id": "nasa", "title": "Moon", "creator": "NASA 3D Resources", "verified": True, "license_id": "public-domain-us-gov", "license": {"name": "Public domain", "url": ""}},
+          {"id": "q", "title": "Quarantined", "creator": "Quarantine Person", "verified": True, "license_id": "cc0-1.0", "files": [{"path": "library/_quarantine/x/q.stl"}], "license": {"name": "CC0", "url": ""}},
+          {"id": "u", "title": "Unverified", "creator": "Unverified Person", "verified": False, "license_id": "cc0-1.0", "license": {"name": "CC0", "url": ""}},
+          {"title": "No id", "creator": "No Id Person", "license": {"name": "CC0", "url": ""}}]
+    (tmp_path / "library" / "manifest.json").write_text(json.dumps({"models": ms}))
+    monkeypatch.setattr(credits, "ROOT", tmp_path)
+    html = page()
+    assert "Okay Maker" in html
+    for hidden in ("Share Alike Person", "NASA 3D Resources", "Quarantine Person", "Unverified Person", "No Id Person"):
+        assert hidden not in html, hidden
+    d = credits.data()
+    monkeypatch.setitem(d["hold"], "enabled", False)                        # the single switch
+    html = page()
+    assert "Share Alike Person" in html and "NASA 3D Resources" in html and "Quarantine Person" not in html and "Unverified Person" not in html

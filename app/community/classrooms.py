@@ -23,6 +23,7 @@ import shutil
 import time
 from datetime import datetime, timezone
 
+from ..core import ratelimit
 from ..config import DATA
 from . import education, safety
 from .identity import Actor
@@ -155,6 +156,9 @@ def recent_failed_joins(code: str) -> int:
     return ratelimit.count(f"joinfail-code:{code}", 3600)
 
 
+LOCKED_CHECK_S = 30        # while an address is in slow mode, one password check per this many seconds per (class, address)
+
+
 def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", seat_code: str = "") -> dict:
     global _DUMMY_HASH
     if not all(isinstance(x, str) for x in (code or "", nickname or "", password or "", seat_code or "")):
@@ -170,7 +174,10 @@ def join(sid: str, code: str, nickname: str, password: str = "", ip: str = "-", 
     room0 = CLASSROOMS.read().get(code)
     wait = _locked_for(code, ip)
     if wait > 0 and not (room0 and sid in room0["students"]):          # a student already in this class is never slowed down
-        raise PermissionError(f"Lots of wrong passwords were tried from this network. Please wait {int(wait) + 1} seconds and try again, or ask your teacher.")
+        # Slow mode (Edge 5): guesses from a busy address are throttled to one check per LOCKED_CHECK_S, but the CORRECT password still gets in,
+        # so one child's wrong tries never lock the rest of a school out.
+        if not ratelimit.hit(f"lockedjoin:{code}:{ip}", 1, LOCKED_CHECK_S):
+            raise PermissionError(f"Lots of wrong passwords were tried from this network. Please wait {int(min(wait, LOCKED_CHECK_S)) + 1} seconds and try again, or ask your teacher.")
     # Check the password OUTSIDE the store lock (scrypt is slow), against a dummy hash for unknown classes (same timing/answer).
     if _DUMMY_HASH is None:
         _DUMMY_HASH = _hash("not-a-real-password")

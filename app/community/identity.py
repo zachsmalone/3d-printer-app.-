@@ -99,13 +99,17 @@ def lock_age(sid: str, ip: str = "") -> float:
     from .store import AGE_BLOCKS
     until = time.time() + config.AGE_LOCK_HOURS * 3600
     ip_until = time.time() + config.AGE_IP_LOCK_MINUTES * 60
+    lock_ip = False
+    if ip and config.AGE_IP_LOCK_MINUTES > 0:     # Edge 5: a shared school address is locked only after several refusals, never after one
+        from ..core import ratelimit
+        lock_ip = not ratelimit.hit("ageref:" + _blk_ip(ip), max(0, config.AGE_IP_LOCK_AFTER), config.AGE_IP_LOCK_MINUTES * 60)
 
     def f(d):
         now = time.time()
         for k in [k for k, v in d.items() if v < now]:      # forget expired locks
             del d[k]
         d[_blk(sid)] = until
-        if ip and config.AGE_IP_LOCK_MINUTES > 0:
+        if lock_ip:
             d[_blk_ip(ip)] = ip_until              # hashed address, short: clearing cookies must not allow an instant retry
     AGE_BLOCKS.update(f)
     return until

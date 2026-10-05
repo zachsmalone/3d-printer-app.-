@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
-import { S, api, toast, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -110,14 +110,14 @@ function loadProject(p, keepCamera = false) {
 function renderHistoryCard() { loadHistory().catch(() => { }); }
 $("#editOps").onclick = e => { const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 
-async function act(url, body, text = "Working…") {
+async function act(url, body, text = "Working…", near = null) {
   if (!E.p) return;
   busy(true, text);
-  try { loadProject(await api(url, J("POST", body)), true); }
-  catch (e) { toast(e.message, "err"); }
+  try { loadProject(await api(url, J("POST", body)), true); clearInline(near); }
+  catch (e) { near ? inlineMsg(near, e.message) : toast(e.message, "err"); }
   finally { busy(false); }
 }
-const doOp = (op, params, text) => act(`/api/edit/${E.p.id}/op`, { op, params }, text);
+const doOp = (op, params, text, near) => act(`/api/edit/${E.p.id}/op`, { op, params }, text, near);
 $("#eUndo").onclick = () => act(`/api/edit/${E.p.id}/undo`, {});
 $("#eRedo").onclick = () => act(`/api/edit/${E.p.id}/redo`, {});
 $("#eReset").onclick = () => viewer?.reset();
@@ -231,7 +231,7 @@ $("#editPanel").addEventListener("submit", e => {
   }[kind];
   if (!P) return;
   clearGhost();
-  doOp(kind, P(), ({ hollow: "Hollowing…", boolean: "Computing boolean…", text: "Building text…", base: "Adding base…", simplify: "Simplifying…" })[kind]);
+  doOp(kind, P(), ({ hollow: "Hollowing…", boolean: "Computing boolean…", text: "Building text…", base: "Adding base…", simplify: "Simplifying…" })[kind], f.querySelector("button:not([type=button])"));
 });
 function primSpec(f) {
   const shape = val(f, "shape"), pos = [len(f, "px"), len(f, "py"), len(f, "pz")];

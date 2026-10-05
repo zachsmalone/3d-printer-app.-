@@ -17,7 +17,7 @@ def run(name, launch):
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(URL); pg.wait_for_timeout(600)
-    link = pg.locator(".sitefoot a"); link.scroll_into_view_if_needed()
+    link = pg.locator(".sitefoot a[href='/credits']"); link.scroll_into_view_if_needed()
     box = link.bounding_box()
     ok(f"{name}: footer 'Thank you & credits' link is there and >= 44px tall", box and box["height"] >= 44 and "credits" in link.inner_text().lower(), box)
     link.click(); pg.wait_for_url("**/credits"); pg.wait_for_timeout(400)

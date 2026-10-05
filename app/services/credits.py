@@ -110,8 +110,32 @@ def bundled() -> list[dict]:
     return out
 
 
+def is_held(m: dict) -> bool:
+    """The one switch (app/credits.json -> hold): NASA and share-alike items stay off public display until cleared."""
+    h = data().get("hold", {})
+    if not h.get("enabled"):
+        return False
+    lid = m.get("license_id") or (m.get("license") or {}).get("spdx", "").lower().replace("_", "-")
+    if lid in h.get("license_ids", []):
+        return True
+    if any(x.lower() in (m.get("creator") or "").lower() for x in h.get("creator_contains", [])):
+        return True
+    src = f"{m.get('source_url', '')} {m.get('source_page_url', '')}".lower()
+    return any(x.lower() in src for x in h.get("source_contains", []))
+
+
+def listable(m: dict) -> bool:
+    """A library model may be shown publicly only if it has a manifest entry that is verified, is not in the quarantine, and is not held."""
+    if not m.get("id") or not m.get("creator") or m.get("verified") is False:
+        return False
+    if any("_quarantine" in str(f.get("path", "")) for f in m.get("files", [])) or m.get("status") in ("hold", "removed", "paused", "not_ready"):
+        return False
+    return not is_held(m)
+
+
 def makers() -> list[dict]:
-    """Creators of library models, from the manifest file(s) when they exist: [{creator, models: [{title, licence, licence_url, url}]}]."""
+    """Creators of library models, from the manifest file(s) when they exist: [{creator, models: [{title, licence, licence_url, url}]}].
+    Only manifest entries that pass listable(): nothing quarantined, unverified or held is ever named here."""
     by: dict = {}
     for rel in data()["creators"].get("manifests", []):
         p = ROOT / rel
@@ -122,6 +146,8 @@ def makers() -> list[dict]:
         except Exception:
             continue
         for m in doc.get("models", []):
+            if not listable(m):
+                continue
             lic = m.get("license") or {}
             by.setdefault(m.get("creator") or "Unknown", []).append({"title": m.get("title", ""), "licence": lic.get("name", ""), "licence_url": lic.get("url", ""),
                                                                       "url": m.get("source_page_url", "")})

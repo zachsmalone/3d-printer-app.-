@@ -72,6 +72,15 @@ async def limit_json_body(request: Request, call_next):
             n = 0
         if n > MAX_JSON_BODY:
             return JSONResponse(status_code=413, content={"detail": "Request too large."})
+        if "content-length" not in request.headers:                      # chunked body: count bytes as they arrive, stop at the cap
+            got = 0
+            chunks = []
+            async for part in request.stream():
+                got += len(part)
+                if got > MAX_JSON_BODY:
+                    return JSONResponse(status_code=413, content={"detail": "Request too large."})
+                chunks.append(part)
+            request._body = b"".join(chunks)
     return await call_next(request)
 
 

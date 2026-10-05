@@ -359,3 +359,67 @@ def test_cr15_cannot_take_over_into_a_browser_that_already_has_an_account_or_is_
     t2, c2, room2 = _teacher_with_class()
     s = student(room2, "pass-123", "Fox")
     assert s.post("/api/me/recover", json={"code": c2}).status_code == 409
+
+
+# ---- Edge 3: a file name never becomes a title ----------------------------------------------------------------------------------
+def test_upload_file_name_never_becomes_the_build_title():
+    import io as _io
+    png = open(b1.SAMPLE, "rb").read(); box_stl = b1.box_stl
+    c = client(ADULT)
+    r = c.post("/api/generate", files={"file": ("IMG_2231_MiaJohnson.png", _io.BytesIO(png), "image/png")}, data={"mode": "relief", "photo_ack": "true"})
+    assert r.status_code == 200, r.text
+    assert r.json()["title"] == "My photo build" and ("MiaJohnson" in r.text) is False
+    r = c.post("/api/edit/new", files={"file": ("MiaJohnson_Lincoln.stl", box_stl(), "application/octet-stream")}); assert r.status_code == 200, r.text
+    assert r.json()["title"] == "My model" and ("MiaJohnson" in r.text) is False
+    r = c.post("/api/edit/new", files={"file": ("IMG_MiaJohnson.png", _io.BytesIO(png), "image/png")}, data={"photo_ack": "true"}); assert r.status_code == 200, r.text
+    assert r.json()["title"] == "My photo build" and ("MiaJohnson" in r.text) is False
+    r = c.post("/api/generate", files={"file": ("MiaJohnson.png", _io.BytesIO(png), "image/png")}, data={"mode": "relief", "title": "Desk fox", "photo_ack": "true"})
+    assert r.json()["title"] == "Desk fox"                                   # the person's own typing still works
+
+
+def test_chunked_json_body_is_capped_before_parsing_and_small_chunked_bodies_still_work():
+    from app.api.textcap import MAX_JSON_BODY
+    c = client(ADULT)
+    def big():
+        for _ in range(MAX_JSON_BODY // 65536 + 3):
+            yield b" " * 65536
+    r = c.post("/api/me/signup", content=big(), headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+    def small():
+        yield b'{"display_name": "Ada",'
+        yield b' "dob": "1985-05-05"}'
+    r = client().post("/api/me/signup", content=small(), headers={"Content-Type": "application/json"})
+    assert r.status_code == 200, r.text
+
+
+def test_data_files_are_private_600_and_data_dirs_700(tmp_path, monkeypatch):
+    import stat
+    from app import config
+    from app.community import store as st
+    c = client(); c.post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"})
+    p = st.USERS.path
+    assert p.exists() and stat.S_IMODE(p.stat().st_mode) == 0o600
+    p.chmod(0o644)                                            # a file left over from an older version
+    monkeypatch.setattr(config, "DATA", p.parent)
+    assert config.harden_data_permissions() >= 1 and stat.S_IMODE(p.stat().st_mode) == 0o600
+    assert stat.S_IMODE(p.parent.stat().st_mode) == 0o700
+
+
+def test_s01_local_mode_settings_refuse_a_cross_site_origin(monkeypatch):
+    monkeypatch.setattr(config, "MODE", "local")
+    c = client(ADULT)
+    h = {"host": "127.0.0.1:8765"}
+    ok = c.put("/api/settings", json={"printers": []}, headers=h)
+    # TestClient's peer is not loopback, so what matters here is the origin rule on the owner path:
+    from app.api import guards
+    from starlette.requests import Request
+    def req(origin):
+        hd = [(b"host", b"127.0.0.1:8765")] + ([(b"origin", origin.encode())] if origin else [])
+        return Request({"type": "http", "headers": hd, "client": ("127.0.0.1", 5), "method": "PUT", "path": "/", "query_string": b""})
+    from fastapi import HTTPException
+    guards.require_settings_admin(req(None), type("A", (), {"sid": "x"})())                           # no Origin (curl, same-origin GET-less) fine
+    guards.require_settings_admin(req("http://127.0.0.1:8765"), type("A", (), {"sid": "x"})())        # ZEIM's own page
+    for bad in ("https://evil.example", "null"):
+        with pytest.raises(HTTPException) as e:
+            guards.require_settings_admin(req(bad), type("A", (), {"sid": "x"})())
+        assert e.value.status_code == 403

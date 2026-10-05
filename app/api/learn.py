@@ -417,5 +417,6 @@ def credits_page():
             f"<h2>{escape(d['teachers']['heading'])}</h2><p class=help>{escape(d['teachers']['blurb'])}</p>{people(d['teachers'])}"
             f"<h2>{escape(d['trademarks']['heading'])}</h2><p>{escape(d['trademarks']['text'])}</p>"
             f"<h2>{escape(tk['heading'])}</h2><p>{escape(tk['text'])}{contact}</p>"
+            "<p class=help><a href='/static/COMMUNITY_GUIDELINES.html'>Rules</a> · <a href='/static/privacy.html'>Privacy</a> · <a href='/static/terms.html'>Terms</a></p>"
             f"<p><a class='btn primary' href='/'>Back to {escape(branding.PRODUCT_NAME)}</a></p>")
     return _page("Thank you", body, "The people and projects behind ZEIM.")

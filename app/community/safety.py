@@ -36,7 +36,7 @@ ALLOW_FILES = ("allow_words", "allow_phrases", "stems")
 REQUIRED = ("en", "extra")            # if either is missing/empty the filter refuses text instead of passing everything
 UNAVAILABLE_MESSAGE = "Posting text is paused for a moment. Please try again later."
 BLOCK_MESSAGE = "Chat doesn't allow that language. Please use appropriate language."
-CONTACT_MESSAGE = "Chat doesn't allow sharing contact details or links. Please keep personal info private."
+CONTACT_MESSAGE = "Please don't put names, phone numbers, emails or links here."
 
 CANNED = {
     "talk_next_class": "I'd like to talk next class",

@@ -12,6 +12,28 @@ PREVIEW_RES = 220
 for d in (OUT, DATA):  # noqa
     d.mkdir(parents=True, exist_ok=True)
 
+
+def harden_data_permissions() -> int:
+    """Data directories 700 and data files 600 (accounts, class lists and printer settings must not be world-readable). Returns how many were changed."""
+    import os
+    n = 0
+    for d in (OUT, DATA):
+        try:
+            if (d.stat().st_mode & 0o777) != 0o700:
+                os.chmod(d, 0o700); n += 1
+        except OSError:
+            pass
+    try:
+        for f in DATA.iterdir():
+            if f.is_file() and (f.stat().st_mode & 0o077):
+                os.chmod(f, 0o600); n += 1
+    except OSError:
+        pass
+    return n
+
+
+harden_data_permissions()
+
 # ---- community / policy constants (single source of truth) ----
 MIN_SIGNUP_AGE = 13          # no accounts under 13 (COPPA-style). Under-13s use the education center
                              # without an account, via a teacher's classroom code + nickname only.
@@ -66,6 +88,7 @@ SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
 # ---- age gate (Safety S-04) ----
 # SEND-3: the "Share..." / "Email it to myself" rows stay OFF until the share-sheet spike (/sharetest, SEND-0) has passed on a real iPhone/iPad.
 SEND_SHARE_UI = _flag("PHOTO3D_SEND_SHARE", False)
+AGE_IP_LOCK_AFTER = _int("PHOTO3D_AGE_IP_LOCK_AFTER", 3)  # the address is only locked after MORE than this many refusals from it within the lock window: one child must not lock a school
 AGE_IP_LOCK_MINUTES = _int("PHOTO3D_AGE_IP_LOCK_MINUTES", 30)  # ...and this network address can't retry for a while either (clearing cookies must not help).
                                                              # Trade-off: a shared school address blocks other sign-ups for this long. 0 = off.
 AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry

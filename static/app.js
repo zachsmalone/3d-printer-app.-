@@ -12,6 +12,15 @@ function toast(msg, kind = "") {
   const t = document.createElement("div"); t.className = "toast " + kind; t.textContent = msg;
   $("#toasts").append(t); setTimeout(() => t.remove(), kind === "err" ? 8000 : 4500);
 }
+/* A refusal belongs INSIDE the dialog, next to the button, and stays until the next try (toasts vanish behind the scrim). Typed text is never cleared. */
+function inlineMsg(near, msg, kind = "err") {
+  if (!near) return toast(msg, kind);
+  let p = near.previousElementSibling;
+  if (!(p && p.classList.contains("inline-msg"))) { p = document.createElement("p"); p.setAttribute("role", "alert"); near.before(p); }
+  p.className = "inline-msg " + kind; p.textContent = msg;
+  p.scrollIntoView?.({ block: "nearest" });
+}
+function clearInline(near) { const p = near?.previousElementSibling; if (p?.classList.contains("inline-msg")) p.remove(); }
 const api = async (url, opt) => {
   const r = await fetch(url, opt); let j = null;
   try { j = await r.json(); } catch { }
@@ -365,4 +374,4 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel };
+export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel };

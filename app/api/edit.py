@@ -94,7 +94,7 @@ def new_project(
             original = data
             if ext != "3mf":
                 scale = meshedit.UNIT_MM[units]
-            base = {"type": "upload", "filename": name[:120], "format": ext, "units": units if ext != "3mf" else "from file"}
+            base = {"type": "upload", "format": ext, "units": units if ext != "3mf" else "from file"}
         elif ext in meshedit.IMAGE_EXT:                         # photo / lithophane base
             if len(data) > 25 * 2**20:
                 raise HTTPException(413, "Photo too large (max 25 MB).")
@@ -117,12 +117,12 @@ def new_project(
             mesh = trimesh.Trimesh(v, f, process=False)
             original, ext_o = exporters.to_stl(mdl), "stl"
             source_image = (data, src_ext)
-            base = {"type": "photo", "photo_mode": photo_mode, "width_mm": width_mm, "filename": name[:120], "params": params}
+            base = {"type": "photo", "photo_mode": photo_mode, "width_mm": width_mm, "params": params}
             ext = ext_o
             warnings.append(f"Photo converted to a {photo_mode} base mesh; edit it like any other model.")
         else:
             raise HTTPException(415, "Unsupported file type. Upload .stl, .obj or .3mf (or a .png/.jpg photo).")
-        title = title or _safe_title(name.rsplit(".", 1)[0][:80])
+        title = title or ("My photo build" if base.get("type") == "photo" else "My model")      # never from the file name
     else:
         raise HTTPException(400, "Choose a file to upload or a build to edit.")
 

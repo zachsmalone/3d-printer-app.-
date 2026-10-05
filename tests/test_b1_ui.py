@@ -157,3 +157,12 @@ def test_credits_page_and_showcase_credit_at_phone_width_in_chrome_and_webkit():
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_refusals_are_inline_persistent_and_keep_typed_text_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_inline.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)

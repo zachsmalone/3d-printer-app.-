@@ -1,4 +1,4 @@
-import { S, api, toast, $, $$, esc, MODE_LABEL, ago } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago } from "/static/app.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -48,7 +48,13 @@ function renderAccount() {
       <button class="btn primary" id="su_go">Create account</button>`;
     $("#su_go").onclick = async () => {
       try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value })); await refreshMe(); renderAccount(); toast("Account created", "ok"); }
-      catch (e) { toast(e.message, "err"); }
+      catch (e) {
+        if (e.status === 403 && /^We can't create an account/.test(e.message)) {     // the neutral age refusal: a calm panel instead of an unchanged form
+          $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still join a class with a code from your teacher.</p><button class="btn primary" id="suJoin">Join a class</button></div>`;
+          $("#suJoin").onclick = () => { $("#dlgAccount").close(); $("#dlgJoin").showModal(); };
+          $("#accBody .calm").focus();
+        } else inlineMsg($("#su_go"), e.message);
+      }
     };
   } else {
     const r = ME.restrictions, pv = ME.privacy;
@@ -139,8 +145,8 @@ $("#btnDoPublish").onclick = async () => {
   try {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
       tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value }));
-    $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
-  } catch (e) { toast(e.message, "err"); }
+    clearInline($("#btnDoPublish")); $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
+  } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
 };
 
 /* my data */
@@ -202,8 +208,8 @@ async function openLesson(id) {
 /* classroom */
 $("#btnJoinClass").onclick = () => $("#dlgJoin").showModal();
 $("#btnDoJoin").onclick = async () => {
-  try { const r = await api("/api/classrooms/join", J("POST", { code: $("#j_code").value, nickname: $("#j_nick").value, password: $("#j_pw").value })); $("#dlgJoin").close(); toast("Joined " + r.name, "ok"); loadLearn(); }
-  catch (e) { toast(e.message, "err"); }
+  try { const r = await api("/api/classrooms/join", J("POST", { code: $("#j_code").value, nickname: $("#j_nick").value, password: $("#j_pw").value })); clearInline($("#btnDoJoin")); $("#dlgJoin").close(); toast("Joined " + r.name, "ok"); loadLearn(); }
+  catch (e) { inlineMsg($("#btnDoJoin"), e.message); }
 };
 $("#btnTeacher").onclick = openTeacher;
 document.addEventListener("click", async e => {
@@ -232,7 +238,7 @@ async function openTeacher() {
       ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
       <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
   if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
-  $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { toast(e.message, "err"); } };
+  $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { inlineMsg($("#cr_go"), e.message); } };
   $("#teacherBody").onclick = async e => {
     const t = e.target;
     if (t.dataset.cp) navigator.clipboard?.writeText(t.dataset.cp), toast("Code copied", "ok");

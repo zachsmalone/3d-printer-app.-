@@ -93,6 +93,9 @@ def meta_for(bid: str, actor: Actor, owner_only: bool = False) -> dict:
     return meta
 
 
+DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+
+
 def _safe_title(derived: str) -> str:
     """A title made from the uploaded file's name: replaced by 'Untitled' if the name itself would not pass the language gate."""
     return derived if derived and not safety.scan(derived) else "Untitled"
@@ -243,7 +246,7 @@ def generate(
         Image.fromarray(model.thumb).save(d / "thumb.png")
         stats = mesh_stats(model)
         meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
-                "title": title.strip() or _safe_title((file.filename or "Untitled").rsplit(".", 1)[0][:40]),
+                "title": title.strip() or DEFAULT_PHOTO_TITLE,
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)

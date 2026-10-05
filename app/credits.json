@@ -132,5 +132,19 @@
       "url": "",
       "share_alike": false
     }
+  },
+  "hold": {
+    "_note": "ONE SWITCH. While enabled, models matching these rules are left off every public list, including this page, until the safety lead clears them. Set enabled to false to release them.",
+    "enabled": true,
+    "license_ids": [
+      "cc-by-sa-4.0"
+    ],
+    "creator_contains": [
+      "NASA"
+    ],
+    "source_contains": [
+      "nasa/NASA-3D-Resources",
+      "nasa.gov"
+    ]
   }
 }
