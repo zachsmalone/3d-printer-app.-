@@ -1,7 +1,7 @@
 import { Viewer } from "/static/viewer.js";
 
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const S = { mode: "lithophane", level: localStorage.level || "beginner", preset: "standard", file: null,
+const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert" : "beginner", restoreTeacher: localStorage.level === "teacher", canTeach: false, me: null, preset: "standard", file: null,
             current: null, history: [], max: 5, settings: null };
 const PRESET_HELP = {
   lithophane: { thin: "Lighter, glows brighter, more fragile (0.6–2.4 mm).", standard: "Balanced contrast and strength (0.8–3.2 mm).", thick: "Deep shadows, sturdy (1.0–4.0 mm)." },
@@ -34,20 +34,66 @@ let viewer;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
 
 /* ---------- level / mode ---------- */
-function applyLevel() {
+const isExpert = () => S.level === "expert";
+const LEVEL_NAME = { beginner: "Beginner", expert: "Experienced", teacher: "Teacher" };
+const LEVEL_ICO = { beginner: "🌱", expert: "🛠", teacher: "🍎" };
+const LEVEL_LINE = { beginner: "Beginner mode: ZEIM picks the settings for you.", expert: "Experienced mode: every setting is yours.",
+                     teacher: "Teacher mode: you see what students see, plus your class tools above. You can look, not change students' work." };
+const LEVEL_SAY = { beginner: "Beginner mode on. ZEIM picks the settings for you.", expert: "Experienced mode on. All the settings are showing.",
+                    teacher: "Teacher mode on. Your class tools are showing above the page." };
+function say(t) { const e = $("#modeStatus"); e.textContent = ""; setTimeout(() => e.textContent = t, 60); }
+function applyLevel(announce = false) {
   localStorage.level = S.level;
   document.body.dataset.level = S.level;
+  $("#modeSel").value = S.level; $("#modeIco").textContent = LEVEL_ICO[S.level]; $("#modeLine").textContent = LEVEL_LINE[S.level];
+  $("#classBar").hidden = S.level !== "teacher";
+  $$("details.tn").forEach(d => { if (S.level === "teacher") d.open = true; });
   document.dispatchEvent(new CustomEvent("zeim:level"));
-  $$("#levelSwitch button").forEach(b => b.classList.toggle("on", b.dataset.level === S.level));
-  $("#beginnerOpts").hidden = S.level !== "beginner";
-  $("#expertOpts").hidden = S.level !== "expert";
+  $("#beginnerOpts").hidden = isExpert();
+  $("#expertOpts").hidden = !isExpert();
+  if (announce) say(LEVEL_SAY[S.level]);
 }
+function teacherExplainer() {
+  const role = S.me?.send?.role, n = $("#teacherNote");
+  let t, b, acts;
+  if (role === "student") { t = "Teacher mode is for your teacher"; b = "You joined a class as a student, so Teacher mode stays off for you. Your teacher can see your class work from their own account."; acts = []; }
+  else if (S.me?.signed_up) { t = "Teacher mode is for adults"; b = "Teacher mode is only for adult accounts. You can use Beginner or Experienced mode, and your teacher can set up a class for you."; acts = []; }
+  else { t = "Teacher mode needs a grown-up account"; b = "Teacher mode is for adults who run a class. Make a free adult account to use it. Students do not need Teacher mode."; acts = [["Make a free adult account", "account"], ["Join a class instead", "join"]]; }
+  $("#tnTitle").textContent = t; $("#tnBody").textContent = b;
+  const box = $("#tnActions"); box.innerHTML = "";
+  [...acts, ["Close", "close"]].forEach(([label, k]) => {
+    const x = document.createElement("button"); x.type = "button"; x.className = "btn"; x.textContent = label;
+    x.onclick = () => {
+      n.hidden = true;
+      if (k === "account") { S.wantTeacher = true; $("#btnAccount").click(); }
+      if (k === "join") $("#btnJoinClass").click();
+      if (k === "close") $("#modeSel").focus();
+    };
+    box.append(x);
+  });
+  n.hidden = false;
+}
+$("#modeSel").onchange = e => {
+  const v = e.target.value;
+  if (v === "teacher" && !S.canTeach) {
+    e.target.value = S.level; teacherExplainer();
+    say("Teacher mode needs a grown-up account. The details are just below the top bar. You are still in " + LEVEL_NAME[S.level] + " mode.");
+    return;
+  }
+  $("#teacherNote").hidden = true; S.level = v; applyLevel(true);
+};
+/* Who is signed in decides whether Teacher is allowed. community.js tells us; the server still decides every real permission. */
+document.addEventListener("zeim:me", e => {
+  S.me = e.detail; S.canTeach = !!(S.me?.signed_up && S.me.age_group === "adult");
+  if (S.restoreTeacher) { S.restoreTeacher = false; if (S.canTeach) { S.level = "teacher"; S.teacherSeen = true; applyLevel(false); } return; }   // a returning teacher: restored quietly, only once we know it is an adult account
+  if (S.wantTeacher && S.canTeach) { S.wantTeacher = false; S.level = "teacher"; S.teacherSeen = true; applyLevel(true); return; }
+  if (S.level === "teacher" && !S.canTeach) { S.level = "beginner"; applyLevel(false); if (S.teacherSeen) say("Back to Beginner mode."); S.teacherSeen = false; }
+});
 function applyMode() {
   $$("#modeCards .card").forEach(c => c.classList.toggle("on", c.dataset.mode === S.mode));
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
 }
-$$("#levelSwitch button").forEach(b => b.onclick = () => { S.level = b.dataset.level; applyLevel(); });
 $$("#modeCards .card").forEach(c => c.onclick = () => { S.mode = c.dataset.mode; applyMode(); });
 $$("#presetSeg button").forEach(b => b.onclick = () => { S.preset = b.dataset.preset; $$("#presetSeg button").forEach(x => x.classList.toggle("on", x === b)); applyMode(); });
 $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
@@ -76,7 +122,7 @@ function setFile(f) {
   img.src = URL.createObjectURL(f); img.hidden = false; $("#dropHint").hidden = true;
   $("#btnBuild").disabled = false; $("#buildHint").textContent = "Photo ready: " + (f.name || "camera photo");
   pick.msg(""); $("#photoChosen").hidden = false; $("#photoChosenName").textContent = "✔ " + (f.name || "camera photo");
-  if (S.level === "beginner") build(false);                         // Beginner: the photo builds straight away, no hidden second step
+  if (!isExpert()) build(false);                         // Beginner: the photo builds straight away, no hidden second step
   else $("#btnBuild").scrollIntoView({ block: "nearest", behavior: "smooth" });   // Expert: tune the settings, then press Build
 }
 const drop = $("#drop");
@@ -94,10 +140,10 @@ $("#sSample").onclick = async () => {
 function formData(autoDelete) {
   const fd = new FormData();
   fd.append("file", S.file); fd.append("mode", S.mode); fd.append("photo_ack", pick.acked());      // CR-5 (the built-in sample needs no tick: the server knows that file)
-  fd.append("beginner", S.level === "beginner"); fd.append("preset", S.preset);
+  fd.append("beginner", !isExpert()); fd.append("preset", S.preset);
   fd.append("width_mm", $("#width_mm").value);
   if (autoDelete) fd.append("auto_delete_oldest", "true");
-  if (S.level === "expert") {
+  if (isExpert()) {
     $$("#expertOpts [name]").forEach(el => {
       if (el.name === "width_mm") return;
       fd.append(el.name, el.type === "checkbox" ? el.checked : el.value);
@@ -160,7 +206,7 @@ function renderHistory() {
   const cards = S.history.slice().reverse().map(b => `
     <div class="hcard ${S.current?.id === b.id ? "cur" : ""}" data-id="${b.id}">
       <img src="${b.thumb}" alt="" data-open="${b.id}" title="Open">
-      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Expert"} · ${ago(b.created)}</span></div>
+      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
         <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? "★" : "☆"}</button>
@@ -259,7 +305,7 @@ async function openPrint(b) {
   const id = b.id;   // the dialog is bound to THIS build; slice/send below use printId, never "whatever is current later"
   let caps = {};
   try { printInfo = await api(`/api/print/${id}/links`); caps = (await api("/api/me")).send || {}; } catch (e) { return toast(e.message, "err"); }
-  printId = id; printB = b; printLabel = `${b.title || "build"} (${b.beginner ? "Beginner" : "Expert"}, ${MODE_LABEL[b.mode] || "Edit"})`;
+  printId = id; printB = b; printLabel = `${b.title || "build"} (${b.beginner ? "Beginner" : "Experienced"}, ${MODE_LABEL[b.mode] || "Edit"})`;
   $("#printWhich").textContent = "Printing: " + printLabel;
   $("#printHint").textContent = printInfo.hint;
   $("#slicerBtns").innerHTML = slicerArea(b, caps);
@@ -384,4 +430,4 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel };
+export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, isExpert };

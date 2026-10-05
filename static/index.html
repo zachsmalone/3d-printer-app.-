@@ -19,17 +19,27 @@
     <button data-view="edit"><span data-sec="edit">Edit</span></button>
     <button data-view="learn"><span data-sec="learn">Learn</span></button>
   </nav>
-  <div class="seg" id="levelSwitch" role="tablist" aria-label="Experience level">
-    <button data-level="beginner" class="on">🌱 Beginner</button>
-    <button data-level="expert">🛠 Expert</button>
+  <div class="modepick">
+    <label for="modeSel">Mode</label>
+    <span class="ico" id="modeIco" aria-hidden="true">🌱</span>
+    <select id="modeSel" aria-describedby="modeHelp">
+      <option value="beginner">Beginner</option>
+      <option value="expert">Experienced</option>
+      <option value="teacher">Teacher</option>
+    </select>
+    <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours. Teacher: Beginner settings plus class tools, for adults with an account.</p>
   </div>
   <div class="spacer"></div>
   <button class="btn ghost" id="btnAccount" aria-label="Account"><span aria-hidden="true">👤</span> <span class="lbl">Sign up</span></button>
   <button class="btn ghost" id="btnSettings" aria-label="Settings"><span aria-hidden="true">⚙</span> <span class="lbl">Settings</span></button>
 </header>
+<section class="tnote" id="teacherNote" hidden aria-labelledby="tnTitle"><h2 id="tnTitle"></h2><p id="tnBody"></p><div class="row" id="tnActions"></div></section>
+<div class="classbar" id="classBar" hidden role="region" aria-label="Classroom"><b>🍎 Your classroom</b><span id="cbRooms">No class yet. Open Teacher tools to make one.</span>
+  <button class="btn" type="button" id="btnTeacherTools">Teacher tools</button></div>
 
 <main class="layout" id="viewCreate">
   <aside class="panel controls">
+    <p class="modeline" id="modeLine"></p>
     <section class="step">
       <h2><i>1</i> Photo</h2>
       <div id="studioPhoto"></div>
@@ -120,7 +130,7 @@
         </div>
       </div>
       <p class="help" id="buildWarn" role="status" hidden></p>
-      <details class="auto" id="autoBox" hidden open><summary>🌱 Auto-chosen settings <small>(Beginner mode)</small></summary><table id="autoTable"></table></details>
+      <details class="auto" id="autoBox" hidden open><summary>🌱 Auto-chosen settings <small>(Beginner and Teacher modes)</small></summary><table id="autoTable"></table></details>
     </div>
 
     <section class="history">
@@ -352,6 +362,7 @@
   <footer><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></footer>
 </div></dialog>
 <div id="toasts"></div>
+<div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <dialog id="dlgSend" aria-labelledby="dlgSendTitle"><h3 id="dlgSendTitle">Let students send files out of ZEIM?</h3>
   <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>
   <p>Turn this on for <b id="dlgSendName"></b>?</p>

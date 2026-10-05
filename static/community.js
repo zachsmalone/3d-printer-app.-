@@ -16,10 +16,25 @@ async function init() {
 }
 async function refreshMe() {
   ME = await api("/api/me");
-  $("#btnAccount").textContent = ME.signed_up ? "👤 " + ME.display_name : "👤 Sign up";
+  $("#btnAccount .lbl").textContent = ME.signed_up ? ME.display_name : "Sign up";
+  $("#btnAccount").setAttribute("aria-label", ME.signed_up ? "Account: " + ME.display_name : "Account: sign up");
   document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
   document.body.dataset.role = ME.send?.role || "";
+  document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
+  refreshClassBar();
 }
+/* Teacher mode's bar: reads the teacher's own classes; shows nothing it cannot read. */
+async function refreshClassBar() {
+  const box = $("#cbRooms"); if (!box) return;
+  if (!(ME.signed_up && ME.age_group === "adult")) return;
+  try {
+    const rooms = (await api("/api/classrooms")).rooms;
+    box.innerHTML = rooms.length ? rooms.slice(0, 3).map(r => `<span class="cbroom"><b>${esc(r.name)}</b> · Join code <span class="code" aria-label="${esc(r.code.split("").join(" "))}">${esc(r.code)}</span> · Students sending files out of ZEIM: <b>${r.send_enabled ? "On" : "Off"}</b></span>`).join(" ") + (rooms.length > 3 ? ` <span>+${rooms.length - 3} more in Teacher tools</span>` : "")
+      : "No class yet. Open Teacher tools to make one.";
+  } catch { box.textContent = "Open Teacher tools to see your classes."; }
+}
+document.addEventListener("zeim:level", () => { if (S.level === "teacher" && typeof ME !== "undefined" && ME) refreshClassBar(); });
+$("#btnTeacherTools").onclick = () => $("#btnTeacher").click();
 
 /* ---------- views ---------- */
 function show(view) {
@@ -218,7 +233,7 @@ async function openLesson(id) {
     <ol>${l.steps.map((s, i) => `<li class="st ${p.steps_done.includes(i) ? "done" : ""}"><label><input type="checkbox" data-step="${i}" ${p.steps_done.includes(i) ? "checked" : ""}><b>${i + 1}. ${esc(s.title)}</b></label><p>${esc(s.body)}</p></li>`).join("")}</ol>
     <div class="quiz"><h4>Quick check</h4><p>${esc(l.quiz.q)}</p>${l.quiz.options.map((o, i) => `<label><input type="radio" name="qz" value="${i}"> ${esc(o)}</label>`).join("")}<button class="btn small" id="qzGo">Check answer</button> <span id="qzOut">${p.quiz_passed ? "✔ passed" : ""}</span></div>
     <div class="row" style="margin-top:12px"><button class="btn primary" id="lsTry">🚀 ${esc(l.try.label)}</button>${p.completed ? '<span class="pill ok">🏅 Lesson complete!</span>' : ""}</div>
-    <details><summary>Teacher notes</summary><p class="help">${esc(l.teacher_notes)}</p></details>`;
+    <details class="tn" ${S.level === "teacher" ? "open" : ""}><summary>Teacher notes</summary><p class="help">${esc(l.teacher_notes)}</p></details>`;
   box.scrollIntoView({ behavior: "smooth" });
   $("#lsClose").onclick = () => { box.hidden = true; loadLearn(); };
   $("#lsCopy").onclick = () => { navigator.clipboard?.writeText(location.origin + l.share_url); toast("Link copied", "ok"); };

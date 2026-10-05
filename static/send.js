@@ -2,7 +2,7 @@
    The SERVER decides what a person may do (/api/me -> send{...}, enforced again on every route); this file only draws what the
    server allows. Download is the product. Share/Email use the system share sheet and stay OFF until the device spike (SEND-0)
    passed (server flag PHOTO3D_SEND_SHARE -> send.share_ui). No link is ever put in a share (no url field, no signed-link route). */
-import { S, api, toast, $, $$, esc, openPrint, printBuild } from "/static/app.js";
+import { S, api, toast, $, $$, esc, openPrint, printBuild, isExpert } from "/static/app.js";
 
 const FMTS = ["3mf", "stl", "obj"];
 const MIMES = { "3mf": ["model/3mf", "application/octet-stream"], stl: ["model/stl", "application/octet-stream"], obj: ["model/obj", "application/octet-stream"] };
@@ -23,7 +23,7 @@ export async function openSend(b) {
   catch (e) { if (navigator.onLine !== false || !lastCaps) return toast(e.message, "err"); caps = lastCaps; }   // offline: reuse what the server said last time (it still enforces everything)
   const adult = caps.role === "adult";
   X = { b, caps, adult, fmt: getFmt(), file: null, blob: null, seq: 0,
-        label: `${b.title || "build"} (${b.beginner ? "Beginner" : "Expert"}, ${MODE_NAME[b.mode] || b.mode || "Edit"})` };
+        label: `${b.title || "build"} (${b.beginner ? "Beginner" : "Experienced"}, ${MODE_NAME[b.mode] || b.mode || "Edit"})` };
   render();
   $("#dlgSendSheet").showModal();
   prepare();
@@ -40,7 +40,7 @@ function render() {
   const chooser = adult ? `<div class="fmt" role="radiogroup" aria-label="File type">${FMTS.map(f =>
     `<button type="button" role="radio" aria-checked="${f === fmt}" class="${f === fmt ? "on" : ""}" data-fmt="${f}">${f.toUpperCase()}${sizes[f] ? `<small>${mb(sizes[f])}</small>` : ""}</button>`).join("")}</div>
     <p class="help" id="ssFmtHint">${{ "3mf": "Best for most slicers. Smallest file.", stl: "Works almost everywhere. Use this one for Shapr3D.", obj: "For other 3D apps." }[fmt]}</p>` : "";
-  const fileLine = !adult ? "" : S.level === "beginner"
+  const fileLine = !adult ? "" : !isExpert()
     ? `<div class="help">File: 3D print file (3MF)<details class="inl"><summary>Different file type?</summary>${chooser}</details></div>` : chooser;
   const rows = [];
   rows.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "⬇ Save to this device" : "⬇ Download my build"}</b>

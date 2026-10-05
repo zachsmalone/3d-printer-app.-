@@ -55,11 +55,11 @@ with sync_playwright() as p:
     ok("then shares an STL", pg.evaluate("window.__shares").pop()["name"] == "ZEIM-build.stl")
     pg.click("[data-close-sheet]"); pg.wait_for_timeout(200)
     # expert shows the chooser with sizes
-    pg.click("#levelSwitch [data-level=expert]"); pg.click("#btnSendSheet"); pg.wait_for_selector("#dlgSendSheet[open]")
+    pg.select_option("#modeSel", "expert"); pg.click("#btnSendSheet"); pg.wait_for_selector("#dlgSendSheet[open]")
     ok("Expert: chooser with 3 types and sizes", pg.locator("#ssBody .fmt button").count() == 3 and ("MB" in pg.inner_text("#ssBody .fmt") or "KB" in pg.inner_text("#ssBody .fmt")), pg.inner_text("#ssBody .fmt"))
     pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
     # history card Send…
-    pg.click("#levelSwitch [data-level=beginner]")
+    pg.select_option("#modeSel", "beginner")
     ok("history card has Send…", pg.locator("#histList [data-send]").count() >= 1)
     pg.locator("#histList [data-send]").first.click(); pg.wait_for_selector("#dlgSendSheet[open]"); ok("history Send… opens the sheet", "Send your build" in sheet_text(pg)); pg.keyboard.press("Escape")
     # print dialog: Send… shortcut; local mode shows the honest label and Start print unchecked
