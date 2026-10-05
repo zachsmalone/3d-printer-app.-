@@ -333,6 +333,8 @@ def scan_language(text: str) -> str | None:
     for var in dict.fromkeys(variants):
         if _scan_view(var, L):
             return "language"
+    if "\u0443" in (text or "").lower():                       # Cyrillic у looks like y but is often used for u ("f" + у + "ck")
+        return scan_language(text.lower().replace("\u0443", "u"))
     return None
 
 
@@ -358,11 +360,12 @@ _PLATFORMS = (r"(?:snapchat|snap|instagram|insta|tiktok|discord|whatsapp|telegra
               r"sc|ig|fb|yt|youtube|twitch|steam|reddit|wechat|minecraft|xbox|gamertag|username)")
 _HANDLE_PLATFORM = re.compile(r"\b" + _PLATFORMS + r"\b\s*(?:[:@=]|\bid\b|\bhandle\b|\busername\b|add me|me on)\s*@?[a-z0-9_.]{3,}"
                               r"|\bmy\s+" + _PLATFORMS + r"\s+(?:is|username is|id is|handle is)\s+@?[a-z0-9_.]{3,}")
+_ADD_ME = re.compile(r"\b(?:add|follow|find|message|msg|dm|hit|hmu|text)\s+me\s+(?:on|at|via)\s+" + _PLATFORMS + r"\b|\b(?:snap|snapchat|whatsapp|insta|instagram|kik|telegram|discord)\s+me\b|\bdm\s+me\b")
 _SEP = r"[ .\-/_,·]"
 _PHONE_US = re.compile(r"(?<![\d.])(?:\+?\d{1,3}" + _SEP + r")?\(?\d{3}\)?" + _SEP + r"\d{3}" + _SEP + r"\d{4}(?![\d])")
 _PHONE_INTL = re.compile(r"\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?!\d)")
 _PHONE_GROUPS = re.compile(r"(?<![\d.])0\d{1,4}(?:" + _SEP + r"\d{2,4}){3,5}(?![\d.])|(?<![\d.])\d{2,4}(?:-\d{2,4}){4,5}(?![\d.-])|(?<!\d)0\d{3,4}[ -]\d{5,7}(?!\d)")
-_PHONE_LOCAL = re.compile(r"\b(?:call|phone|text|tel|telephone|ring|dial|whatsapp|reach|contact|cell|mobile)\b.{0,15}?(?<![\d])(?:\d{3}[ -]\d{4}|\d{7,11})(?!\d)")
+_PHONE_LOCAL = re.compile(r"\b(?:call|phone|text|tel|telephone|ring|dial|whatsapp|reach|contact|cell|mobile|my\s+(?:phone\s+|cell\s+)?(?:number|num|no))\b.{0,15}?(?<![\d])(?:\d{3}[ -]\d{4}|\d{7,11})(?!\d)")
 _ADDRESS = re.compile(r"\b\d{1,5}\s+(?:[a-z]+\.?\s+){1,3}(?:street|st|avenue|ave|road|rd|drive|dr|lane|ln|boulevard|blvd|highway|hwy)\b\.?")
 _PO_BOX = re.compile(r"\bp\.?\s?o\.?\s?box\s+\d+")
 _NUMWORDS = {w: 1 for w in (
@@ -388,12 +391,21 @@ def _spelled_number_run(t: str) -> bool:
     return bool(words and total >= 7)
 
 
+def _spaced_email(t: str) -> bool:
+    """'n a m e @ g m a i l . c o m': letters spread out with spaces around an @ - closed up, does it read as an address on a real provider/TLD?"""
+    if "@" not in t:
+        return False
+    d = re.sub(r"\s+", "", t)
+    m = re.search(r"[\w.+-]{1,64}@([\w-]{1,63})\.(" + _STRONG_TLD[3:] + r"\b", d)
+    return bool(m)
+
+
 def scan_contact(text: str) -> str | None:
     t = normalize(text or "")
     t = re.sub(r"\[\.\]|\(\.\)|[。｡]", ".", t).replace("hxxp", "http")         # "example[.]com", "example。com", "hxxps://"
     if (_EMAIL_PLAIN.search(t) or _EMAIL_SPACED.search(t) or _EMAIL_WORDS.search(t) or _EMAIL_PROVIDER.search(t)
             or _URL.search(t) or _PHONE_US.search(t) or _PHONE_INTL.search(t) or _PHONE_GROUPS.search(t) or _PHONE_LOCAL.search(t)
-            or _spelled_number_run(t) or _HANDLE_AT.search(t) or _HANDLE_TAG.search(t) or _HANDLE_PLATFORM.search(t)
+            or _spelled_number_run(t) or _HANDLE_AT.search(t) or _HANDLE_TAG.search(t) or _HANDLE_PLATFORM.search(t) or _ADD_ME.search(t) or _spaced_email(t)
             or _ADDRESS.search(t) or _PO_BOX.search(t)):
         return "contact_info"
     return None

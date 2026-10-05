@@ -144,3 +144,17 @@ sussex
 essex
 middlesex
 mississippi
+# ordinary words / names that only collide with a NON-English list (red-team F-07); the English list and extra.txt are unaffected
+hard
+peter
+anita
+regina
+stake
+gotten
+finger
+balle
+martillo
+comer
+nicht
+bitte
+pitt
