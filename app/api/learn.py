@@ -343,7 +343,8 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
     thumb = f"<img src='/api/showcase/{pid}/thumb' class=sharethumb alt=''>" if i.get("has_thumb") else ""
     ex = "<p class=pill>EXAMPLE seed data - not a real creator project</p>" if i.get("example") else ""
     files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
-    eng = f" · ♥ {catalog.public(i, actor)['likes']} · ⬇ {catalog.public(i, actor)['downloads']}" if catalog.public(i, actor)["likes"] is not None else ""
+    _pub = catalog.public(i, actor)
+    eng = f" · {_pub['likes']} {'nozzle' if _pub['likes'] == 1 else 'nozzles'} · ⬇ {_pub['downloads']}" if _pub["likes"] is not None else ""
     cl = credits.credit_line(i)
     credit = (f"<p class=credit>Credit: <b>{escape(cl['creator'])}</b>" + (f" · Licence: {_lic(cl['licence'], cl['licence_url'])}" if cl["licence"] else "") + " · <a href='/credits'>Thank you &amp; credits</a></p>") if cl else ""
     body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{thumb}"

@@ -292,7 +292,7 @@
   <p class="help" id="shSub"></p>
   <p class="help" id="shCount" role="status" aria-live="polite"></p>
   <p class="help" id="shNotice"></p>
-  <div class="grid" id="shGrid"></div>
+  <ul class="grid" id="shGrid"></ul>
 </main>
 
 <main class="page" id="viewLearn" hidden>
@@ -380,7 +380,11 @@
   <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></div>
 </div></dialog>
 <div id="toasts"></div>
+<div id="nzStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div><div id="nzAlert" class="sr-only" role="alert"></div>
 <div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<dialog id="dlgNzAcct" aria-labelledby="nzAcctH"><div class="dlg"><div class="dh"><h3 id="nzAcctH">Make a free account to nozzle</h3></div>
+  <div class="body"><p>A nozzle is a way to say "nice work" to a maker. You need a free ZEIM account to give one. It takes a minute and costs nothing.</p></div>
+  <div class="df"><button type="button" class="btn" id="nzAcctLater">Not now</button><button type="button" class="btn primary" id="nzAcctMake">Make an account</button></div></div></dialog>
 <dialog id="dlgSend" aria-labelledby="dlgSendTitle"><h3 id="dlgSendTitle">Let students send files out of ZEIM?</h3>
   <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>
   <p>Turn this on for <b id="dlgSendName"></b>?</p>

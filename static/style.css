@@ -319,3 +319,32 @@ fieldset.seg label{position:relative;display:flex;align-items:center;justify-con
 .untested{font-size:11px;font-weight:700;border:1px solid var(--warn);color:var(--warn);border-radius:99px;padding:0 7px;margin-left:4px;white-space:nowrap}
 .hero .pp-actions .btn.big{flex:0 1 360px}
 @media(max-width:600px){.hero .pp-actions .btn.big{flex:1 1 100%}}
+
+/* ---- Nozzle it (Batch B4) ---- */
+ul.grid{list-style:none;padding:0;margin:14px 0 0}
+.pcard{position:relative}.pcard .meta h2{margin:0;font-size:inherit}.pcard .meta h2 a{color:var(--txt);text-decoration:none;display:inline-block;min-height:44px;line-height:22px;padding:11px 0;font-weight:700}
+.pcard .meta h2 a::after{content:"";position:absolute;inset:0;z-index:1}
+.pcard .meta h2 a:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.pcard .meta{padding-bottom:0}
+.cardfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 11px 10px;margin-top:auto}.cardfoot .dl{color:var(--mut);font-size:13px}
+.cardfoot .nzwrap{display:flex;flex-direction:column;align-items:flex-start;gap:2px}.cardfoot .nz,.cardfoot .nz-static{position:relative;z-index:2}
+.nz{--nz-c:var(--txt);display:inline-flex;align-items:center;gap:6px;min-height:44px;min-width:44px;padding:4px 12px;border-radius:999px;border:2px solid var(--ctl);background:var(--panel);color:var(--nz-c);font:inherit;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;position:relative;z-index:2}
+.nz:hover{background:var(--panel2)}
+.nz-ico{width:24px;height:24px;flex:none;overflow:visible}
+.nz-ico .nz-body{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;transform-box:fill-box;transform-origin:50% 0}
+.nz-ico .nz-drop{fill:currentColor;opacity:0;transform-box:fill-box;transform-origin:50% 0}
+.nz[aria-pressed=true]{--nz-c:var(--warm);background:var(--warmtint);border-color:var(--warm)}
+.nz[aria-pressed=true] .nz-body{fill:currentColor}
+.nz[aria-pressed=true] .nz-drop{opacity:1}
+.nz[aria-pressed=true] .nz-count,.nz[aria-pressed=true] .nz-text{color:var(--txt)}
+.nz[aria-disabled=true]{--nz-c:var(--mut);border-style:dashed;cursor:not-allowed}
+.nz-lg{padding:6px 18px;font-size:17px}
+.nz.pop .nz-body{animation:nzpress .22s ease-out}.nz.pop .nz-drop{animation:nzdrop .45s ease-out}.nz.pop-off .nz-body{animation:nzpress .16s ease-out}
+@keyframes nzpress{0%{transform:translateY(0) scale(1)}45%{transform:translateY(2px) scale(.92)}100%{transform:translateY(0) scale(1)}}
+@keyframes nzdrop{0%{opacity:0;transform:translateY(-6px) scale(.4)}60%{opacity:1;transform:translateY(1px) scale(1.15)}100%{opacity:1;transform:translateY(0) scale(1)}}
+@media (prefers-reduced-motion:reduce){.nz *{animation:none!important}}
+.nz-static{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--mut);font-weight:600}
+.nz-static svg{width:24px;height:24px}.nz-static .nz-body{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}.nz-static .nz-drop{opacity:0}
+.nz-note{font-size:14px;color:var(--mut);margin:0}
+.itrow .nzwrap,.row .nzwrap{display:inline-flex;flex-direction:column;gap:2px}
+@media (forced-colors:active){.nz[aria-pressed=true]{outline:3px solid Highlight}}

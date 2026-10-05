@@ -352,7 +352,7 @@ def set_showcase(actor: Actor, code: str, enabled=None, likes=None) -> dict:
                 room["likes_enabled"] = False
         if likes is not None:
             if likes and not room.get("showcase_enabled", False):
-                raise ValueError("Turn on Showcase for the class first; likes are a second switch.")
+                raise ValueError("Turn on Showcase for the class first; nozzles are a second switch.")
             room["likes_enabled"] = bool(likes)
         room["showcase_changed"] = now
         return {"showcase_enabled": bool(room.get("showcase_enabled", False)), "likes_enabled": bool(room.get("likes_enabled", False))}

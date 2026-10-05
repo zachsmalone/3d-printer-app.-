@@ -96,9 +96,25 @@ def _visible(actor: Actor, users: dict):
     return lambda i: (not i["hidden"]) and privacy.can_view(actor, i.get("owner_sid"), i.get("visibility", "private"), users)
 
 
-def counts_visible(i: dict, users: dict) -> bool:
-    """May like/download numbers for this item be shown to people? (Examples: only if the flag says so; minors: not by default.)"""
+def viewer_sees_no_counts(actor) -> bool:
+    """Class students (nickname accounts, the under-13 path) and any viewer under 13 never see nozzle/download numbers (decision, Batch B)."""
+    if actor is None:
+        return False
+    if classrooms.showcase_policy(actor.sid) is not None:
+        return True
+    u = getattr(actor, "user", None)
+    if u and u.get("dob"):
+        from .identity import age_of
+        return age_of(u) < 13
+    return False
+
+
+def counts_visible(i: dict, users: dict, actor=None) -> bool:
+    """May nozzle/download numbers for this item be shown to this viewer? (Examples: only if the flag says so; minors' items: not by default;
+    class students and under-13 viewers: never.)"""
     if not is_public(i, users):
+        return False
+    if viewer_sees_no_counts(actor):
         return False
     if i.get("example") and not config.SHOW_COUNTS_FOR_EXAMPLES:
         return False
@@ -123,12 +139,14 @@ def public(i: dict, actor: Actor) -> dict:
     tu = next((u for u in users.values() if u["id"] == i["creator_id"]), None)
     pub = is_public(i, users)
     i = resolve(i, users)
-    show_counts = counts_visible(i, users)
+    show_counts = counts_visible(i, users, actor)
     return {"likes": i.get("_likes", 0) if show_counts else None, "liked": bool(pub and actor.sid in i.get("_likers", [])),
             "liked_by_others": bool(pub and i.get("owner_sid") == actor.sid and i.get("_likes", 0) > 0),
             "counts_hidden": bool(pub and not show_counts),
             "can_like": bool(pub and i.get("owner_sid") != actor.sid and (classrooms.showcase_policy(actor.sid) or {"likes": True})["likes"]),
             "visibility": privacy.effective(i.get("visibility", "private"), users.get(i.get("owner_sid"))) if i.get("owner_sid") else "public",
+            "can_like_reason": ("" if (pub and i.get("owner_sid") != actor.sid and (classrooms.showcase_policy(actor.sid) or {"likes": True})["likes"]) else
+                                "own" if i.get("owner_sid") == actor.sid else "class_off" if (pub and classrooms.showcase_policy(actor.sid)) else "not_public"),
             "can_follow": privacy.can_follow(actor, tu, bool(i.get("example"))),"id": i["id"], "title": i["title"], "creator": i["creator"], "creator_id": i["creator_id"],
             "example": i.get("example", False), "tags": i["tags"], "mode": i["mode"],
             "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],
@@ -268,7 +286,7 @@ def set_like(i: dict, actor: Actor, liked: bool | None = None) -> dict:
     if not is_public(i):
         raise Denied(404, "not found")       # private / followers-only: no likes at all
     if i.get("owner_sid") == actor.sid:
-        raise Denied(403, "You can't like your own project.")
+        raise Denied(403, "You can't nozzle your own project.")
     res = {}
 
     def f(d):
@@ -281,6 +299,6 @@ def set_like(i: dict, actor: Actor, liked: bool | None = None) -> dict:
         res["liked"] = actor.sid in lst
         res["likes"] = (int(i.get("likes", 0)) if (not i.get("example") or config.SHOW_COUNTS_FOR_EXAMPLES) else 0) + len(lst)
     ENGAGEMENT.update(f)
-    if not counts_visible(i, USERS.read()):
+    if not counts_visible(i, USERS.read(), actor):
         res["likes"] = None
     return res

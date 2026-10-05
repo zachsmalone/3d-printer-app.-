@@ -120,15 +120,16 @@ async function loadShowcase() {
   $("#shSub").textContent = r.subtitle || "";
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
-  $("#shGrid").innerHTML = r.items.map(i => `<div class="pcard" data-item="${i.id}"><div class="ph">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
-    <div class="meta"><b>${esc(i.title)}</b><span>${esc(i.creator)}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}${i.likes != null ? ` · ♥ ${i.likes}` : ""}${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}${i.liked_by_others ? " · ♥ liked" : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div></div>`).join("");
+  $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${esc(i.creator)}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
+    <div class="cardfoot">${nzHTML(i, { uid: "g" })}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   if (!r.items.length) {
     const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
-    $("#shGrid").innerHTML = `<div class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</div>`;
+    $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
   }
 }
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => x.classList.toggle("on", x === b)); loadShowcase(); };
-$("#shGrid").onclick = e => { const c = e.target.closest("[data-item]"); if (c) openItem(c.dataset.item); };
+$("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
 $("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };            // Search button, Enter and touch-keyboard "Go" all end up here
 $("#shClear").onclick = () => { $("#shSearch").value = ""; loadShowcase(); $("#shSearch").focus(); };
 $("#shSearch").oninput = () => { $("#shClear").hidden = !$("#shSearch").value; };
@@ -141,22 +142,73 @@ $("#shGrid").addEventListener("click", e => {
   else if (d === "studio") { location.hash = "create"; }
 });
 
+
+/* ---------- Nozzle it: the one positive-only button (replaces every like/heart). Spec: reports/design/nozzle-it-spec.md ---------- */
+const NZ_SVG = `<svg class="nz-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><g class="nz-body"><rect x="6" y="2.5" width="12" height="5.5" rx="1.5"/><path d="M8.2 8h7.6l-2 5.5h-3.6z"/><path d="M10.2 13.5h3.6V16h-3.6z"/></g><path class="nz-drop" d="M12 17.6c-1.5 1.9-2 2.7-2 3.5a2 2 0 0 0 4 0c0-.8-.5-1.6-2-3.5z"/></svg>`;
+const NZ_OFF = "Your teacher turned nozzles off for your class.";
+const nzShort = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k" : String(n);
+const nzName = n => n == null ? "Nozzle it" : n === 0 ? "Nozzle it, no nozzles yet" : `Nozzle it, ${n} ${n === 1 ? "nozzle" : "nozzles"}`;
+const nzNeedsAccount = () => !(ME?.signed_up || ME?.send?.role === "student");
+function nzHTML(i, { large = false, uid = "g" } = {}) {
+  if (i.example || i.no_nozzle) return "";                                   // examples are seed data: no button, no number
+  const n = i.likes == null ? null : i.likes;
+  if (i.owned) return `<span class="nz-static">${NZ_SVG}<span>${n == null ? "Your project" : `${n} ${n === 1 ? "nozzle" : "nozzles"}`}</span></span>`;
+  if (i.can_like_reason === "not_public") return "";
+  const off = i.can_like === false && i.can_like_reason === "class_off", why = `nzwhy-${uid}-${i.id}`;
+  return `<span class="nzwrap"><button type="button" class="nz${large ? " nz-lg" : ""}" data-nz="${i.id}" data-likes="${n == null ? "" : n}" aria-pressed="${!!i.liked}" aria-label="${nzName(n)}"
+      ${off ? `aria-disabled="true" aria-describedby="${why}" data-off="1"` : ""}>${NZ_SVG}${large ? '<span class="nz-text" aria-hidden="true">Nozzle it</span>' : ""}<span class="nz-count" aria-hidden="true">${n ? nzShort(n) : ""}</span></button>${off ? `<span class="nz-note" id="${why}">${NZ_OFF}</span>` : ""}</span>`;
+}
+function nzSay(t, alert = false) {
+  const el = $(alert ? "#nzAlert" : "#nzStatus"); if (!el) return;
+  el.textContent = ""; setTimeout(() => el.textContent = t, 60);
+}
+function nzPaint(id, liked, n, pop) {
+  $$(`.nz[data-nz="${CSS.escape(id)}"]`).forEach(b => {
+    b.setAttribute("aria-pressed", String(!!liked)); b.dataset.likes = n == null ? "" : n; b.setAttribute("aria-label", nzName(n));
+    b.querySelector(".nz-count").textContent = n ? nzShort(n) : "";
+    if (pop && !matchMedia("(prefers-reduced-motion: reduce)").matches) { const c = liked ? "pop" : "pop-off"; b.classList.remove("pop", "pop-off"); void b.offsetWidth; b.classList.add(c); }
+  });
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".nz"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (b.dataset.busy) return;                                               // one request at a time per button
+  const id = b.dataset.nz;
+  if (b.dataset.off) { nzSay(NZ_OFF); return; }                              // aria-disabled, not disabled: it stays focusable and says why
+  if (nzNeedsAccount()) { window.__nzOpener = b; $("#dlgNzAcct").showModal(); return; }
+  const was = { liked: b.getAttribute("aria-pressed") === "true", n: b.dataset.likes === "" ? null : +b.dataset.likes }, want = !was.liked;
+  const now = was.n == null ? null : Math.max(0, was.n + (want ? 1 : -1));
+  $$(`.nz[data-nz="${CSS.escape(id)}"]`).forEach(x => x.dataset.busy = "1");
+  nzPaint(id, want, now, true);
+  try {
+    const r = await api(`/api/showcase/${id}/like`, J("POST", { liked: want }));
+    nzPaint(id, r.liked, r.likes, false);
+    nzSay((r.liked ? "Nozzled." : "Nozzle removed.") + (r.likes != null ? ` ${r.likes} ${r.likes === 1 ? "nozzle" : "nozzles"}.` : ""));
+  } catch (er) {
+    nzPaint(id, was.liked, was.n, false);                                    // roll back to exactly what it was
+    if (er.status === 403 && /teacher/i.test(er.message)) nzSay(er.message, true);
+    else { nzSay("Couldn't save your nozzle. Check your connection and try again.", true); toast("Couldn't save your nozzle. Check your connection and try again.", "err"); }
+  } finally { $$(`.nz[data-nz="${CSS.escape(id)}"]`).forEach(x => delete x.dataset.busy); }
+}, true);
+$("#nzAcctMake").onclick = () => { $("#dlgNzAcct").close(); window.__nzWantSignup = true; $("#btnAccount").click(); };
+$("#nzAcctLater").onclick = () => { $("#dlgNzAcct").close(); window.__nzOpener?.focus(); };
+document.addEventListener("zeim:me", () => { if (window.__nzWantSignup && ME?.signed_up) { window.__nzWantSignup = false; nzSay("Account made. You can nozzle projects now."); } });
+
 async function openItem(id) {
   const i = await api("/api/showcase/" + id);
   $("#itTitle").textContent = i.title;
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
-    ${i.thumb ? `<img src="${i.thumb}" style="max-width:100%;border-radius:10px">` : ""}
+    ${i.thumb ? `<img src="${i.thumb}" alt="Preview picture of ${esc(i.title)}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
     <p class="help">by <a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a> · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
-      ${i.likes != null ? `<button class="btn ${i.liked ? "primary" : ""}" id="itLike" ${i.can_like ? "" : "disabled"} title="${i.can_like ? "Like this model" : "You can't like your own model"}">♥ ${i.liked ? "Liked" : "Like"} · ${i.likes}</button>` : ""}
+      ${nzHTML(i, { large: true, uid: "d" })}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}</div>
-    <p class="help">Likes and downloads are counted once per visitor and only for public projects. A feed of the creators you follow: <b>Coming soon</b>.</p>`;
-  if ($("#itLike")) $("#itLike").onclick = async () => { try { await api(`/api/showcase/${id}/like`, J("POST", {})); openItem(id); loadShowcase(); } catch (e) { toast(e.message, "err"); } };
+    <p class="help">Nozzles and downloads are counted once per person and only for public projects. A feed of the creators you follow: <b>Coming soon</b>.</p>`;
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
