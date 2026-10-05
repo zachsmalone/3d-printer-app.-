@@ -98,9 +98,10 @@ def test_download_page_and_showcase_json_carry_the_credit_line():
     pub = client(ADULT); bid = photo_build(pub)
     r = pub.post("/api/showcase", json={"build_id": bid, "title": "Credited", "description": "d", "tags": [], "accept_guidelines": True, "visibility": "public"}); assert r.status_code == 200, r.text
     iid = r.json()["id"]
-    assert r.json()["credit"]["creator"] == ADULT["display_name"]
+    assert r.json()["credit"]["creator"] == "@" + pub.get("/api/me").json()["username"]          # community credit = username only (never the display name)
     h = client().get(f"/p/{iid}").text
-    assert "Credit:" in h and ADULT["display_name"] in h and "/credits" in h
+    un = pub.get("/api/me").json()["username"]
+    assert "Credit:" in h and "@" + un in h and ADULT["display_name"] not in h and "/credits" in h
     ex = client().get("/api/showcase").json()["items"]
     assert all(i["credit"] and i["credit"]["creator"] for i in ex)                  # every card, examples included
     # items with a manifest licence show it

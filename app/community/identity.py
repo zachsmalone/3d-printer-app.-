@@ -150,11 +150,17 @@ def _priv(u):
     return of(u)
 
 
+def _next_username_change(u: dict):
+    from . import usernames
+    return usernames.next_change(u)
+
+
 def public_profile(actor: Actor) -> dict:
     u = actor.user
     if not u:
         return {"signed_up": False, "restrictions": restrictions(actor)}
-    return {"signed_up": True, "id": u["id"], "display_name": u["display_name"],
+    return {"signed_up": True, "id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
+            "username_next_change": _next_username_change(u),
             "age_group": "adult" if actor.is_adult else "teen", "links": u.get("links", {}),
             "following": u.get("following", []), "privacy": _priv(u), "restrictions": restrictions(actor),
             "recovery": {"has_code": bool(u.get("recovery")), "issued": u.get("recovery_issued")} if actor.is_adult else None}

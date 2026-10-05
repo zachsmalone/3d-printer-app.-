@@ -339,6 +339,7 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
         i = catalog.get(pid, actor)
     except catalog.Denied:
         raise HTTPException(404)
+    i = catalog.resolve(i)
     thumb = f"<img src='/api/showcase/{pid}/thumb' class=sharethumb alt=''>" if i.get("has_thumb") else ""
     ex = "<p class=pill>EXAMPLE seed data - not a real creator project</p>" if i.get("example") else ""
     files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])

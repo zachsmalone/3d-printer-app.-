@@ -41,6 +41,7 @@ harden_data_permissions()
 # ---- community / policy constants (single source of truth) ----
 MIN_SIGNUP_AGE = 13          # no accounts under 13 (COPPA-style). Under-13s use the education center
                              # without an account, via a teacher's classroom code + nickname only.
+USERNAME_CHANGE_DAYS = int(os.environ.get("PHOTO3D_USERNAME_CHANGE_DAYS", "90"))      # one username change per this many days
 ADULT_AGE = 18               # teen (13-17) accounts get safer defaults; teachers must be adults
 ADMIN_TOKEN = __import__("os").environ.get("PHOTO3D_ADMIN_TOKEN", "")   # moderation queue access
 

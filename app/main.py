@@ -58,6 +58,12 @@ for r in (builds.router, edit.router, printing.router, printing.files_router, se
           community.router, learn.router, learn.pages):
     app.include_router(r)
 try:
+    from .community import usernames as _usernames
+    _usernames.migrate()               # accounts made before usernames existed get one (adults keep their display name if it is free)
+except Exception:
+    import logging
+    logging.getLogger("zeim").exception("username migration failed")
+try:
     from .community import privacy as _privacy
     _privacy.migrate_minors()          # existing 13-17 data -> current teen posture (idempotent)
 except Exception:                      # never block start-up on a migration problem

@@ -193,3 +193,12 @@ def test_star_keeps_a_build_at_phone_width_in_chrome_and_webkit():
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)
+
+
+def test_username_is_chosen_changed_once_and_locked_in_the_account_dialog_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_username.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)

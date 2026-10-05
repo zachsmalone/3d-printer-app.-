@@ -181,7 +181,8 @@ def credit_line(item: dict) -> dict | None:
         lic = {"name": lic}
     name = row.get("name") or lic.get("name", "")
     url = row.get("url") if row else lic.get("url", "")
-    creator = _clean(c.get("creator") or item.get("creator"), 120)
+    # community uploads are credited by USERNAME (never the display name); library / Originals keep their author's name
+    creator = _clean(c.get("creator") or (("@" + item["creator_username"]) if item.get("creator_username") else item.get("creator")), 120)
     if not creator:
         return None
     title = _clean(item.get("title"), 120)

@@ -44,10 +44,12 @@ function renderAccount() {
   if (!ME.signed_up) {
     $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Learning with a class? You don't need an account — ask your teacher for the class code and join in the ${esc(CFG.sections.learn)}.</p>
       <div class="field"><label>Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
+      <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
       <div class="field"><label>Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
       <button class="btn primary" id="su_go">Create account</button>`;
     $("#su_go").onclick = async () => {
-      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value })); await refreshMe(); renderAccount(); toast("Account created", "ok"); }
+      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim() })); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
         if (e.status === 403 && /^We can't create an account/.test(e.message)) {     // the neutral age refusal: a calm panel instead of an unchanged form
           $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still join a class with a code from your teacher.</p><button class="btn primary" id="suJoin">Join a class</button></div>`;
@@ -58,7 +60,14 @@ function renderAccount() {
     };
   } else {
     const r = ME.restrictions, pv = ME.privacy;
+    const nextUn = ME.username_next_change ? new Date(ME.username_next_change).toLocaleDateString() : null;
     $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> <span class="pill">${ME.age_group}</span></p>
+      <h4>Your username</h4>
+      <p>Credit for what you share goes to <b id="un_now">@${esc(ME.username || "")}</b>. Your email is never shown to anyone.</p>
+      <div class="field"><label for="un_new">New username</label><input id="un_new" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" ${nextUn ? "disabled" : ""}>
+        <small class="help" id="un_help">${nextUn ? "You can change your username again on " + esc(nextUn) + "." : "3 to 20 letters, numbers or underscores. You can change it once every 90 days. The old name stays saved for you, so nobody else can take it. Please don't use your real name."}</small></div>
+      <div class="row"><button class="btn small" id="un_save" ${nextUn ? "disabled" : ""}>Change username</button><button class="btn small ghost" id="un_suggest" ${nextUn ? "disabled" : ""}>Suggest names</button></div>
+      <div class="row" id="un_sugg"></div>
       <p class="help">Public page: <a href="/u/${ME.id}" target="_blank">/u/${ME.id}</a> (only if your profile is visible to the viewer)</p>
       <h4>🔒 Privacy</h4>
       <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""} ${v !== "private" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
@@ -71,6 +80,15 @@ function renderAccount() {
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li>
       <li>Classroom tools: <b>${r.can_create_classroom ? "available" : "adults only"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>`;
+    $("#un_save").onclick = async () => {
+      try { const r = await api("/api/me/username", J("PUT", { username: $("#un_new").value.trim() })); await refreshMe(); renderAccount(); toast("Your username is now @" + r.username, "ok"); }
+      catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
+    };
+    $("#un_suggest").onclick = async () => {
+      try { const r = await api("/api/me/username/suggest", J("POST", {})); $("#un_sugg").innerHTML = r.suggestions.map(n => `<button class="btn small ghost" data-un="${esc(n)}">${esc(n)}</button>`).join("");
+        $("#un_sugg").querySelectorAll("[data-un]").forEach(b => b.onclick = () => { $("#un_new").value = b.dataset.un; $("#un_new").focus(); }); }
+      catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
+    };
     $("#pv_save").onclick = async () => { try { await api("/api/me/privacy", J("PUT", { profile: $("#pv_profile").value, default_visibility: $("#pv_def").value, social: $("#pv_social").checked ? "on" : "off" })); await refreshMe(); renderAccount(); toast("Privacy saved", "ok"); } catch (e) { toast(e.message, "err"); } };
     $("#pv_followers").onclick = async () => { const f = await api("/api/me/followers"); toast(!f.enabled ? "Following is off, so there are no followers." : f.followers.length ? "Followers: " + f.followers.map(x => x.display_name).join(", ") : "No followers yet."); };
   }

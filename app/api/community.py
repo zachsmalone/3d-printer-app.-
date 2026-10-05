@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
-from ..community import catalog, classrooms, links, moderation, personalization, privacy, recovery, safety
+from ..community import catalog, classrooms, links, moderation, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS
@@ -54,7 +54,12 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
     try:
         name = text_in(body.get("display_name", ""), 40, "Display name")
         safety.filter_only(name, "Display name")
-        idn.signup(actor, name, str(body.get("dob", ""))[:12])
+        user = idn.signup(actor, name, str(body.get("dob", ""))[:12])
+        try:
+            usernames.assign_new(actor.sid, user, str(body.get("username") or "")[:40] or None, minor=idn.age_of(user) < config.ADULT_AGE)
+        except usernames.UsernameError as e:
+            USERS.update(lambda d: d.pop(actor.sid, None))          # nothing is kept from a sign-up that did not complete
+            raise HTTPException(400, str(e))
     except PermissionError:
         return _age_refusal(actor, lock=True, ip=_ip(request), request=request)
     except ValueError as e:
@@ -65,6 +70,30 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
         out["recovery_code"] = recovery.issue(actor.sid)
         out["recovery"] = {"has_code": True, "issued": USERS.read()[actor.sid]["recovery_issued"]}
     return out
+
+
+@router.put("/me/username")
+def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    """Change my username. Server-enforced: 3-20 chars, unique ignoring case, passes the chat filter, no email/phone-like text."""
+    if not actor.user:
+        raise HTTPException(401, "Create an account first.")
+    if not ratelimit.hit("username:" + actor.sid, 20, 3600) or not ratelimit.hit("usernameip:" + _ip(request), 200, 3600):
+        raise HTTPException(429, "Too many tries. Please wait a while.")
+    try:
+        return {"username": usernames.change(actor.sid, str(body.get("username", ""))[:60])}
+    except usernames.UsernameWait as e:
+        raise HTTPException(429, str(e))
+    except usernames.UsernameError as e:
+        raise HTTPException(409 if "taken" in str(e) else 400, str(e))
+
+
+@router.post("/me/username/suggest")
+def suggest_username(actor: Actor = Depends(get_actor)):
+    if not actor.user:
+        raise HTTPException(401, "Create an account first.")
+    if not ratelimit.hit("usersuggest:" + actor.sid, 60, 3600):
+        raise HTTPException(429, "Too many tries. Please wait a while.")
+    return {"suggestions": usernames.suggestions()}
 
 
 @router.post("/me/recover")
@@ -116,7 +145,7 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404, "unknown user")
     teen = idn.age_of(u) < config.ADULT_AGE
     social = privacy.social_on(u)
-    return {"id": u["id"], "display_name": u["display_name"],
+    return {"id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
             "followers": idn.follower_count(uid) if social else None,   # opted out -> no count at all
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),

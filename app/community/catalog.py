@@ -106,11 +106,23 @@ def counts_visible(i: dict, users: dict) -> bool:
     return not (config.HIDE_COUNTS_FOR_MINORS and privacy.is_minor(owner_u))
 
 
+def resolve(i: dict, users: dict | None = None) -> dict:
+    """Credit follows the ACCOUNT, not a copy of its name: the uploader's CURRENT username is looked up by account id every time, so a rename
+    updates every old credit, and the display name (which may be a real name) is never shown as the creator of a community project."""
+    if i.get("example") or not i.get("creator_id"):
+        return i
+    users = USERS.read() if users is None else users
+    tu = next((u for u in users.values() if u.get("id") == i["creator_id"]), None)
+    name = (tu or {}).get("username") or i.get("creator_username")           # account gone -> the last known username
+    return {**i, "creator_username": name, "creator": "@" + name} if name else i
+
+
 def public(i: dict, actor: Actor) -> dict:
     following = bool(actor.user and i["creator_id"] in actor.user.get("following", []))
     users = USERS.read()
     tu = next((u for u in users.values() if u["id"] == i["creator_id"]), None)
     pub = is_public(i, users)
+    i = resolve(i, users)
     show_counts = counts_visible(i, users)
     return {"likes": i.get("_likes", 0) if show_counts else None, "liked": bool(pub and actor.sid in i.get("_likers", [])),
             "liked_by_others": bool(pub and i.get("owner_sid") == actor.sid and i.get("_likes", 0) > 0),
@@ -122,7 +134,7 @@ def public(i: dict, actor: Actor) -> dict:
             "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],
             "owned": bool(i.get("owner_sid") and i["owner_sid"] == actor.sid), "following_creator": following,
             "share_url": f"/p/{i['id']}",
-            "credit": credit_line(i), "no_model": not i["files"],
+            "creator_username": i.get("creator_username"), "credit": credit_line(i), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
                        "url": f"/api/showcase/{i['id']}/files/{f['name']}"} for f in i["files"]]}
@@ -215,7 +227,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
     if (OUT / build_id / "thumb.png").exists():
         shutil.copy(OUT / build_id / "thumb.png", d / "thumb.png")
     mode = json.loads((OUT / build_id / "meta.json").read_text())["mode"]
-    item = {"id": pid, "title": title, "creator": actor.user["display_name"], "creator_id": actor.user["id"],
+    item = {"id": pid, "title": title, "creator": actor.user["display_name"], "creator_id": actor.user["id"], "creator_username": actor.user.get("username"),
             "example": False, "tags": [t.strip().lower() for t in tags if t.strip()][:8], "mode": mode,
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
