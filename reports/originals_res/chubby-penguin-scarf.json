@@ -1,0 +1,40 @@
+{
+ "slug": "chubby-penguin-scarf",
+ "title": "Chubby Penguin with Scarf",
+ "category": "Figures & Desk Art",
+ "description": "A round, friendly penguin with a knotted scarf, belly patch and little flippers. Wide flat feet make it stand on its own.",
+ "use": "Desk buddy, shelf figure, party favour or cake topper (use food-safe film if near food).",
+ "material": "PLA, any colour. Print upright, 0.2 mm layers, 15% infill, no supports needed (small chin/scarf overhangs only).",
+ "color": [
+  0.25,
+  0.4,
+  0.62
+ ],
+ "validation": {
+  "faces": 75000,
+  "vertices": 37502,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 66270.1,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   54.9,
+   44.0,
+   69.0
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 884.0,
+  "overhang_pct": 8.67,
+  "bed_contact_mm2": 124.7,
+  "flat_bottom": true,
+  "thick_min_mm": 0.95,
+  "thick_p2_mm": 5.77,
+  "pct_samples_below_1p2mm": 0.0,
+  "pass": true,
+  "stl_kb": 3662
+ }
+}

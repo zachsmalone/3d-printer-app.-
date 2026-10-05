@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOCK · ZEIM Mode dropdown</title>
+<style>
+/* ===== ZEIM design tokens (spec: reports/design/home-redesign-spec.md §Palette). Every pair below is computed in that spec. ===== */
+:root,[data-theme=light]{--bg:#FFF8EE;--panel:#FFFFFF;--panel2:#FFF1DC;--line:#E6D5BD;--ctl:#7F6F5D;--txt:#2B2118;--mut:#5E4F40;
+  --acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#4F34C7;--tint:#EDE7FF;--warm:#B4410C;--on-warm:#FFFFFF;--warmtint:#FFE3CC;--focus:#1D4ED8;
+  --ok:#166534;--okbg:#E3F5E8;--bad:#B91C1C;--badbg:#FDE8E8;--warn:#8A5300;--shadow:0 6px 24px #5b3a1a22;color-scheme:light}
+[data-theme=dark]{--bg:#0E1117;--panel:#161B24;--panel2:#1C2330;--line:#2A3344;--ctl:#7B88A6;--txt:#E6EAF2;--mut:#A9B4C9;
+  --acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#B8A9FF;--tint:#2A2457;--warm:#FFB26B;--on-warm:#1B1208;--warmtint:#3A2A1A;--focus:#8DB8FF;
+  --ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;--shadow:0 6px 24px #0008;color-scheme:dark}
+*{box-sizing:border-box}
+html{max-width:100%;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:100%;overflow-x:clip;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+h1,h2,h3{line-height:1.2;margin:0 0 .4em}
+a{color:var(--accink)}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:-1px;padding:0;border:0}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px}
+.skip{position:absolute;left:8px;top:-60px;background:var(--panel);color:var(--txt);padding:10px 14px;border:2px solid var(--ctl);border-radius:8px;z-index:100}
+.skip:focus{top:8px}
+[hidden]{display:none!important}
+/* mock-only toolbar (NOT part of the product) */
+.mockbar{background:var(--txt);color:var(--bg);padding:8px 12px;font-size:14px;display:flex;gap:12px 18px;flex-wrap:wrap;align-items:center}
+.mockbar label{display:flex;gap:6px;align-items:center}
+.mockbar select{min-height:44px;font-size:16px;border-radius:8px;border:2px solid var(--bg);background:var(--bg);color:var(--txt);padding:4px 8px}
+.mockbar b{font-weight:700}
+/* top bar: wraps, never scrolls sideways */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;min-height:44px;min-width:44px;font-weight:800;font-size:22px;letter-spacing:.5px;color:var(--txt);text-decoration:none;margin-right:auto}
+.brand span{color:var(--accink)}
+.nav{display:flex;gap:4px;flex:1 0 100%;order:5}
+.nav a,.nav button{flex:1 1 0;min-width:0;min-height:44px;padding:8px 6px;border-radius:10px;border:2px solid transparent;background:none;color:var(--mut);font:inherit;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.nav [aria-current=page]{background:var(--tint);color:var(--txt);border-color:var(--accink)}
+@media(min-width:900px){.topbar{padding:10px 20px;gap:8px 16px}.nav{flex:0 1 auto;order:0}.nav a,.nav button{flex:0 0 auto;padding:8px 16px}.brand{margin-right:0}.grow{flex:1}}
+.btn{background:var(--panel);border:2px solid var(--ctl);color:var(--txt);padding:8px 14px;min-height:44px;min-width:44px;border-radius:10px;cursor:pointer;font:inherit;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--panel2)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.btn.primary:hover{background:var(--acc);filter:brightness(1.12)}
+.btn.warm{background:var(--warm);border-color:var(--warm);color:var(--on-warm)}
+.btn.ghost{border-color:transparent;background:none}
+.btn[aria-disabled=true],.btn:disabled{opacity:1;color:var(--mut);border-style:dashed;cursor:not-allowed}
+.help{color:var(--mut);font-size:14px;margin:.3em 0}
+.pill{display:inline-block;background:var(--panel2);border:1px solid var(--ctl);border-radius:99px;padding:2px 10px;font-size:13px;color:var(--txt)}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field>label,.field>legend{font-size:14px;font-weight:600;color:var(--txt)}
+input[type=number],input[type=text],select{background:var(--panel);border:2px solid var(--ctl);border-radius:10px;color:var(--txt);padding:8px 10px;width:100%;min-height:44px;font:inherit;font-size:16px}
+select{appearance:auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.note{background:var(--tint);border:2px solid var(--accink);border-radius:12px;padding:12px 14px;margin:10px 12px}
+.note h2{font-size:17px;margin:0 0 4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+dialog{border:2px solid var(--ctl);border-radius:16px;background:var(--panel);color:var(--txt);padding:0;width:min(520px,94vw);max-width:100vw}
+dialog::backdrop{background:#000a}
+.dlg header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--line)}
+.dlg h2{margin:0;font-size:19px}
+.dlg .body{padding:14px 16px}
+.dlg footer{padding:10px 16px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.x{min-width:44px;min-height:44px;background:none;border:2px solid transparent;border-radius:10px;color:var(--txt);font-size:22px;cursor:pointer}
+.x:hover{border-color:var(--ctl)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media (forced-colors:active){.btn,input,select{border:2px solid ButtonText}.nav [aria-current=page]{outline:2px solid Highlight}}
+
+/* ---- Mode dropdown (new) ---- */
+.modepick{display:flex;align-items:center;gap:8px}
+.modepick label{font-weight:700;font-size:15px}
+.modepick .ico{font-size:20px;line-height:1}
+.modepick select{width:auto;min-width:150px;font-weight:700}
+.classbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--warmtint);border-bottom:2px solid var(--warm);padding:8px 12px}
+.classbar b{font-size:15px}
+.code{font:700 18px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;background:var(--panel);border:2px solid var(--ctl);border-radius:8px;padding:6px 10px}
+/* ---- Studio bits (match the real app's structure) ---- */
+.layout{display:grid;grid-template-columns:1fr;gap:14px;padding:12px;max-width:1100px;margin:0 auto}
+@media(min-width:900px){.layout{grid-template-columns:380px 1fr}}
+.step{margin-bottom:16px}
+.step h2{font-size:15px;text-transform:none;display:flex;gap:8px;align-items:center}
+.step h2 i{font-style:normal;display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border:0;padding:0;margin:0}
+.cards legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.cards label{position:relative;display:flex}
+.cards input,.seg input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.cards span.c{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;border:2px solid var(--ctl);border-radius:12px;padding:10px 4px;min-height:84px;background:var(--panel)}
+.cards small{color:var(--mut);font-size:12px}
+.cards input:checked+span.c,.seg input:checked+span{background:var(--tint);border-color:var(--accink);box-shadow:inset 0 0 0 1px var(--accink)}
+.cards input:focus-visible+span.c,.seg input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+.seg{display:flex;gap:6px;border:0;padding:0;margin:0}
+.seg label{position:relative;flex:1;display:flex}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;border:2px solid var(--ctl);border-radius:10px;background:var(--panel);font-weight:600}
+details{border:2px solid var(--line);border-radius:12px;margin-bottom:8px;padding:0 12px;background:var(--panel2)}
+summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.viewer{border:2px dashed var(--ctl);border-radius:16px;min-height:220px;display:grid;place-content:center;text-align:center;color:var(--mut);padding:12px;background:var(--panel)}
+.modeline{background:var(--panel2);border-radius:10px;padding:10px 12px;margin:0 0 14px}
+.lessonnotes{margin-top:12px}
+.tonly,.eonly,.bonly{display:none}
+body[data-level=expert] .eonly{display:block}
+body[data-level=beginner] .bonly,body[data-level=teacher] .bonly{display:block}
+body[data-level=teacher] .tonly{display:block}
+body[data-level=expert] .bonly{display:none}
+</style>
+</head>
+<body data-level="beginner" data-theme="light">
+<a class="skip" href="#main">Skip to main content</a>
+<div role="region" aria-label="Mock controls (not part of ZEIM)" class="mockbar">
+  <b>MOCK</b>
+  <label>Pretend I am <select id="who"><option value="guest">a visitor with no account</option><option value="adult">a signed-in adult</option><option value="teen">a signed-in teen</option><option value="student">a class student</option></select></label>
+  <label>Theme <select id="theme"><option value="light">Warm (light)</option><option value="dark">Dark</option></select></label>
+</div>
+
+<header class="topbar">
+  <a class="brand" href="#main" aria-label="ZEIM home">ZE<span>I</span>M</a>
+  <nav class="nav" aria-label="Main">
+    <a href="#" aria-current="page">Studio</a><a href="#">Showcase</a><a href="#">Edit</a><a href="#">Learn</a>
+  </nav>
+  <div class="modepick">
+    <label for="modeSel">Mode</label>
+    <span class="ico" id="modeIco" aria-hidden="true">🌱</span>
+    <select id="modeSel" aria-describedby="modeHelp">
+      <option value="beginner">Beginner</option>
+      <option value="expert">Experienced</option>
+      <option value="teacher">Teacher</option>
+    </select>
+    <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours. Teacher: Beginner settings plus class tools, for adults with an account.</p>
+  </div>
+  <span class="grow"></span>
+  <button class="btn ghost" type="button" id="btnAccount"><span aria-hidden="true">👤</span> <span id="acctLbl">Sign up</span></button>
+  <button class="btn ghost" type="button"><span aria-hidden="true">⚙</span> Settings</button>
+</header>
+
+<!-- Teacher-mode explainer: not a dead end, never a modal (arrow keys on a closed select must not be hijacked) -->
+<section class="note" id="teacherNote" hidden aria-labelledby="tnTitle">
+  <h2 id="tnTitle"></h2>
+  <p id="tnBody" style="margin:0 0 10px"></p>
+  <div class="row" id="tnActions"></div>
+</section>
+
+<div class="classbar" id="classBar" hidden role="region" aria-label="Classroom">
+  <b>🍎 Your classroom</b>
+  <span>Class: <b>Room 12</b></span>
+  <span>Join code <span class="code" aria-label="K 7 Q M 2 X">K7QM2X</span></span>
+  <span>Students sending files out of ZEIM: <b>Off</b></span>
+  <button class="btn" type="button" id="btnTeacherTools">Teacher tools</button>
+</div>
+
+<main id="main" class="layout">
+  <h1 class="sr-only">Studio</h1>
+  <section class="panel" aria-label="Make a 3D model">
+    <p class="modeline" id="modeLine"></p>
+    <div class="step">
+      <h2><i aria-hidden="true">1</i> Photo</h2>
+      <button class="btn primary" type="button">📷 Take or choose a photo</button>
+    </div>
+    <fieldset class="step cards" style="margin-bottom:16px">
+      <legend>Style</legend>
+      <label><input type="radio" name="style" value="lithophane" checked><span class="c"><span aria-hidden="true">💡</span><b>Lithophane</b><small>Glows when backlit</small></span></label>
+      <label><input type="radio" name="style" value="relief"><span class="c"><span aria-hidden="true">⛰</span><b>Relief</b><small>3D heightmap</small></span></label>
+      <label><input type="radio" name="style" value="popart"><span class="c"><span aria-hidden="true">🎨</span><b>Pop-art</b><small>Layers pop</small></span></label>
+    </fieldset>
+    <div class="step">
+      <h2><i aria-hidden="true">3</i> Size &amp; settings</h2>
+      <div class="field"><label for="w">Width (mm)</label><input id="w" type="number" value="100" min="5" max="1000" inputmode="numeric"></div>
+      <div class="bonly">
+        <fieldset class="field"><legend>Thickness</legend>
+          <div class="seg"><label><input type="radio" name="pre" value="thin"><span>Thin</span></label><label><input type="radio" name="pre" value="standard" checked><span>Standard</span></label><label><input type="radio" name="pre" value="thick"><span>Thick</span></label></div>
+        </fieldset>
+        <p class="help">ZEIM picks the other settings and shows you what it chose after building.</p>
+      </div>
+      <div class="eonly">
+        <details open><summary>Image &amp; detail</summary>
+          <div class="grid2">
+            <div class="field"><label for="res">Resolution (px wide)</label><input id="res" type="number" value="200"></div>
+            <div class="field"><label for="sm">Smoothing</label><input id="sm" type="number" value="0.8" step="0.1"></div>
+          </div></details>
+        <details><summary>Lithophane</summary>
+          <div class="grid2">
+            <div class="field"><label for="mn">Min thickness (mm)</label><input id="mn" type="number" value="0.8" step="0.1"></div>
+            <div class="field"><label for="mx">Max thickness (mm)</label><input id="mx" type="number" value="3" step="0.1"></div>
+          </div></details>
+      </div>
+    </div>
+    <button class="btn primary" type="button" id="btnBuild" style="width:100%">✨ Build 3D model</button>
+  </section>
+  <section aria-label="Preview and lesson notes">
+    <div class="viewer"><div><div style="font-size:36px" aria-hidden="true">🧊</div><b>Your 3D preview appears here</b></div></div>
+    <div class="tonly lessonnotes">
+      <details open><summary>Teacher notes · Glow Card</summary>
+        <p class="help" style="font-size:15px">Time: 45 min. Students use nicknames. Photos: only ones students made or have permission to use. Tip: have one finished lithophane ready to hold up to a window.</p></details>
+    </div>
+  </section>
+</main>
+<div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const MODES={
+ beginner:{ico:"🌱",line:"Beginner mode: ZEIM picks the settings for you.",say:"Beginner mode on. ZEIM picks the settings for you."},
+ expert:{ico:"🛠",line:"Experienced mode: every setting is yours. Press Build when you are ready.",say:"Experienced mode on. All settings are showing."},
+ teacher:{ico:"🍎",line:"Teacher mode: simple settings like Beginner, plus your classroom tools above.",say:"Teacher mode on. Your classroom tools are showing above the page."}};
+const KEY="zeim-mock-level";
+let ME={who:"guest"};                       // real app: set from /api/me in community.js refreshMe()
+const canTeach=()=>ME.who==="adult";       // real app: ME.signed_up && ME.age_group==="adult"
+let level="beginner", saidOnce=false;
+function say(t){const s=$("#modeStatus");s.textContent="";setTimeout(()=>s.textContent=t,60)}
+function render(announce){
+  document.body.dataset.level=level;
+  $("#modeSel").value=level; $("#modeIco").textContent=MODES[level].ico;
+  $("#modeLine").textContent=MODES[level].line;
+  $("#classBar").hidden=level!=="teacher";
+  $("#btnBuild").textContent=level==="expert"?"✨ Build 3D model":"✨ Build 3D model";
+  try{localStorage[KEY]=level}catch(e){}
+  if(announce) say(MODES[level].say);
+}
+function hideNote(){$("#teacherNote").hidden=true}
+function explain(){
+  const n=$("#teacherNote"),t=$("#tnTitle"),b=$("#tnBody"),a=$("#tnActions"); a.innerHTML="";
+  const btn=(txt,cls,fn)=>{const x=document.createElement("button");x.type="button";x.className="btn "+cls;x.textContent=txt;x.onclick=fn;a.append(x);return x};
+  if(ME.who==="guest"){
+    t.textContent="Teacher mode is for grown-ups with an account";
+    b.textContent="It adds class tools: make a class, share a join code and see what students send. Setting up takes about a minute. Students never need an account. ZEIM can't check who is a teacher, so please only make a class for students you teach.";
+    btn("Make a grown-up account","primary",()=>{ME.who="adult";$("#who").value="adult";level="teacher";hideNote();$("#acctLbl").textContent="Ms. Rivera";render(false);say("Account made. Teacher mode on. Your classroom tools are showing above the page.");$("#modeSel").focus()});
+    btn("Not now","",()=>{hideNote();$("#modeSel").focus()});
+    say("Teacher mode needs a grown-up account. Details are just below the top bar. You are still in "+(level==="expert"?"Experienced":"Beginner")+" mode.");
+  } else {
+    t.textContent="Teacher mode is for adults";
+    b.textContent=ME.who==="student"?"You don't need it. Your teacher gives you a class code, and you join from the Learn page.":"Teacher mode needs an adult (18 or older) account. You can still join a class with a code from your teacher.";
+    btn("Join a class","primary",()=>{hideNote();say("Join a class would open here.")});
+    btn("Okay, keep "+(level==="expert"?"Experienced":"Beginner")+" mode","",()=>{hideNote();$("#modeSel").focus()});
+    say("Teacher mode is for adults. Details are just below the top bar. You are still in "+(level==="expert"?"Experienced":"Beginner")+" mode.");
+  }
+  n.hidden=false;
+}
+$("#modeSel").addEventListener("change",e=>{
+  const v=e.target.value;
+  if(v==="teacher"&&!canTeach()){e.target.value=level;explain();return}   // revert, explain, keep focus on the select
+  hideNote(); level=v; render(true);
+});
+$("#who").addEventListener("change",e=>{
+  ME.who=e.target.value; $("#acctLbl").textContent=ME.who==="guest"?"Sign up":({adult:"Ms. Rivera",teen:"Sam",student:"Class: Nova"})[ME.who];
+  if(level==="teacher"&&!canTeach()){level="beginner";say("Signed out of adult account. Back to Beginner mode.")}
+  hideNote(); render(false);
+});
+$("#theme").addEventListener("change",e=>document.body.dataset.theme=e.target.value);
+$("#btnTeacherTools").onclick=()=>say("Teacher tools would open here.");
+try{const s=localStorage[KEY]; if(MODES[s]&&(s!=="teacher"||canTeach())) level=s}catch(e){}
+render(false);
+</script>
+</body></html>

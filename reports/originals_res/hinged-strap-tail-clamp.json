@@ -1,0 +1,84 @@
+{
+ "slug": "hinged-strap-tail-clamp",
+ "title": "Print-in-Place Hinged Strap-Tail Clamp with Snap Latch",
+ "category": "Outdoor Mechanisms",
+ "description": "A 58 x 89 mm clamshell with a five-knuckle print-in-place hinge, grip ribs and a flexure snap tab. Folds shut over loose webbing tails (backpack straps, tent straps, sling straps) and clicks closed.",
+ "use": "Open it flat, lay the strap tail across the ribs, fold the lid over until it clicks. Thumb-press the tab to open. Also holds spare cord or a bundle of tent pegs flat against a strap.",
+ "material": "PETG, 0.2 mm layers, 4 perimeters, print flat (open) with no supports. Hinge clearance 0.4 mm: may need a few flexes to free after printing.",
+ "color": [
+  0.9,
+  0.6,
+  0.2
+ ],
+ "max_faces": 40000,
+ "parts": {
+  "leaf_A": [
+   57.6,
+   50.4,
+   11.5
+  ],
+  "leaf_B": [
+   57.6,
+   50.4,
+   11.5
+  ]
+ },
+ "mech_ok": true,
+ "mechanism_tests": [
+  "PASS | open (flat) pose: leaves + hinge do not collide: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 15 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 30 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 45 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 60 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 75 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 90 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 105 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 120 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 135 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | lid swung to 150 deg: no collision: overlap 0.000 mm3 (must be 0)",
+  "PASS | closed (180 deg): latch tab sits in pocket, ribs clear: overlap 0.000 mm3 (must be 0)",
+  "PASS | closed latch holds: lifting lid 1.2 mm hits the ledge: overlap 77.564 mm3 (stop/latch must engage, >0)",
+  "PASS | snap-in: barb contacts the ledge near 178 deg (peak overlap 10.88 mm3 = the amount the tab must flex past; 0 here would mean no latch)",
+  "PASS | snap tab: t=1.2 mm, free length 6.6 mm, barb 0.8 mm -> peak strain 3.3 % (PETG/nylon fine below ~4 %)",
+  "PASS | hinge: knuckle gap 0.4 mm axially, pin 1.6 mm in bore 2.0 mm (0.4 radial); leaf-to-knuckle gap 0.5 mm",
+  "PASS | closed gap between leaves 3.2 mm for 2 layers of 1.5 mm webbing; ribs interleave"
+ ],
+ "untested_physically": true,
+ "problem_solved": "Loose webbing tails flap and catch on branches or rattle against gear; most strap keepers are rubber loops that fray or fall off. This hinged clamp holds tails flat and opens one-handed, and it prints as a single assembled piece.",
+ "mechanism": "Five-knuckle print-in-place hinge (pin fused to lid knuckles, free-turning in the base knuckles); two staggered grip-rib sets; a cantilever snap tab with a barb that clicks under a ledge window.",
+ "tolerances": "Hinge: 0.4 mm axial gaps, 0.4 mm pin clearance, 0.5 mm leaf-to-knuckle; snap barb 0.8 mm overlap; closed webbing gap 3.2 mm; ribs 0.8 mm apart when closed.",
+ "assembly": [
+  "1. Print flat, open, no supports.",
+  "2. After printing flex the hinge a few times to break any layer bonds across the 0.4 mm gaps.",
+  "3. Lay webbing across the ribs, fold the lid down until it clicks."
+ ],
+ "fit_notes": "Sized for 25 mm webbing (two layers). No supports; hinge gap bridges over 0.4 mm - ironing/first layer squish may fuse the knuckles on some printers.",
+ "validation": {
+  "faces": 2242,
+  "vertices": 1115,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 24071.6,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   57.6,
+   89.0,
+   11.5
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 2,
+  "euler_number": -6,
+  "overhang_area_mm2": 340.4,
+  "overhang_pct": 2.31,
+  "bed_contact_mm2": 4766.9,
+  "flat_bottom": true,
+  "thick_min_mm": 0.95,
+  "thick_p2_mm": 1.53,
+  "pct_samples_below_1p2mm": 1.6,
+  "pass": true,
+  "min_gap_between_parts_mm": 0.4,
+  "stl_kb": 109
+ }
+}

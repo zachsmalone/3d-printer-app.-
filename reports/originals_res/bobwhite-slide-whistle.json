@@ -1,0 +1,72 @@
+{
+ "slug": "bobwhite-slide-whistle",
+ "title": "Bobwhite Quail Slide Whistle (4-part)",
+ "category": "Wildlife Calls",
+ "description": "Two-note \"bob-WHITE\" style whistle: a fipple whistle with a sliding piston rod you push and pull to glide the pitch.",
+ "use": "Birdwatching / hobby accessory and toy; use lawfully.",
+ "material": "PETG/PLA 0.12-0.16 mm. Wrap the piston groove with a thin rubber band as a seal.",
+ "color": [
+  0.8,
+  0.55,
+  0.25
+ ],
+ "max_faces": 60000,
+ "assembly": [
+  "1. Press the fipple plug into the mouth end (flat windway side toward the window).",
+  "2. Stretch one thin rubber band into the piston groove as a seal. Slide the piston in from the far end (slide-fit, 0.25 mm radial play).",
+  "3. Thread the rod through the end cap hole, then press the cap into the far end of the body.",
+  "4. Blow and slide the rod to change pitch; a quick push-pull makes the two-note call."
+ ],
+ "fit_notes": "Joint clearances: press-fit joints are modelled with 0.10 mm radial clearance (0.20 mm on diameter); sliding joints 0.25 mm radial. If a press-fit is loose wrap one turn of PTFE (plumber) tape or a dab of glue; if tight, sand lightly - do not force. Not tested by test-printing or acoustic measurement. Sound depends on your printer, filament, reed film and fit - expect to tune.",
+ "parts": {
+  "whistle_body": [
+   20.6,
+   20.6,
+   78.0
+  ],
+  "end_cap": [
+   18.6,
+   18.6,
+   14.0
+  ],
+  "fipple_plug": [
+   18.6,
+   15.7,
+   23.0
+  ],
+  "piston_rod": [
+   14.3,
+   14.3,
+   78.0
+  ]
+ },
+ "assembled_interference_mm3": [],
+ "fit_check": "parts built in assembled pose and boolean-intersected pairwise: no interference found",
+ "validation": {
+  "faces": 19406,
+  "vertices": 9705,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 20603.4,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   93.1,
+   20.6,
+   78.0
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 4,
+  "euler_number": 2,
+  "overhang_area_mm2": 271.5,
+  "overhang_pct": 1.91,
+  "bed_contact_mm2": 659.6,
+  "flat_bottom": true,
+  "thick_min_mm": 0.15,
+  "thick_p2_mm": 2.18,
+  "pct_samples_below_1p2mm": 0.2,
+  "pass": true,
+  "stl_kb": 947
+ }
+}

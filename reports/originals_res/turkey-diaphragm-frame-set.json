@@ -1,0 +1,71 @@
+{
+ "slug": "turkey-diaphragm-frame-set",
+ "title": "Diaphragm Call Frame Set (single / double / template)",
+ "category": "Wildlife Calls",
+ "description": "Three flat horseshoe frames (single-reed, double-reed, with 3 sizes) plus a latex cutting template. You supply the thin latex film; the frame holds it taut like a diaphragm call.",
+ "use": "Hobby and acoustics experiment, e.g. turkey-style yelp practice. Adults only for mouth use; wash well, replace regularly.",
+ "material": "PETG, 0.12 mm layers, 100% infill for the frames.",
+ "color": [
+  0.8,
+  0.45,
+  0.35
+ ],
+ "max_faces": 50000,
+ "assembly": [
+  "1. Cut a latex / dental-dam strip using the template ring as a size guide.",
+  "2. Stretch the film across the open front of the frame, tape the edges to the frame legs.",
+  "3. Trim the film so one thin edge floats free over the opening - that edge is the vibrating reed."
+ ],
+ "fit_notes": "Single-piece frames, no press-fit. Not tested by test-printing or acoustic measurement. Sound depends on your printer, filament, reed film and fit - expect to tune. Hygiene: wash printed parts well; porous plastic.",
+ "parts": {
+  "latex_cutting_template": [
+   42.0,
+   34.0,
+   1.4
+  ],
+  "frame_double": [
+   38.0,
+   17.2,
+   2.4
+  ],
+  "frame_single": [
+   34.0,
+   16.1,
+   2.4
+  ],
+  "frame_small": [
+   30.0,
+   14.4,
+   2.4
+  ]
+ },
+ "assembled_interference_mm3": [],
+ "fit_check": "parts built in assembled pose and boolean-intersected pairwise: no interference found",
+ "validation": {
+  "faces": 2132,
+  "vertices": 1070,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 1752.4,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   128.0,
+   55.4,
+   2.4
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 4,
+  "euler_number": 4,
+  "overhang_area_mm2": 0.0,
+  "overhang_pct": 0.0,
+  "bed_contact_mm2": 841.9,
+  "flat_bottom": true,
+  "thick_min_mm": 0.03,
+  "thick_p2_mm": 1.38,
+  "pct_samples_below_1p2mm": 0.1,
+  "pass": true,
+  "stl_kb": 104
+ }
+}

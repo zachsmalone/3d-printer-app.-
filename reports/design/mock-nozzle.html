@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOCK · ZEIM "Nozzle it"</title>
+<style>
+/* ===== ZEIM design tokens (spec: reports/design/home-redesign-spec.md §Palette). Every pair below is computed in that spec. ===== */
+:root,[data-theme=light]{--bg:#FFF8EE;--panel:#FFFFFF;--panel2:#FFF1DC;--line:#E6D5BD;--ctl:#7F6F5D;--txt:#2B2118;--mut:#5E4F40;
+  --acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#4F34C7;--tint:#EDE7FF;--warm:#B4410C;--on-warm:#FFFFFF;--warmtint:#FFE3CC;--focus:#1D4ED8;
+  --ok:#166534;--okbg:#E3F5E8;--bad:#B91C1C;--badbg:#FDE8E8;--warn:#8A5300;--shadow:0 6px 24px #5b3a1a22;color-scheme:light}
+[data-theme=dark]{--bg:#0E1117;--panel:#161B24;--panel2:#1C2330;--line:#2A3344;--ctl:#7B88A6;--txt:#E6EAF2;--mut:#A9B4C9;
+  --acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#B8A9FF;--tint:#2A2457;--warm:#FFB26B;--on-warm:#1B1208;--warmtint:#3A2A1A;--focus:#8DB8FF;
+  --ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;--shadow:0 6px 24px #0008;color-scheme:dark}
+*{box-sizing:border-box}
+html{max-width:100%;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:100%;overflow-x:clip;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+h1,h2,h3{line-height:1.2;margin:0 0 .4em}
+a{color:var(--accink)}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:-1px;padding:0;border:0}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px}
+.skip{position:absolute;left:8px;top:-60px;background:var(--panel);color:var(--txt);padding:10px 14px;border:2px solid var(--ctl);border-radius:8px;z-index:100}
+.skip:focus{top:8px}
+[hidden]{display:none!important}
+/* mock-only toolbar (NOT part of the product) */
+.mockbar{background:var(--txt);color:var(--bg);padding:8px 12px;font-size:14px;display:flex;gap:12px 18px;flex-wrap:wrap;align-items:center}
+.mockbar label{display:flex;gap:6px;align-items:center}
+.mockbar select{min-height:44px;font-size:16px;border-radius:8px;border:2px solid var(--bg);background:var(--bg);color:var(--txt);padding:4px 8px}
+.mockbar b{font-weight:700}
+/* top bar: wraps, never scrolls sideways */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;min-height:44px;min-width:44px;font-weight:800;font-size:22px;letter-spacing:.5px;color:var(--txt);text-decoration:none;margin-right:auto}
+.brand span{color:var(--accink)}
+.nav{display:flex;gap:4px;flex:1 0 100%;order:5}
+.nav a,.nav button{flex:1 1 0;min-width:0;min-height:44px;padding:8px 6px;border-radius:10px;border:2px solid transparent;background:none;color:var(--mut);font:inherit;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.nav [aria-current=page]{background:var(--tint);color:var(--txt);border-color:var(--accink)}
+@media(min-width:900px){.topbar{padding:10px 20px;gap:8px 16px}.nav{flex:0 1 auto;order:0}.nav a,.nav button{flex:0 0 auto;padding:8px 16px}.brand{margin-right:0}.grow{flex:1}}
+.btn{background:var(--panel);border:2px solid var(--ctl);color:var(--txt);padding:8px 14px;min-height:44px;min-width:44px;border-radius:10px;cursor:pointer;font:inherit;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--panel2)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.btn.primary:hover{background:var(--acc);filter:brightness(1.12)}
+.btn.warm{background:var(--warm);border-color:var(--warm);color:var(--on-warm)}
+.btn.ghost{border-color:transparent;background:none}
+.btn[aria-disabled=true],.btn:disabled{opacity:1;color:var(--mut);border-style:dashed;cursor:not-allowed}
+.help{color:var(--mut);font-size:14px;margin:.3em 0}
+.pill{display:inline-block;background:var(--panel2);border:1px solid var(--ctl);border-radius:99px;padding:2px 10px;font-size:13px;color:var(--txt)}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field>label,.field>legend{font-size:14px;font-weight:600;color:var(--txt)}
+input[type=number],input[type=text],select{background:var(--panel);border:2px solid var(--ctl);border-radius:10px;color:var(--txt);padding:8px 10px;width:100%;min-height:44px;font:inherit;font-size:16px}
+select{appearance:auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.note{background:var(--tint);border:2px solid var(--accink);border-radius:12px;padding:12px 14px;margin:10px 12px}
+.note h2{font-size:17px;margin:0 0 4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+dialog{border:2px solid var(--ctl);border-radius:16px;background:var(--panel);color:var(--txt);padding:0;width:min(520px,94vw);max-width:100vw}
+dialog::backdrop{background:#000a}
+.dlg .dh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--line)}
+.dlg h2{margin:0;font-size:19px}
+.dlg .body{padding:14px 16px}
+.dlg .df{padding:10px 16px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.x{min-width:44px;min-height:44px;background:none;border:2px solid transparent;border-radius:10px;color:var(--txt);font-size:22px;cursor:pointer}
+.x:hover{border-color:var(--ctl)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media (forced-colors:active){.btn,input,select{border:2px solid ButtonText}.nav [aria-current=page]{outline:2px solid Highlight}}
+[data-theme=dark] .btn.primary{border-color:var(--accink)}
+
+/* ---- Nozzle it (new component) ---- */
+.nz{--nz-c:var(--txt);display:inline-flex;align-items:center;gap:6px;min-height:44px;min-width:44px;padding:4px 12px;border-radius:999px;border:2px solid var(--ctl);background:var(--panel);color:var(--nz-c);font:inherit;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;position:relative;z-index:2}
+.nz:hover{background:var(--panel2)}
+.nz-ico{width:24px;height:24px;flex:none;overflow:visible}
+.nz-ico .nz-body{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;transform-box:fill-box;transform-origin:50% 0}
+.nz-ico .nz-drop{fill:currentColor;opacity:0;transform-box:fill-box;transform-origin:50% 0}
+.nz[aria-pressed=true]{--nz-c:var(--warm);background:var(--warmtint);border-color:var(--warm)}
+.nz[aria-pressed=true] .nz-body{fill:currentColor}
+.nz[aria-pressed=true] .nz-drop{opacity:1}
+.nz[aria-pressed=true] .nz-count,.nz[aria-pressed=true] .nz-text{color:var(--txt)}
+.nz[aria-disabled=true]{--nz-c:var(--mut);border-style:dashed;cursor:not-allowed}
+.nz-lg{padding:6px 18px;font-size:17px}
+.nz.pop .nz-body{animation:nzpress .22s ease-out}
+.nz.pop .nz-drop{animation:nzdrop .45s ease-out}
+.nz.pop-off .nz-body{animation:nzpress .16s ease-out}
+@keyframes nzpress{0%{transform:translateY(0) scale(1)}45%{transform:translateY(2px) scale(.92)}100%{transform:translateY(0) scale(1)}}
+@keyframes nzdrop{0%{opacity:0;transform:translateY(-6px) scale(.4)}60%{opacity:1;transform:translateY(1px) scale(1.15)}100%{opacity:1;transform:translateY(0) scale(1)}}
+body.rm .nz *{animation:none!important}
+.nz-static{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--mut);font-weight:600}
+.nz-static svg{width:24px;height:24px}
+.nz-static .nz-body{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}.nz-static .nz-drop{opacity:0}
+.nz-note{font-size:14px;color:var(--mut);margin:4px 0 0}
+/* ---- page bits ---- */
+.page{max-width:1100px;margin:0 auto;padding:14px 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;list-style:none;padding:0;margin:14px 0}
+.pcard{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.pcard .ph{aspect-ratio:4/3;display:grid;place-items:center;font-size:44px;background:linear-gradient(135deg,#FFD9A8,#F7B07A);position:relative}
+[data-theme=dark] .pcard .ph{background:linear-gradient(135deg,#3A2A1A,#5B3A22)}
+.pcard .ex{position:absolute;top:8px;left:8px;font-size:12px;font-weight:700;background:var(--panel);color:var(--txt);border:1px solid var(--ctl);padding:2px 9px;border-radius:99px}
+.pcard .meta{padding:10px 12px 12px;display:flex;flex-direction:column;gap:4px}
+.pcard h3{font-size:17px;margin:0}
+.pcard h3 a{color:var(--txt);text-decoration:none;display:inline-flex;align-items:center;min-height:44px}
+.pcard h3 a::after{content:"";position:absolute;inset:0;z-index:1}       /* stretched link: the whole card opens the project, the Nozzle button stays above it */
+.pcard:focus-within{outline:3px solid var(--focus);outline-offset:2px}
+.pcard h3 a:focus-visible{outline:none}
+.pcard .by{color:var(--mut);font-size:14px;margin:0}
+.cardfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;flex-wrap:wrap}
+.dl{color:var(--mut);font-size:14px}
+.section{margin-top:26px}
+.comment{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 12px;margin-bottom:8px}
+.comment p{margin:2px 0 6px}
+.video{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.video .screen{aspect-ratio:16/9;background:#1b1b1b;color:#fff;display:grid;place-items:center;font-weight:600}
+.video .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:8px 12px}
+.demo{background:var(--tint);border:2px dashed var(--accink);border-radius:10px;padding:8px 12px;font-size:14px}
+.toastbox{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));display:flex;justify-content:center;pointer-events:none}
+.toastbox>div{background:var(--txt);color:var(--bg);border-radius:10px;padding:10px 14px;font-weight:600;max-width:420px}
+</style>
+</head>
+<body data-theme="light">
+<a class="skip" href="#main">Skip to main content</a>
+<div role="region" aria-label="Mock controls (not part of ZEIM)" class="mockbar">
+  <b>MOCK</b>
+  <label>Pretend I am <select id="who"><option value="adult">a signed-in maker</option><option value="guest">a visitor with no account</option><option value="classoff">a class student (teacher turned nozzles off)</option></select></label>
+  <label><input type="checkbox" id="fail"> Pretend the network fails</label>
+  <label><input type="checkbox" id="rmx"> Simulate "reduce motion"</label>
+  <label>Theme <select id="theme"><option value="light">Warm (light)</option><option value="dark">Dark</option></select></label>
+</div>
+<header class="topbar">
+  <a class="brand" href="#main" aria-label="ZEIM home">ZE<span>I</span>M</a>
+  <nav class="nav" aria-label="Main"><a href="#">Studio</a><a href="#" aria-current="page">Showcase</a><a href="#">Edit</a><a href="#">Learn</a></nav>
+</header>
+
+<main id="main" class="page">
+  <h1>Showcase</h1>
+  <p class="help">Family-friendly projects from the community. Everything is free to download.</p>
+  <p class="demo">Demo numbers in this mock are made up for layout only. In the real app, EXAMPLE projects show no button and no numbers, and counts are hidden for young makers.</p>
+
+  <h2 class="sr-only">Projects</h2>
+  <ul class="grid" id="grid"></ul>
+
+  <section class="section" aria-labelledby="cmt">
+    <h2 id="cmt">Comments <span class="pill">future surface</span></h2>
+    <div class="comment" data-comment><b>Maker_Ada</b><p>The glow on this is lovely. Which thickness did you use?</p><span data-slot="comment-1"></span></div>
+    <div class="comment" data-comment><b>Maker_Ben</b><p>Trying this one on Saturday.</p><span data-slot="comment-2"></span></div>
+  </section>
+  <section class="section" aria-labelledby="vid">
+    <h2 id="vid">Video <span class="pill">future surface</span></h2>
+    <div class="video"><div class="screen">▶ How to print a lithophane (video placeholder)</div>
+      <div class="bar"><span data-slot="video-1"></span><span class="help">Lesson video · 4 min</span></div></div>
+  </section>
+</main>
+
+<div id="nzStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="nzAlert" class="sr-only" role="alert"></div>
+<div class="toastbox" aria-hidden="true"><div id="toast" hidden></div></div>
+
+<dialog id="dlgItem" aria-labelledby="itTitle"><div class="dlg">
+  <div class="dh"><h2 id="itTitle">Moon Lamp</h2><button class="x" type="button" data-close aria-label="Close">✕</button></div>
+  <div class="body">
+    <p>A soft moon lithophane for a night shelf. Free to download.</p>
+    <div class="row"><span id="itNz"></span><a class="btn" href="#">⬇ Download 3MF</a></div>
+    <p class="help">Nozzles are counted once per person, on public projects only.</p>
+  </div>
+</div></dialog>
+
+<dialog id="dlgAcct" aria-labelledby="acTitle"><div class="dlg">
+  <div class="dh"><h2 id="acTitle">Make a free account to nozzle</h2><button class="x" type="button" data-close aria-label="Close">✕</button></div>
+  <div class="body"><p>Nozzles tell makers you liked their work. An account takes about a minute. Your own projects stay private until you choose.</p></div>
+  <div class="df"><button class="btn" type="button" data-close>Not now</button><button class="btn primary" type="button" id="acGo">Make an account</button></div>
+</div></dialog>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+/* ---- the icon: ONE inline SVG per button (provided verbatim in nozzle-it-spec.md §4) ---- */
+const SVG='<svg class="nz-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><g class="nz-body"><rect x="6" y="2.5" width="12" height="5.5" rx="1.5"/><path d="M8.2 8h7.6l-2 5.5h-3.6z"/><path d="M10.2 13.5h3.6V16h-3.6z"/></g><path class="nz-drop" d="M12 17.6c-1.5 1.9-2 2.7-2 3.5a2 2 0 0 0 4 0c0-.8-.5-1.6-2-3.5z"/></svg>';
+/* ---- data: field names mirror the existing API (likes / liked / can_like); the mock adds reason codes ---- */
+const ITEMS=[
+ {id:"a1",title:"Moon Lamp",by:"Ada",emoji:"🌙",likes:12,liked:false,dl:40},
+ {id:"a2",title:"Dino Desk Buddy",by:"Ben",emoji:"🦖",likes:1243,liked:true,dl:380},
+ {id:"a3",title:"Starter Flower Relief",by:"Chen",emoji:"🌼",likes:0,liked:false,dl:3},
+ {id:"a4",title:"My First Relief",by:"a young maker",emoji:"⛰",likes:null,liked:false,dl:null},
+ {id:"a5",title:"Sample: Cat Silhouette",by:"ZEIM examples",emoji:"🐱",example:true},
+ {id:"a6",title:"Your Pop-art Owl",by:"you",emoji:"🦉",likes:3,liked:false,owned:true,dl:5}];
+const EXTRA={ "comment-1":{likes:5,liked:false},"comment-2":{likes:0,liked:false},"video-1":{likes:18,liked:false}};
+const state={};   // id -> {likes,liked}
+ITEMS.forEach(i=>state[i.id]={likes:i.likes,liked:!!i.liked}); Object.assign(state,JSON.parse(JSON.stringify(EXTRA)));
+let who="adult";
+const short=n=>n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,"")+"k":String(n);
+const nameFor=(n)=>n==null?"Nozzle it":n===0?"Nozzle it, no nozzles yet":`Nozzle it, ${n} ${n===1?"nozzle":"nozzles"}`;
+function nzHTML(id,{large=false,owned=false,example=false}={}){
+  const s=state[id]; if(example) return "";                                   // EXAMPLE items: no button, no numbers
+  if(owned) return `<span class="nz-static" data-nz-static="${id}">${SVG}<span>${s.likes==null?"Nozzles on your project":s.likes===1?"1 nozzle":s.likes+" nozzles"}</span></span>`;
+  const dis = who==="classoff";
+  const count = s.likes==null||s.likes===0 ? "" : `<span class="nz-count">${short(s.likes)}</span>`;
+  return `<button type="button" class="nz${large?" nz-lg":""}" data-nz="${id}" aria-pressed="${s.liked}" ${dis?'aria-disabled="true" aria-describedby="nzoff-${id}"':''} aria-label="${nameFor(s.likes)}">${SVG}${large?'<span class="nz-text">Nozzle it</span>':''}${count}</button>`;
+}
+function paint(){
+  $("#grid").innerHTML=ITEMS.map(i=>`<li class="pcard"><div class="ph" aria-hidden="true">${i.emoji}${i.example?'<span class="ex">EXAMPLE</span>':''}</div>
+    <div class="meta"><h3><a href="#" data-open="${i.id}">${i.title}</a></h3><p class="by">${i.example?"Made by ZEIM to show how it looks":"by "+i.by}</p>
+    <div class="cardfoot">${nzHTML(i.id,{owned:i.owned,example:i.example})}${i.dl!=null?`<span class="dl"><span aria-hidden="true">⬇</span> ${i.dl}<span class="sr-only"> downloads</span></span>`:""}</div>
+    ${who==="classoff"&&!i.example&&!i.owned?'<p class="nz-note" id="nzoff-${i.id}">Your teacher turned nozzles off for your class.</p>':''}</div></li>`).join("");
+  $$("[data-slot]").forEach(s=>{const id=s.dataset.slot;s.innerHTML=nzHTML(id)});
+  if($("#dlgItem").open) $("#itNz").innerHTML=nzHTML("a1",{large:true});
+}
+const say=t=>{const e=$("#nzStatus");e.textContent="";setTimeout(()=>e.textContent=t,60)};
+const rm=()=>matchMedia("(prefers-reduced-motion: reduce)").matches||$("#rmx").checked;
+function toast(t){const e=$("#toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,3000)}
+function refreshAll(id){ // update EVERY button for this item in place: no re-render, focus stays where it is
+  const s=state[id];
+  $$(`[data-nz="${id}"]`).forEach(b=>{
+    b.setAttribute("aria-pressed",s.liked); b.setAttribute("aria-label",nameFor(s.likes));
+    const c=b.querySelector(".nz-count"); const txt=s.likes==null||s.likes===0?"":short(s.likes);
+    if(txt&&c) c.textContent=txt; else if(txt&&!c){const sp=document.createElement("span");sp.className="nz-count";sp.textContent=txt;b.append(sp)} else if(!txt&&c) c.remove();
+  });
+}
+document.addEventListener("click",async e=>{
+  const o=e.target.closest("[data-open]"); if(o){e.preventDefault();$("#itNz").innerHTML=nzHTML("a1",{large:true});$("#dlgItem").showModal();return}
+  if(e.target.closest("[data-close]")){e.target.closest("dialog").close();return}
+  const b=e.target.closest("button[data-nz]"); if(!b) return;
+  if(b.getAttribute("aria-disabled")==="true"){say("Your teacher turned nozzles off for your class.");return}
+  if(who==="guest"){$("#dlgAcct").showModal();return}
+  if(b.dataset.busy) return; b.dataset.busy="1";
+  const id=b.dataset.nz, s=state[id], want=!s.liked, was={...s};
+  s.liked=want; if(s.likes!=null) s.likes+=want?1:-1; refreshAll(id);          // optimistic
+  if(!rm()){b.classList.remove("pop","pop-off");void b.offsetWidth;b.classList.add(want?"pop":"pop-off")}
+  try{
+    await new Promise((res,rej)=>setTimeout(()=>$("#fail").checked?rej(new Error("x")):res(),250));   // real app: POST /api/showcase/<id>/like {"liked": want}
+    say(want?(s.likes==null?"Nozzled.":`Nozzled. ${nameFor(s.likes).replace("Nozzle it, ","")}.`):(s.likes==null?"Nozzle removed.":`Nozzle removed. ${nameFor(s.likes).replace("Nozzle it, ","")}.`));
+    toast(want?"Nozzled!":"Nozzle removed");
+  }catch(err){
+    Object.assign(s,was); refreshAll(id);                                         // rollback
+    const a=$("#nzAlert");a.textContent="";setTimeout(()=>a.textContent="Couldn't save your nozzle. Check your connection and try again.",60);
+    toast("Couldn't save your nozzle. Try again.");
+  } finally { delete b.dataset.busy }
+});
+$("#acGo").onclick=()=>{who="adult";$("#who").value="adult";$("#dlgAcct").close();paint();say("Account made. You can nozzle projects now.")};
+$("#who").onchange=e=>{who=e.target.value;paint()};
+$("#theme").onchange=e=>document.body.dataset.theme=e.target.value;
+$("#rmx").onchange=e=>document.body.classList.toggle("rm",e.target.checked);
+paint();
+</script>
+</body></html>

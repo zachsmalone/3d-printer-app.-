@@ -1,0 +1,89 @@
+{
+ "slug": "field-kit-box-spring-latch",
+ "title": "Field Kit Box with Hinge and Spring Latch",
+ "category": "Outdoor Mechanisms",
+ "description": "Pocket-size hinged box (80 x 54 x 30 mm) with a removable steel-free hinge pin and a flexure snap-latch that clicks shut and opens with a thumb press. Prints open-side-up with no supports.",
+ "use": "Trail kit for fish hooks/lures, first-aid strips, geocaching swag, coins, SD cards or beads. Latch keeps the lid closed in a pack.",
+ "material": "PETG, 0.2 mm layers, 4 perimeters. Latch arm needs layers running along its length (print as oriented). Pin: PETG or a 4 mm steel-free rod/filament offcut.",
+ "color": [
+  0.3,
+  0.55,
+  0.45
+ ],
+ "max_faces": 60000,
+ "parts": {
+  "lid": [
+   80.0,
+   60.5,
+   22.3
+  ],
+  "base": [
+   80.0,
+   59.7,
+   22.6
+  ],
+  "hinge_pin": [
+   81.6,
+   6.8,
+   6.8
+  ]
+ },
+ "mech_ok": true,
+ "mechanism_tests": [
+  "PASS | closed: lid vs base: overlap 0.000 mm3 (must be 0)",
+  "PASS | closed: pin vs lid: overlap 0.000 mm3 (must be 0)",
+  "PASS | closed: pin vs base knuckle holes: overlap -0.000 mm3 (must be 0)",
+  "PASS | hinge open 20 deg: lid vs base: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 20 deg: lid vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 45 deg: lid vs base: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 45 deg: lid vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 70 deg: lid vs base: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 70 deg: lid vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 100 deg: lid vs base: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 100 deg: lid vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 115 deg: lid vs base: overlap 0.000 mm3 (must be 0)",
+  "PASS | hinge open 115 deg: lid vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | latch engaged: lid lifted 1.0 mm is blocked by the catch: overlap 2.160 mm3 (stop/latch must engage, >0)",
+  "PASS | latch: lid lifted 0.4 mm still free (play): overlap 0.000 mm3 (must be 0)",
+  "PASS | latch arm strain at 1.2 mm deflection: 1.53 % (limit ~2 % PLA / ~4 % PETG) - arm L 13.7, t 1.6 mm",
+  "PASS | latch arm clear of base face when closed: min gap 0.40 mm (need >= 0.35)"
+ ],
+ "untested_physically": true,
+ "problem_solved": "Small trail items rattle loose or spill from pockets; most printed boxes either need fiddly hinges or rely on friction lids. This one has a real hinge and a positive click-latch you can operate one-handed with gloves.",
+ "mechanism": "Hinge: 3 knuckles on a 4 mm pin (press-fit in base knuckles, free in lid). Latch: cantilever arm on lid front with a rectangular window that hooks under a chamfered lip on the base; press the arm tip outward to release.",
+ "tolerances": "Pin 2.0 mm radius in base holes 2.1 (0.1 press) and lid hole 2.35 (0.35 free); knuckle gaps 1.0 mm; lid/base rim gap 0.3 mm; latch travel 0.7 mm before catch; arm to base face 0.4 mm.",
+ "assembly": [
+  "1. Print base, lid (printed roof-down) and pin.",
+  "2. Close lid onto base with knuckles interleaved.",
+  "3. Slide the pin through all three knuckles from the left; a drop of glue or tape on the head keeps it in.",
+  "4. Press lid down until the latch clicks."
+ ],
+ "fit_notes": "Latch arm is the wear part - print a spare. Hinge pin is small: keep from toddlers.",
+ "validation": {
+  "faces": 2116,
+  "vertices": 1056,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 39874.0,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   81.6,
+   141.0,
+   22.6
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 3,
+  "euler_number": -2,
+  "overhang_area_mm2": 924.8,
+  "overhang_pct": 2.64,
+  "bed_contact_mm2": 8641.4,
+  "flat_bottom": true,
+  "thick_min_mm": 0.0,
+  "thick_p2_mm": 2.13,
+  "pct_samples_below_1p2mm": 0.4,
+  "pass": true,
+  "stl_kb": 103
+ }
+}

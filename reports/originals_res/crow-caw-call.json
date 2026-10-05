@@ -1,0 +1,78 @@
+{
+ "slug": "crow-caw-call",
+ "title": "Crow Caw Call (5-part kit)",
+ "category": "Wildlife Calls",
+ "description": "Compact, many-ringed reed call with a short wide bell for a raspy crow-style caw.",
+ "use": "Birdwatching / hobby accessory; use lawfully.",
+ "material": "PETG/PLA, 0.16 mm layers; reed from 0.15-0.2 mm PET film.",
+ "color": [
+  0.25,
+  0.25,
+  0.32
+ ],
+ "max_faces": 60000,
+ "assembly": [
+  "1. Press the tone insert into the barrel from the exit end until it seats on the internal shoulder.",
+  "2. Lay the reed strip (film) flat on the insert deck, square end toward the mouthpiece, covering the window.",
+  "3. Press the clamp wedge in over the reed base, flat face against the reed.",
+  "4. Press the end piece (bell/can) spigot into the barrel exit until its flange meets the barrel.",
+  "5. Blow a short, sharp breath from the mouthpiece. Move the wedge or trim the reed free-length 1 mm at a time to tune."
+ ],
+ "fit_notes": "Joint clearances: press-fit joints are modelled with 0.10 mm radial clearance (0.20 mm on diameter); sliding joints 0.25 mm radial. If a press-fit is loose wrap one turn of PTFE (plumber) tape or a dab of glue; if tight, sand lightly - do not force. Not tested by test-printing or acoustic measurement. Sound depends on your printer, filament, reed film and fit - expect to tune.",
+ "parts": {
+  "bell": [
+   34.0,
+   34.0,
+   30.0
+  ],
+  "barrel": [
+   23.4,
+   23.4,
+   53.0
+  ],
+  "tone_insert": [
+   15.4,
+   15.4,
+   31.0
+  ],
+  "clamp_wedge": [
+   7.4,
+   15.4,
+   9.0
+  ],
+  "reed_template": [
+   0.3,
+   11.2,
+   24.0
+  ]
+ },
+ "assembled_interference_mm3": [],
+ "fit_check": "parts built in assembled pose and boolean-intersected pairwise: no interference found",
+ "validation": {
+  "faces": 23580,
+  "vertices": 11794,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 20952.8,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   108.5,
+   34.0,
+   53.0
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 5,
+  "euler_number": 4,
+  "overhang_area_mm2": 29.7,
+  "overhang_pct": 0.21,
+  "bed_contact_mm2": 612.1,
+  "flat_bottom": true,
+  "thick_min_mm": 0.03,
+  "thick_p2_mm": 0.28,
+  "pct_samples_below_1p2mm": 4.7,
+  "pass": true,
+  "stl_kb": 1151
+ }
+}

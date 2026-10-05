@@ -1,0 +1,41 @@
+{
+ "slug": "dino-phone-stand",
+ "title": "Stego Phone Stand",
+ "category": "Useful Items",
+ "description": "A friendly stegosaurus with back plates whose body holds a phone or small tablet upright in an angled slot, with a charging-cable notch at the front.",
+ "use": "Desk phone / small tablet stand for video calls and charging. Slot is 14 mm wide x 80 mm long (fits phones with slim cases).",
+ "material": "PLA or PETG, 0.2 mm layers, 4 perimeters, 20% infill. No supports.",
+ "color": [
+  0.4,
+  0.7,
+  0.5
+ ],
+ "max_faces": 80000,
+ "validation": {
+  "faces": 79996,
+  "vertices": 39982,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 106347.3,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   149.0,
+   54.0,
+   62.5
+  ],
+  "bbox_min_z": -0.001,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": -16,
+  "overhang_area_mm2": 3996.9,
+  "overhang_pct": 16.47,
+  "bed_contact_mm2": 16.8,
+  "flat_bottom": false,
+  "thick_min_mm": 0.12,
+  "thick_p2_mm": 1.4,
+  "pct_samples_below_1p2mm": 1.4,
+  "pass": true,
+  "stl_kb": 3906
+ }
+}

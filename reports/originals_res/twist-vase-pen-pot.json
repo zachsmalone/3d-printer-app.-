@@ -1,0 +1,41 @@
+{
+ "slug": "twist-vase-pen-pot",
+ "title": "Twist Vase / Pen Pot",
+ "category": "Desk Art",
+ "description": "Six-lobed twisting sculptural pot: a pen cup, dried-flower vase or small-plant cover. The twist is gentle enough to print with no supports.",
+ "use": "Pencil pot or dried-flower vase. Not watertight for water: use a glass inside for fresh flowers.",
+ "material": "PLA/PETG, 0.2 mm layers, vase mode not required. Looks great in silk or two-tone filament.",
+ "color": [
+  0.85,
+  0.45,
+  0.65
+ ],
+ "max_faces": 80000,
+ "validation": {
+  "faces": 80000,
+  "vertices": 40002,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 59861.4,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   65.7,
+   70.0,
+   110.0
+  ],
+  "bbox_min_z": -0.015,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 0.0,
+  "overhang_pct": 0.0,
+  "bed_contact_mm2": 2054.1,
+  "flat_bottom": true,
+  "thick_min_mm": 1.47,
+  "thick_p2_mm": 1.98,
+  "pct_samples_below_1p2mm": 0.0,
+  "pass": true,
+  "stl_kb": 3906
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "slug": "whale-tail-wall-hook",
+ "title": "Whale Tail Wall Hook",
+ "category": "Useful Items",
+ "description": "Wall hook whose peg ends in a whale tail fluke. The 2-screw plate has countersunk holes.",
+ "use": "Light-duty hook for keys, hats, headphones, a light jacket (design target about 1 kg - untested). Screw to wall or use strong double-sided tape.",
+ "material": "PETG, 0.2 mm layers, 4+ perimeters, 50%+ infill. Print plate-flat as shown (peg rises vertically). Screws: #6 / 3.5 mm flat head.",
+ "color": [
+  0.25,
+  0.5,
+  0.75
+ ],
+ "max_faces": 60000,
+ "validation": {
+  "faces": 60000,
+  "vertices": 29998,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 14622.7,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   36.6,
+   64.0,
+   54.0
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": -2,
+  "overhang_area_mm2": 112.5,
+  "overhang_pct": 1.7,
+  "bed_contact_mm2": 1712.1,
+  "flat_bottom": true,
+  "thick_min_mm": 0.06,
+  "thick_p2_mm": 3.95,
+  "pct_samples_below_1p2mm": 0.1,
+  "pass": true,
+  "stl_kb": 2929
+ }
+}

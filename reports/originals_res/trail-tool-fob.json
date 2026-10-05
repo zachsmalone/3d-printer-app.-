@@ -1,0 +1,110 @@
+{
+ "slug": "trail-tool-fob",
+ "title": "Trail Tool Fob (3 fold-out tools on one pin)",
+ "category": "Outdoor Mechanisms",
+ "description": "A swiss-knife style fob with three swing-out tools, no blades: a guy-line hook with cord-tie notches, a double hex wrench/pry bar (8 and 10 mm), and a 60 mm ruler arm. Two side plates, three arms and one pin.",
+ "use": "Pocket tool for camping: tighten wing-nuts and bike/tent hardware, hook tent guy-lines, measure line and knot spacing.",
+ "material": "PETG, 0.2 mm layers, 5 perimeters, 100% infill on arms (they are only 2.6 mm thick). The wrench is for light hand-tightening only.",
+ "color": [
+  0.4,
+  0.45,
+  0.7
+ ],
+ "max_faces": 60000,
+ "parts": {
+  "plate_A_with_posts": [
+   81.0,
+   26.0,
+   11.4
+  ],
+  "plate_B": [
+   81.0,
+   26.0,
+   2.4
+  ],
+  "wrench_arm": [
+   68.5,
+   16.0,
+   2.6
+  ],
+  "hook_arm": [
+   70.5,
+   15.4,
+   2.6
+  ],
+  "ruler_arm": [
+   76.5,
+   13.0,
+   2.6
+  ],
+  "pivot_pin": [
+   8.0,
+   8.0,
+   15.6
+  ]
+ },
+ "mech_ok": true,
+ "mechanism_tests": [
+  "PASS | hook arm swung 0 deg: clear of plates, posts and pin",
+  "PASS | hook arm swung -30 deg: clear of plates, posts and pin",
+  "PASS | hook arm swung -60 deg: clear of plates, posts and pin",
+  "PASS | hook arm swung -90 deg: clear of plates, posts and pin",
+  "PASS | hook arm swung -120 deg: clear of plates, posts and pin",
+  "PASS | hook arm swung -150 deg: clear of plates, posts and pin",
+  "PASS | hook arm swung -180 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung 0 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung -30 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung -60 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung -90 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung -120 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung -150 deg: clear of plates, posts and pin",
+  "PASS | wrench arm swung -180 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung 0 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung -30 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung -60 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung -90 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung -120 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung -150 deg: clear of plates, posts and pin",
+  "PASS | ruler arm swung -180 deg: clear of plates, posts and pin",
+  "PASS | arm-to-arm vertical gap (stacked): min gap 0.30 mm (need >= 0.25)",
+  "PASS | arm to top plate gap: min gap 0.30 mm (need >= 0.25)",
+  "PASS | arm to post gap (folded): min gap 0.30 mm (need >= 0.25)"
+ ],
+ "untested_physically": true,
+ "problem_solved": "Camp hardware (wing-nuts, tent line adjusters, cord) is usually handled with several loose bits; this folds guy-line hook, small wrench and ruler into one 70 x 26 x 14 mm fob with no blades.",
+ "mechanism": "Three arms stacked on one 5 mm pin between two plates; arms swing outward away from the post side (0 to -180 deg). Friction between the 0.3 mm gapped layers holds them in place.",
+ "tolerances": "Pin 2.5 mm radius: press (2.6 hole, +0.1) in plates, free (2.85, +0.35) in arms; 0.3 mm vertical gaps between layers; arms clear the posts by >= 2 mm; posts press 2.0 into 2.1 holes.",
+ "assembly": [
+  "1. Press the pin head-down through plate A, then slide the three arms over it (hook, wrench, ruler).",
+  "2. Fit plate B so the posts enter its holes (press fit), pushing the pin top through plate B.",
+  "3. A drop of glue on the pin top and post ends makes it permanent."
+ ],
+ "fit_notes": "Small parts (pin, posts). Hex slots sized 8.2 / 10.2 mm across flats for easy fit.",
+ "validation": {
+  "faces": 4188,
+  "vertices": 2088,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 15370.7,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   146.0,
+   102.0,
+   15.6
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 6,
+  "euler_number": -6,
+  "overhang_area_mm2": 0.0,
+  "overhang_pct": 0.0,
+  "bed_contact_mm2": 6032.8,
+  "flat_bottom": true,
+  "thick_min_mm": 0.5,
+  "thick_p2_mm": 2.38,
+  "pct_samples_below_1p2mm": 0.2,
+  "pass": true,
+  "stl_kb": 204
+ }
+}

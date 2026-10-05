@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOCK · ZEIM home (Studio)</title>
+<style>
+/* ===== ZEIM design tokens (spec: reports/design/home-redesign-spec.md §Palette). Every pair below is computed in that spec. ===== */
+:root,[data-theme=light]{--bg:#FFF8EE;--panel:#FFFFFF;--panel2:#FFF1DC;--line:#E6D5BD;--ctl:#7F6F5D;--txt:#2B2118;--mut:#5E4F40;
+  --acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#4F34C7;--tint:#EDE7FF;--warm:#B4410C;--on-warm:#FFFFFF;--warmtint:#FFE3CC;--focus:#1D4ED8;
+  --ok:#166534;--okbg:#E3F5E8;--bad:#B91C1C;--badbg:#FDE8E8;--warn:#8A5300;--shadow:0 6px 24px #5b3a1a22;color-scheme:light}
+[data-theme=dark]{--bg:#0E1117;--panel:#161B24;--panel2:#1C2330;--line:#2A3344;--ctl:#7B88A6;--txt:#E6EAF2;--mut:#A9B4C9;
+  --acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#B8A9FF;--tint:#2A2457;--warm:#FFB26B;--on-warm:#1B1208;--warmtint:#3A2A1A;--focus:#8DB8FF;
+  --ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;--shadow:0 6px 24px #0008;color-scheme:dark}
+*{box-sizing:border-box}
+html{max-width:100%;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;max-width:100%;overflow-x:clip;
+  padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+h1,h2,h3{line-height:1.2;margin:0 0 .4em}
+a{color:var(--accink)}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;margin:-1px;padding:0;border:0}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px}
+.skip{position:absolute;left:8px;top:-60px;background:var(--panel);color:var(--txt);padding:10px 14px;border:2px solid var(--ctl);border-radius:8px;z-index:100}
+.skip:focus{top:8px}
+[hidden]{display:none!important}
+/* mock-only toolbar (NOT part of the product) */
+.mockbar{background:var(--txt);color:var(--bg);padding:8px 12px;font-size:14px;display:flex;gap:12px 18px;flex-wrap:wrap;align-items:center}
+.mockbar label{display:flex;gap:6px;align-items:center}
+.mockbar select{min-height:44px;font-size:16px;border-radius:8px;border:2px solid var(--bg);background:var(--bg);color:var(--txt);padding:4px 8px}
+.mockbar b{font-weight:700}
+/* top bar: wraps, never scrolls sideways */
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:inline-flex;align-items:center;min-height:44px;min-width:44px;font-weight:800;font-size:22px;letter-spacing:.5px;color:var(--txt);text-decoration:none;margin-right:auto}
+.brand span{color:var(--accink)}
+.nav{display:flex;gap:4px;flex:1 0 100%;order:5}
+.nav a,.nav button{flex:1 1 0;min-width:0;min-height:44px;padding:8px 6px;border-radius:10px;border:2px solid transparent;background:none;color:var(--mut);font:inherit;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.nav [aria-current=page]{background:var(--tint);color:var(--txt);border-color:var(--accink)}
+@media(min-width:900px){.topbar{padding:10px 20px;gap:8px 16px}.nav{flex:0 1 auto;order:0}.nav a,.nav button{flex:0 0 auto;padding:8px 16px}.brand{margin-right:0}.grow{flex:1}}
+.btn{background:var(--panel);border:2px solid var(--ctl);color:var(--txt);padding:8px 14px;min-height:44px;min-width:44px;border-radius:10px;cursor:pointer;font:inherit;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:var(--panel2)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.btn.primary:hover{background:var(--acc);filter:brightness(1.12)}
+.btn.warm{background:var(--warm);border-color:var(--warm);color:var(--on-warm)}
+.btn.ghost{border-color:transparent;background:none}
+.btn[aria-disabled=true],.btn:disabled{opacity:1;color:var(--mut);border-style:dashed;cursor:not-allowed}
+.help{color:var(--mut);font-size:14px;margin:.3em 0}
+.pill{display:inline-block;background:var(--panel2);border:1px solid var(--ctl);border-radius:99px;padding:2px 10px;font-size:13px;color:var(--txt)}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.field>label,.field>legend{font-size:14px;font-weight:600;color:var(--txt)}
+input[type=number],input[type=text],select{background:var(--panel);border:2px solid var(--ctl);border-radius:10px;color:var(--txt);padding:8px 10px;width:100%;min-height:44px;font:inherit;font-size:16px}
+select{appearance:auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+.note{background:var(--tint);border:2px solid var(--accink);border-radius:12px;padding:12px 14px;margin:10px 12px}
+.note h2{font-size:17px;margin:0 0 4px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+dialog{border:2px solid var(--ctl);border-radius:16px;background:var(--panel);color:var(--txt);padding:0;width:min(520px,94vw);max-width:100vw}
+dialog::backdrop{background:#000a}
+.dlg .dh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--line)}
+.dlg h2{margin:0;font-size:19px}
+.dlg .body{padding:14px 16px}
+.dlg .df{padding:10px 16px 14px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.x{min-width:44px;min-height:44px;background:none;border:2px solid transparent;border-radius:10px;color:var(--txt);font-size:22px;cursor:pointer}
+.x:hover{border-color:var(--ctl)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media (forced-colors:active){.btn,input,select{border:2px solid ButtonText}.nav [aria-current=page]{outline:2px solid Highlight}}
+[data-theme=dark] .btn.primary{border-color:var(--accink)}
+
+.modepick{display:flex;align-items:center;gap:8px}
+.modepick label{font-weight:700;font-size:15px}
+.modepick .ico{font-size:20px;line-height:1}
+.modepick select{width:auto;min-width:150px;font-weight:700}
+@media(max-width:899px){.brand{order:0}.hb{order:1}.modepick{order:4;flex:1 0 100%}.nav{order:5}.grow{display:none}.hb:first-of-type{margin-left:auto}}
+@media(max-width:480px){.hb .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.hb{padding:8px 10px}}
+.classbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:var(--warmtint);border-bottom:2px solid var(--warm);padding:8px 12px}
+.code{font:700 18px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.12em;background:var(--panel);border:2px solid var(--ctl);border-radius:8px;padding:6px 10px}
+/* ---- home layout: one column first, two columns from 900px ---- */
+main{max-width:1100px;margin:0 auto;padding:12px}
+.hero{background:linear-gradient(135deg,var(--warmtint),var(--panel2));border:1px solid var(--line);border-radius:20px;padding:20px 16px;margin-bottom:14px;position:relative;overflow:hidden}
+.hero h1{font-size:clamp(26px,6vw,40px);margin:0 0 6px;letter-spacing:-.5px}
+.hero p{margin:0 0 14px;max-width:46ch;font-size:18px}
+.hero .cta{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn.lg{min-height:52px;font-size:18px;padding:10px 20px}
+.linkbtn{background:none;border:0;color:var(--accink);text-decoration:underline;font:inherit;font-weight:600;min-height:44px;padding:0 8px;cursor:pointer}
+body[data-level=expert] .hero{padding:10px 14px}
+body[data-level=expert] .hero p,body[data-level=expert] .hero .cta .lg{display:none}
+body[data-level=expert] .hero h1{font-size:24px;margin:0}
+.path{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0;margin:0 0 14px;counter-reset:p}
+.path li{border:2px solid var(--ctl);border-radius:14px;background:var(--panel);padding:8px 8px;display:flex;flex-direction:column;gap:2px;font-weight:700;font-size:15px;min-height:64px}
+.path li small{font-weight:400;color:var(--mut);font-size:13px}
+.path li::before{counter-increment:p;content:counter(p);display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--panel2);border:2px solid var(--ctl);font-size:13px}
+.path li[aria-current=step]{border-color:var(--accink);background:var(--tint);box-shadow:inset 0 0 0 1px var(--accink)}
+.path li[data-done=true]{border-color:var(--ok);background:var(--okbg)}
+.path li[data-done=true]::before{content:"✓";background:var(--ok);color:var(--panel);border-color:var(--ok)}
+@media(max-width:420px){.path li small{display:none}.path li{font-size:14px}}
+.layout{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:900px){.layout{grid-template-columns:400px 1fr;align-items:start}}
+.step{margin-bottom:16px;border:0;padding:0}
+.step h2{font-size:17px;display:flex;gap:8px;align-items:center;margin:0 0 8px}
+.step h2 i{font-style:normal;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:14px}
+.pickrow{display:flex;gap:10px;flex-wrap:wrap}
+.pickrow .btn{flex:1 1 150px}
+.drop{border:2px dashed var(--ctl);border-radius:16px;background:var(--panel2);min-height:120px;display:grid;place-items:center;text-align:center;padding:10px;margin-top:10px;color:var(--mut)}
+.drop img{max-width:100%;max-height:160px;border-radius:10px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;border:0;padding:0;margin:0 0 16px}
+.cards legend{font-size:17px;font-weight:700;margin-bottom:8px;display:flex;gap:8px;align-items:center;padding:0}
+.cards legend i{font-style:normal;display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:14px}
+.cards label,.seg label{position:relative;display:flex}
+.cards input,.seg input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.cards .c{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;border:2px solid var(--ctl);border-radius:14px;padding:10px 4px;min-height:96px;background:var(--panel)}
+.cards small{color:var(--mut);font-size:13px;line-height:1.25}
+.cards input:checked+.c,.seg input:checked+span{background:var(--tint);border-color:var(--accink);box-shadow:inset 0 0 0 1px var(--accink)}
+.cards input:focus-visible+.c,.seg input:focus-visible+span{outline:3px solid var(--focus);outline-offset:2px}
+.seg{display:flex;gap:6px;border:0;padding:0;margin:0}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;min-height:44px;border:2px solid var(--ctl);border-radius:10px;background:var(--panel);font-weight:600}
+details{border:2px solid var(--line);border-radius:12px;margin-bottom:8px;padding:0 12px;background:var(--panel2)}
+summary{min-height:44px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.eonly{display:none}body[data-level=expert] .eonly{display:block}body[data-level=expert] .bonly{display:none}
+.tonly{display:none}body[data-level=teacher] .tonly{display:block}
+.stage{display:flex;flex-direction:column;gap:12px;min-width:0}
+.viewer{position:relative;border:2px solid var(--ctl);border-radius:18px;min-height:260px;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,var(--panel),var(--panel2));overflow:hidden}
+.viewer .empty{text-align:center;color:var(--mut);padding:16px}
+.model{width:150px;height:110px;border-radius:12px;background:linear-gradient(135deg,#F7B07A,#FFE3CC);box-shadow:0 10px 30px #5b3a1a44, inset 0 0 0 6px #FFF8EE99;transition:transform .5s}
+.vtools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.busy{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 85%,transparent);display:grid;place-content:center;gap:8px;text-align:center;font-weight:700}
+.spin{width:34px;height:34px;border:4px solid var(--line);border-top-color:var(--accink);border-radius:50%;animation:sp .9s linear infinite;margin:auto}@keyframes sp{to{transform:rotate(360deg)}}
+.result{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:12px 14px}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:0;list-style:none}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions .btn{flex:1 1 150px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;list-style:none;padding:0;margin:8px 0 0}
+.tile{display:flex;flex-direction:column;gap:2px;padding:14px;border:2px solid var(--ctl);border-radius:16px;background:var(--panel);text-decoration:none;color:var(--txt);min-height:88px}
+.tile b{font-size:17px}.tile span{color:var(--mut);font-size:14px}
+.tile:hover{background:var(--panel2)}
+.section{margin-top:22px}
+.section h2{font-size:20px}
+.hist{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;list-style:none;padding:0;margin:0}
+.hcard{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.hcard .th{aspect-ratio:4/3;border-radius:10px;background:linear-gradient(135deg,#F7B07A,#FFE3CC)}
+footer.site{margin-top:30px;padding:16px 12px calc(16px + env(safe-area-inset-bottom));border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 8px;justify-content:center}
+footer.site a{display:inline-flex;align-items:center;min-height:44px;padding:0 8px}
+/* ---- Send sheet (dialog): bottom sheet on phones, centred dialog above 600px ---- */
+#dlgSend{width:min(460px,94vw);max-height:90dvh;overflow:auto}
+@media(max-width:600px){#dlgSend{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;border-radius:18px 18px 0 0;padding-bottom:env(safe-area-inset-bottom)}}
+.group{margin:12px 0 4px;font-size:15px;color:var(--mut);font-weight:700;text-transform:none}
+.rows{display:flex;flex-direction:column;gap:8px;list-style:none;padding:0;margin:0}
+.row-btn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;min-height:56px;padding:10px 14px;border:2px solid var(--ctl);border-radius:12px;background:var(--panel);color:var(--txt);font:inherit;cursor:pointer;text-decoration:none}
+.row-btn b{font-size:16px}.row-btn small{color:var(--mut);font-size:14px;line-height:1.35}
+.row-btn:hover{background:var(--panel2)}
+.row-btn.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.row-btn.primary small{color:var(--on-acc)}
+[data-theme=dark] .row-btn.primary{border-color:var(--accink)}
+.row-btn[aria-disabled=true]{border-style:dashed}
+.sendstatus{min-height:1.5em;margin:10px 0 0;font-weight:600}
+.sendalert{color:var(--bad);margin:6px 0 0;font-weight:600}
+.notes{font-size:14px;color:var(--mut)}
+</style>
+</head>
+<body data-level="beginner" data-theme="light">
+<a class="skip" href="#main">Skip to main content</a>
+<div role="region" aria-label="Mock controls (not part of ZEIM)" class="mockbar">
+  <b>MOCK</b>
+  <label>Pretend I am <select id="who">
+    <option value="adult">an adult on iPhone (https, share sheet works)</option>
+    <option value="adultdesk">an adult on a computer (printer send works, no share sheet)</option>
+    <option value="guest">a visitor with no account</option>
+    <option value="teen">a teen (download only)</option>
+    <option value="student">a class student (download + send to teacher)</option></select></label>
+  <label>Theme <select id="theme"><option value="light">Warm (light)</option><option value="dark">Dark</option></select></label>
+</div>
+
+<header class="topbar">
+  <a class="brand" href="#main" aria-label="ZEIM home">ZE<span>I</span>M</a>
+  <nav class="nav" aria-label="Main">
+    <a href="#" aria-current="page">Studio</a><a href="#">Showcase</a><a href="#">Edit</a><a href="#">Learn</a>
+  </nav>
+  <div class="modepick">
+    <label for="modeSel">Mode</label>
+    <span class="ico" id="modeIco" aria-hidden="true">🌱</span>
+    <select id="modeSel" aria-describedby="modeHelp">
+      <option value="beginner">Beginner</option><option value="expert">Experienced</option><option value="teacher">Teacher</option>
+    </select>
+    <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours. Teacher: Beginner settings plus class tools, for adults with an account.</p>
+  </div>
+  <span class="grow"></span>
+  <button class="btn ghost hb" type="button"><span aria-hidden="true">👤</span> <span id="acctLbl" class="lbl">Sign up</span></button>
+  <button class="btn ghost hb" type="button"><span aria-hidden="true">⚙</span> <span class="lbl">Settings</span></button>
+</header>
+<section class="note" id="teacherNote" hidden aria-labelledby="tnTitle">
+  <h2 id="tnTitle">Teacher mode is for grown-ups with an account</h2>
+  <p id="tnBody" style="margin:0 0 10px">Make a grown-up account to use class tools. Students never need an account. ZEIM can't check who is a teacher, so please only make a class for students you teach.</p>
+  <div class="row"><button class="btn primary" type="button" id="tnMake">Make a grown-up account</button><button class="btn" type="button" id="tnNo">Not now</button></div>
+</section>
+<div class="classbar" id="classBar" hidden role="region" aria-label="Classroom">
+  <b>🍎 Your classroom</b><span>Class: <b>Room 12</b></span>
+  <span>Join code <span class="code" aria-label="K 7 Q M 2 X">K7QM2X</span></span>
+  <span>Students sending files out of ZEIM: <b>Off</b></span>
+  <button class="btn" type="button">Teacher tools</button>
+</div>
+
+<main id="main">
+  <section class="hero" aria-labelledby="h1">
+    <h1 id="h1">Turn a photo into something you can print.</h1>
+    <p id="heroP">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free for everyone.</p>
+    <div class="cta">
+      <button class="btn primary lg" type="button" id="btnTake"><span aria-hidden="true">📷</span> Take a photo</button>
+      <button class="btn lg" type="button" id="btnChoose"><span aria-hidden="true">🖼</span> Choose a photo</button>
+      <button class="linkbtn" type="button" id="btnSample">Try a sample photo</button>
+    </div>
+    <p class="help tonly" style="margin-top:12px">Teaching with ZEIM? <a href="#">Start with the Glow Card lesson</a> · <a href="#">Class tools</a></p>
+    <input type="file" id="fileCam" accept="image/*" capture="environment" class="sr-only" tabindex="-1" aria-hidden="true">
+    <input type="file" id="fileLib" accept="image/*,.heic" class="sr-only" tabindex="-1" aria-hidden="true">
+  </section>
+
+  <nav aria-label="Your progress">
+    <ol class="path" id="path">
+      <li id="p1" aria-current="step">Photo<small>Pick one</small></li>
+      <li id="p2">Preview<small>Turn it around</small></li>
+      <li id="p3">Print-ready<small>Save or print</small></li>
+    </ol>
+  </nav>
+  <p class="sr-only" id="pathSay" role="status" aria-live="polite"></p>
+
+  <div class="layout">
+    <section class="panel" aria-label="Your photo and settings">
+      <div class="step">
+        <h2><i aria-hidden="true">1</i> Your photo</h2>
+        <div class="drop" id="drop"><p id="dropHint" style="margin:0">No photo yet. Use <b>Take a photo</b> or <b>Choose a photo</b> above. JPG, PNG or iPhone photos, up to 25 MB.</p><img id="prev" alt="" hidden></div>
+        <p class="help" id="photoName" hidden></p>
+      </div>
+      <fieldset class="cards">
+        <legend><i aria-hidden="true">2</i> Pick a style</legend>
+        <label><input type="radio" name="style" value="lithophane" checked><span class="c"><span aria-hidden="true">💡</span><b>Lithophane</b><small>A picture that glows with a light behind it</small></span></label>
+        <label><input type="radio" name="style" value="relief"><span class="c"><span aria-hidden="true">⛰</span><b>Relief</b><small>Light and dark become hills</small></span></label>
+        <label><input type="radio" name="style" value="popart"><span class="c"><span aria-hidden="true">🎨</span><b>Pop-art</b><small>Flat colour layers</small></span></label>
+      </fieldset>
+      <div class="step">
+        <h2><i aria-hidden="true">3</i> Size</h2>
+        <div class="field"><label for="w">Width (mm)</label><input id="w" type="number" value="100" min="5" max="1000" inputmode="numeric"></div>
+        <div class="bonly">
+          <fieldset class="field" style="border:0;padding:0;margin:0 0 12px"><legend style="font-weight:600">Thickness</legend>
+            <div class="seg"><label><input type="radio" name="pre" value="thin"><span>Thin</span></label><label><input type="radio" name="pre" value="standard" checked><span>Standard</span></label><label><input type="radio" name="pre" value="thick"><span>Thick</span></label></div></fieldset>
+          <p class="help">ZEIM picks the other settings and shows you what it chose.</p>
+        </div>
+        <div class="eonly">
+          <details open><summary>Image &amp; detail</summary><div class="grid2">
+            <div class="field"><label for="res">Resolution (px wide)</label><input id="res" type="number" value="200"></div>
+            <div class="field"><label for="sm">Smoothing</label><input id="sm" type="number" value="0.8" step="0.1"></div></div></details>
+        </div>
+      </div>
+      <button class="btn primary lg" type="button" id="btnBuild" style="width:100%" disabled>✨ Make my 3D model</button>
+      <p class="help" id="buildHint" role="status" aria-live="polite" style="text-align:center">Choose or take a photo to begin.</p>
+    </section>
+
+    <section class="stage" aria-label="Preview">
+      <h2 class="sr-only">Preview</h2>
+      <div class="viewer" id="viewer">
+        <div class="empty" id="empty"><div style="font-size:40px" aria-hidden="true">🧊</div><b>Your 3D model will show up here</b><br>You can turn it around when it is ready.</div>
+        <div class="model" id="model" role="img" aria-label="Your model, a flat glowing picture panel." hidden></div>
+        <div class="busy" id="busy" hidden><div class="spin" aria-hidden="true"></div><span>Making your 3D model…</span></div>
+      </div>
+      <div class="vtools" id="vtools" hidden>
+        <button class="btn" type="button" id="vL"><span aria-hidden="true">↺</span> Turn left</button>
+        <button class="btn" type="button" id="vR"><span aria-hidden="true">↻</span> Turn right</button>
+        <button class="btn" type="button" id="vReset">Reset view</button>
+      </div>
+      <div class="result" id="result" hidden>
+        <h2 style="font-size:18px;margin-bottom:8px">Your model is ready</h2>
+        <ul class="stats"><li class="pill">100 × 75 mm</li><li class="pill">3.0 mm thick</li><li class="pill">Ready to print</li></ul>
+        <div class="actions">
+          <button class="btn primary" type="button" id="btnSendOpen" aria-haspopup="dialog">⬆ Send or save</button>
+          <button class="btn" type="button">🖨 Print…</button>
+          <button class="btn" type="button">✏ Edit this</button>
+          <button class="btn" type="button" id="btnShare">🌐 Share to Showcase</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section class="section" aria-labelledby="hRecent" id="recentSec">
+    <h2 id="hRecent">Pick up where you left off</h2>
+    <ul class="hist"><li class="hcard"><div class="th" aria-hidden="true"></div><b>Moon photo</b><span class="help" style="margin:0">Lithophane · today</span><button class="btn" type="button">Open</button></li>
+      <li class="hcard"><div class="th" aria-hidden="true"></div><b>Our dog</b><span class="help" style="margin:0">Relief · yesterday</span><button class="btn" type="button">Open</button></li></ul>
+  </section>
+
+  <section class="section" aria-labelledby="hNext">
+    <h2 id="hNext">Keep exploring</h2>
+    <ul class="tiles">
+      <li><a class="tile" href="#"><b>Showcase</b><span>See what other makers printed. All free to download.</span></a></li>
+      <li><a class="tile" href="#"><b>Learn</b><span>Short lessons for students, teachers and families.</span></a></li>
+      <li><a class="tile" href="#"><b>Edit a 3D file</b><span>Open an STL, OBJ or 3MF and change it.</span></a></li>
+    </ul>
+  </section>
+</main>
+<footer class="site"><a href="#">Community Guidelines</a><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Credits</a></footer>
+
+<!-- Send or save: one sheet. Not an ARIA menu (rows have descriptions and status), so a dialog with ordinary buttons. -->
+<dialog id="dlgSend" aria-labelledby="sendTitle"><div class="dlg">
+  <div class="dh"><h2 id="sendTitle">Send or save your model</h2><button class="x" type="button" id="sendX" aria-label="Close">✕</button></div>
+  <div class="body" id="sendBody"></div>
+</div></dialog>
+
+<div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+let who="adult", level="beginner", photo=null, built=false;
+const say=(el,t)=>{el.textContent="";setTimeout(()=>el.textContent=t,60)};
+const sayMode=t=>say($("#modeStatus"),t);
+/* ---------- mode (same behaviour as mock-mode.html) ---------- */
+const MODES={beginner:{ico:"🌱",say:"Beginner mode on. ZEIM picks the settings for you."},expert:{ico:"🛠",say:"Experienced mode on. All settings are showing."},teacher:{ico:"🍎",say:"Teacher mode on. Your classroom tools are showing above the page."}};
+const canTeach=()=>who==="adult"||who==="adultdesk";
+function renderMode(announce){
+  document.body.dataset.level=level; $("#modeSel").value=level; $("#modeIco").textContent=MODES[level].ico;
+  $("#classBar").hidden=level!=="teacher";
+  $("#h1").textContent=level==="expert"?"Studio":"Turn a photo into something you can print.";
+  $("#recentSec").hidden=level==="expert"?false:false;
+  if(announce) sayMode(MODES[level].say);
+}
+$("#modeSel").onchange=e=>{const v=e.target.value; if(v==="teacher"&&!canTeach()){e.target.value=level;$("#teacherNote").hidden=false;sayMode("Teacher mode needs a grown-up account. Details are just below the top bar. You are still in "+(level==="expert"?"Experienced":"Beginner")+" mode.");return}
+  $("#teacherNote").hidden=true; level=v; renderMode(true)};
+$("#tnNo").onclick=()=>{$("#teacherNote").hidden=true;$("#modeSel").focus()};
+$("#tnMake").onclick=()=>{who="adult";$("#who").value="adult";$("#teacherNote").hidden=true;level="teacher";$("#acctLbl").textContent="Ms. Rivera";renderMode(false);sayMode("Account made. Teacher mode on.");$("#modeSel").focus()};
+$("#who").onchange=e=>{who=e.target.value;$("#acctLbl").textContent=who==="guest"?"Sign up":who==="teen"?"Sam":who==="student"?"Class: Nova":"Ms. Rivera";
+  if(level==="teacher"&&!canTeach()) level="beginner"; $("#teacherNote").hidden=true; renderMode(false)};
+$("#theme").onchange=e=>document.body.dataset.theme=e.target.value;
+/* ---------- the path: Photo -> Preview -> Print-ready ---------- */
+function setPath(step,msg){
+  ["p1","p2","p3"].forEach((id,i)=>{const li=$("#"+id); li.toggleAttribute("aria-current",false); li.removeAttribute("aria-current"); li.dataset.done=(i+1<step)?"true":"false";
+    if(i+1===step) li.setAttribute("aria-current","step")});
+  if(msg) say($("#pathSay"),msg);
+}
+function choose(name,url){
+  photo=name; $("#prev").src=url||""; $("#prev").alt="Your chosen photo"; $("#prev").hidden=!url; $("#dropHint").hidden=!!url;
+  $("#photoName").hidden=false; $("#photoName").textContent="Photo ready: "+name; $("#btnBuild").disabled=false;
+  $("#buildHint").textContent=level==="expert"?"Photo ready. Check the settings, then press Make my 3D model.":"Photo ready. Making your model…";
+  built=false; $("#result").hidden=true; $("#vtools").hidden=true; $("#model").hidden=true; $("#empty").hidden=false;
+  setPath(1,"Photo chosen.");
+  if(level!=="expert") build();
+}
+function build(){
+  $("#busy").hidden=false; $("#btnBuild").disabled=true; $("#buildHint").textContent="Making your 3D model…";
+  setTimeout(()=>{$("#busy").hidden=true;$("#empty").hidden=true;$("#model").hidden=false;$("#vtools").hidden=false;$("#result").hidden=false;$("#btnBuild").disabled=false;
+    built=true; $("#buildHint").textContent="Your model is ready. You can turn it around, then save or print it."; setPath(3,"Model ready. Step 3 of 3: save or print it. Buttons are below the preview."); $("#result").scrollIntoView({block:"nearest"})},900);
+  setPath(2,"Making your 3D model. Step 2 of 3.");
+}
+$("#btnBuild").onclick=()=>build();
+$("#btnTake").onclick=()=>$("#fileCam").click(); $("#btnChoose").onclick=()=>$("#fileLib").click();
+for(const id of ["#fileCam","#fileLib"]) $(id).onchange=e=>{const f=e.target.files[0]; if(f) choose(f.name,URL.createObjectURL(f))};
+$("#btnSample").onclick=()=>choose("sample photo",null);
+let rot=0; const turn=d=>{rot+=d;$("#model").style.transform=`rotateY(${rot}deg)`;};
+$("#vL").onclick=()=>turn(-20);$("#vR").onclick=()=>turn(20);$("#vReset").onclick=()=>{rot=0;turn(0);say($("#pathSay"),"View reset.")};
+/* ---------- Send or save sheet ---------- */
+function caps(){ // mirrors /api/me -> send{} (the server decides; the page only draws)
+  const c={role:"adult",download:true,share:false,printer:false,teacher:false};
+  if(who==="adult"){c.share=true} if(who==="adultdesk"){c.printer=true}
+  if(who==="guest"){c.role="teen"} if(who==="teen") c.role="teen"; if(who==="student"){c.role="student";c.teacher=true}
+  return c;
+}
+function openSend(){
+  const c=caps(), rows=[];
+  const btn=(id,label,desc,cls="")=>`<li><button type="button" class="row-btn ${cls}" id="${id}"><b>${label}</b><small>${desc}</small></button></li>`;
+  const save=btn("sSave",c.role==="adult"?"⬇ Save to this device":"⬇ Download my model",c.role==="adult"?"Goes to your Files or Downloads.":"Saves a file on this device.","primary");
+  let other="",print="",teach="",notes=[];
+  if(c.share){other+=btn("sShare","📤 Share…","Opens the share sheet. Pick Files, Mail, Shapr3D or another app.");
+    other+=btn("sEmail","✉ Email it to myself","Your Mail app sends it. ZEIM doesn't.");
+    other+=btn("sShapr","🧊 Share as STL for Shapr3D…","Opens as a reference shape. When Shapr3D asks, choose millimetres.");}
+  if(c.teacher) teach=btn("sTeacher","⬆ Send to my teacher","Your teacher can see it.");
+  if(c.printer) print=btn("sPrint","🖨 Send to my printer","Opens the printer step. Tested with a pretend printer only.");
+  if(c.role==="adult"&&!c.share) notes.push("Want it in another app? Save it first, then open the Files app, press and hold the file, and tap Share.");
+  if(c.role==="teen") notes.push("Sending to other apps isn't available for your account. You can download your model.");
+  if(c.role==="student") notes.push("Sending to other apps is turned off for this class. You can download your model or send it to your teacher.");
+  notes.push("A lithophane or relief is your photo turned into a shape. Anyone who gets the file can see it. Only send photos you have permission to use.");
+  $("#sendBody").innerHTML=`<p class="help" id="sendWhich"><b>Sending: Moon photo (Lithophane)</b></p>
+    <ul class="rows">${save}${teach}</ul>
+    ${other?`<h3 class="group">Send to another app</h3><ul class="rows">${other}</ul>`:""}
+    ${print?`<h3 class="group">Print</h3><ul class="rows">${print}</ul>`:""}
+    <p class="sendstatus" id="sendStatus" role="status" aria-live="polite"></p><p class="sendalert" id="sendAlert" role="alert"></p>
+    ${notes.map(n=>`<p class="notes">${n}</p>`).join("")}
+    <div class="row" style="justify-content:flex-end;margin-top:8px"><button type="button" class="btn" id="sendClose">Close</button></div>`;
+  $("#dlgSend").showModal(); $("#sSave").focus();
+}
+$("#btnSendOpen").onclick=openSend;
+const closeSend=()=>{$("#dlgSend").close()};
+$("#sendX").onclick=closeSend;
+$("#dlgSend").addEventListener("close",()=>$("#btnSendOpen").focus());      // focus goes back to the button that opened it
+$("#dlgSend").addEventListener("click",e=>{
+  const t=e.target.closest("button"); if(!t) return; const st=$("#sendStatus"), al=$("#sendAlert");
+  if(t.id==="sendClose") return closeSend();
+  al.textContent="";
+  const S={sSave:"Saved! Look in your Files or Downloads.",sShare:"Share sheet opened. Pick where to send it.",sEmail:"Your Mail app is opening with the file attached.",sShapr:"Share sheet opened for Shapr3D. Choose millimetres when it asks.",sTeacher:"Sent. Your teacher can see it.",sPrint:"Printer step opening."};
+  if(S[t.id]) say(st,S[t.id]);
+});
+setPath(1); renderMode(false);
+</script>
+</body></html>

@@ -1,0 +1,47 @@
+{
+ "slug": "turtle-trinket-jar",
+ "title": "Turtle Trinket Jar (2 parts)",
+ "category": "Containers",
+ "description": "A little turtle whose hex-pattern shell lifts off to reveal a hollow body for small treasures: beads, buttons, coins, earrings, LEGO-size bits.",
+ "use": "Trinket jar / small-parts dish on a desk or dresser. Not food safe unless you use a food-safe filament and liner.",
+ "material": "PLA or PETG, 0.2 mm layers, 3 perimeters. Print base and lid as laid out. Lid lip fits with 0.25 mm radial clearance (loose slip fit, no glue).",
+ "color": [
+  0.3,
+  0.65,
+  0.45
+ ],
+ "max_faces": 80000,
+ "parts": {
+  "base": "turtle body with hollow cavity",
+  "lid": "hex-scute shell with inner lip"
+ },
+ "fit_notes": "Lid lip 0.25 mm radial clearance to base bore (slip fit). Interior cavity ~61 mm dia x 20 mm deep.",
+ "validation": {
+  "faces": 80000,
+  "vertices": 40004,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 65720.1,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   146.0,
+   97.2,
+   31.7
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 2,
+  "euler_number": 4,
+  "overhang_area_mm2": 2952.0,
+  "overhang_pct": 10.11,
+  "bed_contact_mm2": 3803.5,
+  "flat_bottom": true,
+  "thick_min_mm": 0.09,
+  "thick_p2_mm": 2.38,
+  "pct_samples_below_1p2mm": 0.3,
+  "pass": true,
+  "min_gap_between_parts_mm": null,
+  "stl_kb": 3906
+ }
+}

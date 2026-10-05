@@ -1,0 +1,41 @@
+{
+ "slug": "wave-book-stand",
+ "title": "Wave Book Stand (reading easel)",
+ "category": "Useful Items",
+ "description": "Slanted reading easel with a rolling-wave top edge, page-holding ledge and open wave cut-outs; holds a cookbook, tablet or paperback upright.",
+ "use": "Desk / kitchen book or tablet stand. Ledge holds up to ~28 mm thick books; wave arms hold pages open (keep a clip for thick books).",
+ "material": "PLA or PETG, 0.2 mm layers, 4 perimeters, 15% infill. No supports needed (back leans 20 degrees from vertical).",
+ "color": [
+  0.35,
+  0.55,
+  0.85
+ ],
+ "max_faces": 80000,
+ "validation": {
+  "faces": 80000,
+  "vertices": 39998,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 137325.6,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   136.0,
+   96.9,
+   69.7
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": -2,
+  "overhang_area_mm2": 386.3,
+  "overhang_pct": 0.75,
+  "bed_contact_mm2": 10491.9,
+  "flat_bottom": true,
+  "thick_min_mm": 0.14,
+  "thick_p2_mm": 2.53,
+  "pct_samples_below_1p2mm": 0.8,
+  "pass": true,
+  "stl_kb": 3906
+ }
+}

@@ -1,0 +1,41 @@
+{
+ "slug": "horn-dino-band-popper",
+ "title": "Horn-Nose Dino Rubber Band Popper",
+ "category": "Toys & Articulated",
+ "description": "A cartoon horned dinosaur toy that launches rubber bands: hook a band on the nose horn, stretch it to the back post, then slip it off the post to pop it forward. Chunky dino shape, no grip or trigger - clearly a toy.",
+ "use": "Indoor toy for paper targets or cups only. Never aim at people or animals; wear eye protection; adult supervision for younger children.",
+ "material": "PLA/PETG 0.2 mm, 3 perimeters, 15% infill. Use standard thin office rubber bands (about 60-80 mm).",
+ "color": [
+  0.35,
+  0.65,
+  0.4
+ ],
+ "max_faces": 90000,
+ "validation": {
+  "faces": 90000,
+  "vertices": 45002,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 108925.7,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   47.0,
+   121.3,
+   70.0
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 2908.0,
+  "overhang_pct": 16.33,
+  "bed_contact_mm2": 274.2,
+  "flat_bottom": true,
+  "thick_min_mm": 0.19,
+  "thick_p2_mm": 3.55,
+  "pct_samples_below_1p2mm": 0.3,
+  "pass": true,
+  "stl_kb": 4394
+ }
+}

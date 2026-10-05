@@ -1,0 +1,43 @@
+{
+ "slug": "launch-day-comic-panel",
+ "title": "Launch Day Comic Panel Relief",
+ "category": "Comic Book Art",
+ "description": "Wall-art relief styled like a comic panel: caption box, ringed planet, stars and a chunky rocket with a porthole. Generic scene.",
+ "use": "Wall art / shelf display with keyhole hanger.",
+ "material": "PLA, 0.16 mm layers; paint the planet, rocket and caption separately.",
+ "color": [
+  0.4,
+  0.5,
+  0.9
+ ],
+ "max_faces": 90000,
+ "el": 60,
+ "az": -15,
+ "validation": {
+  "faces": 89996,
+  "vertices": 45000,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 53478.6,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   120.0,
+   86.1,
+   8.0
+  ],
+  "bbox_min_z": -0.015,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 90.9,
+  "overhang_pct": 0.35,
+  "bed_contact_mm2": 9721.4,
+  "flat_bottom": true,
+  "thick_min_mm": 0.1,
+  "thick_p2_mm": 1.19,
+  "pct_samples_below_1p2mm": 2.1,
+  "pass": true,
+  "stl_kb": 4394
+ }
+}

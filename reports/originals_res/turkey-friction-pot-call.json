@@ -1,0 +1,77 @@
+{
+ "slug": "turkey-friction-pot-call",
+ "title": "Turkey Friction Pot Call (4-part kit)",
+ "category": "Wildlife Calls",
+ "description": "Pot-style friction call: pot body with side sound port and rebate, printed striking disc (or use a slate/glass disc), retaining ring and a two-piece striker with replaceable tip.",
+ "use": "Birdwatching / hobby accessory, a fun friction-sound experiment. Use lawfully.",
+ "material": "PETG for pot, ring and handle; surface disc PLA (smooth) or real slate/glass disc 60 mm; striker tip: printed peg or hardwood dowel 4.2 mm.",
+ "color": [
+  0.6,
+  0.45,
+  0.3
+ ],
+ "max_faces": 60000,
+ "assembly": [
+  "1. Drop the surface disc into the pot rebate (printed disc, or a 60 mm slate/glass disc).",
+  "2. Press the retaining ring over the disc until flush with the rim (0.10 mm radial press-fit); a tiny dab of glue stops it popping out.",
+  "3. Press the striker tip into the handle socket.",
+  "4. Hold the pot in one hand, drag the tip in small circles / strokes on the disc. Chalk or fine sandpaper on the disc changes the sound."
+ ],
+ "fit_notes": "Joint clearances: press-fit joints are modelled with 0.10 mm radial clearance (0.20 mm on diameter); sliding joints 0.25 mm radial. If a press-fit is loose wrap one turn of PTFE (plumber) tape or a dab of glue; if tight, sand lightly - do not force. Not tested by test-printing or acoustic measurement. Sound depends on your printer, filament, reed film and fit - expect to tune.",
+ "parts": {
+  "pot_body": [
+   74.0,
+   74.0,
+   20.0
+  ],
+  "retaining_ring": [
+   60.2,
+   60.2,
+   4.0
+  ],
+  "surface_disc": [
+   60.0,
+   60.0,
+   2.0
+  ],
+  "striker_handle": [
+   12.4,
+   12.4,
+   112.0
+  ],
+  "striker_tip": [
+   4.2,
+   4.2,
+   32.0
+  ]
+ },
+ "assembled_interference_mm3": [],
+ "fit_check": "parts built in assembled pose and boolean-intersected pairwise: no interference found",
+ "validation": {
+  "faces": 4366,
+  "vertices": 2189,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 57760.9,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   141.2,
+   141.0,
+   112.0
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 5,
+  "euler_number": 6,
+  "overhang_area_mm2": 53.5,
+  "overhang_pct": 0.18,
+  "bed_contact_mm2": 7222.5,
+  "flat_bottom": true,
+  "thick_min_mm": 1.16,
+  "thick_p2_mm": 1.98,
+  "pct_samples_below_1p2mm": 0.0,
+  "pass": true,
+  "stl_kb": 213
+ }
+}

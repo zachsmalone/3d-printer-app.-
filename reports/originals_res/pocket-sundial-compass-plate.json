@@ -1,0 +1,91 @@
+{
+ "slug": "pocket-sundial-compass-plate",
+ "title": "Pocket Sundial with Fold-Flat Gnomon and Compass Seat",
+ "category": "Outdoor Mechanisms",
+ "description": "Palm-size 96 mm horizontal sundial: hour lines for 40 deg N latitude, a gnomon that folds flat on a hinge pin and stops plumb when raised, and a 20 mm recess for a stick-in button compass (not included).",
+ "use": "Teaching tool and trail curiosity: set it level, align the 12 line north with a compass, read solar time. Fold the gnomon down to pack it flat.",
+ "material": "PLA/PETG, 0.12-0.16 mm layers; hour lines are 0.7 mm deep grooves (paint-fill them). Pin: 3 mm PETG rod or filament cut to 33 mm.",
+ "color": [
+  0.9,
+  0.75,
+  0.35
+ ],
+ "max_faces": 60000,
+ "el": 45,
+ "parts": {
+  "dial": [
+   96.0,
+   96.0,
+   21.0
+  ],
+  "hinge_pin": [
+   3.0,
+   32.6,
+   3.0
+  ],
+  "gnomon": [
+   4.8,
+   26.0,
+   24.2
+  ]
+ },
+ "mech_ok": true,
+ "mechanism_tests": [
+  "PASS | raised: gnomon vs dial: overlap 0.000 mm3 (must be 0)",
+  "PASS | raised: pin vs gnomon: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 15 deg: gnomon vs dial/ears/stop: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 15 deg: gnomon vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 30 deg: gnomon vs dial/ears/stop: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 30 deg: gnomon vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 45 deg: gnomon vs dial/ears/stop: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 45 deg: gnomon vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 60 deg: gnomon vs dial/ears/stop: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 60 deg: gnomon vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 75 deg: gnomon vs dial/ears/stop: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 75 deg: gnomon vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 90 deg: gnomon vs dial/ears/stop: overlap 0.000 mm3 (must be 0)",
+  "PASS | fold 90 deg: gnomon vs pin: overlap 0.000 mm3 (must be 0)",
+  "PASS | stop: pushing gnomon 3 deg past plumb is blocked: overlap 2.046 mm3 (stop/latch must engage, >0)",
+  "PASS | folded gnomon clear above dial: min gap 0.30 mm (need >= 0.25)",
+  "PASS | gnomon style angle = latitude 40.0 deg (rise 21.8 over run 26.0 mm); hour lines from tan(H)=sin(lat)*tan(15 deg*(t-12))",
+  "PASS | accuracy is approximate (raised hinge 1.3 mm, no equation-of-time / longitude / DST correction)"
+ ],
+ "untested_physically": true,
+ "problem_solved": "Trail navigation gadgets are either bulky or need batteries. This one tells solar time and shows north when you add a button compass, packs flat in a pocket, and teaches how sundials work.",
+ "mechanism": "Gnomon plate on a 3 mm pin between two ears; folds 90 deg onto the dial; a stop block touches the plate at plumb so it self-locates upright.",
+ "tolerances": "Pin 1.5 mm radius in ears 1.6 (0.1 press) and gnomon bore 1.9 (0.4 free); folded plate floats 0.3 mm above the dial; stop gap 0.3 mm.",
+ "assembly": [
+  "1. Print dial (face up), gnomon (flat) and pin.",
+  "2. Lay the gnomon lug between the two ears and slide the pin through.",
+  "3. Press a 20 mm button compass into the recess.",
+  "4. Lift gnomon until it touches the stop."
+ ],
+ "fit_notes": "Latitude is baked in (40 deg N; change `lat` in the source to regenerate for your location). Compass not included.",
+ "validation": {
+  "faces": 2260,
+  "vertices": 1124,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 49121.5,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   117.8,
+   96.0,
+   24.2
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 3,
+  "euler_number": -6,
+  "overhang_area_mm2": 123.8,
+  "overhang_pct": 0.65,
+  "bed_contact_mm2": 7233.9,
+  "flat_bottom": true,
+  "thick_min_mm": 0.02,
+  "thick_p2_mm": 1.48,
+  "pct_samples_below_1p2mm": 1.8,
+  "pass": true,
+  "stl_kb": 110
+ }
+}

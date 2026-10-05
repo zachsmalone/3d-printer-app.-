@@ -1,0 +1,134 @@
+{
+ "slug": "rain-guard-bird-feeder",
+ "title": "Bird Feeder with Rain-Guard Roof and Twist-Lock Reservoir (4 parts)",
+ "category": "Outdoor Mechanisms",
+ "description": "Seed reservoir with four arched feeding ports locks into a catch tray by bayonet; a bayonet cap carries a hanging post, and a 144 mm cone roof slides down over it. The roof overhang keeps rain off the seed ports.",
+ "use": "Hang from a branch or hook. Fill with sunflower or wild-bird seed, lock the cap, then slip the roof on. Clean the tray weekly.",
+ "material": "PETG or ASA (outdoor UV), 0.2 mm layers, 4 perimeters. Print each part on its own plate: roof upside-down on its sleeve, cap upright, reservoir upright, tray flat. Food-contact: bird seed only, not for people.",
+ "color": [
+  0.45,
+  0.7,
+  0.4
+ ],
+ "max_faces": 80000,
+ "el": 40,
+ "parts": {
+  "roof": [
+   144.0,
+   144.0,
+   68.0
+  ],
+  "tray": [
+   124.0,
+   124.0,
+   17.0
+  ],
+  "cap_post": [
+   80.0,
+   80.0,
+   71.0
+  ],
+  "reservoir": [
+   72.2,
+   70.0,
+   90.0
+  ]
+ },
+ "mech_ok": true,
+ "mechanism_tests": [
+  "PASS | assembled: tray vs reservoir: overlap 0.000 mm3 (must be 0)",
+  "PASS | assembled: reservoir vs cap: overlap 0.000 mm3 (must be 0)",
+  "PASS | assembled: cap vs roof: overlap 0.000 mm3 (must be 0)",
+  "PASS | assembled: reservoir vs roof: overlap 0.000 mm3 (must be 0)",
+  "PASS | assembled: tray vs roof: overlap 0.000 mm3 (must be 0)",
+  "PASS | roof clear of cap plate/collar: min gap 2.14 mm (need >= 1.0)",
+  "PASS | reservoir descending straight into tray: dz=14: overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir descending straight into tray: dz=8: overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir descending straight into tray: dz=3: overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir descending straight into tray: dz=0: overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir seated, twisted 0 deg (lugs in vertical slots): overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir twist 8 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir twist 16 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir twist 24 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | reservoir twist 28 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | locked: reservoir cannot be lifted 1.6 mm (lugs trapped under the arm roof): overlap 12.838 mm3 (stop/latch must engage, >0)",
+  "PASS | cap descending onto reservoir dz=14: overlap 0.000 mm3 (must be 0)",
+  "PASS | cap descending onto reservoir dz=8: overlap 0.000 mm3 (must be 0)",
+  "PASS | cap descending onto reservoir dz=3: overlap 0.000 mm3 (must be 0)",
+  "PASS | cap descending onto reservoir dz=0: overlap 0.000 mm3 (must be 0)",
+  "PASS | cap twist 8 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | cap twist 16 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | cap twist 24 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | cap twist 28 deg (lugs travel inside the slot arm): overlap 0.000 mm3 (must be 0)",
+  "PASS | locked: cap cannot be lifted 1.6 mm: overlap 12.838 mm3 (stop/latch must engage, >0)",
+  "PASS | roof descending on post dz=30: overlap 0.000 mm3 (must be 0)",
+  "PASS | roof descending on post dz=15: overlap 0.000 mm3 (must be 0)",
+  "PASS | roof descending on post dz=5: overlap 0.000 mm3 (must be 0)",
+  "PASS | roof descending on post dz=0: overlap 0.000 mm3 (must be 0)",
+  "PASS | rain shadow: seed ports stay dry up to 43 deg of wind-blown tilt from vertical (rim r=72 mm at 39 mm above port top)",
+  "PASS | roof printed inverted on sleeve; cone angle 44 deg from vertical"
+ ],
+ "untested_physically": true,
+ "multi_plate": true,
+ "problem_solved": "Open bird feeders get rained on: seed clumps, molds and can sicken birds. Most printable feeders are open bowls. Here the roof overhang sheds rain from the ports, drain holes keep the tray from pooling, and twist-lock joints make filling and cleaning tool-free.",
+ "mechanism": "Two 3-lug bayonet joints (tray-reservoir and reservoir-cap), a central hanging post that carries the load, and a loose cone roof that slides over the post.",
+ "tolerances": "Lug 2.8 mm in 3.6 mm slot (0.4 clearance each side); reservoir 0.5 mm radial in collar; roof sleeve 0.2 mm radial to post shoulder 0.3 mm vertical; roof to cap >= 1 mm.",
+ "assembly": [
+  "1. Print tray, reservoir, cap+post, roof (each on its own plate).",
+  "2. Drop the reservoir lugs into the tray slots, twist ~30 deg.",
+  "3. Fill with bird seed through the top, drop the cap on, twist ~30 deg.",
+  "4. Slide the roof over the post until it rests on the shoulder.",
+  "5. Tie cord through the post eye."
+ ],
+ "fit_notes": "Roof and tray exceed a 150 mm bed if combined: print the parts separately. Load: seed fill about 0.35 kg (not tested). Clean weekly with hot soapy water.",
+ "validation": {
+  "faces": 9500,
+  "vertices": 4734,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 186094.3,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   144.0,
+   439.0,
+   90.0
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 4,
+  "euler_number": -16,
+  "overhang_area_mm2": 5156.6,
+  "overhang_pct": 3.35,
+  "bed_contact_mm2": 16480.3,
+  "flat_bottom": true,
+  "thick_min_mm": 0.04,
+  "thick_p2_mm": 1.9,
+  "pct_samples_below_1p2mm": 0.7,
+  "pass": true,
+  "per_part_extents_mm": {
+   "roof": [
+    144.0,
+    144.0,
+    68.0
+   ],
+   "tray": [
+    124.0,
+    124.0,
+    17.0
+   ],
+   "cap_post": [
+    80.0,
+    80.0,
+    71.0
+   ],
+   "reservoir": [
+    72.2,
+    70.0,
+    90.0
+   ]
+  },
+  "plate_note": "STL lays all parts out on one preview plate (larger than a 150 mm bed); print each part separately.",
+  "stl_kb": 463
+ }
+}

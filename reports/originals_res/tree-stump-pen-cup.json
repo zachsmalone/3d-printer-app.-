@@ -1,0 +1,41 @@
+{
+ "slug": "tree-stump-pen-cup",
+ "title": "Tree Stump Pen Cup",
+ "category": "Useful Items",
+ "description": "Organic tree-stump pencil cup with bark ridges, root flare, wavy cut rim and two tiny toadstools.",
+ "use": "Pen / pencil / brush holder, 62 mm bore, ~90 mm deep.",
+ "material": "PLA or PETG, 0.2 mm layers, 3 perimeters; wood-fill filament looks great.",
+ "color": [
+  0.55,
+  0.4,
+  0.28
+ ],
+ "max_faces": 80000,
+ "validation": {
+  "faces": 80000,
+  "vertices": 40002,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 150475.0,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   92.9,
+   86.8,
+   103.1
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 134.0,
+  "overhang_pct": 0.26,
+  "bed_contact_mm2": 5330.7,
+  "flat_bottom": true,
+  "thick_min_mm": 0.5,
+  "thick_p2_mm": 4.17,
+  "pct_samples_below_1p2mm": 0.3,
+  "pass": true,
+  "stl_kb": 3906
+ }
+}

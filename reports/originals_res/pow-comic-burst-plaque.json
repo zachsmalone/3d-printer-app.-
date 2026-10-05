@@ -1,0 +1,43 @@
+{
+ "slug": "pow-comic-burst-plaque",
+ "title": "POW! Comic Burst Wall Plaque",
+ "category": "Comic Book Art",
+ "description": "Comic-book \"POW!\" starburst wall plaque with raised letters, outline ring and Ben-Day halftone dots. Generic comic sound-effect lettering - no characters or logos.",
+ "use": "Wall art / locker or desk display. Two keyhole hangers on the back.",
+ "material": "PLA, 0.16 mm layers; try colour changes at layer heights for the letters (letters rise from 5 mm to 9 mm).",
+ "color": [
+  0.95,
+  0.8,
+  0.2
+ ],
+ "max_faces": 90000,
+ "el": 60,
+ "az": -15,
+ "validation": {
+  "faces": 89998,
+  "vertices": 44995,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 55299.3,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   128.8,
+   125.9,
+   9.5
+  ],
+  "bbox_min_z": -0.002,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": -4,
+  "overhang_area_mm2": 82.7,
+  "overhang_pct": 0.32,
+  "bed_contact_mm2": 8987.0,
+  "flat_bottom": true,
+  "thick_min_mm": 0.38,
+  "thick_p2_mm": 1.97,
+  "pct_samples_below_1p2mm": 0.8,
+  "pass": true,
+  "stl_kb": 4394
+ }
+}

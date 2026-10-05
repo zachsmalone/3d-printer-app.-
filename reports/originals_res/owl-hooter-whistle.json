@@ -1,0 +1,72 @@
+{
+ "slug": "owl-hooter-whistle",
+ "title": "Owl Hooter Whistle (5-part)",
+ "category": "Wildlife Calls",
+ "description": "Large low-pitch fipple whistle with a sliding tuning piston and a cute owl-face end cap (ear tufts, eye rings, beak). For soft hoots.",
+ "use": "Nature-study / hobby accessory and toy; use lawfully.",
+ "material": "PETG/PLA 0.16 mm. Rubber band seal on piston.",
+ "color": [
+  0.62,
+  0.5,
+  0.38
+ ],
+ "max_faces": 70000,
+ "assembly": [
+  "1. Press the fipple plug into the mouth end, flat windway side toward the window.",
+  "2. Fit a thin rubber band in the piston groove, slide the piston in from the far end.",
+  "3. Thread the rod through the owl cap and press the cap onto the body.",
+  "4. Blow softly with lips sealed on the plug; slide the rod for different hoot pitches."
+ ],
+ "fit_notes": "Joint clearances: press-fit joints are modelled with 0.10 mm radial clearance (0.20 mm on diameter); sliding joints 0.25 mm radial. If a press-fit is loose wrap one turn of PTFE (plumber) tape or a dab of glue; if tight, sand lightly - do not force. Not tested by test-printing or acoustic measurement. Sound depends on your printer, filament, reed film and fit - expect to tune.",
+ "parts": {
+  "owl_face_end_cap": [
+   34.4,
+   34.4,
+   41.0
+  ],
+  "whistle_body": [
+   33.4,
+   33.4,
+   120.0
+  ],
+  "fipple_plug": [
+   31.4,
+   27.9,
+   23.0
+  ],
+  "piston_rod": [
+   25.9,
+   25.9,
+   115.0
+  ]
+ },
+ "assembled_interference_mm3": [],
+ "fit_check": "parts built in assembled pose and boolean-intersected pairwise: no interference found",
+ "validation": {
+  "faces": 20606,
+  "vertices": 10305,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 76598.6,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   146.1,
+   34.4,
+   120.0
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 4,
+  "euler_number": 2,
+  "overhang_area_mm2": 627.0,
+  "overhang_pct": 1.74,
+  "bed_contact_mm2": 2014.5,
+  "flat_bottom": true,
+  "thick_min_mm": 0.07,
+  "thick_p2_mm": 2.78,
+  "pct_samples_below_1p2mm": 0.4,
+  "pass": true,
+  "stl_kb": 1006
+ }
+}

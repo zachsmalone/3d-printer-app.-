@@ -1,0 +1,40 @@
+{
+ "slug": "bubble-helmet-explorer-bust",
+ "title": "Bubble-Helmet Explorer Bust",
+ "category": "Comic Book Art",
+ "description": "A comic-style explorer bust: round bubble helmet with a smiling face behind the visor, antenna, shoulder pads and a star chest badge. Generic character concept.",
+ "use": "Desk display, shelf bust, painting practice piece.",
+ "material": "PLA. Print upright at 0.12-0.16 mm for crisp badge detail; 15% infill. Antenna tip is slim - handle with care.",
+ "color": [
+  0.85,
+  0.3,
+  0.3
+ ],
+ "validation": {
+  "faces": 75000,
+  "vertices": 37502,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 109099.9,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   72.0,
+   47.5,
+   97.2
+  ],
+  "bbox_min_z": -0.006,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 3205.9,
+  "overhang_pct": 20.36,
+  "bed_contact_mm2": 16.8,
+  "flat_bottom": false,
+  "thick_min_mm": 0.34,
+  "thick_p2_mm": 5.02,
+  "pct_samples_below_1p2mm": 0.4,
+  "pass": true,
+  "stl_kb": 3662
+ }
+}

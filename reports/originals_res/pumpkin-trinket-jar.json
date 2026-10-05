@@ -1,0 +1,47 @@
+{
+ "slug": "pumpkin-trinket-jar",
+ "title": "Pumpkin Trinket Jar (2 parts)",
+ "category": "Containers",
+ "description": "A lobed pumpkin that splits in the middle: a hollow base with a lid topped by a curly stem. Great for rings, candy-wrapped surprises, pins or paperclips.",
+ "use": "Trinket jar, seasonal desk decoration, small gift box.",
+ "material": "PLA or PETG, 0.2 mm layers. Orange/silk filament looks great. Lid lip: 0.25 mm radial clearance (slip fit).",
+ "color": [
+  0.95,
+  0.55,
+  0.15
+ ],
+ "max_faces": 80000,
+ "parts": {
+  "base": "lobed hollow pumpkin base",
+  "lid": "pumpkin top with stem and inner lip"
+ },
+ "fit_notes": "Lid lip 0.25 mm radial clearance (slip fit).",
+ "validation": {
+  "faces": 80000,
+  "vertices": 40004,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 52842.0,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   145.0,
+   67.5,
+   35.8
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 2,
+  "euler_number": 4,
+  "overhang_area_mm2": 3397.1,
+  "overhang_pct": 13.86,
+  "bed_contact_mm2": 1614.6,
+  "flat_bottom": true,
+  "thick_min_mm": 2.23,
+  "thick_p2_mm": 2.34,
+  "pct_samples_below_1p2mm": 0.0,
+  "pass": true,
+  "min_gap_between_parts_mm": null,
+  "stl_kb": 3906
+ }
+}

@@ -81,3 +81,114 @@ Method: web searches on 2026-10-04; I read the search-result excerpts and did no
 6. **Adopt — keep OctoPrint/Moonraker (open protocols) as the first-class printer paths;** **reject** building around Bambu's cloud/network plugin or Bambu Connect for now (policy-dependent, open to change; LAN/export hand-off stays possible).
 7. **Reject — competing as a full CAD tool.** Teachers point to Tinkercad/Onshape for modelling; ZEIM's Edit is for fixing, scaling and preparing files, which fits our young-project reality.
 8. **Adopt — fix the slice stats parser** (read the whole G-code summary), since print time/filament is something every slicer shows; gap #3.
+
+
+---
+
+## Batch 1 QA pass (Ren Ishikawa, Mesh & Slicer QA) — 2026-10-04, ~17:45–18:25 CT
+
+Requested by Haruto. Read-only on app code: I edited nothing under `app/`, `static/`, `tests/`; this section is the only change. Real headless Chrome (Playwright, `/usr/bin/google-chrome`, Chromium flags `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`), phone context 390x844 (touch, iPhone UA) and desktop 1280x800. Scripts and raw JSON: `/workspace/qa/b1/` (`t1*.py … t7*.py`, `t*_results.json`). Screenshots: `reports/qa_screens/batch1/` (87 PNGs, 8.8 MB).
+
+**What I tested against (please read).** The working tree changed under me while I tested (static files were rewritten at 17:56–17:57, and IOS-2, SEND-2..9 and the K1 preset have landed since). So the authoritative run is a **pinned copy of commit `97a63d6`** (`git archive` → `/workspace/qa`, own temp `data/` + `outputs/`, port 8766, `PHOTO3D_MODE=local`). I then re-ran the checks that matter most on the **live :8765 UI as it stood at ~18:20 CT** (item 3 and the cross-workspace Print bug in item 4). Items 1, 2, 5, 6 and 7 were not re-run on the newer live code. All builds I made on :8765 were deleted afterwards (`outputs/` is identical to my pre-test listing); the pinned instance's data was thrown away.
+
+### Result table
+
+| # | Test | Result | Evidence (screenshots in `reports/qa_screens/batch1/`) |
+|---|---|---|---|
+| 1a | Studio: Take a photo / Choose a photo / Use a sample image | **PASS** (1 Low UI bug, QA-2) | `t1_phone_start`, `t1_phone_take_making`, `t1_phone_take_built`, `t1_phone_choose_making`, `t1_phone_sample_built`, `t1_desk_camera_live/captured/built` |
+| 1b | Studio: HEIC + rotated JPEG | **PASS** | `t1_phone_heic_built`; stored files below |
+| 1c | EXIF/GPS stripped from stored files; orientation applied | **PASS** (orientation 6 and 3 only) | table below |
+| 1d | Studio errors inline, no raw Python / `[object Object]` | **PASS** | `t1_phone_err_fake`, `_fake_real`, `_notes`, `_doc`, `_empty`, `_oversize26` |
+| 1e | Edit photo start (Take / Choose / Sample, HEIC, rotated, errors) | **PARTIAL** (QA-3) | `t1_phone_edit_start`, `t1_phone_edit_take`, `t1_phone_edit_err_*` |
+| 2a | Beginner auto-build shows "Making your 3D model…" | **PASS** | `t1_phone_take_making`; also after "Change photo" in Beginner |
+| 2b | Expert: no auto-build, sticky Build bar, thumbnail + Change photo | **PASS** with caveats (QA-4, QA-5) | `t2_phone_expert_sticky_build`, `t2_phone_expert_built`, `t2_desktop_*` |
+| 3 | No horizontal scroll at 320 / 375 / 390 / 768 | **PASS** (36/36 pinned, 36/36 live) | `t3_<w>_{studio,studio_expert,showcase,edit,learn,edit_loaded,studio_built,print_dialog}` |
+| 4a | Stale-model fix inside Studio (build twice → Print uses latest) | **PASS** | `t4_print_after_A`, `t4_print_after_B` |
+| 4b | Stale model across Studio ↔ Edit | **FAIL** (QA-1, Medium) | `t4_studio_print_after_edit_other_model`, `t4_edit_print_after_studio_open` |
+| 5 | Edit drop zone with the 5-build cap | **PASS** (was UNVERIFIED) | `t5_{desktop,phone}_*` |
+| 6 | Edit text on the bounding-box faces | **PASS** (12/12; QA-6 Low edge case) | `t6_text_tool_form`, `t6_emboss_top/front/right`, `t6_deboss_left` |
+| 7a | Pop-art OBJ/3MF watertight | **PASS**: 11 of 11 previously failing cases now clean | below |
+| 7b | Hollow | **FAIL, unchanged** (known; not in Batch 1) | below |
+| 7c | Simplify | **FAIL, unchanged** (known; not in Batch 1) | below |
+
+### 1. Photo start
+
+**Stored photo check** (inspected `outputs/<id>/source.*` with Pillow after each build; the test JPEG has EXIF Make/Model/Date and a GPS IFD, orientation tag set; raw bytes also grepped for the camera name):
+
+| Input | Path | Stored file | EXIF / GPS / XMP | Orientation result |
+|---|---|---|---|---|
+| `rotated_exif6_gps.jpg` 300x200, orient 6, GPS | Studio Take (capture input) | `source.jpg` 200x300 | none | red marker top-left → top-right (correct 90° CW) |
+| `rotated_exif3_gps.jpg` 300x200, orient 3, GPS | Studio Choose | `source.jpg` 300x200 | none | red marker top-left → bottom-right (correct 180°) |
+| `real_gps.heic` (genuine HEIF container, GPS, orient 6) | Studio Choose | `source.jpg` 200x300 | none | same as orient-6 JPEG |
+| same files | Edit Take / Choose | `source.jpg` 200x300 | none | same |
+| `sample.png` | Studio and Edit Sample | `source.png` 480x360 | none | n/a |
+| fake camera (Chrome fake device, desktop) | Studio Take → Capture → Use photo | `source.jpg` 640x480 | none | n/a; stream tracks `ended` right after Capture |
+
+No copy of the camera name or GPS exists anywhere under the pinned `outputs/` or `data/` (grep). Edit photo projects keep only the derived STL as `original.stl`, not the photo upload.
+Note for the test data: `/workspace/qa/upload/IMG_0001.HEIC` is actually JPEG bytes with a `.HEIC` name, and `fake_real.heic` is 524 bytes that no decoder opens. I generated a real HEIF file with `pillow-heif` for the HEIC tests (`/workspace/qa/b1/real_gps.heic`).
+
+**Studio errors** (phone, inline `#sMsg`, still visible after 9 s, no toast, no page errors, no horizontal scroll): `fake_real.heic`, `fake.jpg`, `notes.txt`, `doc.pdf` → server 400 `We couldn't open that photo. Try a JPG or PNG.`; `empty.jpg` → same text, no request sent; 26 MB file → `That photo is over 25 MB. Try a smaller one (JPG or PNG).`, no request. Direct API: 27 MB → 413 `{"detail":"image too large (max 25 MB)"}` (the UI blocks it first).
+
+**Edit photo errors** (phone): bad/fake JPEG and HEIC → inline `We couldn't open that photo…`; `.txt`/`.pdf` → inline `Unsupported file type. Upload .stl, .obj or .3mf (or a .png/.jpg photo).`; **`empty.jpg` (400 "The file is empty.") and a 26 MB photo (413 "Photo too large (max 25 MB).") are toasts only**, gone after 4.5–8 s (QA-3). A corrupt `.stl` via "Choose a 3D file" is also a toast (acceptable; it is not the photo area).
+
+### 2. Beginner / Expert
+- Phone, Beginner: choosing any photo shows "Making your 3D model…" (spinner, `role=status`) within 2.5 s and builds without pressing Build; Change photo (44 px high) re-builds with the same line.
+- Phone and desktop, Expert: choosing or changing a photo sends **no** request (0 requests after 3 s), Build is enabled, hint "Photo ready: …", thumbnail loaded at natural size 200x300 (rotation applied), Change photo swaps the thumbnail. Pressing Build shows the busy overlay and the line, disables Build and Print while building, then "✨ Build again with these settings".
+- Sticky Build (phone, Expert, 390x844): `position: sticky`, button bottom at 836/844 at scroll 0 and 300, i.e. 8 px above the bottom edge. See QA-5 for the limits.
+
+### 3. Horizontal scroll
+`document.documentElement.scrollWidth` and `body.scrollWidth` equal `innerWidth` at 320/375/390/768 on Studio (empty, Expert, after a build, Print dialog open), Showcase, Edit (start, project loaded in Beginner and Expert) and Learn; top bar `scrollWidth == clientWidth`; no element's right edge past the viewport. Pinned: 36/36. Live :8765 at ~18:20: 36/36 (after IOS-2 and Send landed; Send menu and sheet themselves not examined).
+
+### 4. Stale model
+Pinned, Expert mode, A = lithophane (sample.png), B = pop-art (rotated JPEG, 60 mm), C = lithophane again:
+- After each build, `GET /api/print/<id>/links` was requested for the latest id, the dialog title read the latest build ("Printing: rotated_exif6_gps (Expert, Pop-art)"), the "download 3MF" link pointed at the latest id, and "Slice to G-code" posted to `/api/slice/<B>` (25 layers, 1 h 17 m, 13.6 g). Re-opening A from Recent builds then Print → A. Print is disabled while a rebuild is running. **PASS.**
+- **QA-1 (FAIL):** see below.
+
+### 5. Edit drop zone at the cap
+Filled a fresh session to 5/5 (API), then triggered each entry point in the UI, on desktop and on phone: drop a file on the drop zone (synthetic `drop` event), click the drop zone, "Choose a 3D file", "Try a sample model", photo "Choose a photo", photo "Use a sample image", "Edit it" (from a Studio build). All 14 runs: `POST /api/edit/new` → 409, the "Build history is full" dialog opens (5 items, "Build now" disabled), inline message "Your recent builds are full (5 of 5). Delete one in the window, then continue.", no toast, no raw error. Recovery: "Auto-delete oldest & build" → oldest removed, project created, 5/5; "Delete one" → "Build now" enabled → project created. Both on desktop and phone (dialog fits 390 px, `t5_phone_drop_file_on_drop_zone`). Minor: if the dialog is closed with ✕ the red inline message stays on the Edit start panel; not harmful.
+
+### 6. Edit text on the faces
+Uploaded `box40x30x20_offset.stl` (box centred at (10,-5,3), so face centres are not at the origin), Expert mode, Text tool form, text "F", height 8, depth 1, then each of top / bottom / front / back / left / right in **emboss and deboss** (undo between). From the downloaded STL (independent trimesh check): emboss grows the bounding box by exactly 1.000 mm along the chosen face's outward normal and not on any other axis; deboss leaves the bounding box unchanged and removes ~14.75 mm³ (vs +14.75 mm³ for emboss); every result is watertight; the text vertices lie inside the face; in each face's own outside-view (u right, v up) frame the letter is not mirrored (stem on the left, arms to the right) and its centroid sits at the face centre (-0.1, 0.73 mm = the F's own offset). Also by API: "Shift →/↑" moves by exactly the given mm in that same frame (back and left faces, +5/+2 → (4.9, 2.73)), rotation 90° turns the glyph 90° anticlockwise as seen from outside (extent 4.6x8 → 8x4.6).
+**QA-6 (Low):** text pushed or sized past the face is accepted without a warning (below).
+
+### 7. Mesh checks
+- **Pop-art, API repro:** `/workspace/qa/shapes_repro.png`, `mode=popart`, `beginner=true` via `/api/generate`: app `stats.watertight=true`, all 4 layers true. `model.3mf`: 4 bodies, each watertight, winding-consistent, **0 non-manifold edges, 0 boundary edges** (per-body edge count by hand + trimesh). `model.obj` (4 `o` groups) 0/0 per object; STL welded 0/0. Also `halftone` and `levels=8, layer_mm=0.2` (8 bodies): all clean.
+- **Broad re-run:** the 22 pop-art cases from `gen.py` / `mesh_audit.md` re-generated in-process with the current code (`/workspace/qa/gen_b1.py`, per-body checks of STL/OBJ/3MF). Previously failing: 11 of 22. **Now failing: 0 of 22.** Five extra pop-art cases (palette, single body) also clean → 27/27. The earlier minimal case (`fix_checkers` on a diagonal pair) is covered by the same fix.
+- **Hollow (unchanged):** `sample_model.stl` (vase) → hollow wall 2 + drain Ø3 → HTTP 200, app says watertight; independent check: **333 shells** (same as the original audit). A solid 40 mm sphere hollowed the same way gives 1 shell, volume −76 %: fine. So the void-shell bug is specific to the vase-like input. Not retested: thin-wall depth (min 0.21 mm earlier).
+- **Simplify (unchanged):** `a_gear_bracket_binary.stl`, `keep_ratio 0.5` → 58,976 → 57,564 triangles (−2.4 %), **not watertight, 2 non-manifold edges, 2 shells**, `warnings: []`. A sphere with `keep_ratio 0.25` reaches 1,280 of 5,120 triangles and stays watertight.
+- Not retested: aspect-ratio output cap (mesh_audit Bug 4).
+
+### Bugs found
+
+**QA-1 · Medium · Print opens a different model than the one on screen (Studio ↔ Edit share one "current build").**
+Repro (pinned 97a63d6 and live :8765 at ~18:20): 1) Studio, Beginner, "Use a sample image" → a lithophane appears. 2) Edit tab → "Try a sample model" → project `sample_vase` opens. 3) Back to **Studio** tab; the lithophane is still shown. 4) Click "Print…".
+Expected: dialog for the lithophane on screen. Actual: dialog says "Printing: sample_vase (Beginner, Edited model)", `/api/print/<vase id>/links` is requested, and 3MF/slice/send would use the vase. Reverse: open the lithophane from Recent builds, go to the Edit tab (vase project still shown), click "Print…" → "Printing: sample (Beginner, Lithophane)". (`t4_studio_print_after_edit_other_model.png`, `t4_edit_print_after_studio_open.png`.)
+Cause, from reading only: `app.js` `openPrint()` uses `S.current.id`, and `edit.js` `loadProject()` overwrites `S.current` with the Edit project; each Print button should pass its own workspace's build. The in-Studio stale fix (item 4a) is fine; this is the same class of bug across tabs. The dialog's "Printing: <title>" line shows the problem, but kids will not read it.
+
+**QA-2 · Low · Studio keeps a rejected photo as "ready".** Phone, choose `fake.jpg` (or any unreadable file): red message "We couldn't open that photo…" is shown, but the drop area says "Photo ready — (This browser can't preview it, ZEIM will still open it.)", the row says "✔ fake.jpg … Change photo", and Build is enabled (pressing it repeats the error). Expected: after a 400 photo error, clear the chosen file, preview and ✔ row, and disable Build. (`t1_phone_err_fake.png`.) Cause: the `img.onerror` fallback text is meant for browsers that cannot preview HEIC.
+
+**QA-3 · Low · Edit photo start: some errors are toasts, not inline.** Empty file (400) and photo over 25 MB (413) → toast only, vanishes in 4.5–8 s; Studio shows both inline and pre-checks size before upload. Fix: same pre-checks in `edit.js` and route 400/413 photo errors to `editPick.msg`. (`t1_phone_edit_err_empty.png`, `…_oversize26.png`.)
+
+**QA-4 · Low (UX) · On a phone the finished model is off-screen.** After the Beginner auto-build (390x844) the page stays on the Photo/Style area; the only sign is the "Model built ✔" toast, and the viewer/result bar is ~2 screens below. (`t1_phone_take_built.png`.) Suggest scrolling the viewer into view (respecting reduced motion) and moving focus/announcing "Your 3D model is ready".
+
+**QA-5 · Low · Sticky Build bar limits.** `position: sticky` is bounded by the controls panel: it floats while the settings are scrolled, but once the viewer/result section is reached (scroll ≈ 1,200 of 2,339 px at 390x844) it scrolls away, so "Build again" is not reachable without scrolling back up. The rule also applies to Beginner, where at scroll 0 the button covers the lower part of the three Style cards (the "Relief / Pop-art" captions) (`t1_phone_take_making.png`). Desktop is not sticky (by design, ≤768 px rule) and sits at y=1156/800 in Expert until the panel is scrolled.
+
+**QA-6 · Low · Edit text: off-face placement is silent.** On a 40x30x20 box, `text` emboss with `offset_u=30` on the top face → HTTP 200, message "emboss “F” on top", analysis watertight, but the result has **2 shells** (floating letter, bbox 52.3 mm wide); the same offset with `deboss` does nothing (1 shell, same bbox) with a success message; `height=50` emboss overhangs the 30 mm face (bbox grows 30 → 50). Expected: warn "text extends past the face / does not touch the model" (or clamp). Related existing note in the UI ("curved surfaces may not touch") does not cover flat faces.
+
+**Carried over, unchanged by Batch 1 (listed in `mesh_audit.md` Bugs 2, 3, 4):** Hollow leaves ~333 void/sliver shells on the vase; Simplify ignores its target on CAD-style meshes and can open the mesh while reporting success; no output cap for extreme aspect ratios.
+
+**Infrastructure note (not a ZEIM bug).** The shared box's root filesystem reached 100 % at ~18:10 CT (Chrome could not create its temp dir: `ENOSPC`). My pinned instance wrote large builds (an Expert-mode pop-art from a 300x200 test image at default resolution is ~770k triangles × STL/OBJ/3MF, ~591 MB for the run) and my earlier audit scratch (`/workspace/qa/gen`, 2.7 GB) was still there. I do not know what else filled it; I freed my own pinned/test files (now ~1.9 GB free). Other large directories under `/tmp` (e.g. `/tmp/b1` 1.1 GB, `/tmp/freshvenv` 456 MB, several `/tmp/tmp*` of 164 MB) are not mine and I left them. Ops may want to look at disk space and an `outputs/` quota.
+
+### Unverified / not done
+- **Real iOS Safari / Photos / iCloud HEIC** (10-bit, multi-image, Live Photo): not tested; HEIC proof is a Pillow-heif-written HEIF file only.
+- **Phone "Take a photo"** uses `<input capture=environment>`; in Chrome I answered the file chooser with a file, so the OS camera hand-off and its orientation behaviour are unverified. The live `getUserMedia` flow ran on desktop with Chrome's fake device only.
+- EXIF orientations 2, 4, 5, 7, 8 (mirrored / 270°) not tested; only 6 and 3.
+- Safe-area / home-indicator behaviour of the sticky bar (needs a real iPhone).
+- VoiceOver announcement of "Making your 3D model…" (it has `role=status aria-live=polite` in the markup; not heard).
+- Items 1, 2, 5, 6, 7 were not re-run on the newest live code (IOS-2, SEND-2..9, K1); the Send sheet, Send policy and K1 preset were outside this request.
+- Hollow thin-wall depth and the aspect-ratio cap were not re-measured.
+
+### Hansei
+- I started on the live :8765 instance, then noticed the static files changing under me (and a "Send" button appearing in my screenshots). Pinning `97a63d6` fixed that, but I lost about 20 minutes and some screenshots from the first pass were replaced; the final set mixes pinned shots with two live ones (`t4_studio_print_after_edit_other_model`, `t4_edit_print_after_studio_open`, both showing the newer "Send…" button).
+- Several of my first scripts had test bugs, not app bugs (clicked an Edit control while on the Learn tab; expected Expert mode to auto-build; scrolled `window` when `body` was the scroller; used a heuristic for letter orientation on "F4"). Each was fixed and re-run before I recorded a result.
+- My test files contributed to the disk filling up. Large builds should be deleted right after each check, and `/workspace/qa/gen` (old audit models) should be pruned.

@@ -1,0 +1,40 @@
+{
+ "slug": "sleepy-loaf-cat",
+ "title": "Sleepy Loaf Cat",
+ "category": "Figures & Desk Art",
+ "description": "A cat tucked into a cosy loaf with closed sleepy eyes, tiny paws and a tail wrapped round its feet.",
+ "use": "Desk figure, bookshelf companion, paperweight-style gift.",
+ "material": "PLA or PETG. Print as-is, 0.2 mm layers, 15-20% infill. No supports expected.",
+ "color": [
+  0.9,
+  0.62,
+  0.3
+ ],
+ "validation": {
+  "faces": 75000,
+  "vertices": 37502,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 93723.4,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   61.9,
+   84.5,
+   59.4
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 2,
+  "overhang_area_mm2": 2927.3,
+  "overhang_pct": 20.44,
+  "bed_contact_mm2": 36.6,
+  "flat_bottom": true,
+  "thick_min_mm": 2.85,
+  "thick_p2_mm": 7.32,
+  "pct_samples_below_1p2mm": 0.0,
+  "pass": true,
+  "stl_kb": 3662
+ }
+}

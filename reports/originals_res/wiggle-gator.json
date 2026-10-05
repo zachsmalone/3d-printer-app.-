@@ -1,0 +1,48 @@
+{
+ "slug": "wiggle-gator",
+ "title": "Wiggle Gator (print-in-place articulated)",
+ "category": "Toys & Articulated",
+ "description": "A chunky cartoon gator made of 8 segments joined by vertical-pin hinges that print already assembled; it wiggles side to side like a real tail.",
+ "use": "Fidget toy and desk pet. Print-in-place: no assembly, but you must snap each joint free once.",
+ "material": "PLA or PETG, 0.12-0.16 mm layers, no supports, 15% infill, fine bridging settings. Hinge clearances: 0.55 mm radial, 0.6 mm vertical (tested only in software: gap check below). Break joints free by flexing gently.",
+ "color": [
+  0.45,
+  0.72,
+  0.3
+ ],
+ "max_faces": 98000,
+ "no_decimate": true,
+ "expected_bodies": 8,
+ "parts": {
+  "segments": "8 hinged segments (print-in-place)"
+ },
+ "fit_notes": "Print-in-place hinge: pin radius 2.2 in ring hole radius 2.75 (0.55 mm radial), 0.6 mm vertical gaps above/below ring, 0.55-0.6 mm around lobe. See min_gap_between_parts_mm in validation.",
+ "validation": {
+  "faces": 98000,
+  "vertices": 49002,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 22294.8,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   146.0,
+   33.6,
+   14.2
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 8,
+  "euler_number": 2,
+  "overhang_area_mm2": 913.3,
+  "overhang_pct": 7.53,
+  "bed_contact_mm2": 1229.4,
+  "flat_bottom": true,
+  "thick_min_mm": 0.14,
+  "thick_p2_mm": 1.89,
+  "pct_samples_below_1p2mm": 1.6,
+  "pass": true,
+  "min_gap_between_parts_mm": 0.52,
+  "stl_kb": 4785
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "slug": "ember-baby-dragon",
+ "title": "Ember the Baby Dragon",
+ "category": "Figures & Desk Art",
+ "description": "A chunky friendly baby dragon sitting up with bat wings, back spikes, horns and a curled tail. Original character design.",
+ "use": "Display figure, tabletop RPG mini scale-up, gift.",
+ "material": "PLA, any colour (a gradient/silk filament looks great). Print as-is, 0.16-0.2 mm layers, 15% infill; horns/wing tips are thin - print slowly.",
+ "color": [
+  0.45,
+  0.75,
+  0.4
+ ],
+ "validation": {
+  "faces": 75000,
+  "vertices": 37500,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 91664.9,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   76.8,
+   79.7,
+   78.1
+  ],
+  "bbox_min_z": -0.001,
+  "fits_150mm": true,
+  "bodies": 1,
+  "euler_number": 0,
+  "overhang_area_mm2": 2054.5,
+  "overhang_pct": 11.45,
+  "bed_contact_mm2": 500.4,
+  "flat_bottom": true,
+  "thick_min_mm": 0.15,
+  "thick_p2_mm": 2.36,
+  "pct_samples_below_1p2mm": 0.0,
+  "pass": true,
+  "stl_kb": 3662
+ }
+}

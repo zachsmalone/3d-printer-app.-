@@ -1,0 +1,49 @@
+{
+ "slug": "flower-fidget-spinner",
+ "title": "Flower Fidget Spinner (print-in-place)",
+ "category": "Toys & Articulated",
+ "description": "A six-petal flower that spins freely on a central post. The hub is captured under the post head; it prints already assembled.",
+ "use": "Desk fidget. Print-in-place - flick it once to break the layer bond.",
+ "material": "PLA or PETG, 0.12-0.16 mm layers, no supports (0.5 mm air gaps), cool well. Clearances: hub bore 0.5 mm radial, 0.6 mm vertical.",
+ "color": [
+  0.95,
+  0.5,
+  0.7
+ ],
+ "max_faces": 98000,
+ "no_decimate": true,
+ "expected_bodies": 2,
+ "parts": {
+  "base+post": "fixed base with post",
+  "spinner": "six-petal rotor"
+ },
+ "fit_notes": "Hub bore radius 3.9 vs post 3.4 (0.5 mm radial); rotor floats 0.5 mm above base disc and 0.6 mm below post head.",
+ "validation": {
+  "faces": 98000,
+  "vertices": 49002,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 13234.6,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   58.0,
+   58.0,
+   13.9
+  ],
+  "bbox_min_z": -0.0,
+  "fits_150mm": true,
+  "bodies": 2,
+  "euler_number": 2,
+  "overhang_area_mm2": 1484.6,
+  "overhang_pct": 15.4,
+  "bed_contact_mm2": 2499.0,
+  "flat_bottom": true,
+  "thick_min_mm": 0.18,
+  "thick_p2_mm": 2.22,
+  "pct_samples_below_1p2mm": 0.4,
+  "pass": true,
+  "min_gap_between_parts_mm": 0.47,
+  "stl_kb": 4785
+ }
+}

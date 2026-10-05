@@ -1,0 +1,67 @@
+{
+ "slug": "elk-bugle-tube-kit",
+ "title": "Elk Bugle Tube Kit (3-part telescoping + diaphragm frame)",
+ "category": "Wildlife Calls",
+ "description": "Two telescoping resonator tubes (mouth funnel + flared bell section) and a horseshoe diaphragm frame for a latex reed you supply. The tubes amplify and deepen mouth-reed sounds.",
+ "use": "Nature-study / hobby accessory; use lawfully. Mouth parts: see hygiene note.",
+ "material": "PETG, 0.2 mm layers, 3+ perimeters. Latex/dental-dam film is NOT included.",
+ "color": [
+  0.55,
+  0.38,
+  0.28
+ ],
+ "max_faces": 60000,
+ "assembly": [
+  "1. Slide tube B over the straight end of tube A (slide-fit, 0.25 mm radial play); about 55 mm overlap gives the compact pose, pull out for lower pitch.",
+  "2. Tape or stretch your own thin latex / dental-dam reed across the diaphragm frame (frame is only a holder; film not included).",
+  "3. Hold the frame against the roof of your mouth ONLY after washing it well; or leave the frame out and use it as a mouth-reed training holder in front of the funnel.",
+  "4. Blow through the funnel end of tube A; extend or shorten tube B to change pitch."
+ ],
+ "fit_notes": "Joint clearances: press-fit joints are modelled with 0.10 mm radial clearance (0.20 mm on diameter); sliding joints 0.25 mm radial. If a press-fit is loose wrap one turn of PTFE (plumber) tape or a dab of glue; if tight, sand lightly - do not force. Not tested by test-printing or acoustic measurement. Sound depends on your printer, filament, reed film and fit - expect to tune. Hygiene: 3D-printed plastic is porous; wash with warm soapy water, never share mouth parts, adults only for the mouth frame.",
+ "parts": {
+  "bell_tube_B": [
+   80.9,
+   80.9,
+   135.0
+  ],
+  "mouth_tube_A": [
+   54.0,
+   54.0,
+   135.0
+  ],
+  "diaphragm_frame": [
+   38.0,
+   18.4,
+   3.0
+  ]
+ },
+ "assembled_interference_mm3": [],
+ "fit_check": "parts built in assembled pose and boolean-intersected pairwise: no interference found",
+ "validation": {
+  "faces": 15636,
+  "vertices": 7818,
+  "watertight": true,
+  "winding_consistent": true,
+  "volume_mm3": 96620.8,
+  "volume_positive": true,
+  "degenerate_faces": 0,
+  "bbox_mm": [
+   141.9,
+   106.3,
+   135.0
+  ],
+  "bbox_min_z": 0.0,
+  "fits_150mm": true,
+  "bodies": 4,
+  "euler_number": 0,
+  "overhang_area_mm2": 298.7,
+  "overhang_pct": 0.37,
+  "bed_contact_mm2": 2040.0,
+  "flat_bottom": true,
+  "thick_min_mm": 0.03,
+  "thick_p2_mm": 2.06,
+  "pct_samples_below_1p2mm": 1.1,
+  "pass": true,
+  "stl_kb": 763
+ }
+}
