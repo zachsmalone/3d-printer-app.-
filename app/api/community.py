@@ -329,6 +329,19 @@ def clear_data(actor: Actor = Depends(get_actor)):
     return {"ok": True}
 
 
+@router.delete("/me/builds")
+def delete_everything_i_made(actor: Actor = Depends(get_actor)):
+    """'Delete everything I made': every build / Edit project (starred ones too, photos included) and every project this person shared to the Showcase."""
+    import shutil as _sh
+    from ..community.store import LISTINGS as _L
+    builds = classrooms.purge_builds(actor.sid)
+    mine = [i["id"] for i in _L.read() if i.get("owner_sid") == actor.sid]
+    for pid in mine:
+        _sh.rmtree(catalog.LDIR / pid, ignore_errors=True)
+    _L.update(lambda l: l.__setitem__(slice(None), [i for i in l if i.get("owner_sid") != actor.sid]))
+    return {"ok": True, "builds": builds, "shared": len(mine)}
+
+
 @router.put("/me/personalization")
 def set_personalization(body: dict, actor: Actor = Depends(get_actor)):
     personalization.set_enabled(actor.sid, bool(body.get("enabled")))

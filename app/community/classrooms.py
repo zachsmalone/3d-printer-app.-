@@ -527,6 +527,8 @@ def submit_project(actor: Actor, code: str, build_dir, title: str) -> dict:
     d.mkdir(parents=True)
     for n in ("model.stl", "model.3mf", "thumb.png"):
         shutil.copy(build_dir / n, d / n)
+    from ..services.history import store as _bs
+    _bs.set_saved(build_dir.name)
     p = {"id": pid, "student_sid": actor.sid, "nickname": room["students"][actor.sid]["nickname"], "title": title,
          "created": datetime.now(timezone.utc).isoformat(), "feedback": []}
     CLASSROOMS.update(lambda dd: dd[room["code"]]["projects"].append(p))

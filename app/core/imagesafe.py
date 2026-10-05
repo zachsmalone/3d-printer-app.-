@@ -97,6 +97,20 @@ def is_builtin_sample(raw: bytes) -> bool:
     return bool(h) and hashlib.sha256(raw).hexdigest() == h
 
 
+def builtin_title(raw: bytes) -> str:
+    """'Sample photo' / 'Sample vase' when the bytes are ZEIM's own sample files, else ''. (A title is NEVER taken from a person's file name.)"""
+    import hashlib
+    from ..config import STATIC
+    h = hashlib.sha256(raw).hexdigest()
+    for fn, title in (("sample.png", "Sample photo"), ("sample_model.stl", "Sample vase")):
+        try:
+            if hashlib.sha256((STATIC / fn).read_bytes()).hexdigest() == h:
+                return title
+        except OSError:
+            pass
+    return ""
+
+
 def check_ack(raw: bytes, ack: bool):
     """Every uploaded photo needs the permission box ticked (config.PHOTO_ACK_REQUIRED); ZEIM's own sample photo does not.
     Returns what to record in meta.json: True (ticked), 'sample' (built-in sample) or False (check switched off). Raises ImageRefused."""

@@ -92,7 +92,7 @@ def test_send_sheet_rows_per_audience_share_states_and_printer_honesty_in_a_real
 
 def test_ren_qa_findings_in_a_real_browser_phone_viewport():
     """QA-1 (Print/Send open the right model, both directions), QA-2, QA-3, QA-4, QA-5 and the Edit drop zone at the 5-build cap."""
-    p, u = _spawn("local")
+    p, u = _spawn("local", {"PHOTO3D_MAX_BUILDS": "5"})
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_qa.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
         assert r.returncode == 0 and "FAIL" not in r.stdout, r.stdout + r.stderr
@@ -181,6 +181,15 @@ def test_settings_sheet_fields_are_dark_and_readable_on_a_phone_in_chrome_and_we
     p, u = _spawn("local")
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_settings.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
+        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
+    finally:
+        p.terminate(); p.wait(10)
+
+
+def test_star_keeps_a_build_at_phone_width_in_chrome_and_webkit():
+    p, u = _spawn("local")
+    try:
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_favs.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(10)

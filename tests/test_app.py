@@ -54,15 +54,23 @@ def test_beginner_autotune():
 
 
 def test_history_cap_and_delete():
+    """Cap is per person; the oldest UN-starred build rolls off by itself, starred ones never do (all starred -> 409 and nothing is deleted)."""
     clear()
-    for _ in range(5):
+    from app.services.history import store as _store
+    old = _store.limit; _store.limit = 5
+    try:
+        ids = [build(resolution="40").json()["id"] for _ in range(5)]
+        assert build(resolution="40").status_code == 200                                      # 6th: the oldest rolled off
+        left = [b["id"] for b in c.get("/api/builds").json()["builds"]]
+        assert len(left) == 5 and ids[0] not in left
+        for bid in left: assert c.post(f"/api/builds/{bid}/favorite", json={"favorite": True}).status_code == 200
+        r = build(resolution="40"); assert r.status_code == 409 and r.json()["code"] == "history_full" and r.json()["all_favorites"]
+        assert len(c.get("/api/builds").json()["builds"]) == 5
+        c.delete("/api/builds/" + left[2])
         assert build(resolution="40").status_code == 200
-    r = build(resolution="40"); assert r.status_code == 409 and r.json()["code"] == "history_full"
-    assert len(c.get("/api/builds").json()["builds"]) == 5
-    victim = r.json()["builds"][2]["id"]; c.delete("/api/builds/" + victim)
-    assert build(resolution="40").status_code == 200
-    r = build(resolution="40", auto_delete_oldest="true"); assert r.status_code == 200
-    assert len(c.get("/api/builds").json()["builds"]) == 5
+        assert len(c.get("/api/builds").json()["builds"]) == 5
+    finally:
+        _store.limit = old
 
 
 def test_slice_and_handoff():

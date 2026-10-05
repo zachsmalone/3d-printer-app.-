@@ -163,28 +163,36 @@ function renderHistory() {
       <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Expert"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
-        <button data-del="${b.id}">🗑</button></div></div>`);
-  while (cards.length < S.max) cards.push(`<div class="hslot">Empty slot</div>`);
+        <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? "★" : "☆"}</button>
+        <button data-del="${b.id}" aria-label="Delete this build">🗑</button></div></div>`);
+  while (cards.length < Math.min(S.max, 5)) cards.push(`<div class="hslot">Empty slot</div>`);
+  const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap ☆ to keep one.`;
   $("#histList").innerHTML = cards.join("");
 }
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 $("#histList").onclick = async e => {
-  const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]");
+  const o = e.target.closest("[data-open]"), d = e.target.closest("[data-del]"), f = e.target.closest("[data-fav]");
+  if (f) { const b = S.history.find(x => x.id === f.dataset.fav); try { await api(`/api/builds/${f.dataset.fav}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: !b?.favorite }) }); await loadHistory(); } catch (er) { toast(er.message, "err"); } return; }
   if (o) { try {
     const hb = S.history.find(x => x.id === o.dataset.open);
     if (hb?.kind === "edit") { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: hb.id })); location.hash = "edit"; return; }
     const r = await api("/api/builds/" + o.dataset.open); S.mode = r.mode; applyMode(); showBuild(r); } catch (er) { toast(er.message, "err"); } }
   if (d && confirm("Delete this build and its files?")) { await api("/api/builds/" + d.dataset.del, { method: "DELETE" }); await loadHistory(); }
 };
-async function loadHistory() { const r = await api("/api/builds"); S.history = r.builds; S.max = r.max; renderHistory(); }
+async function loadHistory() { const r = await api("/api/builds"); S.history = r.builds; S.max = r.max; S.keepDays = r.keep_days; renderHistory(); }
 
 /* ---------- history-full dialog ---------- */
 function openFull() { renderFull(); $("#dlgFull").showModal(); }
 function renderFull() {
-  $("#fullList").innerHTML = S.history.map(b => `<div class="fl"><img src="${b.thumb}"><span><b>${esc(b.title)}</b><br><small>${MODE_LABEL[b.mode]} · ${ago(b.created)}</small></span><button class="btn small danger" data-fdel="${b.id}">Delete</button></div>`).join("");
+  const allStar = S.history.length > 0 && S.history.every(b => b.favorite);
+  $("#fullMsg").innerHTML = allStar ? `All <b>${S.max}</b> of your builds are starred ★, and ZEIM never removes a starred build. Un-star or delete one to make room.` : `You can keep <b>${S.max} builds</b>. Delete one yourself, or let ZEIM remove the oldest one that isn't starred.`;
+  $("#btnAutoDel").hidden = allStar;
+  $("#fullList").innerHTML = S.history.map(b => `<div class="fl"><img src="${b.thumb}" alt=""><span><b>${b.favorite ? "★ " : ""}${esc(b.title)}</b><br><small>${MODE_LABEL[b.mode]} · ${ago(b.created)}</small></span>${b.favorite ? `<button class="btn small" data-funstar="${b.id}">Un-star</button>` : ""}<button class="btn small danger" data-fdel="${b.id}">Delete</button></div>`).join("");
   $("#btnRetry").disabled = S.history.length >= S.max;
 }
 $("#fullList").onclick = async e => {
+  const u = e.target.closest("[data-funstar]");
+  if (u) { await api(`/api/builds/${u.dataset.funstar}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: false }) }); await loadHistory(); renderFull(); return; }
   const d = e.target.closest("[data-fdel]"); if (!d) return;
   await api("/api/builds/" + d.dataset.fdel, { method: "DELETE" }); await loadHistory(); renderFull();
 };

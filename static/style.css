@@ -263,3 +263,5 @@ input[type=password],input[type=date],input[type=email],input[type=url],input[ty
 input[type=password]:focus,input[type=date]:focus,input[type=search]:focus,textarea:focus{outline:2px solid var(--acc);outline-offset:-1px}
 input::placeholder,textarea::placeholder{color:#9aa4b2;opacity:1}
 @media (max-width:768px),(pointer:coarse){input[type=password],input[type=date],input[type=email],input[type=url],input[type=tel],input[type=search],textarea{font-size:16px;min-height:44px}}
+.hcard button.star{min-width:44px;min-height:44px;font-size:20px;color:#ffd666}.hcard button.star:not(.on){color:#9aa4b2}
+.fl{flex-wrap:wrap;gap:6px}

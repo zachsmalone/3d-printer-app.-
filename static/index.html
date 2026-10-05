@@ -124,7 +124,8 @@
     </div>
 
     <section class="history">
-      <div class="hhead"><h3 data-sec="history">Recent builds</h3><span id="histCount" class="pill">0 / 5</span></div>
+      <div class="hhead"><h3 data-sec="history">Recent builds</h3><span id="histCount" class="pill">0 / 20</span></div>
+      <p class="help" id="histNote"></p>
       <div class="hlist" id="histList"></div>
     </section>
   </section>
@@ -249,7 +250,7 @@
 <dialog id="dlgFull"><div class="dlg">
   <header><h3>Build history is full</h3><button class="x" data-close>✕</button></header>
   <div class="body">
-    <p>You can keep <b>5 builds</b>. Delete one yourself, or let ZEIM remove the oldest.</p>
+    <p id="fullMsg"></p>
     <div id="fullList" class="fulllist"></div>
   </div>
   <footer><button class="btn" id="btnRetry" disabled>Build now</button><button class="btn primary" id="btnAutoDel">Auto-delete oldest &amp; build</button></footer>

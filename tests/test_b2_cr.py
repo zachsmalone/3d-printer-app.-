@@ -364,7 +364,7 @@ def test_cr15_cannot_take_over_into_a_browser_that_already_has_an_account_or_is_
 # ---- Edge 3: a file name never becomes a title ----------------------------------------------------------------------------------
 def test_upload_file_name_never_becomes_the_build_title():
     import io as _io
-    png = open(b1.SAMPLE, "rb").read(); box_stl = b1.box_stl
+    png = other_png(); box_stl = b1.box_stl
     c = client(ADULT)
     r = c.post("/api/generate", files={"file": ("IMG_2231_MiaJohnson.png", _io.BytesIO(png), "image/png")}, data={"mode": "relief", "photo_ack": "true"})
     assert r.status_code == 200, r.text
@@ -423,3 +423,10 @@ def test_s01_local_mode_settings_refuse_a_cross_site_origin(monkeypatch):
         with pytest.raises(HTTPException) as e:
             guards.require_settings_admin(req(bad), type("A", (), {"sid": "x"})())
         assert e.value.status_code == 403
+
+
+def test_built_in_samples_get_a_friendly_title_but_never_from_a_file_name():
+    c = client(ADULT)
+    assert gen(c).json()["title"] == "Sample photo"                      # ZEIM's own sample.png
+    stl = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "sample_model.stl"), "rb").read()
+    r = c.post("/api/edit/new", files={"file": ("whatever_name.stl", stl, "application/octet-stream")}); assert r.json()["title"] == "Sample vase"

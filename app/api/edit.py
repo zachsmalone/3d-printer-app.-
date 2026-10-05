@@ -31,10 +31,8 @@ def capabilities():
 
 
 def _full(actor):
-    return JSONResponse(status_code=409, content={
-        "code": "history_full", "max": MAX_BUILDS,
-        "message": f"Build history is full ({MAX_BUILDS}/{MAX_BUILDS}). Delete a build or auto-delete the oldest to continue.",
-        "builds": [summary(m) for m in store.list(actor.sid)]})
+    from .builds import full_response
+    return full_response(actor)
 
 
 @router.post("/new")
@@ -78,6 +76,7 @@ def new_project(
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
         limit = editproj.MAX_UPLOAD_EDIT
         data = file.file.read(limit + 1)
+        sample_title = imagesafe.builtin_title(data)
         if len(data) > limit:
             raise HTTPException(413, f"File too large (max {limit // 2**20} MB).")
         if not data:
@@ -122,10 +121,12 @@ def new_project(
             warnings.append(f"Photo converted to a {photo_mode} base mesh; edit it like any other model.")
         else:
             raise HTTPException(415, "Unsupported file type. Upload .stl, .obj or .3mf (or a .png/.jpg photo).")
-        title = title or ("My photo build" if base.get("type") == "photo" else "My model")      # never from the file name
+        title = title or sample_title or ("My photo build" if base.get("type") == "photo" else "My model")      # never from the file name
     else:
         raise HTTPException(400, "Choose a file to upload or a build to edit.")
 
+    from .builds import disk_guard
+    disk_guard()
     with store.lock:
         try:
             store.reserve(actor.sid, auto_delete_oldest)
@@ -169,6 +170,9 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     params = body.get("params") or {}
     if not isinstance(params, dict):
         raise HTTPException(400, "params must be an object")
+    if op in ("hollow", "boolean", "text", "base"):                      # the heavy ones write big new meshes
+        from .builds import disk_guard
+        disk_guard()
     return _act(bid, actor, lambda: editproj.add_op(bid, op, params))
 
 

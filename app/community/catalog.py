@@ -221,6 +221,8 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False}
     LISTINGS.update(lambda l: l.append(item))
+    from ..services.history import store as _bs
+    _bs.set_saved(build_id)
     return item
 
 

@@ -11,11 +11,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image
 
+from .. import config
 from ..community import privacy, safety
 from .textcap import text_in
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS, MAX_UPLOAD, PREVIEW_RES
 from ..core import autotune, exporters, geometry, imagesafe
+from ..services import retention
 from ..services.history import HistoryFull, store
 
 router = APIRouter(prefix="/api")
@@ -54,6 +56,7 @@ def summary(meta: dict) -> dict:
     bid = meta["id"]
     return {**{k: meta[k] for k in ("id", "created", "mode", "beginner", "title", "stats")},
             "kind": meta.get("kind", "photo"), "visibility": meta.get("visibility", "private"),
+            "favorite": bool(meta.get("favorite")), "expires": retention.expires_at(meta),
             "thumb": f"/files/{bid}/thumb.png",
             "downloads": {e: f"/files/{bid}/model.{e}" for e in exporters.WRITERS},
             "sizes": _sizes(bid)}
@@ -96,6 +99,23 @@ def meta_for(bid: str, actor: Actor, owner_only: bool = False) -> dict:
 DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded file name (camera / school file names can hold a child's name)
 
 
+def disk_guard():
+    """Refuse a new heavy build, kindly, when the disk is nearly full and nothing but starred builds could be removed."""
+    try:
+        retention.check_disk()
+    except retention.DiskLow as e:
+        raise HTTPException(507, str(e))
+
+
+def full_response(actor):
+    """All build slots are starred: nothing is removed automatically. Ask the person to un-star or delete one."""
+    return JSONResponse(status_code=409, content={
+        "code": "history_full", "all_favorites": True, "max": MAX_BUILDS,
+        "message": f"All {MAX_BUILDS} of your saved builds are starred ★, and starred builds are never removed by ZEIM. "
+                   "Un-star or delete one to make room.",
+        "builds": [summary(m) for m in store.list(actor.sid)]})
+
+
 def _safe_title(derived: str) -> str:
     """A title made from the uploaded file's name: replaced by 'Untitled' if the name itself would not pass the language gate."""
     return derived if derived and not safety.scan(derived) else "Untitled"
@@ -104,7 +124,7 @@ def _safe_title(derived: str) -> str:
 @router.get("/builds")
 def list_builds(actor: Actor = Depends(get_actor)):
     store.claim_unowned(actor.sid)
-    return {"max": MAX_BUILDS, "builds": [summary(m) for m in store.list(actor.sid)]}
+    return {"max": MAX_BUILDS, "keep_days": config.KEEP_UNSAVED_DAYS, "builds": [summary(m) for m in store.list(actor.sid)]}
 
 
 @router.put("/builds/{bid}/visibility")
@@ -146,11 +166,18 @@ def delete_build(bid: str, actor: Actor = Depends(get_actor)):
 @router.post("/builds/delete-oldest")
 def delete_oldest(actor: Actor = Depends(get_actor)):
     with store.lock:
-        items = store.list(actor.sid)
+        items = [m for m in store.list(actor.sid) if not m.get("favorite")]       # never a starred build
         if not items:
             return {"ok": True, "deleted": None}
         store.delete(items[0]["id"])
         return {"ok": True, "deleted": items[0]["id"]}
+
+
+@router.post("/builds/{bid}/favorite")
+def favorite_build(bid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Star / un-star a build. Starred builds are never removed by age, by the cap or by a low disk; only you deleting them does."""
+    meta_for(bid, actor, owner_only=True)
+    return summary(store.set_favorite(bid, bool(body.get("favorite"))))
 
 
 @router.post("/generate")
@@ -190,6 +217,7 @@ def generate(
     except ValueError as e:
         raise HTTPException(400, str(e))
     data = file.file.read(MAX_UPLOAD + 1)
+    sample_title = imagesafe.builtin_title(data)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
     try:
@@ -207,15 +235,12 @@ def generate(
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+    disk_guard()
     with store.lock:  # serialise so concurrent builds can't exceed the cap
         try:
             store.reserve(actor.sid, auto_delete_oldest)
         except HistoryFull:
-            return JSONResponse(status_code=409, content={
-                "code": "history_full", "max": MAX_BUILDS,
-                "message": f"Build history is full ({MAX_BUILDS}/{MAX_BUILDS}). Delete a build or "
-                           "auto-delete the oldest to continue.",
-                "builds": [summary(m) for m in store.list(actor.sid)]})
+            return full_response(actor)
         auto_notes = []
         if beginner:
             params, auto_notes = autotune.autotune(im, mode, width_mm, preset)
@@ -246,7 +271,7 @@ def generate(
         Image.fromarray(model.thumb).save(d / "thumb.png")
         stats = mesh_stats(model)
         meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
-                "title": title.strip() or DEFAULT_PHOTO_TITLE,
+                "title": title.strip() or sample_title or DEFAULT_PHOTO_TITLE,
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)

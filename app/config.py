@@ -6,7 +6,11 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(__import__("os").environ.get("PHOTO3D_OUT") or ROOT / "outputs")      # one directory per build (history)
 DATA = Path(__import__("os").environ.get("PHOTO3D_DATA") or ROOT / "data")        # settings, users, etc. (never zipped)
 STATIC = ROOT / "static"
-MAX_BUILDS = 5              # history limit
+MAX_BUILDS = int(__import__("os").environ.get("PHOTO3D_MAX_BUILDS", "20"))   # builds kept per person (oldest un-starred roll off; starred ones never do)
+KEEP_UNSAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_UNSAVED_DAYS", "7"))    # ordinary builds are removed after this many days
+KEEP_SAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_SAVED_DAYS", "30"))       # builds shared to the Showcase or sent to a class
+DISK_MIN_FREE_MB = int(__import__("os").environ.get("PHOTO3D_DISK_MIN_FREE_MB", "500"))    # below this, new builds first trigger a sweep, then are refused
+DISK_TARGET_FREE_MB = int(__import__("os").environ.get("PHOTO3D_DISK_TARGET_FREE_MB", "1000"))
 MAX_UPLOAD = 25 * 1024 * 1024
 PREVIEW_RES = 220
 for d in (OUT, DATA):  # noqa
