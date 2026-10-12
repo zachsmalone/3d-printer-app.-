@@ -94,3 +94,5 @@ Full suite after merging origin/zeim (incl. PR #6 slicer API) at `deeb409`: **57
 - The CC BY 4.0 licence is still unconfirmed (pending counsel).
 - Supports and brim flags come from geometry and a generic slicer profile, not prints.
 - No real iPhone, screen reader or teacher has tried any of this.
+
+Re-check after PR #8 (school features removed) at `db04f99`: full suite **561 passed, 0 failed, 0 skipped** (13 min 24 s, finished 4:41 PM CT, Oct 12). PrusaSlicer and the WebKit browser/libs had vanished from the box mid-afternoon and were reinstalled.
