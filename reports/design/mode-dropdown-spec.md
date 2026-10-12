@@ -1,5 +1,8 @@
 # Mode dropdown spec (Beginner · Experienced · Teacher)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 **Author:** Accessibility & Usability Reviewer (design owner) · **Date:** 2026-10-04 · **Status:** ready for Yami to hand to the builders
 **Mock:** `mock-mode.html` (open it in a browser; the grey "MOCK" bar lets you pretend to be a visitor, adult, teen or class student, and flip the light/dark theme).
 **Checked:** axe-core 4.13.0 on the mock, light and dark, at 320, 390 and 1280 px, in five states (Beginner, Experienced, Teacher as adult, the guest explainer, the teen explainer): 30 runs, 0 violations. Keyboard run in headless Chrome (arrow keys on the closed select, explainer, sign-up path). Contrast is computed (see `home-redesign-spec.md`, Palette). **Not tested:** real VoiceOver/TalkBack/NVDA, real iPhone picker, other browsers. Announcement wording is from the code pattern, not heard.

@@ -116,7 +116,7 @@ def trusted_base_url(request) -> str | None:
 
 def public(s: dict | None = None, redact: bool = False) -> dict:
     """Settings safe to send to the browser (API keys masked). `redact=True` (visitors without settings rights in
-    shared mode, and class students) also hides printer addresses."""
+    shared mode) also hides printer addresses."""
     s = json.loads(json.dumps(s or load()))
     for p in s["printers"]:
         p["has_key"] = bool(p.get("api_key"))

@@ -1,4 +1,4 @@
-"""Education CR-1: settings / printers / join QR. Run with the rest: python -m pytest -q tests"""
+"""Education CR-1: settings / printers. Run with the rest: python -m pytest -q tests"""
 import io, json, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pytest, trimesh
@@ -6,7 +6,7 @@ from PIL import Image
 from fastapi.testclient import TestClient
 from app import config
 from app.main import app
-from app.community import classrooms, moderation
+from app.community import moderation
 from app.core import ratelimit
 from tests.b1 import *
 
@@ -32,18 +32,11 @@ def test_cr1_shared_mode_settings_and_send_locked(shared):
     assert adult.put("/api/settings", json=body).status_code == 403         # accounts cannot rewrite server-wide settings either
     assert anon.put("/api/settings", json=body, headers={"X-Admin-Token": "wrong"}).status_code == 403
     assert anon.put("/api/settings", json=body, headers=ADMIN).status_code == 200
-    # printer URLs are not shown to anonymous visitors / students, but are to admin
+    # printer URLs are not shown to anonymous visitors, but are to admin
     pr = anon.get("/api/settings").json()["printers"][0]
     assert "url" not in pr and "api_key" not in pr
     assert anon.get("/api/settings", headers=ADMIN).json()["printers"][0]["url"] == "http://10.0.0.5"
-    # (a) a class student: 403 on PUT and on send
-    t, code, pw = make_class(adult); s = student(code, pw, "Fox")
-    bid = photo_build(s)
-    assert s.put("/api/settings", json=body).status_code == 403
-    assert s.put("/api/settings", json=body, headers=ADMIN).status_code == 403   # a student's browser never gets settings rights
     pid = anon.get("/api/settings", headers=ADMIN).json()["printers"][0]["id"]
-    assert s.post(f"/api/send/{bid}", data={"printer_id": pid}).status_code == 403
-    assert s.get(f"/api/print/{bid}/links").status_code == 403          # SEND-1: students get no slicer links (and so no printer list) at all
     # anonymous visitor cannot send either (no adult account / admin token)
     abid = photo_build(anon)
     assert anon.post(f"/api/send/{abid}", data={"printer_id": pid}).status_code == 403
@@ -59,23 +52,6 @@ def test_cr1_local_mode_unchanged(monkeypatch):
     assert c.put("/api/settings", json={"printers": [], "public_base_url": ""}).status_code == 200
     assert c.get("/api/settings").status_code == 200
 
-
-def test_cr1_join_qr_uses_configured_base_url(shared, monkeypatch):
-    t, code, pw = make_class()
-    # an admin can save a base URL; nobody else can
-    assert t.put("/api/settings", json={"public_base_url": "https://evil.example", "printers": []}).status_code == 403
-    assert t.put("/api/settings", json={"public_base_url": "https://other.example", "printers": []}, headers=ADMIN).status_code == 200
-    assert t.get(f"/api/classrooms/{code}/qr.svg").text == classrooms.qr_svg("https://other.example", code)
-    # the deployment-configured URL beats both the saved one and the Host header, and cannot be changed from the UI
-    monkeypatch.setattr(config, "PUBLIC_BASE_URL", "https://zeim.school.example")
-    svg = t.get(f"/api/classrooms/{code}/qr.svg", headers={"host": "attacker.example"}).text
-    assert svg == classrooms.qr_svg("https://zeim.school.example", code)
-    t.put("/api/settings", json={"public_base_url": "https://third.example", "printers": []}, headers=ADMIN)
-    assert t.get(f"/api/classrooms/{code}/qr.svg").text == svg
-    assert t.get("/api/settings").json()["public_base_url"] == "https://zeim.school.example"
-    monkeypatch.setattr(config, "PUBLIC_BASE_URL", "")
-    assert t.get(f"/api/classrooms/{code}/qr.svg").text == classrooms.qr_svg("https://other.example", code)
-    t.put("/api/settings", json={"public_base_url": "", "printers": []}, headers=ADMIN)
 
 
 def test_cr1_base_url_and_printer_url_validated(shared):

@@ -154,3 +154,11 @@ Total about 20.5 working days for items 1-7 in this order, before Zach's pilot f
 
 ## 2026-10-04 20:07 CT | Haruto Tanaka (Engineering) | STATUS
 Nozzle it accepted: single positive-only button replacing every like/heart/upvote (Showcase, Trending, comments, videos), count beside it, no downvotes, data stays compatible. Owner Haruto, 0.5 d, slotted right after the home screen redesign (item 6b). Needs Sakura's icon. Pilot list total is now about 21 working days.
+
+## 2026-10-12 CT | Owner decision (Zach) | DECISION
+2026-10-12: Zach removed school features; no grades/school records held.
+- Removed (branch `no-schools`): Teacher mode, Teacher tools, classrooms, class codes/join passwords/QR join, class Live view, raised hands and canned class messages, assignments, class projects + teacher feedback, per-class Send/Showcase switches, lesson quizzes (quiz scoring/`quiz_passed`), teacher notes, school wording in UI and docs.
+- Kept: the Spark Lab lessons and learning videos (no scores; only this browser's own step checklist), family-friendly positioning, free.
+- Kids: no new minors' data. Under-13s use ZEIM signed out or with a grown-up in their family; the class-code path is gone. Accounts still 13+.
+- Data on disk: any existing `data/classrooms.json` and `data/classroom_projects/` are no longer read or written, and were NOT deleted. Old `quiz_passed` keys in `education_progress.json` are ignored. Cleanup of those files is Zach's call.
+- Plans dropped: teacher tools (HQ-1 teacher onboarding), ACCT-5 class-code accounts, Classroom roadmap (roster/LMS/district search/FERPA), rubric/teacher guide. Earlier board entries about classes are history only.

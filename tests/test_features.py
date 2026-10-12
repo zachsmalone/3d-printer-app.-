@@ -334,10 +334,9 @@ def test_showcase_visibility_everywhere():
 
 
 def test_lesson_pages_leak_no_user_data():
-    t = client(ADULT); room = t.post("/api/classrooms", json={"name": "Hidden Class", "password": "sesame-12"}).json()
-    s = client(); s.post("/api/classrooms/join", json={"code": room["code"], "nickname": "Quietkid", "password": "sesame-12"})
+    s = client(ADULT); s.post("/api/learn/lessons/lithophanes/steps/0", json={"done": True})
     html = client().get("/l/lithophanes").text
-    assert "Quietkid" not in html and "Hidden Class" not in html and room["code"] not in html
+    assert "Ada Adult" not in html and "steps_done" not in html and "Teacher notes" not in html
 
 
 # ===================================================================== LIKES / DOWNLOADS / TRENDING
@@ -384,66 +383,6 @@ def test_trending_score_formula():
     assert trending_score(mk(0, 0, 30), now) == 0 and trending_score(mk(50, 50, 1), now) > trending_score(mk(1, 0, 30), now)
 
 
-# ===================================================================== CLASSROOMS
-def test_classroom_password_qr_projects_feedback_requests():
-    t, s, s2, outsider = client(ADULT), client(), client(), client()
-    room = t.post("/api/classrooms", json={"name": "Period 5", "password": "plate-77"}).json()
-    code = room["code"]
-    assert t.post("/api/classrooms", json={"name": "x"}).status_code == 400                      # password required
-    assert t.post("/api/classrooms", json={"name": "x", "password": "ab"}).status_code == 400
-    assert client(TEEN).post("/api/classrooms", json={"name": "x", "password": "abcdef"}).status_code == 403
-    qr = t.get(f"/api/classrooms/{code}/qr.svg"); assert qr.status_code == 200 and "svg" in qr.headers["content-type"] and "plate-77" not in qr.text
-    assert s.get(f"/api/classrooms/{code}/qr.svg").status_code == 404
-    assert room["join_path"] == f"/#join/{code}"
-    # join: password required, wrong → 404, nickname rules, no PII fields
-    assert s.post("/api/classrooms/join", json={"code": code, "nickname": "Robo7"}).status_code == 404
-    assert s.post("/api/classrooms/join", json={"code": code, "nickname": "Robo7", "password": "nope"}).status_code == 404
-    assert s.post("/api/classrooms/join", json={"code": code, "nickname": "Robo7", "password": "plate-77"}).status_code == 200
-    assert s2.post("/api/classrooms/join", json={"code": code, "nickname": "robo7", "password": "plate-77"}).status_code == 400   # taken
-    assert s2.post("/api/classrooms/join", json={"code": code, "nickname": "Pixel", "password": "plate-77"}).status_code == 200
-    for i in range(5): outsider.post("/api/classrooms/join", json={"code": code, "nickname": "Hax", "password": f"g{i}"})
-    assert outsider.post("/api/classrooms/join", json={"code": code, "nickname": "Hax", "password": "plate-77"}).status_code == 429   # guess limiter
-    # student project: private to the class
-    sb = photo_build(s)
-    p = s.post(f"/api/classrooms/{code}/projects", json={"build_id": sb, "title": "My moon"}).json()
-    assert p["visibility"] == "classroom" and p["student"] == "Robo7"
-    assert outsider.get(f"/api/classrooms/{code}/projects").status_code == 404
-    assert outsider.get(p["thumb"]).status_code == 404 and outsider.get(p["files"][0]).status_code == 404
-    assert t.get(p["files"][0]).status_code == 200 and s2.get(p["files"][0]).status_code == 200
-    assert not [i for i in client().get("/api/showcase?tab=free").json()["items"] if i["title"] == "My moon"]
-    assert client().post(f"/api/classrooms/{code}/projects", json={"build_id": sb}).status_code == 404   # can't submit others' builds / not a member
-    assert s2.post(f"/api/classrooms/{code}/projects", json={"build_id": sb}).status_code == 404
-    # teacher feedback: text only, no ratings
-    assert s.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "nice"}).status_code == 403
-    fb = t.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "Lovely depth - try a thicker border.", "rating": 5, "score": 10}).json()
-    assert fb["feedback"][0]["comment"].startswith("Lovely") and "rating" not in str(fb).lower() and "score" not in str(fb).lower()
-    assert s.get(f"/api/classrooms/{code}/projects").json()["projects"][0]["feedback"]
-    # canned 'talk next class' - no free text
-    r = s.post(f"/api/classrooms/{code}/requests", json={"kind": "talk_next_class", "text": "free text ignored"})
-    assert r.status_code == 200 and r.json()["text"] == "I'd like to talk next class" and "free text" not in r.text
-    assert s.post(f"/api/classrooms/{code}/requests", json={"kind": "talk_next_class"}).status_code == 400    # duplicate pending
-    assert s.post(f"/api/classrooms/{code}/requests", json={"kind": "chat", "text": "hello"}).status_code == 400
-    assert t.get(f"/api/classrooms/{code}/notifications").json()["notifications"][0]["text"] == "I'd like to talk next class"
-    assert t.get("/api/classrooms").json()["rooms"][0]["notifications"]
-    sid = t.get("/api/classrooms").json()["rooms"][0]["students"][0]["id"]
-    assert t.post(f"/api/classrooms/{code}/requests", json={"kind": "talk_next_class", "to": sid}).status_code == 200
-    assert s.get("/api/learn/lessons").json()["classroom"]["notifications"][0]["text"] == "I'd like to talk next class"
-    assert outsider.get(f"/api/classrooms/{code}/notifications").status_code == 404
-    t.post(f"/api/classrooms/{code}/notifications/read"); assert t.get("/api/classrooms").json()["rooms"][0]["notifications"] == []
-    # teacher mute
-    assert t.put(f"/api/classrooms/{code}/students/{sid}/mute", json={"muted": True}).status_code == 200
-    assert s.post(f"/api/classrooms/{code}/requests", json={"kind": "need_help"}).status_code == 403
-    t.put(f"/api/classrooms/{code}/students/{sid}/mute", json={"muted": False})
-    assert s.post(f"/api/classrooms/{code}/requests", json={"kind": "need_help"}).status_code == 200
-    # report a feedback comment → moderator queue → hide
-    rep = s.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback/{fb['feedback'][0]['id']}/report", json={"reason": "other"})
-    assert rep.status_code == 200
-    q = client().get("/api/moderation/queue", headers={"X-Admin-Token": "t0k"}).json()["reports"]
-    mine = [x for x in q if x["id"] == rep.json()["id"]]; assert mine
-    client().post(f"/api/moderation/{mine[0]['id']}/resolve", json={"action": "hide"}, headers={"X-Admin-Token": "t0k"})
-    assert s.get(f"/api/classrooms/{code}/projects").json()["projects"][0]["feedback"] == []
-    # deleting the class erases projects
-    t.delete(f"/api/classrooms/{code}"); assert s.get(p["files"][0]).status_code == 404
 
 
 # ===================================================================== LANGUAGE FILTER (no strikes / bans)
@@ -488,20 +427,13 @@ def test_wordlist_files_are_editable_and_attributed(tmp_path, monkeypatch):
 
 def test_blocked_language_is_refused_everywhere_no_strikes():
     msg = "Chat doesn't allow that language. Please use appropriate language."
-    t = client(ADULT); s = client()
-    room = t.post("/api/classrooms", json={"name": "Lang", "password": "pass-9999"}).json(); code = room["code"]
-    s.post("/api/classrooms/join", json={"code": code, "nickname": "Kid9", "password": "pass-9999"})
-    clear(s); p = s.post(f"/api/classrooms/{code}/projects", json={"build_id": photo_build(s)}).json()
+    t = client(ADULT)
     for _ in range(5):                                       # repeated blocks never escalate: no strikes, no bans
-        r = t.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "this is sh1t"})
-        assert r.status_code == 422 and r.json()["message"] == msg
-    assert t.post(f"/api/classrooms/{code}/projects/{p['id']}/feedback", json={"comment": "Great work!"}).status_code == 200
-    assert len(s.get(f"/api/classrooms/{code}/projects").json()["projects"][0]["feedback"]) == 1        # blocked ones were never stored
+        r = t.put("/api/me/links", json={"instagram": "sh1t"})
+        assert r.status_code == 422 and r.json()["message"] == msg and r.json()["code"] == "language_blocked"   # one error shape for refused text
     assert t.get("/api/me/safety").status_code == 404 and not hasattr(safety, "record_strike")
-    r = s.post("/api/classrooms/join", json={"code": code, "nickname": "fuck 123", "password": "pass-9999"}); assert r.status_code == 422 and msg in r.text and r.json()["code"] == "language_blocked"   # one error shape for refused text
     assert client().post("/api/me/signup", json={"display_name": "shithead", "dob": "1990-01-01"}).status_code == 422
     o = client(ADULT); clear(o); b = photo_build(o)
     r = publish(o, b, title="fuck lamp"); assert r.status_code == 422 and r.json()["message"] == msg
     r = publish(o, b, description="visit www.spam.com"); assert r.status_code == 422
     assert publish(o, b, title="Lovely lamp").status_code == 200
-    assert t.post("/api/classrooms", json={"name": "shit class", "password": "plum-otter-42"}).status_code == 422

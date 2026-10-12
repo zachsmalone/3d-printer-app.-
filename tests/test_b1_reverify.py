@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app import config
 from app.main import app
-from tests.b1 import client, ADULT, ADMIN, make_class
+from tests.b1 import client, ADULT, ADMIN
 
 BODY = {"public_base_url": "https://evil.example", "printers": []}
 
@@ -40,16 +40,6 @@ def test_local_mode_other_peer_address_is_not_the_owner(monkeypatch):
 
 
 # ------------------------------------------------------------------ QR / forged Host
-def test_qr_does_not_follow_a_forged_host(monkeypatch):
-    monkeypatch.setattr(config, "MODE", "shared"); monkeypatch.setattr(config, "PUBLIC_BASE_URL", "")
-    t, code, pw = make_class()
-    client().put("/api/settings", json={"public_base_url": "", "printers": []}, headers=ADMIN)
-    forged = {"Host": "evil.example"}
-    assert t.get(f"/api/classrooms/{code}/qr.svg", headers=forged).status_code == 409           # nothing trustworthy configured
-    assert t.get(f"/api/print/x/links", headers=forged).status_code in (403, 404)
-    monkeypatch.setattr(config, "PUBLIC_BASE_URL", "https://zeim.example.org")
-    a = t.get(f"/api/classrooms/{code}/qr.svg", headers=forged); b = t.get(f"/api/classrooms/{code}/qr.svg")
-    assert a.status_code == b.status_code == 200 and a.text == b.text                              # identical: the Host header is ignored
 
 
 # ------------------------------------------------------------------ S-04 per address

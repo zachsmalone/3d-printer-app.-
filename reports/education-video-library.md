@@ -1,5 +1,8 @@
 # ZEIM / Spark Lab video library (2026-10-04)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Data: `reports/education-video-library.json` (25 entries). Written by the Spark Lab Curriculum Writer. No app or static files were touched.
 
 ## READ THIS FIRST

@@ -24,7 +24,7 @@
       "trimesh": "Loads, checks, repairs and saves 3D models.",
       "manifold3d": "Cuts, hollows and combines solids without breaking them.",
       "fast-simplification": "Makes a model lighter (Simplify).",
-      "segno": "Draws the QR code teachers print for their class."
+      "segno": "Draws QR codes."
     },
     "system_heading": "Programs ZEIM calls on the computer",
     "system": [
@@ -67,12 +67,6 @@
     "blurb": "People who tried ZEIM on their own phones and printers and told us what broke.",
     "people": [],
     "empty": "We will list our testers here by name, once they say they are happy to be named. Coming soon."
-  },
-  "teachers": {
-    "heading": "Teachers",
-    "blurb": "Teachers who gave their time and honest advice.",
-    "people": [],
-    "empty": "We will list the teachers who helped us here, once they say they are happy to be named. Coming soon."
   },
   "trademarks": {
     "heading": "Names that belong to others",

@@ -57,9 +57,9 @@ def test_three_js_licence_is_read_from_the_vendored_file_header():
 
 def test_sections_placeholders_trademark_and_takedown_lines():
     html = page()
-    for h in ("Thank you", "Tools and libraries we use", "Makers and their models", "Testers", "Teachers", "Names that belong to others", "Something wrong? Tell us."):
+    for h in ("Thank you", "Tools and libraries we use", "Makers and their models", "Testers", "Names that belong to others", "Something wrong? Tell us."):
         assert h in html, h
-    assert html.count("Coming soon") >= 2                                         # testers / teachers (and makers when no manifest) are honest placeholders
+    assert html.count("Coming soon") >= 1                                         # testers (and makers when no manifest) are honest placeholders
     assert "not affiliated with, endorsed by or sponsored by" in html and "Creality" in html
     assert "taken down" in html
     assert "<title>Thank you" in html and "lang=en" in html
@@ -83,7 +83,7 @@ def test_makers_come_from_manifests_when_they_exist(tmp_path, monkeypatch):
     html = page()
     assert "Olivier Wagener" in html and "(2 models)" in html and "Daniel Norée" in html
     assert "Benchy &lt;b&gt;" in html and "Benchy <b>" not in html                 # escaped
-    assert "Coming soon" in html                                                   # (testers/teachers still empty)
+    assert "Coming soon" in html                                                   # (testers still empty)
 
 
 def test_credit_line_uses_the_items_own_manifest_data_and_invents_nothing():

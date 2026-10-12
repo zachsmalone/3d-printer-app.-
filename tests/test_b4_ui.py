@@ -13,7 +13,7 @@ def _run(script, mode="local", extra=None):
         p.terminate(); p.wait(10)
 
 
-def test_mode_dropdown_gates_teacher_announces_and_restores_in_chrome_and_webkit():
+def test_mode_dropdown_has_no_teacher_mode_announces_and_falls_back_in_chrome_and_webkit():
     out = _run("ui_mode.py")
     assert "PASS webkit" in out or "SKIP webkit" in out
 
@@ -42,16 +42,8 @@ def test_send_sheet_labels_untested_rows_and_never_claims_they_work():
     assert "Tested with a pretend printer only" in js
 
 
-def test_nozzle_it_buttons_states_keyboard_sync_rollback_class_rules_and_axe_in_chrome_and_webkit():
+def test_nozzle_it_buttons_states_keyboard_sync_rollback_and_axe_in_chrome_and_webkit():
     out = _run("ui_nozzle.py")
     assert "PASS webkit" in out or "SKIP webkit" in out
 
 
-def test_teacher_live_view_table_hand_raise_stable_order_polling_stop_and_student_notice():
-    out = _run("ui_live.py")
-    assert "PASS webkit" in out or "SKIP webkit" in out
-
-
-def test_delete_class_uses_an_in_app_dialog_not_confirm():
-    out = _run("ui_delclass.py")
-    assert "PASS webkit" in out or "SKIP webkit" in out

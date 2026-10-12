@@ -1,5 +1,8 @@
 # ZEIM on iPhone and iPad, and the "Send" hub: design spec
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 **Author:** Sakura Mori (Design & UX) · **Date:** Sun 2026-10-04 (CT) · **Status:** DRAFT v1 for Engineering, with Kenji (privacy), Aiko (classroom) and Daichi (integrations) to review. Design only: I did not edit app code.
 
 **Read this first:** nobody on the team has an iPhone or iPad here. **Nothing in this spec has been run on real iOS Safari.** Layout numbers come from Chrome desktop *emulation* (not WebKit). Every claim is tagged **VERIFIED** (I ran it or read the cited page), **CODE-READ**, or **UNTESTED / UNCONFIRMED**. Testing on Zach's devices needs a private HTTPS address (Web Share only exists on HTTPS or localhost); Yami is asking Zach how he will reach the app. Until then this spec is **UNTESTED on real iOS**.

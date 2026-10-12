@@ -102,7 +102,6 @@ def test_one_error_shape_for_every_refused_text():
     bad = next(w for w in sorted(lang.words) if w.isalpha() and w.isascii() and len(w) >= 5 and safety.scan_language(w))
     shapes = []
     shapes.append(a.post("/api/me/signup", json={"display_name": bad, "dob": "1990-01-01"}))
-    shapes.append(a.post("/api/classrooms", json={"name": bad, "password": "plum-otter-42"}))
     shapes.append(a.put("/api/me/links", json={"instagram": bad}))
     bid = new_edit(a)
     shapes.append(text_op(a, bid, bad))

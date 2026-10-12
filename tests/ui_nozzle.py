@@ -1,5 +1,5 @@
-"""Nozzle it in a real browser: states, names, keyboard, in-place sync card<->dialog, rollback, double-tap, signed-out dialog, class-off, own project,
-no counts for class students, no hearts/likes words, axe (Chrome).  390px, Chrome + WebKit.   python tests/ui_nozzle.py URL  (TEMP-data server)"""
+"""Nozzle it in a real browser: states, names, keyboard, in-place sync card<->dialog, rollback, double-tap, signed-out dialog, own project,
+no hearts/likes words, axe (Chrome).  390px, Chrome + WebKit.   python tests/ui_nozzle.py URL  (TEMP-data server)"""
 import json, os, re, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
@@ -90,25 +90,8 @@ def run(name, launch, with_axe):
     card = po.locator(f'#shGrid .pcard:has(h2 a[data-open="{own_id}"])')
     ok(f"{name}: your own project shows static text, not a button", card.locator(".nz").count() == 0 and card.locator(".nz-static").count() == 1)
     oc.close()
-    # class student: no numbers, class-off reason
-    tctx = b.new_context(bypass_csp=True); tr = tctx.request
-    tr.post(URL + "/api/me/signup", data={"display_name": "Ms T", "dob": "1980-01-01"})
-    room = tr.post(URL + "/api/classrooms", data={"name": "Room 9", "password": "bluebird-77"}).json(); code = room["code"]
-    sc = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, bypass_csp=True)
-    sc.request.post(URL + "/api/classrooms/join", data={"code": code, "nickname": "Fox", "password": "bluebird-77"})
-    tr.put(URL + f"/api/classrooms/{code}/showcase", data={"enabled": True})
-    ps = page(sc); sb = nz(ps)
-    ok(f"{name}: class student with nozzles off: aria-disabled (still focusable), reason shown as text and linked by aria-describedby",
-       sb.get_attribute("aria-disabled") == "true" and sb.get_attribute("disabled") is None and "turned nozzles off" in ps.inner_text("#shGrid")
-       and ps.locator("#" + sb.get_attribute("aria-describedby")).count() == 1)
-    ok(f"{name}: class student sees no number on the adult's project", sb.locator(".nz-count").inner_text() == "" and sb.get_attribute("aria-label") == "Nozzle it")
-    sb.click(force=True); ps.wait_for_timeout(300)
-    ok(f"{name}: pressing it speaks the reason and sends nothing", "turned nozzles off" in ps.inner_text("#nzStatus") and sb.get_attribute("aria-pressed") == "false")
-    tr.put(URL + f"/api/classrooms/{code}/showcase", data={"likes": True}); ps.reload(); ps.wait_for_selector("#shGrid .pcard") if False else None
-    ps.click("#mainNav [data-view=showcase]"); ps.wait_for_selector("#shGrid .pcard"); sb = nz(ps); sb.click(); ps.wait_for_timeout(500)
-    ok(f"{name}: with nozzles on, the student can nozzle and still sees no number", sb.get_attribute("aria-pressed") == "true" and sb.get_attribute("aria-label") == "Nozzle it" and "Nozzled." in ps.inner_text("#nzStatus"))
     ok(f"{name}: no page errors", not errs, errs)
-    sc.close(); tctx.close(); owner.close(); b.close()
+    owner.close(); b.close()
 
 with sync_playwright() as p:
     run("chrome", lambda: p.chromium.launch(channel="chrome"), True)

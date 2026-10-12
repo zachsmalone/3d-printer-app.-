@@ -1,5 +1,8 @@
 # Design tickets from the HQ browser test (items 4, 5, 6)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 **Author:** Sakura Mori (Design & UX) · **Date:** 2026-10-04 · **Status:** DRAFT for Aiko's classroom check and Kenji's wording check. Only Engineering edits code.
 Evidence: `previews/browser-test/09_classroom_access.png`, `07_showcase_search.png`; `static/community.js:188` (toast "Teacher tools need an adult account - sign up first"), `:78` ("Nothing here yet."), `app/branding.py:19` (SHOWCASE_TABS), `app/api/community.py:~150` (foryou hint).
 

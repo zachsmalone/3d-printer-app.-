@@ -21,20 +21,7 @@ async function refreshMe() {
   document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
   document.body.dataset.role = ME.send?.role || "";
   document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
-  refreshClassBar();
 }
-/* Teacher mode's bar: reads the teacher's own classes; shows nothing it cannot read. */
-async function refreshClassBar() {
-  const box = $("#cbRooms"); if (!box) return;
-  if (!(ME.signed_up && ME.age_group === "adult")) return;
-  try {
-    const rooms = (await api("/api/classrooms")).rooms;
-    box.innerHTML = rooms.length ? rooms.slice(0, 3).map(r => `<span class="cbroom"><b>${esc(r.name)}</b> · Join code <span class="code" aria-label="${esc(r.code.split("").join(" "))}">${esc(r.code)}</span> · Students sending files out of ZEIM: <b>${r.send_enabled ? "On" : "Off"}</b></span>`).join(" ") + (rooms.length > 3 ? ` <span>+${rooms.length - 3} more in Teacher tools</span>` : "")
-      : "No class yet. Open Teacher tools to make one.";
-  } catch { box.textContent = "Open Teacher tools to see your classes."; }
-}
-document.addEventListener("zeim:level", () => { if (S.level === "teacher" && typeof ME !== "undefined" && ME) refreshClassBar(); });
-$("#btnTeacherTools").onclick = () => $("#btnTeacher").click();
 
 /* ---------- views ---------- */
 function show(view) {
@@ -47,7 +34,6 @@ function show(view) {
 $$("#mainNav button").forEach(b => b.onclick = () => { location.hash = b.dataset.view === "create" ? "" : b.dataset.view; });
 function route() {
   const h = location.hash.replace("#", "").split("/");
-  if (h[0] === "join") { show("learn"); $("#j_code").value = (h[1] || "").toUpperCase(); $("#dlgJoin").showModal(); history.replaceState({}, "", "#learn"); return; }
   show(["showcase", "learn", "edit"].includes(h[0]) ? h[0] : "create");
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
 }
@@ -57,7 +43,7 @@ addEventListener("hashchange", route);
 $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
 function renderAccount() {
   if (!ME.signed_up) {
-    $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Learning with a class? You don't need an account — ask your teacher for the class code and join in the ${esc(CFG.sections.learn)}.</p>
+    $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Kids can build and learn in the ${esc(CFG.sections.learn)} without an account, or use ZEIM with a grown-up in their family.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
@@ -78,8 +64,7 @@ function renderAccount() {
       try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim() })); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
         if (e.status === 403 && /^We can't create an account/.test(e.message)) {     // the neutral age refusal: a calm panel instead of an unchanged form
-          $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still join a class with a code from your teacher.</p><button class="btn primary" id="suJoin">Join a class</button></div>`;
-          $("#suJoin").onclick = () => { $("#dlgAccount").close(); $("#dlgJoin").showModal(); };
+          $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still build and use the ${esc(CFG.sections.learn)} lessons without an account.</p></div>`;
           $("#accBody .calm").focus();
         } else inlineMsg($("#su_go"), e.message);
       }
@@ -103,8 +88,7 @@ function renderAccount() {
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
       <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button></div>
       <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
-      <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li>
-      <li>Classroom tools: <b>${r.can_create_classroom ? "available" : "adults only"}</b></li></ul>
+      <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>
       <h4>Sign out</h4><p class="help">Signing out makes this browser forget your account. Use it on a shared computer.</p>
       <button class="btn small" id="so_open">Sign out…</button>`;
@@ -185,7 +169,7 @@ async function loadShowcase() {
   let r;
   try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
-  // category filters: built from what THIS viewer may see (hidden categories never reach class students / under-13s)
+  // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
   $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
   $("#shSub").textContent = r.subtitle || "";
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
@@ -216,16 +200,15 @@ $("#shGrid").addEventListener("click", e => {
 
 /* ---------- Nozzle it: the one positive-only button (replaces every like/heart). Spec: reports/design/nozzle-it-spec.md ---------- */
 const NZ_SVG = `<svg class="nz-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><g class="nz-body"><rect x="6" y="2.5" width="12" height="5.5" rx="1.5"/><path d="M8.2 8h7.6l-2 5.5h-3.6z"/><path d="M10.2 13.5h3.6V16h-3.6z"/></g><path class="nz-drop" d="M12 17.6c-1.5 1.9-2 2.7-2 3.5a2 2 0 0 0 4 0c0-.8-.5-1.6-2-3.5z"/></svg>`;
-const NZ_OFF = "Your teacher turned nozzles off for your class.";
 const nzShort = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, "") + "k" : String(n);
 const nzName = n => n == null ? "Nozzle it" : n === 0 ? "Nozzle it, no nozzles yet" : `Nozzle it, ${n} ${n === 1 ? "nozzle" : "nozzles"}`;
-const nzNeedsAccount = () => !(ME?.signed_up || ME?.send?.role === "student");
+const nzNeedsAccount = () => !ME?.signed_up;
 function nzHTML(i, { large = false, uid = "g" } = {}) {
   if (i.example || i.no_nozzle) return "";                                   // examples are seed data: no button, no number
   const n = i.likes == null ? null : i.likes;
   if (i.owned) return `<span class="nz-static">${NZ_SVG}<span>${n == null ? "Your project" : `${n} ${n === 1 ? "nozzle" : "nozzles"}`}</span></span>`;
   if (i.can_like_reason === "not_public") return "";
-  const off = i.can_like === false && i.can_like_reason === "class_off", why = `nzwhy-${uid}-${i.id}`;
+  const off = false, why = `nzwhy-${uid}-${i.id}`;
   return `<span class="nzwrap"><button type="button" class="nz${large ? " nz-lg" : ""}" data-nz="${i.id}" data-likes="${n == null ? "" : n}" aria-pressed="${!!i.liked}" aria-label="${nzName(n)}"
       ${off ? `aria-disabled="true" aria-describedby="${why}" data-off="1"` : ""}>${NZ_SVG}${large ? '<span class="nz-text" aria-hidden="true">Nozzle it</span>' : ""}<span class="nz-count" aria-hidden="true">${n ? nzShort(n) : ""}</span></button>${off ? `<span class="nz-note" id="${why}">${NZ_OFF}</span>` : ""}</span>`;
 }
@@ -245,7 +228,6 @@ document.addEventListener("click", async e => {
   e.preventDefault(); e.stopPropagation();
   if (b.dataset.busy) return;                                               // one request at a time per button
   const id = b.dataset.nz;
-  if (b.dataset.off) { nzSay(NZ_OFF); return; }                              // aria-disabled, not disabled: it stays focusable and says why
   if (nzNeedsAccount()) { window.__nzOpener = b; $("#dlgNzAcct").showModal(); return; }
   const was = { liked: b.getAttribute("aria-pressed") === "true", n: b.dataset.likes === "" ? null : +b.dataset.likes }, want = !was.liked;
   const now = was.n == null ? null : Math.max(0, was.n + (want ? 1 : -1));
@@ -258,7 +240,6 @@ document.addEventListener("click", async e => {
   } catch (er) {
     nzPaint(id, was.liked, was.n, false);                                    // roll back to exactly what it was
     if (er.status === 401) { window.__nzOpener = b; $("#dlgNzAcct").showModal(); }                // the server says this session has no account (e.g. it expired)
-    else if (er.status === 403 && /teacher/i.test(er.message)) nzSay(er.message, true);
     else { nzSay("Couldn't save your nozzle. Check your connection and try again.", true); toast("Couldn't save your nozzle. Check your connection and try again.", "err"); }
   } finally { $$(`.nz[data-nz="${CSS.escape(id)}"]`).forEach(x => delete x.dataset.busy); }
 }, true);
@@ -331,24 +312,8 @@ async function openData() {
 /* ---------- learn ---------- */
 async function loadLearn() {
   const r = await api("/api/learn/lessons");
-  const cls = r.classroom;
-  $("#classBanner").innerHTML = cls ? `<div class="banner">🎒 You're in <b>${esc(cls.name)}</b> (teacher: ${esc(cls.teacher)}) as <b>${esc(cls.nickname)}</b>. ${cls.assigned.length ? "Assigned lessons are marked ⭐." : ""}
-    <p class="help" id="classNotice">${esc(cls.notice || "")}</p>
-    ${cls.hand_up ? `<p class="handup" id="handState" role="status">✋ Your hand is up. Your teacher can see it. <button type="button" class="btn small" id="handDown">Lower my hand</button></p>` : `<p class="sr-only" id="handState" role="status"></p>`}
-    ${cls.notifications.map(n => `<div class="note">🔔 ${esc(n.from_name)}: ${esc(n.text)}</div>`).join("")}
-    <div class="row" style="margin-top:6px"><span class="help">Quick message to your teacher (pre-set only):</span>${Object.entries(cls.canned).map(([k, t]) => `<button class="btn small" data-req="${k}">${esc(t)}</button>`).join("")}
-    <button class="btn small ghost" id="clsFeedback">📝 My projects &amp; feedback</button><button class="btn small ghost" id="clsSubmit">⬆ Submit a build</button></div></div>` : "";
-  if (cls) {
-    $("#classBanner").onclick = async e => {
-      const q = e.target.closest("[data-req]");
-      if (q) { try { await api(`/api/classrooms/${cls.code}/requests`, J("POST", { kind: q.dataset.req })); toast("Sent to your teacher", "ok"); if (q.dataset.req === "need_help") { await loadLearn(); $("#handDown")?.focus(); } } catch (er) { toast(er.message, "err"); } }
-      if (e.target.id === "handDown") { try { await api(`/api/classrooms/${cls.code}/hand/down`, J("POST")); await loadLearn(); $("#handState").textContent = "Your hand is down."; } catch (er) { toast(er.message, "err"); } }
-      if (e.target.id === "clsFeedback") openClassProjects(cls.code);
-      if (e.target.id === "clsSubmit") submitToClass(cls.code);
-    };
-  }
   $("#lessonGrid").innerHTML = r.lessons.map(l => `<div class="pcard" data-lesson="${l.id}"><div class="ph">${l.emoji}</div>
-    <div class="meta"><h3 class="lt"><a href="#" class="stretch" data-open-lesson="${l.id}">${esc(l.title)}</a> ${r.assigned.includes(l.id) ? '<span aria-label="assigned">⭐</span>' : ""}</h3><span>${l.minutes} min · ages ${l.age}</span><div class="help">${esc(l.summary)}</div>
+    <div class="meta"><h3 class="lt"><a href="#" class="stretch" data-open-lesson="${l.id}">${esc(l.title)}</a></h3><span>${l.minutes} min · ages ${l.age}</span><div class="help">${esc(l.summary)}</div>
     <div class="bar"><i style="width:${100 * l.done_steps / l.steps}%"></i></div><span>${l.completed ? l.badge : `${l.done_steps}/${l.steps} steps`}</span></div></div>`).join("");
 }
 $("#lessonGrid").onclick = e => { const c = e.target.closest("[data-lesson]"); if (c) { e.preventDefault(); openLesson(c.dataset.lesson); } };   // the title link (keyboard) and a tap anywhere on the card
@@ -358,177 +323,13 @@ async function openLesson(id) {
   box.innerHTML = `<div class="row" style="justify-content:space-between"><h2 style="margin:0">${l.emoji} ${esc(l.title)}</h2><div class="row"><button class="btn small ghost" id="lsCopy">🔗 Copy share link</button><button class="btn small ghost" id="lsClose">Close</button></div></div>
     <p class="help">${esc(l.objective)}</p>
     <ol>${l.steps.map((s, i) => `<li class="st ${p.steps_done.includes(i) ? "done" : ""}"><label><input type="checkbox" data-step="${i}" ${p.steps_done.includes(i) ? "checked" : ""}><b>${i + 1}. ${esc(s.title)}</b></label><p>${esc(s.body)}</p></li>`).join("")}</ol>
-    <div class="quiz"><h4>Quick check</h4><p>${esc(l.quiz.q)}</p>${l.quiz.options.map((o, i) => `<label><input type="radio" name="qz" value="${i}"> ${esc(o)}</label>`).join("")}<button class="btn small" id="qzGo">Check answer</button> <span id="qzOut">${p.quiz_passed ? "✔ passed" : ""}</span></div>
-    <div class="row" style="margin-top:12px"><button class="btn primary" id="lsTry">🚀 ${esc(l.try.label)}</button>${p.completed ? '<span class="pill ok">🏅 Lesson complete!</span>' : ""}</div>
-    <details class="tn" ${S.level === "teacher" ? "open" : ""}><summary>Teacher notes</summary><p class="help">${esc(l.teacher_notes)}</p></details>`;
+    <div class="row" style="margin-top:12px"><button class="btn primary" id="lsTry">🚀 ${esc(l.try.label)}</button>${p.completed ? '<span class="pill ok">🏅 Lesson complete!</span>' : ""}</div>`;
   box.scrollIntoView({ behavior: "smooth" });
   $("#lsClose").onclick = () => { box.hidden = true; loadLearn(); };
   $("#lsCopy").onclick = () => { navigator.clipboard?.writeText(location.origin + l.share_url); toast("Link copied", "ok"); };
   $$("[data-step]", box).forEach(c => c.onchange = async () => { await api(`/api/learn/lessons/${id}/steps/${c.dataset.step}`, J("POST", { done: c.checked })); openLesson(id); });
-  $("#qzGo").onclick = async () => {
-    const v = $$("[name=qz]", box).find(x => x.checked); if (!v) return;
-    const r = await api(`/api/learn/lessons/${id}/quiz`, J("POST", { choice: +v.value }));
-    $("#qzOut").textContent = r.correct ? "✔ Correct!" : "Not quite — try again"; if (r.correct) setTimeout(() => openLesson(id), 700);
-  };
   $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
 }
 
-
-/* ---------- Teacher Live view: view-only roster, polled every ~12 s while the window is open ---------- */
-let liveTimer = null, liveCode = "", liveHands = new Set(), liveData = null;
-const liveAgo = iso => { if (!iso) return "no activity yet"; const m = (Date.now() - new Date(iso)) / 60000; return m < 1 ? "just now" : m < 15 ? Math.floor(m) + " min ago" : "inactive 15+ min"; };
-function liveRender(force = false) {
-  const body = $("#liveRows"), rows = liveData.students.slice();
-  if ($("#liveSort").checked) rows.sort((a, b) => (b.hand - a.hand));            // only when the teacher asks; otherwise join order, so rows never jump
-  // a11y #4: never move rows under the pointer or the keyboard focus; offer "Re-sort now" instead
-  const busy = !force && (body.matches(":hover") || body.matches(":focus-within"));
-  let pending = false;
-  $("#liveEmpty").hidden = rows.length > 0;
-  const keep = new Set(rows.map(r => r.id));
-  $$("tr[data-sid]", body).forEach(tr => { if (!keep.has(tr.dataset.sid)) tr.remove(); });
-  rows.forEach((r, idx) => {
-    let tr = body.querySelector(`tr[data-sid="${r.id}"]`);
-    if (!tr) { tr = document.createElement("tr"); tr.dataset.sid = r.id; tr.innerHTML = `<th scope="row" class="c-n"></th><td class="c-l" data-l="Lesson"></td><td class="c-m" data-l="Newest model"></td><td class="c-a" data-l="Last activity"></td><td class="c-h" data-l="Hand"></td>`; body.append(tr); }
-    tr.querySelector(".c-n").textContent = r.nickname;
-    tr.querySelector(".c-l").textContent = r.lesson ? `${r.lesson.title}: ${r.lesson.done_steps} of ${r.lesson.steps} steps` : "No lesson yet";
-    tr.querySelector(".c-m").textContent = r.model || "none yet";
-    tr.querySelector(".c-a").textContent = liveAgo(r.last_active);
-    const h = tr.querySelector(".c-h");
-    if (r.hand && !h.dataset.up) h.innerHTML = `<span class="needs">✋ Needs help</span> <button type="button" class="btn small" data-helped="${r.id}">Helped<span class="sr-only"> ${esc(r.nickname)}</span></button>`;
-    if (!r.hand && (h.dataset.up || !h.textContent)) h.innerHTML = '<span aria-hidden="true">–</span><span class="sr-only">hand down</span>';
-    h.dataset.up = r.hand ? "1" : "";
-    tr.classList.toggle("hand", !!r.hand);
-    if ($("#liveSort").checked && body.children[idx] !== tr) { if (busy) pending = true; else body.insertBefore(tr, body.children[idx] || null); }
-  });
-  $("#liveResort").hidden = !pending;
-  const now = new Set(rows.filter(r => r.hand).map(r => r.id)), fresh = rows.filter(r => r.hand && !liveHands.has(r.id));
-  if (fresh.length) $("#liveSay").textContent = fresh.map(r => r.nickname).join(", ") + (fresh.length === 1 ? " needs help." : " need help.");
-  liveHands = now;
-  $("#liveAsOf").textContent = "Updated " + new Date(liveData.as_of).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + ".";
-}
-async function livePoll() {
-  try { liveData = await api(`/api/classrooms/${liveCode}/live`); liveRender(); }
-  catch (e) { $("#liveAsOf").textContent = "Couldn't refresh just now. " + (e.message || "") + " Trying again soon."; }
-}
-async function openLive(code) {
-  liveCode = code; liveHands = new Set(); $("#liveRows").innerHTML = ""; $("#liveSay").textContent = ""; liveData = null;
-  $("#dlgTeacher").close(); $("#dlgLive").showModal();
-  await livePoll(); clearInterval(liveTimer); liveTimer = setInterval(() => { if (!document.hidden) livePoll(); }, 12000);
-}
-$("#dlgLive").addEventListener("close", () => { clearInterval(liveTimer); liveTimer = null; });           // stop asking the server when the teacher closes the screen
-$("#liveSort").onchange = () => { if (liveData) liveRender(true); };
-$("#liveResort").onclick = () => { if (liveData) liveRender(true); $("#liveSort").focus(); };
-function liveSay(t) { const s = $("#liveSay"); s.textContent = ""; setTimeout(() => { s.textContent = t; }, 60); }   // cleared first so repeated text is spoken again
-$("#liveRows").onclick = async e => {
-  const b = e.target.closest("[data-helped]"); if (!b) return;
-  const sid = b.dataset.helped, tr = b.closest("tr"), nick = tr?.querySelector(".c-n")?.textContent || "Student";
-  try {
-    await api(`/api/classrooms/${liveCode}/students/${sid}/helped`, J("POST")); await livePoll();
-    // a11y #3: the button is gone now; go to the next "Helped" button, else to this student's row header
-    const next = $("#liveRows [data-helped]"), row = $(`#liveRows tr[data-sid="${sid}"] th`);
-    if (next) next.focus(); else if (row) { row.tabIndex = -1; row.focus(); } else $("#liveSort").focus();
-    liveSay(`${nick} marked as helped.`);
-  } catch (er) { toast(er.message, "err"); }
-};
-window.__liveTimer = () => liveTimer;
-
-/* Delete class: an in-app dialog (no browser confirm box). "Keep the class" has focus first; Esc keeps it too. */
-function askDeleteClass(code, name, opener) {
-  const d = $("#dlgDelClass"); $("#dcName").textContent = name; clearInline($("#dcGo").parentElement);
-  stackModal(d); $("#dcKeep").focus();
-  $("#dcKeep").onclick = () => { d.close(); opener?.focus(); };
-  $("#dcGo").onclick = async () => {
-    $("#dcGo").disabled = true;
-    try { await api("/api/classrooms/" + code, { method: "DELETE" }); d.close(); toast(`Deleted ${name}.`, "ok"); openTeacher(); }
-    catch (e) { inlineMsg($("#dcGo").parentElement, e.message || "That didn't work. The class is still there."); }
-    finally { $("#dcGo").disabled = false; }
-  };
-}
-
-/* classroom */
-$("#btnJoinClass").onclick = () => $("#dlgJoin").showModal();
-$("#btnDoJoin").onclick = async () => {
-  try { const r = await api("/api/classrooms/join", J("POST", { code: $("#j_code").value, nickname: $("#j_nick").value, password: $("#j_pw").value })); clearInline($("#btnDoJoin")); $("#dlgJoin").close(); toast("Joined " + r.name, "ok"); loadLearn(); }
-  catch (e) { inlineMsg($("#btnDoJoin"), e.message); }
-};
-$("#btnTeacher").onclick = openTeacher;
-document.addEventListener("click", async e => {
-  if (e.target.id === "sendCancel") $("#dlgSend").close();
-  if (e.target.id === "sendOn") {
-    const code = $("#dlgSend").dataset.code;
-    try { await api(`/api/classrooms/${code}/send`, J("PUT", { enabled: true, confirm: true })); } catch (er) { toast(er.message, "err"); }
-    $("#dlgSend").close(); openTeacher();
-  }
-});
-async function openTeacher() {
-  if (!ME.signed_up || ME.age_group !== "adult") { toast("Teacher tools need an adult account — sign up first.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
-  const [{ rooms }, ls] = await Promise.all([api("/api/classrooms"), api("/api/learn/lessons")]);
-  $("#dlgTeacher").querySelector("h3").textContent = "🍎 Teacher tools";
-  $("#teacherBody").innerHTML = `<div class="row"><input id="cr_name" placeholder="New class name"><input id="cr_pw" placeholder="Join password (8+ chars)"><button class="btn primary" id="cr_go">Create class</button></div>
-    <p class="help">Students join with the class code (or the QR / link below) + your password + a nickname — no accounts, no personal data. Class projects are private to the class. Hand out the password separately; it is not in the QR code.</p>` +
-    rooms.map(r => `<div class="printer"><div class="row" style="justify-content:space-between"><b>${esc(r.name)}</b><span>Code: <code style="font-size:15px">${r.code}</code> <button class="btn small ghost" data-cp="${r.code}">Copy code</button> <button class="btn small ghost" data-cl="${r.code}">Copy join link</button></span></div>
-      <div class="row"><img src="/api/classrooms/${r.code}/qr.svg" alt="QR code to join ${esc(r.name)}" width="120" height="120" style="background:#fff;border-radius:8px"><span class="help">Scan to open the join page for code <b>${r.code}</b>. Link: <code>${esc(location.origin)}/#join/${r.code}</code> · <a href="/api/classrooms/${r.code}/qr.svg" target="_blank">open QR to print</a></span></div>
-      ${r.notifications.length ? `<div class="banner">${r.notifications.map(n => `🔔 ${esc(n.from_name)}: ${esc(n.text)}`).join("<br>")} <button class="btn small" data-rd="${r.code}">Mark read</button></div>` : ""}
-      ${r.failed_joins_last_hour ? `<div class="banner">${r.failed_joins_last_hour} wrong password tries in the last hour. If students can't get in, <button class="btn small" data-unlock="${r.code}">Unlock joining</button></div>` : ""}
-      <div class="sendsw"><label class="sw"><input type="checkbox" role="switch" data-send="${r.code}" ${r.send_enabled ? "checked" : ""} aria-describedby="sw_${r.code}"> <b>Let students send files to other apps</b> <span class="state">${r.send_enabled ? "On" : "Off"}</span></label>
-        <p class="help" id="sw_${r.code}">${r.send_enabled ? `On since ${esc(new Date(r.send_changed).toLocaleString())}. Turn off any time.` : "Off: students can download their own build and send it to you. Nothing else leaves ZEIM."} Why: a build made from a photo contains that photo. Students under 13 can never use outside apps, even if this is on.</p></div>
-      <p class="help">Assign: ${ls.lessons.map(l => `<label class="inl"><input type="checkbox" data-as="${r.code}" value="${l.id}" ${r.assigned.includes(l.id) ? "checked" : ""}> ${esc(l.title)}</label>`).join(" ")}</p>
-      <table class="studs"><tr><th>Student</th><th>Progress</th><th></th></tr>${r.students.map(s => `<tr><td>${esc(s.nickname)}</td><td>${s.lessons.map(x => `${x.completed ? "✅" : `${x.done_steps}/${x.steps}`}`).join(" · ")}</td><td><button class="btn small ghost" data-talk="${r.code}:${s.id}" title="${esc(r.canned.talk_next_class)}">🗨 Talk next class</button> <button class="btn small ghost" data-mu="${r.code}:${s.id}:${s.muted ? 0 : 1}">${s.muted ? "Unmute" : "Mute"}</button> <button class="btn small ghost danger" data-rs="${r.code}:${s.id}">Remove</button></td></tr>`).join("") || "<tr><td colspan=3 class='help'>No students yet</td></tr>"}</table>
-      <h4>Student projects <small class="help">(private to this class)</small></h4>
-      ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
-      <button class="btn small" data-live="${r.code}">Live view</button> <button class="btn small danger" data-dr="${r.code}" data-dr-name="${esc(r.name)}">Delete class</button></div>`).join("");
-  if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
-  $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { inlineMsg($("#cr_go"), e.message); } };
-  $("#teacherBody").onclick = async e => {
-    const t = e.target;
-    if (t.dataset.cp) navigator.clipboard?.writeText(t.dataset.cp), toast("Code copied", "ok");
-    if (t.dataset.cl) navigator.clipboard?.writeText(location.origin + "/#join/" + t.dataset.cl), toast("Join link copied (password not included)", "ok");
-    if (t.dataset.unlock) { await api(`/api/classrooms/${t.dataset.unlock}/unlock-joins`, J("POST")); toast("Joining unlocked", "ok"); openTeacher(); }
-    if (t.dataset.live) { openLive(t.dataset.live); return; }
-    if (t.dataset.rd) { await api(`/api/classrooms/${t.dataset.rd}/notifications/read`, J("POST")); openTeacher(); }
-    if (t.dataset.talk) { const [c, sid] = t.dataset.talk.split(":"); try { await api(`/api/classrooms/${c}/requests`, J("POST", { kind: "talk_next_class", to: sid })); toast("Request sent", "ok"); } catch (er) { toast(er.message, "err"); } }
-    if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }
-    if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); openFeedback(c, pid); }
-    if (t.dataset.rs) { const [c, s] = t.dataset.rs.split(":"); await api(`/api/classrooms/${c}/students/${s}`, { method: "DELETE" }); openTeacher(); }
-    if (t.dataset.dr) { askDeleteClass(t.dataset.dr, t.dataset.drName || t.dataset.dr, t); return; }
-  };
-  $("#teacherBody").onchange = async e => { const t = e.target;
-    if (t.dataset.send) {
-      const code = t.dataset.send;
-      if (!t.checked) { try { await api(`/api/classrooms/${code}/send`, J("PUT", { enabled: false })); } catch (er) { toast(er.message, "err"); } return openTeacher(); }
-      t.checked = false;                                  // only turns on after the dialog's explicit Turn on
-      const d = $("#dlgSend"); d.dataset.code = code;
-      $("#dlgSendName").textContent = (rooms.find(r => r.code === code) || {}).name || code;
-      d.showModal(); $("#sendCancel").focus(); return;
-    }
-    if (!t.dataset.as) return; const ids = $$(`[data-as="${t.dataset.as}"]`).filter(x => x.checked).map(x => x.value); await api(`/api/classrooms/${t.dataset.as}/assign`, J("POST", { lesson_ids: ids })); };
-}
-
-function openFeedback(code, pid) {
-  const d = $("#dlgFeedback"); $("#fbText").value = ""; clearInline($("#fbSave").parentElement);
-  $("#fbSave").onclick = async () => {
-    const comment = $("#fbText").value.trim();
-    if (!comment) return inlineMsg($("#fbSave").parentElement, "Please write a little feedback first.");
-    try { await api(`/api/classrooms/${code}/projects/${pid}/feedback`, J("POST", { comment })); d.close(); toast("Feedback saved", "ok"); openTeacher(); }
-    catch (er) { inlineMsg($("#fbSave").parentElement, er.message); }            // the box keeps what was typed
-  };
-  d.showModal(); $("#fbText").focus();
-}
-async function submitToClass(code) {
-  const b = S.history; if (!b.length) return toast("Build something in the Studio first.", "err");
-  const d = $("#dlgPickBuild"); clearInline($("#pbSend").parentElement);
-  $("#pbList").innerHTML = b.map((x, i) => `<label class="choice"><input type="radio" name="pbBuild" value="${esc(x.id)}" ${i === 0 ? "checked" : ""}> <span>${esc(x.title)}</span></label>`).join("");
-  $("#pbSend").onclick = async () => {
-    const id = (document.querySelector('input[name="pbBuild"]:checked') || {}).value; if (!id) return inlineMsg($("#pbSend").parentElement, "Please pick a build.");
-    try { await api(`/api/classrooms/${code}/projects`, J("POST", { build_id: id })); d.close(); toast("Submitted — only your class can see it.", "ok"); }
-    catch (e) { inlineMsg($("#pbSend").parentElement, e.message); }
-  };
-  d.showModal(); document.querySelector('input[name="pbBuild"]')?.focus();
-}
-async function openClassProjects(code) {
-  const r = await api(`/api/classrooms/${code}/projects`);
-  $("#teacherBody").innerHTML = `<p class="help">Projects here are private to your class.</p>` + (r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.teacher)}: ${esc(f.comment)}</small>`).join("") || "<br><small class='help'>No feedback yet</small>"}</span></div>`).join("") || "<p class='help'>Nothing here yet. Check back soon.</p>");
-  $("#dlgTeacher").querySelector("h3").textContent = "📝 Class projects & feedback"; $("#dlgTeacher").showModal();
-}
 
 init();

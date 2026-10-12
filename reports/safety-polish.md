@@ -1,5 +1,8 @@
 # Trust & Safety polish pass (first-time user on an iPhone-sized screen)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Author: Kenji Watanabe (Trust, Safety & Legal). Date: 2026-10-04 evening (CT). Not a lawyer; nothing here says ZEIM is or is not compliant with any law.
 
 ## 1. Method, and what is untested

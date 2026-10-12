@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from app import config
 from app.main import app
-from app.community import classrooms, moderation
+from app.community import moderation
 from app.core import ratelimit  # noqa
 from tests.make_sample import make
 
@@ -34,20 +34,6 @@ def gen(c, ack=True, name="s.png", data=None, ctype="image/png", mode="relief", 
 
 
 def photo_build(c): r = gen(c); assert r.status_code == 200, r.text; return r.json()["id"]
-
-
-def make_class(teacher=None, pw="pass-123", name="Period 1"):
-    t = teacher or client(ADULT)
-    room = t.post("/api/classrooms", json={"name": name, "password": pw}).json()
-    return t, room["code"], pw
-
-
-def join(s, code, pw, nick, **kw):
-    return s.post("/api/classrooms/join", json={"code": code, "nickname": nick, "password": pw, **kw})
-
-
-def student(code, pw, nick):
-    s = client(); assert join(s, code, pw, nick).status_code == 200; return s
 
 
 def jpeg_with_gps():

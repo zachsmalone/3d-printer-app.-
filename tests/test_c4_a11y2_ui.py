@@ -1,4 +1,4 @@
-"""Accessibility round 2 top-10 in Chrome + WebKit (tests/ui_a11y2.py; Live view parts in tests/ui_live.py)."""
+"""Accessibility round 2 top-10 in Chrome + WebKit (tests/ui_a11y2.py)."""
 from test_b4_ui import _run
 
 

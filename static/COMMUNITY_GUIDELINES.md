@@ -1,6 +1,6 @@
 # Community Guidelines (draft)
 
-This product is **family-friendly only**, for students, teachers and hobbyists of all ages (accounts 13+; younger learners join a teacher's classroom without an account).
+This product is **family-friendly only**, for families, kids and hobbyists of all ages (accounts 13+; younger kids use ZEIM without an account or with a grown-up in their family).
 
 **Allowed:** original or properly licensed 3D-print projects, lithophanes, reliefs and pop-art made from photos you have the right to use; friendly, constructive feedback.
 

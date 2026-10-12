@@ -1,7 +1,7 @@
-"""Teacher account recovery (Education CR-15). Accounts are cookie-bound; clearing browser data used to lose the account AND its classes.
+"""Adult account recovery (CR-15). Accounts are cookie-bound; clearing browser data used to lose the account.
 An adult account gets a one-time RECOVERY CODE when it is made (shown once; only a hash is stored). Entering it in a new browser moves
 the account - classes, builds, progress - to that browser and the old browser loses it. The code is single-use: using it issues a new one.
-Not real authentication (see ROADMAP): whoever holds the code IS the teacher, so the page says to keep it like a password."""
+Not real authentication (see ROADMAP): whoever holds the code IS the account holder, so the page says to keep it like a password."""
 from __future__ import annotations
 
 import hashlib
@@ -11,9 +11,9 @@ import secrets
 import time
 from datetime import datetime, timezone
 
-from .classrooms import ALPHABET
+ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 from .identity import Actor
-from .store import CLASSROOMS, LISTINGS, PREFS, USERS
+from .store import LISTINGS, PREFS, USERS
 
 _audit = logging.getLogger("zeim.audit")
 
@@ -76,9 +76,6 @@ def recover(actor: Actor, code: str, ip: str = "-") -> tuple[dict, str]:
         raise ValueError("This browser already has that account.")
     if actor.user:
         raise ValueError("This browser already has an account. Use a browser that doesn't, such as a private window.")
-    from . import classrooms
-    if classrooms.is_student(actor.sid):
-        raise ValueError("This browser is signed in to a class as a student. Use a different browser.")
     new_code = _new_code()
 
     def move_user(d):
@@ -90,12 +87,8 @@ def recover(actor: Actor, code: str, ip: str = "-") -> tuple[dict, str]:
         return u
     user = USERS.update(move_user)
 
-    def move_rooms(d):
-        for room in d.values():
-            if room["teacher_sid"] == old:
-                room["teacher_sid"] = actor.sid
-    CLASSROOMS.update(move_rooms)
-    classrooms._move_owner(old, actor.sid)                      # builds / Edit projects + lesson progress follow the account
+    from . import ownership
+    ownership.move_owner(old, actor.sid)                        # builds / Edit projects + lesson checklist follow the account
 
     def move_listings(l):
         for i in l:

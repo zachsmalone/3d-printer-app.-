@@ -11,7 +11,7 @@ TAGLINE = "Turn photos into things you can hold"
 SECTIONS = {
     "create": "Studio",             # build lithophanes / reliefs / pop-art
     "discover": "Showcase",         # community projects (all free)
-    "learn": "Spark Lab",           # classroom-friendly education center
+    "learn": "Spark Lab",           # family-friendly learning library
     "groups": "Build Plates",       # hobbyist groups (plural); singular below
     "edit": "Edit",                 # upload + modify existing 3D files
     "history": "Pick up where you left off",

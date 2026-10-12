@@ -46,7 +46,8 @@ USERS = JsonFile("users.json", {})          # sid -> account (DOB, flags)
 PREFS = JsonFile("prefs.json", {})          # sid -> personalization data
 LISTINGS = JsonFile("projects.json", [])    # user-published (free) projects
 MODERATION = JsonFile("moderation.json", {"hidden": [], "reports": []})
-CLASSROOMS = JsonFile("classrooms.json", {})  # code -> classroom
+# 2026-10-12: school features removed. A pre-existing data/classrooms.json (and data/classroom_projects/) is no longer
+# read or written by any code; it is left on disk untouched (no deletion of existing data). Owner decides on cleanup.
 PROGRESS = JsonFile("education_progress.json", {})
 ENGAGEMENT = JsonFile("engagement.json", {"likes": {}, "downloads": {}})   # item id -> [visitor sids] (one each)
 AGE_BLOCKS = JsonFile("age_blocks.json", {})   # sha256(sid)[:24] -> unix time the lock ends (no DOB, no age is ever stored here)

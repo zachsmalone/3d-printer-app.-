@@ -1,5 +1,8 @@
 # ZEIM Trust & Safety Review
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Author: Kenji (Trust, Safety & Legal). Date: Sunday 2026-10-04, 16:10-16:35 CT.
 Reviewed: `/workspace/photo3d` at git `3c3cf83`; `app/`, `static/`, `tests/` had **no uncommitted changes** while I tested. Engineering's Batch 1 (see `reports/engineering-batch1.md`) may change things after this date, so re-verify before closing any item.
 Method: read all of `app/` + wordlists + README/ROADMAP/Guidelines; ran a **separate** instance (port 8799, temp `PHOTO3D_OUT`/`PHOTO3D_DATA` under `/workspace/scratch/t1`) with several cookie jars (adult, teen, teacher, students, anonymous); scratch scripts live in `/workspace/scratch/`. No app code, tests or word lists were edited. The real instance (8765) and its data were not touched.

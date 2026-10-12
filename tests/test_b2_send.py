@@ -4,7 +4,7 @@ import pytest
 from app import config
 from app.services import settings
 from tests import b1
-from tests.b1 import client, photo_build, make_class, student, ADULT, TEEN, ADMIN
+from tests.b1 import client, photo_build, ADULT, TEEN, ADMIN
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -106,14 +106,6 @@ def test_printer_ui_only_in_local_mode_for_adults(monkeypatch):
     assert a.get("/api/me").json()["send"]["printer_ui"] is True
     assert client(TEEN).get("/api/me").json()["send"]["printer_ui"] is False
 
-
-def test_class_student_gets_class_code_for_send_to_my_teacher():
-    t, code, pw = make_class()
-    s = student(code, pw, "Kim")
-    k = s.get("/api/me").json()["send"]
-    assert k["teacher"] and k["class_code"] == code and not k["share_ui"]
-    bid = photo_build(s)
-    assert s.post(f"/api/classrooms/{code}/projects", json={"build_id": bid}).status_code == 200
 
 
 # ---------------------------------------------------------------- static guards on the sheet's code
