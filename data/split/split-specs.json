@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0",
+  "title": "Split connection specifications",
+  "scope": {
+    "primary_printer": "Creality K1",
+    "primary_nozzle": "0.4 mm",
+    "primary_materials": [
+      "PLA",
+      "PETG"
+    ],
+    "resin": "Separate guidance; do not apply FDM clearances directly to resin prints.",
+    "assumptions": [
+      "Dimensions are starting values for calibration, not universal guarantees.",
+      "Print a small fit-test coupon before committing a large Split design.",
+      "All magnet and pin fits should be validated with the actual purchased hardware."
+    ]
+  },
+  "magnet_pockets": {
+    "purpose": "Provide repeatable magnetic closure or positioning while keeping magnets captive.",
+    "recommended_fit": "glue_fit",
+    "starting_dimensions": {
+      "cylindrical_magnet": {
+        "pocket_diameter": "magnet_diameter + 0.25 mm for PLA; magnet_diameter + 0.30 mm for PETG",
+        "pocket_depth": "magnet_thickness + 0.15 mm",
+        "floor_thickness": "at least 1.2 mm or 3 perimeters, whichever is greater",
+        "lead_in_chamfer": "0.5 mm x 45 degrees"
+      },
+      "press_fit_alternative": {
+        "pocket_diameter": "magnet_diameter + 0.10 to 0.15 mm",
+        "caution": "Use only after a coupon test; FDM holes and cylinders can vary by printer, orientation, and material."
+      }
+    },
+    "design_rules": [
+      "Model the pocket as a blind circular pocket with a flat floor; avoid relying on bridging for the magnet seat.",
+      "Add a 0.5 mm x 45 degree lead-in chamfer so the magnet enters cleanly and adhesive has room.",
+      "Leave 0.1-0.2 mm extra depth beyond magnet thickness so adhesive does not prevent full seating.",
+      "Orient the pocket so its opening faces upward or outward where practical; this avoids unsupported ceilings.",
+      "If the pocket ceiling must bridge, keep it short and use supports or redesign the orientation.",
+      "Lightly sand the magnet and pocket when using glue; this improves mechanical keying for adhesive.",
+      "Keep magnets away from thin walls and layer-splitting planes; embed them in solid, thick sections.",
+      "Use opposite-polarity pairs consistently and record orientation in the model filename or assembly notes."
+    ],
+    "pla_vs_petg": {
+      "PLA": "Start at +0.25 mm diameter and +0.15 mm depth for a glue fit; PLA generally needs slightly less clearance than PETG.",
+      "PETG": "Start at +0.30 mm diameter and +0.15 mm depth for a glue fit; increase by 0.05 mm if the magnet binds during a coupon test."
+    },
+    "resin_notes": [
+      "Resin parts are typically more dimensionally accurate than FDM parts, so use smaller clearances.",
+      "Start around +0.10 to +0.15 mm diameter for a glue-fit pocket and validate with the specific resin.",
+      "Ensure uncured resin can drain; avoid fully enclosed pockets unless drainage and curing are addressed."
+    ]
+  },
+  "dovetails": {
+    "purpose": "Provide a mechanical, self-aligning connection between two Split halves.",
+    "recommended_profile": "trapezoidal_dovetail",
+    "starting_geometry": {
+      "included_angle_deg": 60,
+      "depth_mm": 3.0,
+      "root_width_mm": 6.0,
+      "mouth_width_mm": 8.5,
+      "per_side_clearance_mm": {
+        "PLA": 0.15,
+        "PETG": 0.2
+      },
+      "lead_in_chamfer_mm": 0.5
+    },
+    "design_rules": [
+      "Use a 60-degree included angle as a robust default; steeper angles resist separation but become harder to insert.",
+      "Apply clearance to both mating faces, not only one side; the starting values above are per side.",
+      "Add a 0.5 mm lead-in chamfer to the male feature and a matching entry relief to the female feature.",
+      "Avoid sharp internal corners; use at least a 0.5 mm fillet or radius where the model allows.",
+      "Keep the dovetail oriented to print with its sloped faces supported and avoid a large horizontal overhang.",
+      "Do not make the dovetail the sole structural load path for heavy or leveraged loads without testing.",
+      "For a removable connection, begin at the listed clearance; for a permanent glued assembly, reduce clearance only after coupon testing."
+    ],
+    "pla_vs_petg": {
+      "PLA": "Use 0.15 mm clearance per side as the first test; increase in 0.05 mm steps if assembly requires force.",
+      "PETG": "Use 0.20 mm clearance per side as the first test; PETG commonly needs a little more clearance for a non-binding fit."
+    },
+    "resin_notes": [
+      "Start with 0.10-0.15 mm total clearance for a snug resin dovetail, depending on resin and cure conditions.",
+      "Avoid very thin, sharp resin dovetails; they can be fragile and may not cure fully in deep narrow gaps.",
+      "Add drainage and cure access for any enclosed resin cavity."
+    ]
+  },
+  "alignment_pins": {
+    "purpose": "Positively locate Split halves before screws, magnets, adhesive, or dovetails carry the load.",
+    "recommended_pattern": "two_pins_with_one_slot",
+    "starting_geometry": {
+      "pin_diameter_mm": 4.0,
+      "engagement_length_mm": 6.0,
+      "hole_clearance_mm": {
+        "PLA": 0.2,
+        "PETG": 0.25
+      },
+      "slot_extra_length_mm": 1.5,
+      "lead_in_chamfer_mm": 0.5
+    },
+    "design_rules": [
+      "Use two alignment features: one round hole and one elongated slot when their centers are far apart.",
+      "The slot should point toward the other pin/hole so it absorbs printer and assembly misalignment.",
+      "Keep the slot at least 1.5 mm longer than the pin diameter as a practical starting value; increase it for larger parts.",
+      "Use a 4 mm pin diameter as a durable default for FDM; avoid small pins for structural alignment.",
+      "Provide at least 6 mm of engagement, but do not make the pin so long that assembly becomes difficult.",
+      "Add 0.5 mm x 45 degree chamfers to pins and holes to prevent catching during insertion.",
+      "Use pins for location; use screws, adhesive, magnets, or a dovetail for the primary retention and structural load.",
+      "Do not use three or more tightly toleranced pin/hole pairs; over-constraint causes binding."
+    ],
+    "pla_vs_petg": {
+      "PLA": "Start with a 4.20 mm hole for a 4.00 mm pin.",
+      "PETG": "Start with a 4.25 mm hole for a 4.00 mm pin."
+    },
+    "resin_notes": [
+      "Resin can resolve smaller features, but thin pins remain fragile.",
+      "Keep printed resin alignment pins at least 1 mm in diameter; prefer 2 mm or more for handling and durability.",
+      "Use slip fits rather than aggressive press fits unless the specific resin and printer have been calibrated."
+    ]
+  },
+  "validation": {
+    "required_coupon": "Print one coupon per material containing: a magnet pocket, a dovetail pair, and a pin/hole-plus-slot pair.",
+    "acceptance": {
+      "magnet": "Magnet seats fully with adhesive and does not protrude or sit loose.",
+      "dovetail": "Halves join by hand without binding and resist modest separation without permanent deformation.",
+      "alignment_pins": "Pins insert by hand or with light pressure; parts align without forcing."
+    },
+    "adjustment": "Change one dimension at a time in 0.05 mm increments; do not change material, orientation, and clearance simultaneously."
+  }
+}
