@@ -19,7 +19,7 @@ async function load() {
     for (const r of q.reports) {
       const p = r.preview || {};
       const card = el("div", { className: "printer" });
-      card.append(el("b", {}, `${p.title || r.item_id} `), el("span", { className: "pill" }, r.reason), el("span", { className: "help" }, ` · ${p.kind || ""} · filed ${r.created}`));
+      card.append(el("b", {}, `${p.title || r.item_id} `), el("span", { className: "pill" }, r.reason), el("span", { className: "help" }, ` · ${p.kind || ""}${p.creator ? " · by " + p.creator : ""} · filed ${r.created}`));
       if (p.text) card.append(el("p", {}, p.text));
       if (r.details) card.append(el("p", { className: "help" }, "Reporter said: " + r.details));
       if (p.hidden) card.append(el("p", { className: "help" }, "Currently hidden."));

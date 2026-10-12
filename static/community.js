@@ -62,7 +62,18 @@ function renderAccount() {
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
       <div class="field"><label>Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
-      <button class="btn primary" id="su_go">Create account</button>`;
+      <button class="btn primary" id="su_go">Create account</button>
+      <details class="recover"><summary>Signed out before? Get your account back with a recovery code</summary>
+        <div class="field"><label for="rc_code">Recovery code</label><input id="rc_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+        <button class="btn" id="rc_go">Get my account back</button></details>`;
+    $("#rc_go").onclick = async () => {
+      try {
+        const r = await api("/api/me/recover", J("POST", { code: $("#rc_code").value }));
+        $("#accBody").innerHTML = `<div class="calm" role="status" tabindex="-1"><p>Welcome back, <b>@${esc(r.username || "")}</b>.</p><p>Your new recovery code is <b class="code">${esc(r.recovery_code)}</b>. The old one no longer works. Write this one down and keep it like a password.</p><button class="btn primary" id="rc_done">Done</button></div>`;
+        $("#accBody .calm").focus();
+        $("#rc_done").onclick = () => location.reload();
+      } catch (e) { inlineMsg($("#rc_go"), e.message); }
+    };
     $("#su_go").onclick = async () => {
       try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim() })); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
@@ -94,7 +105,10 @@ function renderAccount() {
       <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li>
       <li>Classroom tools: <b>${r.can_create_classroom ? "available" : "adults only"}</b></li></ul>
-      <p class="help">Add link-outs in Settings → Promote your accounts.</p>`;
+      <p class="help">Add link-outs in Settings → Promote your accounts.</p>
+      <h4>Sign out</h4><p class="help">Signing out makes this browser forget your account. Use it on a shared computer.</p>
+      <button class="btn small" id="so_open">Sign out…</button>`;
+    $("#so_open").onclick = () => openSignout();
     $("#un_save").onclick = async () => {
       try { const r = await api("/api/me/username", J("PUT", { username: $("#un_new").value.trim() })); await refreshMe(); renderAccount(); toast("Your username is now @" + r.username, "ok"); }
       catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
@@ -108,6 +122,30 @@ function renderAccount() {
     $("#pv_followers").onclick = async () => { const f = await api("/api/me/followers"); toast(!f.enabled ? "Following is off, so there are no followers." : f.followers.length ? "Followers: " + f.followers.map(x => x.display_name).join(", ") : "No followers yet."); };
   }
 }
+
+/* ---------- Sign out (there are no passwords yet, so say plainly how to get back in before anyone presses it) ---------- */
+function openSignout() {
+  const adult = ME.age_group === "adult", body = $("#soBody"), go = $("#soGo");
+  go.disabled = true; clearInline(go.parentElement);
+  body.innerHTML = adult
+    ? `<p>ZEIM has no passwords yet. To open this account again later, here or on another device, you need a <b>recovery code</b>.</p>
+       <p class="help">Showing a new code makes any older code stop working.</p>
+       <button type="button" class="btn" id="soCodeBtn">Show my recovery code</button><p id="soCode" role="status"></p>
+       <label class="inl"><input type="checkbox" id="soOk" disabled> I have written down my recovery code</label>`
+    : `<p>Accounts under 18 don't have recovery codes yet, so after you sign out <b>this account can't be opened again</b>. Your projects stay private.</p>
+       <label class="inl"><input type="checkbox" id="soOk"> I understand I can't get this account back</label>`;
+  $("#soOk").onchange = e => { go.disabled = !e.target.checked; };
+  if (adult) $("#soCodeBtn").onclick = async () => {
+    try { const r = await api("/api/me/recovery-code", J("POST")); $("#soCode").innerHTML = `Your recovery code: <b class="code">${esc(r.recovery_code)}</b>`; $("#soOk").disabled = false; }
+    catch (e) { $("#soCode").textContent = e.message; }
+  };
+  go.onclick = async () => {
+    try { await api("/api/me/signout", J("POST")); try { sessionStorage.zeimSignedOut = "1"; } catch { } location.reload(); }
+    catch (e) { inlineMsg(go.parentElement, e.message); }
+  };
+  $("#dlgSignout").showModal();
+}
+try { if (sessionStorage.zeimSignedOut) { delete sessionStorage.zeimSignedOut; setTimeout(() => toast("You're signed out. This browser no longer has your account.", "ok"), 300); } } catch { }
 
 /* ---------- showcase grid ---------- */
 const MODE_ICON = { lithophane: "🖼️", relief: "⛰️", popart: "🎨", edit: "✏️" };
@@ -186,7 +224,8 @@ document.addEventListener("click", async e => {
     nzSay((r.liked ? "Nozzled." : "Nozzle removed.") + (r.likes != null ? ` ${r.likes} ${r.likes === 1 ? "nozzle" : "nozzles"}.` : ""));
   } catch (er) {
     nzPaint(id, was.liked, was.n, false);                                    // roll back to exactly what it was
-    if (er.status === 403 && /teacher/i.test(er.message)) nzSay(er.message, true);
+    if (er.status === 401) { window.__nzOpener = b; $("#dlgNzAcct").showModal(); }                // the server says this session has no account (e.g. it expired)
+    else if (er.status === 403 && /teacher/i.test(er.message)) nzSay(er.message, true);
     else { nzSay("Couldn't save your nozzle. Check your connection and try again.", true); toast("Couldn't save your nozzle. Check your connection and try again.", "err"); }
   } finally { $$(`.nz[data-nz="${CSS.escape(id)}"]`).forEach(x => delete x.dataset.busy); }
 }, true);
@@ -262,13 +301,15 @@ async function loadLearn() {
   const cls = r.classroom;
   $("#classBanner").innerHTML = cls ? `<div class="banner">🎒 You're in <b>${esc(cls.name)}</b> (teacher: ${esc(cls.teacher)}) as <b>${esc(cls.nickname)}</b>. ${cls.assigned.length ? "Assigned lessons are marked ⭐." : ""}
     <p class="help" id="classNotice">${esc(cls.notice || "")}</p>
+    ${cls.hand_up ? `<p class="handup" id="handState" role="status">✋ Your hand is up. Your teacher can see it. <button type="button" class="btn small" id="handDown">Lower my hand</button></p>` : `<p class="sr-only" id="handState" role="status"></p>`}
     ${cls.notifications.map(n => `<div class="note">🔔 ${esc(n.from_name)}: ${esc(n.text)}</div>`).join("")}
     <div class="row" style="margin-top:6px"><span class="help">Quick message to your teacher (pre-set only):</span>${Object.entries(cls.canned).map(([k, t]) => `<button class="btn small" data-req="${k}">${esc(t)}</button>`).join("")}
     <button class="btn small ghost" id="clsFeedback">📝 My projects &amp; feedback</button><button class="btn small ghost" id="clsSubmit">⬆ Submit a build</button></div></div>` : "";
   if (cls) {
     $("#classBanner").onclick = async e => {
       const q = e.target.closest("[data-req]");
-      if (q) { try { await api(`/api/classrooms/${cls.code}/requests`, J("POST", { kind: q.dataset.req })); toast("Sent to your teacher", "ok"); } catch (er) { toast(er.message, "err"); } }
+      if (q) { try { await api(`/api/classrooms/${cls.code}/requests`, J("POST", { kind: q.dataset.req })); toast("Sent to your teacher", "ok"); if (q.dataset.req === "need_help") { await loadLearn(); $("#handDown")?.focus(); } } catch (er) { toast(er.message, "err"); } }
+      if (e.target.id === "handDown") { try { await api(`/api/classrooms/${cls.code}/hand/down`, J("POST")); await loadLearn(); $("#handState").textContent = "Your hand is down."; } catch (er) { toast(er.message, "err"); } }
       if (e.target.id === "clsFeedback") openClassProjects(cls.code);
       if (e.target.id === "clsSubmit") submitToClass(cls.code);
     };
@@ -345,6 +386,19 @@ $("#liveRows").onclick = async e => {
 };
 window.__liveTimer = () => liveTimer;
 
+/* Delete class: an in-app dialog (no browser confirm box). "Keep the class" has focus first; Esc keeps it too. */
+function askDeleteClass(code, name, opener) {
+  const d = $("#dlgDelClass"); $("#dcName").textContent = name; clearInline($("#dcGo").parentElement);
+  d.showModal(); $("#dcKeep").focus();
+  $("#dcKeep").onclick = () => { d.close(); opener?.focus(); };
+  $("#dcGo").onclick = async () => {
+    $("#dcGo").disabled = true;
+    try { await api("/api/classrooms/" + code, { method: "DELETE" }); d.close(); toast(`Deleted ${name}.`, "ok"); openTeacher(); }
+    catch (e) { inlineMsg($("#dcGo").parentElement, e.message || "That didn't work. The class is still there."); }
+    finally { $("#dcGo").disabled = false; }
+  };
+}
+
 /* classroom */
 $("#btnJoinClass").onclick = () => $("#dlgJoin").showModal();
 $("#btnDoJoin").onclick = async () => {
@@ -376,7 +430,7 @@ async function openTeacher() {
       <table class="studs"><tr><th>Student</th><th>Progress</th><th></th></tr>${r.students.map(s => `<tr><td>${esc(s.nickname)}</td><td>${s.lessons.map(x => `${x.completed ? "✅" : `${x.done_steps}/${x.steps}`}`).join(" · ")}</td><td><button class="btn small ghost" data-talk="${r.code}:${s.id}" title="${esc(r.canned.talk_next_class)}">🗨 Talk next class</button> <button class="btn small ghost" data-mu="${r.code}:${s.id}:${s.muted ? 0 : 1}">${s.muted ? "Unmute" : "Mute"}</button> <button class="btn small ghost danger" data-rs="${r.code}:${s.id}">Remove</button></td></tr>`).join("") || "<tr><td colspan=3 class='help'>No students yet</td></tr>"}</table>
       <h4>Student projects <small class="help">(private to this class)</small></h4>
       ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
-      <button class="btn small" data-live="${r.code}">Live view</button> <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
+      <button class="btn small" data-live="${r.code}">Live view</button> <button class="btn small danger" data-dr="${r.code}" data-dr-name="${esc(r.name)}">Delete class</button></div>`).join("");
   if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
   $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { inlineMsg($("#cr_go"), e.message); } };
   $("#teacherBody").onclick = async e => {
@@ -390,7 +444,7 @@ async function openTeacher() {
     if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }
     if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); openFeedback(c, pid); }
     if (t.dataset.rs) { const [c, s] = t.dataset.rs.split(":"); await api(`/api/classrooms/${c}/students/${s}`, { method: "DELETE" }); openTeacher(); }
-    if (t.dataset.dr && confirm("Delete this class and all student progress in it?")) { await api("/api/classrooms/" + t.dataset.dr, { method: "DELETE" }); openTeacher(); }
+    if (t.dataset.dr) { askDeleteClass(t.dataset.dr, t.dataset.drName || t.dataset.dr, t); return; }
   };
   $("#teacherBody").onchange = async e => { const t = e.target;
     if (t.dataset.send) {

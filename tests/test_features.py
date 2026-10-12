@@ -259,7 +259,7 @@ def test_followers_only_and_social_opt_out():
     assert b.get(f"/files/{bid}/model.stl").status_code == 404                       # not following yet
     assert b.post(f"/api/follow/{aid}").status_code == 200
     assert b.get(f"/files/{bid}/model.stl").status_code == 200 and c3.get(f"/files/{bid}/model.stl").status_code == 404
-    assert a.get("/api/me/followers").json()["followers"][0]["display_name"] == "Bob"
+    assert a.get("/api/me/followers").json()["followers"][0]["display_name"].startswith("@")   # @username, never the display name
     assert b.delete(f"/api/follow/{aid}").status_code == 200
     assert b.get(f"/files/{bid}/model.stl").status_code == 404                       # unfollow → immediate
     b.post(f"/api/follow/{aid}")
@@ -346,7 +346,7 @@ def test_likes_downloads_trending():
     b1, b2 = photo_build(o), photo_build(o)
     p1 = publish(o, b1, "public", title="Alpha lamp").json(); p2 = publish(o, b2, "public", title="Beta lamp").json()
     pr = publish(o, photo_build(o), "private", title="Hidden lamp").json()
-    v1, v2, v3 = client(), client(), client()
+    v1, v2, v3 = (client({"display_name": f"Liker{n}", "dob": "1990-01-01"}) for n in (1, 2, 3))      # nozzles need an account
     r = v1.post(f"/api/showcase/{p1['id']}/like", json={}).json(); assert r == {"liked": True, "likes": r["likes"]}
     base = r["likes"]
     assert v1.post(f"/api/showcase/{p1['id']}/like", json={}).json()["liked"] is False        # toggle off

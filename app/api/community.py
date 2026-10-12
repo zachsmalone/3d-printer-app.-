@@ -110,6 +110,19 @@ def recover_account(request: Request, body: dict, actor: Actor = Depends(get_act
     return {**idn.public_profile(Actor(actor.sid, user)), "recovery_code": new_code}
 
 
+@router.post("/me/signout")
+def signout(request: Request, actor: Actor = Depends(get_actor)):
+    """Sign out of THIS browser: it gets a brand-new empty session. The account itself is kept on the server; an adult gets back in with their
+    recovery code (POST /me/recover). There are no passwords yet, so the page tells people that before they press it."""
+    if not actor.user:
+        raise HTTPException(400, "You're not signed in.")
+    import logging, secrets as _s
+    logging.getLogger("zeim.audit").info("signout: account=%s", actor.user.get("id"))
+    r = JSONResponse({"signed_out": True})
+    r.set_cookie(idn.COOKIE, _s.token_urlsafe(24), max_age=3600 * 24 * 365, **idn.cookie_args(request))
+    return r
+
+
 @router.post("/me/recovery-code")
 def new_recovery_code(actor: Actor = Depends(get_actor)):
     """Make a fresh recovery code (the old one stops working). Adult accounts only."""
@@ -145,7 +158,8 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404, "unknown user")
     teen = idn.age_of(u) < config.ADULT_AGE
     social = privacy.social_on(u)
-    return {"id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
+    handle = "@" + u["username"] if u.get("username") else "a ZEIM maker"
+    return {"id": u["id"], "display_name": handle, "username": u.get("username"),        # public profile: @username only, never the (possibly real) display name
             "followers": idn.follower_count(uid) if social else None,   # opted out -> no count at all
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
@@ -289,7 +303,9 @@ def like(iid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor, likes=True)
     """Toggle like (or set with {"liked": true|false}). Public projects only. There is deliberately no dislike."""
     try:
-        i = catalog.get(iid, actor)
+        i = catalog.get(iid, actor)                      # private / followers-only stay 404 for everyone not allowed to see them
+        if not actor.user and classrooms.showcase_policy(actor.sid) is None:
+            raise HTTPException(401, "Make a free account to nozzle projects.")      # signed-out visitors can look, not nozzle (class students use their class session)
         res = catalog.set_like(i, actor, (body or {}).get("liked"))
     except catalog.Denied as e:
         raise D(e)
@@ -397,7 +413,7 @@ def _preview(item_id: str) -> dict:
     i = next((x for x in catalog._all() if x["id"] == item_id), None)
     if not i:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
-    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": i["creator"], "hidden": bool(i["hidden"]),
+    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]),       # @username via the account id, never the display name
             "thumb": f"/api/moderation/item/{item_id}/thumb" if i.get("has_thumb") else None}
 
 

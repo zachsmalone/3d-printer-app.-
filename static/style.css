@@ -357,3 +357,5 @@ table.live thead th{font-size:13px;color:var(--mut);text-transform:uppercase;let
 table.live tr.hand{background:var(--warmtint)}.needs{font-weight:700;color:var(--warn)}
 @media(max-width:600px){table.live thead{position:absolute;left:-9999px}table.live,table.live tbody,table.live tr,table.live th,table.live td{display:block;width:100%}
  table.live tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 4px}table.live td::before{content:attr(data-l) ": ";color:var(--mut)}}
+.tnote .code,.calm .code,#soCode .code{font:700 17px ui-monospace,monospace;letter-spacing:.08em;background:var(--panel);border:1px solid var(--ctl);border-radius:6px;padding:1px 6px;word-break:break-all}
+.handup{font-weight:700;color:var(--txt);background:var(--warmtint);border:2px solid var(--warm);border-radius:10px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}

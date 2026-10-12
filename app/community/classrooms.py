@@ -371,7 +371,8 @@ def student_view(sid: str):
             return {"name": room["name"], "code": room["code"], "teacher": room["teacher"],
                     "assigned": room["assigned"], "nickname": room["students"][sid]["nickname"],
                     "notifications": [n for n in room["notifications"] if n["to"] == sid[:8] and not n["read"]],
-                    "canned": {k: safety.CANNED[k] for k in safety.STUDENT_CANNED}, "notice": STUDENT_NOTICE}
+                    "canned": {k: safety.CANNED[k] for k in safety.STUDENT_CANNED}, "notice": STUDENT_NOTICE,
+                    "hand_up": any(n["from"] == sid[:8] and n["to"] == "teacher" and n["kind"] == "need_help" and not n["read"] for n in room["notifications"])}
     return None
 
 
@@ -713,4 +714,17 @@ def helped(actor: Actor, code: str, student_id: str) -> None:
         for n in d[room["code"]]["notifications"]:
             if n["to"] == "teacher" and n["kind"] == "need_help" and n["from"].startswith(student_id[:8]):
                 n["read"] = True
+    CLASSROOMS.update(f)
+
+
+def lower_hand(actor: Actor, code: str) -> None:
+    """A student lowers their own raised hand (their unread 'I need help' request is withdrawn). Students only; nobody else's hand."""
+    role, room = membership(actor, code)
+    if role != "student":
+        raise KeyError(code)
+    me = actor.sid[:8]
+
+    def f(d):
+        r = d[room["code"]]
+        r["notifications"] = [n for n in r["notifications"] if not (n["from"] == me and n["to"] == "teacher" and n["kind"] == "need_help" and not n["read"])]
     CLASSROOMS.update(f)
