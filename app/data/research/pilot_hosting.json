@@ -1,0 +1,62 @@
+{
+  "checked_on": "2026-10-12",
+  "currency": "USD",
+  "plans": [
+    {
+      "id": "digitalocean-basic-2g",
+      "provider": "DigitalOcean",
+      "plan": "Basic Regular 2 GiB / 1 vCPU",
+      "base_monthly_usd": "12.00",
+      "included_storage_gb": "53.6870912",
+      "storage_unit_note": "Source states 50 GiB; converted to decimal GB. OS and app share this disk.",
+      "disk_usd_per_gb_month": "0",
+      "included_transfer_gb": null,
+      "transfer_usd_per_gb": null,
+      "sources": [
+        "https://www.digitalocean.com/pricing/droplets"
+      ],
+      "notes": [
+        "Transfer omitted from calculation: source quotes GiB; caller must budget overage separately.",
+        "Backups, taxes, managed database and worker not included."
+      ]
+    },
+    {
+      "id": "vultr-regular-2g",
+      "provider": "Vultr",
+      "plan": "Regular Performance 2 GB / 1 vCPU",
+      "base_monthly_usd": "10.00",
+      "included_storage_gb": "55",
+      "storage_unit_note": "Source labels storage GB. OS and app share this disk.",
+      "disk_usd_per_gb_month": "0",
+      "included_transfer_gb": null,
+      "transfer_usd_per_gb": null,
+      "sources": [
+        "https://www.vultr.com/pricing/"
+      ],
+      "notes": [
+        "Transfer overage not modelled; current regional availability and checkout must be verified.",
+        "Backups, taxes, managed database and worker not included."
+      ]
+    },
+    {
+      "id": "render-1c-2g-hobby",
+      "provider": "Render",
+      "plan": "Hobby workspace + 1 CPU / 2 GB service",
+      "base_monthly_usd": "25.00",
+      "included_storage_gb": "0",
+      "storage_unit_note": "Persistent disk charged separately; ephemeral filesystem is not persistent storage.",
+      "disk_usd_per_gb_month": "0.25",
+      "included_transfer_gb": "5",
+      "transfer_usd_per_gb": "0.15",
+      "sources": [
+        "https://render.com/pricing",
+        "https://render.com/docs/disks"
+      ],
+      "notes": [
+        "Hobby workspace fee is $0; service compute is $25.",
+        "Persistent disk is single-instance and prevents zero-downtime deploys.",
+        "Backups outside included disk snapshots, taxes, managed database and separate worker not included."
+      ]
+    }
+  ]
+}
