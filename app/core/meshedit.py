@@ -792,6 +792,29 @@ def sniff(data: bytes, ext: str) -> str:
     return f"Unsupported file type .{ext}"
 
 
+_3MF_MIMES = ("model/3mf", "application/vnd.ms-package.3dmanufacturing-3dmodel+xml")
+
+
+def guess_model_ext(name: str, data: bytes, mime: str = "") -> str:
+    """Work out which 3D format an upload is, trusting the CONTENT over the name.
+    iPhones/iPads hand files over with odd names: 'part.3mf.zip', 'part.gcode.3mf', no extension at all, or a 3MF
+    (which is a zip package) typed application/zip or application/octet-stream. Returns 'stl'/'obj'/'3mf' or ''."""
+    n = (name or "").lower().strip()
+    ext = n.rsplit(".", 1)[-1] if "." in n else ""
+    if ext in ALLOWED:
+        return ext
+    if n.endswith((".3mf.zip", ".3mf.bin")) or (mime or "").lower() in _3MF_MIMES:
+        return "3mf"
+    if data[:2] == b"PK" and not sniff(data, "3mf"):
+        return "3mf"
+    if ext in IMAGE_EXT:
+        return ""
+    for e in ("stl", "obj"):
+        if not sniff(data, e):
+            return e
+    return ""
+
+
 def _3mf_unit_scale(data: bytes) -> float:
     try:
         z = zipfile.ZipFile(io.BytesIO(data))

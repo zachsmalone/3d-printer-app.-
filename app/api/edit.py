@@ -81,6 +81,8 @@ def new_project(
             raise HTTPException(413, f"File too large (max {limit // 2**20} MB).")
         if not data:
             raise HTTPException(400, "The file is empty.")
+        if ext not in meshedit.IMAGE_EXT:
+            ext = meshedit.guess_model_ext(name, data, getattr(file, "content_type", "") or "") or ext
         if ext in meshedit.ALLOWED:
             bad = meshedit.sniff(data, ext)
             if bad:

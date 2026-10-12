@@ -15,10 +15,10 @@
 <header class="topbar">
   <a class="brand" href="/" title="Home"><img src="/static/logo-header.png" alt="ZEIM" class="logoimg" id="logoImg"></a>
   <nav class="nav" id="mainNav" aria-label="Main">
-    <button data-view="create" class="on"><span data-sec="create">Studio</span></button>
-    <button data-view="showcase"><span data-sec="discover">Showcase</span></button>
-    <button data-view="edit"><span data-sec="edit">Edit</span></button>
-    <button data-view="learn"><span data-sec="learn">Learn</span></button>
+    <button data-view="create" class="on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span data-sec="create">Studio</span></button>
+    <button data-view="showcase"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span data-sec="discover">Showcase</span></button>
+    <button data-view="edit"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span data-sec="edit">Edit</span></button>
+    <button data-view="learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg><span data-sec="learn">Learn</span></button>
   </nav>
   <div class="modepick">
     <label for="modeSel">Mode</label>
@@ -30,8 +30,8 @@
     <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours.</p>
   </div>
   <div class="spacer"></div>
-  <button class="btn ghost" id="btnAccount" aria-label="Account"><span aria-hidden="true">👤</span> <span class="lbl">Sign up</span></button>
-  <button class="btn ghost" id="btnSettings" aria-label="Settings"><span aria-hidden="true">⚙</span> <span class="lbl">Settings</span></button>
+  <button class="btn ghost" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button>
+  <button class="btn ghost" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button>
 </header>
 
 <main class="layout" id="viewCreate">
@@ -39,6 +39,7 @@
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
     <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
     <div id="studioPhoto"></div>
+    <p class="have3d"><button type="button" class="linkbtn" id="btnHave3d">Already have a 3D file (STL, OBJ or 3MF)? Open it in Edit</button></p>
   </section>
   <nav class="pathnav" aria-label="Your progress">
     <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Print-ready</li></ol>
@@ -112,7 +113,7 @@
 
   <section class="stage">
     <div class="viewer" id="viewer" role="img" aria-label="3D preview of your model. Use the Turn left, Turn right and Reset view buttons to look around it.">
-      <div class="empty" id="viewerEmpty"><div class="big" aria-hidden="true">🧊</div><b>Your 3D preview appears here</b><span>Drag to turn it. Scroll or pinch to zoom.</span></div>
+      <div class="empty" id="viewerEmpty"><svg class="i big" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><b>Your 3D preview appears here</b><span>Drag to turn it. Scroll or pinch to zoom.</span></div>
       <div class="busy" id="busy" hidden><div class="spin"></div>Making your 3D model…</div>
     </div>
     <div class="vtools2" id="vtools" hidden role="group" aria-label="Look around your model">
@@ -160,8 +161,8 @@
   <aside class="panel controls" id="editSide">
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
-      <div class="drop" id="editDrop"><div><div class="big" aria-hidden="true">📂</div><b>Drop an STL, OBJ or 3MF here</b><span>or press the button · up to 50 MB</span></div></div>
-      <div class="row" style="margin-top:8px"><button type="button" class="btn big" id="editChooseModel">📂 Choose a 3D file</button><input type="file" id="editFile" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <div class="drop" id="editDrop"><div><svg class="i big" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><b>Drop an STL, OBJ or 3MF here</b><span>or press the button · up to 50 MB</span></div></div>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn big primary" id="editChooseModel">Choose a 3D file (STL, OBJ, 3MF)</button><input type="file" id="editFile" class="sr-only" tabindex="-1" aria-hidden="true"></div>
       <p class="help" id="editModelMsg" role="alert" hidden></p>
       <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
       <div id="editPhoto"></div>
@@ -179,7 +180,7 @@
 
   <section class="stage">
     <div class="viewer" id="editViewer">
-      <div class="empty" id="editEmpty"><div class="big">🛠</div><b>Your model appears here</b><span>Drag to rotate · scroll to zoom · right-drag to pan</span></div>
+      <div class="empty" id="editEmpty"><svg class="i big" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><b>Your model appears here</b><span>Drag to rotate · scroll to zoom · right-drag to pan</span></div>
       <div class="busy" id="editBusy" hidden><div class="spin"></div><span id="editBusyText">Working…</span></div>
       <div class="vtools" id="editVtools" hidden>
         <button class="btn small ghost" id="eUndo" title="Undo (Ctrl+Z)">↶ Undo</button>
@@ -246,7 +247,7 @@
 
 <!-- Settings dialog -->
 <dialog id="dlgSettings"><div class="dlg wide">
-  <div class="dh"><h3>⚙ Settings</h3><button class="x" data-close>✕</button></div>
+  <div class="dh"><h3>Settings</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
     <div id="tPrint" class="tab">
@@ -283,7 +284,7 @@
 
 <main class="page" id="viewShowcase" hidden>
   <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Family-friendly community projects. Everything is free to download.</p></div>
-    <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><span aria-hidden="true">🔍</span> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
+    <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
   <div class="seg" id="shTabs"></div>
   <p class="help" id="shSub"></p>
   <p class="help" id="shCount" role="status" aria-live="polite"></p>

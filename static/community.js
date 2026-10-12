@@ -167,6 +167,7 @@ async function loadShowcase() {
   const q = $("#shSearch").value.trim();
   $("#shClear").hidden = !q;
   let r;
+  if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
   try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)

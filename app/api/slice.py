@@ -98,16 +98,24 @@ def slice_model(
         _fail(503, "busy", "The slicer is busy right now. Please try again in a minute.")
     try:
         if file is not None:
-            if not (file.filename or "").lower().endswith(".stl"):
-                _fail(400, "bad_model", "Please upload an .stl file.")
             stl = work / "input.stl"
-            written = 0
-            with open(stl, "wb") as out:
-                while chunk := file.file.read(1024 * 1024):
-                    written += len(chunk)
-                    if written > MAX_UPLOAD_BYTES:
-                        _fail(413, "too_large", "That file is over the 50 MB limit.")
-                    out.write(chunk)
+            data = file.file.read(MAX_UPLOAD_BYTES + 1)
+            if len(data) > MAX_UPLOAD_BYTES:
+                _fail(413, "too_large", "That file is over the 50 MB limit.")
+            from app.core import meshedit
+            ext = meshedit.guess_model_ext(file.filename or "", data, file.content_type or "")
+            if not ext:
+                _fail(400, "bad_model", "Please upload an .stl, .obj or .3mf file.")
+            if ext == "stl":
+                stl.write_bytes(data)
+            else:                                   # 3MF / OBJ: parse (units → mm) and hand the slicer a binary STL
+                if meshedit.sniff(data, ext):
+                    _fail(400, "bad_model", meshedit.sniff(data, ext))
+                try:
+                    mesh, _w = meshedit.load_mesh(data, ext)
+                except meshedit.OpError as e:
+                    _fail(400, "bad_model", str(e))
+                stl.write_bytes(mesh.export(file_type="stl"))
         else:
             stl = resolve_model(model_id, actor)  # type: ignore[arg-type]
 

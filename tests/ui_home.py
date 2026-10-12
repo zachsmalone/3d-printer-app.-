@@ -29,7 +29,7 @@ def run(name, launch, with_axe):
     ok(f"{name}: says 'Free to use' and never 'free forever'", "Free to use" in t and not re.search(r"free forever", t, re.I))
     ok(f"{name}: landmarks: one banner, one main, one contentinfo, nav Main + Your progress",
        pg.evaluate("""() => [document.querySelectorAll('body > header').length, [...document.querySelectorAll('main')].filter(m=>!m.hidden).length, document.querySelectorAll('body > footer').length,
-                      [...document.querySelectorAll('nav')].filter(n=>n.offsetParent!==null).map(n=>n.getAttribute('aria-label')).join('|'), document.querySelectorAll('dialog header, dialog footer').length].join(',')""") == "1,1,1,Main|Your progress,0")
+                      [...document.querySelectorAll('nav')].filter(n=>n.getClientRects().length>0).map(n=>n.getAttribute('aria-label')).join('|'), document.querySelectorAll('dialog header, dialog footer').length].join(',')""") == "1,1,1,Main|Your progress,0")
     ok(f"{name}: path starts on step 1 with a polite status", pg.get_attribute("#path li[data-step='1']", "aria-current") == "step" and pg.get_attribute("#pathSay", "aria-live") == "polite" and "Step 1 of 3" in pg.inner_text("#pathSay"))
     prim = pg.evaluate("[...document.querySelectorAll('main .btn.primary')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.top<844&&!e.disabled}).map(e=>e.id)")
     ok(f"{name}: one primary action above the fold", len(prim) == 1 and prim[0] in ("sTake", "sChoose"), prim)
