@@ -104,11 +104,14 @@ def _drop(m):
 def analyze(m: trimesh.Trimesh) -> dict:
     """Health + size report (shown in the UI as the 'Measure / Info' panel)."""
     n = len(m.faces)
-    edges = np.sort(m.edges, axis=1)
+    mg = m.copy() if n else m
+    if n:
+        mg.merge_vertices()                       # count edges as an exported STL will have them (coincident vertices joined)
+    edges = np.sort(mg.edges, axis=1)
     _, cnt = np.unique(edges, axis=0, return_counts=True) if n else (None, np.array([]))
     boundary = int((cnt == 1).sum()); nonmanifold = int((cnt > 2).sum())
     lo, hi = m.bounds if n else (np.zeros(3), np.zeros(3))
-    wt = bool(m.is_watertight)
+    wt = bool(m.is_watertight) and bool(mg.is_watertight) and nonmanifold == 0 and boundary == 0     # trimesh alone can call an edge shared by 4 faces "watertight"
     vol = float(m.volume) if wt else float(abs(m.volume)) if n else 0.0
     try:
         com = m.center_mass.tolist() if wt and m.volume > 0 else m.centroid.tolist()
@@ -286,15 +289,19 @@ def op_simplify(m, p):
         import fast_simplification as fs          # direct call: trimesh's wrapper returned a different (non-manifold) result on flat CAD meshes
         ov, of = fs.simplify(np.asarray(m.vertices, float), np.asarray(m.faces, np.int64), target_reduction=1 - target / n0, agg=agg)
         out = _check(_new(ov, of))
-        if out.is_watertight or not was_ok:
+        if _strict_ok(out) or not was_ok:
             best = out; break
     if best is None:
         raise OpError("Simplify would break this model's surface (it would no longer be watertight), so it was left unchanged. "
                       "Try Fix (repair) first, or a higher keep ratio.")
     out = best
     n1 = len(out.faces)
-    rep = {"before_triangles": n0, "after_triangles": int(n1), "watertight": bool(out.is_watertight),
-           "message": f"{n0:,} → {n1:,} triangles"}
+    nm = _nonmanifold(out)
+    rep = {"before_triangles": n0, "after_triangles": int(n1), "watertight": _strict_ok(out), "nonmanifold_edges": nm,
+           "kept_pct": round(100 * n1 / n0, 1), "message": f"{n0:,} → {n1:,} triangles ({100 * n1 / n0:.1f}% kept)"}
+    warn = []
+    if not rep["watertight"]:
+        warn.append(f"The result is NOT watertight ({nm} non-manifold edge{'s' if nm != 1 else ''}). Run Fix (repair) before printing.")
     wanted, got = 1 - keep, 1 - n1 / n0
     if got < 0.5 * wanted:                    # the target was not met: say so instead of reporting success
         rep["note"] = (f"You asked to keep {keep:.0%} of the triangles, but only {got:.0%} could be removed. This model couldn't "
@@ -302,7 +309,24 @@ def op_simplify(m, p):
         rep["target_met"] = False
     else:
         rep["target_met"] = True
+    if warn:
+        rep["warning"] = " ".join(warn)
+        rep["note"] = (rep.get("note", "") + " " + rep["warning"]).strip()
     return out, rep
+
+
+def _nonmanifold(m) -> int:
+    """Counted on a vertex-merged copy: the simplifier can leave coincident duplicate vertices that hide bad edges until export."""
+    if not len(m.faces):
+        return 0
+    m = m.copy(); m.merge_vertices()
+    _, cnt = np.unique(np.sort(m.edges, axis=1), axis=0, return_counts=True)
+    return int((cnt > 2).sum())
+
+
+def _strict_ok(m) -> bool:
+    mm = m.copy(); mm.merge_vertices()
+    return bool(mm.is_watertight) and _nonmanifold(mm) == 0
 
 
 # ------------------------------------------------------------------ booleans
@@ -532,7 +556,24 @@ def op_hollow(m, p):
     d_in = ndimage.distance_transform_edt(inside) * pitch
     d_out = ndimage.distance_transform_edt(~inside) * pitch
     sdf = np.where(inside, d_in - 0.5 * pitch, -(d_out - 0.5 * pitch))      # +ve inside, ≈ signed distance to surface
-    field = sdf - wall                                                       # cavity = points deeper than `wall`
+    return _hollow_from(mm, sdf, vox, pitch, wall, drain, p)
+
+
+def _ray_wall(m, n=1500):
+    """1st-percentile wall from inward rays at surface samples (the QA probe). None if it can't be measured."""
+    try:
+        pts, fi = trimesh.sample.sample_surface(m, n, seed=1)
+        nn = m.face_normals[fi]; org = pts - nn * 0.02
+        loc, ir, _ = m.ray.intersects_location(org, -nn, multiple_hits=False)
+        d = np.linalg.norm(loc - org[ir], axis=1)
+        return (float(np.percentile(d, 1)), float(d.min())) if len(d) else None
+    except Exception:
+        return None
+
+
+def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
+    from skimage import measure
+    field = sdf - (wall + extra)                                             # cavity = points deeper than `wall` (+ margin on retries)
     if field.max() <= 0:
         raise OpError("Nothing left to hollow with this wall thickness.")
     verts, faces, _, _ = measure.marching_cubes(field, 0.0, spacing=(pitch, pitch, pitch))
@@ -564,9 +605,19 @@ def op_hollow(m, p):
         out = _boolean(out, cyl, "difference")
     out, floating = _drop_slivers(out, min_cav)
     wall_min = _measure_wall(mm, cav)
+    probe = _ray_wall(out)
+    floor = wall - pitch                                                     # what a voxel method can promise
+    if ((probe and probe[0] < floor) or (wall_min is not None and wall_min < floor)) and tries < 2:                             # enforce the minimum: deepen the margin and rebuild
+        return _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra + pitch, tries + 1)
     rep_extra = {"cavity_fragments_dropped": dropped, "floating_pieces_dropped": floating,
                  "thinnest_wall_mm": None if wall_min is None else round(wall_min, 2)}
-    if wall_min is not None and wall_min < 0.75 * wall:
+    if probe:
+        rep_extra["wall_p1_mm"], rep_extra["wall_min_probe_mm"] = round(probe[0], 2), round(probe[1], 2)
+    if probe and probe[1] < floor:
+        rep_extra["warning"] = (f"Some walls are thinner than the {wall:g} mm you asked for: the thinnest spot measured is {probe[1]:.2f} mm "
+                                f"(1% of the surface is under {probe[0]:.2f} mm). Those spots may print badly or break: try a thicker wall, or check them in your slicer.")
+        rep_extra["note"] = rep_extra["warning"]
+    elif wall_min is not None and wall_min < 0.75 * wall:
         rep_extra["note"] = (f"The thinnest wall is about {wall_min:.1f} mm, less than the {wall:g} mm you asked for "
                              "(thin or very detailed parts of the shape). It may print badly: try a thicker wall or check it in your slicer.")
     saved = 100 * (1 - out.volume / mm.volume) if out.volume > 0 else 0

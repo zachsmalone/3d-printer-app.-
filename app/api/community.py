@@ -221,7 +221,7 @@ def unfollow(uid: str, actor: Actor = Depends(get_actor)):
 
 # ---------------- showcase ----------------
 @router.get("/showcase")
-def showcase(tab: str = "trending", q: str = "", actor: Actor = Depends(get_actor)):
+def showcase(tab: str = "trending", q: str = "", category: str = "", actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
     if tab not in branding.SHOWCASE_TABS:
         raise HTTPException(400, "unknown tab")
@@ -229,10 +229,11 @@ def showcase(tab: str = "trending", q: str = "", actor: Actor = Depends(get_acto
     q = q.strip()[:80]
     if q:
         personalization.record_search(actor.sid, q, catalog.known_tags(actor))
-    items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {})
-    out = {"tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
+    items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {}, category.strip()[:60])
+    out = {"categories": catalog.categories(actor), "category": category.strip()[:60],
+           "originals_notice": "ZEIM Originals are free (CC BY 4.0). None has been test-printed yet: treat every file as an untested print.","tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
            "subtitle": "Newest projects first." if tab == "free" else "",
-           "example_notice": "Examples help you see how ZEIM looks. They are not made by real people."}
+           "example_notice": ""}
     if tab == "foryou" and not out["items"]:
         out["hint"] = ("Personalization is off." if not prefs["enabled"] else
                        "Search or open projects to teach For You what you like. Data stays on this server and you can clear it any time.")

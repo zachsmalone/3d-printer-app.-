@@ -40,7 +40,7 @@ The existing `#dlgSendSheet` (send.js) is the right shape: each row has a label 
 - **Not promised yet:** Share, Email, Shapr3D and Creality rows are **untested on real iPhone/iPad** until Zach tries them; printer send is tested only against a mock server. The sheet text must not say otherwise.
 
 ## 5. Palette (computed)
-Warm light is the default; Dark is the existing dark look with fixed contrast. Tokens are CSS variables on `:root` / `[data-theme=dark]` (full block at the top of `mock-home.html`'s `<style>`). Follow `prefers-color-scheme` until the person chooses; the choice is stored in `localStorage.theme` (new Settings option "Look: Auto / Warm / Dark").
+Warm light is the default; Dark is the existing dark look with fixed contrast. Tokens are CSS variables on `:root` / `[data-theme=dark]` (full block at the top of `mock-home.html`'s `<style>`). **Decision (Oct 12, 2026): Warm is ALWAYS the default. Dark applies only when the person picks it; the app does NOT follow `prefers-color-scheme` / the OS setting.** The choice is stored in `localStorage.theme` (Settings option "Look: Warm / Dark").
 
 | Token | Light "Warm" | Dark | Used for |
 |---|---|---|---|
@@ -147,7 +147,7 @@ Rules that come out of the numbers:
 - P3 Errors (non-image, too big, build failed, offline) show plain words next to the step and in the alert region, never `[object Object]` or Python text, and keep the photo.
 - P4 Send sheet: rows exactly as the server allows (adult / adult desktop local / teen / class student); Share-type rows disabled until the file is ready; Save works without JavaScript beyond the dialog; status and alert announced; Esc returns focus; no row links to anything outside ZEIM except the labelled Creality site link.
 - P5 Teacher mode shows the classroom bar and the lesson link; a student/teen never sees them.
-- P6 Dark/light follows the OS until changed; the choice survives reload.
+- P6 Warm is shown on first visit even when the OS is in dark mode; Dark only after the person picks it; the choice survives reload. (Changed Oct 12, 2026: the app no longer follows the OS.)
 - P7 Safari iPhone/iPad (real device, over HTTPS): Take a photo opens the camera; Share opens the share sheet from a single tap; recorded as pass/fail by Ren Ishikawa. **Until then the page may not claim it works.**
 
 ## 8. Decisions needed

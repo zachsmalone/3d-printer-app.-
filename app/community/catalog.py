@@ -1,5 +1,5 @@
 """Showcase catalog: community projects. EVERYTHING IS FREE - there is no pricing, paywall or
-locked file in this product. Seed items are EXAMPLES (example=true), not real creator content.
+locked file in this product. Seed items are the ZEIM Originals (original=true) from library/originals.
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor
-from . import classrooms, privacy
+from . import classrooms, originals_qa, privacy
 from ..services.credits import credit_line
 from .store import ENGAGEMENT, LISTINGS, MODERATION, USERS
 
@@ -26,27 +26,58 @@ class Denied(Exception):
         self.status, self.msg = status, msg
 
 
-CREATORS = {"ex-ada": "Example: Ada", "ex-ben": "Example: Ben", "ex-cleo": "Example: Cleo"}
+CREATORS: dict = {}      # the old invented "Example: Ada/Ben/Cleo" seed creators are gone (Originals-first, Oct 2026)
+
+# ---- ZEIM Originals (library/originals, NOT in git: the deploy ships the folder separately; see config.ORIGINALS) ----
+WILDLIFE = "Wildlife Calls"
+CLASSROOM_HIDDEN_SLUGS = {"horn-dino-band-popper", "fish-bottle-opener"}     # Kenji's rule: not shown to classroom students
+_MCACHE: dict = {}
+
+
+def _manifest() -> dict:
+    p = config.ORIGINALS / "originals_manifest.json"
+    try:
+        key = (str(p), p.stat().st_mtime)
+    except OSError:
+        return {}
+    if _MCACHE.get("key") != key:
+        _MCACHE.update(key=key, data=json.loads(p.read_text()))
+    return _MCACHE["data"]
 
 
 def _seed():
-    def it(i, who, title, tags, mode, dl, desc, day):
-        return {"id": f"ex{i:02d}", "title": title, "creator": CREATORS[who], "creator_id": who, "example": True,
-                "tags": tags, "mode": mode, "downloads": dl, "likes": dl // 9, "description": desc,
-                "created": f"2026-09-{day:02d}T00:00:00+00:00", "files": [],            # examples have no model yet: nothing to download until a real Original is attached
-                
-                "owner_sid": None, "visibility": "public", "hidden": False}
-    return [
-        it(1, "ex-ada", "Sunset Landscape Lithophane", ["landscape", "lithophane", "nightlight"], "lithophane", 1840, "A warm sunset panel tuned for backlit display.", 2),
-        it(2, "ex-ben", "Pet Portrait Relief Frame", ["pets", "portrait", "relief", "gift"], "relief", 920, "Raised relief frame template for pet photos.", 9),
-        it(3, "ex-cleo", "Pop-art Burst Starter", ["popart", "halftone", "poster"], "popart", 1210, "Four-layer halftone pop-art starter.", 12),
-        it(4, "ex-ada", "Moon Phases Lamp Panel", ["space", "lithophane", "lamp", "nightlight"], "lithophane", 2300, "A moon-phase panel for a small lamp.", 5),
-        it(5, "ex-cleo", "Floral Layers Pop-art", ["floral", "popart", "gift"], "popart", 640, "Layered flowers that stand off the page.", 20),
-        it(6, "ex-ben", "Skyline Night Panel", ["landscape", "city", "lithophane"], "lithophane", 705, "City skyline with deep shadows.", 15),
-        it(7, "ex-ada", "Classroom Dino Relief", ["kids", "classroom", "relief", "dinosaur"], "relief", 1500, "Friendly dino relief, great first print for a class.", 22),
-        it(8, "ex-ben", "Family Portrait Frame", ["gift", "portrait", "lithophane"], "lithophane", 380, "Simple frame style for family portraits.", 25),
-        it(9, "ex-cleo", "Retro Comic Halftone", ["popart", "comic", "halftone"], "popart", 510, "Comic-dot look in five layers.", 27),
-    ]
+    """The 45 ZEIM Originals from the manifest (empty list when the library is not installed on this server)."""
+    m = _manifest()
+    out = []
+    for n, x in enumerate(m.get("models", [])):
+        stl, png = x.get("file", ""), x.get("preview", "")
+        names = [f for f in originals_qa.PLATES.get(x["slug"], []) if (config.ORIGINALS / f).is_file()] or [stl]
+        files = [{"name": f, "size_kb": round((config.ORIGINALS / f).stat().st_size / 1024)} for f in names if f and (config.ORIGINALS / f).is_file()]
+        out.append({"id": "zo-" + x["slug"], "slug": x["slug"], "title": x["title"], "creator": "ZEIM", "creator_id": "zeim",
+                    "original": True, "example": False, "category": x.get("category", ""), "difficulty": x.get("difficulty", ""),
+                    "tags": [t for t in re.split(r"[^a-z0-9]+", (x.get("category", "") + " " + x.get("difficulty", "")).lower()) if t],
+                    "mode": "original", "downloads": 0, "likes": 0, "description": x.get("description", ""),
+                    "how_used": x.get("how_it_is_used", ""), "material": x.get("suggested_material_and_print_notes", ""),
+                    "caveats": x.get("fit_notes", ""), "printer": x.get("printer", ""), "untested_note": x.get("untested_note", ""),
+                    "needs_supports": x["slug"] in originals_qa.NEEDS_SUPPORTS,
+                    "low_contact": originals_qa.LOW_CONTACT.get(x["slug"], ""), "plates": len(files) > 1,
+                    "license_id": "cc-by-4.0", "created": f"2026-10-01T00:{n // 60:02d}:{n % 60:02d}+00:00", "files": files,
+                    "preview": png if png and (config.ORIGINALS / png).is_file() else "", "has_thumb": bool(png and (config.ORIGINALS / png).is_file()),
+                    "owner_sid": None, "visibility": "public", "hidden": False})
+    return out
+
+
+def audience_ok(i: dict, actor) -> bool:
+    """Kenji's rules, enforced on the server for lists, item pages, thumbs and downloads: Wildlife Calls (whistles, the open-reed
+    predator call) never reach classroom students or under-13s; the band popper and bottle opener never reach classroom students."""
+    if not i.get("original") or actor is None:
+        return True
+    in_class = classrooms.showcase_policy(actor.sid) is not None
+    if in_class and i.get("slug") in CLASSROOM_HIDDEN_SLUGS:
+        return False
+    if i.get("category") == WILDLIFE and viewer_sees_no_counts(actor):     # class student OR under 13
+        return False
+    return True
 
 
 def _all() -> list[dict]:
@@ -93,7 +124,7 @@ def trending_score(i: dict, now: datetime | None = None) -> float:
 
 
 def _visible(actor: Actor, users: dict):
-    return lambda i: (not i["hidden"]) and privacy.can_view(actor, i.get("owner_sid"), i.get("visibility", "private"), users)
+    return lambda i: (not i["hidden"]) and audience_ok(i, actor) and privacy.can_view(actor, i.get("owner_sid"), i.get("visibility", "private"), users)
 
 
 def viewer_sees_no_counts(actor) -> bool:
@@ -152,6 +183,11 @@ def public(i: dict, actor: Actor) -> dict:
             "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],
             "owned": bool(i.get("owner_sid") and i["owner_sid"] == actor.sid), "following_creator": following,
             "share_url": f"/p/{i['id']}",
+            "original": bool(i.get("original")), "category": i.get("category", ""), "difficulty": i.get("difficulty", ""),
+            "printer_suggested": "FDM" if i.get("original") else "", "printer_note": i.get("printer", ""),
+            "untested": bool(i.get("original")), "untested_note": i.get("untested_note", ""),
+            "material": i.get("material", ""), "caveats": i.get("caveats", ""),
+            "needs_supports": bool(i.get("needs_supports")), "low_contact": i.get("low_contact", ""), "plates": bool(i.get("plates")), "how_used": i.get("how_used", ""),
             "creator_username": i.get("creator_username"), "credit": credit_line(i), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
@@ -167,9 +203,16 @@ def get(item_id: str, actor: Actor) -> dict:
     raise Denied(404, "not found")
 
 
-def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None) -> list[dict]:
+def categories(actor: Actor) -> list[str]:
+    ok = _visible(actor, USERS.read())
+    return sorted({i["category"] for i in _all() if i.get("category") and ok(i)})
+
+
+def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None, category: str = "") -> list[dict]:
     ok = _visible(actor, USERS.read())
     items = [i for i in _all() if ok(i)]
+    if category:
+        items = [i for i in items if i.get("category") == category]
     if q:
         terms = q.lower().split()
         items = [i for i in items if all(t in (i["title"] + " " + " ".join(i["tags"]) + " " + i["description"]).lower() for t in terms)]
@@ -260,11 +303,15 @@ def file_path(i: dict, name: str):
     """Real file for user projects; None for seed items (placeholder is generated by the caller)."""
     if i.get("example") or not any(f["name"] == name for f in i["files"]):
         return None
+    if i.get("original"):
+        return config.ORIGINALS / name
     p = LDIR / i["id"] / name
     return p if p.exists() else None
 
 
 def thumb_path(i: dict):
+    if i.get("original"):
+        return (config.ORIGINALS / i["preview"]) if i.get("preview") else None
     p = LDIR / i["id"] / "thumb.png"
     return p if p.exists() else None
 

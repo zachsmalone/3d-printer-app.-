@@ -8,6 +8,7 @@ os.environ.setdefault("PHOTO3D_OUT", _tmp + "/out")
 os.environ.setdefault("PHOTO3D_DATA", _tmp + "/data")
 os.environ.setdefault("PHOTO3D_ADMIN_TOKEN", "t0k")
 os.environ.setdefault("PHOTO3D_MODE", "local")
+os.environ.setdefault("PHOTO3D_ORIGINALS", os.path.join(os.path.dirname(__file__), "fixtures", "originals"))   # tiny 6-item stand-in; the real 378 MB library is not in git
 
 import pytest
 

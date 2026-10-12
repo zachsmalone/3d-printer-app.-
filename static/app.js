@@ -21,10 +21,22 @@ function inlineMsg(near, msg, kind = "err") {
   p.scrollIntoView?.({ block: "nearest" });
 }
 function clearInline(near) { const p = near?.previousElementSibling; if (p?.classList.contains("inline-msg")) p.remove(); }
+// Server errors: a string detail is shown as-is; FastAPI 422 lists are turned into friendly field messages, never "[object Object]".
+const FIELD_NAMES = { width_mm: "Width", height_mm: "Height", resolution: "Detail", mode: "Style", file: "Photo", dob: "Date of birth", display_name: "Display name",
+  username: "Username", title: "Title", password: "Password", code: "Class code", nickname: "Nickname", keep_ratio: "Keep ratio", wall: "Wall thickness" };
+function errText(j, r) {
+  const d = j?.detail ?? j?.message;
+  if (typeof d === "string" && d) return d;
+  if (Array.isArray(d) && d.length) {
+    const names = [...new Set(d.map(x => { const k = Array.isArray(x?.loc) ? x.loc.at(-1) : ""; return FIELD_NAMES[k] || (typeof k === "string" && k && k !== "body" ? k.replace(/_/g, " ") : ""); }).filter(Boolean))];
+    return names.length ? `Please check: ${names.join(", ")}. Something in the form isn't right.` : "Something in the form isn't right. Check the highlighted field.";
+  }
+  return r.status >= 500 ? "Something went wrong on the server. Please try again." : (r.statusText || "Something went wrong.");
+}
 const api = async (url, opt) => {
   const r = await fetch(url, opt); let j = null;
   try { j = await r.json(); } catch { }
-  if (!r.ok) { const e = new Error(j?.detail || j?.message || r.statusText); e.status = r.status; e.body = j; throw e; }
+  if (!r.ok) { const e = new Error(errText(j, r)); e.status = r.status; e.body = j; throw e; }
   return j;
 };
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(iso).toLocaleDateString(); };
@@ -460,3 +472,11 @@ $$("#expertOpts .field").forEach((f, i) => {
   if (lab && inp && !lab.htmlFor && !lab.contains(inp)) { inp.id = inp.id || "xo_" + (inp.name || i); lab.htmlFor = inp.id; }
 });
 $("#widthRange").setAttribute("aria-label", "Width in millimetres (slider)");
+
+// Skip link: focus whichever main view is showing (the four views share one page)
+document.getElementById("skipLink")?.addEventListener("click", e => {
+  const m = [...document.querySelectorAll("main")].find(x => !x.hidden);
+  if (!m) return;
+  e.preventDefault(); m.tabIndex = -1; m.focus(); m.scrollIntoView?.({ block: "start" });
+});
+window.__errText = errText;   // tests

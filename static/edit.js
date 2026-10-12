@@ -103,7 +103,7 @@ function loadProject(p, keepCamera = false) {
   $("#editMsg").innerHTML = msgs.map(m => `<span class="${/not watertight|isn't|Still/.test(m) ? "warn" : ""}">${esc(m)}</span>`).join("<br>");
   const total = p.ops.length;
   $("#editHeadNote").textContent = `(${p.head} of ${total} applied — click a step to jump)`;
-  $("#editOps").innerHTML = `<li data-goto="0" class="${p.head === 0 ? "cur" : ""}">0 · Original file (kept)</li>` + p.ops.map(o => `<li data-goto="${o.i}" class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}">${o.i} · ${esc(o.label)}</li>`).join("");
+  $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button></li>`).join("");
   renderTools();
   renderHistoryCard();
 }

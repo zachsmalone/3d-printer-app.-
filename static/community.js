@@ -58,10 +58,10 @@ $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal()
 function renderAccount() {
   if (!ME.signed_up) {
     $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Learning with a class? You don't need an account — ask your teacher for the class code and join in the ${esc(CFG.sections.learn)}.</p>
-      <div class="field"><label>Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
+      <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
-      <div class="field"><label>Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
+      <div class="field"><label for="su_dob">Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
       <button class="btn primary" id="su_go">Create account</button>
       <details class="recover"><summary>Signed out before? Get your account back with a recovery code</summary>
         <div class="field"><label for="rc_code">Recovery code</label><input id="rc_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
@@ -126,41 +126,73 @@ function renderAccount() {
 /* ---------- Sign out (there are no passwords yet, so say plainly how to get back in before anyone presses it) ---------- */
 function openSignout() {
   const adult = ME.age_group === "adult", body = $("#soBody"), go = $("#soGo");
-  go.disabled = true; clearInline(go.parentElement);
+  const setGo = on => { go.setAttribute("aria-disabled", on ? "false" : "true"); $("#soWhy").textContent = on ? "" : (adult && $("#soOk")?.getAttribute("aria-disabled") === "true" ? "Show your recovery code and write it down, then tick the box to sign out." : "Tick the box above to sign out."); };
+  clearInline(go.parentElement);
   body.innerHTML = adult
     ? `<p>ZEIM has no passwords yet. To open this account again later, here or on another device, you need a <b>recovery code</b>.</p>
        <p class="help">Showing a new code makes any older code stop working.</p>
        <button type="button" class="btn" id="soCodeBtn">Show my recovery code</button><p id="soCode" role="status"></p>
-       <label class="inl"><input type="checkbox" id="soOk" disabled> I have written down my recovery code</label>`
+       <label class="inl"><input type="checkbox" id="soOk" aria-disabled="true" aria-describedby="soWhy"> I have written down my recovery code</label>`
     : `<p>Accounts under 18 don't have recovery codes yet, so after you sign out <b>this account can't be opened again</b>. Your projects stay private.</p>
        <label class="inl"><input type="checkbox" id="soOk"> I understand I can't get this account back</label>`;
-  $("#soOk").onchange = e => { go.disabled = !e.target.checked; };
+  setGo(false);
+  $("#soOk").onclick = e => { if (e.target.getAttribute("aria-disabled") === "true") { e.preventDefault(); $("#soWhy").textContent = "Show your recovery code first, then tick the box."; } };
+  $("#soOk").onchange = e => setGo(e.target.checked);
   if (adult) $("#soCodeBtn").onclick = async () => {
-    try { const r = await api("/api/me/recovery-code", J("POST")); $("#soCode").innerHTML = `Your recovery code: <b class="code">${esc(r.recovery_code)}</b>`; $("#soOk").disabled = false; }
+    try { const r = await api("/api/me/recovery-code", J("POST")); $("#soCode").innerHTML = `Your recovery code: <b class="code">${esc(r.recovery_code)}</b>`; $("#soOk").setAttribute("aria-disabled", "false"); setGo(false); }
     catch (e) { $("#soCode").textContent = e.message; }
   };
   go.onclick = async () => {
+    if (go.getAttribute("aria-disabled") === "true") { $("#soWhy").focus?.(); return; }
     try { await api("/api/me/signout", J("POST")); try { sessionStorage.zeimSignedOut = "1"; } catch { } location.reload(); }
     catch (e) { inlineMsg(go.parentElement, e.message); }
   };
-  $("#dlgSignout").showModal();
+  stackModal($("#dlgSignout"));
+  (adult ? $("#soCodeBtn") : $("#soOk")).focus();            // a11y #10: start on the first thing to do, not the ✕
 }
+
+/* Stacked dialogs (a11y #8): the dialog underneath is made inert while a child dialog is open, and Tab is kept inside the top dialog
+   explicitly (WebKit let Tab reach the dialog underneath and the <dialog> element itself). */
+function stackModal(d) {
+  const under = $$("dialog[open]").filter(x => x !== d);
+  under.forEach(x => { x.inert = true; });
+  d.addEventListener("close", () => under.forEach(x => { x.inert = false; }), { once: true });
+  d.showModal();
+}
+document.addEventListener("keydown", e => {
+  if (e.key !== "Tab") return;
+  const open = $$("dialog[open]").filter(x => !x.inert); const d = open[open.length - 1]; if (!d) return;
+  const f = $$('a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])', d).filter(x => !x.disabled && !x.hidden && x.offsetParent !== null);
+  if (!f.length) return;
+  const i = f.indexOf(document.activeElement);
+  if (e.shiftKey && (i <= 0)) { e.preventDefault(); f[f.length - 1].focus(); }
+  else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+});
 try { if (sessionStorage.zeimSignedOut) { delete sessionStorage.zeimSignedOut; setTimeout(() => toast("You're signed out. This browser no longer has your account.", "ok"), 300); } } catch { }
 
 /* ---------- showcase grid ---------- */
 const MODE_ICON = { lithophane: "🖼️", relief: "⛰️", popart: "🎨", edit: "✏️" };
+let shCat = "";
+// ZEIM Original card details. Every Original is UNTESTED: nothing in the library has been test-printed yet.
+const origHTML = i => `<div class="orig">${i.credit?.credit_line ? `<p class="credit-line">${esc(i.credit.credit_line)}</p>` : ""}
+    <p><span class="pill">${esc(i.difficulty)}</span> <span class="pill" title="${esc(i.printer_note)}">Suggested: ${esc(i.printer_suggested)}</span> <span class="pill warn">Untested print</span>${i.needs_supports ? ' <span class="pill">Needs supports</span>' : ""}</p>
+    ${i.low_contact ? `<p class="help caveat"><b>Brim:</b> ${esc(i.low_contact)}</p>` : ""}${i.plates ? `<p class="help">Prints as ${i.files.length} separate plates, each fits a 220 × 220 mm bed.</p>` : ""}
+    ${i.material || i.caveats ? `<p class="help caveat">${esc([i.material, i.caveats].filter(Boolean).join(" "))}</p>` : ""}
+    ${i.files.map(f => `<a class="btn small" href="${f.url}" download>⬇ ${i.files.length > 1 ? `Plate ${i.files.indexOf(f) + 1} ` : ""}STL<span class="sr-only"> for ${esc(i.title)}</span></a>`).join("")}</div>`;
 async function loadShowcase() {
   const q = $("#shSearch").value.trim();
   $("#shClear").hidden = !q;
   let r;
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}`); } catch (e) { toast(e.message, "err"); return; }
-  $("#shNotice").textContent = r.example_notice || "";
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}`); } catch (e) { toast(e.message, "err"); return; }
+  $("#shNotice").textContent = r.originals_notice || "";
+  // category filters: built from what THIS viewer may see (hidden categories never reach class students / under-13s)
+  $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
   $("#shSub").textContent = r.subtitle || "";
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
     <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${esc(i.creator)}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
-    <div class="cardfoot">${nzHTML(i, { uid: "g" })}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
+    ${i.original ? origHTML(i) : ""}<div class="cardfoot">${nzHTML(i, { uid: "g" })}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   if (!r.items.length) {
     const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
@@ -168,6 +200,7 @@ async function loadShowcase() {
 }
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => x.classList.toggle("on", x === b)); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
+$("#shCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; shCat = b.dataset.cat; loadShowcase(); });
 $("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };            // Search button, Enter and touch-keyboard "Go" all end up here
 $("#shClear").onclick = () => { $("#shSearch").value = ""; loadShowcase(); $("#shSearch").focus(); };
 $("#shSearch").oninput = () => { $("#shClear").hidden = !$("#shSearch").value; };
@@ -239,7 +272,7 @@ async function openItem(id) {
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
     ${i.thumb ? `<img src="${i.thumb}" alt="Preview picture of ${esc(i.title)}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
-    <p class="help">by <a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a> · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
+    ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
@@ -315,10 +348,10 @@ async function loadLearn() {
     };
   }
   $("#lessonGrid").innerHTML = r.lessons.map(l => `<div class="pcard" data-lesson="${l.id}"><div class="ph">${l.emoji}</div>
-    <div class="meta"><b>${esc(l.title)} ${r.assigned.includes(l.id) ? "⭐" : ""}</b><span>${l.minutes} min · ages ${l.age}</span><div class="help">${esc(l.summary)}</div>
+    <div class="meta"><h3 class="lt"><a href="#" class="stretch" data-open-lesson="${l.id}">${esc(l.title)}</a> ${r.assigned.includes(l.id) ? '<span aria-label="assigned">⭐</span>' : ""}</h3><span>${l.minutes} min · ages ${l.age}</span><div class="help">${esc(l.summary)}</div>
     <div class="bar"><i style="width:${100 * l.done_steps / l.steps}%"></i></div><span>${l.completed ? l.badge : `${l.done_steps}/${l.steps} steps`}</span></div></div>`).join("");
 }
-$("#lessonGrid").onclick = e => { const c = e.target.closest("[data-lesson]"); if (c) openLesson(c.dataset.lesson); };
+$("#lessonGrid").onclick = e => { const c = e.target.closest("[data-lesson]"); if (c) { e.preventDefault(); openLesson(c.dataset.lesson); } };   // the title link (keyboard) and a tap anywhere on the card
 async function openLesson(id) {
   const l = await api("/api/learn/lessons/" + id), box = $("#lessonDetail"), p = l.progress;
   box.hidden = false;
@@ -344,9 +377,12 @@ async function openLesson(id) {
 /* ---------- Teacher Live view: view-only roster, polled every ~12 s while the window is open ---------- */
 let liveTimer = null, liveCode = "", liveHands = new Set(), liveData = null;
 const liveAgo = iso => { if (!iso) return "no activity yet"; const m = (Date.now() - new Date(iso)) / 60000; return m < 1 ? "just now" : m < 15 ? Math.floor(m) + " min ago" : "inactive 15+ min"; };
-function liveRender() {
+function liveRender(force = false) {
   const body = $("#liveRows"), rows = liveData.students.slice();
   if ($("#liveSort").checked) rows.sort((a, b) => (b.hand - a.hand));            // only when the teacher asks; otherwise join order, so rows never jump
+  // a11y #4: never move rows under the pointer or the keyboard focus; offer "Re-sort now" instead
+  const busy = !force && (body.matches(":hover") || body.matches(":focus-within"));
+  let pending = false;
   $("#liveEmpty").hidden = rows.length > 0;
   const keep = new Set(rows.map(r => r.id));
   $$("tr[data-sid]", body).forEach(tr => { if (!keep.has(tr.dataset.sid)) tr.remove(); });
@@ -359,11 +395,12 @@ function liveRender() {
     tr.querySelector(".c-a").textContent = liveAgo(r.last_active);
     const h = tr.querySelector(".c-h");
     if (r.hand && !h.dataset.up) h.innerHTML = `<span class="needs">✋ Needs help</span> <button type="button" class="btn small" data-helped="${r.id}">Helped<span class="sr-only"> ${esc(r.nickname)}</span></button>`;
-    if (!r.hand && h.dataset.up) h.textContent = "";
+    if (!r.hand && (h.dataset.up || !h.textContent)) h.innerHTML = '<span aria-hidden="true">–</span><span class="sr-only">hand down</span>';
     h.dataset.up = r.hand ? "1" : "";
     tr.classList.toggle("hand", !!r.hand);
-    if ($("#liveSort").checked && body.children[idx] !== tr) body.insertBefore(tr, body.children[idx] || null);
+    if ($("#liveSort").checked && body.children[idx] !== tr) { if (busy) pending = true; else body.insertBefore(tr, body.children[idx] || null); }
   });
+  $("#liveResort").hidden = !pending;
   const now = new Set(rows.filter(r => r.hand).map(r => r.id)), fresh = rows.filter(r => r.hand && !liveHands.has(r.id));
   if (fresh.length) $("#liveSay").textContent = fresh.map(r => r.nickname).join(", ") + (fresh.length === 1 ? " needs help." : " need help.");
   liveHands = now;
@@ -379,17 +416,26 @@ async function openLive(code) {
   await livePoll(); clearInterval(liveTimer); liveTimer = setInterval(() => { if (!document.hidden) livePoll(); }, 12000);
 }
 $("#dlgLive").addEventListener("close", () => { clearInterval(liveTimer); liveTimer = null; });           // stop asking the server when the teacher closes the screen
-$("#liveSort").onchange = () => { if (liveData) liveRender(); };
+$("#liveSort").onchange = () => { if (liveData) liveRender(true); };
+$("#liveResort").onclick = () => { if (liveData) liveRender(true); $("#liveSort").focus(); };
+function liveSay(t) { const s = $("#liveSay"); s.textContent = ""; setTimeout(() => { s.textContent = t; }, 60); }   // cleared first so repeated text is spoken again
 $("#liveRows").onclick = async e => {
   const b = e.target.closest("[data-helped]"); if (!b) return;
-  try { await api(`/api/classrooms/${liveCode}/students/${b.dataset.helped}/helped`, J("POST")); await livePoll(); $("#liveSay").textContent = "Marked as helped."; } catch (er) { toast(er.message, "err"); }
+  const sid = b.dataset.helped, tr = b.closest("tr"), nick = tr?.querySelector(".c-n")?.textContent || "Student";
+  try {
+    await api(`/api/classrooms/${liveCode}/students/${sid}/helped`, J("POST")); await livePoll();
+    // a11y #3: the button is gone now; go to the next "Helped" button, else to this student's row header
+    const next = $("#liveRows [data-helped]"), row = $(`#liveRows tr[data-sid="${sid}"] th`);
+    if (next) next.focus(); else if (row) { row.tabIndex = -1; row.focus(); } else $("#liveSort").focus();
+    liveSay(`${nick} marked as helped.`);
+  } catch (er) { toast(er.message, "err"); }
 };
 window.__liveTimer = () => liveTimer;
 
 /* Delete class: an in-app dialog (no browser confirm box). "Keep the class" has focus first; Esc keeps it too. */
 function askDeleteClass(code, name, opener) {
   const d = $("#dlgDelClass"); $("#dcName").textContent = name; clearInline($("#dcGo").parentElement);
-  d.showModal(); $("#dcKeep").focus();
+  stackModal(d); $("#dcKeep").focus();
   $("#dcKeep").onclick = () => { d.close(); opener?.focus(); };
   $("#dcGo").onclick = async () => {
     $("#dcGo").disabled = true;
