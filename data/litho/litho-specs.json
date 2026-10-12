@@ -1,0 +1,125 @@
+{
+  "schema_version": "1.0",
+  "title": "Lithophane specifications",
+  "scope": {
+    "primary_use": "Flat lithophanes, night-light stands, and globe lithophanes",
+    "primary_nozzle": "0.4 mm",
+    "primary_materials": [
+      "PLA",
+      "PETG"
+    ],
+    "principle": "Lithophanes use varying thickness to control transmitted light: thin areas appear bright and thick areas appear dark.",
+    "validation": "Print a small test lithophane with the intended backlight before producing a final stand or globe."
+  },
+  "flat_lithophane_thickness": {
+    "pla_white": {
+      "minimum_thickness_mm": 0.6,
+      "maximum_thickness_mm": 2.8,
+      "notes": "White PLA is the recommended baseline for a classic black-and-white lithophane; use a cool-white backlight."
+    },
+    "pla_colored_or_dark": {
+      "minimum_thickness_mm": 0.6,
+      "maximum_thickness_mm": 3.6,
+      "notes": "Darker or colored filament transmits less light; community reports indicate dark areas may need roughly 3.6 mm to render properly. Treat 3.6 mm as a starting upper bound, not a universal rule."
+    },
+    "petg": {
+      "minimum_thickness_mm": 0.6,
+      "maximum_thickness_mm": 3.0,
+      "notes": "PETG can be used, but PLA is more commonly recommended for visual quality. Start with the PLA range and increase maximum thickness only after a backlight test."
+    },
+    "general_rules": [
+      "Use 100% infill or a solid lithophane body so thickness variations control light transmission.",
+      "Print the lithophane vertically for best detail and layer consistency.",
+      "Use a 0.4 mm nozzle and a layer height around 0.12 mm as a practical starting point.",
+      "Use a cool-white backlight for conventional monochrome lithophanes.",
+      "Avoid clear filament as the default: white PLA generally gives stronger contrast for classic lithophanes."
+    ]
+  },
+  "light_sources": {
+    "led_puck": {
+      "typical_use": "Flat lithophane frames and small night lights",
+      "design_rule": "Size the recess to the measured puck diameter plus clearance; do not assume a universal puck size.",
+      "recommended_clearance_mm": 0.3,
+      "notes": "A 156 mm x 120 mm USB-C powered backlight board is one documented example for larger color lithophanes."
+    },
+    "tea_light": {
+      "typical_use": "Small decorative lithophane stands",
+      "design_rule": "Measure the actual tea-light diameter and height; provide ventilation and a removable battery/LED carrier.",
+      "caution": "Do not enclose a flame-based tea light in plastic; use LED tea lights for 3D-printed stands."
+    },
+    "e12_bulb": {
+      "base_diameter_mm": 12,
+      "typical_use": "Small decorative bulbs and night lights",
+      "socket_opening_start_mm": 12.6,
+      "notes": "E12 refers to a 12 mm screw-base diameter; add clearance for the socket, wiring, heat, and insertion."
+    },
+    "e26_bulb": {
+      "base_diameter_mm": 26,
+      "typical_use": "Standard North American screw-base bulbs",
+      "socket_opening_start_mm": 26.6,
+      "notes": "E26 refers to a 26 mm screw-base diameter; use a lamp socket or certified fixture rather than modeling a mains-voltage socket as a casual 3D-printed part."
+    },
+    "safety": [
+      "Prefer low-heat LED sources over incandescent or flame sources.",
+      "Do not enclose flame-based candles in PLA or PETG.",
+      "For mains-voltage bulbs, use a certified socket, cord, and assembly; do not treat a printed socket as an electrical component.",
+      "Provide ventilation around LED electronics and avoid sealing battery compartments without access."
+    ]
+  },
+  "globe_lithophanes": {
+    "approach": "Parameterize the globe from the selected light source and printer build volume; do not use one fixed globe diameter as a universal standard.",
+    "starting_templates": {
+      "small_desk_globe": {
+        "outer_diameter_mm": 100,
+        "wall_thickness_mm": 1.5,
+        "minimum_thickness_mm": 0.6,
+        "maximum_thickness_mm": 2.8,
+        "opening_diameter_mm": 40,
+        "light_source": "LED puck or E12 LED bulb"
+      },
+      "medium_globe": {
+        "outer_diameter_mm": 150,
+        "wall_thickness_mm": 1.8,
+        "minimum_thickness_mm": 0.6,
+        "maximum_thickness_mm": 3.0,
+        "opening_diameter_mm": 50,
+        "light_source": "LED puck or E26 LED bulb"
+      }
+    },
+    "opening_rules": [
+      "Size the opening from the actual light-source diameter plus at least 0.6 mm total clearance.",
+      "For an E12 LED bulb, begin with a 12.6 mm opening; for E26, begin with a 26.6 mm opening.",
+      "For an LED puck, use puck diameter plus 0.3 mm minimum radial clearance.",
+      "Keep an access opening large enough to install and remove the light source and wiring.",
+      "Add a mounting lip, threaded cap, or friction-fit collar only after measuring the actual hardware."
+    ],
+    "print_notes": [
+      "Split large globes into hemispheres or vertical panels if they exceed the build volume.",
+      "Print lithophane panels vertically and join them with aligned tabs, dovetails, or adhesive-friendly flanges.",
+      "Avoid supports inside the image area; orient seams away from the most detailed facial or image regions."
+    ]
+  },
+  "cmyk_lithophanes": {
+    "method": "Use four separate lithophane layers printed in cyan, magenta, yellow, and black filament, then stack and align them.",
+    "layer_order": [
+      "cyan",
+      "magenta",
+      "yellow",
+      "black"
+    ],
+    "recommended_settings": {
+      "first_layer_height_mm": 0.15,
+      "nozzle_mm": 0.4,
+      "layer_height_mm": 0.12
+    },
+    "design_rules": [
+      "Generate each CMYK channel as its own height map or lithophane layer.",
+      "Maintain consistent XY registration across all four layers; misalignment produces color fringing.",
+      "Use white or light-colored backing/light diffusion where the method calls for it.",
+      "Print each color layer with the same orientation and scaling to preserve alignment.",
+      "Use a bright, diffuse backlight; color lithophanes need more transmitted light than monochrome lithophanes.",
+      "Start with a small CMYK test image before committing to a large globe or panel."
+    ],
+    "sources_note": "Bambu Lab and Snapmaker document CMYK color lithophanes as stacked color layers, with Bambu recommending a 0.15 mm first layer and Snapmaker documenting a 156 mm x 120 mm USB-C backlight board."
+  }
+}
