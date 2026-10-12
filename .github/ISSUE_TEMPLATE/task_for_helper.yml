@@ -1,0 +1,28 @@
+name: Task for helper (Claude / Perplexity)
+description: A scoped task handed to an AI helper
+labels: [helper-task]
+body:
+  - type: dropdown
+    id: role
+    attributes: {label: Helper role, options: [Claude (code), Perplexity (research/data), Other]}
+    validations: {required: true}
+  - type: input
+    id: branch
+    attributes: {label: Branch name, placeholder: helper/short-description}
+    validations: {required: true}
+  - type: textarea
+    id: task
+    attributes: {label: Task description}
+    validations: {required: true}
+  - type: textarea
+    id: acceptance
+    attributes: {label: Acceptance criteria, value: "- [ ] "}
+    validations: {required: true}
+  - type: textarea
+    id: tests
+    attributes: {label: Tests required, description: Tests that must be added or pass in CI.}
+    validations: {required: true}
+  - type: dropdown
+    id: verified
+    attributes: {label: Verification status, options: [NOT verified, Verified]}
+    validations: {required: true}

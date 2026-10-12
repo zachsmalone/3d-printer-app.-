@@ -1,0 +1,15 @@
+name: Feature request
+description: Suggest an idea for ZEIM
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes: {label: Problem / motivation}
+    validations: {required: true}
+  - type: textarea
+    id: proposal
+    attributes: {label: Proposed solution}
+    validations: {required: true}
+  - type: textarea
+    id: alternatives
+    attributes: {label: Alternatives considered}
