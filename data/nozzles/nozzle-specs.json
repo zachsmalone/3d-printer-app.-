@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0",
+  "title": "Nozzle slicer starting specifications",
+  "scope": {
+    "purpose": "Provide conservative slicer starting values for the ZEIM nozzle picker.",
+    "nozzle_sizes_mm": [0.2, 0.4, 0.6, 0.8, 1.0],
+    "materials": ["PLA", "PETG", "TPU", "ABS/ASA"],
+    "priority": "Manufacturer profiles first; derived geometric limits and conservative defaults second.",
+    "validation": "These are starting values. Calibrate flow, pressure advance, temperature, and retraction for each printer, filament, and nozzle before production use."
+  },
+  "general_limits": {
+    "layer_height": {
+      "rule": "Keep nominal layer height at or below 80% of nozzle diameter; a practical detailed range is 20-70% of nozzle diameter.",
+      "source": "Prusa; Bambu community guidance"
+    },
+    "line_width": {
+      "rule": "Start near nozzle diameter; use approximately 75-150% of nozzle diameter as the practical range.",
+      "source": "Bambu community guidance; Prusa guidance"
+    },
+    "flow": {
+      "rule": "Set flow ratio near 1.0 only after calibration; use the printer/filament manufacturer profile where available.",
+      "note": "Volumetric flow is limited by hotend, material, temperature, and nozzle diameter, not by nozzle size alone."
+    }
+  },
+  "nozzles": {
+    "0.2": {
+      "use_case": "Fine detail, small text, miniature features",
+      "layer_height_mm": {"min": 0.04, "max": 0.14, "recommended": 0.1},
+      "line_width_mm": {"min": 0.15, "max": 0.3, "recommended": 0.22},
+      "manufacturer_profile": {
+        "Creality": {
+          "printers": ["K1", "K1 Max", "K1C", "K1 SE"],
+          "documented": true,
+          "pla_flow_ratio": 0.98,
+          "petg_flow_ratio": 0.97,
+          "pla_max_volumetric_speed_mm3_s": 3.0,
+          "petg_max_volumetric_speed_mm3_s": 2.5,
+          "pla_outer_wall_speed_mm_s": 110,
+          "petg_outer_wall_speed_mm_s": 110
+        }
+      },
+      "material_notes": {
+        "PLA": "Use manufacturer profile where available; Creality documents Hyper PLA at 0.98 flow ratio and 3 mm3/s maximum volumetric speed for K1-family 0.2 mm profiles.",
+        "PETG": "Use manufacturer profile where available; Creality documents CR-PETG at 0.97 flow ratio and 2.5 mm3/s maximum volumetric speed for K1-family 0.2 mm profiles.",
+        "TPU": "Start conservatively; small nozzles increase back-pressure and make flexible filament more difficult.",
+        "ABS/ASA": "Use an enclosure and reduced cooling; validate warping and emissions safety before use."
+      }
+    },
+    "0.4": {
+      "use_case": "General-purpose default; balanced detail, strength, and speed",
+      "layer_height_mm": {"min": 0.08, "max": 0.32, "recommended": 0.2},
+      "line_width_mm": {"min": 0.3, "max": 0.6, "recommended": 0.42},
+      "manufacturer_profile": {
+        "Creality": {"printers": ["K1 family"], "documented": "0.4 mm is the standard/default K1-family nozzle size."},
+        "Bambu Lab": {"printers": ["Most Bambu Lab printers ship with 0.4 mm"], "documented": true},
+        "Prusa": {"printers": ["Most Prusa FDM printers use 0.4 mm as the default"], "documented": true}
+      },
+      "material_notes": {
+        "PLA": "Start with the printer manufacturer's PLA profile; calibrate flow and pressure advance.",
+        "PETG": "Use manufacturer PETG profile; expect slightly slower, more viscous printing than PLA.",
+        "TPU": "Use a direct-drive extruder where possible; print slowly and disable or minimize retraction initially.",
+        "ABS/ASA": "Use an enclosure, controlled cooling, and a heated bed; validate warping and ventilation."
+      }
+    },
+    "0.6": {
+      "use_case": "Faster functional prints, thicker walls, better layer bonding",
+      "layer_height_mm": {"min": 0.12, "max": 0.48, "recommended": 0.3},
+      "line_width_mm": {"min": 0.45, "max": 0.9, "recommended": 0.6},
+      "manufacturer_profile": {
+        "Creality": {"printers": ["K1-family compatible nozzles available"], "documented": "Available nozzle size; use a tested profile and calibrate."},
+        "Bambu Lab": {"printers": ["Supported optional nozzle size"], "documented": true},
+        "Prusa": {"printers": ["Supported optional nozzle size"], "documented": true}
+      },
+      "material_notes": {
+        "PLA": "Can use higher volumetric flow than 0.4 mm, but remain within the hotend's measured limit.",
+        "PETG": "Use a conservative speed until flow is calibrated; PETG can string more at high temperatures.",
+        "TPU": "Possible but more difficult; use slow speeds and a direct-drive extruder.",
+        "ABS/ASA": "Use an enclosure; larger beads can improve layer bonding but increase shrinkage-related stress."
+      }
+    },
+    "0.8": {
+      "use_case": "Large, fast, low-detail functional parts",
+      "layer_height_mm": {"min": 0.16, "max": 0.64, "recommended": 0.4},
+      "line_width_mm": {"min": 0.6, "max": 1.2, "recommended": 0.8},
+      "manufacturer_profile": {
+        "Creality": {"printers": ["K1-family compatible nozzles available"], "documented": "Available nozzle size; validate before production use."},
+        "Bambu Lab": {"printers": ["Supported optional nozzle size"], "documented": true},
+        "Prusa": {"printers": ["Supported optional nozzle size"], "documented": true}
+      },
+      "material_notes": {
+        "PLA": "Best for rapid prototypes and thick-walled parts; detail and small holes suffer.",
+        "PETG": "Use conservative speeds and calibrated flow; large beads can trap heat and sag.",
+        "TPU": "Not recommended as a beginner configuration; flexible filament plus a large nozzle is difficult to control.",
+        "ABS/ASA": "Use an enclosure and gradual cooling; large cross-sections increase warp risk."
+      }
+    },
+    "1.0": {
+      "use_case": "Very large, low-detail parts; maximum throughput",
+      "layer_height_mm": {"min": 0.2, "max": 0.8, "recommended": 0.5},
+      "line_width_mm": {"min": 0.75, "max": 1.5, "recommended": 1.0},
+      "manufacturer_profile": {
+        "Creality": {"printers": ["K1-family compatible nozzles are available from third-party sellers"], "documented": "Treat as advanced/community-supported unless the exact printer profile is published by Creality."},
+        "Bambu Lab": {"printers": ["Not listed among Bambu's typical four nozzle sizes"], "documented": false},
+        "Prusa": {"printers": ["Less common than 0.4-0.8 mm"], "documented": false}
+      },
+      "material_notes": {
+        "PLA": "Use only when print time matters more than detail; validate hotend flow and part cooling.",
+        "PETG": "Advanced use; large beads hold heat and are prone to sagging.",
+        "TPU": "Not recommended.",
+        "ABS/ASA": "Advanced use; high shrinkage stress and warp risk make this a poor default."
+      }
+    }
+  },
+  "printer_nozzle_availability": {
+    "Creality K1 family": {
+      "shipped_default_mm": 0.4,
+      "documented_official_profiles": ["0.2"],
+      "available_sizes": ["0.2", "0.4", "0.6", "0.8", "1.0"],
+      "note": "Creality documents official 0.2 mm parameter profiles for K1, K1 Max, K1C, and K1 SE; 0.4 mm is the standard default. Larger sizes are commonly available, but use tested profiles and calibration."
+    },
+    "Bambu Lab": {
+      "shipped_default_mm": 0.4,
+      "documented_sizes": ["0.2", "0.4", "0.6", "0.8"],
+      "note": "Bambu documents 0.2, 0.4, 0.6, and 0.8 mm nozzle sizes; 0.4 mm is the common shipped default."
+    },
+    "Prusa": {
+      "shipped_default_mm": 0.4,
+      "documented_sizes": ["0.4", "0.6", "0.8"],
+      "note": "Prusa documents nozzle-diameter effects and supports alternate nozzle sizes; 0.4 mm is the common default. Confirm the exact nozzle options for the specific printer model before exposing them in the picker."
+    }
+  },
+  "material_defaults": {
+    "PLA": {"relative_speed": "fastest", "cooling": "high", "flow_start": 1.0, "notes": "Use manufacturer profile first; PLA is generally the easiest material for nozzle comparison."},
+    "PETG": {"relative_speed": "moderate", "cooling": "moderate", "flow_start": 1.0, "notes": "Use manufacturer profile first; reduce speed if stringing, poor layer bonding, or under-extrusion appears."},
+    "TPU": {"relative_speed": "slow", "cooling": "moderate", "flow_start": 1.0, "notes": "Use slow speeds, minimal retraction, and a direct-drive extruder where possible; calibrate carefully."},
+    "ABS/ASA": {"relative_speed": "moderate", "cooling": "low", "flow_start": 1.0, "notes": "Use an enclosure, heated bed, and controlled cooling; validate warping, fumes, and ventilation."}
+  }
+}
