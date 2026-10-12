@@ -158,7 +158,8 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404, "unknown user")
     teen = idn.age_of(u) < config.ADULT_AGE
     social = privacy.social_on(u)
-    return {"id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
+    handle = "@" + u["username"] if u.get("username") else "a ZEIM maker"
+    return {"id": u["id"], "display_name": handle, "username": u.get("username"),        # public profile: @username only, never the (possibly real) display name
             "followers": idn.follower_count(uid) if social else None,   # opted out -> no count at all
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
@@ -412,7 +413,7 @@ def _preview(item_id: str) -> dict:
     i = next((x for x in catalog._all() if x["id"] == item_id), None)
     if not i:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
-    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": i["creator"], "hidden": bool(i["hidden"]),
+    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]),       # @username via the account id, never the display name
             "thumb": f"/api/moderation/item/{item_id}/thumb" if i.get("has_thumb") else None}
 
 

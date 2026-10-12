@@ -389,7 +389,7 @@ def user_page(uid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404)
     if u and not privacy.can_view_profile(actor, uid):
         raise HTTPException(404)
-    name = u["display_name"] if u else catalog.CREATORS[uid]
+    name = (("@" + u["username"]) if u.get("username") else "a ZEIM maker") if u else catalog.CREATORS[uid]     # @username, never the display name
     teen = bool(u) and idn.age_of(u) < 18
     lk = "" if (teen or not u) else "".join(
         f"<li>{escape(v['handle'])} on <a rel='nofollow noopener noreferrer' target=_blank href='{escape(v['url'])}'>{escape(k)}</a> "

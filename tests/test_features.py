@@ -259,7 +259,7 @@ def test_followers_only_and_social_opt_out():
     assert b.get(f"/files/{bid}/model.stl").status_code == 404                       # not following yet
     assert b.post(f"/api/follow/{aid}").status_code == 200
     assert b.get(f"/files/{bid}/model.stl").status_code == 200 and c3.get(f"/files/{bid}/model.stl").status_code == 404
-    assert a.get("/api/me/followers").json()["followers"][0]["display_name"] == "Bob"
+    assert a.get("/api/me/followers").json()["followers"][0]["display_name"].startswith("@")   # @username, never the display name
     assert b.delete(f"/api/follow/{aid}").status_code == 200
     assert b.get(f"/files/{bid}/model.stl").status_code == 404                       # unfollow → immediate
     b.post(f"/api/follow/{aid}")

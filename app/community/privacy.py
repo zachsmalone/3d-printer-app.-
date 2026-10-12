@@ -180,7 +180,7 @@ def set_privacy(actor: Actor, body: dict) -> dict:
 
 def followers_of(uid: str) -> list[dict]:
     """Followers who are adults (a teen's name is never listed on someone else's follower list)."""
-    return [{"id": u["id"], "display_name": u["display_name"]} for u in USERS.read().values()
+    return [{"id": u["id"], "display_name": "@" + u["username"] if u.get("username") else "a ZEIM maker"} for u in USERS.read().values()
             if uid in u.get("following", []) and social_on(u) and not is_minor(u)]
 
 
