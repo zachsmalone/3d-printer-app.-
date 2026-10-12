@@ -308,6 +308,16 @@ def hand_helped(code: str, sid: str, actor: Actor = Depends(get_actor)):
     return {"ok": True}
 
 
+@router.post("/classrooms/{code}/hand/down")
+def hand_down(code: str, actor: Actor = Depends(get_actor)):
+    """Student only: lower my own raised hand."""
+    try:
+        classrooms.lower_hand(actor, code)
+    except KeyError:
+        raise HTTPException(404)
+    return {"hand_up": False}
+
+
 @router.get("/classrooms/{code}/notifications")
 def notifications(code: str, actor: Actor = Depends(get_actor)):
     try:

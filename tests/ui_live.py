@@ -53,6 +53,13 @@ def run(name, launch, with_axe):
     r = studs["Ant"].request.get(URL + f"/api/classrooms/{code}/live"); ok(f"{name}: a student gets 404 from the roster", r.status == 404)
     sp = studs["Bee"].new_page(); sp.goto(URL); sp.wait_for_timeout(600); sp.click("#mainNav [data-view=learn]"); sp.wait_for_selector("#classNotice")
     ok(f"{name}: the student sees what the teacher can see", "cannot see your photos" in sp.inner_text("#classNotice") and "nickname" in sp.inner_text("#classNotice"))
+    # the student raises and lowers their own hand from the Learn page; the teacher's roster follows
+    sp.click("#classBanner [data-req=need_help]"); sp.wait_for_selector("#handDown", timeout=8000)
+    ok(f"{name}: student sees their hand is up and can lower it", "Your hand is up" in sp.inner_text("#handState") and sp.evaluate("document.activeElement.id") == "handDown")
+    sp.click("#handDown"); sp.wait_for_timeout(600)
+    ok(f"{name}: lowering it is confirmed", sp.locator("#handDown").count() == 0 and "Your hand is down" in sp.inner_text("#handState"))
+    rows = tc.request.get(URL + f"/api/classrooms/{code}/live").json()["students"]
+    ok(f"{name}: the roster no longer shows Bee's hand", not [r for r in rows if r["nickname"] == "Bee" and r["hand"]])
     ok(f"{name}: no page errors", not errs, errs)
     for c in studs.values(): c.close()
     tc.close(); b.close()

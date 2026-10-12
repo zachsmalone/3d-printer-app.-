@@ -76,3 +76,16 @@ def test_students_are_told_what_the_teacher_can_see():
     t, code, pw = make_class(); a = student(code, pw, "Fox")
     n = a.get("/api/learn/lessons").json()["classroom"]["notice"]
     assert "nickname" in n and "lesson step" in n and "model's name" in n and "cannot see your photos" in n
+
+
+def test_a_student_can_lower_their_own_hand_but_nobody_elses():
+    t, code, pw = make_class(); a, b = student(code, pw, "Ant"), student(code, pw, "Bee")
+    a.post(f"/api/classrooms/{code}/requests", json={"kind": "need_help"}); b.post(f"/api/classrooms/{code}/requests", json={"kind": "need_help"})
+    assert a.get("/api/learn/lessons").json()["classroom"]["hand_up"] is True
+    assert a.post(f"/api/classrooms/{code}/hand/down").status_code == 200
+    assert a.get("/api/learn/lessons").json()["classroom"]["hand_up"] is False
+    hands = {r["nickname"]: r["hand"] for r in t.get(f"/api/classrooms/{code}/live").json()["students"]}
+    assert hands == {"Ant": False, "Bee": True}                                     # only Ant's own hand went down
+    assert t.post(f"/api/classrooms/{code}/hand/down").status_code == 404          # the teacher uses Helped instead
+    assert client().post(f"/api/classrooms/{code}/hand/down").status_code == 404
+    assert a.post(f"/api/classrooms/{code}/requests", json={"kind": "need_help"}).status_code == 200   # and can raise it again

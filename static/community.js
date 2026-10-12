@@ -301,13 +301,15 @@ async function loadLearn() {
   const cls = r.classroom;
   $("#classBanner").innerHTML = cls ? `<div class="banner">🎒 You're in <b>${esc(cls.name)}</b> (teacher: ${esc(cls.teacher)}) as <b>${esc(cls.nickname)}</b>. ${cls.assigned.length ? "Assigned lessons are marked ⭐." : ""}
     <p class="help" id="classNotice">${esc(cls.notice || "")}</p>
+    ${cls.hand_up ? `<p class="handup" id="handState" role="status">✋ Your hand is up. Your teacher can see it. <button type="button" class="btn small" id="handDown">Lower my hand</button></p>` : `<p class="sr-only" id="handState" role="status"></p>`}
     ${cls.notifications.map(n => `<div class="note">🔔 ${esc(n.from_name)}: ${esc(n.text)}</div>`).join("")}
     <div class="row" style="margin-top:6px"><span class="help">Quick message to your teacher (pre-set only):</span>${Object.entries(cls.canned).map(([k, t]) => `<button class="btn small" data-req="${k}">${esc(t)}</button>`).join("")}
     <button class="btn small ghost" id="clsFeedback">📝 My projects &amp; feedback</button><button class="btn small ghost" id="clsSubmit">⬆ Submit a build</button></div></div>` : "";
   if (cls) {
     $("#classBanner").onclick = async e => {
       const q = e.target.closest("[data-req]");
-      if (q) { try { await api(`/api/classrooms/${cls.code}/requests`, J("POST", { kind: q.dataset.req })); toast("Sent to your teacher", "ok"); } catch (er) { toast(er.message, "err"); } }
+      if (q) { try { await api(`/api/classrooms/${cls.code}/requests`, J("POST", { kind: q.dataset.req })); toast("Sent to your teacher", "ok"); if (q.dataset.req === "need_help") { await loadLearn(); $("#handDown")?.focus(); } } catch (er) { toast(er.message, "err"); } }
+      if (e.target.id === "handDown") { try { await api(`/api/classrooms/${cls.code}/hand/down`, J("POST")); await loadLearn(); $("#handState").textContent = "Your hand is down."; } catch (er) { toast(er.message, "err"); } }
       if (e.target.id === "clsFeedback") openClassProjects(cls.code);
       if (e.target.id === "clsSubmit") submitToClass(cls.code);
     };
