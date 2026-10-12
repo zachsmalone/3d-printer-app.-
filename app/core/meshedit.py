@@ -607,7 +607,7 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
     wall_min = _measure_wall(mm, cav)
     probe = _ray_wall(out)
     floor = wall - pitch                                                     # what a voxel method can promise
-    if probe and probe[0] < floor and tries < 2:                             # enforce the minimum: deepen the margin and rebuild
+    if ((probe and probe[0] < floor) or (wall_min is not None and wall_min < floor)) and tries < 2:                             # enforce the minimum: deepen the margin and rebuild
         return _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra + pitch, tries + 1)
     rep_extra = {"cavity_fragments_dropped": dropped, "floating_pieces_dropped": floating,
                  "thinnest_wall_mm": None if wall_min is None else round(wall_min, 2)}
