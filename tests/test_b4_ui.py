@@ -50,3 +50,8 @@ def test_nozzle_it_buttons_states_keyboard_sync_rollback_class_rules_and_axe_in_
 def test_teacher_live_view_table_hand_raise_stable_order_polling_stop_and_student_notice():
     out = _run("ui_live.py")
     assert "PASS webkit" in out or "SKIP webkit" in out
+
+
+def test_delete_class_uses_an_in_app_dialog_not_confirm():
+    out = _run("ui_delclass.py")
+    assert "PASS webkit" in out or "SKIP webkit" in out

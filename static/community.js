@@ -386,6 +386,19 @@ $("#liveRows").onclick = async e => {
 };
 window.__liveTimer = () => liveTimer;
 
+/* Delete class: an in-app dialog (no browser confirm box). "Keep the class" has focus first; Esc keeps it too. */
+function askDeleteClass(code, name, opener) {
+  const d = $("#dlgDelClass"); $("#dcName").textContent = name; clearInline($("#dcGo").parentElement);
+  d.showModal(); $("#dcKeep").focus();
+  $("#dcKeep").onclick = () => { d.close(); opener?.focus(); };
+  $("#dcGo").onclick = async () => {
+    $("#dcGo").disabled = true;
+    try { await api("/api/classrooms/" + code, { method: "DELETE" }); d.close(); toast(`Deleted ${name}.`, "ok"); openTeacher(); }
+    catch (e) { inlineMsg($("#dcGo").parentElement, e.message || "That didn't work. The class is still there."); }
+    finally { $("#dcGo").disabled = false; }
+  };
+}
+
 /* classroom */
 $("#btnJoinClass").onclick = () => $("#dlgJoin").showModal();
 $("#btnDoJoin").onclick = async () => {
@@ -417,7 +430,7 @@ async function openTeacher() {
       <table class="studs"><tr><th>Student</th><th>Progress</th><th></th></tr>${r.students.map(s => `<tr><td>${esc(s.nickname)}</td><td>${s.lessons.map(x => `${x.completed ? "✅" : `${x.done_steps}/${x.steps}`}`).join(" · ")}</td><td><button class="btn small ghost" data-talk="${r.code}:${s.id}" title="${esc(r.canned.talk_next_class)}">🗨 Talk next class</button> <button class="btn small ghost" data-mu="${r.code}:${s.id}:${s.muted ? 0 : 1}">${s.muted ? "Unmute" : "Mute"}</button> <button class="btn small ghost danger" data-rs="${r.code}:${s.id}">Remove</button></td></tr>`).join("") || "<tr><td colspan=3 class='help'>No students yet</td></tr>"}</table>
       <h4>Student projects <small class="help">(private to this class)</small></h4>
       ${r.projects.map(p => `<div class="fl"><img src="${p.thumb}" alt=""><span><b>${esc(p.title)}</b> <small>by ${esc(p.student)}</small>${p.feedback.map(f => `<br><small>💬 ${esc(f.comment)}</small>`).join("")}</span><button class="btn small" data-fb="${r.code}:${p.id}">Feedback</button></div>`).join("") || "<p class='help'>No projects yet. When students send builds, they show up here for you to look at first.</p>"}
-      <button class="btn small" data-live="${r.code}">Live view</button> <button class="btn small danger" data-dr="${r.code}">Delete class</button></div>`).join("");
+      <button class="btn small" data-live="${r.code}">Live view</button> <button class="btn small danger" data-dr="${r.code}" data-dr-name="${esc(r.name)}">Delete class</button></div>`).join("");
   if (!$("#dlgTeacher").open) $("#dlgTeacher").showModal();
   $("#cr_go").onclick = async () => { try { await api("/api/classrooms", J("POST", { name: $("#cr_name").value, password: $("#cr_pw").value })); openTeacher(); } catch (e) { inlineMsg($("#cr_go"), e.message); } };
   $("#teacherBody").onclick = async e => {
@@ -431,7 +444,7 @@ async function openTeacher() {
     if (t.dataset.mu) { const [c, sid, m] = t.dataset.mu.split(":"); await api(`/api/classrooms/${c}/students/${sid}/mute`, J("PUT", { muted: m === "1" })); openTeacher(); }
     if (t.dataset.fb) { const [c, pid] = t.dataset.fb.split(":"); openFeedback(c, pid); }
     if (t.dataset.rs) { const [c, s] = t.dataset.rs.split(":"); await api(`/api/classrooms/${c}/students/${s}`, { method: "DELETE" }); openTeacher(); }
-    if (t.dataset.dr && confirm("Delete this class and all student progress in it?")) { await api("/api/classrooms/" + t.dataset.dr, { method: "DELETE" }); openTeacher(); }
+    if (t.dataset.dr) { askDeleteClass(t.dataset.dr, t.dataset.drName || t.dataset.dr, t); return; }
   };
   $("#teacherBody").onchange = async e => { const t = e.target;
     if (t.dataset.send) {
