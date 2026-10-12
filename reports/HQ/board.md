@@ -162,3 +162,12 @@ Nozzle it accepted: single positive-only button replacing every like/heart/upvot
 - Kids: no new minors' data. Under-13s use ZEIM signed out or with a grown-up in their family; the class-code path is gone. Accounts still 13+.
 - Data on disk: any existing `data/classrooms.json` and `data/classroom_projects/` are no longer read or written, and were NOT deleted. Old `quiz_passed` keys in `education_progress.json` are ignored. Cleanup of those files is Zach's call.
 - Plans dropped: teacher tools (HQ-1 teacher onboarding), ACCT-5 class-code accounts, Classroom roadmap (roster/LMS/district search/FERPA), rubric/teacher guide. Earlier board entries about classes are history only.
+## 2026-10-12 Zach decisions (backlog, priority order)
+1. Universal export: "Open in" 3MF/G-code sized per printer for Creality, Bambu Lab, Prusa, Elegoo, Anycubic, etc. (K1 first test). No unofficial cloud-account linking.
+2. Printer picker at signup (drives export, fit checks, slicer).
+3. "Will it print?" badge (fit, thin walls, overhangs).
+4. Merge the two slicing paths into one.
+5. Beginner mode (advanced settings hidden).
+6. Remix credit chain; "I printed this" photos.
+7. LAST before launch: lithophanes incl. color options (light colors, CMYK multi-color for AMS/CFS, backlight tip).
+Postponed: live streams, DMs, modeling tools. Removed: school features.
