@@ -82,6 +82,7 @@ Built on origin/zeim (`22f091b`; origin's 3 later HQ doc commits merged in at me
   - Live view: after Helped, focus moves to the next Helped button or the row, and the announcement names the student; with "needs help first" on, rows never move under the pointer or focus, and a "Re-sort now" button appears instead
   - Spec note updated: **Warm is always the default; Dark only by choice, never from the OS.**
 - `3b1f6ad` test tolerance fix.
+Full suite after merging origin/zeim (incl. PR #6 slicer API) at `deeb409`: **571 passed, 0 failed, 0 skipped** (13 min 21 s, finished 3:31 PM CT). One earlier run hit a WebKit "Page crashed" in ui_report.py once; it did not recur.
 **Library and deploy:** `library/` (378 MB) is **not in git** (now in .gitignore). **The deploy must ship `library/originals` separately** and either put it at `<app>/library/originals` or set `PHOTO3D_ORIGINALS=/path/to/originals`. Without it the Showcase has no Originals, but nothing crashes. Tests and CI use a 6-item fixture in `tests/fixtures/originals`; two tests check the real library when it is present.
 **Box:**
 - PrusaSlicer 2.9.2 was reinstalled via apt. dpkg reported errors on fuse3/xdg-desktop-portal, but the CLI slices fine.
