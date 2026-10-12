@@ -2,9 +2,9 @@
 
 Local MVP identity = session cookie (`p3d_sid`) -> account record; no passwords yet (real auth is
 a roadmap item). Rules:
-  * no accounts under MIN_SIGNUP_AGE (13); under-13s learn via a teacher's classroom code (no PII)
+  * no accounts under MIN_SIGNUP_AGE (13); under-13s use ZEIM signed out or alongside a grown-up's account (no kid PII collected)
   * 13-17 = "teen": safer defaults - DMs from strangers OFF (DMs are a stub anyway), public
-    profile link-outs hidden, cannot create classrooms
+    profile link-outs hidden
   * the site is family-friendly only for everyone (see COMMUNITY_GUIDELINES.md)
 """
 from __future__ import annotations
@@ -67,8 +67,8 @@ def session_only_cookie(request: Request, response: Response, sid: str):
 
 
 AGE_COOKIE = "p3d_ag"
-AGE_MESSAGE = ("We can't create an account for you right now. If you're learning with a class, ask your teacher for "
-               "the class code and password - you don't need an account for that.")
+AGE_MESSAGE = ("We can't create an account for you right now. You can still build and learn without an account, "
+               "or use ZEIM together with a grown-up in your family.")
 
 
 def _blk(sid: str) -> str:
@@ -100,7 +100,7 @@ def lock_age(sid: str, ip: str = "") -> float:
     until = time.time() + config.AGE_LOCK_HOURS * 3600
     ip_until = time.time() + config.AGE_IP_LOCK_MINUTES * 60
     lock_ip = False
-    if ip and config.AGE_IP_LOCK_MINUTES > 0:     # Edge 5: a shared school address is locked only after several refusals, never after one
+    if ip and config.AGE_IP_LOCK_MINUTES > 0:     # Edge 5: a shared home or library address is locked only after several refusals, never after one
         from ..core import ratelimit
         lock_ip = not ratelimit.hit("ageref:" + _blk_ip(ip), max(0, config.AGE_IP_LOCK_AFTER), config.AGE_IP_LOCK_MINUTES * 60)
 
@@ -141,8 +141,7 @@ def signup(actor: Actor, display_name: str, dob: str) -> dict:
 def restrictions(actor: Actor) -> dict:
     teen = actor.is_teen
     return {"dm_from_strangers": False,          # DMs not built; rule documented: never from strangers for teens
-            "public_link_outs": not teen,        # teens' social link-outs are not shown publicly
-            "can_create_classroom": actor.is_adult}
+            "public_link_outs": not teen}        # teens' social link-outs are not shown publicly
 
 
 def _priv(u):

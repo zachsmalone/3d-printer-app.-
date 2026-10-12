@@ -9,7 +9,7 @@ from app import config
 from app.services import retention
 from app.services.history import store, BuildStore
 from tests import b1
-from tests.b1 import client, photo_build, ADULT, make_class, student, join
+from tests.b1 import client, photo_build, ADULT
 
 
 def _age(bid, days):
@@ -115,11 +115,6 @@ def test_a_sweep_frees_room_with_unstarred_builds_and_the_build_then_goes_throug
 
 
 def test_delete_my_stuff_and_delete_everything_remove_starred_builds_and_their_files():
-    t, code, pw = make_class(); s = student(code, pw, "Robo9")
-    bid = photo_build(s); s.post(f"/api/builds/{bid}/favorite", json={"favorite": True}); d = store.dir(bid)
-    assert d.exists()
-    assert s.delete("/api/me/class-data").status_code == 200
-    assert not d.exists()                                                           # starred or not, the folder is gone
     a = client(ADULT); b2 = photo_build(a); a.post(f"/api/builds/{b2}/favorite", json={"favorite": True})
     b3 = photo_build(a); a.post("/api/showcase", json={"build_id": b3, "title": "Shared", "accept_guidelines": True, "visibility": "private"})
     out = a.delete("/api/me/builds").json()

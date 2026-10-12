@@ -1,5 +1,8 @@
 # ZEIM catalog: engineering spec
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Author: Haruto Tanaka (Engineering) · Date: 2026-10-04 (evening) · Status: **SPEC ONLY. No file under `app/`, `static/` or `tests/` was changed.**
 Owners: **Engineering** (this file, §3, §6–§8, §10–§13, §15–§16). **Aiko Nakamura** owns content (categories, difficulty wording, classroom picks, Spark Lab links). **Sakura Mori** owns design (cards, detail page, filters UI, empty/loading/error states). Their sections are marked **[AIKO]** / **[SAKURA]** below with the decisions engineering needs from them. **Kenji** owns the licence/credit rules (`reports/attribution-standard.md`, which this spec follows) and the safety sign-off.
 
@@ -156,7 +159,7 @@ Engineering proposal (from what exists, so the filter is not empty on day one). 
 > **[SAKURA — decide]** category icons/colours, how many show before "More", and the empty state when a category has no ready items.
 > **Engineering constraints:** category is a single enum per item (tags carry the rest); renaming a category is a one-line change in `categories.json`, not a code change; the API returns display names from that file.
 
-Question for **Kenji/Zach** (not a judgement): "Wildlife Calls" are game and predator calls (duck, turkey, deer, elk, predator). They are legitimate hobby items, but hunting-related items in a school-friendly app deserve a deliberate decision, ideally within Kenji's family-friendly review of the 45.
+Question for **Kenji/Zach** (not a judgement): "Wildlife Calls" are game and predator calls (duck, turkey, deer, elk, predator). They are legitimate hobby items, but hunting-related items in a family-friendly app deserve a deliberate decision, ideally within Kenji's family-friendly review of the 45.
 
 ---
 
@@ -399,7 +402,7 @@ Phase view: CAT-1…9 + 14 = Originals browse (≈ 15–18 working days **[est]*
 1. The **licence line** for Originals (with counsel). Candidates are Kenji's: CC BY for reuse, or a "personal and classroom use only" custom text.
 2. **Takedown contact** (a role mailbox, not a person) and the 2/10-business-day targets.
 3. Keep **one data folder across phone-test restarts** (so accounts survive), or accept a reset each time? Longer term: sign-in/recovery (needs a mail provider = cost).
-4. "Wildlife Calls" category in a school-friendly app (§4): keep, rename, or hold back from class views?
+4. "Wildlife Calls" category in a family-friendly app (§4): keep, rename, or hold back from class views?
 
 **Kenji**
 1. Field list (§3.1) and statuses match your §7.1; any change?

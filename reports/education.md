@@ -1,5 +1,8 @@
 # ZEIM Education & Community Report
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 **Author:** Aiko Nakamura, Head of Education & Community · **Date:** 2026-10-04 (CT) · **Status:** DRAFT for Zach / Mr. Yami Kato / Haruto Tanaka
 **Scope:** `/workspace/photo3d` (read-only review; Education did not edit app code). Companion files: `education-change-requests.md` (section 6 below, saved separately) and `education-lessons-draft.json` (draft lessons in the app's `LESSONS` schema).
 

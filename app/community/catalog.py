@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor
-from . import classrooms, originals_qa, privacy
+from . import originals_qa, privacy
 from ..services.credits import credit_line
 from .store import ENGAGEMENT, LISTINGS, MODERATION, USERS
 
@@ -30,7 +30,6 @@ CREATORS: dict = {}      # the old invented "Example: Ada/Ben/Cleo" seed creator
 
 # ---- ZEIM Originals (library/originals, NOT in git: the deploy ships the folder separately; see config.ORIGINALS) ----
 WILDLIFE = "Wildlife Calls"
-CLASSROOM_HIDDEN_SLUGS = {"horn-dino-band-popper", "fish-bottle-opener"}     # Kenji's rule: not shown to classroom students
 _MCACHE: dict = {}
 
 
@@ -69,13 +68,10 @@ def _seed():
 
 def audience_ok(i: dict, actor) -> bool:
     """Kenji's rules, enforced on the server for lists, item pages, thumbs and downloads: Wildlife Calls (whistles, the open-reed
-    predator call) never reach classroom students or under-13s; the band popper and bottle opener never reach classroom students."""
+    predator call) never reach under-13s. (The classroom-only hides were removed with school features, 2026-10-12.)"""
     if not i.get("original") or actor is None:
         return True
-    in_class = classrooms.showcase_policy(actor.sid) is not None
-    if in_class and i.get("slug") in CLASSROOM_HIDDEN_SLUGS:
-        return False
-    if i.get("category") == WILDLIFE and viewer_sees_no_counts(actor):     # class student OR under 13
+    if i.get("category") == WILDLIFE and viewer_sees_no_counts(actor):     # under 13
         return False
     return True
 
@@ -128,11 +124,9 @@ def _visible(actor: Actor, users: dict):
 
 
 def viewer_sees_no_counts(actor) -> bool:
-    """Class students (nickname accounts, the under-13 path) and any viewer under 13 never see nozzle/download numbers (decision, Batch B)."""
+    """Any viewer under 13 never see nozzle/download numbers (decision, Batch B)."""
     if actor is None:
         return False
-    if classrooms.showcase_policy(actor.sid) is not None:
-        return True
     u = getattr(actor, "user", None)
     if u and u.get("dob"):
         from .identity import age_of
@@ -142,7 +136,7 @@ def viewer_sees_no_counts(actor) -> bool:
 
 def counts_visible(i: dict, users: dict, actor=None) -> bool:
     """May nozzle/download numbers for this item be shown to this viewer? (Examples: only if the flag says so; minors' items: not by default;
-    class students and under-13 viewers: never.)"""
+    under-13 viewers: never.)"""
     if not is_public(i, users):
         return False
     if viewer_sees_no_counts(actor):
@@ -174,10 +168,10 @@ def public(i: dict, actor: Actor) -> dict:
     return {"likes": i.get("_likes", 0) if show_counts else None, "liked": bool(pub and actor.sid in i.get("_likers", [])),
             "liked_by_others": bool(pub and i.get("owner_sid") == actor.sid and i.get("_likes", 0) > 0),
             "counts_hidden": bool(pub and not show_counts),
-            "can_like": bool(pub and i.get("owner_sid") != actor.sid and (classrooms.showcase_policy(actor.sid) or {"likes": True})["likes"]),
+            "can_like": bool(pub and i.get("owner_sid") != actor.sid),
             "visibility": privacy.effective(i.get("visibility", "private"), users.get(i.get("owner_sid"))) if i.get("owner_sid") else "public",
-            "can_like_reason": ("" if (pub and i.get("owner_sid") != actor.sid and (classrooms.showcase_policy(actor.sid) or {"likes": True})["likes"]) else
-                                "own" if i.get("owner_sid") == actor.sid else "class_off" if (pub and classrooms.showcase_policy(actor.sid)) else "not_public"),
+            "can_like_reason": ("" if (pub and i.get("owner_sid") != actor.sid) else
+                                "own" if i.get("owner_sid") == actor.sid else "not_public"),
             "can_follow": privacy.can_follow(actor, tu, bool(i.get("example"))),"id": i["id"], "title": i["title"], "creator": i["creator"], "creator_id": i["creator_id"],
             "example": i.get("example", False), "tags": i["tags"], "mode": i["mode"],
             "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],

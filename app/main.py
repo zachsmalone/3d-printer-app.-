@@ -39,7 +39,7 @@ for _n in ("uvicorn.access", "uvicorn.error", "uvicorn"):
     if not any(isinstance(f, RedactTokens) for f in _lg.filters):
         _lg.addFilter(RedactTokens())
 
-_aud = _logging.getLogger("zeim.audit")      # settings changes that matter for safety (class code + time, never names)
+_aud = _logging.getLogger("zeim.audit")      # settings changes that matter for safety (time, never names)
 if not _aud.handlers:
     _h = _logging.StreamHandler(); _h.setFormatter(_logging.Formatter("%(asctime)s AUDIT %(message)s"))
     _aud.addHandler(_h); _aud.setLevel(_logging.INFO); _aud.propagate = False

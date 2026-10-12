@@ -1,5 +1,8 @@
 # ZEIM design, accessibility & kid/teacher-friendliness audit
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 **Author:** Sakura (Design & UX lead) · **Date:** Sun 2026-10-04 (CT) · **Scope:** read-only audit of `/workspace/photo3d` (README, ROADMAP, `static/*`, relevant `app/*` copy) and the running app at `localhost:8765`.
 **Status:** first-pass audit. Read the **Hansei** section to see what was and was not actually verified. Effort sizes (S/M/L) are guesses by a designer, not engineering estimates.
 
@@ -141,7 +144,7 @@ Format: **ID · Title** — *Screen · Mode* — Evidence → Fix (effort).
 
 **D29 · Expert-mode Studio help** — Evidence: index.html:68–91: `σ`, "Gamma", "Posterize", "Halftone" without tooltips; units appear in `<em>` with opacity .65 (low contrast). → Fix: `?` popovers with one sentence and an example; PrusaSlicer-style "safe to change / careful" hints (research R9). (M)
 
-**D30 · Policy question for Trust & Safety, not a design call** — "Promote your accounts" includes Patreon link-outs (index.html:210) on a family/school product. Design view: keep it out of any class or teen surface (already hidden for teens) and label as "optional, adults only"; whether Patreon belongs at all given "no paid content" positioning is for Kenji/Yami to decide. (S)
+**D30 · Policy question for Trust & Safety, not a design call** — "Promote your accounts" includes Patreon link-outs (index.html:210) on a family product. Design view: keep it out of any class or teen surface (already hidden for teens) and label as "optional, adults only"; whether Patreon belongs at all given "no paid content" positioning is for Kenji/Yami to decide. (S)
 
 **D31 · Build Plates (groups) — design guardrails for when they are built** (not built yet; no UI exists to audit). Recommendations: show one plain-language "Who can see this Build Plate" line at the top; school/class Build Plates use the same class-private rules as classrooms; moderator list visible to members; "Report" always one click away using the T3 dialog; join by invite for under-18s; no free-text DMs; any "Build Plate" naming gets a short explainer ("a group of makers who share a print bed idea") since a child may not know the pun. (M, later)
 

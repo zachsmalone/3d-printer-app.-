@@ -1,5 +1,5 @@
 """Originals-first Showcase in the browser: cards show credit, difficulty, Suggested FDM, Untested print, caveats and a working STL link;
-category chips filter; a class student never sees Wildlife Calls or the popper/opener. 390px, Chrome + WebKit (axe in Chrome)."""
+category chips filter. 390px, Chrome + WebKit (axe in Chrome)."""
 import json, os, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]; bad = []
@@ -32,19 +32,8 @@ def run(name, launch, with_axe):
         v = pg.evaluate("axe.run(document.querySelector('#shGrid').closest('section') || document, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa']}}).then(r=>r.violations.map(v=>({id:v.id,n:v.nodes.length,t:v.nodes.slice(0,3).map(n=>n.target.join(' '))})))")
         ok(f"{name}: axe on the Showcase", not v, json.dumps(v)[:800])
     pg.click('#shCats [data-cat=""]'); pg.wait_for_timeout(300)
-    # a class student (fresh context)
-    s = b.new_context(viewport={"width": 390, "height": 844}); r = ctx.request
-    r.post(URL + "/api/me/signup", data={"display_name": "Ms T", "dob": "1980-01-01"})
-    c = r.post(URL + "/api/classrooms", data={"name": f"Owls {name}", "password": "bluebird-77"}).json()["code"]
-    r.put(URL + f"/api/classrooms/{c}/showcase", data={"enabled": True})
-    j = s.request.post(URL + "/api/classrooms/join", data={"code": c, "nickname": "Otter", "password": "bluebird-77"})
-    sp = s.new_page(); sp.on("pageerror", lambda e: errs.append(str(e)))
-    sp.goto(URL); sp.wait_for_timeout(700); sp.click("#mainNav [data-view=showcase]"); sp.click('#shTabs [data-tab=free]')
-    sp.wait_for_selector('#shGrid .pcard[data-item="zo-pencil-cup"]')
-    seen = " ".join(cards(sp)) + sp.inner_text("#shCats")
-    ok(f"{name}: class student sees no Wildlife Calls, popper or opener", j.ok and not any(w in seen for w in ("Whistle", "Predator", "Wildlife", "Popper", "Bottle Opener")), (j.status, seen))
     ok(f"{name}: no page errors", not errs, errs)
-    ctx.close(); s.close(); b.close()
+    ctx.close(); b.close()
 with sync_playwright() as p:
     run("chrome", lambda: p.chromium.launch(channel="chrome"), True)
     run("webkit", lambda: p.webkit.launch(), False)

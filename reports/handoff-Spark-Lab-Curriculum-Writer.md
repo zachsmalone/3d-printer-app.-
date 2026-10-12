@@ -1,5 +1,8 @@
 # Handoff: Spark Lab Curriculum Writer (2026-10-04)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 ## What I did
 - Zach asked for a teacher/parent guide for ZEIM. I asked him who it is for (classroom teachers, parents, or both) and the age range. He had not answered yet.
 - In the Hq2 room I collected facts for the guide. No guide file has been written.

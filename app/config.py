@@ -10,7 +10,7 @@ STATIC = ROOT / "static"
 ORIGINALS = Path(os.environ.get("PHOTO3D_ORIGINALS", str(ROOT / "library" / "originals")))
 MAX_BUILDS = int(__import__("os").environ.get("PHOTO3D_MAX_BUILDS", "20"))   # builds kept per person (oldest un-starred roll off; starred ones never do)
 KEEP_UNSAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_UNSAVED_DAYS", "7"))    # ordinary builds are removed after this many days
-KEEP_SAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_SAVED_DAYS", "30"))       # builds shared to the Showcase or sent to a class
+KEEP_SAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_SAVED_DAYS", "30"))       # builds shared to the Showcase
 DISK_MIN_FREE_MB = int(__import__("os").environ.get("PHOTO3D_DISK_MIN_FREE_MB", "500"))    # below this, new builds first trigger a sweep, then are refused
 DISK_TARGET_FREE_MB = int(__import__("os").environ.get("PHOTO3D_DISK_TARGET_FREE_MB", "1000"))
 MAX_UPLOAD = 25 * 1024 * 1024
@@ -20,7 +20,7 @@ for d in (OUT, DATA):  # noqa
 
 
 def harden_data_permissions() -> int:
-    """Data directories 700 and data files 600 (accounts, class lists and printer settings must not be world-readable). Returns how many were changed."""
+    """Data directories 700 and data files 600 (accounts and printer settings must not be world-readable). Returns how many were changed."""
     import os
     n = 0
     for d in (OUT, DATA):
@@ -41,10 +41,10 @@ def harden_data_permissions() -> int:
 harden_data_permissions()
 
 # ---- community / policy constants (single source of truth) ----
-MIN_SIGNUP_AGE = 13          # no accounts under 13 (COPPA-style). Under-13s use the education center
-                             # without an account, via a teacher's classroom code + nickname only.
+MIN_SIGNUP_AGE = 13          # no accounts under 13 (COPPA-style). Under-13s use ZEIM signed out or
+                             # with a grown-up in their family. (School/class-code path removed 2026-10-12.)
 USERNAME_CHANGE_DAYS = int(os.environ.get("PHOTO3D_USERNAME_CHANGE_DAYS", "90"))      # one username change per this many days
-ADULT_AGE = 18               # teen (13-17) accounts get safer defaults; teachers must be adults
+ADULT_AGE = 18               # teen (13-17) accounts get safer defaults
 ADMIN_TOKEN = __import__("os").environ.get("PHOTO3D_ADMIN_TOKEN", "")   # moderation queue access
 
 
@@ -63,7 +63,7 @@ def _int(name: str, default: int) -> int:
 # ---- deployment mode (Education CR-1) ----
 # "shared" (DEFAULT): a server other people use. Server-wide settings (printers, public base URL, linked accounts)
 #   need the admin token (X-Admin-Token); sending to a printer needs an adult account or the admin token;
-#   class-student sessions never get either.
+#   teen and signed-out sessions never get either.
 # "local": one person on their own machine; behaves as before. ./run.sh sets this unless you override it.
 MODE = (os.environ.get("PHOTO3D_MODE") or "shared").strip().lower()
 if MODE not in ("shared", "local"):
@@ -76,7 +76,7 @@ PUBLIC_BASE_URL = (os.environ.get("PHOTO3D_PUBLIC_BASE_URL") or "").strip().rstr
 # cookie-bound display name + date of birth, so requiring it would add friction without adding trust).
 LIKES_REQUIRE_ACCOUNT = _flag("PHOTO3D_LIKES_REQUIRE_ACCOUNT", False)
 LIKE_LIMIT_PER_HOUR = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR", 30)        # per browser session
-LIKE_LIMIT_PER_HOUR_IP = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR_IP", 300)  # per network address (a whole school may share one)
+LIKE_LIMIT_PER_HOUR_IP = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR_IP", 300)  # per network address (a whole household or library may share one)
 SHOW_COUNTS_FOR_EXAMPLES = _flag("PHOTO3D_SHOW_COUNTS_FOR_EXAMPLES", False)   # invented numbers on EXAMPLE items
 TEEN_PUBLIC_ENABLED = _flag("PHOTO3D_TEEN_PUBLIC_ENABLED", False)    # accounts 13-17 may choose Public (items, profile)
 TEEN_FOLLOWERS_ENABLED = _flag("PHOTO3D_TEEN_FOLLOWERS_ENABLED", False)  # 13-17: Followers-only items/profile, and being followed.
@@ -95,9 +95,9 @@ SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
 # ---- age gate (Safety S-04) ----
 # SEND-3: the "Share..." / "Email it to myself" rows stay OFF until the share-sheet spike (/sharetest, SEND-0) has passed on a real iPhone/iPad.
 SEND_SHARE_UI = _flag("PHOTO3D_SEND_SHARE", False)
-AGE_IP_LOCK_AFTER = _int("PHOTO3D_AGE_IP_LOCK_AFTER", 3)  # the address is only locked after MORE than this many refusals from it within the lock window: one child must not lock a school
+AGE_IP_LOCK_AFTER = _int("PHOTO3D_AGE_IP_LOCK_AFTER", 3)  # the address is only locked after MORE than this many refusals from it within the lock window: one child must not lock a shared address
 AGE_IP_LOCK_MINUTES = _int("PHOTO3D_AGE_IP_LOCK_MINUTES", 30)  # ...and this network address can't retry for a while either (clearing cookies must not help).
-                                                             # Trade-off: a shared school address blocks other sign-ups for this long. 0 = off.
+                                                             # Trade-off: a shared address blocks other sign-ups for this long. 0 = off.
 AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry
 SIGNUP_ATTEMPTS_PER_HOUR_IP = _int("PHOTO3D_SIGNUP_ATTEMPTS_PER_HOUR_IP", 30)
 

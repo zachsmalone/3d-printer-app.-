@@ -2,7 +2,7 @@
 
 If a message contains disallowed language the server REFUSES to send/store it and tells the sender:
     "Chat doesn't allow that language. Please use appropriate language."
-There are no strikes, bans or restricted modes. Reporting, muting (teachers) and the moderator queue stay available.
+There are no strikes, bans or restricted modes. Reporting, and the moderator queue stay available.
 
 Word lists are plain files in `app/community/wordlists/` (edit them any time; changes load without a restart):
   <lang>.txt          LDNOOBW lists (CC BY 4.0, see ATTRIBUTION.md) for en es fr de it pt nl da sv no fi pl cs hu tr ru
@@ -38,14 +38,6 @@ UNAVAILABLE_MESSAGE = "Posting text is paused for a moment. Please try again lat
 BLOCK_MESSAGE = "Chat doesn't allow that language. Please use appropriate language."
 CONTACT_MESSAGE = "Please don't put names, phone numbers, emails or links here."
 
-CANNED = {
-    "talk_next_class": "I'd like to talk next class",
-    "need_help": "I need help with my project",
-    "finished": "I finished my project",
-    "thanks": "Thank you!",
-}
-TEACHER_CANNED = ["talk_next_class", "thanks"]
-STUDENT_CANNED = ["talk_next_class", "need_help", "finished", "thanks"]
 
 
 MAX_SCAN_CHARS = 2000      # nothing longer is ever scanned (callers cap their own fields much lower); longer = refused

@@ -10,9 +10,9 @@ Goal: app fully coded and ready within one month (target 2026-11-12).
 | Bot | Owns | Cross-checks |
 |---|---|---|
 | Ren Ishikawa (QA) | Regression, mesh/slicer, Originals printability | Ren Okabe's CI |
-| Filter Red-Team Tester (Safety) | Filter, PII, minors' safety, visibility rules | Spark Lab's lessons and teacher tools |
+| Filter Red-Team Tester (Safety) | Filter, PII, minors' safety, visibility rules | Spark Lab's lessons and videos |
 | Accessibility Reviewer (Design) | WCAG, plain language, warm look, modes | Safety messages are clear and kind |
-| Spark Lab (Education) | Lessons, teacher guides, video library | Design fits real classrooms |
+| Spark Lab (Education) | Lessons and video library (no quizzes, scores or grades) | Design fits families and kids |
 | Ren Okabe (DevOps) | CI, hosting, backups, deploy, disk | QA tests reproducible, CI matches local |
 
 ## Rhythm
@@ -35,4 +35,4 @@ Goal: app fully coded and ready within one month (target 2026-11-12).
 - Evening: cross-checks posted; Yami sends Zach one short summary.
 
 ### Handoffs
-QA -> Build (bugs) · Safety -> Build (filter/visibility) · Design -> Build (UI) · Education -> Design (classroom fit) -> Build · DevOps -> everyone (CI, hosting) · Anything needing Zach -> Yami only.
+QA -> Build (bugs) · Safety -> Build (filter/visibility) · Design -> Build (UI) · Education -> Design (family fit) -> Build · DevOps -> everyone (CI, hosting) · Anything needing Zach -> Yami only.

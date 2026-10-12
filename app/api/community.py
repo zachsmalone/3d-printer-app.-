@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
-from ..community import catalog, classrooms, links, moderation, personalization, privacy, recovery, safety, usernames
+from ..community import catalog, links, moderation, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS
@@ -33,7 +33,7 @@ def get_config():
 # ---------------- identity ----------------
 @router.get("/me")
 def me(request: Request, actor: Actor = Depends(get_actor)):
-    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor), "class_showcase": classrooms.showcase_policy(actor.sid)}
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor)}
 
 
 def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
@@ -98,7 +98,7 @@ def suggest_username(actor: Actor = Depends(get_actor)):
 
 @router.post("/me/recover")
 def recover_account(request: Request, body: dict, actor: Actor = Depends(get_actor)):
-    """Get a teacher account back in a new browser with its recovery code (CR-15). The old browser loses it."""
+    """Get an adult account back in a new browser with its recovery code (CR-15). The old browser loses it."""
     try:
         user, new_code = recovery.recover(actor, str(body.get("code", ""))[:60], _ip(request))
     except recovery.Locked:
@@ -127,7 +127,7 @@ def signout(request: Request, actor: Actor = Depends(get_actor)):
 def new_recovery_code(actor: Actor = Depends(get_actor)):
     """Make a fresh recovery code (the old one stops working). Adult accounts only."""
     if not actor.user or not actor.is_adult:
-        raise HTTPException(403, "Recovery codes are for adult (teacher) accounts.")
+        raise HTTPException(403, "Recovery codes are for adult accounts.")
     return {"recovery_code": recovery.issue(actor.sid)}
 
 
@@ -238,7 +238,7 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", actor: Acto
         out["hint"] = ("Personalization is off." if not prefs["enabled"] else
                        "Search or open projects to teach For You what you like. Data stays on this server and you can clear it any time.")
     if not items:
-        quiet = actor.is_teen or classrooms.is_student(actor.sid)       # no "share one" nudge for teens or class students
+        quiet = actor.is_teen       # no "share one" nudge for teens
         if q:
             out["empty"] = {"text": f'No projects match "{q}". Try a shorter word like "relief" or "lamp", or look in Trending.',
                             "action": {"label": "Clear search", "do": "clear"}}
@@ -305,8 +305,8 @@ def like(iid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
     """Toggle like (or set with {"liked": true|false}). Public projects only. There is deliberately no dislike."""
     try:
         i = catalog.get(iid, actor)                      # private / followers-only stay 404 for everyone not allowed to see them
-        if not actor.user and classrooms.showcase_policy(actor.sid) is None:
-            raise HTTPException(401, "Make a free account to nozzle projects.")      # signed-out visitors can look, not nozzle (class students use their class session)
+        if not actor.user:
+            raise HTTPException(401, "Make a free account to nozzle projects.")      # signed-out visitors can look, not nozzle 
         res = catalog.set_like(i, actor, (body or {}).get("liked"))
     except catalog.Denied as e:
         raise D(e)
@@ -380,7 +380,8 @@ def delete_everything_i_made(actor: Actor = Depends(get_actor)):
     """'Delete everything I made': every build / Edit project (starred ones too, photos included) and every project this person shared to the Showcase."""
     import shutil as _sh
     from ..community.store import LISTINGS as _L
-    builds = classrooms.purge_builds(actor.sid)
+    from ..community import ownership
+    builds = ownership.purge_builds(actor.sid)
     mine = [i["id"] for i in _L.read() if i.get("owner_sid") == actor.sid]
     for pid in mine:
         _sh.rmtree(catalog.LDIR / pid, ignore_errors=True)
@@ -408,9 +409,6 @@ def _admin(token: str, request: Request | None = None):
 
 
 def _preview(item_id: str) -> dict:
-    fb = classrooms.feedback_preview(item_id) if item_id.startswith("fb:") else None
-    if fb:
-        return fb
     i = next((x for x in catalog._all() if x["id"] == item_id), None)
     if not i:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
@@ -442,8 +440,6 @@ def mod_resolve(rid: str, body: dict, request: Request, x_admin_token: str = Hea
     _admin(x_admin_token, request)
     try:
         out = moderation.resolve(rid, body.get("action", ""))
-        if body.get("action") == "hide" and str(out.get("item_id", "")).startswith("fb:"):
-            classrooms.hide_feedback(out["item_id"])
         return out
     except KeyError:
         raise HTTPException(404)

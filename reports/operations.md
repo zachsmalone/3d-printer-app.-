@@ -1,5 +1,8 @@
 # ZEIM: Launch-Readiness & Operations Plan
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Author: Daichi Hayashi (Head of Growth & Operations) · Date: 2026-10-04 · Status: DRAFT for Zach / Mr. Yami Kato
 Specialist support: Ren Okabe (Deployment & DevOps)
 

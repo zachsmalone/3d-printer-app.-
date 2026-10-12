@@ -1,7 +1,7 @@
 import { Viewer } from "/static/viewer.js";
 
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert" : "beginner", restoreTeacher: localStorage.level === "teacher", canTeach: false, me: null, preset: "standard", file: null,
+const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert" : "beginner", me: null, preset: "standard", file: null,
             current: null, history: [], max: 5, settings: null };
 const PRESET_HELP = {
   lithophane: { thin: "Lighter, glows brighter, more fragile (0.6–2.4 mm).", standard: "Balanced contrast and strength (0.8–3.2 mm).", thick: "Deep shadows, sturdy (1.0–4.0 mm)." },
@@ -23,7 +23,7 @@ function inlineMsg(near, msg, kind = "err") {
 function clearInline(near) { const p = near?.previousElementSibling; if (p?.classList.contains("inline-msg")) p.remove(); }
 // Server errors: a string detail is shown as-is; FastAPI 422 lists are turned into friendly field messages, never "[object Object]".
 const FIELD_NAMES = { width_mm: "Width", height_mm: "Height", resolution: "Detail", mode: "Style", file: "Photo", dob: "Date of birth", display_name: "Display name",
-  username: "Username", title: "Title", password: "Password", code: "Class code", nickname: "Nickname", keep_ratio: "Keep ratio", wall: "Wall thickness" };
+  username: "Username", title: "Title", password: "Password", nickname: "Nickname", keep_ratio: "Keep ratio", wall: "Wall thickness" };
 function errText(j, r) {
   const d = j?.detail ?? j?.message;
   if (typeof d === "string" && d) return d;
@@ -47,60 +47,26 @@ try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unava
 
 /* ---------- level / mode ---------- */
 const isExpert = () => S.level === "expert";
-const LEVEL_NAME = { beginner: "Beginner", expert: "Experienced", teacher: "Teacher" };
-const LEVEL_ICO = { beginner: "🌱", expert: "🛠", teacher: "🍎" };
-const LEVEL_LINE = { beginner: "Beginner mode: ZEIM picks the settings for you.", expert: "Experienced mode: every setting is yours.",
-                     teacher: "Teacher mode: you see what students see, plus your class tools above. You can look, not change students' work." };
-const LEVEL_SAY = { beginner: "Beginner mode on. ZEIM picks the settings for you.", expert: "Experienced mode on. All the settings are showing.",
-                    teacher: "Teacher mode on. Your class tools are showing above the page." };
+const LEVEL_NAME = { beginner: "Beginner", expert: "Experienced" };
+const LEVEL_ICO = { beginner: "🌱", expert: "🛠" };
+const LEVEL_LINE = { beginner: "Beginner mode: ZEIM picks the settings for you.", expert: "Experienced mode: every setting is yours." };
+const LEVEL_SAY = { beginner: "Beginner mode on. ZEIM picks the settings for you.", expert: "Experienced mode on. All the settings are showing." };
 function say(t) { const e = $("#modeStatus"); e.textContent = ""; setTimeout(() => e.textContent = t, 60); }
 function applyLevel(announce = false) {
   localStorage.level = S.level;
   document.body.dataset.level = S.level;
   $("#modeSel").value = S.level; $("#modeIco").textContent = LEVEL_ICO[S.level]; $("#modeLine").textContent = LEVEL_LINE[S.level];
-  $("#classBar").hidden = S.level !== "teacher";
-  $$("details.tn").forEach(d => { if (S.level === "teacher") d.open = true; });
   document.dispatchEvent(new CustomEvent("zeim:level"));
   $("#beginnerOpts").hidden = isExpert();
   $("#expertOpts").hidden = !isExpert();
   if (announce) say(LEVEL_SAY[S.level]);
 }
-function teacherExplainer() {
-  const role = S.me?.send?.role, n = $("#teacherNote");
-  let t, b, acts;
-  if (role === "student") { t = "Teacher mode is for your teacher"; b = "You joined a class as a student, so Teacher mode stays off for you. Your teacher can see your class work from their own account."; acts = []; }
-  else if (S.me?.signed_up) { t = "Teacher mode is for adults"; b = "Teacher mode is only for adult accounts. You can use Beginner or Experienced mode, and your teacher can set up a class for you."; acts = []; }
-  else { t = "Teacher mode needs a grown-up account"; b = "Teacher mode is for adults who run a class. Make a free adult account to use it. Students do not need Teacher mode."; acts = [["Make a free adult account", "account"], ["Join a class instead", "join"]]; }
-  $("#tnTitle").textContent = t; $("#tnBody").textContent = b;
-  const box = $("#tnActions"); box.innerHTML = "";
-  [...acts, ["Close", "close"]].forEach(([label, k]) => {
-    const x = document.createElement("button"); x.type = "button"; x.className = "btn"; x.textContent = label;
-    x.onclick = () => {
-      n.hidden = true;
-      if (k === "account") { S.wantTeacher = true; $("#btnAccount").click(); }
-      if (k === "join") $("#btnJoinClass").click();
-      if (k === "close") $("#modeSel").focus();
-    };
-    box.append(x);
-  });
-  n.hidden = false;
-}
 $("#modeSel").onchange = e => {
   const v = e.target.value;
-  if (v === "teacher" && !S.canTeach) {
-    e.target.value = S.level; teacherExplainer();
-    say("Teacher mode needs a grown-up account. The details are just below the top bar. You are still in " + LEVEL_NAME[S.level] + " mode.");
-    return;
-  }
-  $("#teacherNote").hidden = true; S.level = v; applyLevel(true);
+  S.level = v; applyLevel(true);
 };
-/* Who is signed in decides whether Teacher is allowed. community.js tells us; the server still decides every real permission. */
-document.addEventListener("zeim:me", e => {
-  S.me = e.detail; S.canTeach = !!(S.me?.signed_up && S.me.age_group === "adult");
-  if (S.restoreTeacher) { S.restoreTeacher = false; if (S.canTeach) { S.level = "teacher"; S.teacherSeen = true; applyLevel(false); } return; }   // a returning teacher: restored quietly, only once we know it is an adult account
-  if (S.wantTeacher && S.canTeach) { S.wantTeacher = false; S.level = "teacher"; S.teacherSeen = true; applyLevel(true); return; }
-  if (S.level === "teacher" && !S.canTeach) { S.level = "beginner"; applyLevel(false); if (S.teacherSeen) say("Back to Beginner mode."); S.teacherSeen = false; }
-});
+/* Who is signed in. community.js tells us; the server still decides every real permission. */
+document.addEventListener("zeim:me", e => { S.me = e.detail; });
 function applyMode() {
   $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); });
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });

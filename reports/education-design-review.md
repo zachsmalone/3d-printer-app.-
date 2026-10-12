@@ -1,5 +1,8 @@
 # Education review of design.md T7 and T8 (classroom realism and reading level)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 **Author:** Aiko Nakamura, Head of Education & Community · **For:** Sakura Mori (Design) · **Date:** Sun 2026-10-04 (CT) · **Status:** DRAFT, desk review
 **Read:** `reports/design.md` T7, T8 (plus D6, D6b, D14, D20, D31, R6), `reports/education.md`, and the current copy and code in `static/index.html` (Print and Join dialogs), `static/app.js` (`showBuild`, `openPrint`), `static/community.js` (`openTeacher`), `app/api/printing.py` (print hint), `app/community/classrooms.py` (join limiter). Nothing was edited.
 
@@ -92,7 +95,7 @@ Safety tab, **only the lines that are true when it ships** (gate each line on th
 > - Students use nicknames only. No names, emails or accounts.
 > - Class projects can only be seen by your class.
 > - Students cannot chat. They can send four ready-made messages to you.
-> - Words that are not school-friendly are blocked in titles and comments.
+> - Words that are not family-friendly are blocked in titles and comments.
 > - *(only after CR-3)* Students cannot open the public Showcase unless you turn it on.
 >
 > **What ZEIM cannot do**

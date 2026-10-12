@@ -1,6 +1,6 @@
 """Accessibility round 2 top-10 (reports/accessibility-round2.md, tested on 22f091b): labels, keyboard lesson cards and Edit steps,
 friendly error text, 3px focus ring in Dark, skip link, stacked-dialog focus trap, 24/44px targets, Sign out explains the disabled button.
-(Live view items 3-4 are in tests/ui_live.py.)  390px + 1280px, Chrome + WebKit (axe in Chrome).  No screen reader or real phone here."""
+(Live view items 3-4 removed with school features, 2026-10-12.)  390px + 1280px, Chrome + WebKit (axe in Chrome).  No screen reader or real phone here."""
 import json, os, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]; bad = []

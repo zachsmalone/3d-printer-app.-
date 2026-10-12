@@ -26,24 +26,19 @@
     <select id="modeSel" aria-describedby="modeHelp">
       <option value="beginner">Beginner</option>
       <option value="expert">Experienced</option>
-      <option value="teacher">Teacher</option>
     </select>
-    <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours. Teacher: Beginner settings plus class tools, for adults with an account.</p>
+    <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours.</p>
   </div>
   <div class="spacer"></div>
   <button class="btn ghost" id="btnAccount" aria-label="Account"><span aria-hidden="true">👤</span> <span class="lbl">Sign up</span></button>
   <button class="btn ghost" id="btnSettings" aria-label="Settings"><span aria-hidden="true">⚙</span> <span class="lbl">Settings</span></button>
 </header>
-<section class="tnote" id="teacherNote" hidden aria-labelledby="tnTitle"><h2 id="tnTitle"></h2><p id="tnBody"></p><div class="row" id="tnActions"></div></section>
-<div class="classbar" id="classBar" hidden role="region" aria-label="Classroom"><b>🍎 Your classroom</b><span id="cbRooms">No class yet. Open Teacher tools to make one.</span>
-  <button class="btn" type="button" id="btnTeacherTools">Teacher tools</button></div>
 
 <main class="layout" id="viewCreate">
   <section class="hero" aria-labelledby="h1">
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
     <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
     <div id="studioPhoto"></div>
-    <p class="teachline" data-lvl="teacher">Teaching with ZEIM? Start with the <a href="#learn">Make a lithophane lesson</a>, or open Teacher tools in the bar above.</p>
   </section>
   <nav class="pathnav" aria-label="Your progress">
     <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Print-ready</li></ol>
@@ -140,7 +135,7 @@
         </div>
       </div>
       <p class="help" id="buildWarn" role="status" hidden></p>
-      <details class="auto" id="autoBox" hidden open><summary>🌱 Settings ZEIM picked <small>(Beginner and Teacher modes)</small></summary><table id="autoTable"></table></details>
+      <details class="auto" id="autoBox" hidden open><summary>🌱 Settings ZEIM picked <small>(Beginner mode)</small></summary><table id="autoTable"></table></details>
     </div>
 
     <section class="history">
@@ -152,7 +147,7 @@
       <h2 id="exH">Keep exploring</h2>
       <ul class="tiles">
         <li><a class="tile" href="#showcase"><b>See what others made</b><span>Family-friendly projects from the community</span></a></li>
-        <li><a class="tile" href="#learn"><b>Learn to make things</b><span>Short lessons for students, teachers and hobbyists</span></a></li>
+        <li><a class="tile" href="#learn"><b>Learn to make things</b><span>Short lessons for families, kids and hobbyists</span></a></li>
         <li><a class="tile" href="#edit"><b>Fix or change a 3D file</b><span>Open an STL, OBJ or 3MF and get it ready to print</span></a></li>
       </ul>
     </section>
@@ -298,9 +293,8 @@
 </main>
 
 <main class="page" id="viewLearn" hidden>
-  <div class="pagehead"><div><h1><span data-sec="learn">Learn</span></h1><p class="help">Classroom-friendly lessons for students, teachers and hobbyists. Curated content only — no chat, no user uploads, no external links.</p></div>
-    <div class="row"><button class="btn" id="btnJoinClass">🎒 Join a class</button><button class="btn" id="btnTeacher">🍎 Teacher tools</button></div></div>
-  <div id="classBanner"></div>
+  <div class="pagehead"><div><h1><span data-sec="learn">Learn</span></h1><p class="help">Family-friendly lessons for kids, families and hobbyists. No quizzes, scores or grades. Curated content only — no chat, no user uploads, no external links.</p></div>
+</div>
   <div class="grid lessons" id="lessonGrid"></div>
   <div id="lessonDetail" class="lesson" hidden></div>
 </main>
@@ -315,7 +309,7 @@
   <div class="body">
     <p class="help">Free for everyone to download. Family-friendly projects only.</p>
     <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
-    <div class="field"><label>Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, school names, phone numbers or addresses.</small></div>
+    <div class="field"><label>Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
     <div class="field"><label>Description</label><input id="pub_desc" maxlength="500"></div>
     <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
     <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
@@ -332,22 +326,6 @@
   <div class="dh"><h3>🔒 My personalization data</h3><button class="x" data-close>✕</button></div>
   <div class="body" id="dataBody"></div>
   <div class="df"><button class="btn" id="btnToggleP13n"></button><button class="btn danger" id="btnClearData">Clear all my data</button></div>
-</div></dialog>
-
-<dialog id="dlgTeacher"><div class="dlg wide">
-  <div class="dh"><h3>🍎 Teacher tools</h3><button class="x" data-close>✕</button></div>
-  <div class="body" id="teacherBody"></div>
-</div></dialog>
-
-<dialog id="dlgJoin"><div class="dlg">
-  <div class="dh"><h3>🎒 Join a class</h3><button class="x" data-close>✕</button></div>
-  <div class="body">
-    <p class="help">No account needed. Use a nickname — <b>not your real full name</b>.</p>
-    <div class="field"><label>Class code</label><input id="j_code" maxlength="6" style="text-transform:uppercase"></div>
-    <div class="field"><label>Class password <em>from your teacher</em></label><input id="j_pw" type="password" autocomplete="off"></div>
-    <div class="field"><label>Nickname</label><input id="j_nick" maxlength="20"></div>
-  </div>
-  <div class="df"><button class="btn primary" id="btnDoJoin">Join</button></div>
 </div></dialog>
 
 <dialog id="dlgReport" aria-labelledby="repTitle"><div class="dlg">
@@ -369,40 +347,15 @@
   <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="repSend">Send report</button></div>
 </div></dialog>
 
-<dialog id="dlgFeedback" aria-labelledby="fbTitle"><div class="dlg">
-  <div class="dh"><h3 id="fbTitle">Feedback for this project</h3><button class="x" data-close aria-label="Close">✕</button></div>
-  <div class="body"><div class="field"><label for="fbText">Your feedback <em>text only, up to 500 characters</em></label><textarea id="fbText" maxlength="500" rows="4"></textarea>
-    <small class="help">Please don't put names, phone numbers, emails or links here.</small></div></div>
-  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="fbSave">Save feedback</button></div>
-</div></dialog>
-<dialog id="dlgPickBuild" aria-labelledby="pbTitle"><div class="dlg">
-  <div class="dh"><h3 id="pbTitle">Which build do you want to send?</h3><button class="x" data-close aria-label="Close">✕</button></div>
-  <div class="body"><fieldset class="reasons"><legend>Pick one</legend><div id="pbList"></div></fieldset>
-    <p class="help">Only you and your class can see it.</p></div>
-  <div class="df"><button class="btn" data-close>Cancel</button><button class="btn primary" id="pbSend">Send to my class</button></div>
-</div></dialog>
 <div id="toasts"></div>
 <div id="nzStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div><div id="nzAlert" class="sr-only" role="alert"></div>
 <div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-<dialog id="dlgLive" aria-labelledby="liveH"><div class="dlg wide"><div class="dh"><h3 id="liveH">Live view</h3><button class="x" data-close aria-label="Close live view">✕</button></div>
-  <div class="body"><p class="help" id="liveNote">View only. This shows each student's nickname, the lesson and how many steps they have ticked, their newest model's name (no pictures), and when they last did something. It refreshes about every 12 seconds while this window is open.</p>
-    <label class="inl"><input type="checkbox" id="liveSort"> Show students who need help first</label> <button type="button" class="btn small" id="liveResort" hidden>Re-sort now</button>
-    <p class="help" id="liveAsOf"></p><p class="sr-only" id="liveSay" role="status" aria-live="polite"></p>
-    <div class="tablewrap"><table class="live"><caption class="sr-only">Students in this class</caption><thead><tr><th scope="col">Nickname</th><th scope="col">Lesson and steps ticked</th><th scope="col">Newest model</th><th scope="col">Last activity</th><th scope="col">Hand</th></tr></thead><tbody id="liveRows"></tbody></table></div>
-    <p class="help" id="liveEmpty" hidden>No students have joined yet.</p></div></div></dialog>
 <dialog id="dlgSignout" aria-labelledby="soH"><div class="dlg"><div class="dh"><h3 id="soH">Sign out of this browser?</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body" id="soBody"></div>
   <div class="df"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn primary" id="soGo" aria-disabled="true" aria-describedby="soWhy">Sign out</button></div><p class="help" id="soWhy">Tick the box above to sign out.</p></div></dialog>
-<dialog id="dlgDelClass" aria-labelledby="dcH" aria-describedby="dcBody"><div class="dlg"><div class="dh"><h3 id="dcH">Delete this class?</h3></div>
-  <div class="body" id="dcBody"><p>This deletes <b id="dcName"></b> for good: every student's progress, their class projects and feedback, and their builds made in this class. Students will need a new join code to come back.</p><p>This can't be undone.</p></div>
-  <div class="df"><button type="button" class="btn" id="dcKeep">Keep the class</button><button type="button" class="btn danger" id="dcGo">Delete class</button></div></div></dialog>
 <dialog id="dlgNzAcct" aria-labelledby="nzAcctH"><div class="dlg"><div class="dh"><h3 id="nzAcctH">Make a free account to nozzle</h3></div>
   <div class="body"><p>A nozzle is a way to say "nice work" to a maker. You need a free ZEIM account to give one. It takes a minute and costs nothing.</p></div>
   <div class="df"><button type="button" class="btn" id="nzAcctLater">Not now</button><button type="button" class="btn primary" id="nzAcctMake">Make an account</button></div></div></dialog>
-<dialog id="dlgSend" aria-labelledby="dlgSendTitle"><h3 id="dlgSendTitle">Let students send files out of ZEIM?</h3>
-  <p>Students will be able to send their builds to any app on their device. A build made from a photo contains that photo. Students under 13 still can't use outside apps.</p>
-  <p>Turn this on for <b id="dlgSendName"></b>?</p>
-  <div class="row"><button class="btn" id="sendCancel">Cancel</button> <button class="btn primary" id="sendOn">Turn on</button></div></dialog>
 <footer class="sitefoot"><button type="button" class="linkbtn" id="themeBtn" aria-pressed="false">Look: Warm</button><a href="/static/COMMUNITY_GUIDELINES.html">Rules</a><a href="/static/privacy.html">Privacy</a><a href="/static/terms.html">Terms</a><a href="/credits">Thank you &amp; credits</a></footer>
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/community.js"></script>

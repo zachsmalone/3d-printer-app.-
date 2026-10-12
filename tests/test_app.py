@@ -148,7 +148,7 @@ def test_community_flow(monkeypatch):
     cl.put("/api/me/links", json={"tiktok": "teen.maker"})
     assert cl.get(f"/api/users/{me['id']}").json()["links"] == {}          # teen link-outs never public
     assert cl.put("/api/me/links", json={"tiktok": "bad handle!"}).status_code == 400
-    assert cl.post("/api/classrooms", json={"name": "x"}).status_code == 403   # teens can't create classrooms
+    assert cl.post("/api/classrooms", json={"name": "x"}).status_code == 404   # school features removed (2026-10-12): no classrooms route at all
     # publish needs guidelines confirmation
     assert cl.post("/api/showcase", json={"build_id": bid, "title": "T"}).status_code == 422
     p = cl.post("/api/showcase", json={"build_id": bid, "title": "My lithophane", "tags": ["gift", "Portrait"], "accept_guidelines": True, "visibility": "public"}).json()
@@ -175,23 +175,20 @@ def test_community_flow(monkeypatch):
     assert cl.get("/api/showcase/zo-gear-demo").status_code == 200
 
 
-def test_education_classroom():
-    t = TestClient(app); s = TestClient(app)
-    t.post("/api/me/signup", json={"display_name": "Ms T", "dob": "1985-05-05"})
-    room = t.post("/api/classrooms", json={"name": "Period 3", "password": "plate-42"}).json()
-    assert s.post("/api/classrooms/join", json={"code": room["code"], "nickname": "Jo Smith Real", "password": "plate-42"}).status_code in (200, 400)
-    assert s.post("/api/classrooms/join", json={"code": "ZZZZZZ", "nickname": "Jo", "password": "x"}).status_code == 404
-    assert s.post("/api/classrooms/join", json={"code": room["code"], "nickname": "Robo 7", "password": "plate-42"}).status_code == 200
-    t.post(f"/api/classrooms/{room['code']}/assign", json={"lesson_ids": ["lithophanes"]})
-    ls = s.get("/api/learn/lessons").json(); assert ls["assigned"] == ["lithophanes"]
-    l = s.get("/api/learn/lessons/lithophanes").json(); assert "answer" not in str(l["quiz"])
+def test_learning_library_keeps_no_scores_or_school_data():
+    """2026-10-12: school features removed. Lessons stay; no quiz, score, grade, class or teacher fields anywhere."""
+    s = TestClient(app)
+    ls = s.get("/api/learn/lessons").json()
+    assert set(ls) == {"lessons", "badges"}
+    l = s.get("/api/learn/lessons/lithophanes").json()
+    assert "quiz" not in l and "teacher_notes" not in l and "quiz_passed" not in l["progress"]
     for i in range(len(l["steps"])):
         s.post(f"/api/learn/lessons/lithophanes/steps/{i}", json={"done": True})
-    assert s.post("/api/learn/lessons/lithophanes/quiz", json={"choice": 0}).json()["correct"] is False
-    r = s.post("/api/learn/lessons/lithophanes/quiz", json={"choice": 1}).json(); assert r["correct"] and r["badge"]
-    rooms = t.get("/api/classrooms").json()["rooms"]
-    assert rooms[0]["students"][0]["nickname"] == "Robo 7" and rooms[0]["students"][0]["lessons"][0]["completed"]
-    assert "Lithophane" in s.get("/l/lithophanes").text or "lithophane" in s.get("/l/lithophanes").text.lower()
-    t.delete(f"/api/classrooms/{room['code']}")
-    assert s.get("/api/learn/lessons").json()["classroom"] is None
-    assert s.get("/api/learn/lessons").json()["lessons"][2]["done_steps"] == 0   # data erased
+    assert s.get("/api/learn/lessons/lithophanes").json()["progress"]["completed"]       # finishing the steps is enough; nothing is scored
+    assert s.post("/api/learn/lessons/lithophanes/quiz", json={"choice": 1}).status_code in (404, 405)
+    for path in ("/api/classrooms", "/api/classrooms/join"):
+        assert s.post(path, json={}).status_code in (404, 405)
+    page = s.get("/l/lithophanes").text
+    assert "lithophane" in page.lower() and "Teacher notes" not in page
+    s.delete("/api/learn/progress")
+    assert s.get("/api/learn/lessons").json()["lessons"][2]["done_steps"] == 0

@@ -1,5 +1,8 @@
 # Teacher Live View: one-page spec (Spark Lab Curriculum Writer, 2026-10-04)
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Status: spec for Yami's builders. Not built. Nothing here has been tested with a teacher or a child.
 Assumption (from Yami): today a teacher cannot see live student progress.
 

@@ -6,21 +6,16 @@ from pathlib import Path
 import pytest
 from app import config
 from app.community import catalog
-from tests.b1 import client, make_class, student, ADULT
+from tests.b1 import client, ADULT
 
 WILD = {"zo-owl-whistle", "zo-open-reed-predator-call"}
-CLASS_ONLY = {"zo-horn-dino-band-popper", "zo-fish-bottle-opener"}
+CLASS_ONLY = {"zo-horn-dino-band-popper", "zo-fish-bottle-opener"}     # used to be hidden in classrooms; school features removed 2026-10-12
 ALL = WILD | CLASS_ONLY | {"zo-pencil-cup", "zo-gear-demo"}
 
 
 def _ids(c, **params):
     return {i["id"] for i in c.get("/api/showcase", params={"tab": "free", **params}).json()["items"] if i.get("original")}
 
-
-def _class_student():
-    t, code, pw = make_class(); s = student(code, pw, "Otter")
-    t.put(f"/api/classrooms/{code}/showcase", json={"enabled": True})
-    return s
 
 
 def test_originals_replace_the_example_cards_and_carry_credit_difficulty_fdm_untested_and_caveats():
@@ -54,18 +49,6 @@ def test_category_filter_and_category_list():
     assert _ids(c, category="Containers") == {"zo-pencil-cup"}
 
 
-def test_class_students_never_get_wildlife_calls_or_the_popper_and_bottle_opener():
-    s = _class_student()
-    assert _ids(s) == ALL - WILD - CLASS_ONLY
-    assert "Wildlife Calls" not in s.get("/api/showcase?tab=free").json()["categories"]
-    assert _ids(s, category="Wildlife Calls") == set()
-    for iid in WILD | CLASS_ONLY:                                               # item page, thumb and file all look like 404
-        assert s.get(f"/api/showcase/{iid}").status_code == 404
-        assert s.get(f"/api/showcase/{iid}/thumb").status_code == 404
-        slug = iid[3:]
-        assert s.get(f"/api/showcase/{iid}/files/{slug}.stl").status_code == 404
-    assert _ids(client(ADULT)) == ALL                                           # adults still see everything
-
 
 def test_under_13_viewers_lose_wildlife_calls_but_keep_the_popper_and_bottle_opener(monkeypatch):
     from app.community.identity import Actor
@@ -89,7 +72,7 @@ for _p in (REAL, Path("/workspace/photo3d/library/originals")):
 
 
 @pytest.mark.skipif(not (REAL / "originals_manifest.json").exists(), reason="real ZEIM Originals library not installed here (it is not in git)")
-def test_the_real_library_gives_45_originals_with_files_and_wildlife_calls_hidden_for_students(monkeypatch):
+def test_the_real_library_gives_45_originals_with_files_and_wildlife_calls_hidden_for_under_13s(monkeypatch):
     monkeypatch.setattr(config, "ORIGINALS", REAL)
     m = json.loads((REAL / "originals_manifest.json").read_text())
     c = client()
@@ -98,7 +81,7 @@ def test_the_real_library_gives_45_originals_with_files_and_wildlife_calls_hidde
     assert all(i["files"] and i["thumb"] and i["untested"] and i["credit"]["credit_line"].endswith("by ZEIM · CC BY 4.0") for i in o)
     wild = {i["id"] for i in o if i["category"] == "Wildlife Calls"}
     assert "zo-open-reed-predator-call" in wild and len(wild) == 12
-    s = _class_student()
-    seen = _ids(s)
-    assert not (seen & wild) and not (seen & CLASS_ONLY) and len(seen) == 45 - 12 - 2
+    from app.community.identity import Actor
+    seen = {i["id"] for i in catalog.list_items(Actor(sid="u13-real", user={"dob": "2017-03-03"}), "free") if i.get("original")}
+    assert not (seen & wild) and len(seen) == 45 - 12
 

@@ -1,12 +1,12 @@
 # Roadmap
 
 ## Vision
-One place to go from **photo or existing 3D file → printable object → printed → shared → learned**. ZEIM aims to bring the best parts of existing maker tools together in one place — modelling/editing, slicing and printing, a friendly family-safe community, and an education center for **students, teachers and hobbyists**. It is a young project and still growing; many parts are scaffolds (see below). Easy for beginners (auto-everything), with every setting available to experts.
+One place to go from **photo or existing 3D file → printable object → printed → shared → learned**. ZEIM aims to bring the best parts of existing maker tools together in one place — modelling/editing, slicing and printing, a friendly family-safe community, and a learning library for **families, kids and hobbyists**. It is a young project and still growing; many parts are scaffolds (see below). Easy for beginners (auto-everything), with every setting available to experts.
 
 *Long-term aspiration only (not a claim about today):* "all you need to turn an idea into a print".
 
 ## Where we are (this repo)
-Newest: **Edit workspace** (upload STL/OBJ/3MF/photo or a Studio build → move/rotate/scale/mirror/drop/cut/hollow/base/booleans/text/repair/simplify/measure, non-destructive undo/redo), **privacy controls** (Private / Followers / Public everywhere, follow opt-out), **likes + download-aware Trending**, **classrooms with password + QR, class-private projects, teacher feedback and canned "talk next class" requests**, and a **multilingual language filter** that blocks disallowed words in anything other people can read.
+Newest: **Edit workspace** (upload STL/OBJ/3MF/photo or a Studio build → move/rotate/scale/mirror/drop/cut/hollow/base/booleans/text/repair/simplify/measure, non-destructive undo/redo), **privacy controls** (Private / Followers / Public everywhere, follow opt-out), **likes + download-aware Trending**, and a **multilingual language filter** that blocks disallowed words in anything other people can read.
 Working: photo→lithophane/relief/pop-art, STL/OBJ/3MF, preview, PrusaSlicer slicing, slicer deep links, OctoPrint/Moonraker upload, build history (5), Beginner/Expert, Showcase (free, example seed data), local For You personalization, reports + moderation stub, follow scaffolding, link-outs to your other accounts, Spark Lab lessons + classrooms, shareable lesson/project pages.
 Scaffold/stub only: OAuth providers (no posting/verification), PrusaLink/Bambu/Duet/Repetier uploads, DMs, feed, real auth.
 
@@ -20,15 +20,14 @@ Scaffold/stub only: OAuth providers (no posting/verification), PrusaLink/Bambu/D
 7. Studio: curved/cylindrical lithophanes, hanging holes/stands, lamp kits, text/QR, multi-photo bundles, AMS/MMU colour mapping, better pop-art (outline layers, drop-shadow offsets), mesh decimation for big outputs.
 
 ## Education (Spark Lab)
-- More lessons: CAD basics, measuring/tolerances, troubleshooting, design challenges; printable worksheets, rubric + teacher guide; lesson authoring for teachers (reviewed before sharing).
-- Classroom: roster import, LMS / Google Classroom sign-in, assignment due dates, exportable progress reports, print queue per class.
-- Accessibility + localisation; offline-capable lessons for school networks.
+- More lessons: CAD basics, measuring/tolerances, troubleshooting, design challenges; printable worksheets; learning videos. No quizzes, scores, grades or progress reports for others (2026-10-12).
+- Accessibility + localisation; offline-capable lessons.
 
 ## Adoption strategy
 - **Import**: open STL/3MF/OBJ library import (drag-drop, folder watch) so existing collections work on day one; bulk import of a user's own files from other sites via their export/zip.
 - **Compatibility**: first-class slicer hand-off (Prusa, Bambu, Orca, Cura), standard 3MF/STL output, standard printer protocols (OctoPrint, Moonraker, PrusaLink). Never lock files in.
-- **Positioning**: humble — bring useful pieces of existing maker tools into one place (photo→print, edit, teach, share), free community content, schools/hobbyists first. Grow by listening to users, not by comparing ourselves to others.
-- **Growth**: shareable project/lesson pages (already built), one-click share to linked social accounts, teacher-friendly classroom codes, maker-club and library partnerships.
+- **Positioning**: humble — bring useful pieces of existing maker tools into one place (photo→print, edit, learn, share), free community content, families/hobbyists first. Grow by listening to users, not by comparing ourselves to others.
+- **Growth**: shareable project/lesson pages (already built), one-click share to linked social accounts, maker-club and library partnerships.
 
 ## CAD-lite (long term)
 Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, import-and-edit of Showcase remixes, all in the browser; kid-friendly block-based mode in Spark Lab.
@@ -37,9 +36,9 @@ Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, imp
 `history.BuildStore` records carry `owner`/`visibility`; `community/*` modules sit behind small functions over JSON files (swap for a DB); routers are mounted in `app/main.py`; public pages are server-rendered with stable URLs. Planned: profiles, follows/feed, comments, shares, creator pages, saved collections.
 
 ## Legal & safety (REQUIRED before any public launch)
-This product serves minors and educators. **The following needs legal review and is NOT done:**
+This product is family-friendly and kids use it with their families. **The following needs legal review and is NOT done:**
 - **Family-friendly only.** No adult/mature content, no paid-mature, no age-gated adult tier (removed from scope). **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
-- Children's privacy: COPPA (US), GDPR-K / UK Age Appropriate Design Code; current posture = no accounts under 13, classroom students use nickname-only, no PII, teacher can delete class data; parental-consent flows, data-retention policy, privacy policy and DPA for schools (FERPA / state student-privacy laws) are still to do.
+- Children's privacy: COPPA (US), GDPR-K / UK Age Appropriate Design Code; current posture = no accounts under 13 (they use ZEIM signed out or with a grown-up in their family), no kid PII; parental-consent flows, data-retention policy and privacy policy are still to do. ZEIM holds no grades, scores or school records (school features removed 2026-10-12).
 - Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process, trademark clearance of product/section names.
 - Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits and anti-grooming protections (teens: no DMs from strangers, no public link-outs — enforced today only as stubs because DMs don't exist yet).
 - Age signals: date of birth is self-declared today (neutral gate, bypassable); consider privacy-preserving age assurance where required.
@@ -59,11 +58,7 @@ Planned, **not built**: interest-based groups called **Build Plates** (e.g. a lo
 - Language filter (PG-13): LDNOOBW word lists (CC BY 4.0) for 16 languages + ZEIM additions, whole-word matching with leetspeak / stretched-letter / spaced-letter handling and an editable allowlist for false positives. A blocked message is **not sent or stored**; the sender sees "Chat doesn't allow that language. Please use appropriate language." There are no strikes or bans. Report, teacher mute and the moderator queue remain.
 - Honest limits: a word list is not a moderation service (misses new slang, context, images, many languages); sessions are cookie-based until real auth exists, so anonymous identity can be reset by clearing cookies.
 
-## Classrooms (current + future)
-Current: teacher (adult account) creates a class with a name, **join password**, join code, link and **QR code**; students join with code + password + nickname (no personal data; wrong-guess rate limit); students submit builds to the class (private to the class, never public); teacher writes text feedback (no ratings); students and teacher exchange only **canned requests** such as "I'd like to talk next class", delivered as notifications; teacher can mute a student and remove students or delete the class (all class data erased).
-**Future (not built, clearly marked):**
-- **US school / district search** so teachers can find their school and create *private school groups* (invite-only Build Plates for a school or district), with verified-educator onboarding, roster import and Google Classroom / Clever / LMS sign-in.
-- **Family / kid onboarding**: a parent or guardian creates the child's profile, sets privacy limits and approves classrooms and followers.
-- **COPPA notes (US, under-13):** collecting personal information from children under 13 needs verifiable parental consent *or* a school-authorised consent arrangement where the school acts as the parent's agent for educational use only; keep data minimal (today: a nickname only), publish a children's privacy notice, give parents review/delete rights, and don't use child data for advertising or profiling. Legal review required before any under-13 launch.
-- **FERPA notes (US):** if ZEIM holds student education records on behalf of a school it must act as a "school official" under the school's direct control, use the data only for the authorised educational purpose, and sign a data-privacy agreement (many districts also require state student-privacy-pledge terms). Provide export/deletion on the school's request; no student data in public pages.
-- Also: GDPR-K / UK Age Appropriate Design Code, retention policy, privacy policy and DPA.
+## School features: removed (2026-10-12)
+Zach removed the school aspect of ZEIM: no teacher tools, class codes, classrooms, assignments, quizzes, grades, scores or school records. ZEIM stays free and family-friendly; kids use it with their families. Not planned: school/district search, roster import, LMS sign-in, FERPA arrangements.
+- **Family / kid onboarding** (future, not built): a parent or guardian creates the child's profile and sets privacy limits; needs verifiable parental consent (COPPA) before any under-13 data is collected.
+

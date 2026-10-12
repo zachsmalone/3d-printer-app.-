@@ -1,5 +1,8 @@
 # ZEIM "Send" hub: trust, safety and privacy review
 
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
+
 Author: Kenji Watanabe (Trust, Safety & Legal) | Date: 2026-10-04 (CT) | Status: DRAFT for Engineering, Design and Mr. Kato
 **This is not legal advice and does not claim compliance with any law or any third party's terms.** Items for a lawyer are listed in section 8. "Verified" means I ran it or read the cited page; "unverified" means I did not.
 

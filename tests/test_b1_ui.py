@@ -43,7 +43,7 @@ def test_photo_start_upload_camera_heic_errors_in_a_real_browser(live):
     assert code == 0, out
 
 
-def test_teacher_send_switch_dialog_and_teen_print_hidden():
+def test_teen_print_hidden():
     import socket as _s, tempfile as _t
     s = _s.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     d = _t.mkdtemp(prefix="zeim-ui-")
@@ -204,11 +204,3 @@ def test_username_is_chosen_changed_once_and_locked_in_the_account_dialog_in_chr
         p.terminate(); p.wait(10)
 
 
-def test_no_native_prompt_boxes_left_class_send_and_teacher_feedback_are_dialogs_in_chrome_and_webkit():
-    assert "prompt(" not in open(os.path.join(ROOT, "static", "community.js"), encoding="utf-8").read()
-    p, u = _spawn("local")
-    try:
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_prompts.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
-        assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
-    finally:
-        p.terminate(); p.wait(10)

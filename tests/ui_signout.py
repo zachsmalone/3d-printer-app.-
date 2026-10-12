@@ -1,5 +1,5 @@
 """Sign out in Account: plain warning, adults must see + confirm their recovery code first, teens confirm they can't come back; after sign-out the
-browser is empty and Teacher mode falls back; an adult gets back in with the code.  390px, Chrome + WebKit (axe in Chrome).  python tests/ui_signout.py URL"""
+browser is empty; an adult gets back in with the code.  390px, Chrome + WebKit (axe in Chrome).  python tests/ui_signout.py URL"""
 import json, os, re, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
@@ -16,7 +16,7 @@ def run(name, launch, with_axe):
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, bypass_csp=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL); pg.wait_for_timeout(700)
     pg.click("#btnAccount"); pg.fill("#su_name", "Ms Out"); pg.fill("#su_user", f"MsOut_{tag}"); pg.fill("#su_dob", "1980-02-02"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
-    pg.evaluate("document.querySelector('#dlgAccount').close()"); pg.select_option("#modeSel", "teacher"); pg.wait_for_timeout(300)
+    pg.evaluate("document.querySelector('#dlgAccount').close()"); pg.select_option("#modeSel", "expert"); pg.wait_for_timeout(300)
     pg.click("#btnAccount"); pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]")
     ok(f"{name}: sign-out dialog explains there are no passwords and needs the recovery code", "no passwords yet" in pg.inner_text("#soBody") and "recovery code" in pg.inner_text("#soBody"))
     ok(f"{name}: Sign out stays off until the code is shown and the box ticked", pg.is_disabled("#soGo") and pg.is_disabled("#soOk"))
@@ -29,8 +29,8 @@ def run(name, launch, with_axe):
         ok(f"axe: sign-out dialog", not r, r)
     pg.check("#soOk"); ok(f"{name}: ticking the box turns Sign out on", not pg.is_disabled("#soGo"))
     pg.click("#soGo"); pg.wait_for_load_state(); pg.wait_for_timeout(1200)
-    ok(f"{name}: after sign-out the browser has no account and Teacher mode is back to Beginner",
-       "sign up" in (pg.get_attribute("#btnAccount", "aria-label") or "") and pg.input_value("#modeSel") == "beginner" and not pg.is_visible("#classBar"))
+    ok(f"{name}: after sign-out the browser has no account",
+       "sign up" in (pg.get_attribute("#btnAccount", "aria-label") or "") and not pg.locator("#classBar").count())
     ok(f"{name}: the page says you are signed out", "signed out" in pg.inner_text("#toasts").lower(), pg.inner_text("#toasts"))
     pg.click("#btnAccount"); pg.click("#accBody details.recover summary"); pg.fill("#rc_code", "WRONG-CODE-0000-0000"); pg.click("#rc_go"); pg.wait_for_selector("#accBody .inline-msg")
     ok(f"{name}: a wrong code is refused inline and the typed code stays", "didn't work" in pg.inner_text("#accBody .inline-msg") and pg.input_value("#rc_code") == "WRONG-CODE-0000-0000")

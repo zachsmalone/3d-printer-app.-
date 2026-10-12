@@ -45,7 +45,6 @@ function render() {
   const save = [], other = [], print = [];
   save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "⬇ Save to this device" : "⬇ Download my model"}</b>
     <small>${adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
-  if (caps.teacher && caps.class_code) save.push(`<button type="button" class="btn sheet-row" id="ssTeacher"><b>⬆ Send to my teacher</b><small>Your teacher can see it.</small></button>`);
   if (b.original) save.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b>⬇ Your original file</b><small>The file you opened, unchanged.</small></a>`);
   if (adult && shareAllowed()) {
     other.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b>📤 Share… <span class="untested">untested</span></b><small>Opens the ${shareLabel()} share sheet, where you pick the app (Files, Mail and more). Not tried on a real iPhone or iPad yet.</small></button>`);
@@ -56,7 +55,6 @@ function render() {
   const group = (title, items, id) => items.length ? `<h3 class="group" id="${id}">${title}</h3><ul class="rows" aria-labelledby="${id}">${items.map(h => `<li>${h}</li>`).join("")}</ul>` : "";
   const notes = [];
   if (caps.role === "teen") notes.push("Sending to other apps isn't available for your account. You can download your build.");
-  if (caps.role === "student" && !caps.share) notes.push("Sending to other apps is turned off for this class. You can download your build or send it to your teacher.");
   if (adult && !shareAllowed()) notes.push(!caps.share_ui ? "Want it in another app? Save it first, then open the Files app, press and hold the file, and tap Share."
     : !isSecureContext ? "Sharing to other apps needs a secure (https) address. Save it first, then open the Files app, press and hold the file, and tap Share."
     : "Want it in another app? Save it first, then open the Files app, press and hold the file, and tap Share.");
@@ -129,11 +127,6 @@ document.addEventListener("click", async e => {
     if (X.file) doShare(X.file, t); return;
   }
   if (t.id === "ssPrinter") { const b = X.b; $("#dlgSendSheet").close(); openPrint(b); return; }
-  if (t.id === "ssTeacher") {
-    try { await api(`/api/classrooms/${X.caps.class_code}/projects`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ build_id: X.b.id }) });
-      $("#ssStatus").textContent = "Sent. Your teacher can see it."; }
-    catch (er) { $("#ssAlert").textContent = er.message; }
-  }
 });
 $("#dlgSendSheet").addEventListener("close", () => { X = null; });
 

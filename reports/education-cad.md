@@ -1,4 +1,7 @@
 # CAD in education, and what "CAD" means for ZEIM
+
+> **Superseded in part (2026-10-12):** Zach removed the school aspect of ZEIM. Teacher tools, classrooms, class codes, assignments, quizzes, scores, grades and any school records described below are NOT part of ZEIM and will not be built. ZEIM stays free and family-friendly; kids use it with their families. Learning lessons/videos that keep no scores still apply. See reports/HQ/board.md.
+
 Author: Aiko Nakamura (Education & Community) · Date: 2026-10-04 · Status: DRAFT for HQ review
 Scope: research and planning only. I did not edit app code. Nothing here has been tested with a teacher, a child, or an iPad.
 

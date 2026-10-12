@@ -108,16 +108,5 @@ with sync_playwright() as p:
     if a.locator("#btnPrint").is_visible():
         a.click("#btnPrint"); a.wait_for_selector("#dlgPrint[open]")
         ok("hosted: printer UI not rendered, download-and-open line instead", not a.is_visible("#printerBlock") and a.is_visible("#printerHosted"))
-    # class student (switch off by default): Download + Send to my teacher only
-    tc = b.new_context(); tp = tc.new_page(); tp.goto(SHARED)
-    tp.evaluate("fetch('/api/me/signup'," + J % "{display_name:'Ms Teach',dob:'1980-02-02'}" + ")"); tp.wait_for_timeout(300)
-    code = tp.evaluate("fetch('/api/classrooms'," + J % "{name:'Room 12',password:'long-pass-1'}" + ").then(r=>r.json()).then(j=>j.code)")
-    sc = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True); sc.add_init_script(STUB); sp = sc.new_page(); sp.goto(SHARED)
-    sp.evaluate("fetch('/api/classrooms/join'," + J % ("{code:'%s',nickname:'Kim',password:'long-pass-1'}" % code) + ")"); sp.wait_for_timeout(500); sp.reload(); sp.wait_for_timeout(600)
-    build(sp); sp.click("#btnSendSheet"); sp.wait_for_selector("#dlgSendSheet[open]"); sp.wait_for_timeout(500); st = sheet_text(sp)
-    ok("student: Download + Send to my teacher with Kenji's wording", "Download my model" in st and "Send to my teacher" in st and "Your teacher can see it." in st and "Only your teacher" not in st, st[:200].replace("\n", " "))
-    ok("student: no share/email/printer/Creality/chooser, switch-off note shown", not any(x in st for x in ("Share…", "Email", "Shapr3D", "printer", "Creality", "file type")) and "turned off for this class" in st)
-    sp.click("#ssTeacher"); sp.wait_for_timeout(600)
-    ok("student: 'Send to my teacher' submits this build", "Your teacher can see it." in sp.inner_text("#ssStatus") and "Sent." in sp.inner_text("#ssStatus"), sp.inner_text("#ssStatus") + sp.inner_text("#ssAlert"))
-    sc.close(); tc.close(); ctx3.close(); b.close()
+    ctx3.close(); b.close()
 sys.exit(0 if all(R) else 1)
