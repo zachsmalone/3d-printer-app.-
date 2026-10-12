@@ -20,3 +20,19 @@ Goal: app fully coded and ready within one month (target 2026-11-12).
 2. Cross-check your partner daily; resolve with them first, then escalate to Mr. Yami Kato.
 3. PASS only after re-testing the latest origin/zeim commit (name it).
 4. Kids' data safety outranks every feature and date. Spending, launch, legal, minors' data and deletions go to Zach.
+
+## The Path (how every change flows)
+1. **Ask** - Anyone finds a need (bug, fix, lesson need) -> posts one ticket line in reports/HQ/board.md: `[ID] owner | what | evidence | priority`.
+2. **Plan** - Mr. Yami Kato sets priority daily (safety > pilot blockers > polish) and assigns the build.
+3. **Build** - Yami's build line codes it on haruto/work, one commit per ticket, with a test.
+4. **Gate** - Full test suite + CI green -> merged to main -> pushed to GitHub `zeim`. The ticket gets the commit hash.
+5. **Verify** - The owning specialist re-tests on that exact commit; their cross-check partner spot-checks. Only then: PASS.
+6. **Ship** - Batches of PASS items go to Zach's phone test link; real-device results are logged in board.md.
+
+### Daily rhythm (CT)
+- Morning: each bot fetches origin/zeim, re-tests yesterday's tickets, posts 5-line status.
+- Midday: Yami merges and pushes the next batch.
+- Evening: cross-checks posted; Yami sends Zach one short summary.
+
+### Handoffs
+QA -> Build (bugs) · Safety -> Build (filter/visibility) · Design -> Build (UI) · Education -> Design (classroom fit) -> Build · DevOps -> everyone (CI, hosting) · Anything needing Zach -> Yami only.
