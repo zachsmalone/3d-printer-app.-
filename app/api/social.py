@@ -98,7 +98,8 @@ def _print_public(p: dict, actor: Actor) -> dict:
     tu = next((u for u in users.values() if u.get("id") == p["uid"]), None)
     name = (tu or {}).get("username") or p.get("username")
     return {"id": p["id"], "url": f"/api/prints/{p['id']}/photo", "caption": p.get("caption", ""),
-            "by": "@" + name if name else "a ZEIM maker", "created": p["created"], "mine": p["owner_sid"] == actor.sid}
+            "by": "@" + name if name else "a ZEIM maker", "created": p["created"], "mine": p["owner_sid"] == actor.sid,
+            "status": social.status(p), "pending": social.status(p) != "approved"}
 
 
 @router.get("/showcase/{iid}/prints")
@@ -107,7 +108,7 @@ def list_prints(iid: str, actor: Actor = Depends(get_actor)):
         catalog.get(iid, actor)
     except catalog.Denied as e:
         raise HTTPException(e.status, e.msg)
-    return {"prints": [_print_public(p, actor) for p in social.prints_for(iid)]}
+    return {"prints": [_print_public(p, actor) for p in social.prints_for(iid, actor.sid)]}
 
 
 @router.post("/showcase/{iid}/prints")
@@ -145,7 +146,7 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
 
 def _visible_print(pid: str, actor: Actor) -> dict:
     p = social.get_print(pid)
-    if not p or social.mod_key(pid) in set(moderation.MODERATION.read()["hidden"]):
+    if not p or social.mod_key(pid) in set(moderation.MODERATION.read()["hidden"]) or not social.visible_to(p, actor.sid):
         raise HTTPException(404)
     try:
         catalog.get(p["item_id"], actor)
