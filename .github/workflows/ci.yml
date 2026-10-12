@@ -1,10 +1,11 @@
-# PROPOSAL (Ren / DevOps) - not active until a remote with GitHub Actions exists.
+# CI (Ren / DevOps): runs the fast, browser-free tests on GitHub Actions.
 # Runs the two fast, browser-free test modules on every push / PR.
 name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, zeim]
+  workflow_dispatch:
   pull_request:
 
 permissions:
