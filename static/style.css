@@ -585,7 +585,7 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .pgallery figcaption{font-size:var(--fs-sm);margin-top:4px}
 .prform summary{list-style:none;display:inline-flex;min-height:44px;align-items:center}
 .remix{padding:8px 12px;border-left:4px solid var(--ctl);background:var(--panel);border-radius:8px}
-.remix a{min-height:44px;display:inline-flex;align-items:center}
+.remix a,.plist a{color:inherit;text-decoration:underline;min-height:44px;display:inline-flex;align-items:center}
 .counts{display:flex;gap:16px}
 .counts .stat b{font-size:var(--fs-lg)}
 .plist a,.creator-link{display:inline-flex;align-items:center;min-height:44px}

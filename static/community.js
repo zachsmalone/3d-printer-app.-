@@ -53,6 +53,7 @@ function route() {
   if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
   if (h[0] === "u" && h[1]) setTimeout(() => openProfile(h[1]), 50);
+  else if ($("#dlgProfile")?.open) $("#dlgProfile").close();          // leaving a profile link by tab closes the profile
   if (v === "account") loadFavorites();
 }
 addEventListener("hashchange", route);
