@@ -182,10 +182,38 @@ def public(i: dict, actor: Actor) -> dict:
             "untested": bool(i.get("original")), "untested_note": i.get("untested_note", ""),
             "material": i.get("material", ""), "caveats": i.get("caveats", ""),
             "needs_supports": bool(i.get("needs_supports")), "low_contact": i.get("low_contact", ""), "plates": bool(i.get("plates")), "how_used": i.get("how_used", ""),
-            "creator_username": i.get("creator_username"), "credit": credit_line(i), "no_model": not i["files"],
+            "creator_username": i.get("creator_username"), "credit": credit_line(i),
+            "favorited": bool(actor.user) and _social().is_fav(actor.sid, i["id"]), "can_favorite": bool(actor.user),
+            "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
                        "url": f"/api/showcase/{i['id']}/files/{f['name']}"} for f in i["files"]]}
+
+
+def _social():
+    from . import social
+    return social
+
+
+def remix_chain(i: dict, actor, limit: int = 10) -> list[dict]:
+    """'Remixed from X by Y', walking back through the chain. A parent this viewer may not see shows as an unlinked
+    'a project that is no longer available' so private work is never revealed."""
+    out, seen, cur = [], {i["id"]}, i.get("remix_of")
+    if not cur:
+        return out
+    users = USERS.read()
+    ok = _visible(actor, users) if actor is not None else (lambda x: True)
+    by_id = {x["id"]: x for x in _all()}
+    while cur and cur not in seen and len(out) < limit:
+        seen.add(cur)
+        p = by_id.get(cur)
+        if not p or not ok(p):
+            out.append({"id": None, "title": "a project that is no longer available", "creator": None, "creator_id": None})
+            break
+        p = resolve(p, users)
+        out.append({"id": p["id"], "title": p["title"], "creator": p["creator"], "creator_id": p["creator_id"], "url": f"/p/{p['id']}"})
+        cur = p.get("remix_of")
+    return out
 
 
 def get(item_id: str, actor: Actor) -> dict:
@@ -216,11 +244,16 @@ def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None,
         return [i for s, i in sorted(scored, key=lambda x: (-x[0], -trending_score(x[1]))) if s > 0]
     if tab == "free":    # everything is free: newest first
         return sorted(items, key=lambda i: i["created"], reverse=True)
-    users = USERS.read()   # Trending: public projects only, ranked by likes + downloads with recency decay
+    if tab == "following":   # projects by the people I follow, newest first (no DMs, no comments: just their work)
+        follows = set((actor.user or {}).get("following", []))
+        return sorted([i for i in items if i.get("creator_id") in follows], key=lambda i: i["created"], reverse=True)
+    from . import social
+    users = USERS.read()   # Trending: public projects only, ranked by RECENT favorites / downloads / 'I printed this' / nozzles with time decay
     now = datetime.now(timezone.utc)
-    # score ties (e.g. examples without counts, brand-new projects) fall back to newest first
+    h = social.heat(now.timestamp())
+    # score ties (brand-new projects with no activity) fall back to newest first
     pubs = sorted([i for i in items if is_public(i, users)], key=lambda i: i["created"], reverse=True)
-    return sorted(pubs, key=lambda i: -trending_score(i, now))
+    return sorted(pubs, key=lambda i: -social.trending_rank(h.get(i["id"], 0.0), trending_score(i, now)))
 
 
 def known_tags(actor: Actor) -> set[str]:
@@ -250,7 +283,7 @@ def set_visibility(actor: Actor, item_id: str, level: str) -> dict:
     return found
 
 
-def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None) -> dict:
+def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "") -> dict:
     if not actor.user:
         raise Denied(401, "Create an account to publish.")
     if not accept_guidelines:
@@ -269,6 +302,13 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
         raise Denied(422, str(e))
     except PermissionError as e:
         raise Denied(403, str(e))
+    remix_of = (remix_of or "").strip()
+    if remix_of:
+        remix_of = remix_of.rsplit("/p/", 1)[-1].strip("/ ")        # accept a share link or a bare id
+        try:
+            get(remix_of, actor)                                     # you can only credit a project you can see
+        except Denied:
+            raise Denied(422, "We couldn't find the project you remixed. Paste its Showcase link.")
     from ..services import editproj
     editproj.ensure_exports(build_id)       # edit projects write their STL/3MF lazily
     pid = secrets.token_hex(5)
@@ -287,6 +327,8 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False}
+    if remix_of:
+        item["remix_of"] = remix_of
     LISTINGS.update(lambda l: l.append(item))
     from ..services.history import store as _bs
     _bs.set_saved(build_id)
@@ -320,6 +362,7 @@ def count_download(i: dict, actor: Actor):
         if actor.sid not in lst:
             lst.append(actor.sid)
     ENGAGEMENT.update(f)
+    _social().record("download", i["id"], actor.sid)
 
 
 def set_like(i: dict, actor: Actor, liked: bool | None = None) -> dict:
@@ -340,6 +383,7 @@ def set_like(i: dict, actor: Actor, liked: bool | None = None) -> dict:
         res["liked"] = actor.sid in lst
         res["likes"] = (int(i.get("likes", 0)) if (not i.get("example") or config.SHOW_COUNTS_FOR_EXAMPLES) else 0) + len(lst)
     ENGAGEMENT.update(f)
+    (_social().record if res["liked"] else _social().unrecord)("nozzle", i["id"], actor.sid)
     if not counts_visible(i, USERS.read(), actor):
         res["likes"] = None
     return res

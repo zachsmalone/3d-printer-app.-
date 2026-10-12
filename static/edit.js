@@ -66,7 +66,7 @@ function fromFile(file) {
 const drop = $("#editDrop");
 $("#btnHave3d")?.addEventListener("click", () => { location.hash = "slicer"; $("#editFile").click(); });     // Studio → Edit (same tap, so iOS opens the picker)
 $("#editChooseModel").onclick = () => $("#editFile").click();
-$("#editFile").onchange = e => { fromFile(e.target.files[0]); e.target.value = ""; };
+$("#editFile").onchange = e => { fromFiles([...e.target.files]); e.target.value = ""; };
 drop.addEventListener("click", () => $("#editFile").click());
 $("#editPhoto").innerHTML = photoBlock("e", { sample: true });
 const editPick = mountPhoto("e", f => fromFile(f));
@@ -76,7 +76,41 @@ $("#eSample").onclick = async () => {
 };
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => fromFile(e.dataTransfer.files[0]));
+drop.addEventListener("drop", e => fromFiles([...e.dataTransfer.files]));
+
+/* ---------- several files at once: 'Parts of one print' (one plate) or 'Separate prints' ---------- */
+let multiFiles = [];
+function fromFiles(files) {
+  files = files.filter(Boolean);
+  if (files.length <= 1) return fromFile(files[0]);
+  const bad = files.filter(f => !isModel(f));
+  if (bad.length) return modelMsg("When you pick several files, they all need to be 3D models (.stl, .obj or .3mf).");
+  if (files.length > 12) return modelMsg("Up to 12 files at a time.");
+  modelMsg(""); multiFiles = files;
+  $("#multiWhich").textContent = `${files.length} files: ${files.map(f => f.name).join(", ")}`;
+  $("#multiMsg").textContent = "";
+  $("#dlgMulti").showModal();
+}
+async function sendMulti(mode, auto = false) {
+  const fd = new FormData();
+  multiFiles.forEach(f => fd.append("files", f));
+  fd.append("mode", mode); fd.append("units", $("#editUnits").value); fd.append("beginner", !isExpert());
+  if (auto) fd.append("auto_delete_oldest", "true");
+  $("#multiMsg").textContent = mode === "plate" ? "Arranging the parts on one plate…" : "Importing each file…";
+  busy(true, "Importing…");
+  try {
+    const r = await api("/api/edit/multi", { method: "POST", body: fd });
+    $("#dlgMulti").close();
+    S.history = r.history; renderHistory(); loadProject(r.project);
+    if (r.mode === "plate") toast(r.plate.fits ? `All ${r.plate.parts} parts fit on the bed (${r.plate.footprint_mm[0]} × ${r.plate.footprint_mm[1]} mm).` : `These parts don't fit on one ${r.plate.bed_mm[0]} × ${r.plate.bed_mm[1]} mm bed together. Try Separate prints or scale them down.`, r.plate.fits ? "ok" : "err");
+    else toast(`Made ${r.projects.length} separate projects. Find them under Pick up where you left off.`, "ok");
+  } catch (e) {
+    if (e.status === 409 && e.body?.code === "history_full") { $("#dlgMulti").close(); S.history = e.body.builds; renderHistory(); S.pending = a => sendMulti(mode, a); openFull(); }
+    else $("#multiMsg").textContent = e.message;
+  } finally { busy(false); }
+}
+$("#multiPlate").onclick = () => sendMulti("plate");
+$("#multiSeparate").onclick = () => sendMulti("separate");
 $("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_vase.stl")); };
 function fromBuild(id) {
   const mk = () => { const fd = new FormData(); fd.append("from_build", id); fd.append("beginner", !isExpert()); return fd; };
@@ -142,6 +176,11 @@ function renderTools() {
   const unitSel = `<div class="row" style="justify-content:space-between"><b>${esc(E.p.title)}</b><span class="seg" id="unitSeg">${Object.keys(UNITS).map(u => `<button data-unit="${u}" class="${u === E.unit ? "on" : ""}">${u}</button>`).join("")}</span></div>`;
   const beginner = `<div data-lvl="beginner">
     <p class="help">Pick a job. ZEIM chooses sensible settings — switch to Experienced mode for every tool.</p>
+    <details class="tool smartorient" open><summary>🧭 Smart orient</summary>
+      <p class="help">Turn the model so it prints well. Lay flat puts its largest flat face on the bed; Best position picks the side with the least overhang and support.</p>
+      <div class="tool-row"><button type="button" class="btn small" data-orient="lay_flat">⤓ Lay flat</button><button type="button" class="btn small" data-orient="best_orient">✦ Best position</button></div>
+      <div class="tool-row"><button type="button" class="btn small ghost" data-rot="rx">+90° X</button><button type="button" class="btn small ghost" data-rot="ry">+90° Y</button><button type="button" class="btn small ghost" data-rot="rz">+90° Z</button></div>
+      <p class="help" data-orient-out role="status" aria-live="polite"></p></details>
     <div class="bigtools">
       <button class="bigtool ${E.tool === "fix" ? "on" : ""}" data-big="fix"><span class="ico">🩹</span><b>Fix</b><small>Repair holes &amp; flipped faces, put it on the bed</small></button>
       <button class="bigtool ${E.tool === "scale" ? "on" : ""}" data-big="scale"><span class="ico">↔</span><b>Scale</b><small>Make it bigger or smaller</small></button>
@@ -150,6 +189,11 @@ function renderTools() {
     </div>
     <div id="bDrawer"></div></div>`;
   const expert = `<div data-lvl="expert">
+    <details class="tool smartorient" open><summary>🧭 Smart orient</summary>
+      <p class="help">Turn the model so it prints well. Lay flat puts its largest flat face on the bed; Best position picks the side with the least overhang and support.</p>
+      <div class="tool-row"><button type="button" class="btn small" data-orient="lay_flat">⤓ Lay flat</button><button type="button" class="btn small" data-orient="best_orient">✦ Best position</button></div>
+      <div class="tool-row"><button type="button" class="btn small ghost" data-rot="rx">+90° X</button><button type="button" class="btn small ghost" data-rot="ry">+90° Y</button><button type="button" class="btn small ghost" data-rot="rz">+90° Z</button></div>
+      <p class="help" data-orient-out role="status" aria-live="polite"></p></details>
     <details class="tool" open><summary>📐 Move / Rotate / Scale</summary>
       <form data-form="translate"><div class="grid3t">${lenInput("dx", 0, "Move X")}${lenInput("dy", 0, "Move Y")}${lenInput("dz", 0, "Move Z")}</div><button class="btn small">Move</button></form>
       <form data-form="rotate"><div class="grid3t">${numInput("rx", 0, "Rot X", "°")}${numInput("ry", 0, "Rot Y", "°")}${numInput("rz", 0, "Rot Z", "°")}</div>
@@ -199,6 +243,8 @@ $("#editPanel").addEventListener("click", e => {
   }
   const o1 = e.target.closest("[data-op1]");
   if (o1) { const [op, v] = o1.dataset.op1.split(":"); return doOp(op, op === "mirror" ? { axis: v } : { drop: v !== "center", center_xy: v !== "drop" }); }
+  const ori = e.target.closest("[data-orient]");
+  if (ori) { e.preventDefault(); return doOp(ori.dataset.orient, {}).then(() => { const r = E.p?.report || {}; $$("[data-orient-out]").forEach(x => x.textContent = r.message || (ori.dataset.orient === "lay_flat" ? "Laid flat." : "Turned to the best position.")); }); }
   const rot = e.target.closest("[data-rot]"); if (rot) { e.preventDefault(); return doOp("rotate", { rx: 0, ry: 0, rz: 0, [rot.dataset.rot]: 90 }); }
   if (e.target.id === "toggleMeasure") toggleMeasure();
   if (e.target.id === "editClose") { E.p = null; $("#editStart").hidden = false; $("#editPanel").hidden = true; $("#editResult").hidden = true; $("#editVtools").hidden = true; $("#editEmpty").hidden = false; viewer?.group.clear(); clearGhost(); fillBuildSelect(); }

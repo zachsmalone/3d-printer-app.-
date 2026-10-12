@@ -139,7 +139,7 @@ def test_examples_ui_shows_no_numbers_when_null():
 def test_hq2_free_tab_is_called_newest_and_sorted_by_date():
     c = client()
     tabs = c.get("/api/config").json()["showcase_tabs"]
-    assert list(tabs) == ["trending", "free", "foryou"] and tabs["free"] == "Newest" and "Free" not in tabs.values()
+    assert list(tabs) == ["trending", "free", "foryou", "following"] and tabs["free"] == "Newest" and "Free" not in tabs.values()
     r = c.get("/api/showcase?tab=free").json()
     assert [i["created"] for i in r["items"]] == sorted((i["created"] for i in r["items"]), reverse=True)
     assert r["subtitle"] == "Newest projects first."

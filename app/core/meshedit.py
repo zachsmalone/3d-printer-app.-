@@ -712,7 +712,17 @@ def op_text(m, p):
     return out, {"message": f"{mode} “{txt}” on {face}", "note": note}
 
 
-OPS = {"translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
+def op_lay_flat(m, p):
+    from . import orient
+    return orient.lay_flat(m)
+
+
+def op_best_orient(m, p):
+    from . import orient
+    return orient.best_position(m)
+
+
+OPS = {"lay_flat": op_lay_flat, "best_orient": op_best_orient, "translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
        "repair": op_repair, "simplify": op_simplify, "cut": op_cut, "hollow": op_hollow, "base": op_base,
        "boolean": op_boolean, "text": op_text}
 
@@ -727,6 +737,8 @@ def label(op: str, p: dict) -> str:
             "mirror": lambda: f"Mirror {str(g('axis')).upper()}",
             "place": lambda: "Drop to bed" + (" + centre" if p.get("center_xy") else ""),
             "repair": lambda: "Fix / repair",
+            "lay_flat": lambda: "Lay flat",
+            "best_orient": lambda: "Best position (least overhang)",
             "simplify": lambda: f"Simplify (keep {g('keep_ratio', 0.5) * 100:.0f}%)",
             "cut": lambda: f"Cut {str(g('axis', 'plane')).upper()}={g('position', '')} keep {g('keep', 'above')}",
             "hollow": lambda: f"Hollow {g('wall', 2):g} mm wall" + (f" + Ø{g('drain_diameter'):g} drain" if p.get('drain_diameter') else ""),

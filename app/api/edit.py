@@ -205,3 +205,105 @@ def original(bid: str, actor: Actor = Depends(get_actor)):
     if not f:
         raise HTTPException(404)
     return FileResponse(f, filename=f"original_{bid}{f.suffix}", headers={"Cache-Control": "no-store"})
+
+
+MAX_MULTI_FILES = 12
+
+
+@router.post("/multi")
+def new_multi(
+    actor: Actor = Depends(get_actor),
+    files: list[UploadFile] = File(...),
+    mode: str = Form("plate"),
+    units: str = Form("mm"),
+    beginner: bool = Form(True),
+    auto_delete_oldest: bool = Form(False),
+    bed_x: float = Form(220.0),
+    bed_y: float = Form(220.0),
+    bed_z: float = Form(250.0),
+    gap_mm: float = Form(5.0),
+):
+    """Several STL / OBJ / 3MF files at once. mode=plate: 'Parts of one print' (auto-spaced on one plate + bed-fit check, one project);
+    mode=separate: 'Separate prints' (one project each)."""
+    from ..core import orient
+    if mode not in ("plate", "separate"):
+        raise HTTPException(400, "mode must be plate | separate")
+    if units not in meshedit.UNIT_MM:
+        raise HTTPException(400, f"units must be one of {list(meshedit.UNIT_MM)}")
+    files = [f for f in files if f is not None and f.filename]
+    if not files:
+        raise HTTPException(400, "Choose at least one 3D file.")
+    if len(files) > MAX_MULTI_FILES:
+        raise HTTPException(400, f"Up to {MAX_MULTI_FILES} files at a time.")
+    if not (20 <= bed_x <= 2000 and 20 <= bed_y <= 2000 and 20 <= bed_z <= 2000 and 0 <= gap_mm <= 50):
+        raise HTTPException(400, "Bed size must be 20..2000 mm and the gap 0..50 mm.")
+    loaded, total = [], 0
+    for n, f in enumerate(files, 1):
+        data = f.file.read(editproj.MAX_UPLOAD_EDIT + 1)
+        total += len(data)
+        if len(data) > editproj.MAX_UPLOAD_EDIT or total > 2 * editproj.MAX_UPLOAD_EDIT:
+            raise HTTPException(413, f"Files too large (max {editproj.MAX_UPLOAD_EDIT // 2**20} MB each).")
+        if not data:
+            raise HTTPException(400, f"File {n} is empty.")
+        name = f.filename
+        ext = meshedit.guess_model_ext(name, data, getattr(f, "content_type", "") or "") or (name.rsplit(".", 1)[-1].lower() if "." in name else "")
+        if ext not in meshedit.ALLOWED:
+            raise HTTPException(415, f"File {n} is not an STL, OBJ or 3MF file.")
+        bad = meshedit.sniff(data, ext)
+        if bad:
+            raise HTTPException(415, f"File {n}: {bad}")
+        try:
+            mesh, w = meshedit.load_mesh(data, ext)
+        except meshedit.OpError as e:
+            raise HTTPException(422, f"File {n}: {e}")
+        scale = meshedit.UNIT_MM[units] if ext != "3mf" else 1.0
+        loaded.append({"n": n, "data": data, "ext": ext, "mesh": mesh, "warnings": w, "scale": scale})
+
+    from .builds import disk_guard
+    disk_guard()
+    made = []
+    with store.lock:
+        if mode == "plate":
+            meshes = []
+            for x in loaded:
+                m = x["mesh"].copy()
+                if x["scale"] != 1.0:
+                    m.apply_scale(x["scale"])
+                meshes.append(m)
+            combined, plate = orient.arrange(meshes, (bed_x, bed_y), gap_mm, bed_z)
+            warnings = [w for x in loaded for w in x["warnings"]]
+            warnings.append(f"{len(loaded)} parts arranged on one plate, {gap_mm:g} mm apart.")
+            if not plate["fits"]:
+                warnings.append(f"The parts don't fit on a {bed_x:g} × {bed_y:g} mm bed together "
+                                f"(they need {plate['footprint_mm'][0]:g} × {plate['footprint_mm'][1]:g} mm). Try 'Separate prints' or scale them down.")
+            try:
+                store.reserve(actor.sid, auto_delete_oldest)
+            except HistoryFull:
+                return _full(actor)
+            try:
+                meta = editproj.create(actor.sid, privacy.default_level(actor), title=f"Plate of {len(loaded)} parts",
+                                       base={"type": "plate", "parts": len(loaded), "units": units, "plate": plate},
+                                       original=combined.export(file_type="stl"), original_ext="stl", mesh=combined, beginner=beginner,
+                                       warnings=warnings, import_scale=1.0, import_units="mm")
+            except meshedit.OpError as e:
+                raise HTTPException(422, str(e))
+            made.append(meta["id"])
+            out = {"mode": "plate", "plate": plate, "projects": made, "project": editproj.payload(meta["id"])}
+        else:
+            if len(store.list(actor.sid)) + len(loaded) > MAX_BUILDS and not auto_delete_oldest:
+                return _full(actor)
+            for x in loaded:
+                try:
+                    store.reserve(actor.sid, auto_delete_oldest)
+                except HistoryFull:
+                    return _full(actor)
+                try:
+                    meta = editproj.create(actor.sid, privacy.default_level(actor), title=f"Part {x['n']} of {len(loaded)}",
+                                           base={"type": "upload", "format": x["ext"], "units": units if x["ext"] != "3mf" else "from file"},
+                                           original=x["data"], original_ext=x["ext"], mesh=x["mesh"], beginner=beginner,
+                                           warnings=x["warnings"], import_scale=x["scale"], import_units=units)
+                except meshedit.OpError as e:
+                    raise HTTPException(422, f"File {x['n']}: {e}")
+                made.append(meta["id"])
+            out = {"mode": "separate", "projects": made, "project": editproj.payload(made[0])}
+    return {**out, "history": [summary(m) for m in store.list(actor.sid)]}

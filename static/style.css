@@ -565,3 +565,29 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .toolcard .btn.primary{color:var(--on-acc)}
 .toolcard .btn .lbl{display:inline!important}
 @media (prefers-reduced-motion:reduce){.toolcard:hover{transform:none}}
+
+/* ---------- community batch: favorites, recent searches, prints gallery, remix chain, profiles ---------- */
+.fav{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;min-width:44px;padding:4px 10px;border-radius:999px;border:2px solid var(--ctl);background:var(--panel);color:var(--txt);font:inherit;font-weight:700;cursor:pointer;position:relative;z-index:2}
+.fav .fav-ico path{fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:round}
+.fav[aria-pressed="true"]{color:#d6336c;border-color:#d6336c}
+.fav[aria-pressed="true"] .fav-ico path{fill:currentColor}
+.fav:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+.cardfoot{gap:8px}
+.recent{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0}
+.recent .chips{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.rchip{display:inline-flex;align-items:center;border:1px solid var(--ctl);border-radius:999px;overflow:hidden}
+.rchip .chip{min-height:44px;min-width:44px;padding:6px 12px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.rchip .chip.x{padding:6px 10px;border-left:1px solid var(--ctl)}
+.recent .btn{min-height:44px}
+.pgallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;list-style:none;padding:0;margin:8px 0}
+.pgallery figure{margin:0}
+.pgallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block}
+.pgallery figcaption{font-size:var(--fs-sm);margin-top:4px}
+.prform summary{list-style:none;display:inline-flex;min-height:44px;align-items:center}
+.remix{padding:8px 12px;border-left:4px solid var(--ctl);background:var(--panel);border-radius:8px}
+.remix a{min-height:44px;display:inline-flex;align-items:center}
+.counts{display:flex;gap:16px}
+.counts .stat b{font-size:var(--fs-lg)}
+.plist a,.creator-link{display:inline-flex;align-items:center;min-height:44px}
+.favs{margin-top:24px}
+#dlgMulti .bigtool,#editPanel [data-orient]{min-height:44px}

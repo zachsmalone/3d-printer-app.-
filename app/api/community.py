@@ -161,6 +161,7 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
     handle = "@" + u["username"] if u.get("username") else "a ZEIM maker"
     return {"id": u["id"], "display_name": handle, "username": u.get("username"),        # public profile: @username only, never the (possibly real) display name
             "followers": idn.follower_count(uid) if social else None,   # opted out -> no count at all
+            "following": len(u.get("following", [])) if social else None,
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
             "links": {} if teen else u.get("links", {}),   # teens: link-outs never public
@@ -242,6 +243,10 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", actor: Acto
         if q:
             out["empty"] = {"text": f'No projects match "{q}". Try a shorter word like "relief" or "lamp", or look in Trending.',
                             "action": {"label": "Clear search", "do": "clear"}}
+        elif tab == "following":
+            out["empty"] = ({"text": "Follow makers you like and their new projects show up here. Open a project and tap Follow.",
+                             "action": {"label": "Look at Trending", "do": "trending"}} if actor.user else
+                            {"text": "Make a free account to follow makers. Their new projects then show up here.", "action": None})
         elif quiet:
             out["empty"] = {"text": "Nothing here yet. Check back soon.", "action": None}
         elif tab == "foryou" and not prefs["enabled"]:
@@ -280,7 +285,7 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
         i = catalog.create_project(actor, title=body.get("title"), description=body.get("description", ""),
                                    tags=body.get("tags") or [], build_id=str(body.get("build_id", ""))[:40],
                                    accept_guidelines=bool(body.get("accept_guidelines")),
-                                   visibility=body.get("visibility"))
+                                   visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200])
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:
@@ -409,6 +414,13 @@ def _admin(token: str, request: Request | None = None):
 
 
 def _preview(item_id: str) -> dict:
+    if item_id.startswith("print:"):
+        from ..community import social
+        p = social.get_print(item_id[6:])
+        if not p:
+            return {"kind": "unknown", "title": "(photo no longer exists)", "text": ""}
+        return {"kind": "print photo", "title": "I printed this photo", "text": p.get("caption", ""), "creator": "@" + (p.get("username") or "?"),
+                "hidden": item_id in moderation.MODERATION.read()["hidden"], "thumb": f"/api/moderation/item/{item_id}/thumb"}
     i = next((x for x in catalog._all() if x["id"] == item_id), None)
     if not i:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
@@ -428,8 +440,13 @@ def mod_queue(request: Request, x_admin_token: str = Header("")):
 @router.get("/moderation/item/{iid}/thumb")
 def mod_thumb(iid: str, request: Request, x_admin_token: str = Header("")):
     _admin(x_admin_token, request)
-    i = next((x for x in catalog._all() if x["id"] == iid), None)
-    p = catalog.thumb_path(i) if i else None
+    if iid.startswith("print:"):
+        from ..community import social
+        pr = social.get_print(iid[6:])
+        p = social.print_path(pr) if pr else None
+    else:
+        i = next((x for x in catalog._all() if x["id"] == iid), None)
+        p = catalog.thumb_path(i) if i else None
     if not p:
         raise HTTPException(404)
     return FileResponse(p, headers={"Cache-Control": "no-store"})

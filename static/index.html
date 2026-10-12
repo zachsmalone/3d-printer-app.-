@@ -163,7 +163,8 @@
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
       <div class="drop" id="editDrop"><div><svg class="i big" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><b>Drop an STL, OBJ or 3MF here</b><span>or press the button · up to 50 MB</span></div></div>
-      <div class="row" style="margin-top:8px"><button type="button" class="btn big primary" id="editChooseModel">Choose a 3D file (STL, OBJ, 3MF)</button><input type="file" id="editFile" class="sr-only" tabindex="-1" aria-hidden="true"></div>
+      <div class="row" style="margin-top:8px"><button type="button" class="btn big primary" id="editChooseModel">Choose a 3D file (STL, OBJ, 3MF)</button><input type="file" id="editFile" class="sr-only" tabindex="-1" aria-hidden="true" multiple></div>
+      <p class="help">Tip: pick or drop several files at once to put them on one plate or make separate prints.</p>
       <p class="help" id="editModelMsg" role="alert" hidden></p>
       <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
       <div id="editPhoto"></div>
@@ -287,6 +288,7 @@
   <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Family-friendly community projects. Everything is free to download.</p></div>
     <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
   <div class="row feedbar"><div class="seg" id="shTabs"></div><a class="btn primary createcta" href="#studio" id="btnCreatePhoto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Create from photo</a><a class="btn ghost" href="#learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg> Learn</a></div>
+  <div class="recent" id="shRecent" hidden></div>
   <p class="help" id="shSub"></p>
   <p class="help" id="shCount" role="status" aria-live="polite"></p>
   <p class="help" id="shNotice"></p>
@@ -308,6 +310,7 @@
   <ul class="grid toolgrid">
     <li class="toolcard"><h2>Repair</h2><p class="help">Fix normals, fill holes, remove duplicates, keep the largest part.</p><a class="btn" href="#slicer/repair">Repair a model</a></li>
     <li class="toolcard"><h2>Hollow</h2><p class="help">Save material with a hollow inside and a drain hole.</p><a class="btn" href="#slicer/hollow">Hollow a model</a></li>
+    <li class="toolcard"><h2>Smart orient</h2><p class="help">Lay flat on the largest flat face, or let ZEIM find the position with the least overhang and support. Manual rotate too.</p><a class="btn" href="#slicer/smartorient">Orient a model</a></li>
     <li class="toolcard"><h2>Simplify</h2><p class="help">Lower the triangle count while keeping the shape.</p><a class="btn" href="#slicer/simplify">Simplify a model</a></li>
   </ul>
 </main>
@@ -319,6 +322,7 @@
     <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
     <li class="toolcard"><h2>Learn</h2><p class="help">Short family-friendly lessons.</p><a class="btn big" href="#learn">Open Learn</a></li>
   </ul>
+  <section class="favs" aria-labelledby="favH"><h2 id="favH">Favorites</h2><p class="help" id="favNote">Projects you save with the heart. Only you can see this list.</p><ul class="grid" id="favGrid"></ul></section>
 </main>
 
 <main class="page" id="viewLearn" hidden>
@@ -340,10 +344,24 @@
     <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
     <div class="field"><label>Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
     <div class="field"><label>Description</label><input id="pub_desc" maxlength="500"></div>
+    <div class="field"><label for="pub_remix">Remixed from <em>optional: paste the Showcase link</em></label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
     <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
     <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
   </div>
   <div class="df"><button class="btn primary" id="btnDoPublish">Publish</button></div>
+</div></dialog>
+
+<dialog id="dlgMulti" aria-labelledby="multiH"><div class="dlg">
+  <div class="dh"><h3 id="multiH">Several files</h3><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="body"><p class="help" id="multiWhich"></p>
+    <div class="bigtools"><button type="button" class="bigtool" id="multiPlate"><span class="ico">▦</span><b>Parts of one print</b><small>Arrange them on one plate, spaced apart, with a bed-fit check</small></button>
+    <button type="button" class="bigtool" id="multiSeparate"><span class="ico">⧉</span><b>Separate prints</b><small>One project for each file</small></button></div>
+    <p class="help" id="multiMsg" role="status" aria-live="polite"></p></div>
+</div></dialog>
+
+<dialog id="dlgProfile" aria-labelledby="pfName"><div class="dlg">
+  <div class="dh"><h3 id="pfName"></h3><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="body" id="pfBody"></div>
 </div></dialog>
 
 <dialog id="dlgItem"><div class="dlg">

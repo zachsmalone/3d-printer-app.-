@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import branding
 from .api import builds, community, edit, learn, printing
+from .api import social as social_api
 from .api import settings as settings_api
 from .api import slice as slice_api
 from . import config
@@ -56,7 +57,7 @@ def _start_retention():
     from .services import retention
     retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
-          community.router, learn.router, learn.pages, slice_api.router):
+          community.router, learn.router, learn.pages, slice_api.router, social_api.router):
     app.include_router(r)
 try:
     from .community import usernames as _usernames

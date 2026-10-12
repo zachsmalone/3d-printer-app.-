@@ -51,3 +51,7 @@ MODERATION = JsonFile("moderation.json", {"hidden": [], "reports": []})
 PROGRESS = JsonFile("education_progress.json", {})
 ENGAGEMENT = JsonFile("engagement.json", {"likes": {}, "downloads": {}})   # item id -> [visitor sids] (one each)
 AGE_BLOCKS = JsonFile("age_blocks.json", {})   # sha256(sid)[:24] -> unix time the lock ends (no DOB, no age is ever stored here)
+# Community features (Oct 2026): favorites, timestamped activity for Trending, "I printed this" photos
+FAVORITES = JsonFile("favorites.json", {})      # sid -> [item ids], newest first (private bookmark list, never shown to others)
+ACTIVITY = JsonFile("activity.json", [])        # [{"k": fav|download|printed|nozzle, "i": item id, "s": sha(sid), "t": unix}] for Trending decay
+PRINTS = JsonFile("prints.json", [])            # "I printed this" photo records (photo files live in data/prints/)

@@ -36,10 +36,10 @@ function show(view) {
   if (view === "learn") loadLearn();
 }
 $$("#mainNav button").forEach(b => b.onclick = () => { location.hash = b.dataset.view; });
-const TOOLWORDS = { cut: "Cut", orient: "Rotate", text: "Text", repair: "Repair", hollow: "Hollow", simplify: "Repair" };
+const TOOLWORDS = { smartorient: "Smart orient", cut: "Cut", orient: "Rotate", text: "Text", repair: "Repair", hollow: "Hollow", simplify: "Repair" };
 function openTool(t) {   // Smart Fix / CAD shortcuts: open the matching tool in the editor once a model is loaded
   const w = TOOLWORDS[t]; if (!w) return;
-  const d = [...document.querySelectorAll("#viewEdit details.tool")].find(x => x.querySelector("summary")?.textContent.includes(w));
+  const d = [...document.querySelectorAll("#viewEdit details.tool")].find(x => x.offsetParent && x.querySelector("summary")?.textContent.includes(w));
   if (d && d.offsetParent) { d.open = true; d.scrollIntoView?.({ block: "nearest" }); return; }
   const b = document.querySelector(`#viewEdit [data-big="${t}"]:not(:disabled)`); if (b && !b.classList.contains("on")) b.click();
 }
@@ -52,6 +52,8 @@ function route() {
   if (v === "lithophane" && h[0] === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
   if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
+  if (h[0] === "u" && h[1]) setTimeout(() => openProfile(h[1]), 50);
+  if (v === "account") loadFavorites();
 }
 addEventListener("hashchange", route);
 
@@ -189,11 +191,12 @@ async function loadShowcase() {
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
   $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
   $("#shSub").textContent = r.subtitle || "";
+  loadRecent();
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${esc(i.creator)}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
-    ${i.original ? origHTML(i) : ""}<div class="cardfoot">${nzHTML(i, { uid: "g" })}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
+    ${i.original ? origHTML(i) : ""}<div class="cardfoot">${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   if (!r.items.length) {
     const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
@@ -202,7 +205,8 @@ async function loadShowcase() {
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => x.classList.toggle("on", x === b)); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
 $("#shCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; shCat = b.dataset.cat; loadShowcase(); });
-$("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };            // Search button, Enter and touch-keyboard "Go" all end up here
+$("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };
+$("#shSearch").addEventListener("focus", () => loadRecent());            // Search button, Enter and touch-keyboard "Go" all end up here
 $("#shClear").onclick = () => { $("#shSearch").value = ""; loadShowcase(); $("#shSearch").focus(); };
 $("#shSearch").oninput = () => { $("#shClear").hidden = !$("#shSearch").value; };
 $("#shGrid").addEventListener("click", e => {
@@ -274,11 +278,27 @@ async function openItem(id) {
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
-      ${nzHTML(i, { large: true, uid: "d" })}
+      ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}</div>
-    <p class="help">Nozzles and downloads are counted once per person and only for public projects. A feed of the creators you follow: <b>Coming soon</b>.</p>`;
+    <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
+    <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4><ul class="pgallery" id="prGallery"></ul>
+      ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn">📷 Add a photo of your print</summary>
+        <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo can be reported and is checked by a grown-up.</p>
+        <div class="field"><label for="prFile">Photo</label><input type="file" id="prFile" accept="image/*"></div>
+        <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
+        <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
+        <div class="row"><button class="btn primary" id="prSend" type="button">Share photo</button></div></details>` : ""}</section>`;
+  if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
+  loadPrints(id);
+  if ($("#prSend")) $("#prSend").onclick = async () => {
+    const f = $("#prFile").files[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo first.");
+    const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked);
+    $("#prSend").disabled = true;
+    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your print photo is up.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
+    catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
+  };
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
@@ -296,7 +316,7 @@ async function openItem(id) {
       } catch (e) { inlineMsg($("#repSend"), e.message); } finally { $("#repSend").disabled = false; }
     };
   };
-  $("#dlgItem").showModal();
+  if (!$("#dlgItem").open) $("#dlgItem").showModal();
 }
 
 /* publish */
@@ -307,7 +327,7 @@ $("#btnPublish").onclick = () => {
 $("#btnDoPublish").onclick = async () => {
   try {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
-      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value }));
+      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim() }));
     clearInline($("#btnDoPublish")); $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
   } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
 };
@@ -350,3 +370,81 @@ async function openLesson(id) {
 
 
 init();
+
+
+/* ---------- search history (stored per account on the server; 'Clear history' deletes it) ---------- */
+async function loadRecent() {
+  const box = $("#shRecent"); if (!box) return;
+  let r; try { r = await api("/api/me/searches"); } catch { box.hidden = true; return; }
+  if (!r.searches.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<span class="help">Recent searches</span><ul class="chips">${r.searches.map(q => `<li class="rchip"><button type="button" class="chip" data-recent="${esc(q)}">${esc(q)}</button><button type="button" class="chip x" data-unrecent="${esc(q)}" aria-label="Remove ${esc(q)} from history">✕</button></li>`).join("")}</ul><button type="button" class="btn small ghost" id="shClearHist">Clear history</button>`;
+}
+$("#shRecent").addEventListener("click", async e => {
+  const go = e.target.closest("[data-recent]"); if (go) { $("#shSearch").value = go.dataset.recent; return loadShowcase(); }
+  const rm = e.target.closest("[data-unrecent]");
+  if (rm) { try { await api("/api/me/searches/remove", J("POST", { q: rm.dataset.unrecent })); loadRecent(); toast("Removed from history", "ok"); } catch (er) { toast(er.message, "err"); } return; }
+  if (e.target.id === "shClearHist") { try { await api("/api/me/searches", { method: "DELETE" }); loadRecent(); toast("Search history deleted", "ok"); } catch (er) { toast(er.message, "err"); } }
+});
+
+/* ---------- Favorites: a private bookmark list (SVG heart icon) ---------- */
+const FAV_SVG = `<svg class="fav-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false"><path d="M12 20.5s-7.5-4.6-9.2-9.4C1.6 7.6 4 4.5 7.3 4.5c2 0 3.6 1.1 4.7 2.7 1.1-1.6 2.7-2.7 4.7-2.7 3.3 0 5.7 3.1 4.5 6.6-1.7 4.8-9.2 9.4-9.2 9.4z"/></svg>`;
+function favHTML(i, large = false) {
+  if (i.example) return "";
+  return `<button type="button" class="fav${large ? " fav-lg" : ""}" data-fav="${i.id}" aria-pressed="${!!i.favorited}" aria-label="Save to Favorites" title="Save to Favorites">${FAV_SVG}${large ? '<span class="fav-text" aria-hidden="true">Favorite</span>' : ""}</button>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest(".fav"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!ME?.signed_up) { toast("Make a free account to save favorites.", "err"); return; }
+  const id = b.dataset.fav, want = b.getAttribute("aria-pressed") !== "true";
+  $$(`.fav[data-fav="${CSS.escape(id)}"]`).forEach(x => x.setAttribute("aria-pressed", String(want)));
+  try { const r = await api(`/api/showcase/${id}/favorite`, J("POST", { favorite: want })); $$(`.fav[data-fav="${CSS.escape(id)}"]`).forEach(x => x.setAttribute("aria-pressed", String(r.favorite))); nzSay(r.favorite ? "Saved to Favorites." : "Removed from Favorites."); if (document.body.dataset.view === "account") loadFavorites(); }
+  catch (er) { $$(`.fav[data-fav="${CSS.escape(id)}"]`).forEach(x => x.setAttribute("aria-pressed", String(!want))); toast(er.message, "err"); }
+}, true);
+async function loadFavorites() {
+  const g = $("#favGrid"); if (!g) return;
+  if (!ME?.signed_up) { g.innerHTML = `<li class="empty"><p>Make a free account to save favorites.</p></li>`; return; }
+  let r; try { r = await api("/api/me/favorites"); } catch { return; }
+  g.innerHTML = r.items.length ? r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : "🧊"}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${esc(i.creator)}</span></div><div class="cardfoot">${favHTML(i)}</div></li>`).join("")
+    : `<li class="empty"><p>No favorites yet. Tap the heart on any project to save it here.</p><a class="btn" href="#showcase">Open Showcase</a></li>`;
+}
+$("#favGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
+
+/* ---------- remix credit chain ---------- */
+function remixHTML(chain) {
+  const step = x => x.id ? `<a href="#" data-open-item="${x.id}">${esc(x.title)}</a> by ${x.creator_id && x.creator !== "ZEIM" ? `<a href="#u/${x.creator_id}">${esc(x.creator)}</a>` : esc(x.creator || "")}` : esc(x.title);
+  return `<p class="remix">🔁 Remixed from ${step(chain[0])}${chain.length > 1 ? `<span class="remix-more">, which was remixed from ${chain.slice(1).map(step).join(", remixed from ")}</span>` : ""}</p>`;
+}
+document.addEventListener("click", e => { const a = e.target.closest("a[data-open-item]"); if (a) { e.preventDefault(); openItem(a.dataset.openItem); } });
+
+/* ---------- 'I printed this' gallery ---------- */
+async function loadPrints(id) {
+  const g = $("#prGallery"); if (!g) return;
+  let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
+  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure><img src="${p.url}" alt="Photo of a print${p.caption ? ": " + esc(p.caption) : ""}" loading="lazy"><figcaption>${esc(p.caption)} <span class="help">${esc(p.by)}</span>
+      ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}">⚑ Report</button>`}</figcaption></figure></li>`).join("")
+    : `<li class="help">No print photos yet.</li>`;
+  g.onclick = async e => {
+    const d = e.target.closest("[data-prdel]"), rp = e.target.closest("[data-prrep]");
+    try {
+      if (d) { await api(`/api/prints/${d.dataset.prdel}`, { method: "DELETE" }); toast("Photo deleted", "ok"); loadPrints(id); }
+      if (rp) { const r2 = await api(`/api/prints/${rp.dataset.prrep}/report`, J("POST", { reason: "not_family_friendly", details: "" })); toast(r2.auto_hidden ? "Thank you. The photo is hidden while a grown-up looks at it." : "Thank you. We got your report.", "ok"); }
+    } catch (er) { toast(er.message, "err"); }
+  };
+}
+
+/* ---------- profiles: follow / unfollow, follower and following counts ---------- */
+async function openProfile(uid) {
+  let u; try { u = await api("/api/users/" + uid); } catch (e) { toast(e.message, "err"); return; }
+  $("#pfName").textContent = u.display_name;
+  const n = (v, w) => v == null ? "" : `<span class="stat"><b>${v}</b> ${w}</span>`;
+  $("#pfBody").innerHTML = `<p class="counts">${n(u.followers, u.followers === 1 ? "follower" : "followers")} ${n(u.following, "following")}</p>
+    ${u.can_follow ? `<button type="button" class="btn ${u.following_creator ? "" : "primary"}" id="pfFollow" aria-pressed="${!!u.following_creator}">${u.following_creator ? "✔ Following" : "＋ Follow"}</button>` : ""}
+    <p class="help">Following shows their new projects in the Following tab. There are no messages in ZEIM.</p>
+    <h4>Projects</h4><ul class="plist">${u.projects.map(i => `<li><a href="#" data-open-item="${i.id}">${esc(i.title)}</a></li>`).join("") || "<li class='help'>None yet</li>"}</ul>`;
+  if ($("#pfFollow")) $("#pfFollow").onclick = async () => { try { await api("/api/follow/" + uid, { method: u.following_creator ? "DELETE" : "POST" }); openProfile(uid); } catch (e) { toast(e.message, "err"); } };
+  if (!$("#dlgProfile").open) $("#dlgProfile").showModal();
+}
+document.addEventListener("click", e => { const a = e.target.closest("a.creator-link"); if (a) { e.preventDefault(); openProfile(a.getAttribute("href").split("/").pop()); } });
