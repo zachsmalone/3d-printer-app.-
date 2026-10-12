@@ -38,7 +38,7 @@ def run(name, launch, with_axe):
     ok(f"{name}: a real project has a Nozzle it button, name with the count rule, aria-pressed=false", btn.count() == 1 and btn.get_attribute("aria-pressed") == "false"
        and btn.get_attribute("aria-label") in ("Nozzle it, no nozzles yet", "Nozzle it, 0 nozzles"), btn.get_attribute("aria-label"))
     ok(f"{name}: no '0' is shown to the child", btn.locator(".nz-count").inner_text() == "")
-    ok(f"{name}: EXAMPLE cards have no button and no number", pg.locator("#shGrid .pcard:has(.ex)").count() >= 1 and pg.locator("#shGrid .pcard:has(.ex) .nz").count() == 0)
+    ok(f"{name}: no EXAMPLE cards remain", pg.locator("#shGrid .pcard:has(.ex)").count() == 0)
     bb = btn.bounding_box(); ok(f"{name}: button is at least 44x44", bb["width"] >= 43.5 and bb["height"] >= 43.5, bb)
     ok(f"{name}: each card's title is a link and the card is a list item", pg.locator("#shGrid > li.pcard h2 a").count() >= 1)
     ok(f"{name}: no hearts, likes or downvote words on the Showcase", not re.search(r"♥|❤|dislike|downvote|\\blikes?\\b", pg.inner_text("#viewShowcase"), re.I))

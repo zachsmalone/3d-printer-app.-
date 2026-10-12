@@ -145,7 +145,7 @@ def test_s02_long_text_rejected_fast_everywhere():
         ("publish title", lambda: a.post("/api/showcase", json={"build_id": bid, "title": BIG, "accept_guidelines": True})),
         ("publish desc", lambda: a.post("/api/showcase", json={"build_id": bid, "title": "T", "description": BIG, "accept_guidelines": True})),
         ("publish tag", lambda: a.post("/api/showcase", json={"build_id": bid, "title": "T", "tags": [BIG], "accept_guidelines": True})),
-        ("report details", lambda: a.post("/api/showcase/ex01/report", json={"reason": "other", "details": BIG})),
+        ("report details", lambda: a.post("/api/showcase/zo-pencil-cup/report", json={"reason": "other", "details": BIG})),
         ("class name", lambda: a.post("/api/classrooms", json={"name": BIG, "password": "plum-otter-42"})),
         ("class password", lambda: a.post("/api/classrooms", json={"name": "N", "password": BIG})),
         ("join nickname", lambda: join(client(), code, pw, BIG)),

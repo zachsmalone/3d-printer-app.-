@@ -30,9 +30,9 @@ def run(name, launch):
     ok(f"{name}: external links are noopener", pg.locator("a[href^='http']:not([rel*='noopener'])").count() == 0)
     # Showcase: example item has no fake download; credit line / creator link present
     pg.goto(URL); pg.wait_for_timeout(500); pg.click("#mainNav [data-view=showcase]"); pg.wait_for_selector("#shGrid .pcard", timeout=15000)
-    pg.click("#shGrid .pcard >> nth=0"); pg.wait_for_selector("#dlgItem[open]", timeout=8000); pg.wait_for_timeout(300)
+    pg.click('#shGrid .pcard[data-item="zo-pencil-cup"] h2 a'); pg.wait_for_selector("#dlgItem[open]", timeout=8000); pg.wait_for_timeout(300)
     txt = pg.inner_text("#dlgItem")
-    ok(f"{name}: example item says 'No model yet' and offers no .stl download", "No model yet" in txt and pg.locator("#dlgItem a[download]").count() == 0, txt[:160])
+    ok(f"{name}: an Original shows its credit line, Untested print and a real .stl download", '"Pencil Cup" by ZEIM' in txt and "Untested print" in txt and pg.locator("#dlgItem a[download][href$='.stl']").count() == 1, txt[:200])
     ok(f"{name}: dialog has no sideways scroll", pg.evaluate("document.querySelector('#dlgItem').scrollWidth <= document.querySelector('#dlgItem').clientWidth + 1"))
     ok(f"{name}: no page errors", not errs, errs)
     ctx.close(); b.close()

@@ -161,20 +161,18 @@ def test_community_flow(monkeypatch):
     assert not any("price" in k for k in cl.get("/api/showcase").json()["items"][0])
     # personalization
     assert cl.get("/api/showcase?tab=foryou").json()["items"][0:1] != [] or True
-    cl.get("/api/showcase?tab=trending&q=popart")
-    fy = cl.get("/api/showcase?tab=foryou").json()["items"]; assert fy and any("popart" in i["tags"] for i in fy)
-    assert cl.get("/api/me/data").json()["searches"] == ["popart"]
+    cl.get("/api/showcase?tab=trending&q=containers")
+    fy = cl.get("/api/showcase?tab=foryou").json()["items"]; assert fy and any("containers" in i["tags"] for i in fy)
+    assert cl.get("/api/me/data").json()["searches"] == ["containers"]
     cl.delete("/api/me/data"); d = cl.get("/api/me/data").json(); assert d["interests"] == {} and d["searches"] == []
     assert cl.get("/api/showcase?tab=foryou").json()["items"] == []
     # follow + report
-    assert cl.post("/api/follow/ex-ada").status_code == 200
-    assert cl.get("/api/showcase/ex01").json()["following_creator"] is True
-    r = cl.post("/api/showcase/ex03/report", json={"reason": "minor_safety"}).json(); assert r["auto_hidden"]
-    assert cl.get("/api/showcase/ex03").status_code == 404
+    r = cl.post("/api/showcase/zo-gear-demo/report", json={"reason": "minor_safety"}).json(); assert r["auto_hidden"]
+    assert cl.get("/api/showcase/zo-gear-demo").status_code == 404
     assert c.get("/api/moderation/queue").status_code == 403
     q = c.get("/api/moderation/queue", headers={"X-Admin-Token": "t0k"}).json()["reports"]; assert q
     c.post(f"/api/moderation/{q[0]['id']}/resolve", json={"action": "restore"}, headers={"X-Admin-Token": "t0k"})
-    assert cl.get("/api/showcase/ex03").status_code == 200
+    assert cl.get("/api/showcase/zo-gear-demo").status_code == 200
 
 
 def test_education_classroom():

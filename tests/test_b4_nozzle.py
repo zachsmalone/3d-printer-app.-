@@ -23,7 +23,7 @@ def test_a_signed_out_visitor_cannot_nozzle_and_gets_a_plain_401():
     r = anon.post(f"/api/showcase/{iid}/like", json={"liked": True})
     assert r.status_code == 401 and r.json()["detail"] == "Make a free account to nozzle projects."
     assert anon.get(f"/api/showcase/{iid}").json()["liked"] is False and client().get(f"/api/showcase/{iid}").status_code == 200   # looking still works
-    assert anon.post("/api/showcase/ex01/like", json={}).status_code == 401
+    assert anon.post("/api/showcase/zo-pencil-cup/like", json={}).status_code == 401
     # a private / unknown project is still a plain 404, not a hint that it exists
     assert anon.post("/api/showcase/nope123/like", json={}).status_code == 404
 
@@ -76,10 +76,9 @@ def test_class_students_see_no_nozzle_or_download_numbers_even_on_adults_project
     assert s.get(f"/api/showcase/{iid}").json()["liked"] is True
 
 
-def test_example_items_still_show_no_numbers():
+def test_no_example_items_remain():
     items = client().get("/api/showcase").json()["items"]
-    ex = [i for i in items if i.get("example")]
-    assert ex and all(i["likes"] is None for i in ex)
+    assert items and not [i for i in items if i.get("example")]
 
 
 def test_project_page_and_teacher_list_say_nozzles_not_hearts():

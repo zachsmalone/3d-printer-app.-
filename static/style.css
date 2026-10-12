@@ -359,3 +359,12 @@ table.live tr.hand{background:var(--warmtint)}.needs{font-weight:700;color:var(-
  table.live tr{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;padding:6px 4px}table.live td::before{content:attr(data-l) ": ";color:var(--mut)}}
 .tnote .code,.calm .code,#soCode .code{font:700 17px ui-monospace,monospace;letter-spacing:.08em;background:var(--panel);border:1px solid var(--ctl);border-radius:6px;padding:1px 6px;word-break:break-all}
 .handup{font-weight:700;color:var(--txt);background:var(--warmtint);border:2px solid var(--warm);border-radius:10px;padding:6px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* Originals-first Showcase: category chips + Original card details */
+.cats { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.cats .chip { min-height: 44px; padding: 6px 12px; border-radius: 999px; border: 1px solid currentColor; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.cats .chip.on { background: #1f2937; color: #fff; border-color: #1f2937; }
+.pcard .orig { padding: 0 12px; font-size: .9rem; }
+.pcard .orig .caveat { margin: 4px 0; }
+.pill.warn { background: #fde68a; color: #422006; }
+.btn.small { min-height: 44px; padding: 8px 12px; display: inline-flex; align-items: center; }

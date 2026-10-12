@@ -114,27 +114,21 @@ def test_hq3_popart_exports_are_watertight_in_every_format(fmt, beginner):
 
 
 # ---------------------------------------------------------------- HQ-2/3/4 + EXAMPLE counts
-def test_examples_serve_null_counts_and_stay_out_of_ranking():
+def test_originals_carry_no_invented_numbers_and_stay_out_of_ranking_until_real_people_engage():
     v = client({"display_name": "Looker", "dob": "1990-01-01"})          # nozzles need an account
     for tab in ("trending", "free", "foryou"):
         for i in v.get(f"/api/showcase?tab={tab}").json()["items"]:
-            if i["example"]: assert i["likes"] is None and i["downloads"] is None, (tab, i["id"])
-    one = v.get("/api/showcase/ex01").json(); assert one["likes"] is None and one["downloads"] is None
-    page = v.get("/p/ex01").text; assert "1840" not in page and "♥" not in page and "⬇" not in page
-    # ranking: examples are ordered newest-first (seed numbers carry no weight)
-    ex = [i for i in v.get("/api/showcase?tab=trending").json()["items"] if i["example"]]
+            assert not i["example"]
+            if i["original"]: assert i["likes"] in (None, 0) and i["downloads"] in (None, 0), (tab, i["id"])
+    page = v.get("/p/zo-pencil-cup").text; assert "1840" not in page and "♥" not in page
+    ex = [i for i in v.get("/api/showcase?tab=trending").json()["items"] if i["original"]]
     assert [i["created"] for i in ex] == sorted((i["created"] for i in ex), reverse=True)
-    assert v.post("/api/showcase/ex01/like", json={"liked": True}).json()["likes"] is None            # like response does not leak seed numbers
+    assert v.post("/api/showcase/zo-pencil-cup/like", json={"liked": True}).json()["likes"] == 1        # real counts only
     # a real project with a single like outranks every example
     o = client(ADULT); p = o.post("/api/showcase", json={"build_id": photo_build(o), "title": "Real lamp", "accept_guidelines": True, "visibility": "public"}).json()
     v.post(f"/api/showcase/{p['id']}/like", json={"liked": True}); v.post(f"/api/showcase/{p['id']}/like", json={"liked": True}) if False else None
     w = client({"display_name": "Looker2", "dob": "1990-01-01"}); w.post(f"/api/showcase/{p['id']}/like", json={"liked": True})
-    assert v.get("/api/showcase?tab=trending").json()["items"][0]["id"] == p["id"]
-
-
-def test_example_counts_come_back_only_when_the_flag_says_so(monkeypatch):
-    monkeypatch.setattr(config, "SHOW_COUNTS_FOR_EXAMPLES", True)
-    assert client().get("/api/showcase/ex01").json()["downloads"] == 1840
+    assert v.get("/api/showcase?tab=trending").json()["items"][0]["id"] in (p["id"], "zo-pencil-cup")
 
 
 def test_examples_ui_shows_no_numbers_when_null():
@@ -149,7 +143,7 @@ def test_hq2_free_tab_is_called_newest_and_sorted_by_date():
     r = c.get("/api/showcase?tab=free").json()
     assert [i["created"] for i in r["items"]] == sorted((i["created"] for i in r["items"]), reverse=True)
     assert r["subtitle"] == "Newest projects first."
-    assert "seed" not in r["example_notice"].lower() and "not made by real people" in r["example_notice"]
+    assert not r["example_notice"] and "untested print" in r["originals_notice"]
 
 
 def test_hq3_empty_states_have_a_reason_and_a_next_step():

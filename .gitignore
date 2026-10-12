@@ -30,3 +30,6 @@ reports/qa_samples/*.3mf
 *.egg-info/
 # local backups
 backups/
+
+# ZEIM Originals library (378 MB): NOT in git; the deploy ships it separately (see config.ORIGINALS / PHOTO3D_ORIGINALS)
+/library/

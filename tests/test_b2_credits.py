@@ -111,12 +111,11 @@ def test_download_page_and_showcase_json_carry_the_credit_line():
 
 
 # ---- Showcase wording / examples (Zach's iPhone screenshot) -------------------------------------------------------------------
-def test_example_items_offer_no_fake_download():
+def test_items_offer_no_fake_download():
     c = client()
-    one = c.get("/api/showcase/ex01").json()
-    assert one["files"] == [] and one["no_model"] is True
-    assert c.get("/api/showcase/ex01/files/example_model.stl").status_code == 404
-    assert "No model yet" in c.get("/p/ex01").text and "example_model" not in c.get("/p/ex01").text
+    one = c.get("/api/showcase/zo-pencil-cup").json()
+    assert [f["name"] for f in one["files"]] == ["pencil-cup.stl"] and one["no_model"] is False
+    assert c.get("/api/showcase/zo-pencil-cup/files/example_model.stl").status_code == 404
     pub = client(ADULT); bid = photo_build(pub)
     r = pub.post("/api/showcase", json={"build_id": bid, "title": "Real", "description": "d", "tags": [], "accept_guidelines": True, "visibility": "public"}).json()
     assert r["no_model"] is False and r["files"]
