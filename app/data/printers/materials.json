@@ -1,0 +1,29 @@
+{
+  "PLA": {
+    "settings": {
+      "first_layer_nozzle_temperature_c": {"value": 215, "unit": "C", "sources": ["https://help.prusa3d.com/article/pla_2062"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "nozzle_temperature_c": {"value": 210, "unit": "C", "sources": ["https://help.prusa3d.com/article/pla_2062"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "bed_temperature_c": {"value": 60, "unit": "C", "sources": ["https://help.prusa3d.com/article/pla_2062"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "typical_max_volumetric_speed_range_mm3_s": {"value": [12, 20], "unit": "mm^3/s", "sources": ["https://help.prusa3d.com/article/max-volumetric-speed_127176"], "note": "Typical material MVS range; not a K1 hotend measurement. Do not convert to linear speed without extrusion geometry or choose a default automatically."}
+    },
+    "notes": ["Material-specific retraction and K1-specific linear speeds omitted: not verified in this research pass.", "Reference data only; select settings using the actual filament manufacturer guidance and calibration."]
+  },
+  "PETG": {
+    "settings": {
+      "first_layer_nozzle_temperature_c": {"value": 230, "unit": "C", "sources": ["https://help.prusa3d.com/article/petg_2059"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "nozzle_temperature_c": {"value": 240, "unit": "C", "sources": ["https://help.prusa3d.com/article/petg_2059"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "first_layer_bed_temperature_c": {"value": 85, "unit": "C", "sources": ["https://help.prusa3d.com/article/petg_2059"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "bed_temperature_c": {"value": 90, "unit": "C", "sources": ["https://help.prusa3d.com/article/petg_2059"], "note": "General Prusa guidance, not a K1-tested or universal filament preset."},
+      "typical_max_volumetric_speed_range_mm3_s": {"value": [8, 15], "unit": "mm^3/s", "sources": ["https://help.prusa3d.com/article/max-volumetric-speed_127176"], "note": "Typical material MVS range; not a K1 hotend measurement. Do not convert to linear speed without extrusion geometry or choose a default automatically."}
+    },
+    "notes": ["Material-specific retraction and K1-specific linear speeds omitted: not verified in this research pass.", "Reference data only; select settings using the actual filament manufacturer guidance and calibration."]
+  },
+  "TPU": {
+    "settings": {
+      "nozzle_temperature_range_c": {"value": [220, 240], "unit": "C", "sources": ["https://help.prusa3d.com/article/prusament-tpu-95a-material-guide_899653"], "note": "General Prusa guidance, not K1-tested. TPU temperature ranges specifically describe Prusament TPU 95A."},
+      "bed_temperature_range_c": {"value": [55, 75], "unit": "C", "sources": ["https://help.prusa3d.com/article/prusament-tpu-95a-material-guide_899653"], "note": "General Prusa guidance, not K1-tested. TPU temperature ranges specifically describe Prusament TPU 95A."},
+      "typical_max_volumetric_speed_range_mm3_s": {"value": [2, 5], "unit": "mm^3/s", "sources": ["https://help.prusa3d.com/article/max-volumetric-speed_127176"], "note": "Typical material MVS range; not a K1 hotend measurement. Do not convert to linear speed without extrusion geometry or choose a default automatically."}
+    },
+    "notes": ["Material-specific retraction and K1-specific linear speeds omitted: not verified in this research pass.", "Reference data only; select settings using the actual filament manufacturer guidance and calibration."]
+  }
+}
