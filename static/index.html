@@ -11,6 +11,7 @@
 <script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
 </head>
 <body>
+<a class="skip" id="skipLink" href="#viewCreate">Skip to main content</a>
 <header class="topbar">
   <a class="brand" href="/" title="Home"><img src="/static/logo-header.png" alt="ZEIM" class="logoimg" id="logoImg"></a>
   <nav class="nav" id="mainNav" aria-label="Main">
@@ -170,12 +171,12 @@
       <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
       <div id="editPhoto"></div>
       <div class="grid2" style="margin-top:10px">
-        <div class="field"><label>Units in the file <em>STL / OBJ</em></label><select id="editUnits"><option value="mm">millimetres</option><option value="cm">centimetres</option><option value="in">inches</option><option value="m">metres</option></select></div>
-        <div class="field"><label>If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>
+        <div class="field"><label for="editUnits">Units in the file <em>STL / OBJ</em></label><select id="editUnits"><option value="mm">millimetres</option><option value="cm">centimetres</option><option value="in">inches</option><option value="m">metres</option></select></div>
+        <div class="field"><label for="editPhotoMode">If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>
       </div>
       <div class="row"><button class="btn" id="editSample">Try a sample model</button></div>
       <h2 style="margin-top:16px"><i>or</i> Edit a Studio build</h2>
-      <div class="row"><select id="editFromBuild" style="flex:1"></select><button class="btn" id="editFromBuildGo">Edit it</button></div>
+      <div class="row"><label for="editFromBuild" class="sr-only">Studio build to edit</label><select id="editFromBuild" style="flex:1"></select><button class="btn" id="editFromBuildGo">Edit it</button></div>
       <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your 5 recent builds. Colours from multi-colour builds/3MF files are merged into one mesh.</p>
     </section>
     <section id="editPanel" hidden></section>
@@ -255,7 +256,7 @@
     <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
     <div id="tPrint" class="tab">
       <div class="grid2">
-        <div class="field"><label>Default slicer</label><select id="set_slicer"><option value="auto">Automatic (Creality on phones and with a K1)</option><option value="creality">Creality Print / Creality Cloud</option><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
+        <div class="field"><label for="set_slicer">Default slicer</label><select id="set_slicer"><option value="auto">Automatic (Creality on phones and with a K1)</option><option value="creality">Creality Print / Creality Cloud</option><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
         <div class="field"><label>Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
       </div>
       <h4>Printers</h4><div id="printerList"></div>
@@ -385,13 +386,13 @@
 <div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 <dialog id="dlgLive" aria-labelledby="liveH"><div class="dlg wide"><div class="dh"><h3 id="liveH">Live view</h3><button class="x" data-close aria-label="Close live view">✕</button></div>
   <div class="body"><p class="help" id="liveNote">View only. This shows each student's nickname, the lesson and how many steps they have ticked, their newest model's name (no pictures), and when they last did something. It refreshes about every 12 seconds while this window is open.</p>
-    <label class="inl"><input type="checkbox" id="liveSort"> Show students who need help first</label>
+    <label class="inl"><input type="checkbox" id="liveSort"> Show students who need help first</label> <button type="button" class="btn small" id="liveResort" hidden>Re-sort now</button>
     <p class="help" id="liveAsOf"></p><p class="sr-only" id="liveSay" role="status" aria-live="polite"></p>
     <div class="tablewrap"><table class="live"><caption class="sr-only">Students in this class</caption><thead><tr><th scope="col">Nickname</th><th scope="col">Lesson and steps ticked</th><th scope="col">Newest model</th><th scope="col">Last activity</th><th scope="col">Hand</th></tr></thead><tbody id="liveRows"></tbody></table></div>
     <p class="help" id="liveEmpty" hidden>No students have joined yet.</p></div></div></dialog>
 <dialog id="dlgSignout" aria-labelledby="soH"><div class="dlg"><div class="dh"><h3 id="soH">Sign out of this browser?</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body" id="soBody"></div>
-  <div class="df"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn primary" id="soGo" disabled>Sign out</button></div></div></dialog>
+  <div class="df"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn primary" id="soGo" aria-disabled="true" aria-describedby="soWhy">Sign out</button></div><p class="help" id="soWhy">Tick the box above to sign out.</p></div></dialog>
 <dialog id="dlgDelClass" aria-labelledby="dcH" aria-describedby="dcBody"><div class="dlg"><div class="dh"><h3 id="dcH">Delete this class?</h3></div>
   <div class="body" id="dcBody"><p>This deletes <b id="dcName"></b> for good: every student's progress, their class projects and feedback, and their builds made in this class. Students will need a new join code to come back.</p><p>This can't be undone.</p></div>
   <div class="df"><button type="button" class="btn" id="dcKeep">Keep the class</button><button type="button" class="btn danger" id="dcGo">Delete class</button></div></div></dialog>
