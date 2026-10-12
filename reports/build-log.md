@@ -64,3 +64,32 @@ Built on origin/zeim (`5c5a966`). One commit each:
 - `1ed097a` Delete class uses an in-app dialog (Keep focused first, Esc keeps the class) instead of confirm(). The Delete build button in history still uses confirm().
 Full suite on haruto/work at `1ed097a`: **523 passed, 0 failed, 5 skipped** (12 min, finished about 1:00 PM CT). The skips are 4 slicer tests (no PrusaSlicer CLI on the box since its rebuild) and 1 that needs `ss`. Box changes made to run the suite: the shared `/workspace/photo3d/.venv` had been rebuilt without pytest/playwright, so tests ran from a separate `/workspace/photo3d-wt/.venv-wt` (excluded via .git/info/exclude); WebKit and its system libraries were reinstalled (`playwright install webkit` + `install-deps`). A first run before WebKit was installed failed 2 tests and skipped WebKit everywhere; the counted run above includes WebKit. Merged into main as `1a319dd`.
 Untested: real iPhone/iPad, screen readers, slicing (skipped), sign-out/recovery with real families.
+
+## Originals-first Showcase, Ren's QA fixes, accessibility round 2 (Oct 12, 2026)
+Built on origin/zeim (`22f091b`; origin's 3 later HQ doc commits merged in at merge time). One commit per feature:
+- `93fc35c` **Showcase: ZEIM Originals replace the 9 EXAMPLE cards.** Every card shows the preview, title, credit line `"Title" by ZEIM · CC BY 4.0`, difficulty, "Suggested: FDM", an **Untested print** label, material notes and fit caveats, and a working STL download. Category chips filter the list (`?category=`). Kenji's rules are enforced **on the server** for lists, item pages, thumbs and downloads (404): Wildlife Calls (all whistles and calls, including the open-reed predator call) are hidden from classroom students and under-13s; `horn-dino-band-popper` and `fish-bottle-opener` are hidden from classroom students. ("Classroom" means a class-student session. An adult teacher browsing in Teacher mode still sees them; tell me if that should change.) QA flags: "Needs supports" on the 7 models Ren flagged, and a brim / low-contact warning on sleepy-loaf-cat and chubby-penguin-scarf. These live in `app/community/originals_qa.py` because the library is not in git. Counts on Originals are real (they start at 0), with no invented numbers.
+- `838e1c5` **rain-guard-bird-feeder as 2 plate files** (`_plate1.stl` 144×144 mm, `_plate2.stl` 210×200 mm; both sliced in PrusaSlicer 2.9.2 on a 220×220 bed). New `tools/validate_originals.py` checks the **whole plate** for every Original (45/45 fit 220×220×250). The original 144×439 file is left untouched. The library's own generator (`library/originals/source/zkit.py`, not in git, not mine) still checks only `fits_150mm` of the largest part, so its validation_report.json is unchanged.
+- `e9f6eae` + `2bb9d2f` **Edit: Hollow and Simplify tell the truth.** Hollow rebuilds the cavity with a deeper margin until the true wall reaches wall − one voxel, and warns if it can't. On the sample vase the min wall went from 0.21 → 2.03 mm (QA probe). The analysis and Simplify count non-manifold edges on a vertex-merged copy, so they no longer call a mesh with hidden bad edges watertight. On Ren's gear bracket every simplifier setting leaves 2 such edges, so Simplify now **refuses with a clear message** instead of returning it.
+- `840e58c` **Accessibility round 2 top 10** (from reports/accessibility-round2.md):
+  - labels on sign-up, the Edit selects and the default slicer
+  - lesson cards are links and Edit steps are buttons with `aria-current=step`
+  - 422 error lists become field messages
+  - 3 px focus ring in Dark
+  - skip link
+  - stacked dialogs: the one underneath is inert, and Tab is trapped in the top one (WebKit too)
+  - 44 px buttons and 24 px lesson checkboxes
+  - Sign out is `aria-disabled` with a reason, and focus starts on the first step
+  - Live view: after Helped, focus moves to the next Helped button or the row, and the announcement names the student; with "needs help first" on, rows never move under the pointer or focus, and a "Re-sort now" button appears instead
+  - Spec note updated: **Warm is always the default; Dark only by choice, never from the OS.**
+- `3b1f6ad` test tolerance fix.
+**Library and deploy:** `library/` (378 MB) is **not in git** (now in .gitignore). **The deploy must ship `library/originals` separately** and either put it at `<app>/library/originals` or set `PHOTO3D_ORIGINALS=/path/to/originals`. Without it the Showcase has no Originals, but nothing crashes. Tests and CI use a 6-item fixture in `tests/fixtures/originals`; two tests check the real library when it is present.
+**Box:**
+- PrusaSlicer 2.9.2 was reinstalled via apt. dpkg reported errors on fuse3/xdg-desktop-portal, but the CLI slices fine.
+- `iproute2` was installed for `ss`.
+- The shared `/workspace/photo3d/.venv` now has pytest 9.1.1, playwright 1.63.0 and requests 2.34.2. These were only added; the server on 8765 was not restarted and still answers 200.
+**Ren's repro** (`/workspace/qa/regress/run.sh <temp server> --only b,c`): 14 PASS, 0 FAIL, 1 ERROR (all Hollow checks pass). The ERROR is c1: Simplify is refused (HTTP 422, an honest refusal) on the gear bracket instead of returning a broken mesh. The 40–60 % reduction target is still not met on that model. The 0.3 mm call reeds were left as they are, as asked.
+**Untested:**
+- No Original has been test-printed.
+- The CC BY 4.0 licence is still unconfirmed (pending counsel).
+- Supports and brim flags come from geometry and a generic slicer profile, not prints.
+- No real iPhone, screen reader or teacher has tried any of this.
