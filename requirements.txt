@@ -1,6 +1,6 @@
 # Direct runtime dependencies, pinned to the versions the test suite passed with (Python 3.13.x).
 # constraints.txt pins the full resolved tree:  pip install -r requirements.txt -c constraints.txt
-cryptography==43.0.0
+cryptography==50.0.0
 fast-simplification==0.2.0
 fastapi==0.142.2
 httpx==0.28.1

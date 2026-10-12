@@ -6,7 +6,7 @@ anyio==4.15.1
 certifi==2026.7.22
 click==8.5.0
 contourpy==1.4.0
-cryptography==43.0.0
+cryptography==50.0.0
 cycler==0.12.1
 fast-simplification==0.2.0
 fastapi==0.142.2
