@@ -13,6 +13,6 @@ with sync_playwright() as p:
     pg.click("#itLike"); pg.wait_for_timeout(500); print(pg.locator("#itLike").inner_text())
     pg.screenshot(path="previews/ui_showcase_like.png")
     pg.keyboard.press("Escape")
-    pg.click('#mainNav [data-view=learn]'); pg.wait_for_timeout(800); print("lessons", pg.locator("#lessonGrid .pcard").count())
+    pg.evaluate("location.hash='learn'"); pg.wait_for_timeout(800); print("lessons", pg.locator("#lessonGrid .pcard").count())
     b.close()
 print("errors",errs)

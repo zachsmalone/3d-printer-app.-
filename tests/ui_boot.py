@@ -22,11 +22,11 @@ def run(name, launch):
         return ctx, pg, errs
     # 1. clean run
     ctx, pg, errs = page()
-    pg.goto(URL)
+    pg.goto(URL.rstrip("/") + "/#studio")
     pg.wait_for_selector("#mainNav", timeout=15000); pg.wait_for_timeout(2500)
     ok(f"{name}: app reports started", pg.evaluate("window.__zeimStarted === true && window.__zeimEditStarted === true"))
     ok(f"{name}: no error banner on a healthy page", not pg.is_visible("#bootError"))
-    for v in ("showcase", "learn", "edit", "create"):
+    for v in ("showcase", "slicer", "cad", "smartfix", "account", "lithophane"):
         pg.click(f"#mainNav [data-view={v}]"); pg.wait_for_timeout(500)
     pg.click("#sSample"); pg.wait_for_selector("#result:not([hidden])", timeout=120000); pg.wait_for_timeout(500)
     ok(f"{name}: no page errors / console errors on a normal session (4 tabs + a sample build)", not errs, errs[:3])
@@ -36,7 +36,7 @@ def run(name, launch):
                            ("app.js is a 404", lambda r: r.fulfill(status=404, body="nope"))):
         target = "**/static/edit.js" if "edit" in label else "**/static/app.js"
         ctx, pg, errs = page(lambda c, t=target, h=handler: c.route(t, lambda r: h(r)))
-        pg.goto(URL); pg.wait_for_timeout(2500)
+        pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(2500)
         vis = pg.is_visible("#bootError")
         ok(f"{name}: {label} -> a visible message with a Reload button", vis and pg.is_visible("#bootError button"), pg.inner_text("#bootError") if vis else "(no banner)")
         ctx.close()

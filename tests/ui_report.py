@@ -21,7 +21,7 @@ def run(name, launch):
     errs = []; dialogs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("dialog", lambda d: (dialogs.append(d.type), d.dismiss()))
-    pg.goto(URL); pg.wait_for_timeout(700); pg.click("#mainNav [data-view=showcase]"); pg.wait_for_selector("#shGrid .pcard", timeout=15000)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700); pg.click("#mainNav [data-view=showcase]"); pg.wait_for_selector("#shGrid .pcard", timeout=15000)
     pg.click("#shGrid .pcard:has-text('Retro Comic') >> nth=0") if pg.locator("#shGrid .pcard:has-text('Retro Comic')").count() else pg.click("#shGrid .pcard >> nth=0")
     pg.wait_for_selector("#dlgItem[open]")
     if pg.locator("#dlgItem .pill:has-text('EXAMPLE')").count():

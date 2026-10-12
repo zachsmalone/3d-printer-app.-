@@ -14,9 +14,9 @@ def run(name, launch):
     errs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(700)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
     # --- under-13 sign-up: calm panel (no class-code path any more), not a toast over an unchanged form
-    pg.click("#btnAccount"); pg.fill("#su_name", "Kiddo"); pg.fill("#su_dob", "2018-03-04"); pg.click("#su_go")
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.fill("#su_name", "Kiddo"); pg.fill("#su_dob", "2018-03-04"); pg.click("#su_go")
     pg.wait_for_selector("#accBody .calm", timeout=8000)
     ok(f"{name}: under-13 refusal is a panel in the dialog", pg.locator("#suJoin").count() == 0 and not pg.is_visible("#su_go") and "can't create an account" in pg.inner_text("#accBody"))
     pg.wait_for_timeout(9000)

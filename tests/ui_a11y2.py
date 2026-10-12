@@ -18,7 +18,7 @@ def run(name, launch, with_axe):
     errs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, bypass_csp=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(800)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(800)
     # 7 skip link
     pg.keyboard.press("Tab")
     ok(f"{name}: first Tab stop is the skip link, visible on focus", pg.evaluate("document.activeElement.id") == "skipLink" and pg.locator("#skipLink").bounding_box()["y"] >= 0)
@@ -29,36 +29,36 @@ def run(name, launch, with_axe):
     ok(f"{name}: a 422 list becomes a field message, never [object Object]", "Width" in t and "object" not in t.lower(), t)
     ok(f"{name}: an unknown 422 entry falls back to plain words", "isn't right" in pg.evaluate("window.__errText({detail:[{}]}, {status:422})"))
     # 1 labels: sign-up
-    pg.click("#btnAccount"); pg.wait_for_selector("#su_dob")
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.wait_for_selector("#su_dob")
     ok(f"{name}: sign-up name and DOB have labels", pg.evaluate("[...document.querySelectorAll('#su_name,#su_dob')].every(i => i.labels.length === 1)"))
     if with_axe: v = axe_rules(pg, "#dlgAccount", ["label", "select-name"]); ok(f"{name}: axe label/select-name in Account", not v, v)
     pg.keyboard.press("Escape")
     # 6 dark focus ring
-    pg.evaluate("document.documentElement.dataset.theme='dark'"); pg.click("#btnAccount"); pg.wait_for_selector("#su_name"); pg.focus("#su_name")
+    pg.evaluate("document.documentElement.dataset.theme='dark'"); pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.wait_for_selector("#su_name"); pg.focus("#su_name")
     ow = pg.evaluate("getComputedStyle(document.querySelector('#su_name')).outlineWidth"); oc = pg.evaluate("getComputedStyle(document.querySelector('#su_name')).outlineColor")
     ok(f"{name}: dark input focus ring is the 3px --focus ring", ow == "3px" and oc in ("rgb(141, 184, 255)",), (ow, oc))
     pg.keyboard.press("Escape"); pg.evaluate("document.documentElement.removeAttribute('data-theme')")
     # 1 Settings slicer label
-    pg.click("#btnSettings"); pg.wait_for_selector("#dlgSettings[open]")
+    pg.evaluate("location.hash='account'"); pg.click("#btnSettings"); pg.wait_for_selector("#dlgSettings[open]")
     ok(f"{name}: default slicer select has a label", pg.evaluate("document.querySelector('#set_slicer').labels.length") == 1)
     pg.keyboard.press("Escape")
     # 1 + 2 Edit: labelled dropdowns, history steps are buttons
-    pg.click('#mainNav [data-view=edit]'); pg.wait_for_timeout(400)
+    pg.click('#mainNav [data-view=slicer]'); pg.wait_for_timeout(400)
     ok(f"{name}: Edit's 3 dropdowns have labels", pg.evaluate("['editUnits','editPhotoMode','editFromBuild'].every(id => document.getElementById(id).labels.length === 1)"))
     pg.click("#editSample"); pg.wait_for_selector("#editOps button[data-goto]", timeout=60000)
     ok(f"{name}: Edit history steps are buttons and the current one is aria-current=step",
        pg.locator("#editOps li button[data-goto]").count() >= 1 and pg.locator('#editOps [aria-current="step"]').count() == 1)
     # 2 lesson cards keyboard
-    pg.click("#mainNav [data-view=learn]"); pg.wait_for_selector("#lessonGrid a[data-open-lesson]")
+    pg.evaluate("location.hash='learn'"); pg.wait_for_selector("#lessonGrid a[data-open-lesson]")
     pg.focus("#lessonGrid a[data-open-lesson] >> nth=0"); pg.keyboard.press("Enter"); pg.wait_for_timeout(600)
     ok(f"{name}: a lesson opens from the keyboard", pg.locator("#lessonDetail input[data-step]").count() >= 1)
     # 9 targets: lesson checkboxes >= 24px
     cb = pg.locator("#lessonDetail input[data-step] >> nth=0").bounding_box()
     ok(f"{name}: lesson checkboxes are at least 24px", cb["width"] >= 23.5 and cb["height"] >= 23.5, cb)
     # 10 + 8 Sign out
-    pg.click("#btnAccount"); pg.fill("#su_name", "Ms A"); pg.fill("#su_user", f"MsA_{name}"); pg.fill("#su_dob", "1980-02-02"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.fill("#su_name", "Ms A"); pg.fill("#su_user", f"MsA_{name}"); pg.fill("#su_dob", "1980-02-02"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
     pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
-    pg.click("#btnAccount"); pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]"); pg.wait_for_timeout(200)
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]"); pg.wait_for_timeout(200)
     ok(f"{name}: Sign out dialog starts on 'Show my recovery code'", pg.evaluate("document.activeElement.id") == "soCodeBtn")
     ok(f"{name}: Sign out is focusable, aria-disabled and says why", pg.get_attribute("#soGo", "aria-disabled") == "true" and not pg.evaluate("document.querySelector('#soGo').disabled")
        and "recovery code" in pg.inner_text("#soWhy"))

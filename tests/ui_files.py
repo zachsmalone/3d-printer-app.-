@@ -18,7 +18,7 @@ def run(name, launch):
     def fresh():
         ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=name != "webkit-desktop")
         pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-        pg.goto(URL); pg.wait_for_timeout(500); pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)
+        pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(500); pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
         return ctx, pg
     ctx, pg = fresh()
     ok(f"{name}: #editFile has no accept attribute", pg.get_attribute("#editFile", "accept") is None)

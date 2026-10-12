@@ -213,7 +213,7 @@ $("#histList").onclick = async e => {
   if (f) { const b = S.history.find(x => x.id === f.dataset.fav); try { await api(`/api/builds/${f.dataset.fav}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: !b?.favorite }) }); await loadHistory(); } catch (er) { toast(er.message, "err"); } return; }
   if (o) { try {
     const hb = S.history.find(x => x.id === o.dataset.open);
-    if (hb?.kind === "edit") { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: hb.id })); location.hash = "edit"; return; }
+    if (hb?.kind === "edit") { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: hb.id })); location.hash = "slicer"; return; }
     const r = await api("/api/builds/" + o.dataset.open); S.mode = r.mode; applyMode(); showBuild(r); } catch (er) { toast(er.message, "err"); } }
   if (d && confirm("Delete this build and its files?")) { await api("/api/builds/" + d.dataset.del, { method: "DELETE" }); await loadHistory(); }
 };

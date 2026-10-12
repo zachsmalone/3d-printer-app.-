@@ -25,7 +25,7 @@ with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=args)
     ctx = b.new_context(viewport={"width": 390, "height": 844}, user_agent=IPHONE, has_touch=True, is_mobile=True, device_scale_factor=2)
     pg = ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(700)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
     for sel in ("#sChoose", "#sTake", "#sSample"):
         bx = pg.locator(sel).bounding_box(); ok(f"phone: {sel} visible, >=44px tall, inside viewport", bx and bx["height"] >= 44 and bx["x"] >= 0 and bx["x"] + bx["width"] <= 391, str(bx))
     ok("phone: privacy + permission lines under the buttons", "stay private to you" in pg.inner_text("#sPick") and "ask first" in pg.inner_text("#sPick"))
@@ -48,7 +48,7 @@ with sync_playwright() as p:
     # ---------------- desktop WITH a (fake) camera
     b = p.chromium.launch(channel="chrome", args=args + ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"])
     ctx = b.new_context(viewport={"width": 1280, "height": 800}, permissions=["camera"]); pg = ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(800)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(800)
     ok("desktop+camera: Take a photo is shown", pg.locator("#sTake").is_visible())
     pg.click("#sTake"); pg.wait_for_selector("#sCamPanel:not([hidden])", timeout=10000); pg.wait_for_timeout(1200)
     pg.screenshot(path="previews/photo_desktop_camera_live.png")
@@ -62,7 +62,7 @@ with sync_playwright() as p:
     ok("desktop: camera photo -> built", pg.locator("#result").is_visible())
     pg.click("#sCamCancel") if pg.locator("#sCamPanel").is_visible() else None
     # Edit
-    pg.click('#mainNav [data-view=edit]'); pg.wait_for_timeout(400)
+    pg.click('#mainNav [data-view=slicer]'); pg.wait_for_timeout(400)
     ok("edit: 3D-file input has NO accept list (iOS greys out bare extensions); the type is checked by name in JS (tests/ui_files.py)", pg.get_attribute("#editFile", "accept") is None)
     ok("edit: photo buttons present", pg.locator("#eChoose").is_visible() and pg.locator("#eTake").is_visible())
     pg.screenshot(path="previews/photo_edit_start.png")
@@ -76,7 +76,7 @@ with sync_playwright() as p:
     ctx = b.new_context(viewport={"width": 1280, "height": 800}); pg = ctx.new_page()
     pg.add_init_script("""const o = navigator.mediaDevices; if (o) { o.enumerateDevices = async () => [{kind:'videoinput', deviceId:'x', label:''}];
       o.getUserMedia = async () => { throw new DOMException('denied', 'NotAllowedError'); }; }""")
-    pg.goto(URL); pg.wait_for_timeout(800)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(800)
     pg.click("#sTake"); pg.wait_for_selector("#sMsg:not([hidden])")
     ok("camera denied: calm persistent message + Choose button right there", pg.inner_text("#sMsg") == "ZEIM can't use the camera. You can choose a photo instead." and pg.locator("#sChoose").is_visible())
     pg.screenshot(path="previews/photo_camera_blocked.png")
@@ -85,7 +85,7 @@ with sync_playwright() as p:
     ctx.close()
     ctx = b.new_context(viewport={"width": 1280, "height": 800}); pg = ctx.new_page()
     pg.add_init_script("if (navigator.mediaDevices) navigator.mediaDevices.enumerateDevices = async () => [];")
-    pg.goto(URL); pg.wait_for_timeout(800)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(800)
     ok("desktop with no camera device: Take a photo is hidden", pg.locator("#sTake").is_hidden() and pg.locator("#sChoose").is_visible() and pg.locator("#sSample").is_visible())
     ctx.close(); b.close()
 bad_ = [r for r in R if not r[1]]

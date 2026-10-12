@@ -29,7 +29,7 @@ def run(name, launch, with_axe):
     r.post(URL + "/api/me/signup", data={"display_name": "Ada", "dob": "1985-05-05"})
     iid = publish(r, f"Fox {tag}")
     def page(ctx):
-        pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL); pg.wait_for_timeout(700)
+        pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
         pg.click("#mainNav [data-view=showcase]"); pg.wait_for_selector("#shGrid .pcard", timeout=15000); return pg
     nz = lambda pg: pg.locator(f'#shGrid .nz[data-nz="{iid}"]')
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, bypass_csp=True)

@@ -13,7 +13,7 @@ def run(name, launch):
     errs = []
     def page(storage=None):
         ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
-        pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL); pg.wait_for_timeout(700); return ctx, pg
+        pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700); return ctx, pg
     ctx, pg = page()
     ok(f"{name}: a labelled Mode select with two plain-word options",
        pg.inner_text("label[for=modeSel]") == "Mode" and pg.eval_on_selector_all("#modeSel option", "o=>o.map(x=>x.textContent)") == ["Beginner", "Experienced"])

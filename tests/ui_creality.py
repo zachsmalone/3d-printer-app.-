@@ -13,7 +13,7 @@ def open_print(b, url, phone, stub=False):
     ctx = b.new_context(viewport={"width": 390, "height": 844} if phone else {"width": 1280, "height": 900}, has_touch=phone)
     pg = ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     if stub: pg.add_init_script(STUB)
-    pg.goto(url); pg.wait_for_selector("#mainNav", timeout=15000); pg.wait_for_timeout(800)
+    pg.goto(url.rstrip("/") + "/#studio"); pg.wait_for_selector("#mainNav", timeout=15000); pg.wait_for_timeout(800)
     pg.click("#sSample"); pg.wait_for_selector("#result:not([hidden])", timeout=120000); pg.wait_for_timeout(500)
     pg.click("#btnPrint"); pg.wait_for_selector("#dlgPrint[open]"); pg.wait_for_timeout(700)
     return ctx, pg, errs

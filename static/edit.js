@@ -64,7 +64,7 @@ function fromFile(file) {
   create(mk(), mk);
 }
 const drop = $("#editDrop");
-$("#btnHave3d")?.addEventListener("click", () => { location.hash = "edit"; $("#editFile").click(); });     // Studio → Edit (same tap, so iOS opens the picker)
+$("#btnHave3d")?.addEventListener("click", () => { location.hash = "slicer"; $("#editFile").click(); });     // Studio → Edit (same tap, so iOS opens the picker)
 $("#editChooseModel").onclick = () => $("#editFile").click();
 $("#editFile").onchange = e => { fromFile(e.target.files[0]); e.target.value = ""; };
 drop.addEventListener("click", () => $("#editFile").click());
@@ -83,7 +83,7 @@ function fromBuild(id) {
   create(mk(), mk);
 }
 $("#editFromBuildGo").onclick = () => { const v = $("#editFromBuild").value; if (v) fromBuild(v); };
-$("#btnEditThis")?.addEventListener("click", () => { if (S.current) { location.hash = "edit"; fromBuild(S.current.id); } });
+$("#btnEditThis")?.addEventListener("click", () => { if (S.current) { location.hash = "slicer"; fromBuild(S.current.id); } });
 function fillBuildSelect() {
   $("#editFromBuild").innerHTML = S.history.length ? S.history.slice().reverse().map(b => `<option value="${b.id}">${esc(b.title)} (${b.kind === "edit" ? "edited" : b.mode})</option>`).join("") : `<option value="">No builds yet — make one in the Studio</option>`;
   $("#editFromBuildGo").disabled = !S.history.length;
@@ -187,6 +187,7 @@ function renderTools() {
   $("#editPanel").innerHTML = unitSel + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px">＋ Open another model</button>`;
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
+  document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 $("#editPanel").addEventListener("click", e => {
   const u = e.target.closest("[data-unit]"); if (u) { E.unit = u.dataset.unit; localStorage.eunit = E.unit; loadProject(E.p, true); return; }

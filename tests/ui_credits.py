@@ -16,7 +16,7 @@ def run(name, launch):
     errs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(600)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
     link = pg.locator(".sitefoot a[href='/credits']"); link.scroll_into_view_if_needed()
     box = link.bounding_box()
     ok(f"{name}: footer 'Thank you & credits' link is there and >= 44px tall", box and box["height"] >= 44 and "credits" in link.inner_text().lower(), box)
@@ -29,7 +29,7 @@ def run(name, launch):
     ok(f"{name}: block-level links/summaries on /credits are >= 44px", not small, small)
     ok(f"{name}: external links are noopener", pg.locator("a[href^='http']:not([rel*='noopener'])").count() == 0)
     # Showcase: example item has no fake download; credit line / creator link present
-    pg.goto(URL); pg.wait_for_timeout(500); pg.click("#mainNav [data-view=showcase]"); pg.wait_for_selector("#shGrid .pcard", timeout=15000)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(500); pg.click("#mainNav [data-view=showcase]"); pg.wait_for_selector("#shGrid .pcard", timeout=15000)
     pg.click('#shGrid .pcard[data-item="zo-pencil-cup"] h2 a'); pg.wait_for_selector("#dlgItem[open]", timeout=8000); pg.wait_for_timeout(300)
     txt = pg.inner_text("#dlgItem")
     ok(f"{name}: an Original shows its credit line, Untested print and a real .stl download", '"Pencil Cup" by ZEIM' in txt and "Untested print" in txt and pg.locator("#dlgItem a[download][href$='.stl']").count() == 1, txt[:200])

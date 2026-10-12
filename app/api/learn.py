@@ -51,7 +51,7 @@ def reset_progress(actor: Actor = Depends(get_actor)):
 # ---- public, shareable server-rendered pages (no login, no tracking) ----
 def _page(title, body, desc=""):
     p = branding.PRODUCT_NAME
-    return HTMLResponse(f"""<!doctype html><html lang=en><head><meta charset=utf-8>
+    return HTMLResponse(f"""<!doctype html><html lang=en><head><meta charset=utf-8><script>try{{var t=localStorage.theme;if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.setAttribute("data-theme","dark")}}catch(e){{}}</script><script src="/static/theme.js" defer></script>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>{escape(title)} · {escape(p)}</title>
 <meta property="og:title" content="{escape(title)}"><meta property="og:description" content="{escape(desc)}">
 <link rel=icon href=/static/favicon.png><link rel=stylesheet href=/static/style.css></head>

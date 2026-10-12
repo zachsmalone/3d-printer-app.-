@@ -21,7 +21,7 @@ def run(name, launch, with_axe):
     errs = []
     def page(w=390, h=844, **kw):
         ctx = b.new_context(viewport={"width": w, "height": h}, bypass_csp=True, **kw)
-        pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL); pg.wait_for_timeout(800); return ctx, pg
+        pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(800); return ctx, pg
     ctx, pg = page()
     h1 = pg.locator("h1:visible"); 
     ok(f"{name}: exactly one visible h1 with the agreed words", h1.count() == 1 and h1.inner_text().strip() == "Turn a photo into something you can print.", h1.all_inner_texts())
@@ -76,14 +76,14 @@ def run(name, launch, with_axe):
     pg.select_option("#modeSel", "beginner")
     # themes
     ok(f"{name}: default look is the warm light theme", pg.evaluate("document.documentElement.dataset.theme || 'warm'") == "warm")
-    pg.click("#themeBtn"); pg.wait_for_timeout(150)
-    ok(f"{name}: Look button switches to dark, remembered after reload", pg.evaluate("document.documentElement.dataset.theme") == "dark" and (pg.reload() or True) and (pg.wait_for_timeout(700) or True) and pg.evaluate("document.documentElement.dataset.theme") == "dark")
+    pg.click("#themeToggle"); pg.wait_for_timeout(150)
+    ok(f"{name}: Dark mode toggle switches to dark, remembered after reload", pg.evaluate("document.documentElement.dataset.theme") == "dark" and (pg.reload() or True) and (pg.wait_for_timeout(700) or True) and pg.evaluate("document.documentElement.dataset.theme") == "dark")
     if with_axe: axe(pg, "Studio, 390 dark")
-    pg.click("#themeBtn")
+    pg.click("#themeToggle")
     ctx.close()
-    # OS dark preference does not change the default
+    # first visit with no saved choice follows the OS preference
     ctx, pg = page(color_scheme="dark")
-    ok(f"{name}: an OS dark preference does not flip the default look", pg.evaluate("document.documentElement.dataset.theme || 'warm'") == "warm"); ctx.close()
+    ok(f"{name}: no saved choice + OS dark preference starts dark", pg.evaluate("document.documentElement.dataset.theme") == "dark"); ctx.close()
     # widths
     for w in (320, 360, 390, 768, 1280):
         ctx, pg = page(w, 800)
@@ -98,9 +98,9 @@ def run(name, launch, with_axe):
     # keyboard order of the first controls
     ctx, pg = page()
     order = []
-    for _ in range(9):
+    for _ in range(11):
         pg.keyboard.press("Tab"); order.append(pg.evaluate("document.activeElement.id || document.activeElement.textContent.trim().slice(0,12)"))
-    ok(f"{name}: keyboard reaches tabs, Mode, Account, Settings, then the photo buttons", "modeSel" in order and "btnAccount" in order and "btnSettings" in order, order)
+    ok(f"{name}: keyboard reaches the six tabs, Mode, then the Dark mode toggle", all(t in order for t in ("Showcase", "Slicer", "CAD", "Lithophane", "Smart Fix", "Account", "modeSel", "themeToggle")) and order.index("modeSel") < order.index("themeToggle"), order)
     ok(f"{name}: no page errors", not errs, errs)
     ctx.close(); b.close()
 

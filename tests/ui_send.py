@@ -9,7 +9,7 @@ J = "{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.string
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
     # a teen: Print button hidden, Download buttons stay
-    t = b.new_page(viewport={"width": 1100, "height": 900}); t.goto(URL)
+    t = b.new_page(viewport={"width": 1100, "height": 900}); t.goto(URL.rstrip("/") + "/#studio")
     t.evaluate("fetch('/api/me/signup'," + J % "{display_name:'Tess Teen',dob:'2011-01-01'}" + ")")
     t.reload(); t.wait_for_timeout(600)
     ok("teen: Print button hidden by CSS", t.evaluate("getComputedStyle(document.querySelector('#btnPrint')).display") == "none")

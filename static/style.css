@@ -1,6 +1,6 @@
 /* Warm light is the default look; Dark is a choice (html[data-theme=dark], stored in localStorage.theme). Tokens and contrast: reports/design/home-redesign-spec.md section 5 (tests/test_b3_theme.py recomputes the ratios). */
 :root{--bg:#FFF8EE;--panel:#FFFFFF;--panel2:#FFF1DC;--sunk:#FBF3E6;--line:#E6D5BD;--ctl:#7F6F5D;--txt:#2B2118;--mut:#5E4F40;--acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#4F34C7;--acc2:#4F34C7;--tint:#EDE7FF;--warm:#B4410C;--warmtint:#FFE3CC;--focus:#1D4ED8;--ok:#166534;--okbg:#E3F5E8;--bad:#B91C1C;--badbg:#FDE8E8;--warn:#8A5300;--r:12px;--stage1:#2c3547;--stage2:#0b0e14;color-scheme:light}
-html[data-theme=dark]{--bg:#0E1117;--panel:#161B24;--panel2:#1C2330;--sunk:var(--sunk);--line:#2A3344;--ctl:#7B88A6;--txt:#E6EAF2;--mut:#A9B4C9;--acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#B8A9FF;--acc2:#B8A9FF;--tint:#2A2457;--warm:#FFB26B;--warmtint:#3A2A1A;--focus:#8DB8FF;--ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;color-scheme:dark}
+html[data-theme=dark]{--bg:#0E1117;--panel:#161B24;--panel2:#1C2330;--sunk:#121722;--line:#2A3344;--ctl:#7B88A6;--txt:#E6EAF2;--mut:#A9B4C9;--acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#B8A9FF;--acc2:#B8A9FF;--tint:#2A2457;--warm:#FFB26B;--warmtint:#3A2A1A;--focus:#8DB8FF;--ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;color-scheme:dark}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 *{box-sizing:border-box}html{height:100%}body{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -495,3 +495,73 @@ dialog::backdrop{background:rgba(43,33,24,.45);backdrop-filter:blur(4px)}
 @media (prefers-reduced-motion:reduce){.skel{animation:none}dialog[open]{animation:none}.pcard:hover,.btn:active:not(:disabled){transform:none}}
 @media (forced-colors:active){.topbar .nav button.on{outline:2px solid Highlight}.skel{border:1px solid CanvasText}}
 .i.big{width:40px;height:40px;stroke-width:1.5;color:var(--accink);margin:0 auto var(--s2);display:block}.viewer .i.big{color:#C5CEDF}
+
+/* ======================================================================================================
+   v2 "tech" layer (2026-10): crisper type, glass top bar with a hairline gradient, soft page backdrop,
+   tighter hierarchy, micro-interactions, and the sun/moon Dark mode toggle (#themeToggle, theme.js).
+   Colours still come from the contrast-tested tokens above (tests/test_b3_theme.py).
+   ====================================================================================================== */
+:root{--font:"Inter var",Inter,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --glow1:rgba(91,63,214,.07);--glow2:rgba(180,65,12,.05);--hair:linear-gradient(90deg,transparent,rgba(91,63,214,.35),rgba(180,65,12,.25),transparent);
+  --ease:cubic-bezier(.16,1,.3,1);--dur:.2s}
+html[data-theme=dark]{--glow1:rgba(184,169,255,.08);--glow2:rgba(255,178,107,.04);--hair:linear-gradient(90deg,transparent,rgba(184,169,255,.45),rgba(255,178,107,.25),transparent);
+  --stage1:#1b2232;--stage2:#05070b}
+body{background:radial-gradient(1200px 600px at 10% -10%,var(--glow1),transparent 60%),radial-gradient(900px 500px at 100% 0%,var(--glow2),transparent 60%),var(--bg);background-attachment:fixed;
+  font-feature-settings:"cv11","ss01","ss03";letter-spacing:-.006em}
+h1,h2,h3,h4{letter-spacing:-.022em}
+.hero h1,.page h1,.pagehead h1{letter-spacing:-.035em;font-weight:720}
+.lede{color:var(--mut);font-size:var(--fs-md);line-height:1.6}
+.topbar{position:sticky;background:color-mix(in srgb,var(--panel) 72%,transparent);backdrop-filter:saturate(1.8) blur(18px);-webkit-backdrop-filter:saturate(1.8) blur(18px);
+  border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:none;min-height:56px}
+.topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:var(--hair);pointer-events:none}
+.nav button{font-weight:550;color:var(--mut)}
+.nav button.on{color:var(--accink);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accink) 22%,transparent)}
+.btn{transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease),color var(--dur) var(--ease)}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn:active:not(:disabled){transform:translateY(0) scale(.98)}
+.btn.primary{background:linear-gradient(180deg,color-mix(in srgb,var(--acc) 88%,#fff),var(--acc));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 1px 2px rgba(79,52,199,.3),0 8px 20px -6px rgba(79,52,199,.45)}
+.btn.primary:hover:not(:disabled){background:linear-gradient(180deg,var(--acc),var(--accink))}
+.panel,.result,.history,.hero,.card,.pcard,.hcard,details,.printer,.acc,dialog{border-color:color-mix(in srgb,var(--line) 80%,transparent)}
+.hero{background:linear-gradient(160deg,color-mix(in srgb,var(--panel2) 70%,var(--tint)),var(--panel) 75%)}
+.pcard:hover{transform:translateY(-3px)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+/* Dark mode toggle: upper right of the top bar, 44px target */
+.themetoggle{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;min-width:44px;padding:0;margin-left:var(--s1);flex:none;order:99;
+  border-radius:var(--r-pill);border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer;box-shadow:var(--sh-1);
+  transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),transform var(--dur) var(--ease)}
+.themetoggle:hover{border-color:var(--ctl);background:var(--sunk)}
+.themetoggle:active{transform:scale(.94)}
+.themetoggle:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.themetoggle .i{width:20px;height:20px;transition:transform .35s var(--ease)}
+.themetoggle[aria-pressed=true] .i{transform:rotate(-30deg)}
+.themetoggle.floating{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:30}
+.topbar .themetoggle{margin-left:auto}.topbar .spacer+.themetoggle,.topbar .btn+.themetoggle{margin-left:var(--s1)}
+html[data-theme=dark] dialog::backdrop{background:rgba(0,0,0,.6)}
+html[data-theme=dark] .logoimg{background:#fff}
+html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{color-scheme:dark}
+input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,textarea){color-scheme:dark}
+@media (max-width:768px){.topbar{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}/* a filter here would trap the fixed bottom tab bar */
+  .themetoggle{order:4;margin-left:2px}}
+@media (prefers-reduced-motion:reduce){.btn:hover:not(:disabled),.btn:active:not(:disabled),.pcard:hover,.themetoggle:active{transform:none}.themetoggle .i,.themetoggle[aria-pressed=true] .i{transition:none;transform:none}}
+@media (forced-colors:active){.themetoggle{border:1px solid ButtonText}.topbar::after{display:none}}
+
+/* v2 nav: six tabs (Showcase, Slicer, CAD, Lithophane, Smart Fix, Account); feed-style Showcase; tool cards */
+.nav button{white-space:nowrap}
+@media (min-width:769px) and (max-width:1100px){.nav button span{display:none}.nav button{padding:var(--s2) var(--s3)}}
+@media (max-width:768px){.topbar .nav button{font-size:11px;min-width:0;flex:1 1 0;letter-spacing:-.01em}.topbar .nav button span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .topbar .nav button.on .i{width:44px;padding:2px 10px}}
+.feedbar{gap:var(--s2);align-items:center;flex-wrap:wrap;margin:var(--s2) 0}
+.feedbar .createcta{margin-left:auto;text-decoration:none;display:inline-flex;align-items:center;gap:var(--s2)}
+.feedbar a.btn.ghost{text-decoration:none;display:inline-flex;align-items:center;gap:var(--s2);color:var(--txt)}
+#viewShowcase .pagehead form{flex:1 1 360px}
+#viewShowcase #shSearch{width:100%!important;min-height:48px;font-size:var(--fs-md);border-radius:var(--r-pill);padding-left:var(--s5);background:var(--panel)}
+#viewShowcase .pagehead{flex-wrap:wrap;gap:var(--s4)}
+#viewShowcase .grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+@media (max-width:768px){#viewShowcase .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}.feedbar .createcta{margin-left:0;flex:1 1 100%;justify-content:center;min-height:48px}}
+.toolgrid{list-style:none;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--s4)}
+.toolcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--sh-1);display:flex;flex-direction:column;gap:var(--s2);transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
+.toolcard:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+.toolcard h2{margin:0;font-size:var(--fs-lg)}.toolcard .btn{margin-top:auto;align-self:flex-start;text-decoration:none;display:inline-flex;align-items:center;gap:var(--s2);color:inherit}
+.toolcard .btn.primary{color:var(--on-acc)}
+.toolcard .btn .lbl{display:inline!important}
+@media (prefers-reduced-motion:reduce){.toolcard:hover{transform:none}}

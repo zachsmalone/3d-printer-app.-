@@ -51,5 +51,5 @@ def test_light_is_the_default_and_the_violet_gradient_and_old_brand_violet_are_g
     assert LIGHT["bg"].lower() == "#fff8ee" and "color-scheme:light" in CSS[CSS.index(":root{"):].split("}")[0]
     assert "prefers-color-scheme:dark" not in CSS.replace(" ", "")          # dark only when the person chose it
     assert "#7c5cff" not in CSS.lower() and "linear-gradient(135deg,var(--acc)" not in CSS
-    boot = (Path(__file__).parent.parent / "static" / "boot.js").read_text()
-    assert 'localStorage.theme === "dark"' in boot
+    idx = (Path(__file__).parent.parent / "static" / "index.html").read_text()
+    assert 't==="dark"' in idx[:idx.index("</head>")]          # saved choice wins; OS preference only when nothing is saved (inline head snippet)

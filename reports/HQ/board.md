@@ -171,3 +171,30 @@ Nozzle it accepted: single positive-only button replacing every like/heart/upvot
 6. Remix credit chain; "I printed this" photos.
 7. LAST before launch: lithophanes incl. color options (light colors, CMYK multi-color for AMS/CFS, backlight tip).
 Postponed: live streams, DMs, modeling tools. Removed: school features.
+
+## 2026-10-12 Zach request: multi-file upload
+Upload several STL/3MF/OBJ at once, then choose: (a) "Parts of one print": arrange all on one plate (auto-arrange, fit check, one 3MF/G-code), or (b) "Separate prints": each file becomes its own model/export/slice. Priority: right after the UI redesign + 3MF fix. Ties into Claude task 11 (multi-object plates).
+
+## 2026-10-12 Zach request: Split large models
+- Manual split: user places/rotates a cut plane (or several) in the 3D view.
+- Smart auto-split: user picks number of parts (2-N); algorithm chooses cuts so each part fits the selected printer's bed, minimizing visible seams (cut along flat/hidden areas, avoid thin features) and support needs. Label honestly as "auto", not AI, unless an ML model is actually used.
+- Joining options per cut: (a) magnet pockets: user enters magnet diameter x thickness (e.g. 6x3 mm) + clearance, pockets auto-placed in pairs; (b) dovetail/keyed locking tabs; (c) alignment pins/dowel holes (printed or 1.75 mm filament pins); (d) plain flat + glue registration marks.
+- Seam hiding: cut-face registration keys so parts align exactly, optional chamfer/groove on seam line, part numbering embossed on hidden face.
+- Each part exported/sliced separately or arranged across plates (ties into multi-file upload + multi-object plates).
+Priority: after UI redesign, 3MF fix, multi-file upload. Owner: Claude (geometry) + builder; QA Ren Ishikawa prints a test fit.
+
+## 2026-10-12 Zach request: Auto-orient + lay flat
+- "Lay flat": user taps a face (manual) or auto picks the best large flat face down.
+- "Best orientation": auto-rotate to minimize support volume/overhang area (>45 deg), weighted for bed contact and print height; show before/after support estimate. Manual rotate stays.
+- Overlaps Claude task 5 (auto-orient). Name it "Smart orient" (algorithmic, honest labeling).
+Priority: with slicer UI work, before Split.
+
+## Nozzle size picker (Zach, 2026-10-12)
+- Printer picker adds nozzle: 0.1/0.2/0.4/0.6/0.8/1.0 mm; drives slicer profile, Will-it-print badge, Split connector tolerances.
+- Vision: all-in-one (lithophanes, upload/download, trending, slicer, editor). Perplexity to compile sourced top maker pain points (Reddit/FB/YouTube/blogs); target 80%+ satisfied.
+
+## All-in-one vision (Zach, 2026-10-12 5:16 PM)
+- Launch: full slicer settings (infill pattern/%, walls, layers, supports, speed, temps), search history + clear, favorites, follow users, trending.
+- Post-launch: Tinkercad-style beginner builder growing into advanced tools.
+- Later: Shapr3D-style precision CAD, Nomad-style sculpting.
+- Benchmark Cura/PrusaSlicer/Thingiverse/Printables/Cults gaps via Perplexity pain-points research.

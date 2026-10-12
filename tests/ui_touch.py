@@ -33,7 +33,7 @@ with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
     for (w, h) in ((390, 844), (820, 1180)):
         ctx = b.new_context(viewport={"width": w, "height": h}, has_touch=True, is_mobile=True, device_scale_factor=2)
-        pg = ctx.new_page(); pg.goto(URL); pg.wait_for_timeout(700)
+        pg = ctx.new_page(); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
         meta = pg.evaluate("document.querySelector('meta[name=viewport]').content")
         if "viewport-fit=cover" not in meta: bad.append((w, "viewport", meta))
         tag = f"{w}"
@@ -68,7 +68,7 @@ with sync_playwright() as p:
             pg.click("#btnPrint"); pg.wait_for_timeout(500); audit(pg, tag + " print-dialog")
             pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
             if pg.evaluate("document.querySelector('#dlgPrint').open"): pg.click("#dlgPrint [data-close]"); pg.wait_for_timeout(200)       # (under heavy load Chrome ignores Escape when the dialog opened after the tap's activation expired)
-        for view in ("edit", "showcase"):
+        for view in ("slicer", "cad", "smartfix", "account", "showcase"):
             pg.click(f"#mainNav [data-view={view}]"); pg.wait_for_timeout(600); audit(pg, f"{tag} {view}")
         pg.screenshot(path=f"previews/ui_touch_{w}.png")
         ctx.close()

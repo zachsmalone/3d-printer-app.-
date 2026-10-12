@@ -204,3 +204,8 @@ def test_username_is_chosen_changed_once_and_locked_in_the_account_dialog_in_chr
         p.terminate(); p.wait(10)
 
 
+
+
+def test_dark_mode_toggle_persists_aria_44px_every_page_in_a_real_browser(live):
+    code, out = run("ui_theme_toggle.py", live)
+    assert code == 0, out

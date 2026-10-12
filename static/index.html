@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head>
+<head><script>try{var t=localStorage.theme;if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script><script src="/static/theme.js" defer></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ZEIM</title>
@@ -11,14 +11,16 @@
 <script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
 </head>
 <body>
-<a class="skip" id="skipLink" href="#viewCreate">Skip to main content</a>
+<a class="skip" id="skipLink" href="#viewShowcase">Skip to main content</a>
 <header class="topbar">
   <a class="brand" href="/" title="Home"><img src="/static/logo-header.png" alt="ZEIM" class="logoimg" id="logoImg"></a>
   <nav class="nav" id="mainNav" aria-label="Main">
-    <button data-view="create" class="on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span data-sec="create">Studio</span></button>
-    <button data-view="showcase"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span data-sec="discover">Showcase</span></button>
-    <button data-view="edit"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span data-sec="edit">Edit</span></button>
-    <button data-view="learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg><span data-sec="learn">Learn</span></button>
+    <button data-view="showcase" class="on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Showcase</span></button>
+    <button data-view="slicer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M8 4v6M16 9v6M11 14v6"/></svg><span>Slicer</span></button>
+    <button data-view="cad"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span>CAD</span></button>
+    <button data-view="lithophane"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span>Lithophane</span></button>
+    <button data-view="smartfix"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>Smart Fix</span></button>
+    <button data-view="account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg><span>Account</span></button>
   </nav>
   <div class="modepick">
     <label for="modeSel">Mode</label>
@@ -30,11 +32,10 @@
     <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours.</p>
   </div>
   <div class="spacer"></div>
-  <button class="btn ghost" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button>
-  <button class="btn ghost" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button>
+  <button type="button" class="themetoggle" id="themeToggle" aria-pressed="false" aria-label="Dark mode" title="Switch to dark mode"></button>
 </header>
 
-<main class="layout" id="viewCreate">
+<main class="layout" id="viewCreate" hidden>
   <section class="hero" aria-labelledby="h1">
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
     <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
@@ -282,15 +283,42 @@
 </div></dialog>
 
 
-<main class="page" id="viewShowcase" hidden>
+<main class="page" id="viewShowcase">
   <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Family-friendly community projects. Everything is free to download.</p></div>
     <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
-  <div class="seg" id="shTabs"></div>
+  <div class="row feedbar"><div class="seg" id="shTabs"></div><a class="btn primary createcta" href="#studio" id="btnCreatePhoto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Create from photo</a><a class="btn ghost" href="#learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg> Learn</a></div>
   <p class="help" id="shSub"></p>
   <p class="help" id="shCount" role="status" aria-live="polite"></p>
   <p class="help" id="shNotice"></p>
   <div class="cats" id="shCats" role="group" aria-label="Filter by category"></div>
   <ul class="grid" id="shGrid"></ul>
+</main>
+
+<main class="page" id="viewCad" hidden>
+  <div class="pagehead"><div><h1>CAD</h1><p class="help"><span class="pill">Coming soon</span> A full design workspace (sketch, extrude, parametric parts) is on the way. Until then, these tools already work on any STL, OBJ or 3MF:</p></div></div>
+  <ul class="grid toolgrid">
+    <li class="toolcard"><h2>Cut &amp; split</h2><p class="help">Slice a model with a plane into parts that fit your printer.</p><a class="btn" href="#slicer/cut">Open Cut / split</a></li>
+    <li class="toolcard"><h2>Orient &amp; place</h2><p class="help">Drop to the bed, centre, mirror, rotate and scale.</p><a class="btn" href="#slicer/orient">Open Orient</a></li>
+    <li class="toolcard"><h2>Text &amp; base</h2><p class="help">Add raised text or a base plate.</p><a class="btn" href="#slicer/text">Open Text</a></li>
+  </ul>
+</main>
+
+<main class="page" id="viewFix" hidden>
+  <div class="pagehead"><div><h1>Smart Fix</h1><p class="help">Open a model in the editor, then repair, hollow or simplify it. ZEIM checks for holes, flipped faces and hidden voids.</p></div></div>
+  <ul class="grid toolgrid">
+    <li class="toolcard"><h2>Repair</h2><p class="help">Fix normals, fill holes, remove duplicates, keep the largest part.</p><a class="btn" href="#slicer/repair">Repair a model</a></li>
+    <li class="toolcard"><h2>Hollow</h2><p class="help">Save material with a hollow inside and a drain hole.</p><a class="btn" href="#slicer/hollow">Hollow a model</a></li>
+    <li class="toolcard"><h2>Simplify</h2><p class="help">Lower the triangle count while keeping the shape.</p><a class="btn" href="#slicer/simplify">Simplify a model</a></li>
+  </ul>
+</main>
+
+<main class="page" id="viewAccount" hidden>
+  <div class="pagehead"><div><h1>Account</h1><p class="help" id="accSummary">Your page: profile, sign-in and your printers.</p></div></div>
+  <ul class="grid toolgrid">
+    <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><button class="btn big primary" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></li>
+    <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
+    <li class="toolcard"><h2>Learn</h2><p class="help">Short family-friendly lessons.</p><a class="btn big" href="#learn">Open Learn</a></li>
+  </ul>
 </main>
 
 <main class="page" id="viewLearn" hidden>
@@ -357,7 +385,7 @@
 <dialog id="dlgNzAcct" aria-labelledby="nzAcctH"><div class="dlg"><div class="dh"><h3 id="nzAcctH">Make a free account to nozzle</h3></div>
   <div class="body"><p>A nozzle is a way to say "nice work" to a maker. You need a free ZEIM account to give one. It takes a minute and costs nothing.</p></div>
   <div class="df"><button type="button" class="btn" id="nzAcctLater">Not now</button><button type="button" class="btn primary" id="nzAcctMake">Make an account</button></div></div></dialog>
-<footer class="sitefoot"><button type="button" class="linkbtn" id="themeBtn" aria-pressed="false">Look: Warm</button><a href="/static/COMMUNITY_GUIDELINES.html">Rules</a><a href="/static/privacy.html">Privacy</a><a href="/static/terms.html">Terms</a><a href="/credits">Thank you &amp; credits</a></footer>
+<footer class="sitefoot"><a href="/static/COMMUNITY_GUIDELINES.html">Rules</a><a href="/static/privacy.html">Privacy</a><a href="/static/terms.html">Terms</a><a href="/credits">Thank you &amp; credits</a></footer>
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/community.js"></script>
 <script type="module" src="/static/edit.js"></script>

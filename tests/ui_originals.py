@@ -14,7 +14,7 @@ def run(name, launch, with_axe):
     errs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(700); pg.click("#mainNav [data-view=showcase]"); pg.click('#shTabs [data-tab=free]')
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700); pg.click("#mainNav [data-view=showcase]"); pg.click('#shTabs [data-tab=free]')
     pg.wait_for_selector('#shGrid .pcard[data-item="zo-pencil-cup"]')
     t = pg.inner_text('#shGrid .pcard[data-item="zo-pencil-cup"]')
     ok(f"{name}: card shows credit, difficulty, Suggested FDM, Untested print, caveat", all(s in t for s in ('"Pencil Cup" by ZEIM · CC BY 4.0', "Easy", "Suggested: FDM", "Untested print", "Fit not checked")), t)

@@ -7,12 +7,12 @@ bad = []
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
     for w in (320, 375, 390, 768):
-        pg = b.new_page(viewport={"width": w, "height": 800}); pg.goto(URL); pg.wait_for_timeout(600)
-        for view in ("create", "showcase", "edit", "learn"):
+        pg = b.new_page(viewport={"width": w, "height": 800}); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
+        for view in ("showcase", "slicer", "cad", "lithophane", "smartfix", "account"):
             pg.click(f"#mainNav [data-view={view}]"); pg.wait_for_timeout(300)
             sw = pg.evaluate("document.documentElement.scrollWidth")
             if sw > w: bad.append((w, view, "scrollWidth", sw))
-            for sel in ("#mainNav [data-view=create]", "#mainNav [data-view=learn]", "#modeSel", "#btnAccount", "#btnSettings"):
+            for sel in [f"#mainNav [data-view={v}]" for v in ("showcase", "slicer", "cad", "lithophane", "smartfix", "account")] + ["#modeSel", "#themeToggle"]:
                 bx = pg.locator(sel).bounding_box()
                 if not bx or bx["x"] < -1 or bx["x"] + bx["width"] > w + 1 or bx["height"] < 43: bad.append((w, view, sel, bx))
         pg.screenshot(path=f"previews/ui_mobile_{w}.png"); pg.close()

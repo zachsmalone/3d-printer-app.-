@@ -14,10 +14,10 @@ def run(name, launch, with_axe):
     except Exception as e: print(f"SKIP {name}: {str(e).splitlines()[0][:80]}"); return
     errs = []; tag = name[:2] + str(os.getpid() % 997)
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, bypass_csp=True)
-    pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL); pg.wait_for_timeout(700)
-    pg.click("#btnAccount"); pg.fill("#su_name", "Ms Out"); pg.fill("#su_user", f"MsOut_{tag}"); pg.fill("#su_dob", "1980-02-02"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
+    pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.fill("#su_name", "Ms Out"); pg.fill("#su_user", f"MsOut_{tag}"); pg.fill("#su_dob", "1980-02-02"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
     pg.evaluate("document.querySelector('#dlgAccount').close()"); pg.select_option("#modeSel", "expert"); pg.wait_for_timeout(300)
-    pg.click("#btnAccount"); pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]")
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]")
     ok(f"{name}: sign-out dialog explains there are no passwords and needs the recovery code", "no passwords yet" in pg.inner_text("#soBody") and "recovery code" in pg.inner_text("#soBody"))
     ok(f"{name}: Sign out stays off until the code is shown and the box ticked", pg.is_disabled("#soGo") and pg.is_disabled("#soOk"))
     pg.click("#soCodeBtn"); pg.wait_for_selector("#soCode .code")
@@ -32,7 +32,7 @@ def run(name, launch, with_axe):
     ok(f"{name}: after sign-out the browser has no account",
        "sign up" in (pg.get_attribute("#btnAccount", "aria-label") or "") and not pg.locator("#classBar").count())
     ok(f"{name}: the page says you are signed out", "signed out" in pg.inner_text("#toasts").lower(), pg.inner_text("#toasts"))
-    pg.click("#btnAccount"); pg.click("#accBody details.recover summary"); pg.fill("#rc_code", "WRONG-CODE-0000-0000"); pg.click("#rc_go"); pg.wait_for_selector("#accBody .inline-msg")
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.click("#accBody details.recover summary"); pg.fill("#rc_code", "WRONG-CODE-0000-0000"); pg.click("#rc_go"); pg.wait_for_selector("#accBody .inline-msg")
     ok(f"{name}: a wrong code is refused inline and the typed code stays", "didn't work" in pg.inner_text("#accBody .inline-msg") and pg.input_value("#rc_code") == "WRONG-CODE-0000-0000")
     pg.fill("#rc_code", code); pg.click("#rc_go"); pg.wait_for_selector("#rc_done")
     ok(f"{name}: the right code brings the account back and shows a NEW code", f"@MsOut_{tag}" in pg.inner_text("#accBody") and code not in pg.inner_text("#accBody .code"))
@@ -40,8 +40,8 @@ def run(name, launch, with_axe):
     ok(f"{name}: signed in again after reload", "Ms Out" in pg.inner_text("#btnAccount") or "Ms Out" in (pg.get_attribute("#btnAccount", "aria-label") or ""))
     ctx.close()
     # teen
-    ctx = b.new_context(viewport={"width": 390, "height": 844}, bypass_csp=True); pg = ctx.new_page(); pg.goto(URL); pg.wait_for_timeout(600)
-    pg.click("#btnAccount"); pg.fill("#su_name", "Tess"); pg.fill("#su_dob", "2011-01-01"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
+    ctx = b.new_context(viewport={"width": 390, "height": 844}, bypass_csp=True); pg = ctx.new_page(); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
+    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.fill("#su_name", "Tess"); pg.fill("#su_dob", "2011-01-01"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
     pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]")
     ok(f"{name}: a teen is told plainly the account can't be opened again", "can't be opened again" in pg.inner_text("#soBody") and pg.is_disabled("#soGo"))
     pg.check("#soOk"); pg.click("#soGo"); pg.wait_for_load_state(); pg.wait_for_timeout(1000)

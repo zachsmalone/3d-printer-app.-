@@ -24,17 +24,33 @@ async function refreshMe() {
 }
 
 /* ---------- views ---------- */
+const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", account: "#viewAccount", learn: "#viewLearn" };
+const ALIAS = { "": "showcase", edit: "slicer", create: "lithophane", studio: "lithophane" };
 function show(view) {
-  $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === view); if (b.dataset.view === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
-  $("#viewCreate").hidden = view !== "create"; $("#viewShowcase").hidden = view !== "showcase"; $("#viewLearn").hidden = view !== "learn"; $("#viewEdit").hidden = view !== "edit";
-  if (view === "edit") document.dispatchEvent(new CustomEvent("zeim:edit-shown"));
+  const tab = view === "learn" ? "account" : view;
+  $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === tab); if (b.dataset.view === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+  Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
+  document.body.dataset.view = view;
+  if (view === "slicer") document.dispatchEvent(new CustomEvent("zeim:edit-shown"));
   if (view === "showcase") loadShowcase();
   if (view === "learn") loadLearn();
 }
-$$("#mainNav button").forEach(b => b.onclick = () => { location.hash = b.dataset.view === "create" ? "" : b.dataset.view; });
+$$("#mainNav button").forEach(b => b.onclick = () => { location.hash = b.dataset.view; });
+const TOOLWORDS = { cut: "Cut", orient: "Rotate", text: "Text", repair: "Repair", hollow: "Hollow", simplify: "Repair" };
+function openTool(t) {   // Smart Fix / CAD shortcuts: open the matching tool in the editor once a model is loaded
+  const w = TOOLWORDS[t]; if (!w) return;
+  const d = [...document.querySelectorAll("#viewEdit details.tool")].find(x => x.querySelector("summary")?.textContent.includes(w));
+  if (d && d.offsetParent) { d.open = true; d.scrollIntoView?.({ block: "nearest" }); return; }
+  const b = document.querySelector(`#viewEdit [data-big="${t}"]:not(:disabled)`); if (b && !b.classList.contains("on")) b.click();
+}
+let toolDone = "";
+document.addEventListener("zeim:edit-loaded", () => { const h = location.hash.split("/"); if (h[1] && toolDone !== location.hash) { toolDone = location.hash; openTool(h[1]); } });
 function route() {
   const h = location.hash.replace("#", "").split("/");
-  show(["showcase", "learn", "edit"].includes(h[0]) ? h[0] : "create");
+  const v = ALIAS[h[0]] ?? (VIEWS[h[0]] ? h[0] : "showcase");
+  show(v);
+  if (v === "lithophane" && h[0] === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
+  if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
 }
 addEventListener("hashchange", route);
@@ -329,7 +345,7 @@ async function openLesson(id) {
   $("#lsClose").onclick = () => { box.hidden = true; loadLearn(); };
   $("#lsCopy").onclick = () => { navigator.clipboard?.writeText(location.origin + l.share_url); toast("Link copied", "ok"); };
   $$("[data-step]", box).forEach(c => c.onchange = async () => { await api(`/api/learn/lessons/${id}/steps/${c.dataset.step}`, J("POST", { done: c.checked })); openLesson(id); });
-  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = ""; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
+  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = "studio"; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
 }
 
 

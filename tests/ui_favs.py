@@ -15,7 +15,7 @@ def run(name, launch):
     errs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_timeout(600); pg.evaluate(MK); pg.reload(); pg.wait_for_selector("#histList .hcard", timeout=15000)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600); pg.evaluate(MK); pg.reload(); pg.wait_for_selector("#histList .hcard", timeout=15000)
     ok(f"{name}: the 7-day note and the 0/20 style count are shown", "7 days" in pg.inner_text("#histNote") and "/ 20" in pg.inner_text("#histCount"), (pg.inner_text("#histNote"), pg.inner_text("#histCount")))
     star = pg.locator("#histList .hcard button.star").first
     box = star.bounding_box(); ok(f"{name}: star is >= 44px", box["width"] >= 44 and box["height"] >= 44, box)

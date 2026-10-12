@@ -11,9 +11,9 @@ with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome")
     pg = b.new_context(viewport={"width": 390, "height": 844}).new_page(); errs = []
     pg.on("pageerror", lambda e: errs.append(str(e)))
-    pg.goto(URL); pg.wait_for_selector("#mainNav"); pg.wait_for_timeout(700)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_selector("#mainNav"); pg.wait_for_timeout(700)
     for pre, label in (("s", "Studio"), ("e", "Edit")):
-        if pre == "e": pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(400)
+        if pre == "e": pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(400)
         box = f"#{pre}Ack"
         ok(f"{label}: permission box exists, is NOT pre-ticked", pg.is_visible(box) and not pg.is_checked(box))
         ok(f"{label}: wording asks for own photo/permission, no addresses, school names or license plates", all(x in pg.inner_text(f"#{pre}Pick .pp-ack") for x in ("my photo", "permission", "addresses", "school names", "license plates")))
@@ -24,13 +24,13 @@ with sync_playwright() as p:
         pg.wait_for_selector("#result:not([hidden])" if pre == "s" else "#editPanel:not([hidden])", timeout=120000)
         ok(f"{label}: with the box ticked the photo is accepted", True)
         pg.reload(); pg.wait_for_selector("#mainNav"); pg.wait_for_timeout(500)
-        if pre == "s": pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300); pg.click("#mainNav [data-view=create]"); pg.wait_for_timeout(300)
+        if pre == "s": pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300); pg.click("#mainNav [data-view=lithophane]"); pg.wait_for_timeout(300)
     # sample needs no tick
-    pg.click("#mainNav [data-view=create]"); pg.reload(); pg.wait_for_selector("#mainNav"); pg.wait_for_timeout(500)
+    pg.click("#mainNav [data-view=lithophane]"); pg.reload(); pg.wait_for_selector("#mainNav"); pg.wait_for_timeout(500)
     ok("Studio: box is unticked again after a reload", not pg.is_checked("#sAck"))
     pg.click("#sSample"); pg.wait_for_selector("#result:not([hidden])", timeout=120000)
     ok("Studio: the built-in sample image builds without ticking", True)
-    pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)
+    pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
     ok("Edit: box unticked", not pg.is_checked("#eAck"))
     pg.click("#eSample"); pg.wait_for_selector("#editPanel:not([hidden])", timeout=120000)
     ok("Edit: the built-in sample image opens without ticking", True)

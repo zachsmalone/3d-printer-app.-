@@ -17,21 +17,21 @@ J = "{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.string
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, device_scale_factor=2)
-    pg = ctx.new_page(); pg.goto(URL); pg.wait_for_timeout(700)
+    pg = ctx.new_page(); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
     # ---- QA-1 (Studio -> Edit -> Studio, and back)
     pg.click("#sSample"); pg.wait_for_selector("#result:not([hidden])", timeout=120000); pg.wait_for_timeout(500)
-    pg.click("#mainNav [data-view=edit]"); pg.click("#editSample"); pg.wait_for_selector("#editResult:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
-    pg.click("#mainNav [data-view=create]"); pg.wait_for_timeout(300)
+    pg.click("#mainNav [data-view=slicer]"); pg.click("#editSample"); pg.wait_for_selector("#editResult:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
+    pg.click("#mainNav [data-view=lithophane]"); pg.wait_for_timeout(300)
     pg.click("#btnPrint"); pg.wait_for_selector("#dlgPrint[open]"); w = pg.inner_text("#printWhich")
     ok("QA-1: Studio Print shows the Studio lithophane, not the Edit vase", "Lithophane" in w and "Sample vase" not in w, w)
     pg.keyboard.press("Escape")
-    pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)
+    pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
     pg.click("#editPrint"); pg.wait_for_selector("#dlgPrint[open]"); w2 = pg.inner_text("#printWhich")
     ok("QA-1: Edit Print shows the Edit project", "Sample vase" in w2, w2)
     pg.keyboard.press("Escape")
     pg.click("#editSend"); pg.wait_for_selector("#dlgSendSheet[open]"); w3 = pg.inner_text("#ssWhich")
     ok("QA-1: Edit Send names the Edit project", "Sample vase" in w3, w3); pg.keyboard.press("Escape")
-    pg.click("#mainNav [data-view=create]"); pg.click("#btnSendSheet"); pg.wait_for_selector("#dlgSendSheet[open]")
+    pg.click("#mainNav [data-view=lithophane]"); pg.evaluate("location.hash=\'studio\'"); pg.click("#btnSendSheet"); pg.wait_for_selector("#dlgSendSheet[open]")
     ok("QA-1: Studio Send names the Studio build", "Sample photo" in pg.inner_text("#ssWhich"), pg.inner_text("#ssWhich")); pg.keyboard.press("Escape")
     # ---- QA-4: the finished model is brought into view after a Beginner build
     pg.reload(); pg.wait_for_timeout(600)
@@ -56,7 +56,7 @@ with sync_playwright() as p:
     pg.evaluate("window.scrollTo(0,0)"); pg.select_option("#modeSel", "beginner"); pg.wait_for_timeout(300)
     ok("QA-5: Beginner Build is not floating over the Style cards", pg.evaluate("getComputedStyle(document.querySelector('#btnBuild')).position") != "fixed")
     # ---- QA-3: Edit photo errors are inline
-    pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)
+    pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
     for f, want in (("empty.jpg", "couldn't open"), ("big.jpg", "over 25 MB")):
         up(pg, "#eFile", "#eAck", T + "/" + f); pg.wait_for_timeout(600)
         ok(f"QA-3: Edit {f} -> inline message under the photo buttons", want in pg.inner_text("#eMsg") and pg.locator(".toast").count() == 0, pg.inner_text("#eMsg"))
@@ -64,13 +64,13 @@ with sync_playwright() as p:
     ok("QA-3: Edit unreadable photo -> inline too", "couldn't open" in pg.inner_text("#eMsg"), pg.inner_text("#eMsg"))
     ctx.close()
     # ---- Edit drop zone at the 5-build cap (item 6)
-    ctx = b.new_context(viewport={"width": 1100, "height": 900}); pg = ctx.new_page(); pg.goto(URL); pg.wait_for_timeout(600)
+    ctx = b.new_context(viewport={"width": 1100, "height": 900}); pg = ctx.new_page(); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
     n = pg.evaluate("""async () => { const sb = await (await fetch('/static/sample.png')).blob(); let ok = 0;
         for (let i = 0; i < 5; i++) { const fd = new FormData(); fd.append('file', new File([sb], 'a'+i+'.png', {type:'image/png'})); fd.append('mode','relief'); fd.append('resolution','40'); fd.append('width_mm','40');
           fd.append('photo_ack','true'); const r = await fetch('/api/generate', {method:'POST', body: fd}); if (r.ok) { ok++; const id = (await r.json()).id;
             await fetch('/api/builds/' + id + '/favorite', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({favorite:true})}); } } return ok; }""")
     pg.reload(); pg.wait_for_timeout(800)
-    pg.click("#mainNav [data-view=edit]"); pg.wait_for_timeout(300)
+    pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
     pg.click("#editSample"); pg.wait_for_selector("#dlgFull[open]", timeout=15000)
     ok("Edit at 5/5: model sample opens the 'history full' dialog (not a raw error)", n == 5 and pg.is_visible("#dlgFull"), n)
     pg.keyboard.press("Escape")

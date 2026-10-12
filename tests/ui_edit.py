@@ -7,12 +7,12 @@ with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
     pg = b.new_page(viewport={"width": 1440, "height": 1000})
     pg.on("pageerror", lambda e: errs.append("PAGEERR " + str(e))); pg.on("console", lambda m: errs.append(m.text) if m.type == "error" else None)
-    pg.goto(URL); pg.wait_for_timeout(600)
+    pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
     pg.evaluate("localStorage.level='beginner'"); pg.reload(); pg.wait_for_timeout(500)
     # clean history
     for x in pg.evaluate("fetch('/api/builds').then(r=>r.json()).then(j=>j.builds.map(b=>b.id))"):
         pg.evaluate(f"fetch('/api/builds/{x}',{{method:'DELETE'}})")
-    pg.click('#mainNav [data-view=edit]'); pg.wait_for_timeout(500)
+    pg.click('#mainNav [data-view=slicer]'); pg.wait_for_timeout(500)
     pg.screenshot(path="previews/ui_edit_start.png")
     pg.click("#editSample"); pg.wait_for_selector("#editResult:not([hidden])", timeout=60000); pg.wait_for_timeout(1500)
     pg.screenshot(path="previews/ui_edit_beginner.png")
