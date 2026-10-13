@@ -21,7 +21,7 @@ Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md).
 
 **ZEIM Originals** — our in-house flagship designs. Each is simulation-checked and badged **Simulated** or **Test-printed**.
 
-Hobbyist groups are called **Build Plates**.
+Groups are called **Build Plates**.
 
 ## Roadmap
 
