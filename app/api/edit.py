@@ -172,7 +172,7 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     params = body.get("params") or {}
     if not isinstance(params, dict):
         raise HTTPException(400, "params must be an object")
-    if op in ("hollow", "boolean", "text", "base"):                      # the heavy ones write big new meshes
+    if op in ("hollow", "boolean", "text", "base", "smart_split"):                      # the heavy ones write big new meshes
         from .builds import disk_guard
         disk_guard()
     return _act(bid, actor, lambda: editproj.add_op(bid, op, params))
