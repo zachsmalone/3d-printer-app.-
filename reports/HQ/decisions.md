@@ -30,3 +30,5 @@
 
 ## TOP PRIORITY (Zach, 2026-10-04 4:50 PM): photo upload broken + no camera option
 - Haruto: diagnose/fix upload with regression test; add "Take a photo" (capture=environment on phones, getUserMedia on desktop, strip EXIF/GPS). Ren Ishikawa verifies via real UI at phone size before "fixed".
+
+- 2026-10-12 18:41 CT (auto-approved after 6h, reversible): resin 0.2 mm = Experimental opt-in only; Wildlife Calls no classroom-only hold (schools removed); phone tests via existing ngrok/local-https; printer pref = account + localStorage; Experienced/Newest labels confirmed.

@@ -203,3 +203,34 @@ Priority: with slicer UI work, before Split.
 - Post-launch: Tinkercad-style beginner builder growing into advanced tools.
 - Later: Shapr3D-style precision CAD, Nomad-style sculpting.
 - Benchmark Cura/PrusaSlicer/Thingiverse/Printables/Cults gaps via Perplexity pain-points research.
+
+## 2026-10-12 18:41 CT | Mr. Yami Kato (VP) | STATUS (build-line run)
+Lead builder was idle; resumed on **print-core** (pilot blockers: printer+nozzle picker, Will-it-print badge, merge slicing paths, universal Open-in export). Community suite also mid-test in photo3d-comm. Local main fast-forwarded to origin/zeim `95cb54a` (Split specs #13). Disk: cleaned ~2GB stale `/tmp/zeim-tests-*`; box ~12% disk, RAM freed by killing stale pr7 servers. CI on zeim green. Copilot export branch still empty vs zeim — print-core covers issue #10. Teacher tools stay removed. Evening Zach summary reserved for ~8:34 CT run.
+
+## 2026-10-12 18:41 CT | Mr. Yami Kato (VP) | DECISION (auto-approved after 6h, reversible)
+1. **Resin 0.2 mm feature profile**: opt-in Experimental only; defaults stay at sourced public-guide sizes (walls ~0.8 mm, features ~0.5–0.7 mm). Not claimed as verified.
+2. **Wildlife Calls classroom hold**: school features removed; drop classroom-only hide. Treat like other Originals for family use. Sound/print verification still open (not auto-approved as "works").
+3. **Phone test path**: keep using the existing ngrok/tunnel path + Ren's local-https kit as fallback. No new paid tunnel. Hosting/domain still wait on Zach.
+4. **Printer preference storage**: account setting when signed in; browser localStorage for guests. Matches Zach's signup picker ask.
+5. **Mode label "Experienced"** (stored value `expert`) and **Newest** tab rename: confirm as shipped defaults.
+
+Still **open for Zach** (not auto-approved): web domain + claims mailbox, hosting budget, lawyer/counsel (CC BY Originals, DMCA agent, PrusaSlicer AGPL, takedown), deleting leftover `data/classrooms*` files, public/pilot launch.
+
+## 2026-10-12 21:19 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~8PM)
+Lead builder was idle (print-core fully behind origin/zeim; tip already merged). Resumed builder on Copilot **PR #22** (universal export API) with instructions to rebase onto latest zeim and keep only net-new bits — print-core `1378ffd` already shipped picker / Will-it-print / merged slicing / Open-in exports. Community "I printed this" (`390ee19`) already on zeim. Local main = origin/zeim `ef34640`; CI on zeim green. Disk: cleaned ~3GB stale `/tmp/zeim-tests-*` (box ~13% used). No new >6h reversible Zach questions since 18:41 auto-approvals. Still open (not auto-approved): domain + claims mailbox, hosting budget, counsel (CC BY / DMCA / AGPL), deleting leftover `data/classrooms*`, public/pilot launch, real K1 print + iPhone test. Teacher tools stay removed. Evening summary to Zach this run.
+
+## 2026-10-12 22:38 CT | Mr. Yami Kato (VP) | STATUS (build-line run)
+Lead builder idle again (no active executor). Local main fast-forwarded to origin/zeim `80d99c0` (no-lawyers legal pages). Disk: removed ~3GB `/tmp/aud` + stale print/qa dirs (box ~11% used, `/tmp` ~216M). No new >6h reversible Zach questions; prior auto-approvals stand. Open for Zach unchanged (domain/claims mailbox, hosting budget, DMCA fee OK, AGPL repo visibility, delete leftover classrooms data, public/pilot launch, real K1 + iPhone tests). Teacher tools stay removed. Evening Zach summary already sent at 21:19 run — this run stays quiet to Zach.
+
+**Build order this run (lead builder):**
+1. Land Copilot **PR #22** net-new bits only (`app/services/universal_export.py`, `app/api/export.py`, settings/printing wiring) rebased onto `80d99c0`; full suite green; merge to `zeim` and close #10 if covered.
+2. Next: **wire auth on** for local/pilot (`docs/auth.md` still "not mounted"): mount `init_auth` behind `ZEIM_ENV=dev` defaults for localhost, keep production refuse-without-secrets; do not spend on SMTP/domain.
+3. Then safety polish still open: grooming-style filter phrases; image-moderation stub/queue hooks for "I printed this" (already pending-review).
+
+**Specialists (HQ):** reports stale since ~16:43 CT — need fresh verify-on-`80d99c0` tasks (see HQ post).
+
+## 2026-10-13 00:38 CT | Mr. Yami Kato (VP) | STATUS (build-line run)
+Lead builder had not started the 22:38 build order (export22 worktree clean, no new commits on origin/zeim `80d99c0`). Re-dispatched lead builder on: (1) PR #22 net-new export bits, (2) PR #24 lithophane spec if docs-only, (3) auth on for local/pilot, (4) safety filter + photo moderation hook. Disk ~11% used, `/tmp` ~216M, no stale test dirs or stray servers. No new >6h reversible Zach questions. Open for Zach unchanged (domain/claims mailbox, hosting budget, DMCA fee OK, AGPL repo visibility, delete leftover classrooms data, public/pilot launch, real K1 + iPhone tests). Quiet to Zach (next summary ~8 PM CT).
+
+## 2026-10-13 01:17 CT | Lead builder | SHIPPED
+Universal export API (PR #22 net-new): commit e8156a2, 797 tests passing. Added app/services/universal_export.py + app/api/export.py (/api/export/hints, /{bid}, /{bid}/download), account-printer wiring into effective_slicer and /api/print/slice. Print-core picker / Will-it-print / Open-in catalog / merged slicing left as-is (no duplicate).
