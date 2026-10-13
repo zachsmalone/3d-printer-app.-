@@ -1,4 +1,4 @@
-import { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, applyMode } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -381,17 +381,47 @@ $("#btnDoPublish").onclick = async () => {
   } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
 };
 
-/* my data */
+/* What ZEIM knows about you (Kenji S-07): live view, download metadata, delete everything I made */
 $("#btnMyData").onclick = openData;
 async function openData() {
   const d = await api("/api/me/data");
-  const ints = Object.entries(d.interests).sort((a, b) => b[1] - a[1]);
-  $("#dataBody").innerHTML = `<p class="help">${esc(d.note)}</p><p>Personalization: <b>${d.enabled ? "on" : "off"}</b></p>
+  const ints = Object.entries(d.interests || {}).sort((a, b) => b[1] - a[1]);
+  const acct = d.account;
+  const who = acct ? `Signed in as <b>@${esc(acct.username || "")}</b>${acct.display_name ? ` (${esc(acct.display_name)})` : ""}.`
+                   : "You are using ZEIM without an account (this browser session only).";
+  const pr = acct?.printer ? `<li>Your printer choice: <b>${esc(acct.printer.printer_id || "")}${acct.printer.nozzle != null ? ` · ${esc(String(acct.printer.nozzle))} mm` : ""}</b></li>` : "";
+  $("#dataBody").innerHTML = `<p class="help">${esc(d.note)}</p>
+    <p>${who}</p>
+    <ul class="help">
+      <li>Builds and Edit projects: <b>${d.builds_count ?? 0}</b>${(d.builds || []).some(b => b.favorite) ? " (some starred ★)" : ""}</li>
+      <li>Projects you shared to Showcase: <b>${d.shared_count ?? 0}</b></li>
+      ${pr}
+      <li>Personalization (For You ranking): <b>${d.enabled ? "on" : "off"}</b></li>
+    </ul>
+    <h4>What ZEIM does <em>not</em> keep</h4>
+    <p class="help">${(d.not_collected || []).map(esc).join(" · ")}</p>
     <h4>Interests</h4><p>${ints.map(([t, w]) => `<span class="tag">${esc(t)} · ${w}</span>`).join("") || "<span class='help'>none yet</span>"}</p>
-    <h4>Recent searches</h4><p>${d.searches.map(s => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='help'>none</span>"}</p>`;
+    <h4>Recent searches</h4><p>${(d.searches || []).map(s => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='help'>none</span>"}</p>
+    <p class="help">Download my stuff saves a JSON file of this summary (no photo or model bytes). Delete everything I made removes your builds, photos and Showcase posts; your account stays so you can keep using ZEIM.</p>`;
   $("#btnToggleP13n").textContent = d.enabled ? "Turn personalization off" : "Turn personalization on";
   $("#btnToggleP13n").onclick = async () => { await api("/api/me/personalization", J("PUT", { enabled: !d.enabled })); openData(); };
-  $("#btnClearData").onclick = async () => { await api("/api/me/data", { method: "DELETE" }); toast("Cleared", "ok"); openData(); };
+  $("#btnClearData").onclick = async () => { await api("/api/me/data", { method: "DELETE" }); toast("Personalization cleared", "ok"); openData(); };
+  $("#btnDeleteStuff").onclick = async () => {
+    const n = (d.builds_count || 0) + (d.shared_count || 0);
+    if (!n) { toast("You have nothing to delete yet.", "ok"); return; }
+    const yes = await askConfirm({
+      title: "Delete everything I made?",
+      message: `This permanently removes ${d.builds_count || 0} build(s) (including starred ones and their photos) and ${d.shared_count || 0} Showcase project(s). Your account stays. This cannot be undone.`,
+      okLabel: "Delete everything I made",
+    });
+    if (!yes) return;
+    try {
+      const r = await api("/api/me/builds", { method: "DELETE" });
+      toast(`Deleted ${r.builds} build(s) and ${r.shared} shared project(s).`, "ok");
+      try { await loadHistory(); } catch { }
+      openData();
+    } catch (e) { toast(e.message, "err"); }
+  };
   if (!$("#dlgData").open) $("#dlgData").showModal();
 }
 

@@ -21,6 +21,24 @@ function inlineMsg(near, msg, kind = "err") {
   p.scrollIntoView?.({ block: "nearest" });
 }
 function clearInline(near) { const p = near?.previousElementSibling; if (p?.classList.contains("inline-msg")) p.remove(); }
+/** Accessible confirm dialog (replaces window.confirm). Resolves true/false. */
+function askConfirm({ title = "Please confirm", message, okLabel = "OK", danger = true } = {}) {
+  return new Promise(resolve => {
+    const dlg = $("#dlgConfirm"); if (!dlg) { resolve(window.confirm(message || title)); return; }
+    $("#confirmTitle").textContent = title;
+    $("#confirmMsg").textContent = message || "";
+    const ok = $("#confirmOk");
+    ok.textContent = okLabel;
+    ok.className = danger ? "btn danger" : "btn primary";
+    let settled = false;
+    const done = (v) => { if (settled) return; settled = true; dlg.close(); resolve(v); };
+    ok.onclick = () => done(true);
+    $("#confirmCancel").onclick = () => done(false);
+    dlg.addEventListener("close", () => done(false), { once: true });
+    dlg.showModal();
+    (danger ? $("#confirmCancel") : ok).focus();
+  });
+}
 // Server errors: a string detail is shown as-is; FastAPI 422 lists are turned into friendly field messages, never "[object Object]".
 const FIELD_NAMES = { width_mm: "Width", height_mm: "Height", resolution: "Detail", mode: "Style", file: "Photo", dob: "Date of birth", display_name: "Display name",
   username: "Username", title: "Title", password: "Password", nickname: "Nickname", keep_ratio: "Keep ratio", wall: "Wall thickness" };
@@ -439,7 +457,7 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert };
+export { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert };
 
 /* ---------- Look: Warm (default) or Dark. Remembered on this device; nothing is sent anywhere. ---------- */
 (() => {

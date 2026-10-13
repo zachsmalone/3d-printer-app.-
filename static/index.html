@@ -372,10 +372,20 @@
   <div class="body" id="itBody"></div>
 </div></dialog>
 
-<dialog id="dlgData"><div class="dlg">
-  <div class="dh"><h3>🔒 My personalization data</h3><button class="x" data-close>✕</button></div>
+<dialog id="dlgData" aria-labelledby="dataTitle"><div class="dlg">
+  <div class="dh"><h3 id="dataTitle">🔒 What ZEIM knows about you</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body" id="dataBody"></div>
-  <div class="df"><button class="btn" id="btnToggleP13n">Turn personalization on or off</button><button class="btn danger" id="btnClearData">Clear all my data</button></div>
+  <div class="df" style="flex-wrap:wrap;gap:8px">
+    <a class="btn" id="btnDownloadStuff" href="/api/me/export" download="zeim-my-data.json">⬇ Download my stuff</a>
+    <button class="btn" type="button" id="btnToggleP13n">Turn personalization on or off</button>
+    <button class="btn" type="button" id="btnClearData">Clear personalization</button>
+    <button class="btn danger" type="button" id="btnDeleteStuff">Delete everything I made</button>
+  </div>
+</div></dialog>
+<dialog id="dlgConfirm" aria-labelledby="confirmTitle"><div class="dlg">
+  <div class="dh"><h3 id="confirmTitle">Please confirm</h3><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="body"><p id="confirmMsg" role="alert"></p></div>
+  <div class="df"><button class="btn" type="button" id="confirmCancel" data-close>Cancel</button><button class="btn danger" type="button" id="confirmOk">Delete</button></div>
 </div></dialog>
 
 <dialog id="dlgReport" aria-labelledby="repTitle"><div class="dlg">

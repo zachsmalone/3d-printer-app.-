@@ -401,11 +401,55 @@ def report_user(uid: str, request: Request, body: dict, actor: Actor = Depends(g
 
 
 # ---------------- personalization (view / disable / clear) ----------------
+def _what_zeim_knows(actor: Actor) -> dict:
+    """Plain summary of everything ZEIM holds for this browser session / account (no photo bytes, no EXIF)."""
+    from ..services.history import store as _builds
+    p = personalization.get(actor.sid)
+    builds = [{"id": m["id"], "title": m.get("title"), "mode": m.get("mode"), "kind": m.get("kind", "photo"),
+               "created": m.get("created"), "favorite": bool(m.get("favorite")),
+               "visibility": m.get("visibility", "private")} for m in _builds.list(actor.sid)]
+    shared = [{"id": i["id"], "title": i.get("title"), "visibility": i.get("visibility", "private"),
+               "created": i.get("created")} for i in catalog.LISTINGS.read() if i.get("owner_sid") == actor.sid]
+    acct = None
+    if actor.user:
+        acct = {"username": actor.user.get("username"), "display_name": actor.user.get("display_name"),
+                "printer": actor.user.get("printer"), "privacy": actor.user.get("privacy"),
+                "following_count": len(actor.user.get("following") or [])}
+    return {
+        "account": acct, "signed_up": bool(actor.user),
+        "builds": builds, "builds_count": len(builds),
+        "shared": shared, "shared_count": len(shared),
+        "personalization": {"enabled": p.get("enabled"), "interests": p.get("interests") or {},
+                            "searches": p.get("searches") or []},
+        "not_collected": ["email (unless you used passkey/email login)", "phone number", "precise location",
+                          "payment info", "ads or trackers", "grades or school records"],
+        "note": ("Here is everything ZEIM keeps for you on this server. Photos you uploaded are kept with each build "
+                 "until you delete that build (EXIF/GPS is stripped on upload). ZEIM does not sell your data."),
+    }
+
+
 @router.get("/me/data")
 def my_data(actor: Actor = Depends(get_actor)):
-    p = personalization.get(actor.sid)
-    return {**p, "note": "Stored only on this server (data/prefs.json), keyed by your browser session. "
-                         "Used only to rank the For You tab."}
+    """What ZEIM knows about you (live view for the My data dialog)."""
+    d = _what_zeim_knows(actor)
+    # keep the old personalization keys at the top level so older clients still work
+    p = d["personalization"]
+    return {**d, "enabled": p["enabled"], "interests": p["interests"], "searches": p["searches"]}
+
+
+@router.get("/me/export")
+def export_my_stuff(actor: Actor = Depends(get_actor)):
+    """Download a JSON file of what ZEIM knows about you (metadata only — no photo/model bytes)."""
+    import json as _json
+    from datetime import datetime, timezone
+    body = _what_zeim_knows(actor)
+    body["exported_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    body["export_note"] = ("Metadata only. To save a model file, open the build and use Send or save. "
+                           "This file is for your records; it is not a full backup of every STL.")
+    raw = _json.dumps(body, indent=2, ensure_ascii=False).encode("utf-8")
+    return Response(content=raw, media_type="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="zeim-my-data.json"',
+                             "Cache-Control": "no-store"})
 
 
 @router.delete("/me/data")
