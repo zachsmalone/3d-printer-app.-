@@ -127,6 +127,12 @@ def signout(request: Request, actor: Actor = Depends(get_actor)):
     logging.getLogger("zeim.audit").info("signout: account=%s", actor.user.get("id"))
     r = JSONResponse({"signed_out": True})
     r.set_cookie(idn.COOKIE, _s.token_urlsafe(24), max_age=3600 * 24 * 365, **idn.cookie_args(request))
+    svc = getattr(request.app.state, "auth_service", None)
+    if svc is not None:                               # a passkey/email session on this browser ends too (else it would sign straight back in)
+        if actor.auth_session is not None:
+            svc.logout(actor.auth_session)
+        if request.cookies.get(svc.cfg.cookie_name):
+            r.delete_cookie(svc.cfg.cookie_name, path="/", secure=svc.cfg.secure_cookies, httponly=True, samesite="lax")
     return r
 
 

@@ -1,7 +1,11 @@
 """Identity. ZEIM accounts are 18+ only (owner decision 2026-10-12). Age is computed server-side from the date of birth
 typed at sign-up; a refused sign-up stores nothing about the date.
 
-Local MVP identity = session cookie (`p3d_sid`) -> account record; no passwords yet (real auth is a roadmap item).
+Identity = an account record in users.json, keyed by an internal "account key" (historically the `p3d_sid` cookie value).
+  * passkey / email-code sign-in (app/auth, docs/auth.md): when a live `zeim_session` is present, the account is the one
+    whose `id` equals the session's auth `owner_id` (legacy id for upgraded cookie accounts, else the auth account id).
+    Builds, Showcase items, follows and favourites then belong to that account on every device.
+  * otherwise the old cookie login: `p3d_sid` -> account record (kept working; recovery codes still apply).
   * no accounts under MIN_SIGNUP_AGE (18). Families can print designs together with an adult account holder.
   * content is clean and safe for all, for everyone (see COMMUNITY_GUIDELINES.md)
   * an account is RESTRICTED (treated like signed out for sharing, its content shown to nobody else) while it is
@@ -23,12 +27,19 @@ COOKIE = "p3d_sid"
 
 @dataclass
 class Actor:
-    sid: str
+    sid: str                         # internal account key: every ownership check (owner_sid) uses it
     user: dict | None
+    via: str = "cookie"              # "auth" when a passkey/email-code session picked this account
+    auth_session: object = None      # app.auth.service.SessionInfo when via == "auth"
+
+    @property
+    def owner_id(self) -> str | None:
+        """Stable account id (== auth SessionInfo.owner_id for signed-in passkey/email accounts)."""
+        return self.user.get("id") if self.user else None
 
     @property
     def age(self):
-        return age_of(self.user) if self.user else None
+        return age_of(self.user) if self.user and self.user.get("dob") else None
 
     @property
     def is_adult(self):
@@ -63,8 +74,122 @@ def cookie_args(request: Request) -> dict:
     return {"httponly": True, "samesite": "lax", "secure": secure}
 
 
-def get_actor(request: Request, response: Response) -> Actor:
+def _auth_service(request: Request):
+    try:
+        return getattr(request.app.state, "auth_service", None)
+    except Exception:
+        return None
+
+
+def _new_record(uid: str, display_name: str, dob: str | None) -> dict:
+    from .privacy import defaults_for
+    u = {"id": uid, "display_name": (display_name or "").strip()[:40] or "ZEIM maker",
+         "created": datetime.now(timezone.utc).isoformat(), "links": {}, "following": [], "auth_account": uid}
+    if dob:
+        u["dob"] = dob
+    u["privacy"] = defaults_for(u)
+    return u
+
+
+def link_auth_account(account_id: str, display_name: str = "", dob: str | None = None) -> tuple[str, dict]:
+    """Give a passkey/email account (made through /api/auth sign-up, 18+ checked there) its ZEIM account record.
+    Idempotent. The record lives under a fresh random account key that is never handed out as a cookie, so only a
+    live auth session reaches it (signing out of the session really signs out). Returns (key, user)."""
+    if not isinstance(account_id, str) or not account_id:
+        raise ValueError("account id required")
+    if dob is not None:
+        try:
+            date.fromisoformat(dob)
+        except (TypeError, ValueError):
+            dob = None
+    key = "acct_" + secrets.token_urlsafe(24)
+    made = {}
+
+    def f(d):
+        for k, u in d.items():
+            if u.get("id") == account_id:
+                made["k"], made["u"] = k, u
+                return
+        u = _new_record(account_id, display_name, dob)
+        d[key] = u
+        made["k"], made["u"], made["new"] = key, u, True
+    USERS.update(f)
+    if made.get("new"):
+        from . import usernames
+        try:
+            usernames.assign_new(made["k"], made["u"], None)
+        except Exception:
+            import logging
+            logging.getLogger("zeim").exception("username for new passkey account failed")
+    return made["k"], made["u"]
+
+
+def account_for_session(session, service=None) -> tuple[str | None, dict | None]:
+    """Auth SessionInfo -> (account key, user). Upgraded cookie accounts: the record whose id is the legacy id
+    (None if it is gone: never invented). Passkey/email-born accounts: their record, made on first use if missing."""
+    oid = getattr(session, "owner_id", None)
+    if not oid:
+        return None, None
+    for k, u in USERS.read().items():
+        if u.get("id") == oid:
+            return k, u
+    if getattr(session, "legacy_id", None):
+        return None, None
+    name = ""
+    if service is not None:
+        try:
+            row = service.store.one("SELECT display_name FROM accounts WHERE id=?", (session.account_id,))
+            name = (row["display_name"] if row else "") or ""
+        except Exception:
+            name = ""
+    return link_auth_account(session.account_id, name)
+
+
+def auth_actor(request: Request) -> Actor | None:
+    """The account of a live passkey/email session on this request, or None (no auth mounted / no or dead session)."""
+    svc = _auth_service(request)
+    if svc is None:
+        return None
+    tok = request.cookies.get(svc.cfg.cookie_name)
+    if not tok:
+        return None
+    try:
+        s = svc.resolve_session(tok)
+    except Exception:
+        import logging
+        logging.getLogger("zeim.auth").exception("session lookup failed; using the browser cookie")
+        return None
+    if not s:
+        return None
+    key, user = account_for_session(s, svc)
+    if not key:
+        return None
+    return Actor(key, user, via="auth", auth_session=s)
+
+
+def adopt_guest_builds(request: Request, session) -> int:
+    """Right after a passkey/email sign-in: builds this browser made while signed OUT follow the account.
+    Never merges two accounts (a browser that has its own cookie account keeps it). Returns how many moved."""
     sid = request.cookies.get(COOKIE)
+    if not sid or len(sid) < 16 or sid in USERS.read():
+        return 0
+    key, _u = account_for_session(session, _auth_service(request))
+    if not key or key == sid:
+        return 0
+    from ..services.history import store
+    n = len(store.list(sid))
+    from . import ownership
+    ownership.move_owner(sid, key)
+    return n
+
+
+def get_actor(request: Request, response: Response) -> Actor:
+    a = auth_actor(request)
+    if a is not None:
+        return a
+    sid = request.cookies.get(COOKIE)
+    if sid and sid.startswith("acct_"):          # passkey-account keys are never valid as a browser cookie
+        sid = None
     if not sid or len(sid) < 16:
         sid = secrets.token_urlsafe(24)
         response.set_cookie(COOKIE, sid, max_age=3600 * 24 * 365, **cookie_args(request))

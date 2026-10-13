@@ -108,6 +108,17 @@ def _session_or_legacy(request: Request) -> tuple:
     raise HTTPException(401, detail={"code": "not_signed_in", "message": "Please sign in first."})
 
 
+def _signed_in(request: Request, session) -> None:
+    """After a real sign-in on this browser (passkey or email code): let the app attach this browser's signed-out builds."""
+    hook = getattr(request.app.state, "on_signed_in", None)
+    if hook and session is not None:
+        try:
+            hook(request, session)
+        except Exception:
+            import logging
+            logging.getLogger("zeim.auth").exception("post-sign-in step failed (sign-in itself succeeded)")
+
+
 def _dict(payload) -> dict:
     if not isinstance(payload, dict):
         raise HTTPException(400, detail={"code": "bad_request", "message": "That request wasn't understood."})
@@ -133,6 +144,7 @@ def signup_finish(request: Request, payload: dict = Body(...)):
     _csrf(request); p = _dict(payload)
     token, s = _run(_svc(request).signup_finish, p.get("ceremony_id"), p.get("credential"), p.get("name"),
                     request.headers.get("user-agent"))
+    _signed_in(request, s)
     return _json(request, {"signed_in": True, "display_name": _svc(request).overview(s)["display_name"]}, 201, token=token)
 
 
@@ -147,6 +159,7 @@ def signin_finish(request: Request, payload: dict = Body(...)):
     _csrf(request); p = _dict(payload)
     token, s = _run(_svc(request).signin_finish, p.get("ceremony_id"), p.get("credential"),
                     request.headers.get("user-agent"), _ip(request))
+    _signed_in(request, s)
     return _json(request, {"signed_in": True}, token=token)
 
 
@@ -162,6 +175,7 @@ def email_verify(request: Request, payload: dict = Body(...)):
     _csrf(request); p = _dict(payload)
     token, s = _run(_svc(request).email_verify_login, p.get("email"), p.get("code"),
                     request.headers.get("user-agent"), _ip(request))
+    _signed_in(request, s)
     return _json(request, {"signed_in": True}, token=token)
 
 
@@ -285,6 +299,34 @@ def legacy_cookie_resolver(request: Request):
     return (user["id"], name)
 
 
+def zeim_signup_validator(cfg: AuthConfig, clock: Callable[[], float] = None):
+    """Passkey sign-up checks = the auth defaults (name 1-40, 18+ from the birth date) + ZEIM's display-name filter."""
+    import time as _time
+    from app.auth.service import default_signup_validator
+    clock = clock or _time.time
+
+    def validate(display_name: object, birth_date: object) -> str:
+        name = default_signup_validator(cfg, clock())(display_name, birth_date)
+        from app.community import safety
+        try:
+            safety.filter_only(name, "Display name")
+        except safety.ChatBlocked as e:
+            raise AuthError("bad_name", e.payload.get("message") or "Please choose a different display name.", 422)
+        return name
+    return validate
+
+
+def zeim_account_created(account_id: str, display_name: str, birth_date: Optional[str]) -> None:
+    """A passkey sign-up finished: make its ZEIM account record (owner id == auth account id)."""
+    from app.community import identity as idn
+    idn.link_auth_account(account_id, display_name or "", birth_date)
+
+
+def zeim_signed_in(request: Request, session) -> None:
+    from app.community import identity as idn
+    idn.adopt_guest_builds(request, session)
+
+
 def _auth_env():
     """Env for AuthConfig.from_env. On ZEIM_ENV=dev or loopback HOST, fill safe local defaults
     when the three required values are missing. Never invent defaults for a non-loopback host
@@ -324,8 +366,11 @@ def try_mount_auth(app: FastAPI) -> bool:
         cfg = AuthConfig.from_env(env)
         service = AuthService(cfg, AuthStore(cfg.db_path),
                               PyWebAuthnBackend(cfg.rp_id, cfg.rp_name, cfg.origins),
-                              mailer_from_env(env))
+                              mailer_from_env(env),
+                              signup_validator=zeim_signup_validator(cfg),
+                              on_account_created=zeim_account_created)
         init_auth(app, service=service, legacy_resolver=legacy_cookie_resolver)
+        app.state.on_signed_in = zeim_signed_in
         app.include_router(router)
         app.state.auth_mounted = True
         from app.auth.mailer import NullMailer

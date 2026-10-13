@@ -28,6 +28,18 @@ legacy resolver). The old cookie login (`p3d_sid`) still works alongside it.
 Existing cookie accounts can add a passkey: the legacy resolver maps today's `p3d_sid` account to
 `(account id, display name)` so `owner_id` stays that account id and their Showcase / follows keep working.
 
+## Who owns what (session -> account)
+- Every ZEIM route asks `identity.get_actor`. If a live `zeim_session` cookie is present, the account is the one whose
+  `id` equals the session's auth `owner_id` (the legacy id for upgraded cookie accounts, otherwise the auth account id).
+  Builds, Edit projects, Showcase items, follows and favourites then belong to that account on **every device** it signs in on.
+- A passkey sign-up makes the ZEIM account record right away (same birth-date record as cookie accounts, display name
+  through ZEIM's name filter, auto username). That record sits under an internal key that is never a browser cookie,
+  so signing out of the passkey session really signs that browser out.
+- Right after a passkey / email-code sign-in, builds this browser made while **signed out** move to the account.
+  A browser that has its own cookie account is never merged into another account.
+- Without a live session (signed out, expired, revoked, account disabled) the old `p3d_sid` cookie login works as before.
+- "Sign out" in the app (`/api/me/signout`) also ends the passkey session on this browser.
+
 ## Settings (environment variables)
 | Variable | Required | Meaning |
 |---|---|---|
@@ -46,4 +58,4 @@ The auth module still **refuses to start** if the three required values are miss
 1. Retire the old recovery codes once accounts have a passkey or email.
 2. Decide what happens when someone loses their only passkey and has no email.
 3. Set `ZEIM_RP_ID`, `ZEIM_ORIGINS` and `ZEIM_AUTH_PEPPER` on the live server (and SMTP if email codes are wanted).
-4. Wire the new session into the rest of the app so builds use the auth `owner_id` end-to-end (today ownership is still the cookie `p3d_sid`; the legacy link keeps account ids stable when upgrading).
+4. ~~Wire the new session into the rest of the app~~ **Done (2026-10-13).** See "Who owns what" below.
