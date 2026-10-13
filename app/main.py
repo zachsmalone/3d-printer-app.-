@@ -16,9 +16,6 @@ from .config import STATIC
 import logging as _logging
 
 _log = _logging.getLogger("uvicorn.error")
-if config.HOST not in config.LOOPBACK_HOSTS:
-    _log.warning("ZEIM is set to listen on %s (not just this computer). There is NO real authentication yet: "
-                 "anyone who can reach this address can use it. Use only on a trusted network.", config.HOST)
 if config.MODE == "local" and config.HOST not in config.LOOPBACK_HOSTS:
     _log.warning("PHOTO3D_MODE=local while listening beyond this computer: printer/settings changes are open to everyone who can connect.")
 
@@ -62,6 +59,15 @@ for r in (builds.router, edit.router, printing.router, printing.files_router, se
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
           export_api.router):
     app.include_router(r)
+
+# Passkey + email-code login (docs/auth.md). Localhost / ZEIM_ENV=dev get safe defaults.
+# Outside that, missing/weak ZEIM_RP_ID/ORIGINS/PEPPER keeps the old cookie login and logs a warning.
+from .api.auth import try_mount_auth as _try_mount_auth
+_AUTH_ON = _try_mount_auth(app)
+if config.HOST not in config.LOOPBACK_HOSTS and not _AUTH_ON:
+    _log.warning("ZEIM is set to listen on %s (not just this computer) and passkey login is OFF: "
+                 "anyone who can reach this address can use the old cookie login. "
+                 "Set ZEIM_RP_ID, ZEIM_ORIGINS and ZEIM_AUTH_PEPPER, or use only on a trusted network.", config.HOST)
 try:
     from .community import social as _social
     _social.mark_existing_pending()      # 'I printed this' photos made before review existed are held for review

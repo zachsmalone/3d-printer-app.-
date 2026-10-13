@@ -264,3 +264,86 @@ def email_remove(request: Request):
     _csrf(request); s = _need_session(request)
     _run(_svc(request).remove_email, s)
     return _json(request, {"ok": True})
+
+
+# ------------------------------------------------------------------ app mount (local / pilot)
+def legacy_cookie_resolver(request: Request):
+    """Map today's cookie account (p3d_sid -> users.json) to (legacy_id, display_name).
+
+    legacy_id is the account's stable `id` so Showcase creator_id / follow links stay the same after
+    the person adds a passkey. Returns None when there is no signed-up cookie account.
+    """
+    from app.community import identity as idn
+    from app.community.store import USERS
+    sid = request.cookies.get(idn.COOKIE)
+    if not sid or len(sid) < 16:
+        return None
+    user = USERS.read().get(sid)
+    if not user or not user.get("id"):
+        return None
+    name = (user.get("display_name") or user.get("username") or "").strip()
+    return (user["id"], name)
+
+
+def _auth_env():
+    """Env for AuthConfig.from_env. On ZEIM_ENV=dev or loopback HOST, fill safe local defaults
+    when the three required values are missing. Never invent defaults for a non-loopback host
+    unless ZEIM_ENV=dev was set on purpose."""
+    from app import config
+    e = {k: v for k, v in os.environ.items()}
+    host = (config.HOST or "").strip().lower()
+    loopback = host in config.LOOPBACK_HOSTS
+    env_flag = (e.get("ZEIM_ENV") or "").lower()
+    want_dev = env_flag == "dev" or (loopback and env_flag in ("", "dev"))
+    if want_dev:
+        e.setdefault("ZEIM_ENV", "dev")
+        port = str(config.PORT)
+        e.setdefault("ZEIM_RP_ID", "localhost")
+        e.setdefault("ZEIM_ORIGINS", f"http://localhost:{port},http://127.0.0.1:{port}")
+        e.setdefault("ZEIM_AUTH_PEPPER", "dev-only-pepper-do-not-use-in-production!!")
+        e.setdefault("ZEIM_INSECURE_COOKIES", "1")   # plain http on this computer
+    if "ZEIM_AUTH_DB" not in e:
+        e["ZEIM_AUTH_DB"] = str(config.DATA / "auth.sqlite3")
+    return e
+
+
+def try_mount_auth(app: FastAPI) -> bool:
+    """Mount passkey + email-code login when settings allow it.
+
+    * ZEIM_ENV=dev or listening on localhost: comes up with safe local defaults.
+    * Otherwise needs strong ZEIM_RP_ID / ZEIM_ORIGINS / ZEIM_AUTH_PEPPER (AuthConfig refuses weak ones).
+    * If those are missing outside that local case: log a clear warning and leave the old cookie
+      login running (do not crash the app). Email codes stay off without SMTP (mailer_from_env).
+    Returns True when the /api/auth routes are live.
+    """
+    import logging
+    from app.auth.config import ConfigError
+    log = logging.getLogger("zeim.auth")
+    try:
+        env = _auth_env()
+        cfg = AuthConfig.from_env(env)
+        service = AuthService(cfg, AuthStore(cfg.db_path),
+                              PyWebAuthnBackend(cfg.rp_id, cfg.rp_name, cfg.origins),
+                              mailer_from_env(env))
+        init_auth(app, service=service, legacy_resolver=legacy_cookie_resolver)
+        app.include_router(router)
+        app.state.auth_mounted = True
+        from app.auth.mailer import NullMailer
+        email_on = not isinstance(service.mailer, NullMailer)
+        log.info("passkey/email login is on (rp_id=%s, origins=%s, email_codes=%s)",
+                 cfg.rp_id, ",".join(cfg.origins), "on" if email_on else "off")
+        return True
+    except ConfigError as e:
+        app.state.auth_mounted = False
+        app.state.auth_service = None
+        app.state.legacy_resolver = None
+        log.warning("passkey/email login is OFF — old cookie login still works. "
+                    "Set ZEIM_RP_ID, ZEIM_ORIGINS (https) and ZEIM_AUTH_PEPPER (32+ chars), "
+                    "or run with ZEIM_ENV=dev / listen on localhost. Detail: %s", e)
+        return False
+    except Exception:
+        app.state.auth_mounted = False
+        app.state.auth_service = None
+        app.state.legacy_resolver = None
+        log.exception("passkey/email login failed to start; old cookie login still works")
+        return False
