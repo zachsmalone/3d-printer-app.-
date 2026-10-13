@@ -22,10 +22,13 @@ def test_default_bind_is_localhost_only():
 
 
 def test_non_loopback_host_logs_a_no_auth_warning():
+    """Without strong auth secrets, a public bind must warn; localhost gets passkey login on with defaults."""
     out = subprocess.run([sys.executable, "-c", "import app.main"], env=_env(HOST="0.0.0.0"), cwd=ROOT, capture_output=True, text=True)
-    assert "no real authentication" in (out.stderr + out.stdout).lower()
+    text = (out.stderr + out.stdout).lower()
+    assert "passkey/email login is off" in text or "no real authentication" in text
     quiet = subprocess.run([sys.executable, "-c", "import app.main"], env=_env(), cwd=ROOT, capture_output=True, text=True)
-    assert "no real authentication" not in (quiet.stderr + quiet.stdout).lower()
+    q = (quiet.stderr + quiet.stdout).lower()
+    assert "passkey/email login is off" not in q and "no real authentication" not in q
 
 
 @pytest.mark.skipif(not shutil.which("ss"), reason="needs `ss`")
