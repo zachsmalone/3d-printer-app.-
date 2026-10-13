@@ -4,25 +4,71 @@
   "scope": {
     "printer": "Creality K1",
     "nozzle_mm": 0.4,
-    "materials": ["PLA", "PETG"],
+    "materials": [
+      "PLA",
+      "PETG"
+    ],
     "purpose": "Provide sourced starting geometry and tuning rules for a functional ZEIM bird call.",
-    "validation": "Print at least three tuning variants; a bird call is not complete until it makes a repeatable sound."
+    "validation": "Print at least three tuning variants; a bird call is not complete until it makes a repeatable sound.",
+    "verified": false,
+    "verification_note": "Dimensions are ZEIM starting values, not test-printed yet. More water leaves less air in the chamber, which raises pitch."
   },
   "design_type": {
     "recommended": "water-chirping bird whistle",
     "why": "Simple two-part air-and-water chamber design; established printable examples exist in PLA or ABS."
   },
   "core_geometry": {
-    "body": {"outer_diameter_mm": 30, "length_mm": 55, "wall_thickness_mm": 1.6, "chamber_diameter_mm": 22, "chamber_length_mm": 40},
-    "mouthpiece": {"outer_diameter_mm": 14, "inner_diameter_mm": 8, "length_mm": 18, "lip_wall_thickness_mm": 1.6},
-    "air_channel": {"width_mm": 2.0, "height_mm": 1.2, "length_mm": 16, "exit_angle_deg": 20},
-    "window": {"length_mm": 6, "width_mm": 5, "edge_radius_mm": 0.8},
-    "water_chamber": {"diameter_mm": 18, "length_mm": 25, "fill_fraction": 0.35},
-    "cap": {"diameter_mm": 24, "engagement_length_mm": 8, "clearance_mm": 0.25, "seal_ring_width_mm": 1.5}
+    "body": {
+      "outer_diameter_mm": 30,
+      "length_mm": 55,
+      "wall_thickness_mm": 1.6,
+      "chamber_diameter_mm": 22,
+      "chamber_length_mm": 40
+    },
+    "mouthpiece": {
+      "outer_diameter_mm": 14,
+      "inner_diameter_mm": 8,
+      "length_mm": 18,
+      "lip_wall_thickness_mm": 1.6
+    },
+    "air_channel": {
+      "width_mm": 2.0,
+      "height_mm": 1.2,
+      "length_mm": 16,
+      "exit_angle_deg": 20
+    },
+    "window": {
+      "length_mm": 6,
+      "width_mm": 5,
+      "edge_radius_mm": 0.8
+    },
+    "water_chamber": {
+      "diameter_mm": 18,
+      "length_mm": 25,
+      "fill_fraction": 0.35
+    },
+    "cap": {
+      "diameter_mm": 24,
+      "engagement_length_mm": 8,
+      "clearance_mm": 0.25,
+      "seal_ring_width_mm": 1.5
+    }
   },
   "print_settings": {
-    "pla": {"layer_height_mm": 0.16, "walls": 3, "infill_percent": 100, "orientation": "mouthpiece down or vertical with channel supported", "notes": "Use PLA for the first tuning batch."},
-    "petg": {"layer_height_mm": 0.2, "walls": 3, "infill_percent": 100, "orientation": "vertical", "notes": "Use PETG for durability after the PLA sound geometry is proven."}
+    "pla": {
+      "layer_height_mm": 0.16,
+      "walls": 3,
+      "infill_percent": 100,
+      "orientation": "mouthpiece down or vertical with channel supported",
+      "notes": "Use PLA for the first tuning batch."
+    },
+    "petg": {
+      "layer_height_mm": 0.2,
+      "walls": 3,
+      "infill_percent": 100,
+      "orientation": "vertical",
+      "notes": "Use PETG for durability after the PLA sound geometry is proven."
+    }
   },
   "print_rules": [
     "Keep the air channel, window, and sealing faces smooth; remove strings or blobs before assembly.",
@@ -34,31 +80,107 @@
   ],
   "tuning": {
     "no_sound": [
-      {"change": "increase_air_gap", "setting_key": "air_channel_height", "direction": "increase", "amount": "0.1-0.2 mm"},
-      {"change": "check_air_channel", "setting_key": "air_channel_obstruction", "direction": "inspect", "amount": null},
-      {"change": "improve_seal", "setting_key": "cap_clearance", "direction": "decrease", "amount": "0.05-0.10 mm"}
+      {
+        "change": "increase_air_gap",
+        "setting_key": "air_channel_height",
+        "direction": "increase",
+        "amount": "0.1-0.2 mm"
+      },
+      {
+        "change": "check_air_channel",
+        "setting_key": "air_channel_obstruction",
+        "direction": "inspect",
+        "amount": null
+      },
+      {
+        "change": "improve_seal",
+        "setting_key": "cap_clearance",
+        "direction": "decrease",
+        "amount": "0.05-0.10 mm"
+      }
     ],
     "too_much_air_or_weak_sound": [
-      {"change": "reduce_air_gap", "setting_key": "air_channel_height", "direction": "decrease", "amount": "0.05-0.10 mm"},
-      {"change": "reduce_window", "setting_key": "window_width", "direction": "decrease", "amount": "0.5-1.0 mm"},
-      {"change": "check_water_level", "setting_key": "water_fill_fraction", "direction": "adjust", "amount": "0.25-0.45"}
+      {
+        "change": "reduce_air_gap",
+        "setting_key": "air_channel_height",
+        "direction": "decrease",
+        "amount": "0.05-0.10 mm"
+      },
+      {
+        "change": "reduce_window",
+        "setting_key": "window_width",
+        "direction": "decrease",
+        "amount": "0.5-1.0 mm"
+      },
+      {
+        "change": "check_water_level",
+        "setting_key": "water_fill_fraction",
+        "direction": "adjust",
+        "amount": "0.25-0.45"
+      }
     ],
     "pitch_too_high": [
-      {"change": "enlarge_chamber", "setting_key": "water_chamber_length", "direction": "increase", "amount": "2-5 mm"},
-      {"change": "increase_water", "setting_key": "water_fill_fraction", "direction": "increase", "amount": "0.05"},
-      {"change": "lengthen_body", "setting_key": "body_length", "direction": "increase", "amount": "3-5 mm"}
+      {
+        "change": "enlarge_chamber",
+        "setting_key": "water_chamber_length",
+        "direction": "increase",
+        "amount": "2-5 mm"
+      },
+      {
+        "change": "reduce_water",
+        "setting_key": "water_fill_fraction",
+        "direction": "decrease",
+        "amount": "0.05"
+      },
+      {
+        "change": "lengthen_body",
+        "setting_key": "body_length",
+        "direction": "increase",
+        "amount": "3-5 mm"
+      }
     ],
     "pitch_too_low": [
-      {"change": "reduce_chamber", "setting_key": "water_chamber_length", "direction": "decrease", "amount": "2-5 mm"},
-      {"change": "reduce_water", "setting_key": "water_fill_fraction", "direction": "decrease", "amount": "0.05"},
-      {"change": "shorten_body", "setting_key": "body_length", "direction": "decrease", "amount": "3-5 mm"}
+      {
+        "change": "reduce_chamber",
+        "setting_key": "water_chamber_length",
+        "direction": "decrease",
+        "amount": "2-5 mm"
+      },
+      {
+        "change": "increase_water",
+        "setting_key": "water_fill_fraction",
+        "direction": "increase",
+        "amount": "0.05"
+      },
+      {
+        "change": "shorten_body",
+        "setting_key": "body_length",
+        "direction": "decrease",
+        "amount": "3-5 mm"
+      }
     ]
   },
   "test_variants": [
-    {"id": "baseline", "changes": "Use core geometry exactly.", "purpose": "Establish whether the starting design makes sound."},
-    {"id": "air_gap_plus", "changes": "Increase air-channel height by 0.15 mm.", "purpose": "Test whether restricted airflow is preventing sound."},
-    {"id": "chamber_long", "changes": "Increase water-chamber length by 4 mm.", "purpose": "Test lower pitch and more stable chirp."},
-    {"id": "window_narrow", "changes": "Reduce window width by 0.75 mm.", "purpose": "Test stronger edge tone and less air loss."}
+    {
+      "id": "baseline",
+      "changes": "Use core geometry exactly.",
+      "purpose": "Establish whether the starting design makes sound."
+    },
+    {
+      "id": "air_gap_plus",
+      "changes": "Increase air-channel height by 0.15 mm.",
+      "purpose": "Test whether restricted airflow is preventing sound."
+    },
+    {
+      "id": "chamber_long",
+      "changes": "Increase water-chamber length by 4 mm.",
+      "purpose": "Test lower pitch and more stable chirp."
+    },
+    {
+      "id": "window_narrow",
+      "changes": "Reduce window width by 0.75 mm.",
+      "purpose": "Test stronger edge tone and less air loss."
+    }
   ],
   "acceptance": {
     "functional": "Produces a repeatable chirp or bird-like sound with normal breath pressure.",
@@ -67,10 +189,25 @@
     "print_quality": "Air channel is open; no supports or strings block the window or chamber."
   },
   "sources": [
-    {"topic": "Established printable chirping-bird whistle design", "url": "https://www.thingiverse.com/thing:1155687"},
-    {"topic": "Bird-whistle chamber concept and printable educational version", "url": "https://www.fabbaloo.com/news/design-of-the-week-chirping-bird-whistle"},
-    {"topic": "Whistle airway/window geometry example", "url": "https://www.chiffandfipple.com/t/3d-printed-whistle-head-strengthening-lower-octave/104823"},
-    {"topic": "Cavity volume and frequency relationship", "url": "https://www.themusicscientist.com/3d-printed-whistle-project-understanding-frequency-math-for-music-education/"},
-    {"topic": "3D-printed whistle material and air-channel sensitivity", "url": "https://cani3dprintit.com/whistle"}
+    {
+      "topic": "Established printable chirping-bird whistle design",
+      "url": "https://www.thingiverse.com/thing:1155687"
+    },
+    {
+      "topic": "Bird-whistle chamber concept and printable educational version",
+      "url": "https://www.fabbaloo.com/news/design-of-the-week-chirping-bird-whistle"
+    },
+    {
+      "topic": "Whistle airway/window geometry example",
+      "url": "https://www.chiffandfipple.com/t/3d-printed-whistle-head-strengthening-lower-octave/104823"
+    },
+    {
+      "topic": "Cavity volume and frequency relationship",
+      "url": "https://www.themusicscientist.com/3d-printed-whistle-project-understanding-frequency-math-for-music-education/"
+    },
+    {
+      "topic": "3D-printed whistle material and air-channel sensitivity",
+      "url": "https://cani3dprintit.com/whistle"
+    }
   ]
 }
