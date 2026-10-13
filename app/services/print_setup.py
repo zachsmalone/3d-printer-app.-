@@ -40,6 +40,7 @@ PRESETS = {
     "strong":   {"label": "Strong",   "help": "Thicker walls and more infill.",     "layer_frac": 0.50, "walls": 4, "top_bottom": 5, "infill": 40, "pattern": "cubic", "speed": 60},
 }
 DEFAULT_PRESET = "standard"
+PRESET_PUBLIC = ("label", "help", "layer_frac", "walls", "top_bottom", "infill", "pattern", "speed")
 
 
 class SetupError(ValueError):
@@ -111,7 +112,8 @@ def public() -> dict:
     return {"default": {"printer_id": DEFAULT_PRINTER, "nozzle": DEFAULT_NOZZLE}, "nozzles": list(NOZZLES),
             "printers": [printer_public(pid) for pid in sorted(_catalog(), key=lambda k: printer_public(k)["name"])],
             "patterns": list(PATTERNS), "supports": list(SUPPORTS),
-            "presets": [{"id": k, **{x: v[x] for x in ("label", "help")}} for k, v in PRESETS.items()], "default_preset": DEFAULT_PRESET,
+            # the preset's own numbers too, so the Advanced fields start from the preset the maker picked (not from Standard's numbers)
+            "presets": [{"id": k, **{x: v[x] for x in PRESET_PUBLIC}} for k, v in PRESETS.items()], "default_preset": DEFAULT_PRESET,
             "materials": {m: material_temps(m) for m in mats}, "layer_fraction": [LAYER_MIN, LAYER_MAX],
             "nozzle_validation": specs()["scope"]["validation"], "advanced_note": ADVANCED_NOTE}
 
@@ -150,6 +152,14 @@ def layer_range(nozzle: float) -> tuple[float, float]:
     return round(max(nozzle * LAYER_MIN, sp["min"]), 3), round(min(nozzle * LAYER_MAX, sp["max"]), 3)
 
 
+def preset_layer(nozzle: float, preset: str = DEFAULT_PRESET) -> float:
+    """A preset's layer height on this nozzle: the sourced recommended layer scaled by the preset (Standard = recommended), kept in range.
+    static/printer.js presetLayer() uses the same formula so the Advanced field shows what Beginner would slice with."""
+    lo, hi = layer_range(nozzle)
+    rec = nozzle_spec(nozzle)["layer_height_mm"]["recommended"]          # sourced starting value; presets scale around it
+    return round(min(max(rec * PRESETS[preset]["layer_frac"] / 0.5, lo), hi), 3)
+
+
 def line_width(nozzle: float) -> float:
     return float(nozzle_spec(nozzle)["line_width_mm"]["recommended"])
 
@@ -176,8 +186,7 @@ def settings_for(printer_id=None, nozzle=None, opts: dict | None = None) -> dict
         raise SetupError("Unknown preset.")
     pr = PRESETS[preset]
     lo, hi = layer_range(n)
-    rec = nozzle_spec(n)["layer_height_mm"]["recommended"]          # sourced starting value; presets scale around it
-    layer = round(min(max(rec * pr["layer_frac"] / 0.5, lo), hi), 3)
+    layer = preset_layer(n, preset)
     if "layer_height" in o:
         layer = _num(o["layer_height"], lo, hi, f"Layer height for a {n:g} mm nozzle")
     material = o.get("material", "PLA")

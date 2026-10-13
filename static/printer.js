@@ -85,11 +85,16 @@ export const checkBuild = (id, slice = false) => api(`/api/willprint/build/${id}
 export const checkShowcase = (id, slice = false) => api(`/api/showcase/${id}/willprint?${q()}${slice ? "&slice=true" : ""}`);
 
 /* ---------- slicer settings panel ---------- */
+const presetOf = id => P.cat.presets.find(x => x.id === id) || P.cat.presets.find(x => x.id === P.cat.default_preset) || {};
+// same formula as print_setup.preset_layer(): the nozzle's recommended layer scaled by the preset, kept in the nozzle's range
+export const presetLayer = (pv, rec, lo, hi) => +Math.min(Math.max(rec * (pv.layer_frac ?? 0.5) / 0.5, lo), hi).toFixed(3);
 export function panelHTML() {
   const pref = P.pref, p = printerOf(pref.printer_id), n = pref.nozzle || 0.4;
   const o = nozzleOpt(pref.printer_id, n), lh = o?.layer_height_mm || { min: n / 4, max: n * 0.75, recommended: n / 2 };
   const lo = +Math.max(n * P.cat.layer_fraction[0], lh.min).toFixed(3), hi = +Math.min(n * P.cat.layer_fraction[1], lh.max).toFixed(3);
-  const beginner = localStorage.getItem("zeim.slicerMode") !== "advanced";
+  // no saved slicer choice yet: follow the app's Beginner / Experienced switch
+  const saved = localStorage.getItem("zeim.slicerMode"), beginner = saved ? saved !== "advanced" : localStorage.level !== "expert";
+  const pv = presetOf(P.cat.default_preset);
   const mats = Object.keys(P.cat.materials);
   const t = P.cat.materials.PLA;
   const sel = (id, label, vals, cur, names = {}) => `<div class="field"><label for="${id}">${label}</label><select id="${id}">${vals.map(v => `<option value="${v}" ${v === cur ? "selected" : ""}>${esc(names[v] || v)}</option>`).join("")}</select></div>`;
@@ -102,12 +107,12 @@ export function panelHTML() {
     <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === P.cat.default_preset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>
     <div class="grid2">${sel("spMat", "Material", mats, "PLA")}${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
     <div id="spAdv" ${beginner ? "hidden" : ""}><div class="grid3">
-      ${num("spLayer", "Layer height", lh.recommended, lo, hi, 0.01, `mm (${lo} to ${hi})`)}
-      ${num("spWalls", "Walls", 2, 1, 10, 1, "")}${num("spTB", "Top/bottom layers", 4, 0, 20, 1, "")}
-      ${num("spInfill", "Infill", 15, 0, 100, 1, "%")}${sel("spPattern", "Infill pattern", P.cat.patterns, "grid")}
-      ${num("spBrim", "Brim", 0, 0, 30, 1, "mm")}${num("spSpeed", "Speed", 80, 10, 500, 5, "mm/s")}
+      ${num("spLayer", "Layer height", presetLayer(pv, lh.recommended, lo, hi), lo, hi, 0.01, `mm (${lo} to ${hi})`).replace("<input ", `<input data-rec="${lh.recommended}" `)}
+      ${num("spWalls", "Walls", pv.walls ?? 2, 1, 10, 1, "")}${num("spTB", "Top/bottom layers", pv.top_bottom ?? 4, 0, 20, 1, "")}
+      ${num("spInfill", "Infill", pv.infill ?? 15, 0, 100, 1, "%")}${sel("spPattern", "Infill pattern", P.cat.patterns, pv.pattern || "grid")}
+      ${num("spBrim", "Brim", 0, 0, 30, 1, "mm")}${num("spSpeed", "Speed", pv.speed ?? 80, 10, 500, 5, "mm/s")}
       ${num("spNozT", "Nozzle temp", t.nozzle_c, 150, p?.max_nozzle_c || 300, 1, "°C")}${num("spBedT", "Bed temp", t.bed_c, 0, p?.max_bed_c || 110, 1, "°C")}</div>
-      <p class="help">Line width ${o?.line_width_mm.recommended ?? n} mm for the ${n} mm nozzle (from the nozzle specs). Temperatures start from the material's reference values.</p></div>
+      <p class="help">These start from the preset you picked above; changing the preset fills them in again. Line width ${o?.line_width_mm.recommended ?? n} mm for the ${n} mm nozzle (from the nozzle specs). Temperatures start from the material's reference values.</p></div>
     <label class="inl chk"><input type="checkbox" id="spFit"> Scale down to fit this printer if it's too big</label>
     <div class="row"><button class="btn primary big" id="spGo">Slice</button></div>`}
     <div id="spOut" aria-live="polite"></div>`;
@@ -132,6 +137,13 @@ export function wirePanel(getModelId) {
   const mode = adv => { localStorage.setItem("zeim.slicerMode", adv ? "advanced" : "beginner"); $("#spAdv").hidden = !adv; $("#spBeginner").setAttribute("aria-pressed", !adv); $("#spAdvanced").setAttribute("aria-pressed", adv); };
   $("#spBeginner").onclick = () => mode(false); $("#spAdvanced").onclick = () => mode(true);
   mat.onchange = () => { const t = P.cat.materials[mat.value]; $("#spNozT").value = t.nozzle_c; $("#spBedT").value = t.bed_c; };
+  // Advanced fields follow the preset: picking Strong in Advanced really slices with Strong's walls / infill (not Standard's numbers)
+  document.querySelectorAll("[name=spPreset]").forEach(r => r.onchange = () => {
+    const pv = presetOf(r.value), l = $("#spLayer");
+    l.value = presetLayer(pv, +(l.dataset.rec || l.value), +l.min, +l.max);
+    $("#spWalls").value = pv.walls; $("#spTB").value = pv.top_bottom; $("#spInfill").value = pv.infill; $("#spPattern").value = pv.pattern;
+    $("#spSpeed").value = Math.min(pv.speed, +$("#spSpeed").max || pv.speed);
+  });
   $("#spGo").onclick = async () => {
     const out = $("#spOut"), fd = readPanel(); fd.append("model_id", getModelId());
     out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}…</p>`; $("#spGo").disabled = true;
