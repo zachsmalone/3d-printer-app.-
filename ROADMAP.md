@@ -19,8 +19,8 @@ Scaffold/stub only: OAuth providers (no posting/verification), PrusaLink/Bambu/D
 6. Edit workspace next steps: on-model drag gizmos, face/edge selection, snapping, sketch-extrude, fillet/chamfer, section view, thickness analysis, mesh-quality heatmap, multi-object scenes with colour/material kept on 3MF import, auto-arrange, text on curved surfaces, a proper (non-fan) hole-filler, a faster non-voxel hollow.
 7. Studio: curved/cylindrical lithophanes, hanging holes/stands, lamp kits, text/QR, multi-photo bundles, AMS/MMU colour mapping, better pop-art (outline layers, drop-shadow offsets), mesh decimation for big outputs.
 
-## Learning content (optional, not school)
-- Troubleshooting and maker how-tos may grow over time. No quizzes, scores, grades, teachers, classes or school records.
+## Learning content (optional)
+- Troubleshooting and maker how-tos may grow over time. No quizzes, scores or grades.
 - Accessibility + localisation where it helps adults using the app.
 
 ## Adoption strategy
@@ -36,7 +36,7 @@ Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, imp
 `history.BuildStore` records carry `owner`/`visibility`; `community/*` modules sit behind small functions over JSON files (swap for a DB); routers are mounted in `app/main.py`; public pages are server-rendered with stable URLs. Planned: profiles, follows/feed, comments, shares, creator pages, saved collections.
 
 ## Legal & safety (REQUIRED before any public launch)
-ZEIM is **18+ only**, free, and not for school use. Decision 2026-10-12 (Zach): ZEIM launches with no lawyers. Terms, Privacy and Rules are plain-words pages based on common free templates; they make no compliance claims. **Still NOT done:**
+ZEIM is **18+ only** and free. Decision 2026-10-12 (Zach): ZEIM launches with no lawyers. Terms, Privacy and Rules are plain-words pages based on common free templates; they make no compliance claims. **Still NOT done:**
 - **No NSFW.** No adult/mature content marketplace, no paid-mature tier. **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
 - Age: accounts are 18+ only; an under-18 date of birth is refused and not stored. Underage reports → moderator suspends (reversible). Accounts and data are never deleted by the app or admins. Data-retention policy and the final privacy notice are still to do. ZEIM holds no grades, scores or school records (school features removed 2026-10-12).
 - Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process (section added to Terms with a placeholder contact; TODO: register a DMCA designated agent with the US Copyright Office, small fee, needs Zach's OK before paying), trademark clearance of product/section names.
@@ -59,5 +59,5 @@ Planned, **not built**: interest-based groups called **Build Plates** (e.g. a lo
 - Honest limits: a word list is not a moderation service (misses new slang, context, images, many languages); sessions are cookie-based until real auth exists, so anonymous identity can be reset by clearing cookies.
 
 ## School features: removed (2026-10-12)
-Zach removed the school aspect of ZEIM: no teacher tools, class codes, classrooms, assignments, quizzes, grades, scores or school records. ZEIM is free, **18+ only**, and not a school product. Not planned: school/district search, roster import, LMS sign-in, FERPA arrangements, or family/kid onboarding.
+Zach removed the school aspect of ZEIM on 2026-10-12; none of it is planned to come back. ZEIM is free and **18+ only**.
 
