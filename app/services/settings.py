@@ -20,11 +20,19 @@ SLICER_CHOICES = ("auto", "creality", "prusaslicer", "bambustudio", "orcaslicer"
 DEFAULTS = {"public_base_url": "", "default_slicer": "auto", "printers": []}
 
 
-def effective_slicer(s: dict, phone: bool = False) -> str:
-    """What 'Default slicer' means right now. 'auto' picks Creality Print / Creality Cloud on a phone or when a Creality K1 printer is set up."""
+def effective_slicer(s: dict, phone: bool = False, user_printer: str | None = None) -> str:
+    """What 'Default slicer' means right now. 'auto' follows the account printer, phone, or configured printers."""
     v = s.get("default_slicer") or "auto"
     if v != "auto":
         return v if v in SLICER_CHOICES else "prusaslicer"
+    if user_printer:
+        up = user_printer.lower()
+        if "bambu" in up:
+            return "bambustudio"
+        if "creality" in up or "ender" in up or "k1" in up:
+            return "creality"
+        if "prusa" in up:
+            return "prusaslicer"
     k1 = any(p.get("profile") == "creality_k1" for p in s.get("printers", []))
     return "creality" if (phone or k1) else "prusaslicer"
 PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y", "profile")

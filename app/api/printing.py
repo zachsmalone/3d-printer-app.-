@@ -58,7 +58,8 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
     # Shared server with no configured public address: the request's Host header is attacker-controlled and would end up
     # inside signed links, so no slicer deep links are offered until an admin sets the public base URL.
     no_base = config.MODE == "shared" and not (config.PUBLIC_BASE_URL or s.get("public_base_url"))
-    return {"base_url": settings.trusted_base_url(request) or "", "default_slicer": s["default_slicer"], "effective_slicer": settings.effective_slicer(s),
+    user_pr = (actor.user.get("printer") or {}).get("printer_id") if actor.user else None
+    return {"base_url": settings.trusted_base_url(request) or "", "default_slicer": s["default_slicer"], "effective_slicer": settings.effective_slicer(s, user_printer=user_pr),
             "slicers": [] if no_base else handoff.links(base_url(request), bid, lambda n: privacy.make_token(bid, n)),
             "slicer_links_disabled": ("Slicer links are off until the site's public address is set in Settings. You can still download the file." if no_base else ""),
             "printers": settings.public(s, redact=not guards.can_see_printer_urls(request, actor))["printers"], "printer_types": printers.TYPES,
@@ -89,9 +90,24 @@ def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float
                 catalog_printer: str = Form(""), nozzle: str = Form("")):
     meta_for(bid, actor, owner_only=True)
     pr = settings.get_printer(printer_id) if printer_id else None      # same bed/profile the "Send" of that printer will use
+    user_pr = (actor.user.get("printer") or {}) if actor.user else {}
+    if not catalog_printer and not printer_id and user_pr.get("printer_id"):
+        catalog_printer = user_pr["printer_id"]
+        if not nozzle and user_pr.get("nozzle") is not None:
+            nozzle = str(user_pr["nozzle"])
     chosen = {"printer_id": catalog_printer, "nozzle": nozzle} if catalog_printer else {}
     res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr), **chosen)
-    res["bed"] = list(printers.bed_of(pr))
+    if pr:
+        res["bed"] = list(printers.bed_of(pr))
+    elif catalog_printer:
+        from app.services import print_setup as ps
+        try:
+            bx, by, _ = ps.bed_of(catalog_printer)
+            res["bed"] = [bx, by]
+        except Exception:
+            res["bed"] = list(printers.bed_of(None))
+    else:
+        res["bed"] = list(printers.bed_of(None))
     if res.get("ok"):
         res["download"] = f"/files/{bid}/model.gcode"
     return JSONResponse(res)  # unavailable slicer -> 200 with available=false
