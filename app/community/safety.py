@@ -7,6 +7,7 @@ There are no strikes, bans or restricted modes. Reporting, and the moderator que
 Word lists are plain files in `app/community/wordlists/` (edit them any time; changes load without a restart):
   <lang>.txt          LDNOOBW lists (CC BY 4.0, see ATTRIBUTION.md) for en es fr de it pt nl da sv no fi pl cs hu tr ru
   extra.txt           ZEIM additions: slurs / hate speech / sexual terms / grooming-style phrases
+                     (plus a regex pattern layer in scan_grooming for common rewordings)
   allow_words.txt     false-positive allowlist (Scunthorpe-style names, cross-language collisions, 3D-printing words)
   allow_phrases.txt   multi-word exceptions ("ball bearing")
   stems.txt           long distinctive stems that are also caught when run together / spaced out ("fu ck")
@@ -330,6 +331,77 @@ def scan_language(text: str) -> str | None:
     return None
 
 
+
+# ------------------------------------------------------------------------------------------------ grooming / solicitation patterns
+# Catches common rewordings of the child-safety phrases in extra.txt. Runs on normalised text.
+# Honest limit: context-free patterns miss clever paraphrases; reports stay the primary control.
+# Benign maker talk ("what age group is this lesson for", "where do I find the infill", "send me the STL")
+# is written to pass — patterns require a YOU/YOUR-style target or a secrecy/isolation cue.
+
+_YOU = r"(?:you|u|ya|your|ur|youre|you're)"
+_PARENTS = r"(?:parents?|mom|mum|dad|mother|father|teacher|guardian)"
+_AGE_ASK = re.compile(
+    r"\b(?:how|what|hw|wut)\s+(?:old|age)\s+(?:are|r)\s+" + _YOU + r"\b"
+    r"|\bwhat\s+(?:is|s)\s+" + _YOU + r"r?\s+age\b"
+    r"|\b" + _YOU + r"r?\s+age\s*\?"
+    r"|\b(?:what|which)\s+grade\s+(?:are|r)\s+" + _YOU + r"\b"
+    r"|\b(?:when|whats|what's)\s+(?:is\s+)?" + _YOU + r"r?\s+birthday\b"
+    r"|\basl\b|\ba\s*/\s*s\s*/\s*l\b"
+    r"|\bare\s+" + _YOU + r"\s+(?:a\s+)?(?:boy|girl|guy|teen)\b",
+    re.I,
+)
+_LOC_ASK = re.compile(
+    r"\bwhere\s+(?:do|d)\s+" + _YOU + r"\s+live\b"
+    r"|\bwhere\s+(?:are|r)\s+" + _YOU + r"\s+from\b"
+    r"|\bwhat\s+(?:city|town|state|zip|address)\s+(?:are|r|do)\s+" + _YOU + r"\b"
+    r"|\b(?:what|which)\s+school\s+(?:do|are|r)\s+" + _YOU + r"\b"
+    r"|\b" + _YOU + r"r?\s+(?:real\s+)?(?:last\s+)?name\s*\?",
+    re.I,
+)
+_SECRECY = re.compile(
+    r"\b(?:don'?t|dont|do\s+not)\s+tell\s+(?:(?:your|ur)\s+)?" + _PARENTS + r"\b"
+    r"|\bour\s+little\s+secret\b"
+    r"|\bkeep\s+(?:this|it)\s+(?:a\s+)?secret\b"
+    r"|\bkeep\s+(?:this|it)\s+between\s+us\b"
+    r"|\b(?:no\s+one|nobody)\s+(?:has\s+)?to\s+know\b"
+    r"|\bare\s+(?:your|ur)\s+" + _PARENTS + r"\s+home\b"
+    r"|\bis\s+anyone\s+home\b"
+    r"|\bdelete\s+(?:this|that)\s+(?:message|chat|text)\b",
+    re.I,
+)
+_PIC_MEET = re.compile(
+    r"\bsend\s+(?:me\s+)?(?:a\s+)?(?:pic|pics|picture|pictures|photo|photos|selfie)(?:\s+of\s+(?:yourself|you|u))?\b"
+    r"|\bshow\s+me\s+" + _YOU + r"r?\s+face\b"
+    r"|\bturn\s+on\s+" + _YOU + r"r?\s+camera\b"
+    r"|\bwhat\s+are\s+" + _YOU + r"\s+wearing\b"
+    r"|\bmeet\s+(?:me\s+)?(?:in\s+person|alone|after\s+school)\b"
+    r"|\bcome\s+to\s+(?:my|our)\s+(?:house|place)\b"
+    r"|\bcan\s+we\s+meet\b",
+    re.I,
+)
+_OFF_PLATFORM = re.compile(
+    r"\b(?:let'?s|lets|let\s+us)\s+(?:go\s+)?private\b"
+    r"|\b(?:talk|chat|message)\s+(?:somewhere\s+)?(?:else|elsewhere)\b"
+    r"|\bthis\s+chat\s+is\s+monitored\b",
+    re.I,
+)
+
+
+def scan_grooming(text: str) -> str | None:
+    """'language' if the text matches a grooming/solicitation pattern, else None.
+
+    Exact multi-word phrases also live in extra.txt (caught by scan_language). This layer
+    catches common rewordings on the same normalised text the rest of the filter uses.
+    """
+    t = normalize(text or "")
+    if not t.strip():
+        return None
+    if (_AGE_ASK.search(t) or _LOC_ASK.search(t) or _SECRECY.search(t)
+            or _PIC_MEET.search(t) or _OFF_PLATFORM.search(t)):
+        return "language"
+    return None
+
+
 # ------------------------------------------------------------------------------------------------ contact info / PII
 _BARE_TLD = r"(?:com|net|org|edu|gov|info|biz|xyz|ru|uk|co|us|ca|de|fr|cn|jp|au|link|site|online|club|shop|store)"
 _STRONG_TLD = r"(?:com|net|org|edu|gov|info|biz|xyz|io|gg|ly|tv|ai|cc|app|dev|link|site|online)"
@@ -406,7 +478,7 @@ def scan_contact(text: str) -> str | None:
 def scan(text: str) -> str | None:
     if len(text or "") > MAX_SCAN_CHARS:
         return "too_long"
-    return scan_language(text) or scan_contact(text)
+    return scan_language(text) or scan_contact(text) or scan_grooming(text)
 
 
 def check(text: str, context: str = "") -> str:

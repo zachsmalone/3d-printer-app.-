@@ -61,6 +61,7 @@ sexting
 fetish
 erotic
 # --- child-safety / grooming phrases
+# Exact phrases (pattern layer in safety.scan_grooming catches common rewordings too).
 pedo
 pedophile
 paedophile
@@ -70,14 +71,34 @@ rapist
 send nudes
 send pics
 send me pictures
+send me a pic
+send me a photo
+show me your face
 are you alone
 dont tell your parents
+do not tell your parents
+dont tell your mom
+dont tell your dad
 keep this secret
+keep this between us
+our little secret
+no one has to know
+are your parents home
 meet me at
 meet up alone
+meet in person
+come to my house
 what school do you go
+which school do you go
 where do you live
+where are you from
 how old are you
+what is your age
+what grade are you
+when is your birthday
+asl
+lets go private
+talk elsewhere
 dickhead
 scheisse
 scheiße
