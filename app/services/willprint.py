@@ -81,6 +81,25 @@ _pool = None
 _cache: dict = {}
 
 
+def _watch_parent(parent: int):
+    """Worker initializer: exit as soon as the server process is gone (SIGTERM'd servers never shut the pool down,
+    which left 370 MB orphans behind)."""
+    import os, threading, time
+    def loop():
+        while True:
+            if os.getppid() != parent:
+                os._exit(0)
+            time.sleep(1)
+    threading.Thread(target=loop, daemon=True).start()
+
+
+def _shutdown():
+    global _pool
+    if _pool is not None:
+        _pool.shutdown(wait=False, cancel_futures=True)
+        _pool = None
+
+
 def _worker(path, printer_id, nozzle, kw):
     return check_file(path, printer_id, nozzle, **kw)
 
@@ -98,7 +117,9 @@ async def check_file_async(path, printer_id=None, nozzle=None, **kw) -> dict:
     else:
         if _pool is None:
             import multiprocessing as mp
-            _pool = ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("spawn"))
+            import atexit
+            _pool = ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("spawn"), initializer=_watch_parent, initargs=(os.getpid(),))
+            atexit.register(_shutdown)
         res = await asyncio.get_running_loop().run_in_executor(_pool, _worker, str(path), printer_id, nozzle, kw)
     if len(_cache) > 500:
         _cache.clear()

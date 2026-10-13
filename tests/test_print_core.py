@@ -258,3 +258,22 @@ def test_one_plate_bed_check_uses_the_chosen_printer():
     assert k1max["plate"]["fits"] is True and mini["plate"]["fits"] is False and mini["plate"]["bed_mm"][:2] == [180.0, 180.0]
     assert c.post("/api/edit/multi", files=two, data={"mode": "plate", "printer_id": "nope"}).status_code == 400
     assert 'fd.append("printer_id", P.pref.printer_id)' in (ROOT / "static/edit.js").read_text()
+
+
+def test_willprint_worker_exits_when_the_server_dies(tmp_path):
+    """The geometry worker process must not outlive a killed server (orphans once filled the box's memory)."""
+    import subprocess, sys, time, os
+    big = tmp_path / "big.stl"; big.write_bytes(trimesh.creation.icosphere(subdivisions=6).export(file_type="stl"))
+    assert big.stat().st_size > 2_000_000
+    code = ("import asyncio,os,sys; from app.services import willprint as w; asyncio.run(w.check_file_async(sys.argv[1]));"
+            "print([p.pid for p in w._pool._processes.values()][0], flush=True); os._exit(0)")
+    out = subprocess.run([sys.executable, "-c", code, str(big)], cwd=ROOT, capture_output=True, text=True, timeout=120,
+                         env={**os.environ, "PHOTO3D_WILLPRINT_INLINE": ""})
+    pid = int(out.stdout.strip().splitlines()[-1])
+    for _ in range(50):
+        try:
+            os.kill(pid, 0); time.sleep(0.2)
+        except ProcessLookupError:
+            break
+    else:
+        os.kill(pid, 9); raise AssertionError("worker outlived the server")
