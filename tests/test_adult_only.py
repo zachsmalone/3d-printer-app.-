@@ -4,7 +4,7 @@ import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from datetime import date
 from app import config
-from app.community import erase, identity, privacy
+from app.community import identity, privacy
 from app.community.store import USERS, AGE_BLOCKS, LISTINGS
 from tests.b1 import *
 
@@ -132,19 +132,6 @@ def test_underage_reason_needs_an_account():
     import pytest
     with pytest.raises(ValueError):
         moderation.report("zo-gear-demo-x", "sid-x", "underage_user", "", None)
-
-
-def test_documented_delete_process_removes_only_that_account_and_is_dry_run_first():
-    a = client({"display_name": "Gone", "dob": "1990-03-03"}); uid = a.get("/api/me").json()["id"]
-    keep = client(ADULT); kid = keep.get("/api/me").json()["id"]
-    pid = publish(a, photo_build(a)).json()["id"]
-    keep.post(f"/api/follow/{uid}")
-    plan = erase.plan(uid); assert plan["builds"] >= 1 and plan["projects"] == 1
-    assert identity.user_by_id(uid)[1] is not None                                     # the plan deleted nothing
-    out = erase.erase(uid); assert out["projects"] == 1
-    assert identity.user_by_id(uid) == (None, None) and not any(i["id"] == pid for i in LISTINGS.read())
-    assert identity.user_by_id(kid)[1] is not None and uid not in identity.user_by_id(kid)[1].get("following", [])
-    assert erase.erase("nope") is None
 
 
 def test_legacy_under_18_account_is_restricted_not_deleted():

@@ -13,6 +13,6 @@ ZEIM accounts are for **adults 18 and over only**. All content must be **clean a
 6. Content that infringes someone else's copyright or trademark.
 7. Spam, scams, or attempts to move people to private channels.
 
-**Reporting:** use *Report* on any project or print photo. Reports of type "minor safety" hide the item instantly pending review. Reports of type "underage user" (the account holder seems to be under 18) go to a moderator, who can suspend the account; its data is then deleted through the documented process (README → Underage accounts).
+**Reporting:** use *Report* on any project or print photo. Reports of type "minor safety" hide the item instantly pending review. Reports of type "underage user" (the account holder seems to be under 18) go to a moderator, who can suspend the account; suspension is reversible and nothing is deleted.
 
 > Draft, pending legal review. These guidelines, the Terms and the privacy notice are not a statement of legal compliance.

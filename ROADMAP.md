@@ -38,7 +38,7 @@ Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, imp
 ## Legal & safety (REQUIRED before any public launch)
 ZEIM is **18+ only**, free, and not for school use. Terms, Privacy and Rules are **drafts, pending legal review**. **The following needs legal review and is NOT done:**
 - **No NSFW.** No adult/mature content marketplace, no paid-mature tier. **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
-- Age: accounts are 18+ only; an under-18 date of birth is refused and not stored. Underage reports → moderator suspends → documented data deletion. Data-retention policy and the final privacy notice are still to do. ZEIM holds no grades, scores or school records (school features removed 2026-10-12).
+- Age: accounts are 18+ only; an under-18 date of birth is refused and not stored. Underage reports → moderator suspends (reversible). Accounts and data are never deleted by the app or admins. Data-retention policy and the final privacy notice are still to do. ZEIM holds no grades, scores or school records (school features removed 2026-10-12).
 - Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process, trademark clearance of product/section names.
 - Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits (DMs don't exist yet).
 - Age signals: date of birth is self-declared today (18+ gate, bypassable); consider privacy-preserving age assurance where required.

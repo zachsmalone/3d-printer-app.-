@@ -3,7 +3,7 @@
 Reports are stored; `minor_safety` reports hide the item immediately pending review.
 `underage_user` = "this account holder seems to be under 18" (ZEIM is 18+ only). It names the ACCOUNT (account_id); a moderator
 can resolve it with action "suspend", which suspends the account (its content is then shown to nobody else, it can't share or send).
-Deleting that person's data is a separate, deliberate step: see README "Underage accounts" and tools/delete_user_data.py.
+Accounts and data are never deleted by this process; suspension is reversible.
 The queue is only readable with header X-Admin-Token == PHOTO3D_ADMIN_TOKEN (unset = disabled).
 Real launch needs: trained reviewers, escalation + NCMEC reporting for CSAM, takedown/appeals
 workflow, audit log, hash-matching - see LEGAL.md.
