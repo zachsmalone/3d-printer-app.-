@@ -95,13 +95,14 @@ function applyMode() {
   $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
 }
 /* lithophane shape picker: flat outlines + curved shells (globe / night-light); curved ones take diameter + height instead of width */
-const CURVED = ["globe", "nightlight"];
+const CURVED = ["globe", "nightlight", "cup"];
 const litShape = () => ($("#shapeCards input:checked") || {}).value || "rect";
 function applyShape() {
   const lit = S.mode === "lithophane", curved = lit && CURVED.includes(litShape());
   $("#shapeCards").hidden = !lit; $("#shapeHelp").hidden = !lit; $("#curvedOpts").hidden = !curved;
   $("#width_mm").closest(".field").hidden = curved;
-  $("#diaLbl").firstChild.textContent = litShape() === "globe" ? "Globe diameter " : "Light diameter ";
+  $("#diaLbl").firstChild.textContent = { globe: "Globe diameter ", cup: "Cup inside diameter " }[litShape()] || "Light diameter ";
+  $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
 }
 $("#shapeCards").onchange = applyShape;
 $("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked

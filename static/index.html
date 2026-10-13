@@ -68,13 +68,14 @@
 <label class="card" data-shape="circle"><input type="radio" name="litho_shape" value="circle"><span class="ico" aria-hidden="true">◯</span><b>Circle</b><small>Flat, round</small></label>
 <label class="card" data-shape="heart"><input type="radio" name="litho_shape" value="heart"><span class="ico" aria-hidden="true">♡</span><b>Heart</b><small>Flat heart</small></label>
 <label class="card" data-shape="star"><input type="radio" name="litho_shape" value="star"><span class="ico" aria-hidden="true">☆</span><b>Star</b><small>Flat star</small></label>
-<label class="card" data-shape="globe"><input type="radio" name="litho_shape" value="globe"><span class="ico" aria-hidden="true">◍</span><b>Globe</b><small>Curved, stands up</small></label>
+<label class="card" data-shape="globe"><input type="radio" name="litho_shape" value="globe"><span class="ico" aria-hidden="true">◍</span><b>Globe</b><small>Full sphere, open base</small></label>
+<label class="card" data-shape="cup"><input type="radio" name="litho_shape" value="cup"><span class="ico" aria-hidden="true">◫</span><b>Cylinder / Cup</b><small>Pen holder or cup</small></label>
 <label class="card" data-shape="nightlight"><input type="radio" name="litho_shape" value="nightlight"><span class="ico" aria-hidden="true">🕯</span><b>Night-light</b><small>Slips over a tea-light</small></label>
       </fieldset>
-      <p class="help" id="shapeHelp">Flat shapes lie on the bed. Globe and night-light covers print standing up.</p>
+      <p class="help" id="shapeHelp">Flat shapes lie on the bed. Globe, cup and night-light covers print standing up.</p>
       <div class="grid2" id="curvedOpts" hidden>
         <div class="field"><label for="diameter_mm" id="diaLbl">Light diameter <em>mm</em></label><input type="number" id="diameter_mm" value="40" min="10" max="200" step="1"></div>
-        <div class="field"><label for="height_mm">Height <em>mm</em></label><input type="number" id="height_mm" value="60" min="10" max="240" step="1"></div>
+        <div class="field" id="heightFld"><label for="height_mm">Height <em>mm</em></label><input type="number" id="height_mm" value="60" min="10" max="240" step="1"></div>
       </div>
     </section>
 
