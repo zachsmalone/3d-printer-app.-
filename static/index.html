@@ -222,9 +222,9 @@
     <hr>
     <h4>Slice here <small id="builtinState"></small></h4>
     <div class="grid3">
-      <div class="field"><label>Layer height</label><input type="number" id="s_layer" value="0.2" step="0.05" min="0.05"></div>
-      <div class="field"><label>Infill %</label><input type="number" id="s_fill" value="15" min="0" max="100"></div>
-      <div class="field"><label>Brim mm</label><input type="number" id="s_brim" value="0" min="0" step="1"></div>
+      <div class="field"><label for="s_layer">Layer height</label><input type="number" id="s_layer" value="0.2" step="0.05" min="0.05"></div>
+      <div class="field"><label for="s_fill">Infill %</label><input type="number" id="s_fill" value="15" min="0" max="100"></div>
+      <div class="field"><label for="s_brim">Brim mm</label><input type="number" id="s_brim" value="0" min="0" step="1"></div>
       <div class="field chk"><label><input type="checkbox" id="s_up"> Stand upright (lithophane)</label></div>
       <div class="field chk"><label><input type="checkbox" id="s_sup"> Supports</label></div>
     </div>
@@ -253,17 +253,17 @@
 <dialog id="dlgSettings"><div class="dlg wide">
   <div class="dh"><h3>Settings</h3><button class="x" data-close>✕</button></div>
   <div class="body">
-    <nav class="tabs"><button class="on" data-tab="tPrint">Printing</button><button data-tab="tAcc">Promote your accounts</button></nav>
-    <div id="tPrint" class="tab">
+    <div class="tabs" role="tablist" aria-label="Settings sections"><button type="button" class="on" role="tab" id="tabPrint" aria-selected="true" aria-controls="tPrint" data-tab="tPrint">Printing</button><button type="button" role="tab" id="tabAcc" aria-selected="false" aria-controls="tAcc" tabindex="-1" data-tab="tAcc">Promote your accounts</button></div>
+    <div id="tPrint" class="tab" role="tabpanel" aria-labelledby="tabPrint">
       <div class="grid2">
         <div class="field"><label for="set_slicer">Default slicer</label><select id="set_slicer"><option value="auto">Automatic (Creality on phones and with a K1)</option><option value="creality">Creality Print / Creality Cloud</option><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
-        <div class="field"><label>Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
+        <div class="field"><label for="set_base">Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
       </div>
       <h4>Printers</h4><div id="printerList"></div>
       <button class="btn small" id="btnAddPrinter">+ Add printer</button>
       <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are marked Coming soon. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
     </div>
-    <div id="tAcc" class="tab" hidden>
+    <div id="tAcc" class="tab" role="tabpanel" aria-labelledby="tabAcc" hidden>
       <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built.</p>
       <div class="grid2" id="linkInputs"></div>
       <button class="btn small" id="btnSaveLinks">Save link-outs</button>
@@ -289,7 +289,7 @@
 <main class="page" id="viewShowcase">
   <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Community projects, clean and safe for all. Everything is free to download.</p></div>
     <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
-  <div class="row feedbar"><div class="seg" id="shTabs"></div><a class="btn primary createcta" href="#studio" id="btnCreatePhoto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Create from photo</a><a class="btn ghost" href="#learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg> Learn</a></div>
+  <div class="row feedbar"><div class="seg" id="shTabs" role="group" aria-label="Showcase lists"></div><a class="btn primary createcta" href="#studio" id="btnCreatePhoto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Create from photo</a><a class="btn ghost" href="#learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg> Learn</a></div>
   <div class="recent" id="shRecent" hidden></div>
   <p class="help" id="shSub"></p>
   <p class="help" id="shCount" role="status" aria-live="polite"></p>
@@ -344,11 +344,11 @@
   <div class="dh"><h3>🌐 Share this build to the Showcase</h3><button class="x" data-close>✕</button></div>
   <div class="body">
     <p class="help">Free for everyone to download. Clean and safe for all projects only.</p>
-    <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
-    <div class="field"><label>Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
-    <div class="field"><label>Description</label><input id="pub_desc" maxlength="500"></div>
+    <div class="field"><label for="pub_vis">Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
+    <div class="field"><label for="pub_title">Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
+    <div class="field"><label for="pub_desc">Description</label><input id="pub_desc" maxlength="500"></div>
     <div class="field"><label for="pub_remix">Remixed from <em>optional: paste the Showcase link</em></label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
-    <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
+    <div class="field"><label for="pub_tags">Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
     <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (clean and safe for all; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
   </div>
   <div class="df"><button class="btn primary" id="btnDoPublish">Publish</button></div>
@@ -375,7 +375,7 @@
 <dialog id="dlgData"><div class="dlg">
   <div class="dh"><h3>🔒 My personalization data</h3><button class="x" data-close>✕</button></div>
   <div class="body" id="dataBody"></div>
-  <div class="df"><button class="btn" id="btnToggleP13n"></button><button class="btn danger" id="btnClearData">Clear all my data</button></div>
+  <div class="df"><button class="btn" id="btnToggleP13n">Turn personalization on or off</button><button class="btn danger" id="btnClearData">Clear all my data</button></div>
 </div></dialog>
 
 <dialog id="dlgReport" aria-labelledby="repTitle"><div class="dlg">

@@ -10,7 +10,7 @@ async function init() {
   document.title = CFG.product;
   $$("[data-sec]").forEach(e => e.textContent = CFG.sections[e.dataset.sec] || e.textContent);
   $("#logoImg").alt = CFG.product;
-  $("#shTabs").innerHTML = Object.entries(CFG.showcase_tabs).map(([k, v]) => `<button data-tab="${k}" class="${k === shTab ? "on" : ""}">${esc(v)}</button>`).join("");
+  $("#shTabs").innerHTML = Object.entries(CFG.showcase_tabs).map(([k, v]) => `<button type="button" data-tab="${k}" class="${k === shTab ? "on" : ""}" aria-pressed="${k === shTab}">${esc(v)}</button>`).join("");
   await refreshMe();
   route();
   window.__zeimStarted = true;                 // static/boot.js shows a visible error if this never happens
@@ -208,7 +208,7 @@ async function loadShowcase() {
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
   }
 }
-$("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => x.classList.toggle("on", x === b)); loadShowcase(); };
+$("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
 $("#shCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; shCat = b.dataset.cat; loadShowcase(); });
 $("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };

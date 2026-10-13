@@ -173,6 +173,9 @@ function showBuild(r) {
   $("#viewerEmpty").hidden = true; $("#vtools").hidden = false; $("#result").hidden = false;
   viewer?.load(r.preview, r.mode);
   const st = r.stats, sz = st.size_mm.map(x => x.toFixed(1)).join(" × ");
+  const nb = st.bodies?.length || 1;
+  $("#viewer").setAttribute("aria-label", `3D preview: ${MODE_LABEL[r.mode] || "model"}, ${sz.replace(/ × /g, " by ")} millimetres, ${nb} ${nb > 1 ? "pieces" : "piece"}` +
+    `${st.watertight ? "" : ", not watertight yet"}. Use the Turn left, Turn right and Reset view buttons to look around it.`);
   $("#stats").innerHTML = `<span class="pill">${MODE_LABEL[r.mode]}</span><span class="pill">${sz} mm</span>` +
     `<span class="pill">${st.triangles.toLocaleString()} triangles</span><span class="pill">${st.bodies.length} ${st.bodies.length > 1 ? "bodies" : "body"}</span>` +
     `<span class="pill ${st.watertight ? "ok" : "bad"}">${st.watertight ? "✔ watertight" : "✖ not watertight"}</span>`;
@@ -412,7 +415,21 @@ async function renderAccounts() {
     ${p.state === "connected" ? `<button class="btn small" data-disc="${p.id}">Disconnect</button>` : `<a class="btn small ${p.state === "not_configured" ? "" : "primary"}" ${p.state === "not_configured" ? 'style="pointer-events:none;opacity:.4"' : `href="/api/accounts/${p.id}/connect"`}>Connect</a>`}</div>`).join("");
 }
 $("#accList").onclick = async e => { const d = e.target.closest("[data-disc]"); if (d) { await api("/api/accounts/" + d.dataset.disc, { method: "DELETE" }); renderAccounts(); } };
-$$(".tabs button").forEach(b => b.onclick = () => { $$(".tabs button").forEach(x => x.classList.toggle("on", x === b)); $$(".tab").forEach(t => t.hidden = t.id !== b.dataset.tab); });
+/* Settings sections are real tabs: aria-selected, one Tab stop, arrow keys / Home / End move between them. */
+const _tabs = $$(".tabs [role=tab]");
+const pickTab = (b, focus) => {
+  _tabs.forEach(x => { const on = x === b; x.classList.toggle("on", on); x.setAttribute("aria-selected", String(on)); x.tabIndex = on ? 0 : -1; });
+  $$(".tab").forEach(t => t.hidden = t.id !== b.dataset.tab);
+  if (focus) b.focus();
+};
+_tabs.forEach((b, i) => {
+  b.onclick = () => pickTab(b);
+  b.onkeydown = e => {
+    const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: _tabs.length - 1 }[e.key];
+    if (j === undefined) return;
+    e.preventDefault(); pickTab(_tabs[(j + _tabs.length) % _tabs.length], true);
+  };
+});
 $("#btnSettings").onclick = openSettings;
 $$("[data-close]").forEach(b => b.onclick = () => b.closest("dialog").close());
 
@@ -432,11 +449,22 @@ export { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, ope
   paint();
 })();
 
-/* Every Experienced-mode field gets a real label link (the markup puts the label text beside the box, not around it). */
-$$("#expertOpts .field").forEach((f, i) => {
-  const lab = f.querySelector(":scope > label"), inp = f.querySelector("input:not([type=checkbox]),select");
-  if (lab && inp && !lab.htmlFor && !lab.contains(inp)) { inp.id = inp.id || "xo_" + (inp.name || i); lab.htmlFor = inp.id; }
-});
+/* Every ".field" (label text beside the box, not around it) gets a real label link, including fields drawn later
+   (Edit tools, printer rows, account links, dialogs). Screen readers then say the field's name, and tapping the label focuses the box. */
+let _flN = 0;
+function linkFieldLabels(root = document) {
+  const fields = root.matches?.(".field") ? [root] : [];
+  fields.push(...(root.querySelectorAll ? root.querySelectorAll(".field") : []));
+  for (const f of fields) {
+    const lab = f.querySelector(":scope > label"), inp = f.querySelector("input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea");
+    if (!lab || !inp || lab.htmlFor || lab.contains(inp) || (inp.labels && inp.labels.length)) continue;     // already linked: leave it
+    if (!inp.id) inp.id = (f.closest("#expertOpts") ? "xo_" + (inp.name || _flN) : "fl_" + (inp.name || inp.dataset.f || inp.dataset.link || "f") + "_" + (++_flN));
+    lab.htmlFor = inp.id;
+  }
+}
+linkFieldLabels();
+new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) linkFieldLabels(n); })
+  .observe(document.body, { childList: true, subtree: true });
 $("#widthRange").setAttribute("aria-label", "Width in millimetres (slider)");
 
 // Skip link: focus whichever main view is showing (the four views share one page)
