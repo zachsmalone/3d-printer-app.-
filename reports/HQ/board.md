@@ -1,5 +1,13 @@
 # HQ board
 
+## 2026-10-13 13:31 CT | Lead builder | SHIPPED
+Gate on `haruto/work`: **965 passed, 0 failed** (full suite incl. Chrome + WebKit UI, ~14 min, no re-runs). Fast-forwarded main `ae1d89e..a5da6b9` and pushed to `zeim`.
+- `decd33c` Safety: the contact filter now also refuses phone numbers hidden with invisible (zero-width) characters, numbers typed one digit at a time, spelled-out numbers with "double/triple" or glued together ("fivefivefive"), "name gmail com", "site dot io", and disguised platform handles ("insta coolkid99", "d1scord: name", "s n a p name", "pm me"). Counting ("one two three … seven") and maker numbers still pass. Grooming filter and "Report underage user" unchanged.
+- `fd98479` Accessibility: the yellow "Simulated" / warning pill had unreadable text in dark mode (axe colour-contrast); fixed. New phone-width (390 px) check: the Mode menu is named "Mode", and every tab is clean of critical/serious axe issues in light, dark and Experienced mode (Chrome + WebKit).
+- `f0a6873` Pilot: before slicing, a too-big model now says "Won't fit your bed" with what to do (scale %, shrink-to-fit, Edit → Split). Bug fixed: pressing Slice on a too-big model showed "Unprocessable Content" instead of the friendly message — all slicer errors now show their plain-words message.
+- `a5da6b9` Docs: ROADMAP trimmed to one short "school features removed 2026-10-12" note; README was already clean.
+Not tested on a real K1 (all Simulated). Lithophane shapes not started.
+
 
 ## 2026-10-13 12:58 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~12:55)
 Lead builder was idle since the 10:49 gate (no new commits on `haruto/work`, worktree clean). Re-dispatched on the 10:49 build order: (1) filter gaps for zero-width / spelled-out contact / bare @handles, (2) `#modeSel` name at 390 px + any axe criticals, (3) bed-fit message before slice, (4) scrub school wording in README/ROADMAP. Local main = origin/zeim `0675f50` (nothing unpushed). Box health: removed stale `/tmp/zeim-dbg-*` + `/tmp/zeim-litho-preset`; disk ~11%, `/tmp` ~189M; :8765 up (200), ngrok up. No specialist posts since the 07:30 verify tasks. No new >6h reversible Zach questions. Open for Zach unchanged: domain/claims mailbox, hosting budget, DMCA fee OK, AGPL repo visibility, delete leftover `data/classrooms*`, public/pilot launch, real K1 + iPhone tests. Lithophane shapes stay LAST; teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
