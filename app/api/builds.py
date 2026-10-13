@@ -198,6 +198,9 @@ def generate(
     min_thickness: float = Form(0.8),
     max_thickness: float = Form(3.0),
     border_mm: float = Form(3.0),
+    shape: str = Form("rect"),               # lithophane outline: rect | heart | circle | star | square | globe | nightlight
+    diameter_mm: float = Form(40.0),         # curved shapes: globe diameter / light diameter the night-light slips over
+    height_mm: float = Form(60.0),           # curved shapes: height
     base_mm: float = Form(2.0),
     relief_mm: float = Form(6.0),
     levels: int = Form(4),
@@ -235,6 +238,13 @@ def generate(
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+    from ..core import litho_shapes
+    if mode == "lithophane":
+        if shape not in litho_shapes.SHAPES:
+            raise HTTPException(400, "shape must be one of " + " | ".join(litho_shapes.SHAPES))
+        if shape in litho_shapes.CURVED_SHAPES and not (10 <= diameter_mm <= 200 and 10 <= height_mm <= 240):
+            raise HTTPException(400, "diameter_mm must be 10..200 and height_mm 10..240")
+
     disk_guard()
     with store.lock:  # serialise so concurrent builds can't exceed the cap
         try:
@@ -253,6 +263,10 @@ def generate(
                 "popart": dict(base_mm=base_mm, levels=levels, layer_mm=layer_mm, style=style,
                                halftone_cell=halftone_cell, multi_body=multi_body, palette=palette or None),
             }[mode])
+        if mode == "lithophane":
+            params.update(shape=shape)
+            if shape in litho_shapes.CURVED_SHAPES:
+                params.update(diameter_mm=diameter_mm, height_mm=height_mm)
         t0 = time.time()
         try:
             model = geometry.build(im, mode, params)
@@ -270,6 +284,9 @@ def generate(
             (d / f"model.{ext}").write_bytes(fn(model))
         Image.fromarray(model.thumb).save(d / "thumb.png")
         stats = mesh_stats(model)
+        if mode == "lithophane" and params.get("shape", "rect") != "rect":
+            from ..services import willprint            # same bed-fit check the Will-it-print box uses (default printer)
+            model.info = {**(model.info or {}), "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), "creality_k1")}
         meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
                 "title": title.strip() or sample_title or DEFAULT_PHOTO_TITLE,
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
