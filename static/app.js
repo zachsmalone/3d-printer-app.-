@@ -45,6 +45,8 @@ const FIELD_NAMES = { width_mm: "Width", height_mm: "Height", resolution: "Detai
 function errText(j, r) {
   const d = j?.detail ?? j?.message;
   if (typeof d === "string" && d) return d;
+  // {detail: {code, message}} (slicer: "too big for the bed", busy, bad file…): show the friendly message, never "Unprocessable Content"
+  if (d && typeof d === "object" && !Array.isArray(d) && typeof d.message === "string" && d.message) return d.message;
   if (Array.isArray(d) && d.length) {
     const names = [...new Set(d.map(x => { const k = Array.isArray(x?.loc) ? x.loc.at(-1) : ""; return FIELD_NAMES[k] || (typeof k === "string" && k && k !== "body" ? k.replace(/_/g, " ") : ""); }).filter(Boolean))];
     return names.length ? `Please check: ${names.join(", ")}. Something in the form isn't right.` : "Something in the form isn't right. Check the highlighted field.";

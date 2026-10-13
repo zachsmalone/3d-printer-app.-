@@ -75,7 +75,7 @@ export function badgeHTML(r, { detail = false } = {}) {
   const pill = `<span class="pill willprint ${cls}" title="Will it print on the ${esc(r.printer || "")}?"><span aria-hidden="true">${ico}</span> ${esc(r.label)}<span class="sr-only"> on the ${esc(r.printer || "")}</span></span>`;
   if (!detail || !c.bed_fit) return pill;
   return `<div class="willbox"><p><b>Will it print?</b> ${pill} <span class="help">${esc(r.printer)}${r.nozzle ? ` · ${r.nozzle} mm nozzle` : ""}</span></p><ul class="checks">
-    ${row(c.bed_fit.ok, c.bed_fit.ok ? `Fits the bed (${c.bed_fit.size_mm.join(" × ")} mm)` : `Too big: ${c.bed_fit.size_mm.join(" × ")} mm on a ${c.bed_fit.bed_mm.join(" × ")} mm printer`)}
+    ${row(c.bed_fit.ok, c.bed_fit.ok ? `Fits the bed (${c.bed_fit.size_mm.join(" × ")} mm)` : `Won't fit your bed: ${c.bed_fit.size_mm.join(" × ")} mm on a ${c.bed_fit.bed_mm.join(" × ")} mm printer`)}
     ${row(c.slices.ok, c.slices.ok ? "Slices OK" : c.slices.ok === false ? "Slicing failed" : "Not sliced yet (press Slice)")}
     ${row(c.thin_wall.ok, c.thin_wall.ok === false ? `Thin walls under ${c.thin_wall.min_mm} mm (${Math.round(c.thin_wall.thin_fraction * 100)}% of the surface)` : c.thin_wall.ok ? `No walls thinner than one ${c.thin_wall.min_mm} mm line` : "Wall check not available")}</ul>
     ${(r.tips || []).map(t => `<p class="help">${esc(t)}</p>`).join("")}</div>`;

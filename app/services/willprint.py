@@ -62,7 +62,8 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
         verdict, label = "likely", "Fits: not sliced yet"
     tips = []
     if not fit["ok"]:
-        tips.append(f"Scale it to about {fit['fit_scale_pct']}% to fit the {p['name']} ({' x '.join(f'{b:g}' for b in fit['bed_mm'])} mm).")
+        tips.append(f"It won't fit your bed. Scale it to about {fit['fit_scale_pct']}% to fit the {p['name']} "
+                    f"({' x '.join(f'{b:g}' for b in fit['bed_mm'])} mm), use shrink-to-fit (\"Scale down to fit this printer\") when you slice, or cut it into pieces with Edit → Split.")
     if thin["ok"] is False:
         tips.append(f"Some walls are thinner than one {min_wall:g} mm line. Try a smaller nozzle or thicken them.")
     if slices_ok is False:
