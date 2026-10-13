@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "title": "CMYK colour lithophane specifications",
+  "target": {
+    "printers": ["Bambu Lab printers with AMS", "Creality printers with CFS"],
+    "materials": ["translucent PLA or PETG in cyan, magenta, yellow, and white"],
+    "backlight": "diffuse cool-white LED panel or light box"
+  },
+  "method": {
+    "name": "stacked subtractive CMYK lithophane",
+    "order_from_light": ["white", "yellow", "magenta", "cyan"],
+    "principle": "White is the light-transmitting base; yellow, magenta, and cyan are translucent colour layers. Their combined thickness controls perceived colour and brightness.",
+    "status": "experimental_untested"
+  },
+  "layer_thickness": {
+    "unit": "mm",
+    "white": {"minimum": 0.4, "default": 0.8, "maximum": 1.6},
+    "yellow": {"minimum": 0.04, "default": 0.08, "maximum": 0.2},
+    "magenta": {"minimum": 0.04, "default": 0.08, "maximum": 0.2},
+    "cyan": {"minimum": 0.04, "default": 0.08, "maximum": 0.2},
+    "total_stack": {"minimum": 0.6, "default": 1.04, "maximum": 2.0},
+    "verification": "unverified"
+  },
+  "filament_choices": {
+    "white": {"role": "base / brightness", "requirements": "translucent white, consistent diameter, low yellowing", "examples": ["Bambu Lab PLA Basic White", "Creality Hyper PLA White"], "verification": "unverified"},
+    "yellow": {"role": "warm highlights and yellow channel", "requirements": "highly translucent yellow", "examples": ["Bambu Lab PLA Translucent Yellow", "Creality PLA Translucent Yellow"], "verification": "unverified"},
+    "magenta": {"role": "red / pink / purple mixing", "requirements": "highly translucent magenta", "examples": ["Bambu Lab PLA Translucent Magenta", "Creality PLA Translucent Magenta"], "verification": "unverified"},
+    "cyan": {"role": "blue / green / teal mixing", "requirements": "highly translucent cyan", "examples": ["Bambu Lab PLA Translucent Cyan", "Creality PLA Translucent Cyan"], "verification": "unverified"}
+  },
+  "backlight_tips": [
+    "Use a diffuse white light source; avoid bare LEDs that create hot spots.",
+    "Start with a cool-white backlight around 5000-6500 K.",
+    "Keep the backlight evenly spaced behind the print.",
+    "Use lower brightness first, then increase gradually to avoid washing out colour.",
+    "For a warmer look, try 4000-5000 K; for a cleaner, cooler look, try 6000-6500 K.",
+    "Do not use high-power incandescent bulbs near PLA; use LED lighting instead.",
+    "Calibrate colour layers with a step wedge before printing a full image."
+  ],
+  "print_settings": {
+    "nozzle_mm": 0.4,
+    "layer_height_mm": {"pla": 0.08, "petg": 0.1},
+    "infill": "100% rectilinear or solid layers",
+    "orientation": "flat, with the white base closest to the backlight",
+    "multi_material": "Assign each colour to its own AMS/CFS slot and use the slicer’s colour-change workflow."
+  },
+  "test_files": [
+    {"id": "cmyk_step_wedge", "purpose": "Calibrate layer thickness per colour and measure colour accuracy."},
+    {"id": "small_photo", "purpose": "Validate a simple high-contrast photo before a large print."},
+    {"id": "grayscale_control", "purpose": "Check brightness and contrast without colour layers."}
+  ],
+  "acceptance": {
+    "functional": "Produces a recognizable, evenly lit colour image with no major hot spots or colour banding.",
+    "mechanical": "Layers bond securely and the lithophane does not crack during handling.",
+    "colour": "Cyan, magenta, and yellow layers produce visibly distinct colour mixing.",
+    "verification": "unverified_until_test_printed"
+  },
+  "sources": [
+    {"topic": "CMYK colour lithophane method and layer guidance", "url": "https://wiki.bambulab.com/en/knowledge-sharing/cmyk-color-lithophane-printing-instructions"},
+    {"topic": "CMYK colour lithophane printing guidance", "url": "https://wiki.snapmaker.com/en/snapmaker_orca/color_lithophane_printing_instructions"},
+    {"topic": "Bambu AMS multi-colour printing", "url": "https://wiki.bambulab.com/en/knowledge-sharing/cmyk-color-lithophane-printing-instructions"},
+    {"topic": "Creality CFS multi-colour printing", "url": "https://www.creality.com/pages/cfs-color-filament-system"}
+  ]
+}
