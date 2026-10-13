@@ -16,6 +16,8 @@ all invisible/format characters removed (zero-width, soft hyphen, tags, bidi, va
 look-alikes mapped to Latin, other-script digits to 0-9, lower-case.
 Matching is on WHOLE WORDS (so "class", "assemble", "cockpit", "Scunthorpe", "Nigeria" are fine), with plural/-ing/-ed handling, leetspeak
 ("sh!t", "a55"), stretched letters ("fuuuck"), spaced-out letters ("f u c k", "f.u.c.k") and a single inserted symbol ("f*ck", "fu.ck").
+Contact checks also refuse digits hidden with invisible characters ("555<zero-width>1234"), phone numbers typed digit-by-digit or spelled
+out (incl. "triple five", "fivefivefive"; plain counting "one two three ... seven" is allowed), and disguised platform names ("d1scord: name").
 Only the files listed in LANG_FILES / EXTRA_FILES / ALLOW_FILES are read - the CC-BY licence text in the same folder is NOT a word list.
 If the required lists are missing the filter FAILS CLOSED: free text is refused (HTTP 503) instead of letting everything through.
 Non-English entries of 3 characters or fewer are ignored (too many collisions with ordinary words in other languages);
@@ -414,8 +416,8 @@ _PROVIDERS = r"(?:gmail|yahoo|hotmail|outlook|icloud|protonmail|proton|aol|msn|g
 _EMAIL_PLAIN = re.compile(r"[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{2,}){1,3}|@" + _PROVIDERS + r"\b")
 _EMAIL_SPACED = re.compile(r"[\w.+-]{1,64}\s{0,3}" + _AT + r"\s{0,3}[\w-]{1,63}" + _DOT_SP + _STRONG_TLD + r"\b")
 _EMAIL_WORDS = re.compile(r"[\w.+-]{1,64}" + _AT_WORD + r"[\w-]{1,63}" + _DOT_TIGHT + _BARE_TLD + r"\b")
-_EMAIL_PROVIDER = re.compile(r"\bat\s+" + _PROVIDERS + r"\b|\b" + _PROVIDERS + r"\s*:\s*[a-z0-9_.]{4,}|\bmy\s+" + _PROVIDERS + r"\s+(?:is|address is)\s+[a-z0-9_.]{4,}")
-_URL = re.compile(r"(?:\b(?:https?|ftp)://|\bwww\s*\.|\b(?:javascript|vbscript|data):|\blocalhost:\d|\b[a-z0-9][a-z0-9-]*\." + _BARE_TLD + r"\b|\b[a-z0-9-]+" + _DOTW + _BARE_TLD
+_EMAIL_PROVIDER = re.compile(r"(?:\b(?:at|is)\s+[a-z0-9_.]{3,}|:\s*[a-z0-9_.]{3,}|\b[a-z_.]*\d[a-z0-9_.]*)\s+" + _PROVIDERS + r"\s+(?:com|net|co)\b|\bat\s+" + _PROVIDERS + r"\b|\b" + _PROVIDERS + r"\s*:\s*[a-z0-9_.]{4,}|\bmy\s+" + _PROVIDERS + r"\s+(?:is|address is)\s+[a-z0-9_.]{4,}")
+_URL = re.compile(r"(?:\b(?:https?|ftp)://|\bwww\s*\.|\b(?:javascript|vbscript|data):|\blocalhost:\d|\b[a-z0-9][a-z0-9-]*\." + _BARE_TLD + r"\b|\b[a-z0-9-]+" + _DOTW + r"(?:" + _BARE_TLD + r"|io|gg)"
                   + r"\b|\b[a-z0-9-]{2,}\s+\.\s+" + _BARE_TLD + r"\b|\b[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}/[\w~%-]"
                   + r"|(?<![\d.])(?:[1-9]\d|1\d\d|2[0-4]\d|25[0-5])(?:\.\d{1,3}){3}(?![\d.]))")
 _HANDLE_AT = re.compile(r"(?<![\w@.+-])@[a-z][a-z0-9_.]{2,30}|(?<![\w/])u/[a-z0-9_-]{3,}")
@@ -425,6 +427,20 @@ _PLATFORMS = (r"(?:snapchat|snap|instagram|insta|tiktok|discord|whatsapp|telegra
 _HANDLE_PLATFORM = re.compile(r"\b" + _PLATFORMS + r"\b\s*(?:[:@=]|\bid\b|\bhandle\b|\busername\b|add me|me on)\s*@?[a-z0-9_.]{3,}"
                               r"|\bmy\s+" + _PLATFORMS + r"\s+(?:is|username is|id is|handle is)\s+@?[a-z0-9_.]{3,}")
 _ADD_ME = re.compile(r"\b(?:add|follow|find|message|msg|dm|hit|hmu|text)\s+me\s+(?:on|at|via)\s+" + _PLATFORMS + r"\b|\b(?:snap|snapchat|whatsapp|insta|instagram|kik|telegram|discord)\s+me\b|\bdm\s+me\b")
+_PLATFORM_RE = re.compile(_PLATFORMS + r"$")
+_HANDLE_AFTER_PLATFORM = re.compile(r"\b" + _PLATFORMS + r"\s+(?:gamertag\s+|tag\s+|name\s+)?(?=[a-z0-9_.]*[a-z]{2})(?=[a-z0-9_.]*\d)[a-z0-9_.]{4,30}\b"
+                                    r"|\b(?:pm|facetime|skype|telegram|signal)\s+me\b")
+_PLAT_LEET = str.maketrans({"1": "i", "0": "o", "3": "e", "4": "a", "5": "s", "@": "a", "$": "s", "!": "i"})
+
+
+def _platform_view(t: str) -> str:
+    """Spell platform names back out so the handle checks see them: 's n a p' / 's.n.a.p' -> 'snap', 'd1scord' -> 'discord'."""
+    t = re.sub(r"(?<![a-z0-9])(?:[a-z][ .]){2,}[a-z](?![a-z0-9])",
+               lambda m: (lambda j: j if _PLATFORM_RE.match(j) else m.group(0))(re.sub(r"[ .]", "", m.group(0))), t)
+    return re.sub(r"(?<![a-z0-9])[a-z0-9@$!]{2,10}(?![a-z0-9])",
+                  lambda m: (lambda j: j if _PLATFORM_RE.match(j) else m.group(0))(m.group(0).translate(_PLAT_LEET)), t)
+
+
 _SEP = r"[ .\-/_,·]"
 _PHONE_US = re.compile(r"(?<![\d.])(?:\+?\d{1,3}" + _SEP + r")?\(?\d{3}\)?" + _SEP + r"\d{3}" + _SEP + r"\d{4}(?![\d])")
 _PHONE_INTL = re.compile(r"\+\d{1,3}[ .-]?\d{1,4}(?:[ .-]?\d{2,4}){2,4}(?!\d)")
@@ -439,20 +455,77 @@ _NUMWORDS = {w: 1 for w in (
     "null eins zwei drei vier funf sechs sieben acht neun").split()}
 
 
+_NUMWORD_VAL = {w: str(i % 10) for i, grp in enumerate((
+    "zero oh cero null", "one uno un une eins", "two dos deux zwei", "three tres trois drei", "four cuatro quatre vier",
+    "five cinco cinq funf", "six seis sechs", "seven siete sept sieben", "eight ocho huit acht", "nine nueve neuf neun")) for w in grp.split()}
+_REPEAT = {"double": 2, "triple": 3}
+
+
+def _glued_numwords(tok: str) -> list[str] | None:
+    """'fivefivefive' -> ['five', 'five', 'five'] when a token is made ONLY of 2+ number words, else None."""
+    if len(tok) < 6 or tok in _NUMWORDS:
+        return None
+    best: dict[int, list[str]] = {0: []}
+    for i in range(len(tok)):
+        if i not in best:
+            continue
+        for w in _NUMWORD_VAL:
+            if tok.startswith(w, i) and (i + len(w)) not in best:
+                best[i + len(w)] = best[i] + [w]
+    out = best.get(len(tok))
+    return out if out and len(out) >= 2 else None
+
+
+def _is_counting(digits: str) -> bool:
+    """'1234567' / '0123456789' / '9876543': someone counting or a number stencil, not a phone number."""
+    steps = {(int(b) - int(a)) for a, b in zip(digits, digits[1:])}
+    return steps in ({1}, {-1})
+
+
 def _spelled_number_run(t: str) -> bool:
-    """>=7 digits written as words (any mix with short digit groups): 'five five five one two three four'."""
-    total, words = 0, 0
+    """>=7 digits written as words (any mix with short digit groups): 'five five five one two three four', 'triple five ...',
+    'fivefivefive onetwothree'. Plain counting ('one, two, three ... seven') is not a phone number."""
+    digits, words, mult = "", 0, 1
+
+    def done() -> bool:
+        return bool(words and len(digits) >= 7 and not _is_counting(digits))
+
     for m in re.finditer(r"[a-z]+|\d+", t):
         tok = m.group(0)
-        if tok in _NUMWORDS:
-            total += 1; words += 1
+        parts = [tok] if tok in _NUMWORDS else _glued_numwords(tok)
+        if tok in _REPEAT:
+            mult = _REPEAT[tok]
+            continue
+        if parts:
+            for w in parts:
+                digits += _NUMWORD_VAL.get(w, "0") * mult; words += 1; mult = 1
         elif tok.isdigit() and len(tok) <= 4:
-            total += len(tok)
+            digits += tok * mult; mult = 1
         else:
-            if words and total >= 7:
+            if done():
                 return True
-            total = words = 0
-    return bool(words and total >= 7)
+            digits, words, mult = "", 0, 1
+    return done()
+
+
+_DIGIT_RUN = re.compile(r"\d(?:[\x00 .\-/_,·]{0,3}\d){6,}")
+
+
+def _hidden_or_spaced_digits(raw: str) -> bool:
+    """Phone numbers disguised with invisible characters between the digits ('555<zero-width>1234') or typed one digit at a
+    time ('5 5 5 1 2 3 4 5 6 7'). Ordinary numbers never contain invisible characters, so any 7+ digit run that does is refused."""
+    s = unicodedata.normalize("NFKC", raw or "")
+    s = "".join("\x00" if (unicodedata.category(c) == "Cf" or c in _BLANKS) else c for c in s)
+    for m in _DIGIT_RUN.finditer(s):
+        run = m.group(0)
+        digits = re.sub(r"\D", "", run)
+        if _is_counting(digits):
+            continue
+        if "\x00" in run:
+            return True
+        if len(digits) >= 10 and len(set(digits)) > 2 and re.fullmatch(r"\d(?: \d){9,}", run):         # every digit on its own: 5 5 5 1 2 3 4 5 6 7
+            return True
+    return False
 
 
 def _spaced_email(t: str) -> bool:
@@ -464,13 +537,32 @@ def _spaced_email(t: str) -> bool:
     return bool(m)
 
 
-def scan_contact(text: str) -> str | None:
-    t = normalize(text or "")
+def _contact_view(t: str) -> bool:
     t = re.sub(r"\[\.\]|\(\.\)|[。｡]", ".", t).replace("hxxp", "http")         # "example[.]com", "example。com", "hxxps://"
-    if (_EMAIL_PLAIN.search(t) or _EMAIL_SPACED.search(t) or _EMAIL_WORDS.search(t) or _EMAIL_PROVIDER.search(t)
+    return bool(_EMAIL_PLAIN.search(t) or _EMAIL_SPACED.search(t) or _EMAIL_WORDS.search(t) or _EMAIL_PROVIDER.search(t)
             or _URL.search(t) or _PHONE_US.search(t) or _PHONE_INTL.search(t) or _PHONE_GROUPS.search(t) or _PHONE_LOCAL.search(t)
             or _spelled_number_run(t) or _HANDLE_AT.search(t) or _HANDLE_TAG.search(t) or _HANDLE_PLATFORM.search(t) or _ADD_ME.search(t) or _spaced_email(t)
-            or _ADDRESS.search(t) or _PO_BOX.search(t)):
+            or _ADDRESS.search(t) or _PO_BOX.search(t) or _off_platform_handle(t))
+
+
+def _off_platform_handle(t: str) -> bool:
+    """'insta coolkid99', 'xbox gamertag coolkid99', 'pm me', and the platform-name disguises 'd1scord: name', 's n a p name'."""
+    if _HANDLE_AFTER_PLATFORM.search(t):
+        return True
+    pv = _platform_view(t)
+    return pv != t and bool(_HANDLE_PLATFORM.search(pv) or _ADD_ME.search(pv) or _HANDLE_AFTER_PLATFORM.search(pv)
+                            or re.search(r"\b" + _PLATFORMS + r"\s+[a-z0-9_.]{4,30}\b", pv))
+
+
+def scan_contact(text: str) -> str | None:
+    raw = text or ""
+    if _hidden_or_spaced_digits(raw):
+        return "contact_info"
+    views = [normalize(raw)]
+    if any(unicodedata.category(c) == "Cf" or c in _BLANKS for c in raw):
+        # an invisible character used AS a space ('my<zero-width>snap is ...'): check that reading too
+        views.append(normalize("".join(" " if (unicodedata.category(c) == "Cf" or c in _BLANKS) else c for c in raw)))
+    if any(_contact_view(v) for v in views):
         return "contact_info"
     return None
 
