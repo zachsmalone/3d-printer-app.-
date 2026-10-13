@@ -1,4 +1,4 @@
-"""Community layer (SCAFFOLD): identity (teen-safe defaults), free Showcase catalog, personalization,
+"""Community layer (SCAFFOLD): identity (18+ accounts), free Showcase catalog, personalization,
 moderation stub, follows, link-outs, learning library (no grades or school records).
 
 Everything stores to JSON files in data/ behind small functions so it can be swapped for a real

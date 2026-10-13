@@ -148,8 +148,8 @@
     <section class="explore" data-lvl="beginner" aria-labelledby="exH">
       <h2 id="exH">Keep exploring</h2>
       <ul class="tiles">
-        <li><a class="tile" href="#showcase"><b>See what others made</b><span>Family-friendly projects from the community</span></a></li>
-        <li><a class="tile" href="#learn"><b>Learn to make things</b><span>Short lessons for families, kids and hobbyists</span></a></li>
+        <li><a class="tile" href="#showcase"><b>See what others made</b><span>Clean, safe projects from the community</span></a></li>
+        <li><a class="tile" href="#learn"><b>Learn to make things</b><span>Short lessons for makers and families</span></a></li>
         <li><a class="tile" href="#edit"><b>Fix or change a 3D file</b><span>Open an STL, OBJ or 3MF and get it ready to print</span></a></li>
       </ul>
     </section>
@@ -264,7 +264,7 @@
       <p class="help">OctoPrint and Moonraker are implemented (tested against mock servers, not real hardware). Other types are marked Coming soon. API keys are stored encrypted in <code>data/settings.json</code> on the server (the key sits next to it, so this protects a copied file, not a stolen computer).</p>
     </div>
     <div id="tAcc" class="tab" hidden>
-      <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built (teen accounts never show link-outs publicly).</p>
+      <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built.</p>
       <div class="grid2" id="linkInputs"></div>
       <button class="btn small" id="btnSaveLinks">Save link-outs</button>
       <h4>OAuth connections <small>Coming soon</small></h4>
@@ -287,7 +287,7 @@
 
 
 <main class="page" id="viewShowcase">
-  <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Family-friendly community projects. Everything is free to download.</p></div>
+  <div class="pagehead"><div><h1 data-sec="discover">Showcase</h1><p class="help">Community projects, clean and safe for all. Everything is free to download.</p></div>
     <div class="row"><form role="search" id="shForm" class="row" style="gap:6px"><label for="shSearch" class="sr-only">Search projects</label><input id="shSearch" type="search" placeholder="Search projects…" style="width:220px" autocomplete="off"><button class="btn primary" id="shGo" type="submit" aria-label="Search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg> <span class="lbl">Search</span></button><button class="btn" id="shClear" type="button" aria-label="Clear search" hidden>✕ Clear</button></form><button class="btn" id="btnMyData">🔒 My data</button></div></div>
   <div class="row feedbar"><div class="seg" id="shTabs"></div><a class="btn primary createcta" href="#studio" id="btnCreatePhoto"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Create from photo</a><a class="btn ghost" href="#learn"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 8l9-4 9 4-9 4z"/><path d="M7 10v5c3 2 7 2 10 0v-5"/></svg> Learn</a></div>
   <div class="recent" id="shRecent" hidden></div>
@@ -323,13 +323,13 @@
     <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><button class="btn big primary" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></li>
     <li class="toolcard"><h2>Your printer</h2><p class="help">Pick your printer and nozzle. The Slicer, exports and "Will it print?" use it.</p><div id="accPrinter"></div></li>
     <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
-    <li class="toolcard"><h2>Learn</h2><p class="help">Short family-friendly lessons.</p><a class="btn big" href="#learn">Open Learn</a></li>
+    <li class="toolcard"><h2>Learn</h2><p class="help">Short, clean and safe lessons.</p><a class="btn big" href="#learn">Open Learn</a></li>
   </ul>
   <section class="favs" aria-labelledby="favH"><h2 id="favH">Favorites</h2><p class="help" id="favNote">Projects you save with the heart. Only you can see this list.</p><ul class="grid" id="favGrid"></ul></section>
 </main>
 
 <main class="page" id="viewLearn" hidden>
-  <div class="pagehead"><div><h1><span data-sec="learn">Learn</span></h1><p class="help">Family-friendly lessons for kids, families and hobbyists. No quizzes, scores or grades. Curated content only — no chat, no user uploads, no external links.</p></div>
+  <div class="pagehead"><div><h1><span data-sec="learn">Learn</span></h1><p class="help">Clean, safe lessons for makers and families. No quizzes, scores or grades. Curated content only — no chat, no user uploads, no external links.</p></div>
 </div>
   <div class="grid lessons" id="lessonGrid"></div>
   <div id="lessonDetail" class="lesson" hidden></div>
@@ -343,13 +343,13 @@
 <dialog id="dlgPublish"><div class="dlg">
   <div class="dh"><h3>🌐 Share this build to the Showcase</h3><button class="x" data-close>✕</button></div>
   <div class="body">
-    <p class="help">Free for everyone to download. Family-friendly projects only.</p>
+    <p class="help">Free for everyone to download. Clean and safe for all projects only.</p>
     <div class="field"><label>Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
     <div class="field"><label>Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
     <div class="field"><label>Description</label><input id="pub_desc" maxlength="500"></div>
     <div class="field"><label for="pub_remix">Remixed from <em>optional: paste the Showcase link</em></label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
     <div class="field"><label>Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
-    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (family-friendly; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
+    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (clean and safe for all; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
   </div>
   <div class="df"><button class="btn primary" id="btnDoPublish">Publish</button></div>
 </div></dialog>
@@ -383,7 +383,8 @@
   <div class="body">
     <fieldset class="reasons"><legend>What is the problem?</legend>
       <label class="choice"><input type="radio" name="repReason" value="minor_safety"> <span>Something about a person or a child is not safe</span></label>
-      <label class="choice"><input type="radio" name="repReason" value="not_family_friendly"> <span>Not family-friendly</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="underage_user"> <span>The account holder seems to be under 18</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="not_family_friendly"> <span>Not clean and safe for all</span></label>
       <label class="choice"><input type="radio" name="repReason" value="harassment"> <span>Mean or unkind</span></label>
       <label class="choice"><input type="radio" name="repReason" value="personal_info"> <span>Shares private information</span></label>
       <label class="choice"><input type="radio" name="repReason" value="copyright"> <span>Copyright, or someone's work without credit</span></label>

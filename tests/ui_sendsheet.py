@@ -90,14 +90,14 @@ with sync_playwright() as p:
     ok("Edit sheet: same rules + original file row, no photo warning", "Save to this device" in et and "Your original file" in et and "is the photo" not in et, et[:160].replace("\n", " "))
     pg.keyboard.press("Escape")
     ctx.close()
-    # ---------------- shared (hosted) mode: teen sees Download only, no printer UI
+    # ---------------- shared (hosted) mode: a signed-out visitor sees Download only, no printer UI
     ctx2 = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True); ctx2.add_init_script(STUB)
     t = ctx2.new_page(); t.goto(SHARED.rstrip("/") + "/#studio")
-    t.evaluate("fetch('/api/me/signup'," + J % "{display_name:'Tess Teen',dob:'2011-01-01'}" + ")"); t.reload(); t.wait_for_timeout(600)
+    t.reload(); t.wait_for_timeout(600)
     build(t); t.evaluate("location.hash=\'studio\'"); t.click("#btnSendSheet"); t.wait_for_selector("#dlgSendSheet[open]"); t.wait_for_timeout(500); tt = sheet_text(t)
-    ok("teen: Save your model / Download my model only", "Save your model" in tt and "Download my model" in tt and not any(x in tt for x in ("Share…", "Email", "Shapr3D", "printer", "Creality", "file type")), tt[:200].replace("\n", " "))
-    ok("teen: account note + kids photo warning", "isn't available for your account" in tt and "Anyone with the file can see the picture" in tt)
-    t.screenshot(path="previews/ui_sendsheet_teen.png")
+    ok("visitor: Save your model / Download my model only", "Save your model" in tt and "Download my model" in tt and not any(x in tt for x in ("Share…", "Email", "Shapr3D", "printer", "Creality", "file type")), tt[:200].replace("\n", " "))
+    ok("visitor: account note + photo warning", "isn't available for your account" in tt and "Anyone with the file can see the picture" in tt)
+    t.screenshot(path="previews/ui_sendsheet_visitor.png")
     ctx2.close()
     # hosted adult: no share row without the flag, printer block replaced by the hosted line
     ctx3 = b.new_context(viewport={"width": 1100, "height": 900}); a = ctx3.new_page(); a.goto(SHARED.rstrip("/") + "/#studio")

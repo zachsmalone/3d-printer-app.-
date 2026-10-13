@@ -65,13 +65,13 @@ def require_settings_admin(request: Request, actor: Actor):
 
 
 def _role(request: Request, actor: Actor) -> str:
-    """'teen' | 'adult'. Visitors who have NOT passed the age gate count as teens on a shared server (Download
-    only); on a local server (one person's own machine) they are treated as the owner, like before."""
+    """'adult' | 'basic'. Signed-out visitors and suspended accounts are 'basic' on a shared server (Download only);
+    on a local server (one person's own machine) a signed-out visitor is treated as the owner, like before."""
     if actor.user:
-        return "adult" if actor.is_adult else "teen"
+        return "adult" if actor.is_adult else "basic"
     if is_admin(request) or is_owner(request):
         return "adult"
-    return "teen"
+    return "basic"
 
 
 def send_caps(request: Request, actor: Actor) -> dict:
@@ -94,14 +94,14 @@ def send_caps(request: Request, actor: Actor) -> dict:
 
 
 def require_links(request: Request, actor: Actor):
-    """Minting signed links that carry a build outside ZEIM: adults only (never under-13 / teens)."""
+    """Minting signed links that carry a build outside ZEIM: adult accounts (or the owner/admin) only."""
     if not send_caps(request, actor)["links"]:
         raise HTTPException(403, "Sending to other apps isn't available for your account. You can download your build.")
 
 
 def require_send(request: Request, actor: Actor):
     role = _role(request, actor)
-    if role == "teen":
+    if role != "adult":
         raise HTTPException(403, "Sending to a printer needs an adult account.")
     return
 

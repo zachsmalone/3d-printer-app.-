@@ -16,12 +16,16 @@ from tests.make_sample import make
 SAMPLE = make(_tmp + "/s3.png")
 ADMIN = {"X-Admin-Token": "t0k"}
 ADULT = {"display_name": "Ada Adult", "dob": "1985-05-05"}
-TEEN = {"display_name": "Tess Teen", "dob": "2011-01-01"}
+UNDER18 = {"display_name": "Sam Young", "dob": "2011-01-01"}      # refused at sign-up: ZEIM is 18+ only
+SUSPENDED = "suspended"     # client(SUSPENDED): an adult account a moderator has suspended (the restricted, Download-only account)
 
 
 def client(user=None):
     c = TestClient(app)
-    if user:
+    if user == SUSPENDED:
+        r = c.post("/api/me/signup", json={"display_name": "Sid Suspended", "dob": "1990-02-02"}); assert r.status_code == 200, r.text
+        assert moderation.suspend(r.json()["id"], "test")
+    elif user:
         r = c.post("/api/me/signup", json=user); assert r.status_code == 200, r.text
     return c
 

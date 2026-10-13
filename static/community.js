@@ -63,11 +63,11 @@ addEventListener("hashchange", route);
 $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
 function renderAccount() {
   if (!ME.signed_up) {
-    $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. Kids can build and learn in the ${esc(CFG.sections.learn)} without an account, or use ZEIM with a grown-up in their family.</p>
+    $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. Anyone can build and learn in the ${esc(CFG.sections.learn)} without an account, and families can print designs together with an adult account holder.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
-        <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
-      <div class="field"><label for="su_dob">Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
+        <small class="help">3 to 20 letters, numbers or underscores. Leave it empty and ZEIM makes you a friendly nickname you can change later. Not your real name, email or phone number.</small></div>
+      <div class="field"><label for="su_dob">Date of birth <em>used only to confirm you are 18 or over; not kept if you are not</em></label><input id="su_dob" type="date"></div>
       <details class="su-printer"><summary>Your printer <em>optional</em></summary><div id="su_printer"><p class="help">Loading printers…</p></div></details>
       <button class="btn primary" id="su_go">Create account</button>
       <details class="recover"><summary>Signed out before? Get your account back with a recovery code</summary>
@@ -86,7 +86,7 @@ function renderAccount() {
       const pick = $("#su_pr") ? readPicker("su") : null;
       try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim(), ...(pick || {}) })); if (pick) savePref(pick).catch(() => { }); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
-        if (e.status === 403 && /^We can't create an account/.test(e.message)) {     // the neutral age refusal: a calm panel instead of an unchanged form
+        if (e.status === 403 && /^Sorry, ZEIM accounts are for adults/.test(e.message)) {     // the 18+ refusal: a calm panel instead of an unchanged form
           $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still build and use the ${esc(CFG.sections.learn)} lessons without an account.</p></div>`;
           $("#accBody .calm").focus();
         } else inlineMsg($("#su_go"), e.message);
@@ -95,7 +95,7 @@ function renderAccount() {
   } else {
     const r = ME.restrictions, pv = ME.privacy;
     const nextUn = ME.username_next_change ? new Date(ME.username_next_change).toLocaleDateString() : null;
-    $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> <span class="pill">${ME.age_group}</span></p>
+    $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> ${ME.suspended ? '<span class="pill">suspended</span>' : ""}</p>
       <h4>Your username</h4>
       <p>Credit for what you share goes to <b id="un_now">@${esc(ME.username || "")}</b>. Your email is never shown to anyone.</p>
       <div class="field"><label for="un_new">New username</label><input id="un_new" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" ${nextUn ? "disabled" : ""}>
@@ -104,14 +104,14 @@ function renderAccount() {
       <div class="row" id="un_sugg"></div>
       <p class="help">Public page: <a href="/u/${ME.id}" target="_blank">/u/${ME.id}</a> (only if your profile is visible to the viewer)</p>
       <h4>🔒 Privacy</h4>
-      <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""} ${v !== "private" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
-      <div class="field"><label>Default for new builds &amp; projects</label><select id="pv_def">${[["private", "Private — only me"], ["followers", "Followers only"], ["public", "Public"]].map(([v, t]) => `<option value="${v}" ${pv.default_visibility === v ? "selected" : ""} ${v !== "private" && ME.age_group === "teen" ? "disabled" : ""}>${t}</option>`).join("")}</select></div>
-      ${ME.age_group === "teen" ? '<p class="help">For now, accounts under 18 keep everything <b>Private</b>. You can still make, edit and download your projects.</p>' : ""}
+      <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""}${v !== "private" && ME.suspended ? " disabled" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label>Default for new builds &amp; projects</label><select id="pv_def">${[["private", "Private — only me"], ["followers", "Followers only"], ["public", "Public"]].map(([v, t]) => `<option value="${v}" ${pv.default_visibility === v ? "selected" : ""}${v !== "private" && ME.suspended ? " disabled" : ""}>${t}</option>`).join("")}</select></div>
+      ${ME.suspended ? '<p class="help">This account is suspended, so everything stays <b>Private</b>. You can still make, edit and download your projects.</p>' : ""}
       <label class="inl"><input type="checkbox" id="pv_social" ${pv.social === "on" ? "checked" : ""}> Allow following (I can follow others and others can follow me)</label>
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
       <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button></div>
       <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
-      <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden — teen account"}</b></li></ul>
+      <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>
       <h4>Sign out</h4><p class="help">Signing out makes this browser forget your account. Use it on a shared computer.</p>
       <button class="btn small" id="so_open">Sign out…</button>`;
@@ -132,7 +132,7 @@ function renderAccount() {
 
 /* ---------- Sign out (there are no passwords yet, so say plainly how to get back in before anyone presses it) ---------- */
 function openSignout() {
-  const adult = ME.age_group === "adult", body = $("#soBody"), go = $("#soGo");
+  const adult = !!ME.recovery, body = $("#soBody"), go = $("#soGo");
   const setGo = on => { go.setAttribute("aria-disabled", on ? "false" : "true"); $("#soWhy").textContent = on ? "" : (adult && $("#soOk")?.getAttribute("aria-disabled") === "true" ? "Show your recovery code and write it down, then tick the box to sign out." : "Tick the box above to sign out."); };
   clearInline(go.parentElement);
   body.innerHTML = adult
@@ -140,7 +140,7 @@ function openSignout() {
        <p class="help">Showing a new code makes any older code stop working.</p>
        <button type="button" class="btn" id="soCodeBtn">Show my recovery code</button><p id="soCode" role="status"></p>
        <label class="inl"><input type="checkbox" id="soOk" aria-disabled="true" aria-describedby="soWhy"> I have written down my recovery code</label>`
-    : `<p>Accounts under 18 don't have recovery codes yet, so after you sign out <b>this account can't be opened again</b>. Your projects stay private.</p>
+    : `<p>This account has no recovery code, so after you sign out <b>this account can't be opened again</b>. Your projects stay private.</p>
        <label class="inl"><input type="checkbox" id="soOk"> I understand I can't get this account back</label>`;
   setGo(false);
   $("#soOk").onclick = e => { if (e.target.getAttribute("aria-disabled") === "true") { e.preventDefault(); $("#soWhy").textContent = "Show your recovery code first, then tick the box."; } };
@@ -198,7 +198,7 @@ async function loadShowcase() {
   $("#shSub").textContent = r.subtitle || "";
   loadRecent();
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
-  // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
+  // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
     <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
@@ -331,7 +331,7 @@ async function openItem(id) {
       $("#repSend").disabled = true;
       try {
         const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details: $("#repDetails").value }));
-        $("#dlgReport").close(); toast(r.auto_hidden ? "Thank you. The project is hidden while a grown-up looks at it." : "Thank you. We got your report.", "ok");
+        $("#dlgReport").close(); toast(r.auto_hidden ? "Thank you. The project is hidden while a moderator looks at it." : "Thank you. We got your report.", "ok");
         if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); }
       } catch (e) { inlineMsg($("#repSend"), e.message); } finally { $("#repSend").disabled = false; }
     };
@@ -450,7 +450,7 @@ async function loadPrints(id) {
     const d = e.target.closest("[data-prdel]"), rp = e.target.closest("[data-prrep]");
     try {
       if (d) { await api(`/api/prints/${d.dataset.prdel}`, { method: "DELETE" }); toast("Photo deleted", "ok"); loadPrints(id); }
-      if (rp) { const r2 = await api(`/api/prints/${rp.dataset.prrep}/report`, J("POST", { reason: "not_family_friendly", details: "" })); toast(r2.auto_hidden ? "Thank you. The photo is hidden while a grown-up looks at it." : "Thank you. We got your report.", "ok"); }
+      if (rp) { const r2 = await api(`/api/prints/${rp.dataset.prrep}/report`, J("POST", { reason: "not_family_friendly", details: "" })); toast(r2.auto_hidden ? "Thank you. The photo is hidden while a moderator looks at it." : "Thank you. We got your report.", "ok"); }
     } catch (er) { toast(er.message, "err"); }
   };
 }

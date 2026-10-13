@@ -1,7 +1,7 @@
 # Roadmap
 
 ## Vision
-One place to go from **photo or existing 3D file → printable object → printed → shared → learned**. ZEIM aims to bring the best parts of existing maker tools together in one place — modelling/editing, slicing and printing, a friendly family-safe community, and a learning library for **families, kids and hobbyists**. It is a young project and still growing; many parts are scaffolds (see below). Easy for beginners (auto-everything), with every setting available to experts.
+One place to go from **photo or existing 3D file → printable object → printed → shared → learned**. ZEIM aims to bring the best parts of existing maker tools together in one place — modelling/editing, slicing and printing, a friendly family-safe community, and a learning library for **makers and families** (accounts 18+). It is a young project and still growing; many parts are scaffolds (see below). Easy for beginners (auto-everything), with every setting available to experts.
 
 *Long-term aspiration only (not a claim about today):* "all you need to turn an idea into a print".
 
@@ -12,7 +12,7 @@ Scaffold/stub only: OAuth providers (no posting/verification), PrusaLink/Bambu/D
 
 ## Near term
 1. Real auth (email/passkey), sessions, password-less login; move JSON stores → SQLite/Postgres; object storage for files.
-2. Showcase: tags/search index, licence picker (CC variants), remix links, comments (moderated, pre-approved for teens), project collections.
+2. Showcase: tags/search index, licence picker (CC variants), remix links, comments (moderated), project collections.
 3. Follow → feed of followed creators; notifications; creator profile pages with verified link-outs.
 4. Promote-your-accounts: finish OAuth for TikTok / Instagram / Reddit / Patreon to *verify* handles and show a "verified" badge; **one-click share** of a build (turntable video/photo + link) to linked accounts. Patreon is a **link-out only** (creators send fans to their own page) — no selling or paywalls inside the app.
 5. More printers: PrusaLink, Bambu LAN (MQTT+FTPS), Duet; printer profile library; per-printer slicing profiles; live status.
@@ -36,12 +36,12 @@ Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, imp
 `history.BuildStore` records carry `owner`/`visibility`; `community/*` modules sit behind small functions over JSON files (swap for a DB); routers are mounted in `app/main.py`; public pages are server-rendered with stable URLs. Planned: profiles, follows/feed, comments, shares, creator pages, saved collections.
 
 ## Legal & safety (REQUIRED before any public launch)
-This product is family-friendly and kids use it with their families. **The following needs legal review and is NOT done:**
-- **Family-friendly only.** No adult/mature content, no paid-mature, no age-gated adult tier (removed from scope). **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
-- Children's privacy: COPPA (US), GDPR-K / UK Age Appropriate Design Code; current posture = no accounts under 13 (they use ZEIM signed out or with a grown-up in their family), no kid PII; parental-consent flows, data-retention policy and privacy policy are still to do. ZEIM holds no grades, scores or school records (school features removed 2026-10-12).
+ZEIM accounts are **18+ only** (owner decision 2026-10-12); content is clean and safe for all, and families can print designs together with an adult account holder. Terms, Privacy and Rules are **drafts, pending legal review**. **The following needs legal review and is NOT done:**
+- **Clean and safe for all.** No adult/mature content, no paid-mature, no age-gated adult tier (removed from scope). **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
+- Age: accounts are 18+ only; an under-18 date of birth is refused and not stored. Underage reports → moderator suspends → documented data deletion (README → Underage accounts). Data-retention policy and the final privacy notice are still to do. ZEIM holds no grades, scores or school records.
 - Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process, trademark clearance of product/section names.
-- Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits and anti-grooming protections (teens: no DMs from strangers, no public link-outs — enforced today only as stubs because DMs don't exist yet).
-- Age signals: date of birth is self-declared today (neutral gate, bypassable); consider privacy-preserving age assurance where required.
+- Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits and anti-grooming protections (DMs don't exist).
+- Age signals: date of birth is self-declared today (18+ gate, bypassable); consider privacy-preserving age assurance where required.
 - Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are stored plain in `data/settings.json`), third-party licences (PrusaSlicer is AGPL — review if distributing/hosting).
 
 
@@ -53,12 +53,11 @@ Partial: multi-colour/material data is merged away on import; hole filling is a 
 Planned, **not built**: interest-based groups called **Build Plates** (e.g. a local maker club, a printer-model group). Each has its own visibility (private / invite / public), moderators, shared project boards and the same privacy and language rules as everything else. Names are configured in `app/branding.py` (`GROUP_NAME`, `GROUP_NAME_PLURAL`).
 
 ## Privacy, safety and moderation (current state)
-- Visibility Private / Followers-only / Public on every build, edit project and Showcase project; default **Private**; teen accounts default to a private profile and can't default to Public. Enforced server-side on every route (lists, search, Trending, For You, direct URLs, thumbnails, share pages, files, likes, reports). Denials look like 404. Slicer deep links use signed 2-hour file links so a private build still opens in the owner's slicer.
+- Visibility Private / Followers-only / Public on every build, edit project and Showcase project; default **Private**. Enforced server-side on every route (lists, search, Trending, For You, direct URLs, thumbnails, share pages, files, likes, reports). Denials look like 404. Slicer deep links use signed 2-hour file links so a private build still opens in the owner's slicer.
 - Follow opt-out (no following, no followers, no counts, existing follows removed at once). Private profile.
 - Language filter (PG-13): LDNOOBW word lists (CC BY 4.0) for 16 languages + ZEIM additions, whole-word matching with leetspeak / stretched-letter / spaced-letter handling and an editable allowlist for false positives. A blocked message is **not sent or stored**; the sender sees "Chat doesn't allow that language. Please use appropriate language." There are no strikes or bans. Report, teacher mute and the moderator queue remain.
 - Honest limits: a word list is not a moderation service (misses new slang, context, images, many languages); sessions are cookie-based until real auth exists, so anonymous identity can be reset by clearing cookies.
 
 ## School features: removed (2026-10-12)
-Zach removed the school aspect of ZEIM: no teacher tools, class codes, classrooms, assignments, quizzes, grades, scores or school records. ZEIM stays free and family-friendly; kids use it with their families. Not planned: school/district search, roster import, LMS sign-in, FERPA arrangements.
-- **Family / kid onboarding** (future, not built): a parent or guardian creates the child's profile and sets privacy limits; needs verifiable parental consent (COPPA) before any under-13 data is collected.
+Zach removed the school aspect of ZEIM: no teacher tools, class codes, classrooms, assignments, quizzes, grades, scores or school records. ZEIM stays free, clean and safe for all, with 18+ accounts. Not planned: school/district search, roster import, LMS sign-in, FERPA arrangements.
 

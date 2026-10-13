@@ -28,7 +28,7 @@ def test_local_mode_refuses_settings_from_tunnel_or_lan(monkeypatch, hdrs):
     assert c.put("/api/settings", json=BODY, headers=hdrs).status_code == 403
     assert c.get("/api/settings", headers=hdrs).json()["can_edit"] is False
     assert c.delete("/api/accounts/tiktok", headers=hdrs).status_code == 403
-    assert c.get("/api/me", headers=hdrs).json()["send"]["role"] == "teen"            # and anonymous visitors are not 'the owner' either
+    assert c.get("/api/me", headers=hdrs).json()["send"]["role"] == "basic"            # and anonymous visitors are not 'the owner' either
     assert c.put("/api/settings", json=BODY, headers={**hdrs, **ADMIN}).status_code == 200   # the admin token still works
     assert c.put("/api/settings", json={"public_base_url": "", "printers": []}, headers=ADMIN).status_code == 200   # tidy up
 
@@ -65,8 +65,8 @@ def test_age_ip_lock_expires(monkeypatch):
     assert TestClient(app).post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"}).status_code == 200
 
 
-def test_one_under_13_refusal_does_not_lock_a_teen_or_adult_on_the_same_school_address(monkeypatch):
-    """Edge 5: a school sits behind one public address. A single refusal locks that child's browser only."""
+def test_one_under_18_refusal_does_not_lock_an_adult_on_the_same_shared_address(monkeypatch):
+    """A home, office or library sits behind one public address. A single refusal locks that browser only."""
     monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 30)
     from app.api import community as _c
     from app.core import ratelimit; ratelimit.reset()
@@ -74,7 +74,7 @@ def test_one_under_13_refusal_does_not_lock_a_teen_or_adult_on_the_same_school_a
     kid = TestClient(app)
     assert kid.post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"}).status_code == 403
     assert kid.post("/api/me/signup", json={"display_name": "kid", "dob": "1985-01-01"}).status_code == 403       # same browser stays locked (cookie + session)
-    assert TestClient(app).post("/api/me/signup", json={"display_name": "Alex", "dob": "2010-01-01"}).status_code == 200   # teen, same address
+    assert TestClient(app).post("/api/me/signup", json={"display_name": "Alex", "dob": "2000-01-01"}).status_code == 200   # another adult, same address
     assert TestClient(app).post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"}).status_code == 200   # adult, same address
     ratelimit.reset()
 

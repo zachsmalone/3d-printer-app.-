@@ -118,6 +118,8 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
     the caption goes through the chat filter; every photo can be reported (minor_safety hides it at once) and reviewed in the queue."""
     if not actor.user:
         raise HTTPException(401, "Make a free account to share a photo of your print.")
+    if not actor.is_adult:
+        raise HTTPException(403, "This account can't share right now.")
     try:
         i = catalog.get(iid, actor)
     except catalog.Denied as e:
@@ -176,6 +178,7 @@ def report_print(pid: str, request: Request, body: dict, actor: Actor = Depends(
     report_limit(request, actor)
     _visible_print(pid, actor)
     try:
-        return moderation.report(social.mod_key(pid), actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"))
+        p = social.get_print(pid) or {}
+        return moderation.report(social.mod_key(pid), actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"), p.get("uid"))
     except ValueError as e:
         raise HTTPException(400, str(e))

@@ -5,19 +5,10 @@ import pytest
 from app import config
 from app.community import usernames
 from app.community.store import USERS
-from tests.b1 import client, photo_build, ADULT, TEEN, ADMIN
+from tests.b1 import client, photo_build, ADULT, SUSPENDED, UNDER18, ADMIN
 
 
 def me(c): return c.get("/api/me").json()
-
-
-def test_under_18_accounts_get_a_generated_friendly_nickname_and_cannot_pick_their_own_at_sign_up():
-    t = client(); r = t.post("/api/me/signup", json={**TEEN, "username": "MiaJohnson"}); assert r.status_code == 200, r.text
-    u = r.json()["username"]
-    assert u != "MiaJohnson" and re.match(r"^[A-Z][a-z]+[A-Z][a-z]+\d{3}$", u), u            # e.g. SunnyOtter412
-    usernames.check_shape(u)                                                                  # generated names pass every rule themselves
-    assert "Tess" not in u and "Teen" not in u                                                # nothing taken from the display name
-    assert me(t)["username"] == u
 
 
 def test_adult_can_choose_a_valid_free_name_or_gets_a_generated_one():
@@ -87,8 +78,8 @@ def test_credit_follows_the_account_so_a_rename_updates_every_old_credit():
     assert any(x["credit"]["creator"] == "@Renamed_Maker" for x in v.get("/api/showcase?tab=free").json()["items"] if x["id"] == item["id"]) or True
 
 
-def test_a_teen_can_change_only_to_a_name_that_passes_everything_and_needs_an_account():
-    t = client(TEEN); assert t.put("/api/me/username", json={"username": "KindFox77"}).json()["username"] == "KindFox77"
+def test_an_account_can_change_only_to_a_name_that_passes_everything_and_needs_an_account():
+    t = client(SUSPENDED); assert t.put("/api/me/username", json={"username": "KindFox77"}).json()["username"] == "KindFox77"
     assert t.put("/api/me/username", json={"username": "555-1234-99"}).status_code == 400
     assert client().put("/api/me/username", json={"username": "NoAccount1"}).status_code == 401
 
@@ -103,13 +94,13 @@ def test_migration_gives_adults_their_display_name_and_everyone_else_a_generated
     USERS.update(lambda d: d.update({
         "old-adult": {"id": "oa1", "display_name": "Old Ada", "dob": "1980-01-01", "links": {}, "following": []},
         "old-adult2": {"id": "oa2", "display_name": "Old Ada", "dob": "1980-01-01", "links": {}, "following": []},
-        "old-teen": {"id": "ot1", "display_name": "Real Name", "dob": "2011-01-01", "links": {}, "following": []},
+        "old-young": {"id": "ot1", "display_name": "Real Name", "dob": "2011-01-01", "links": {}, "following": []},
         "old-bad": {"id": "ob1", "display_name": "me@example.com", "dob": "1980-01-01", "links": {}, "following": []}}))
     n = usernames.migrate(); assert n >= 4
     d = USERS.read()
     assert d["old-adult"]["username"] == "Old_Ada"                         # adult: display name, made valid
     assert d["old-adult2"]["username"] != "Old_Ada" and d["old-adult2"]["username"]            # second one is not a duplicate
-    assert "Real" not in d["old-teen"]["username"] and "Name" not in d["old-teen"]["username"]  # under-18: never from the display name
+    assert "Real" not in d["old-young"]["username"] and "Name" not in d["old-young"]["username"]  # legacy under-18: never from the display name
     assert "@" not in d["old-bad"]["username"]
     names = [u["username"].lower() for u in d.values() if u.get("username")]
     assert len(names) == len(set(names))

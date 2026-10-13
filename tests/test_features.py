@@ -13,7 +13,6 @@ from tests.make_sample import make
 
 SAMPLE = make(_tmp + "/s2.png")
 ADULT = {"display_name": "Ada Adult", "dob": "1985-05-05"}
-TEEN = {"display_name": "Tess Teen", "dob": "2011-01-01"}
 
 
 def client(user=None):
@@ -281,12 +280,10 @@ def test_followers_only_and_social_opt_out():
     assert c3.get(f"/api/users/{aid}").status_code == 200
 
 
-def test_teen_defaults_private():
-    t = client(TEEN)
+def test_new_accounts_default_private_builds_and_a_public_profile():
+    t = client(ADULT)
     me = t.get("/api/me").json()
-    assert me["privacy"]["profile"] == "private" and me["privacy"]["default_visibility"] == "private"
-    assert t.put("/api/me/privacy", json={"default_visibility": "public"}).status_code == 403
-    assert client().get(f"/api/users/{me['id']}").status_code == 404
+    assert me["privacy"]["profile"] == "public" and me["privacy"]["default_visibility"] == "private"
     tb = photo_build(t); assert t.get("/api/builds").json()["builds"][-1]["visibility"] == "private"
 
 

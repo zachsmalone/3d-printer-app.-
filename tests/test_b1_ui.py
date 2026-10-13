@@ -43,7 +43,7 @@ def test_photo_start_upload_camera_heic_errors_in_a_real_browser(live):
     assert code == 0, out
 
 
-def test_teen_print_hidden():
+def test_visitor_print_hidden_on_a_shared_server():
     import socket as _s, tempfile as _t
     s = _s.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     d = _t.mkdtemp(prefix="zeim-ui-")

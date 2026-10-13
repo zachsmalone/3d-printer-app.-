@@ -41,10 +41,8 @@ def harden_data_permissions() -> int:
 harden_data_permissions()
 
 # ---- community / policy constants (single source of truth) ----
-MIN_SIGNUP_AGE = 13          # no accounts under 13 (COPPA-style). Under-13s use ZEIM signed out or
-                             # with a grown-up in their family. (School/class-code path removed 2026-10-12.)
+MIN_SIGNUP_AGE = 18          # ZEIM accounts are 18+ only (owner decision 2026-10-12). Families print together with an adult account holder.
 USERNAME_CHANGE_DAYS = int(os.environ.get("PHOTO3D_USERNAME_CHANGE_DAYS", "90"))      # one username change per this many days
-ADULT_AGE = 18               # teen (13-17) accounts get safer defaults
 ADMIN_TOKEN = __import__("os").environ.get("PHOTO3D_ADMIN_TOKEN", "")   # moderation queue access
 
 
@@ -63,7 +61,7 @@ def _int(name: str, default: int) -> int:
 # ---- deployment mode (Education CR-1) ----
 # "shared" (DEFAULT): a server other people use. Server-wide settings (printers, public base URL, linked accounts)
 #   need the admin token (X-Admin-Token); sending to a printer needs an adult account or the admin token;
-#   teen and signed-out sessions never get either.
+#   signed-out and suspended sessions never get either.
 # "local": one person on their own machine; behaves as before. ./run.sh sets this unless you override it.
 MODE = (os.environ.get("PHOTO3D_MODE") or "shared").strip().lower()
 if MODE not in ("shared", "local"):
@@ -78,10 +76,6 @@ LIKES_REQUIRE_ACCOUNT = _flag("PHOTO3D_LIKES_REQUIRE_ACCOUNT", False)
 LIKE_LIMIT_PER_HOUR = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR", 30)        # per browser session
 LIKE_LIMIT_PER_HOUR_IP = _int("PHOTO3D_LIKE_LIMIT_PER_HOUR_IP", 300)  # per network address (a whole household or library may share one)
 SHOW_COUNTS_FOR_EXAMPLES = _flag("PHOTO3D_SHOW_COUNTS_FOR_EXAMPLES", False)   # invented numbers on EXAMPLE items
-TEEN_PUBLIC_ENABLED = _flag("PHOTO3D_TEEN_PUBLIC_ENABLED", False)    # accounts 13-17 may choose Public (items, profile)
-TEEN_FOLLOWERS_ENABLED = _flag("PHOTO3D_TEEN_FOLLOWERS_ENABLED", False)  # 13-17: Followers-only items/profile, and being followed.
-                                                                    # With both teen flags off (launch posture) teens are PRIVATE ONLY.
-HIDE_COUNTS_FOR_MINORS = _flag("PHOTO3D_HIDE_COUNTS_FOR_MINORS", True)  # no like/download numbers on under-18 creators' items
 
 # ---- Education CR-5 ----
 PHOTO_ACK_REQUIRED = _flag("PHOTO3D_PHOTO_ACK_REQUIRED", True)       # "I have permission" box before uploading a photo
@@ -95,10 +89,12 @@ SEAT_RESET_HOURS = _int("PHOTO3D_SEAT_RESET_HOURS", 24)
 # ---- age gate (Safety S-04) ----
 # SEND-3: the "Share..." / "Email it to myself" rows stay OFF until the share-sheet spike (/sharetest, SEND-0) has passed on a real iPhone/iPad.
 SEND_SHARE_UI = _flag("PHOTO3D_SEND_SHARE", False)
-AGE_IP_LOCK_AFTER = _int("PHOTO3D_AGE_IP_LOCK_AFTER", 3)  # the address is only locked after MORE than this many refusals from it within the lock window: one child must not lock a shared address
-AGE_IP_LOCK_MINUTES = _int("PHOTO3D_AGE_IP_LOCK_MINUTES", 30)  # ...and this network address can't retry for a while either (clearing cookies must not help).
-                                                             # Trade-off: a shared address blocks other sign-ups for this long. 0 = off.
-AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)         # after a "can't create an account" result, this browser session can't retry
+# The 18+ check is limited PER BROWSER (session + marker cookie): after an under-18 result that browser can't retry for AGE_LOCK_HOURS.
+# The network address only gets a SOFT limit, so one person can never lock out a whole home, office or library:
+# it is locked only after MORE than AGE_IP_LOCK_AFTER refusals within AGE_IP_LOCK_MINUTES, and only for that short window. 0 = off.
+AGE_IP_LOCK_AFTER = _int("PHOTO3D_AGE_IP_LOCK_AFTER", 10)
+AGE_IP_LOCK_MINUTES = _int("PHOTO3D_AGE_IP_LOCK_MINUTES", 15)
+AGE_LOCK_HOURS = _int("PHOTO3D_AGE_LOCK_HOURS", 24)
 SIGNUP_ATTEMPTS_PER_HOUR_IP = _int("PHOTO3D_SIGNUP_ATTEMPTS_PER_HOUR_IP", 30)
 
 # ---- network binding ----

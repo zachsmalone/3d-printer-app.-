@@ -6,7 +6,7 @@ from app import config
 
 from app.services.history import store
 from tests import b1
-from tests.b1 import client, gen, photo_build, ADULT, TEEN, ADMIN
+from tests.b1 import client, gen, photo_build, ADULT, SUSPENDED, UNDER18, ADMIN
 
 
 def owned(sid):
@@ -156,7 +156,7 @@ def test_cr15_adult_signup_shows_a_recovery_code_once_and_stores_only_a_hash():
     assert code not in stored and code.replace("-", "") not in stored and "recovery" in stored       # only the hash is there
     assert "recovery_code" not in t.get("/api/me").json()
     assert t.get("/api/me").json()["recovery"]["has_code"] is True
-    teen = client(); r = teen.post("/api/me/signup", json=TEEN).json(); assert "recovery_code" not in r         # adults only
+    young = client(); r = young.post("/api/me/signup", json=UNDER18); assert r.status_code == 403 and "recovery_code" not in r.json()   # under 18: no account at all
 
 
 def test_cr15_new_browser_regains_the_adult_account_and_the_old_one_loses_it():
@@ -189,7 +189,7 @@ def test_cr15_regenerate_kills_the_old_code_and_wrong_guesses_are_rate_limited()
 
 def test_cr15_cannot_take_over_into_a_browser_that_already_has_an_account():
     t, code, room = _adult_with_code()
-    other = client(TEEN)
+    other = client(SUSPENDED)
     assert other.post("/api/me/recover", json={"code": code}).status_code == 409
 
 

@@ -71,12 +71,6 @@ try:
 except Exception:
     import logging
     logging.getLogger("zeim").exception("username migration failed")
-try:
-    from .community import privacy as _privacy
-    _privacy.migrate_minors()          # existing 13-17 data -> current teen posture (idempotent)
-except Exception:                      # never block start-up on a migration problem
-    import logging
-    logging.getLogger("zeim").exception("minor data migration failed")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

@@ -136,17 +136,16 @@ def test_accounts_not_configured():
 
 def test_community_flow(monkeypatch):
     from app import config
-    monkeypatch.setattr(config, "TEEN_PUBLIC_ENABLED", True)   # launch default is OFF (tests/test_b1_teen_posture.py); this flow exercises the Showcase with the flag reopened
     clear()
     cl = TestClient(app)                                  # fresh browser session
     bid = cl.post("/api/generate", files={"file": ("s.png", open(SAMPLE, "rb"), "image/png")},
                   data={"mode": "lithophane", "width_mm": "60", "resolution": "50"}).json()["id"]
     assert cl.get("/api/me").json()["signed_up"] is False
-    assert TestClient(app).post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"}).status_code == 403   # under 13 (own cookie: the age lock is per browser session now, see test_b1_safety_high.py)
-    assert cl.post("/api/me/signup", json={"display_name": "Teen", "dob": "2011-01-01"}).status_code == 200
-    me = cl.get("/api/me").json(); assert me["age_group"] == "teen" and not me["restrictions"]["dm_from_strangers"]
-    cl.put("/api/me/links", json={"tiktok": "teen.maker"})
-    assert cl.get(f"/api/users/{me['id']}").json()["links"] == {}          # teen link-outs never public
+    assert TestClient(app).post("/api/me/signup", json={"display_name": "Sam", "dob": "2011-01-01"}).status_code == 403   # under 18: refused (own cookie: the age lock is per browser)
+    assert cl.post("/api/me/signup", json={"display_name": "Maker", "dob": "1990-01-01"}).status_code == 200
+    me = cl.get("/api/me").json(); assert me["suspended"] is False and not me["restrictions"]["dm_from_strangers"]
+    cl.put("/api/me/links", json={"tiktok": "maker.one"})
+    assert cl.get(f"/api/users/{me['id']}").json()["links"] == {"tiktok": cl.get("/api/me").json()["links"]["tiktok"]}
     assert cl.put("/api/me/links", json={"tiktok": "bad handle!"}).status_code == 400
     assert cl.post("/api/classrooms", json={"name": "x"}).status_code == 404   # school features removed (2026-10-12): no classrooms route at all
     # publish needs guidelines confirmation

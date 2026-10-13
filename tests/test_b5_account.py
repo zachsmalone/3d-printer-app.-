@@ -1,5 +1,5 @@
 """Small batch after Batch B: sign out (server side) and the recovery-code way back in."""
-from tests.b1 import client, ADULT, TEEN
+from tests.b1 import client, ADULT, SUSPENDED, UNDER18
 
 
 def test_sign_out_gives_this_browser_a_new_empty_session_and_keeps_the_account():
@@ -26,7 +26,7 @@ def test_an_adult_gets_back_in_with_the_recovery_code_and_the_code_changes():
     assert c.post("/api/me/recover", json={"code": code}).status_code == 404        # the old code is single-use
 
 
-def test_a_teen_can_sign_out_too_and_has_no_recovery_code():
-    t = client(TEEN)
+def test_a_suspended_account_can_sign_out_too_and_has_no_recovery_code():
+    t = client(SUSPENDED)
     assert t.post("/api/me/recovery-code").status_code == 403
     assert t.post("/api/me/signout").status_code == 200 and t.get("/api/me").json()["signed_up"] is False

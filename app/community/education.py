@@ -14,11 +14,11 @@ LESSONS = [
     {"id": "first-print", "objective": 'You can describe how FDM printing works and follow basic printer safety.', "title": "Your first print", "emoji": "🖨", "minutes": 20, "age": "8+",
      "summary": "Meet your printer, stay safe, and make something small.",
      "steps": [
-         {"title": "Safety first", "body": "The nozzle and the bed get HOT. Always have a grown-up nearby, never touch the nozzle, and keep hair and sleeves away from moving parts."},
+         {"title": "Safety first", "body": "The nozzle and the bed get HOT. Never touch the nozzle, keep children and pets away from the printer while it runs, and keep hair and sleeves away from moving parts."},
          {"title": "How a printer builds things", "body": "A 3D printer melts plastic and draws your shape one very thin layer at a time, like stacking super-thin sheets of paper until a solid object appears."},
          {"title": "Pick a starter model", "body": "Choose something small and flat. Open the Studio, press 'Try a sample photo', pick Relief and build it. Small + flat prints are quick and rarely fail."},
          {"title": "Slice it", "body": "A 'slicer' cuts your model into layers and writes the printer's instructions (G-code). Use Print → Slice here, or open it in your slicer."},
-         {"title": "Watch the first layer", "body": "The first layer must stick well. Watch it go down; if it curls up, ask your grown-up to pause and re-level the bed."},
+         {"title": "Watch the first layer", "body": "The first layer must stick well. Watch it go down; if it curls up, pause the print and re-level the bed."},
      ],
      "try": {"mode": "relief", "preset": "thin", "label": "Open the Studio with a starter relief"}},
     {"id": "intro-modeling", "objective": 'You will explain that brightness can be mapped to height and compare two relief heights.', "title": "Intro to modeling", "emoji": "📐", "minutes": 25, "age": "9+",

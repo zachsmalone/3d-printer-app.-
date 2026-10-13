@@ -154,8 +154,8 @@ def test_hq3_empty_states_have_a_reason_and_a_next_step():
     r = c.get("/api/showcase?tab=foryou").json(); assert "For You fills up" in r["empty"]["text"] and r["empty"]["action"]["do"] == "trending"
     c.put("/api/me/personalization", json={"enabled": False})
     r = c.get("/api/showcase?tab=foryou").json(); assert "For You is off" in r["empty"]["text"] and r["empty"]["action"]["do"] == "mydata"
-    # teens and class students: calm text, no "share one" nudge
-    t = client(TEEN)
+    # an account that cannot share (suspended): calm text, no "share one" nudge
+    t = client(SUSPENDED)
     r = t.get("/api/showcase?tab=foryou").json(); assert r["empty"] == {"text": "Nothing here yet. Check back soon.", "action": None}
     assert "share" not in json.dumps(r["empty"]).lower()
     js = (config.STATIC / "community.js").read_text()

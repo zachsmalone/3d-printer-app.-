@@ -50,15 +50,6 @@ def test_category_filter_and_category_list():
 
 
 
-def test_under_13_viewers_lose_wildlife_calls_but_keep_the_popper_and_bottle_opener(monkeypatch):
-    from app.community.identity import Actor
-    a = Actor(sid="u13-test", user={"dob": "2017-03-03"})
-    items = {i["id"] for i in catalog.list_items(a, "free") if i.get("original")}
-    assert items == ALL - WILD
-    with pytest.raises(catalog.Denied):
-        catalog.get("zo-owl-whistle", a)
-
-
 def test_missing_library_means_no_originals_not_a_crash(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "ORIGINALS", tmp_path / "nothing")
     r = client().get("/api/showcase?tab=free")
@@ -72,7 +63,7 @@ for _p in (REAL, Path("/workspace/photo3d/library/originals")):
 
 
 @pytest.mark.skipif(not (REAL / "originals_manifest.json").exists(), reason="real ZEIM Originals library not installed here (it is not in git)")
-def test_the_real_library_gives_45_originals_with_files_and_wildlife_calls_hidden_for_under_13s(monkeypatch):
+def test_the_real_library_gives_45_originals_with_files_and_wildlife_calls_listed(monkeypatch):
     monkeypatch.setattr(config, "ORIGINALS", REAL)
     m = json.loads((REAL / "originals_manifest.json").read_text())
     c = client()
@@ -81,7 +72,4 @@ def test_the_real_library_gives_45_originals_with_files_and_wildlife_calls_hidde
     assert all(i["files"] and i["thumb"] and i["untested"] and i["credit"]["credit_line"].endswith("by ZEIM · CC BY 4.0") for i in o)
     wild = {i["id"] for i in o if i["category"] == "Wildlife Calls"}
     assert "zo-open-reed-predator-call" in wild and len(wild) == 12
-    from app.community.identity import Actor
-    seen = {i["id"] for i in catalog.list_items(Actor(sid="u13-real", user={"dob": "2017-03-03"}), "free") if i.get("original")}
-    assert not (seen & wild) and len(seen) == 45 - 12
 

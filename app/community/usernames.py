@@ -2,7 +2,7 @@
 
 * 3-20 characters: letters, digits and underscore, starting with a letter. Unique ignoring case.
 * No email-like or phone-like strings, nothing the chat filter blocks, no reserved words (staff, admin, zeim ...).
-* Under-18 accounts ALWAYS start from a generated nickname (friendly, never a real name) and may change it only to a name that passes all of the above.
+* Sign-up may supply a username (it must pass every check); otherwise a friendly generated nickname is given. Changes must pass all of the above.
 * A username is separate from the display name; neither is ever an email address, and email is never part of any public response.
 All of it is enforced here on the server; the pages only show the message.
 """
@@ -99,10 +99,10 @@ def suggestions(n: int = 3) -> list[str]:
     return out
 
 
-def assign_new(sid: str, user: dict, chosen: str | None, minor: bool) -> str:
-    """At sign-up. Minors always get a generated nickname; an adult may supply their own (it must pass every check)."""
+def assign_new(sid: str, user: dict, chosen: str | None) -> str:
+    """At sign-up. The person may supply their own username (it must pass every check); otherwise a nickname is generated."""
     name = None
-    if chosen and not minor:
+    if chosen:
         name = check_shape(chosen)
 
     def f(d):
@@ -147,7 +147,7 @@ def change(sid: str, new: str) -> str:
 
 def migrate() -> int:
     """Give every existing account that has no username one: adults keep their display name if it is a valid free username, everyone else
-    (all under-18 accounts included, whose display name might be a real name) gets a generated nickname. Safe to run again."""
+    (legacy under-18 accounts included, whose display name might be a real name) gets a generated nickname. Safe to run again."""
     from . import identity as idn
     changed = []
 
@@ -155,7 +155,7 @@ def migrate() -> int:
         for sid, u in d.items():
             if u.get("username"):
                 continue
-            adult = idn.age_of(u) >= config.ADULT_AGE
+            adult = not idn.underage(u)
             cand = re.sub(r"[^A-Za-z0-9_]", "", (u.get("display_name") or "").replace(" ", "_"))[:20]
             ok = None
             if adult:

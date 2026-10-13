@@ -4,7 +4,7 @@ import pytest, uvicorn
 from fastapi import FastAPI
 from app import config
 from app.services import printers, settings, slicer
-from tests.b1 import client, photo_build, ADULT, TEEN
+from tests.b1 import client, photo_build, ADULT, SUSPENDED, UNDER18
 
 
 @pytest.fixture
@@ -76,10 +76,10 @@ def test_test_route_friendly_failures(local):
     assert r3["ok"] is False and "not implemented" in r3["message"]
 
 
-def test_test_route_refuses_teens_visitors_and_unknown_ids(local):
+def test_test_route_refuses_suspended_visitors_and_unknown_ids(local):
     c = client(ADULT); pid = _save(c, "http://127.0.0.1:1")
     assert c.post("/api/printers/nope/test").status_code == 404
-    for who in (client(TEEN),):
+    for who in (client(SUSPENDED),):
         assert who.post(f"/api/printers/{pid}/test").status_code == 403
 
 

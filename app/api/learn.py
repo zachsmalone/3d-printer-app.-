@@ -102,8 +102,7 @@ def user_page(uid: str, actor: Actor = Depends(get_actor)):
     if u and not privacy.can_view_profile(actor, uid):
         raise HTTPException(404)
     name = (("@" + u["username"]) if u.get("username") else "a ZEIM maker") if u else catalog.CREATORS[uid]     # @username, never the display name
-    teen = bool(u) and idn.age_of(u) < 18
-    lk = "" if (teen or not u) else "".join(
+    lk = "" if (not u or idn.restricted(u)) else "".join(
         f"<li>{escape(v['handle'])} on <a rel='nofollow noopener noreferrer' target=_blank href='{escape(v['url'])}'>{escape(k)}</a> "
         f"<span class=pill>{'verified' if v.get('verified') else 'unverified'}</span></li>" for k, v in u.get("links", {}).items())
     projs = "".join(f"<li><a href='/p/{i['id']}'>{escape(i['title'])}</a></li>" for i in catalog.list_items(actor, "free") if i["creator_id"] == uid)

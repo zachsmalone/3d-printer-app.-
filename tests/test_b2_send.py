@@ -4,7 +4,7 @@ import pytest
 from app import config
 from app.services import settings
 from tests import b1
-from tests.b1 import client, photo_build, ADULT, TEEN, ADMIN
+from tests.b1 import client, photo_build, ADULT, SUSPENDED, UNDER18, ADMIN
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -96,7 +96,7 @@ def test_share_rows_ship_off_until_the_device_spike_passed(monkeypatch):
     assert a.get("/api/me").json()["send"]["share_ui"] is False and a.get("/api/me").json()["send"]["share"] is True
     monkeypatch.setattr(config, "SEND_SHARE_UI", True)
     assert a.get("/api/me").json()["send"]["share_ui"] is True
-    assert client(TEEN).get("/api/me").json()["send"]["share_ui"] is False                 # never for teens, flag or not
+    assert client(SUSPENDED).get("/api/me").json()["send"]["share_ui"] is False                 # never for a suspended account, flag or not
 
 
 def test_printer_ui_only_in_local_mode_for_adults(monkeypatch):
@@ -104,7 +104,7 @@ def test_printer_ui_only_in_local_mode_for_adults(monkeypatch):
     a = client(ADULT); assert a.get("/api/me").json()["send"]["printer_ui"] is False
     monkeypatch.setattr(config, "MODE", "local")
     assert a.get("/api/me").json()["send"]["printer_ui"] is True
-    assert client(TEEN).get("/api/me").json()["send"]["printer_ui"] is False
+    assert client(SUSPENDED).get("/api/me").json()["send"]["printer_ui"] is False
 
 
 

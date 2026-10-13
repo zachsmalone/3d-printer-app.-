@@ -54,7 +54,7 @@ function render() {
   if (caps.printer_ui) print.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b>🖨 Send to my printer</b><small>Opens the printer step in Print. Tested with a pretend printer only.</small></button>`);
   const group = (title, items, id) => items.length ? `<h3 class="group" id="${id}">${title}</h3><ul class="rows" aria-labelledby="${id}">${items.map(h => `<li>${h}</li>`).join("")}</ul>` : "";
   const notes = [];
-  if (caps.role === "teen") notes.push("Sending to other apps isn't available for your account. You can download your build.");
+  if (caps.role !== "adult") notes.push("Sending to other apps isn't available for your account. You can download your build.");
   if (adult && !shareAllowed()) notes.push(!caps.share_ui ? "Want it in another app? Save it first, then open the Files app, press and hold the file, and tap Share."
     : !isSecureContext ? "Sharing to other apps needs a secure (https) address. Save it first, then open the Files app, press and hold the file, and tap Share."
     : "Want it in another app? Save it first, then open the Files app, press and hold the file, and tap Share.");

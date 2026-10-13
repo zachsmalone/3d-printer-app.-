@@ -24,8 +24,11 @@ async function load() {
       if (r.details) card.append(el("p", { className: "help" }, "Reporter said: " + r.details));
       if (p.hidden) card.append(el("p", { className: "help" }, "Currently hidden."));
       const row = el("div", { className: "row" });
-      for (const [a, label] of [["hide", "Hide"], ["restore", "Restore"], ["dismiss", "Dismiss"]]) {
-        const b = el("button", { type: "button", className: "btn small" + (a === "hide" ? " danger" : "") }, label);
+      if (p.suspended) card.append(el("p", { className: "help" }, "Account suspended."));
+      const acts = [["hide", "Hide"], ["restore", "Restore"], ["dismiss", "Dismiss"]];
+      if (r.account_id) acts.push(["suspend", "Suspend account"]);     // e.g. 'underage_user': ZEIM is 18+ only. Data deletion: README "Underage accounts"
+      for (const [a, label] of acts) {
+        const b = el("button", { type: "button", className: "btn small" + (a === "hide" || a === "suspend" ? " danger" : "") }, label);
         b.onclick = async () => { b.disabled = true; try { await call(`/api/moderation/${r.id}/resolve`, { method: "POST", body: JSON.stringify({ action: a }) }); await load(); } catch (e) { $("#msg").textContent = e.message; b.disabled = false; } };
         row.append(b);
       }

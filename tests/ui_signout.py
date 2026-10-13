@@ -1,4 +1,4 @@
-"""Sign out in Account: plain warning, adults must see + confirm their recovery code first, teens confirm they can't come back; after sign-out the
+"""Sign out in Account: plain warning, adults must see + confirm their recovery code first; after sign-out the
 browser is empty; an adult gets back in with the code.  390px, Chrome + WebKit (axe in Chrome).  python tests/ui_signout.py URL"""
 import json, os, re, sys
 from playwright.sync_api import sync_playwright
@@ -39,13 +39,6 @@ def run(name, launch, with_axe):
     pg.click("#rc_done"); pg.wait_for_load_state(); pg.wait_for_timeout(1000)
     ok(f"{name}: signed in again after reload", "Ms Out" in pg.inner_text("#btnAccount") or "Ms Out" in (pg.get_attribute("#btnAccount", "aria-label") or ""))
     ctx.close()
-    # teen
-    ctx = b.new_context(viewport={"width": 390, "height": 844}, bypass_csp=True); pg = ctx.new_page(); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
-    pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.fill("#su_name", "Tess"); pg.fill("#su_dob", "2011-01-01"); pg.click("#su_go"); pg.wait_for_selector("#un_now", timeout=8000)
-    pg.click("#so_open"); pg.wait_for_selector("#dlgSignout[open]")
-    ok(f"{name}: a teen is told plainly the account can't be opened again", "can't be opened again" in pg.inner_text("#soBody") and pg.is_disabled("#soGo"))
-    pg.check("#soOk"); pg.click("#soGo"); pg.wait_for_load_state(); pg.wait_for_timeout(1000)
-    ok(f"{name}: teen sign-out works", "sign up" in (pg.get_attribute("#btnAccount", "aria-label") or ""))
     ok(f"{name}: no page errors", not errs, errs)
     ctx.close(); b.close()
 

@@ -56,7 +56,7 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
         safety.filter_only(name, "Display name")
         user = idn.signup(actor, name, str(body.get("dob", ""))[:12])
         try:
-            usernames.assign_new(actor.sid, user, str(body.get("username") or "")[:40] or None, minor=idn.age_of(user) < config.ADULT_AGE)
+            usernames.assign_new(actor.sid, user, str(body.get("username") or "")[:40] or None)
         except usernames.UsernameError as e:
             USERS.update(lambda d: d.pop(actor.sid, None))          # nothing is kept from a sign-up that did not complete
             raise HTTPException(400, str(e))
@@ -134,7 +134,7 @@ def signout(request: Request, actor: Actor = Depends(get_actor)):
 def new_recovery_code(actor: Actor = Depends(get_actor)):
     """Make a fresh recovery code (the old one stops working). Adult accounts only."""
     if not actor.user or not actor.is_adult:
-        raise HTTPException(403, "Recovery codes are for adult accounts.")
+        raise HTTPException(403, "Recovery codes aren't available for this account.")
     return {"recovery_code": recovery.issue(actor.sid)}
 
 
@@ -163,7 +163,6 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404, "unknown user")
     if not privacy.can_view_profile(actor, uid):
         raise HTTPException(404, "unknown user")
-    teen = idn.age_of(u) < config.ADULT_AGE
     social = privacy.social_on(u)
     handle = "@" + u["username"] if u.get("username") else "a ZEIM maker"
     return {"id": u["id"], "display_name": handle, "username": u.get("username"),        # public profile: @username only, never the (possibly real) display name
@@ -171,7 +170,7 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
             "following": len(u.get("following", [])) if social else None,
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
-            "links": {} if teen else u.get("links", {}),   # teens: link-outs never public
+            "links": {} if idn.restricted(u) else u.get("links", {}),
             "projects": [catalog.public(i, actor) for i in catalog.list_items(actor, "free") if i["creator_id"] == uid]}
 
 
@@ -246,7 +245,7 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", actor: Acto
         out["hint"] = ("Personalization is off." if not prefs["enabled"] else
                        "Search or open projects to teach For You what you like. Data stays on this server and you can clear it any time.")
     if not items:
-        quiet = actor.is_teen       # no "share one" nudge for teens
+        quiet = bool(actor.user) and not actor.is_adult       # no "share one" nudge for an account that can't share
         if q:
             out["empty"] = {"text": f'No projects match "{q}". Try a shorter word like "relief" or "lamp", or look in Trending.',
                             "action": {"label": "Clear search", "do": "clear"}}
@@ -365,10 +364,24 @@ def report(iid: str, request: Request, body: dict, actor: Actor = Depends(get_ac
     report_limit(request, actor)
     guards.showcase_gate(actor)
     try:
-        catalog.get(iid, actor)
-        return moderation.report(iid, actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"))
+        i = catalog.get(iid, actor)
+        owner = USERS.read().get(i.get("owner_sid") or "") or {}
+        return moderation.report(iid, actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"), owner.get("id"))
     except catalog.Denied as e:
         raise D(e)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/users/{uid}/report")
+def report_user(uid: str, request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    """Report an ACCOUNT (e.g. reason 'underage_user': ZEIM is 18+ only). Unknown / hidden profiles answer 404."""
+    report_limit(request, actor)
+    _, u = idn.user_by_id(uid)
+    if not u or not privacy.can_view_profile(actor, uid):
+        raise HTTPException(404, "unknown user")
+    try:
+        return moderation.report("user:" + uid, actor.sid, str(body.get("reason", "underage_user"))[:40], text_in(body.get("details"), 1000, "Details"), uid)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -421,6 +434,10 @@ def _admin(token: str, request: Request | None = None):
 
 
 def _preview(item_id: str) -> dict:
+    if item_id.startswith("user:"):
+        _, u = idn.user_by_id(item_id[5:])
+        return {"kind": "account", "title": "@" + ((u or {}).get("username") or "?"), "text": "", "creator": "@" + ((u or {}).get("username") or "?"),
+                "hidden": False, "suspended": bool(u and u.get("suspended"))}
     if item_id.startswith("print:"):
         from ..community import social
         p = social.get_print(item_id[6:])
@@ -491,3 +508,18 @@ def mod_resolve(rid: str, body: dict, request: Request, x_admin_token: str = Hea
         raise HTTPException(404)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/moderation/users/{uid}/suspend")
+def mod_suspend(uid: str, request: Request, body: dict | None = None, x_admin_token: str = Header("")):
+    _admin(x_admin_token, request)
+    if not moderation.suspend(uid, str((body or {}).get("why", "moderator"))):
+        raise HTTPException(404)
+    return {"ok": True, "suspended": True}
+
+
+@router.post("/moderation/users/{uid}/unsuspend")
+def mod_unsuspend(uid: str, request: Request, x_admin_token: str = Header("")):
+    _admin(x_admin_token, request)
+    moderation.unsuspend(uid)
+    return {"ok": True, "suspended": False}

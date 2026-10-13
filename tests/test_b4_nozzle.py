@@ -1,8 +1,8 @@
-"""Nozzle it (reports/design/nozzle-it-spec.md): server side. Positive only, idempotent {"liked": bool}, no counts for under-13 viewers,
+"""Nozzle it (reports/design/nozzle-it-spec.md): server side. Positive only, idempotent {"liked": bool}, no counts on non-public items,
 can_like_reason, wording. Browser part: tests/ui_nozzle.py via test_b4_ui.py."""
 import os, re
 from app import config
-from tests.b1 import client, photo_build, ADULT, TEEN
+from tests.b1 import client, photo_build, ADULT, SUSPENDED, UNDER18
 
 
 def _publish_one(with_owner=False):

@@ -66,16 +66,6 @@ def _seed():
     return out
 
 
-def audience_ok(i: dict, actor) -> bool:
-    """Kenji's rules, enforced on the server for lists, item pages, thumbs and downloads: Wildlife Calls (whistles, the open-reed
-    predator call) never reach under-13s. (The classroom-only hides were removed with school features, 2026-10-12.)"""
-    if not i.get("original") or actor is None:
-        return True
-    if i.get("category") == WILDLIFE and viewer_sees_no_counts(actor):     # under 13
-        return False
-    return True
-
-
 def _all() -> list[dict]:
     hidden = set(MODERATION.read()["hidden"])
     items = _seed() + LISTINGS.read()
@@ -120,31 +110,14 @@ def trending_score(i: dict, now: datetime | None = None) -> float:
 
 
 def _visible(actor: Actor, users: dict):
-    return lambda i: (not i["hidden"]) and audience_ok(i, actor) and privacy.can_view(actor, i.get("owner_sid"), i.get("visibility", "private"), users)
-
-
-def viewer_sees_no_counts(actor) -> bool:
-    """Any viewer under 13 never see nozzle/download numbers (decision, Batch B)."""
-    if actor is None:
-        return False
-    u = getattr(actor, "user", None)
-    if u and u.get("dob"):
-        from .identity import age_of
-        return age_of(u) < 13
-    return False
+    return lambda i: (not i["hidden"]) and privacy.can_view(actor, i.get("owner_sid"), i.get("visibility", "private"), users)
 
 
 def counts_visible(i: dict, users: dict, actor=None) -> bool:
-    """May nozzle/download numbers for this item be shown to this viewer? (Examples: only if the flag says so; minors' items: not by default;
-    under-13 viewers: never.)"""
+    """May nozzle/download numbers for this item be shown? (Public items only; examples only if the flag says so.)"""
     if not is_public(i, users):
         return False
-    if viewer_sees_no_counts(actor):
-        return False
-    if i.get("example") and not config.SHOW_COUNTS_FOR_EXAMPLES:
-        return False
-    owner_u = users.get(i.get("owner_sid")) if i.get("owner_sid") else None
-    return not (config.HIDE_COUNTS_FOR_MINORS and privacy.is_minor(owner_u))
+    return not (i.get("example") and not config.SHOW_COUNTS_FOR_EXAMPLES)
 
 
 def resolve(i: dict, users: dict | None = None) -> dict:
@@ -288,7 +261,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
         raise Denied(401, "Create an account to publish.")
     if not accept_guidelines:
         raise Denied(422, "You must confirm this project follows the Community Guidelines "
-                          "(family-friendly only, no content involving minors in any unsafe context).")
+                          "(clean and safe for all, no content involving minors in any unsafe context).")
     title = (title or "").strip()[:80]
     if not title:
         raise Denied(422, "title required")

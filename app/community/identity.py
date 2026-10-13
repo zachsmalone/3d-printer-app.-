@@ -1,11 +1,11 @@
-"""Identity + teen-safe posture. Age is computed server-side from the stored date of birth.
+"""Identity. ZEIM accounts are 18+ only (owner decision 2026-10-12). Age is computed server-side from the date of birth
+typed at sign-up; a refused sign-up stores nothing about the date.
 
-Local MVP identity = session cookie (`p3d_sid`) -> account record; no passwords yet (real auth is
-a roadmap item). Rules:
-  * no accounts under MIN_SIGNUP_AGE (13); under-13s use ZEIM signed out or alongside a grown-up's account (no kid PII collected)
-  * 13-17 = "teen": safer defaults - DMs from strangers OFF (DMs are a stub anyway), public
-    profile link-outs hidden
-  * the site is family-friendly only for everyone (see COMMUNITY_GUIDELINES.md)
+Local MVP identity = session cookie (`p3d_sid`) -> account record; no passwords yet (real auth is a roadmap item).
+  * no accounts under MIN_SIGNUP_AGE (18). Families can print designs together with an adult account holder.
+  * content is clean and safe for all, for everyone (see COMMUNITY_GUIDELINES.md)
+  * an account is RESTRICTED (treated like signed out for sharing, its content shown to nobody else) while it is
+    suspended by a moderator, or if it is a legacy account whose stored date of birth is under 18 (from the old 13+ rules)
 """
 from __future__ import annotations
 
@@ -32,11 +32,22 @@ class Actor:
 
     @property
     def is_adult(self):
-        return self.age is not None and self.age >= config.ADULT_AGE
+        """A signed-in account in good standing (18+, not suspended)."""
+        return bool(self.user) and not restricted(self.user)
 
-    @property
-    def is_teen(self):
-        return self.age is not None and self.age < config.ADULT_AGE
+
+def underage(user: dict | None) -> bool:
+    """Legacy account whose stored date of birth is under 18 (made under the old 13+ rules). New ones can't be created."""
+    return bool(user) and bool(user.get("dob")) and age_of(user) < config.MIN_SIGNUP_AGE
+
+
+def suspended(user: dict | None) -> bool:
+    return bool(user) and bool(user.get("suspended"))
+
+
+def restricted(user: dict | None) -> bool:
+    """Suspended, or a legacy under-18 account: may not share, follow or send, and nobody else sees its content."""
+    return suspended(user) or underage(user)
 
 
 def age_of(user: dict, today: date | None = None) -> int:
@@ -67,8 +78,8 @@ def session_only_cookie(request: Request, response: Response, sid: str):
 
 
 AGE_COOKIE = "p3d_ag"
-AGE_MESSAGE = ("We can't create an account for you right now. You can still build and learn without an account, "
-               "or use ZEIM together with a grown-up in your family.")
+AGE_MESSAGE = ("Sorry, ZEIM accounts are for adults 18 and over. You can still build, learn and download without an account, "
+               "and families can print designs together with an adult account holder.")
 
 
 def _blk(sid: str) -> str:
@@ -100,7 +111,7 @@ def lock_age(sid: str, ip: str = "") -> float:
     until = time.time() + config.AGE_LOCK_HOURS * 3600
     ip_until = time.time() + config.AGE_IP_LOCK_MINUTES * 60
     lock_ip = False
-    if ip and config.AGE_IP_LOCK_MINUTES > 0:     # Edge 5: a shared home or library address is locked only after several refusals, never after one
+    if ip and config.AGE_IP_LOCK_MINUTES > 0:     # soft IP limit: a shared home/office/library address is locked only after MANY refusals, briefly
         from ..core import ratelimit
         lock_ip = not ratelimit.hit("ageref:" + _blk_ip(ip), max(0, config.AGE_IP_LOCK_AFTER), config.AGE_IP_LOCK_MINUTES * 60)
 
@@ -126,22 +137,22 @@ def signup(actor: Actor, display_name: str, dob: str) -> dict:
     if d > datetime.now(timezone.utc).date() or d.year < 1900:
         raise ValueError("invalid date of birth")
     if age_of({"dob": dob}) < config.MIN_SIGNUP_AGE:
-        raise PermissionError(AGE_MESSAGE)           # neutral: never states the age limit
+        raise PermissionError(AGE_MESSAGE)           # refused: nothing about the date is stored
     name = (display_name or "").strip()[:40]
     if not name:
         raise ValueError("display name required")
     user = {"id": secrets.token_hex(6), "display_name": name, "dob": dob,
             "created": datetime.now(timezone.utc).isoformat(), "links": {}, "following": []}
-    from .privacy import defaults_for           # teens: private profile; everyone: private by default
-    user["privacy"] = defaults_for(user, age_of(user) < config.ADULT_AGE)
+    from .privacy import defaults_for           # everyone: private by default
+    user["privacy"] = defaults_for(user)
     USERS.update(lambda d_: d_.__setitem__(actor.sid, user))
     return user
 
 
 def restrictions(actor: Actor) -> dict:
-    teen = actor.is_teen
-    return {"dm_from_strangers": False,          # DMs not built; rule documented: never from strangers for teens
-            "public_link_outs": not teen}        # teens' social link-outs are not shown publicly
+    return {"dm_from_strangers": False,          # DMs are not built
+            "public_link_outs": bool(actor.user) and not restricted(actor.user),
+            "suspended": suspended(actor.user)}
 
 
 def _priv(u):
@@ -160,7 +171,7 @@ def public_profile(actor: Actor) -> dict:
         return {"signed_up": False, "restrictions": restrictions(actor)}
     return {"signed_up": True, "id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
             "username_next_change": _next_username_change(u),
-            "age_group": "adult" if actor.is_adult else "teen", "links": u.get("links", {}),
+            "suspended": suspended(u), "links": u.get("links", {}),
             "following": u.get("following", []), "privacy": _priv(u), "printer": u.get("printer"), "restrictions": restrictions(actor),
             "recovery": {"has_code": bool(u.get("recovery")), "issued": u.get("recovery_issued")} if actor.is_adult else None}
 
@@ -173,5 +184,5 @@ def user_by_id(uid: str):
 
 
 def follower_count(uid: str) -> int:
-    from .privacy import is_minor, social_on
-    return sum(1 for u in USERS.read().values() if uid in u.get("following", []) and social_on(u) and not is_minor(u))
+    from .privacy import social_on
+    return sum(1 for u in USERS.read().values() if uid in u.get("following", []) and social_on(u) and not restricted(u))
