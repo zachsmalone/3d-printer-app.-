@@ -13,6 +13,16 @@ def ok(n, c, x=""):
 
 def axe(pg, label):
     if not os.path.exists(AXE): raise SystemExit("FAIL axe missing: " + AXE)
+    # Wait until secondary dialog buttons have opaque text+bg (avoids one-frame flake on #nzAcctLater).
+    _ready = r"""() => {
+      const el = document.querySelector('#nzAcctLater') || document.querySelector('.dlg .df .btn:not(.primary)');
+      if (!el) return true;
+      const s = getComputedStyle(el);
+      const parse = (c) => { const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/); return m ? [+m[1],+m[2],+m[3], m[4]==null?1:+m[4]] : null; };
+      const fg = parse(s.color), bg = parse(s.backgroundColor);
+      return !!(fg && bg && fg[3] >= 0.99 && bg[3] >= 0.99);
+    }"""
+    pg.wait_for_function(_ready, timeout=3000)
     pg.add_script_tag(path=AXE)
     r = pg.evaluate("axe.run(document, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice']}}).then(r=>r.violations.map(v=>({id:v.id,n:v.nodes.length,t:v.nodes.slice(0,3).map(n=>n.target.join(' '))})))")
     ok(f"axe: {label}", not r, json.dumps(r)[:700])

@@ -403,15 +403,17 @@ h1,h2,h3,h4{letter-spacing:-.01em;line-height:1.2}
 .topbar .btn.ghost:hover:not(:disabled){background:var(--sunk);border-color:var(--line)}
 .modepick select{border-radius:var(--r-pill);padding-left:var(--s4)}
 
-/* buttons: primary / secondary / ghost */
-.btn{border-radius:var(--r-md);padding:10px var(--s4);font-weight:600;border:1px solid var(--line);background:var(--panel);box-shadow:var(--sh-1);
+/* buttons: primary / secondary / ghost
+   Secondary uses --panel2 + --ctl border + --txt (never --line borders: those fail M-contrast ~1.4:1).
+   Explicit colors keep dialog footers like #nzAcctLater axe colour-contrast stable. */
+.btn{border-radius:var(--r-md);padding:10px var(--s4);font-weight:600;border:1px solid var(--ctl);background:var(--panel2);color:var(--txt);box-shadow:var(--sh-1);
   transition:background var(--dur) var(--ease),border-color var(--dur) var(--ease),box-shadow var(--dur) var(--ease),transform var(--dur) var(--ease)}
-.btn:hover:not(:disabled){border-color:var(--ctl);box-shadow:var(--sh-2)}
+.btn:hover:not(:disabled){border-color:var(--accink);box-shadow:var(--sh-2)}
 .btn:active:not(:disabled){transform:translateY(1px);box-shadow:var(--sh-1)}
 .btn.primary{background:var(--acc);border:1px solid var(--accink);color:var(--on-acc);box-shadow:0 1px 2px rgba(79,52,199,.25),0 6px 16px rgba(79,52,199,.22)}
 .btn.primary:hover:not(:disabled){filter:none;background:var(--accink)}
-.btn.ghost{background:transparent;box-shadow:none;border-color:transparent}
-.btn.ghost:hover:not(:disabled){background:var(--sunk);border-color:var(--line);box-shadow:none}
+.btn.ghost{background:transparent;box-shadow:none;border-color:transparent;color:var(--txt)}
+.btn.ghost:hover:not(:disabled){background:var(--sunk);border-color:var(--ctl);box-shadow:none}
 .btn.big{border-radius:var(--r-lg);min-height:52px;font-size:var(--fs-md)}
 .btn.small{border-radius:var(--r-sm)}
 .linkbtn{color:var(--accink);font-weight:600;text-underline-offset:3px}
