@@ -182,9 +182,25 @@ def prism_mask_solid(mask: np.ndarray, pitch: float, z0: float, z1: float):
 # ------------------------------------------------------------------ modes
 def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness=3.0,
                border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0,
-               auto_contrast=True, invert=False, **_) -> Model:
+               auto_contrast=True, invert=False, shape="rect", diameter_mm=40.0, height_mm=60.0,
+               color_mode="mono", **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
+    if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
+        raise ValueError(f"color_mode {color_mode!r} is not available yet")
+    shape = shape or "rect"
+    if shape != "rect":
+        from . import litho_shapes
+        if shape not in litho_shapes.SHAPES:
+            raise ValueError(f"unknown lithophane shape {shape!r}")
+        v, f, info, thick = litho_shapes.build(
+            im, shape, width_mm=width_mm, min_thickness=min_thickness, max_thickness=max_thickness,
+            border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma, auto_contrast=auto_contrast,
+            invert=invert, diameter_mm=diameter_mm, height_mm=height_mm, color_mode=color_mode)
+        m = Model([Body("lithophane", v, f)], "lithophane")
+        m.info = {**info, "shape": shape}
+        m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)
+        return m
     small = _resize(im, resolution)
     g = _tone(_luma(np.asarray(small, np.float64)), auto_contrast, gamma, smooth)
     if invert:
