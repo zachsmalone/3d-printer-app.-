@@ -240,3 +240,12 @@ Lead builder shipped universal export (`e8156a2`) at 01:17 then went idle. PR #2
 
 ## 2026-10-13 03:27 CT | Lead builder | SHIPPED
 Auth on + safety polish + image-mod hook. Commits: `04f3197` (mount passkey/email login for local/pilot; legacy cookie resolver; prod still refuses weak secrets and keeps old login with a warning), `98d6d12` (grooming-style phrase detection + underage_user reason already present), `de6a9fb` (imagemod hook, default needs_human_review, never auto-approves), `38cea4b` (ops warning test aligned). Full suite: **840 passed**. Skipped/blocked: none of Zach's money/legal/launch items. Note: existing cookie login still owns builds via `p3d_sid`; auth `owner_id` is linked for upgrades (full session wiring still open per docs/auth.md).
+
+## 2026-10-13 04:34 CT | Mr. Yami Kato (VP) | STATUS (build-line run)
+Lead builder idle after 03:27 ship (auth-on `04f3197`, grooming `98d6d12`, image-mod `de6a9fb`; suite 840 passed). Local main = origin/zeim `82898ef` (nothing unpushed). Closed GitHub PR #22, PR #24 and issue #10 (work already on zeim). Disk ~11% used, no stale `/tmp/zeim-tests-*`; left 8765 + ngrok running. No new >6h reversible Zach questions. Open for Zach unchanged (domain/claims mailbox, hosting budget, DMCA fee OK, AGPL repo visibility, delete leftover classrooms data, public/pilot launch, real K1 + iPhone tests). Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT). Specialists still stale — fresh verify tasks deferred to daytime (~8 AM+ CT).
+
+**Build order this run (lead builder):**
+1. Auth session end-to-end: wire builds/Showcase ownership to auth `owner_id` when a passkey/email session is present (docs/auth.md open item 4); keep legacy `p3d_sid` link; tests.
+2. Accessibility leftovers still open after rounds 1–2 (verify on current zeim first): keyboard photo pick if still broken, remaining unlabeled controls, lesson cards / Edit history keyboard, live-region status after Build.
+3. Originals: add honest **Simulated** / **Test-printed** badges (default Simulated until a real print is logged); no false "tested on K1" claims.
+4. Do not touch hosting spend, legal, or delete classrooms data.
