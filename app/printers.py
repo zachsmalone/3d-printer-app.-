@@ -135,16 +135,19 @@ def load_catalog(*, technology=None):
     return catalog
 
 
+MATERIAL_NAMES = ("PLA", "PETG", "TPU", "ABS", "ASA", "PC")   # every one sourced in materials.json; ABS/ASA/PC not K1-tested
+
+
 def load_materials():
     materials = _read("materials.json")
-    if not isinstance(materials, dict) or set(materials) != {"PLA", "PETG", "TPU"}:
-        raise ProfileValidationError("Expected PLA, PETG and TPU")
+    if not isinstance(materials, dict) or set(materials) != set(MATERIAL_NAMES):
+        raise ProfileValidationError("Expected " + ", ".join(MATERIAL_NAMES))
     for profile in materials.values():
         validate_profile(profile, material=True)
     return materials
 
 
 def load_material(material):
-    if material not in ("PLA", "PETG", "TPU"):
+    if material not in MATERIAL_NAMES:
         raise ProfileValidationError("Unknown material")
     return load_materials()[material]

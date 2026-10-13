@@ -108,6 +108,7 @@ export function panelHTML(hintMode) {
     <div class="segmented" role="group" aria-label="Settings level"><button type="button" id="spBeginner" aria-pressed="${beginner}">Beginner</button><button type="button" id="spAdvanced" aria-pressed="${!beginner}">Advanced</button></div>
     <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === wantPreset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>
     <div class="grid2">${sel("spMat", "Material", mats, "PLA")}${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
+    <div id="spMatWarn" aria-live="polite">${matWarnHTML("PLA")}</div>
     <div id="spAdv" ${beginner ? "hidden" : ""}><div class="grid3">
       ${num("spLayer", "Layer height", presetLayer(pv, lh.recommended, lo, hi), lo, hi, 0.01, `mm (${lo} to ${hi})`).replace("<input ", `<input data-rec="${lh.recommended}" `)}
       ${num("spWalls", "Walls", pv.walls ?? 2, 1, 10, 1, "")}${num("spTB", "Top/bottom layers", pv.top_bottom ?? 4, 0, 20, 1, "")}
@@ -118,6 +119,13 @@ export function panelHTML(hintMode) {
     <label class="inl chk"><input type="checkbox" id="spFit"> Scale down to fit this printer if it's too big</label>
     <div class="row"><button class="btn primary big" id="spGo">Slice</button></div>`}
     <div id="spOut" aria-live="polite"></div>`;
+}
+/* ABS / ASA / PC (significant fumes): ventilation + enclosure note shown as soon as the material is picked, and again before slicing. */
+export function matWarnHTML(m, { ask = false } = {}) {
+  const w = P.cat?.materials?.[m]?.warning;
+  if (!w) return "";
+  return `<div class="matwarn" ${ask ? `role="alert"` : ""}><p><b>⚠ ${esc(w.title)}</b></p><p>${esc(w.message)}</p><p class="help">${esc(w.tested)}</p>` +
+    (ask ? `<div class="row"><button type="button" class="btn primary" id="spVentOk">${esc(w.confirm)}</button><button type="button" class="btn" id="spVentNo">Pick another material</button></div>` : "") + `</div>`;
 }
 function readPanel() {
   const fd = new FormData(), pref = P.pref, adv = $("#spAdvanced")?.getAttribute("aria-pressed") === "true";
@@ -138,7 +146,9 @@ export function wirePanel(getModelId) {
   if (!mat) return;
   const mode = adv => { localStorage.setItem("zeim.slicerMode", adv ? "advanced" : "beginner"); $("#spAdv").hidden = !adv; $("#spBeginner").setAttribute("aria-pressed", !adv); $("#spAdvanced").setAttribute("aria-pressed", adv); };
   $("#spBeginner").onclick = () => mode(false); $("#spAdvanced").onclick = () => mode(true);
-  mat.onchange = () => { const t = P.cat.materials[mat.value]; $("#spNozT").value = t.nozzle_c; $("#spBedT").value = t.bed_c; };
+  // reference temps, capped to what this printer can reach (the server caps them the same way and says so)
+  const cap = (v, el) => Math.min(v, +el.max || v);
+  mat.onchange = () => { const t = P.cat.materials[mat.value]; $("#spNozT").value = cap(t.nozzle_c, $("#spNozT")); $("#spBedT").value = cap(t.bed_c, $("#spBedT")); $("#spMatWarn").innerHTML = matWarnHTML(mat.value); };
   // Advanced fields follow the preset: picking Strong in Advanced really slices with Strong's walls / infill (not Standard's numbers)
   document.querySelectorAll("[name=spPreset]").forEach(r => r.onchange = () => {
     const pv = presetOf(r.value), l = $("#spLayer");
@@ -146,19 +156,32 @@ export function wirePanel(getModelId) {
     $("#spWalls").value = pv.walls; $("#spTB").value = pv.top_bottom; $("#spInfill").value = pv.infill; $("#spPattern").value = pv.pattern;
     $("#spSpeed").value = Math.min(pv.speed, +$("#spSpeed").max || pv.speed);
   });
-  $("#spGo").onclick = async () => {
+  const doSlice = async (ventOk = false) => {
     const out = $("#spOut"), fd = readPanel(); fd.append("model_id", getModelId());
+    if (ventOk) fd.append("ventilation_ok", "true");
+    $("#spMatWarn").hidden = false;
     out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}…</p>`; $("#spGo").disabled = true;
     try {
       const r = await api("/api/slice", { method: "POST", body: fd });
+      const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
       out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
+        ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a><a class="btn" href="${r.downloads.stl}" download>⬇ STL</a></div>
         ${openInHTML(r.downloads)}`;
-    } catch (e) { out.innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`; }
+    } catch (e) {
+      if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
+        out.innerHTML = matWarnHTML(e.body.detail.warning?.material || $("#spMat").value, { ask: true });
+        $("#spMatWarn").hidden = true;                                           // one copy on screen (the one that asks)
+        $("#spVentOk").onclick = () => doSlice(true);
+        $("#spVentNo").onclick = () => { out.innerHTML = ""; $("#spMatWarn").hidden = false; $("#spMat").focus(); };
+        $("#spVentOk").focus();
+      } else out.innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`;
+    }
     finally { $("#spGo").disabled = false; }
   };
+  $("#spGo").onclick = () => doSlice(false);
 }
 
 /* ---------- Account: "Your printer" card ---------- */

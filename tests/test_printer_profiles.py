@@ -12,7 +12,7 @@ def test_load_printer():
 
 def test_load_materials():
     profiles = printers.load_materials()
-    assert set(profiles) == {"PLA", "PETG", "TPU"}
+    assert set(profiles) == {"PLA", "PETG", "TPU", "ABS", "ASA", "PC"}
     for profile in profiles.values():
         for entry in profile["settings"].values():
             assert entry["sources"]
@@ -27,7 +27,7 @@ def test_unknown_printer(bad):
 
 def test_unknown_material():
     with pytest.raises(printers.ProfileValidationError):
-        printers.load_material("ABS")
+        printers.load_material("NYLON")              # in filaments.json for reference, but not a sourced slicer material
 
 
 @pytest.mark.parametrize("field,value", [

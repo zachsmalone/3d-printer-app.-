@@ -31,7 +31,10 @@ LAYER_MIN, LAYER_MAX = 0.25, 0.75            # fraction of the nozzle
 LINE_WIDTH_FACTOR = 1.125
 PATTERNS = {"grid": "grid", "gyroid": "gyroid", "honeycomb": "honeycomb", "cubic": "cubic", "lines": "line", "lightning": "lightning", "rectilinear": "rectilinear"}  # rectilinear is the only pattern PrusaSlicer accepts at 100% fill
 SUPPORTS = ("off", "auto", "everywhere")
-MATERIALS = ("PLA", "PETG", "TPU")
+MATERIALS = catalog.MATERIAL_NAMES             # PLA, PETG, TPU, ABS, ASA, PC (all sourced in materials.json)
+FILAMENTS_PATH = Path(__file__).resolve().parents[2] / "data" / "materials" / "filaments.json"
+FILAMENT_ID = {"PLA": "pla", "PETG": "petg", "TPU": "tpu_95a", "ABS": "abs", "ASA": "asa", "PC": "pc"}
+FUME_MATERIALS = ("ABS", "ASA", "PC")          # always warned; any other filament whose fumes are marked "Significant" is too
 # Beginner presets. Layer height is a fraction of the nozzle so a preset means the same thing on every nozzle.
 PRESETS = {
     "draft":      {"label": "Draft",      "help": "Fastest. Visible layers.",
@@ -122,7 +125,7 @@ def public() -> dict:
             "patterns": list(PATTERNS), "supports": list(SUPPORTS),
             # the preset's own numbers too, so the Advanced fields start from the preset the maker picked (not from Standard's numbers)
             "presets": [{"id": k, **{x: v[x] for x in PRESET_PUBLIC}} for k, v in PRESETS.items()], "default_preset": DEFAULT_PRESET,
-            "materials": {m: material_temps(m) for m in mats}, "layer_fraction": [LAYER_MIN, LAYER_MAX],
+            "materials": {m: {**material_temps(m), "warning": material_safety(m)} for m in mats}, "layer_fraction": [LAYER_MIN, LAYER_MAX],
             "nozzle_validation": specs()["scope"]["validation"], "advanced_note": ADVANCED_NOTE}
 
 
@@ -143,6 +146,35 @@ def resolve(printer_id=None, nozzle=None) -> tuple[str, float | None]:
     if n not in sizes:
         raise SetupError(f"The {printer_public(pid)['name']} takes a " + ", ".join(f"{x:g}" for x in sizes) + " mm nozzle.")
     return pid, n
+
+
+@lru_cache(maxsize=1)
+def filaments() -> dict:
+    """data/materials/filaments.json by id (enclosure / fumes / food-safe notes)."""
+    return {f["id"]: f for f in json.loads(FILAMENTS_PATH.read_text(encoding="utf-8"))["filaments"]}
+
+
+def filament_info(material: str) -> dict:
+    return filaments().get(FILAMENT_ID.get(material, str(material).lower()), {})
+
+
+def material_safety(material: str) -> dict | None:
+    """Ventilation + enclosure warning the maker must see before slicing ABS / ASA / PC (or any filament with significant fumes).
+    None for everyday materials. Warn-then-allow: POST /api/slice asks once, then slices when the maker says they've read it."""
+    f = filament_info(material)
+    fumes = f.get("fumes") or ""
+    if material not in FUME_MATERIALS and not fumes.lower().startswith("significant"):
+        return None
+    name = f.get("name") or material
+    return {"material": material, "code": "ventilation_check",
+            "title": f"{name} needs fresh air and an enclosure",
+            "message": (f"{name} gives off fumes while it prints that you should not breathe in. "
+                        "Print it in a well-ventilated room, not in a bedroom or a small closed space, and keep people and pets away from the printer while it runs. "
+                        "Use a closed printer or an enclosure (it also helps against warping), but don't point a fan or draft at the print. "
+                        "If you can't ventilate the room, pick PLA or PETG instead."),
+            "enclosure": f.get("enclosure") or "", "fumes": fumes,
+            "tested": f"ZEIM has not test-printed {name} on a Creality K1 yet. Temperatures are general Prusa guidance; check your filament's label.",
+            "confirm": "I have good ventilation. Slice it"}
 
 
 def material_temps(material: str) -> dict:
@@ -199,11 +231,18 @@ def settings_for(printer_id=None, nozzle=None, opts: dict | None = None) -> dict
         layer = _num(o["layer_height"], lo, hi, f"Layer height for a {n:g} mm nozzle")
     material = o.get("material", "PLA")
     if material not in MATERIALS:
-        raise SetupError("Material must be PLA, PETG or TPU.")
+        raise SetupError("Material must be " + ", ".join(MATERIALS[:-1]) + " or " + MATERIALS[-1] + ".")
     t = material_temps(material)
     max_noz, max_bed = p["max_nozzle_c"] or 300, p["max_bed_c"] or 110
-    noz_c = _num(o.get("nozzle_temp", t["nozzle_c"]), 150, max_noz, "Nozzle temperature", int)
-    bed_c = _num(o.get("bed_temp", t["bed_c"]), 0, max_bed, "Bed temperature", int)
+    temp_notes = []                       # reference temperature above what this printer can reach: capped, and the maker is told
+    if "nozzle_temp" not in o and t["nozzle_c"] > max_noz:
+        temp_notes.append(f"The {material} reference nozzle temperature is {t['nozzle_c']} °C, but the {p['name']} tops out at {max_noz} °C, "
+                          f"so ZEIM used {max_noz} °C. {material} may not print well on this printer.")
+    if "bed_temp" not in o and t["bed_c"] > max_bed:
+        temp_notes.append(f"The {material} reference bed temperature is {t['bed_c']} °C, but the {p['name']} tops out at {max_bed} °C, "
+                          f"so ZEIM used {max_bed} °C. Expect more warping; an enclosure and a brim help.")
+    noz_c = _num(o.get("nozzle_temp", min(t["nozzle_c"], max_noz)), 150, max_noz, "Nozzle temperature", int)
+    bed_c = _num(o.get("bed_temp", min(t["bed_c"], max_bed)), 0, max_bed, "Bed temperature", int)
     pattern = o.get("infill_pattern", pr["pattern"])
     if pattern not in PATTERNS:
         raise SetupError("Unknown infill pattern.")
@@ -221,7 +260,8 @@ def settings_for(printer_id=None, nozzle=None, opts: dict | None = None) -> dict
             "speed": _num(o.get("speed", pr["speed"]), 10, min(500, float(p.get("max_speed") or 500)), "Speed", int),
             "nozzle_temp": noz_c, "bed_temp": bed_c,
             "first_layer_nozzle_temp": max(noz_c, min(t["first_layer_nozzle_c"], max_noz)) if "nozzle_temp" not in o else noz_c,
-            "first_layer_bed_temp": min(t["first_layer_bed_c"], max_bed) if "bed_temp" not in o else bed_c}
+            "first_layer_bed_temp": min(t["first_layer_bed_c"], max_bed) if "bed_temp" not in o else bed_c,
+            "material_warning": material_safety(material), "temp_notes": temp_notes}
 
 
 def _mvs(pid, n, material):

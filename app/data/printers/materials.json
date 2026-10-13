@@ -25,5 +25,29 @@
       "typical_max_volumetric_speed_range_mm3_s": {"value": [2, 5], "unit": "mm^3/s", "sources": ["https://help.prusa3d.com/article/max-volumetric-speed_127176"], "note": "Typical material MVS range; not a K1 hotend measurement. Do not convert to linear speed without extrusion geometry or choose a default automatically."}
     },
     "notes": ["Material-specific retraction and K1-specific linear speeds omitted: not verified in this research pass.", "Reference data only; select settings using the actual filament manufacturer guidance and calibration."]
+  },
+  "ABS": {
+    "settings": {
+      "nozzle_temperature_c": {"value": 255, "unit": "C", "sources": ["https://help.prusa3d.com/article/abs_2058"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."},
+      "bed_temperature_c": {"value": 100, "unit": "C", "sources": ["https://help.prusa3d.com/article/abs_2058"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."},
+      "bed_temperature_range_c": {"value": [80, 110], "unit": "C", "sources": ["https://help.prusa3d.com/article/abs_2058"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."}
+    },
+    "notes": ["Not tested by ZEIM on a Creality K1 (or any printer yet).", "Prusa: significant warping, needs a printer enclosure, and releases potentially dangerous fumes (styrene); print in a well-ventilated room without a draft on the print.", "Bed range 80-110 C depends on object size (Prusa). Material-specific retraction, speeds and max volumetric speed omitted: not verified in this research pass."]
+  },
+  "ASA": {
+    "settings": {
+      "nozzle_temperature_c": {"value": 260, "unit": "C", "sources": ["https://help.prusa3d.com/article/asa_1809"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."},
+      "first_layer_bed_temperature_c": {"value": 105, "unit": "C", "sources": ["https://help.prusa3d.com/article/asa_1809"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."},
+      "bed_temperature_c": {"value": 110, "unit": "C", "sources": ["https://help.prusa3d.com/article/asa_1809"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."}
+    },
+    "notes": ["Not tested by ZEIM on a Creality K1 (or any printer yet).", "Prusa: significant warping, an enclosure is needed for larger parts, and releases potentially dangerous fumes (styrene); print in a well-ventilated room without a draft on the print.", "Some printers (e.g. the K1 at 100 C) cannot reach the 110 C reference bed; ZEIM caps it at the printer's sourced maximum and says so. Retraction, speeds and max volumetric speed omitted: not verified."]
+  },
+  "PC": {
+    "settings": {
+      "nozzle_temperature_c": {"value": 275, "unit": "C", "sources": ["https://help.prusa3d.com/article/polycarbonate-pc_165812"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."},
+      "first_layer_bed_temperature_c": {"value": 110, "unit": "C", "sources": ["https://help.prusa3d.com/article/polycarbonate-pc_165812"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."},
+      "bed_temperature_c": {"value": 115, "unit": "C", "sources": ["https://help.prusa3d.com/article/polycarbonate-pc_165812"], "note": "General Prusa guidance, not K1-tested or a universal filament preset."}
+    },
+    "notes": ["Not tested by ZEIM on a Creality K1 (or any printer yet).", "Prusa: very hard to print (advanced users), high warping, use an enclosure, very moisture-sensitive (dry before printing), moderate odor; ventilate.", "Most hobby printers cannot reach the 115 C reference bed; ZEIM caps it at the printer's sourced maximum and says so. Retraction, speeds and max volumetric speed omitted: not verified."]
   }
 }

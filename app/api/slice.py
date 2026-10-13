@@ -94,6 +94,7 @@ def slice_model(
     material: Optional[str] = Form(None),
     scale_to_fit: bool = Form(False),
     fit: bool = Form(False),
+    ventilation_ok: bool = Form(False),
     actor: Actor = Depends(get_actor),
 ):
     if bool(file) == bool(model_id):
@@ -106,6 +107,12 @@ def slice_model(
         prof, chosen = eng.profile_for(printer_id or profile, nozzle, opts)
     except eng.SliceError as e:
         _fail(e.status, e.code, e.message)
+    warn = chosen.get("material_warning")
+    if warn and not ventilation_ok:
+        # Warn, then allow: ABS / ASA / PC (significant fumes) need the maker to read the ventilation + enclosure note once.
+        # Resend with ventilation_ok=true to slice. Nothing is written before this point.
+        raise HTTPException(status_code=409, detail={"code": "ventilation_check", "message": warn["title"] + ". " + warn["message"],
+                                                     "warning": warn})
 
     root = slices_root()
     _prune(root)
@@ -168,6 +175,7 @@ def slice_model(
         "printer_id": prof.id, "printer": prof.name, "nozzle": prof.nozzle, "settings": chosen,
         "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
         "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
+        "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf"},
     }
