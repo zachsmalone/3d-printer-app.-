@@ -190,6 +190,18 @@ const origHTML = i => `<div class="orig">${i.credit?.credit_line ? `<p class="cr
     ${i.low_contact ? `<p class="help caveat"><b>Brim:</b> ${esc(i.low_contact)}</p>` : ""}${i.plates ? `<p class="help">Prints as ${i.files.length} separate plates, each fits a 220 × 220 mm bed.</p>` : ""}
     ${i.material || i.caveats ? `<p class="help caveat">${esc([i.material, i.caveats].filter(Boolean).join(" "))}</p>` : ""}
     ${i.files.map(f => `<a class="btn small" href="${f.url}" download>⬇ ${i.files.length > 1 ? `Plate ${i.files.indexOf(f) + 1} ` : ""}STL<span class="sr-only"> for ${esc(i.title)}</span></a>`).join("")}</div>`;
+// ZEIM Original detail page: the real facts from the Originals manifest (size, supports, parts, how to use, assembly). Nothing is guessed:
+// a missing fact is simply left out.
+const mm = v => `${Number(v).toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
+const origMoreHTML = i => {
+  const s = i.size_mm, out = [];
+  if (i.how_used) out.push(`<h4>How to use it</h4><p>${esc(i.how_used)}</p>`);
+  if (s) out.push(`<p class="orig-size"><b>Size:</b> ${mm(s.x)} × ${mm(s.y)} × ${mm(s.z)} mm <span class="help">(width × depth × height${s.note ? `, ${esc(s.note)}` : ""})</span></p>`);
+  if (i.supports_detail) out.push(`<p class="orig-supports"><b>Supports${i.supports_level ? ` (${esc(i.supports_level)})` : ""}:</b> ${esc(i.supports_detail)}</p>`);
+  if (i.parts?.length) out.push(`<h4>Parts in this kit</h4><ul class="orig-parts">${i.parts.map(p => `<li>${esc(p.name)}: ${p.size_mm ? `${p.size_mm.map(mm).join(" × ")} mm` : esc(p.about || "")}</li>`).join("")}</ul>`);
+  if (i.assembly_steps?.length) out.push(`<h4>Put it together</h4><ul class="orig-steps">${i.assembly_steps.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`);
+  return out.length ? `<section class="orig-more" aria-label="About this ZEIM Original">${out.join("")}</section>` : "";
+};
 async function loadShowcase() {
   const q = $("#shSearch").value.trim();
   $("#shClear").hidden = !q;
@@ -293,7 +305,7 @@ async function openItem(id) {
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
     ${i.thumb ? `<img src="${i.thumb}" alt="Preview picture of ${esc(i.title)}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
-    ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
+    ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}

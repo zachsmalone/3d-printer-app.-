@@ -614,3 +614,8 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .su-printer summary{min-height:44px;display:flex;align-items:center;cursor:pointer}
 .cardfoot .wp:empty{display:none}
 .cardfoot .pill.willprint{white-space:normal}
+
+/* ZEIM Original detail facts (size, supports, parts, assembly) */
+.orig-more { margin: 8px 0; }
+.orig-more h4 { margin: 12px 0 4px; }
+.orig-more ul { margin: 4px 0; padding-left: 1.2em; }

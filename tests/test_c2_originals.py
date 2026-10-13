@@ -44,7 +44,7 @@ def test_the_stl_download_and_preview_really_serve_the_library_files():
 def test_category_filter_and_category_list():
     c = client()
     r = c.get("/api/showcase?tab=free").json()
-    assert {"Wildlife Calls", "Containers", "School STEM"} <= set(r["categories"])
+    assert {"Wildlife Calls", "Containers", "STEM & Science"} <= set(r["categories"])
     assert _ids(c, category="Wildlife Calls") == WILD
     assert _ids(c, category="Containers") == {"zo-pencil-cup"}
 

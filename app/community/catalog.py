@@ -44,17 +44,64 @@ def _manifest() -> dict:
     return _MCACHE["data"]
 
 
+# Category names shown to makers. School features were removed (2026-10-12), so the manifest's "School STEM" shows as plain "STEM & Science".
+CATEGORY_LABEL = {"School STEM": "STEM & Science"}
+
+
+def _num(v):
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return round(f, 1) if f > 0 else None
+
+
+def _size(x: dict):
+    """Real bounding box from the manifest, in mm ({x, y, z, note}); None when the manifest has no usable size (never guessed)."""
+    d = x.get("dimensions_mm") or {}
+    xyz = {k: _num(d.get(k)) for k in ("x", "y", "z")} if isinstance(d, dict) else {}
+    if not xyz or None in xyz.values():
+        return None
+    return {**xyz, "note": str(d.get("note", ""))[:160]}
+
+
+def _parts(x: dict) -> list[dict]:
+    """Kit parts: {name, size_mm:[x, y, z]} when the manifest gives three real sizes, or {name, about} when it describes the part
+    in words ("hex-scute shell with inner lip"). A row that is neither is dropped, never filled in."""
+    out = []
+    for name, v in (x.get("parts") or {}).items() if isinstance(x.get("parts"), dict) else []:
+        row = {"name": str(name).replace("_", " ")[:60]}
+        if isinstance(v, str) and v.strip():
+            row["about"] = v.strip()[:160]
+        else:
+            nums = [_num(n) for n in (v if isinstance(v, (list, tuple)) else [])][:3]
+            if len(nums) != 3 or None in nums:
+                continue
+            row["size_mm"] = nums
+        out.append(row)
+    return out[:20]
+
+
+def _steps(x: dict) -> list[str]:
+    """Assembly steps exactly as the manifest words them (they carry their own numbering, e.g. "1-3. Seat the insert"); blanks dropped."""
+    raw = x.get("assembly_steps") or []
+    return [str(t).strip()[:300] for t in raw if str(t).strip()][:12] if isinstance(raw, list) else []
+
+
 def _seed():
     """The 45 ZEIM Originals from the manifest (empty list when the library is not installed on this server)."""
     m = _manifest()
     out = []
     for n, x in enumerate(m.get("models", [])):
         stl, png = x.get("file", ""), x.get("preview", "")
+        cat = CATEGORY_LABEL.get(x.get("category", ""), x.get("category", ""))
         names = [f for f in originals_qa.PLATES.get(x["slug"], []) if (config.ORIGINALS / f).is_file()] or [stl]
         files = [{"name": f, "size_kb": round((config.ORIGINALS / f).stat().st_size / 1024)} for f in names if f and (config.ORIGINALS / f).is_file()]
         out.append({"id": "zo-" + x["slug"], "slug": x["slug"], "title": x["title"], "creator": "ZEIM", "creator_id": "zeim",
-                    "original": True, "example": False, "category": x.get("category", ""), "difficulty": x.get("difficulty", ""),
-                    "tags": [t for t in re.split(r"[^a-z0-9]+", (x.get("category", "") + " " + x.get("difficulty", "")).lower()) if t],
+                    "original": True, "example": False, "category": cat, "difficulty": x.get("difficulty", ""),
+                    "tags": [t for t in re.split(r"[^a-z0-9]+", (cat + " " + x.get("difficulty", "")).lower()) if t],
+                    "size_mm": _size(x), "parts": _parts(x), "assembly_steps": _steps(x),
+                    "supports_level": str(x.get("supports_needed", ""))[:40], "supports_detail": str(x.get("supports_detail", ""))[:400],
                     "mode": "original", "downloads": 0, "likes": 0, "description": x.get("description", ""),
                     "how_used": x.get("how_it_is_used", ""), "material": x.get("suggested_material_and_print_notes", ""),
                     "caveats": x.get("fit_notes", ""), "printer": x.get("printer", ""), "untested_note": x.get("untested_note", ""),
@@ -161,6 +208,9 @@ def public(i: dict, actor: Actor) -> dict:
             "proof": _proof(i) if i.get("original") else None,
             "material": i.get("material", ""), "caveats": i.get("caveats", ""),
             "needs_supports": bool(i.get("needs_supports")), "low_contact": i.get("low_contact", ""), "plates": bool(i.get("plates")), "how_used": i.get("how_used", ""),
+            "size_mm": i.get("size_mm") if i.get("original") else None, "parts": i.get("parts", []) if i.get("original") else [],
+            "assembly_steps": i.get("assembly_steps", []) if i.get("original") else [],
+            "supports_level": i.get("supports_level", "") if i.get("original") else "", "supports_detail": i.get("supports_detail", "") if i.get("original") else "",
             "creator_username": i.get("creator_username"), "credit": credit_line(i),
             "favorited": bool(actor.user) and _social().is_fav(actor.sid, i["id"]), "can_favorite": bool(actor.user),
             "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],

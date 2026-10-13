@@ -19,7 +19,12 @@
    "file": "owl-whistle.stl",
    "preview": "owl-whistle.png",
    "untested_note": "Not test-printed.",
-   "not_test_printed": true
+   "not_test_printed": true,
+   "dimensions_mm": {
+    "x": 0,
+    "y": 20,
+    "z": 30
+   }
   },
   {
    "title": "Open-Reed Predator Call",
@@ -87,7 +92,15 @@
    "file": "pencil-cup.stl",
    "preview": "pencil-cup.png",
    "untested_note": "Not test-printed.",
-   "not_test_printed": true
+   "not_test_printed": true,
+   "dimensions_mm": {
+    "x": 70.0,
+    "y": 70.0,
+    "z": 90.0,
+    "note": "bounding box of the printed part"
+   },
+   "supports_needed": "none",
+   "supports_detail": "No overhangs past 45 degrees: prints without supports."
   },
   {
    "title": "Gear Demo",
@@ -104,7 +117,41 @@
    "file": "gear-demo.stl",
    "preview": "gear-demo.png",
    "untested_note": "Not test-printed.",
-   "not_test_printed": true
+   "not_test_printed": true,
+   "dimensions_mm": {
+    "x": 120,
+    "y": 80,
+    "z": 12
+   },
+   "parts": {
+    "big_gear": [
+     60,
+     60,
+     8
+    ],
+    "small_gear": [
+     30,
+     30,
+     8
+    ],
+    "base_plate": [
+     120,
+     80,
+     4
+    ],
+    "bad_part": [
+     1,
+     "x",
+     3
+    ],
+    "crank": "hand crank with a round knob"
+   },
+   "assembly_steps": [
+    "1. Print the base and both gears.",
+    "2) Press the gears onto the base pegs.",
+    "   ",
+    "3. Turn the big gear."
+   ]
   }
  ]
 }
