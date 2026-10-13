@@ -244,7 +244,7 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", actor: Acto
         personalization.record_search(actor.sid, q, catalog.known_tags(actor))
     items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {}, category.strip()[:60])
     out = {"categories": catalog.categories(actor), "category": category.strip()[:60],
-           "originals_notice": "ZEIM Originals are free (CC BY 4.0). None has been test-printed yet: treat every file as an untested print.","tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
+           "originals_notice": _originals_notice(),"tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
            "subtitle": "Newest projects first." if tab == "free" else "",
            "example_notice": ""}
     if tab == "foryou" and not out["items"]:
@@ -456,6 +456,55 @@ def _preview(item_id: str) -> dict:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
     return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]),       # @username via the account id, never the display name
             "thumb": f"/api/moderation/item/{item_id}/thumb" if i.get("has_thumb") else None}
+
+
+def _originals_notice() -> str:
+    from ..community import originals_proof
+    n = originals_proof.count_test_printed([i["id"] for i in catalog._all() if i.get("original")])
+    head = ("ZEIM Originals are free (CC BY 4.0). Each one is marked Simulated (checked on a computer only) "
+            "or Test-printed (a real ZEIM print is logged). ")
+    if not n:
+        return head + "None has been test-printed yet: treat every file as an untested print."
+    return head + f"{n} {'has' if n == 1 else 'have'} been test-printed so far; treat every Simulated file as an untested print."
+
+
+# ---------------- ZEIM Originals: logged test prints (admin token) ----------------
+@router.get("/moderation/originals/prints")
+def originals_prints(request: Request, x_admin_token: str = Header("")):
+    _admin(x_admin_token, request)
+    from ..community import originals_proof
+    return {"prints": originals_proof.entries(), "results": originals_proof.RESULTS}
+
+
+@router.post("/moderation/originals/{item_id}/prints")
+def originals_log_print(item_id: str, body: dict, request: Request, x_admin_token: str = Header("")):
+    """Log a REAL print of an Original (printer, date, outcome). Only then can it show Test-printed."""
+    _admin(x_admin_token, request)
+    from ..community import originals_proof
+    if not any(i["id"] == item_id and i.get("original") for i in catalog._all()):
+        raise HTTPException(404, "That ZEIM Original wasn't found.")
+    try:
+        e = originals_proof.log_print(item_id, body.get("printer"), str(body.get("printed_on", "")), str(body.get("result", "")),
+                                      body.get("logged_by") or "admin", body.get("notes") or "")
+    except originals_proof.ProofError as er:
+        raise HTTPException(400, str(er))
+    import logging
+    logging.getLogger("zeim.audit").info("original test print logged: item=%s entry=%s result=%s", item_id, e["id"], e["result"])
+    return {"entry": e, "proof": originals_proof.proof(item_id)}
+
+
+@router.post("/moderation/originals/prints/{entry_id}/retract")
+def originals_retract_print(entry_id: str, request: Request, body: dict | None = None, x_admin_token: str = Header("")):
+    """A wrong log entry is marked retracted (kept for the record), never deleted."""
+    _admin(x_admin_token, request)
+    from ..community import originals_proof
+    try:
+        e = originals_proof.retract(entry_id, (body or {}).get("reason") or "", (body or {}).get("by") or "admin")
+    except KeyError:
+        raise HTTPException(404, "That print log entry wasn't found.")
+    import logging
+    logging.getLogger("zeim.audit").info("original test print retracted: entry=%s", entry_id)
+    return {"entry": e, "proof": originals_proof.proof(e["item_id"])}
 
 
 @router.get("/moderation/queue")

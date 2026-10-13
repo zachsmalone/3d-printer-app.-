@@ -131,6 +131,11 @@ def resolve(i: dict, users: dict | None = None) -> dict:
     return {**i, "creator_username": name, "creator": "@" + name} if name else i
 
 
+def _proof(i: dict) -> dict:
+    from . import originals_proof
+    return originals_proof.proof(i["id"])
+
+
 def public(i: dict, actor: Actor) -> dict:
     following = bool(actor.user and i["creator_id"] in actor.user.get("following", []))
     users = USERS.read()
@@ -152,7 +157,8 @@ def public(i: dict, actor: Actor) -> dict:
             "share_url": f"/p/{i['id']}",
             "original": bool(i.get("original")), "category": i.get("category", ""), "difficulty": i.get("difficulty", ""),
             "printer_suggested": "FDM" if i.get("original") else "", "printer_note": i.get("printer", ""),
-            "untested": bool(i.get("original")), "untested_note": i.get("untested_note", ""),
+            "untested": bool(i.get("original")) and _proof(i)["badge"] != "test_printed", "untested_note": i.get("untested_note", ""),
+            "proof": _proof(i) if i.get("original") else None,
             "material": i.get("material", ""), "caveats": i.get("caveats", ""),
             "needs_supports": bool(i.get("needs_supports")), "low_contact": i.get("low_contact", ""), "plates": bool(i.get("plates")), "how_used": i.get("how_used", ""),
             "creator_username": i.get("creator_username"), "credit": credit_line(i),

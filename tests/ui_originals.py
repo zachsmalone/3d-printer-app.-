@@ -18,6 +18,8 @@ def run(name, launch, with_axe):
     pg.wait_for_selector('#shGrid .pcard[data-item="zo-pencil-cup"]')
     t = pg.inner_text('#shGrid .pcard[data-item="zo-pencil-cup"]')
     ok(f"{name}: card shows credit, difficulty, Suggested FDM, Untested print, caveat", all(s in t for s in ('"Pencil Cup" by ZEIM · CC BY 4.0', "Easy", "Suggested: FDM", "Untested print", "Fit not checked")), t)
+    ok(f"{name}: card shows the honest Simulated badge (no printer claim)", pg.locator('#shGrid .pcard[data-item="zo-pencil-cup"] .proof[data-proof=simulated]').inner_text() == "Simulated"
+       and "computer only" in t and "K1" not in t and "Test-printed" not in t, t)
     ok(f"{name}: no EXAMPLE cards left", "EXAMPLE" not in pg.inner_text("#shGrid"))
     href = pg.get_attribute('#shGrid .pcard[data-item="zo-pencil-cup"] a[download]', "href")
     r = ctx.request.get(URL + href)

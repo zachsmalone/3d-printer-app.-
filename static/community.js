@@ -180,9 +180,13 @@ try { if (sessionStorage.zeimSignedOut) { delete sessionStorage.zeimSignedOut; s
 /* ---------- showcase grid ---------- */
 const MODE_ICON = { lithophane: "🖼️", relief: "⛰️", popart: "🎨", edit: "✏️" };
 let shCat = "";
-// ZEIM Original card details. Every Original is UNTESTED: nothing in the library has been test-printed yet.
+// ZEIM Original card details. Proof badge from the server: "Simulated" (computer checks only, the default) or
+// "Test-printed" (a real ZEIM print is logged; the detail names the printer that was logged). Never more than that.
+const proofHTML = i => { const p = i.proof || { badge: "simulated", label: "Simulated", detail: "Checked on a computer only. Untested print: not printed by the ZEIM team yet." };
+  return `<span class="pill ${p.badge === "test_printed" ? "ok" : "warn"} proof" data-proof="${esc(p.badge)}">${esc(p.label)}</span>`; };
 const origHTML = i => `<div class="orig">${i.credit?.credit_line ? `<p class="credit-line">${esc(i.credit.credit_line)}</p>` : ""}
-    <p><span class="pill">${esc(i.difficulty)}</span> <span class="pill" title="${esc(i.printer_note)}">Suggested: ${esc(i.printer_suggested)}</span> <span class="pill warn">Untested print</span>${i.needs_supports ? ' <span class="pill">Needs supports</span>' : ""}</p>
+    <p><span class="pill">${esc(i.difficulty)}</span> <span class="pill" title="${esc(i.printer_note)}">Suggested: ${esc(i.printer_suggested)}</span> ${proofHTML(i)}${i.needs_supports ? ' <span class="pill">Needs supports</span>' : ""}</p>
+    <p class="help proof-detail">${esc((i.proof && i.proof.detail) || "Checked on a computer only. Untested print: not printed by the ZEIM team yet.")}</p>
     ${i.low_contact ? `<p class="help caveat"><b>Brim:</b> ${esc(i.low_contact)}</p>` : ""}${i.plates ? `<p class="help">Prints as ${i.files.length} separate plates, each fits a 220 × 220 mm bed.</p>` : ""}
     ${i.material || i.caveats ? `<p class="help caveat">${esc([i.material, i.caveats].filter(Boolean).join(" "))}</p>` : ""}
     ${i.files.map(f => `<a class="btn small" href="${f.url}" download>⬇ ${i.files.length > 1 ? `Plate ${i.files.indexOf(f) + 1} ` : ""}STL<span class="sr-only"> for ${esc(i.title)}</span></a>`).join("")}</div>`;
