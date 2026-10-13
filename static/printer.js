@@ -88,13 +88,15 @@ export const checkShowcase = (id, slice = false) => api(`/api/showcase/${id}/wil
 const presetOf = id => P.cat.presets.find(x => x.id === id) || P.cat.presets.find(x => x.id === P.cat.default_preset) || {};
 // same formula as print_setup.preset_layer(): the nozzle's recommended layer scaled by the preset, kept in the nozzle's range
 export const presetLayer = (pv, rec, lo, hi) => +Math.min(Math.max(rec * (pv.layer_frac ?? 0.5) / 0.5, lo), hi).toFixed(3);
-export function panelHTML() {
+export function panelHTML(hintMode) {
   const pref = P.pref, p = printerOf(pref.printer_id), n = pref.nozzle || 0.4;
   const o = nozzleOpt(pref.printer_id, n), lh = o?.layer_height_mm || { min: n / 4, max: n * 0.75, recommended: n / 2 };
   const lo = +Math.max(n * P.cat.layer_fraction[0], lh.min).toFixed(3), hi = +Math.min(n * P.cat.layer_fraction[1], lh.max).toFixed(3);
   // no saved slicer choice yet: follow the app's Beginner / Experienced switch
   const saved = localStorage.getItem("zeim.slicerMode"), beginner = saved ? saved !== "advanced" : localStorage.level !== "expert";
-  const pv = presetOf(P.cat.default_preset);
+  // Studio/Edit lithophanes open on the Lithophane preset (solid fill); other models keep Standard
+  const wantPreset = (hintMode === "lithophane" && P.cat.presets.some(x => x.id === "lithophane")) ? "lithophane" : P.cat.default_preset;
+  const pv = presetOf(wantPreset);
   const mats = Object.keys(P.cat.materials);
   const t = P.cat.materials.PLA;
   const sel = (id, label, vals, cur, names = {}) => `<div class="field"><label for="${id}">${label}</label><select id="${id}">${vals.map(v => `<option value="${v}" ${v === cur ? "selected" : ""}>${esc(names[v] || v)}</option>`).join("")}</select></div>`;
@@ -104,7 +106,7 @@ export function panelHTML() {
     ${p?.technology === "Resin" ? `<p class="help warn">The ${esc(p.name)} is a resin printer. ZEIM's slicer makes G-code for filament printers only. Download the STL or 3MF below and open it in ${esc(p.official_slicer || "your resin slicer")}.</p>` : `
     <p class="help nozzlespec">${mfrHTML(pref.printer_id, n)}</p>
     <div class="segmented" role="group" aria-label="Settings level"><button type="button" id="spBeginner" aria-pressed="${beginner}">Beginner</button><button type="button" id="spAdvanced" aria-pressed="${!beginner}">Advanced</button></div>
-    <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === P.cat.default_preset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>
+    <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === wantPreset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>
     <div class="grid2">${sel("spMat", "Material", mats, "PLA")}${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
     <div id="spAdv" ${beginner ? "hidden" : ""}><div class="grid3">
       ${num("spLayer", "Layer height", presetLayer(pv, lh.recommended, lo, hi), lo, hi, 0.01, `mm (${lo} to ${hi})`).replace("<input ", `<input data-rec="${lh.recommended}" `)}

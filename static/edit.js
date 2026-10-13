@@ -153,7 +153,8 @@ async function renderSlicePanel() {
   if (!E.p) return;
   const id = E.p.id;
   try { await loadCatalog(); } catch { return; }
-  $("#slicePanel").innerHTML = panelHTML(); wirePanel(() => E.p.id);
+  const lithoHint = (E.p.mode === "lithophane" || E.p.base?.photo_mode === "lithophane" || E.p.base?.from_mode === "lithophane") ? "lithophane" : "";
+  $("#slicePanel").innerHTML = panelHTML(lithoHint); wirePanel(() => E.p.id);
   $("#editWill").innerHTML = "";
   try { const r = await checkBuild(id); if (E.p?.id === id) $("#editWill").innerHTML = badgeHTML(r, { detail: true }); } catch { }
 }

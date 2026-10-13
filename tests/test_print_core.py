@@ -166,7 +166,7 @@ def test_panel_settings_reach_the_slicer(fake_engine):
     assert j["print_time_human"] == "12m 5s" and j["filament_grams"] == 3.7 and j["filament_mm"] == 1234.5
 
 
-@pytest.mark.parametrize("pattern,ini", [("grid", "grid"), ("gyroid", "gyroid"), ("honeycomb", "honeycomb"), ("cubic", "cubic"), ("lines", "line"), ("lightning", "lightning")])
+@pytest.mark.parametrize("pattern,ini", [("grid", "grid"), ("gyroid", "gyroid"), ("honeycomb", "honeycomb"), ("cubic", "cubic"), ("lines", "line"), ("lightning", "lightning"), ("rectilinear", "rectilinear")])
 def test_infill_patterns_map_to_prusaslicer(pattern, ini):
     assert ini_dict(eng.profile_for(None, None, {"infill_pattern": pattern})[0].ini)["fill_pattern"] == ini
 

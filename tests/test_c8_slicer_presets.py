@@ -66,7 +66,7 @@ def test_the_panels_layer_formula_matches_the_server_for_every_nozzle_and_preset
 
 
 def test_panel_fills_advanced_from_the_preset_and_follows_the_app_level():
-    assert "presetOf(P.cat.default_preset)" in JS and 'pv.walls ?? 2' in JS and 'pv.pattern || "grid"' in JS
+    assert ("presetOf(wantPreset)" in JS or "presetOf(P.cat.default_preset)" in JS) and 'pv.walls ?? 2' in JS and 'pv.pattern || "grid"' in JS
     wire = JS.split("export function wirePanel", 1)[1]
     assert '[name=spPreset]' in wire
     for f in ("spWalls", "spTB", "spInfill", "spPattern", "spSpeed", "spLayer"):

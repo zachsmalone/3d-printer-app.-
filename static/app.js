@@ -334,7 +334,16 @@ async function openPrint(b) {
   $("#builtinState").textContent = bs.available ? "(PrusaSlicer CLI detected)" : "(slicer not installed)";
   $("#btnSlice").disabled = !bs.available;
   $("#s_up").checked = b.mode === "lithophane";
-  $("#sliceOut").textContent = bs.available ? "" : bs.message;
+  // Honest lithophane print defaults on the quick Print dialog (99% — PrusaSlicer refuses 100% on grid/line).
+  // Edit → Slice has the full Lithophane preset (100% rectilinear, first layer = layer height).
+  if (b.mode === "lithophane") {
+    $("#s_layer").value = "0.12";
+    $("#s_fill").value = "99";
+    $("#sliceOut").textContent = (bs.available ? "" : bs.message + " ") +
+      "Lithophane tip: ~0.12 mm layers and near-solid fill. For the full Lithophane preset (100% rectilinear), open Edit → Slice.";
+  } else {
+    $("#sliceOut").textContent = bs.available ? "" : bs.message;
+  }
   // SEND-6: the printer block exists only where it can really work (ZEIM on the user's own computer); hosted ZEIM promises nothing
   $("#printerBlock").hidden = !caps.printer_ui; $("#printerHosted").hidden = !!caps.printer_ui;
   startNowOff(); fillPrinterSel(); $("#sendOut").textContent = "";

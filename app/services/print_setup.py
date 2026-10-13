@@ -29,15 +29,23 @@ DEFAULT_NOZZLE = 0.4
 NOZZLES = (0.2, 0.4, 0.6, 0.8, 1.0)       # sizes with sourced specs in data/nozzles/nozzle-specs.json
 LAYER_MIN, LAYER_MAX = 0.25, 0.75            # fraction of the nozzle
 LINE_WIDTH_FACTOR = 1.125
-PATTERNS = {"grid": "grid", "gyroid": "gyroid", "honeycomb": "honeycomb", "cubic": "cubic", "lines": "line", "lightning": "lightning"}
+PATTERNS = {"grid": "grid", "gyroid": "gyroid", "honeycomb": "honeycomb", "cubic": "cubic", "lines": "line", "lightning": "lightning", "rectilinear": "rectilinear"}  # rectilinear is the only pattern PrusaSlicer accepts at 100% fill
 SUPPORTS = ("off", "auto", "everywhere")
 MATERIALS = ("PLA", "PETG", "TPU")
 # Beginner presets. Layer height is a fraction of the nozzle so a preset means the same thing on every nozzle.
 PRESETS = {
-    "draft":    {"label": "Draft",    "help": "Fastest. Visible layers.",           "layer_frac": 0.70, "walls": 2, "top_bottom": 3, "infill": 10, "pattern": "lightning", "speed": 120},
-    "standard": {"label": "Standard", "help": "Good everyday quality.",             "layer_frac": 0.50, "walls": 2, "top_bottom": 4, "infill": 15, "pattern": "grid", "speed": 80},
-    "fine":     {"label": "Fine",     "help": "Smooth surfaces, slower.",           "layer_frac": 0.30, "walls": 3, "top_bottom": 6, "infill": 15, "pattern": "gyroid", "speed": 50},
-    "strong":   {"label": "Strong",   "help": "Thicker walls and more infill.",     "layer_frac": 0.50, "walls": 4, "top_bottom": 5, "infill": 40, "pattern": "cubic", "speed": 60},
+    "draft":      {"label": "Draft",      "help": "Fastest. Visible layers.",
+                   "layer_frac": 0.70, "walls": 2, "top_bottom": 3, "infill": 10, "pattern": "lightning", "speed": 120},
+    "standard":   {"label": "Standard",   "help": "Good everyday quality.",
+                   "layer_frac": 0.50, "walls": 2, "top_bottom": 4, "infill": 15, "pattern": "grid", "speed": 80},
+    "fine":       {"label": "Fine",       "help": "Smooth surfaces, slower.",
+                   "layer_frac": 0.30, "walls": 3, "top_bottom": 6, "infill": 15, "pattern": "gyroid", "speed": 50},
+    "strong":     {"label": "Strong",     "help": "Thicker walls and more infill.",
+                   "layer_frac": 0.50, "walls": 4, "top_bottom": 5, "infill": 40, "pattern": "cubic", "speed": 60},
+    # Solid fill for lit-from-behind photo prints. 100% rectilinear is accepted by PrusaSlicer at full density
+    # (grid/line refuse 100%). Layer ~0.12 mm on a 0.4 mm nozzle. Untested on a real K1 until Zach prints.
+    "lithophane": {"label": "Lithophane", "help": "Solid fill for a lit photo print (~0.12 mm layers). Untested on a real K1.",
+                   "layer_frac": 0.30, "walls": 2, "top_bottom": 8, "infill": 100, "pattern": "rectilinear", "speed": 40},
 }
 DEFAULT_PRESET = "standard"
 PRESET_PUBLIC = ("label", "help", "layer_frac", "walls", "top_bottom", "infill", "pattern", "speed")
@@ -229,7 +237,9 @@ def ini_overrides(s: dict) -> dict:
     out = {"bed_shape": f"0x0,{x:g}x0,{x:g}x{y:g},0x{y:g}", "max_print_height": f"{z:g}",
            "nozzle_diameter": f"{s['nozzle']:g}", "filament_diameter": f"{_v(p, 'filament_diameter_mm', 1.75):g}",
            "filament_type": s["material"], "layer_height": f"{s['layer_height']:g}",
-           "first_layer_height": f"{min(max(s['layer_height'], s['nozzle'] * 0.5), s['nozzle'] * LAYER_MAX):g}",
+           # Lithophane: first layer matches the rest (sharper vertical detail). Others: thicker first layer for bed stick.
+           "first_layer_height": (f"{s['layer_height']:g}" if s.get("preset") == "lithophane"
+                                 else f"{min(max(s['layer_height'], s['nozzle'] * 0.5), s['nozzle'] * LAYER_MAX):g}"),
            "extrusion_width": f"{s['line_width']:g}", "first_layer_extrusion_width": f"{s['line_width']:g}",
            "perimeters": str(s["walls"]), "top_solid_layers": str(s["top_bottom"]), "bottom_solid_layers": str(s["top_bottom"]),
            "fill_density": f"{s['infill']}%", "fill_pattern": PATTERNS[s["infill_pattern"]],
