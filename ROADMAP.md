@@ -26,7 +26,7 @@ Scaffold/stub only: OAuth providers (no posting/verification), PrusaLink/Bambu/D
 ## Adoption strategy
 - **Import**: open STL/3MF/OBJ library import (drag-drop, folder watch) so existing collections work on day one; bulk import of a user's own files from other sites via their export/zip.
 - **Compatibility**: first-class slicer hand-off (Prusa, Bambu, Orca, Cura), standard 3MF/STL output, standard printer protocols (OctoPrint, Moonraker, PrusaLink). Never lock files in.
-- **Positioning**: humble — bring useful pieces of existing maker tools into one place (photo→print, edit, share), free community content, adult hobbyists first. Grow by listening to users, not by comparing ourselves to others.
+- **Positioning**: confident and proud (Zach, 2026-10-04) — ZEIM brings photo→print, edit, slice and share into one free place for adult hobbyists. Every claim we make must be true, and we make no unverifiable claims about named competitors. Grow by listening to users.
 - **Growth**: shareable project pages (already built), one-click share to linked social accounts, maker-club partnerships.
 
 ## CAD-lite (long term)
