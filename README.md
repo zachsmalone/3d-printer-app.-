@@ -1,6 +1,35 @@
-# ZEIM — photos → 3D prints (code dir: `photo3d`)
+# ZEIM
 
-Web app: upload a photo → **lithophane**, **raised relief** (heightmap) or **pop-art layers** (flat colour layers stacked in Z so the picture pops off the page) → export **STL / OBJ / 3MF**, preview in 3D, slice with PrusaSlicer, hand off to a slicer, or send to a network printer. Also an **Edit** workspace for existing STL/OBJ/3MF files, a free community **Showcase**, and a classroom-friendly education center. ZEIM is young and still growing: it tries to bring useful parts of existing maker tools together in one place, and many parts are still scaffolds (see *Known limits*).
+**ZEIM** is a free, all-in-one 3D-printing maker app and community for adults (**18+ only**).
+
+No payments. No NSFW. No school features — no teachers, classes, or grades.
+
+One place to find designs, fix and slice them, turn a photo into a lithophane, and share what you print. Built with pride for makers who want the full path from idea to print without the clutter.
+
+Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md).
+
+## What you get
+
+| Tab | What it does |
+|---|---|
+| **Showcase** | The landing feed. Trending, Following, search with history, favorites, follows, remix credit chain, and **I printed this** photos held for moderator review. |
+| **Slicer** | In-app slicing built on PrusaSlicer. Printer and nozzle picker (0.1–1.0 mm), Beginner / Advanced settings, a **Will it print?** badge, multi-file upload as one plate or separate prints, shrink-to-fit, and **Open in your slicer** (3MF / STL) for Creality, Bambu Lab, Prusa, Elegoo, and Anycubic. First tested on a Creality K1. |
+| **CAD** | Coming soon. |
+| **Lithophane** | Photo → lithophane. Shapes planned: heart, globe, circle, star, square, night-light cover — plus color options. |
+| **Smart Fix** | Mesh repair and auto-orient. |
+| **Account** | Your account, Settings, and light / dark mode. |
+
+**ZEIM Originals** — our in-house flagship designs. Each is simulation-checked and badged **Simulated** or **Test-printed**.
+
+Hobbyist groups are called **Build Plates**.
+
+## Roadmap
+
+- **Launch-ready target:** around **Nov 12, 2026** (invite-only pilot first)
+- **Simple model editor:** about 3–4 months after launch
+- **Full CAD / sculpting:** 6–12 months
+
+Details and status: [`ROADMAP.md`](ROADMAP.md).
 
 ## Run
 
@@ -13,74 +42,22 @@ PHOTO3D_MODE=shared      # default for any server others use (see 'Deployment mo
 python -m pytest -q tests          # end-to-end tests: tests/test_app.py + tests/test_features.py (temp data dirs; slicer + printer upload tests use mocks)
 PYTHONPATH=. python tests/render_previews.py ; python tests/ui_smoke.py ; python tests/ui_edit.py ; python tests/ui_showcase.py   # preview PNGs / headless UI smoke tests (ui_edit.py writes previews/ui_edit*.png)
 ```
+
 Slicing needs a slicer CLI: `sudo apt install prusa-slicer` (already installed on the dev box: 2.9.2). Without one, **Slice** and **Send** answer gracefully with `available: false` + instructions; exports still work.
 
-## Names / branding (all in one file: `app/branding.py`)
-Product **ZEIM** (logo `static/logo.jpg`; header `static/logo-header.png`, favicon `static/favicon.{png,ico}` derived from it). Section names are original and configurable: **Studio** (build from a photo), **Edit** (modify 3D files), **Showcase** (community), **Spark Lab** (education center), **Recent builds** (history); Showcase tabs **Trending / Free / For You**. The UI reads them from `GET /api/config`. No MakerWorld/Cults3D/Printables-style names are used for our features; third-party services (PrusaSlicer, OctoPrint, TikTok…) are named factually. Hobbyist groups are called **Build Plates** (singular **Build Plate**): `GROUP_NAME` / `GROUP_NAME_PLURAL` / `SECTIONS["groups"]` in `branding.py`, served by `/api/config`. The groups feature itself is **not built yet** (see ROADMAP). *Trademark clearance has not been done.*
-
-## Features
-- **Studio**: Beginner mode (pick mode + size + Thin/Standard/Thick; everything else auto-chosen from the image, and the "Auto-chosen settings" table shows what/why) or Expert mode (every parameter).
-  - Lithophane: brightness→thickness, width, min/max thickness, border frame, resolution, smoothing, gamma, auto-contrast, invert.
-  - Relief: base + relief height. Pop-art: 2–8 colour layers (k-means palette or custom hex), posterize or halftone dots, layer step; **multi-body** (one body per colour, 3MF with per-body colours) or single mesh.
-- **Exports**: STL (binary), OBJ (named groups per body), 3MF (zip + core-spec model XML, mm units, basematerials colours). All meshes are built on shared-vertex grids → watertight and consistently wound; the app verifies this (`✔ watertight`). For multi-body pop-art, STL/slicing use one merged watertight mesh (1-px sloped risers) while 3MF/OBJ keep the separate colour bodies.
-- **3D preview**: three.js (vendored in `static/vendor`, works offline).
-- **Build history**: max **5** builds (settings + thumbnail + files). When full, new builds are blocked with a dialog: delete one manually or "Auto-delete oldest & build".
-- **Print**: deep links `prusaslicer://`, `bambustudio://`, `orcaslicer://`, `cura://open?file=<url>` (needs the slicer installed on the browser's machine and the file URL reachable — set *Public base URL* in Settings if remote; Cura is best-effort), built-in **Slice** (PrusaSlicer CLI → G-code), and **Send to printer**: **OctoPrint** and **Moonraker** upload (+optional start) are implemented and tested against mock servers (**not tested on real printers**); PrusaLink, Bambu LAN, Duet, Repetier are labeled stubs.
-- **Edit workspace** (`static/edit.js`, `app/core/meshedit.py`, `app/services/editproj.py`, `/api/edit/*`): open an **STL / OBJ / 3MF** (drop a file, "Open sample", or "Edit this" on a Studio build), or a **photo** (lithophane / relief base). Limits: 50 MB, file type checked by content (not just extension); an edit project counts toward the same **5-item history** as builds (same "delete oldest" dialog).
-  - **Non-destructive**: the uploaded `original.<ext>` is never touched; the project is a list of operations replayed from the original (undo / redo / click a step to jump; exports are made lazily from the current head). Beginner mode shows four big buttons (**Fix, Scale, Hollow, Add base**) with sensible defaults; Expert mode shows everything.
-  - Tools: move / rotate / scale with numeric inputs in mm / cm / in (and "keep proportions"), mirror X/Y/Z, drop to bed + centre, two-point **measure**, **cut / split** with a plane (keep one side or both pieces, optional gap and lay-flat), **hollow** (wall thickness + optional drain hole), **base / brim** (rectangle, round, or outline of the footprint), **booleans** (union / difference / intersection with a box, cylinder or sphere; manifold3d), **text emboss / deboss** (bundled DejaVu fonts), **repair** (normals, duplicate/degenerate faces, small holes, floating bits), **simplify** (target triangles or %).
-  - Exports STL / OBJ / 3MF / original; **Print...** reuses the Studio flow (deep links, slice, network printers). Photo mode reuses the Studio generators.
-  - **Partial / honest limits**: no on-model drag handles (numeric inputs + ghost previews of cut planes and shapes); text only on flat bounding-box faces; 3MF colours/materials are merged into one mesh; hollow is voxel-based (accuracy about one voxel; thin plates may fail with a clear error); hole filling is a simple centroid fan (rough on very concave holes); booleans need a watertight input (run Fix first); previews of meshes over 150k triangles are decimated (exports are full resolution); STL/OBJ carry no units, so choose the units on import; tested on generated/sample meshes, not a large corpus of real-world files.
-- **Showcase** (all content free, clean and safe for all): Trending / Free / For You tabs, project pages (`/p/<id>`), publish a build, report button, moderation queue stub, follow. **Seed items are marked EXAMPLE.**
-  - **Likes**: every public project has a ♥ Like toggle (one like per visitor, shows the count). There is **no dislike** anywhere. Private / followers-only items cannot be liked or counted.
-  - **Trending** = likes + downloads with a recency decay: `score = ln(1 + 3·likes + downloads) × (0.15 + 0.85 · 0.5^(age_days/21))`. Likes weigh 3× a download, the log stops one popular item running away, and the freshness factor halves every 3 weeks (floor 15 %). A download counts **once per visitor** (anonymous session cookie; owners' own downloads and non-public items never count). Visitors are cookie sessions, so this is not tamper-proof against someone clearing cookies; real accounts + rate limits are on the ROADMAP. The formula lives in `app/community/catalog.py::trending_score`.
-  - *For You* is local-only personalization: searches + tag interests stored in `data/prefs.json`; view/disable/clear under **My data**.
-  - Accounts are minimal (display name + date of birth, no password yet). **Accounts are 18+ only** (owner decision 2026-10-12): a date of birth under 18 is refused with a friendly message and the date is not stored. Anyone can build, learn and download without an account; families can print designs together with an adult account holder. Every account's **defaults are Private**.
-- **Privacy** (`app/community/privacy.py`, enforced server-side on every route, effect is immediate): every **build, edit project, and Showcase project** is **Private** (default, owner only) / **Followers-only** / **Public**; change it in Studio/Edit (dropdown beside the downloads), in the publish dialog or via `PUT /api/builds/{id}/visibility` / `PUT /api/showcase/{id}/visibility`. Denied items answer 404 (no existence leak) from lists, search, Trending, For You, direct URLs, thumbnails, share pages `/p/<id>`, files, likes and reports. Slicer deep links use **signed file links that work for ONE file for 10 minutes** (`/f/<token>/…`, token redacted in the access log; none are offered on a shared server until a public base URL is set) so a private build can still be opened by its owner in a slicer; print/slice/send are owner-only, and only **adult accounts** get slicer links, printer send or sharing (signed-out visitors on a shared server and suspended accounts get Download only). Account options (Settings → Account, `PUT /api/me/privacy`): **profile** public / followers / private, **social on/off** (opt out = cannot follow or be followed, no follow button, followers list or count, existing follows removed), **default visibility** for new items. Items from before privacy existed become private (legacy builds are claimed by the first session that lists them).
-- **Promote your other accounts** (Settings): TikTok / Instagram / Reddit / Patreon handles shown as **unverified** link-outs on your public page `/u/<id>`. OAuth connect scaffolding (env-configured client keys, Fernet-encrypted tokens, "not configured" state) exists; **posting and handle verification are NOT implemented**. Env vars: `PHOTO3D_<PROVIDER>_CLIENT_ID/_CLIENT_SECRET`, redirect URI `<base>/api/accounts/<provider>/callback`.
-- **Spark Lab** (learning library): curated lessons, clean and safe for all (First print, Intro to modeling, Lithophanes) with steps, a private step checklist and badges, plus shareable lesson pages (`/l/<id>`). No quizzes, scores, grades or school records (school features removed 2026-10-12).
-- **Language filter** (`app/community/safety.py`, word lists in `app/community/wordlists/`): every piece of text other people can read (usernames, project titles, Showcase titles/descriptions/tags, display names) goes through the same server-side gate (PG-13). A message with disallowed language is **not saved or sent**, and the sender sees exactly: *"Chat doesn't allow that language. Please use appropriate language."* No strikes, no bans, no restricted mode. Phone numbers, e-mail addresses and links are also blocked (separate message). Lists: LDNOOBW (**CC BY 4.0**, unmodified, 16 languages, attribution in `wordlists/ATTRIBUTION.md` + full licence text) plus ZEIM's own `extra.txt`, an **allowlist** (`allow_words.txt`, `allow_phrases.txt`) for false positives such as Scunthorpe/class/assess, and `stems.txt`. Matching is whole-word and runs on ONE normalisation (NFKC, accents and invisible/zero-width characters removed, Cyrillic/Greek/small-caps look-alikes mapped to Latin, other-script digits to 0-9); it catches leetspeak (`sh1t`), stretched letters, spaced letters (`s h i t`) and one inserted symbol (`f*ck`, `fu.ck`). Only the listed language files are read (the licence text in the same folder is not a word list), and **if the main lists are missing the filter refuses free text (HTTP 503) instead of letting everything through**. Contact details are blocked too: e-mail (also `name at gmail dot com`), phone numbers with separators and spelled-out digits, `@handles`, links and bare domains (`.com .net .org …`; file-like names such as `benchy.me`, `main.dev` are fine), `12 Oak Street`-style addresses (best effort). A refused text always answers with the same JSON (`code`, `message`, `context`, `detail`) — HTTP 422, 413 for too long, 503 if the lists are missing. Edit the `.txt` files (one entry per line) — changes load without a restart. **Limits**: grooming-style phrases ("how old are you", "don't tell your parents") are NOT detected; 10 contiguous digits pass (serial numbers); a word list is a first line of defence, not a moderation service: it misses new slang, context, images and unlisted languages; very short (≤3-letter) foreign entries are ignored to avoid false positives.
-- Moderation queue: set `PHOTO3D_ADMIN_TOKEN`, then `GET /api/moderation/queue` with header `X-Admin-Token`. `minor_safety` reports hide a project immediately. `underage_user` reports ("the account holder seems to be under 18", on projects, print photos, or `POST /api/users/<id>/report`) name the account; the moderator can **Suspend account** (`POST /api/moderation/<report>/resolve {"action":"suspend"}` or `POST /api/moderation/users/<id>/suspend`, undo with `/unsuspend`). All print photos stay held for review / reportable as before.
-
-### Underage accounts (documented process)
-ZEIM is 18+ only. Nothing is deleted automatically.
-1. Someone reports the account as *underage_user*; a moderator reviews it in `/admin/moderation`.
-2. If it looks right, the moderator presses **Suspend account**. A suspended account (and any legacy account made under the old 13+ rules whose date of birth is under 18) is *restricted*: its content is shown to nobody else, it can't share, follow, be followed, post print photos or send builds out of ZEIM.
-3. The server admin deletes that person's data: `python tools/delete_user_data.py <account id>` (dry run, lists what goes), then the same with `--confirm`. This removes the account record (date of birth included), builds/Edit projects and their photos, Showcase projects, print photos, personalization and favorites, and follows of the account. The action is written to the audit log; reports stay with the account id only.
+Dev extras: `pip install -r requirements-dev.txt` (adds pytest and optional Playwright for `tests/ui_*.py`). Runtime pins are in `requirements.txt`; the full resolved tree is in `constraints.txt` (`pip install -r requirements.txt -c constraints.txt`). Copy `.env.example` to `.env` for deploy-oriented flags. Env overrides for tests: `PHOTO3D_OUT`, `PHOTO3D_DATA`.
 
 ## Layout
+
 ```
 app/main.py            app factory           app/branding.py  names (single source)   app/config.py  limits/paths
-app/core/              geometry, exporters, autotune, thumbnail      (pure image→mesh logic)
-app/core/meshedit.py   Edit ops (trimesh + manifold3d), meshthumb.py
-app/services/          slicer, printers, handoff, settings, accounts, history, editproj (edit projects)
-app/community/         identity, privacy, catalog, personalization, moderation (+safety: language filter, wordlists/), education, ownership, links, store (JSON files → swap for a DB)
-app/api/               builds, edit, printing, settings(+accounts), community, learn(+public pages)
-static/                index.html, app.js, edit.js, community.js, viewer.js, style.css, vendor/three
+app/core/              geometry, exporters, autotune, thumbnail
+app/services/          slicer, printers, handoff, settings, accounts, history, edit projects
+app/community/         identity, privacy, catalog, moderation, safety, store
+app/api/               HTTP routes
+static/                web UI
 data/  outputs/        runtime state (git-ignored)
+tests/                 pytest + UI smoke scripts
 ```
-Env overrides for tests: `PHOTO3D_OUT`, `PHOTO3D_DATA`.
 
-## Known limits
-Not production-ready: no real auth/passwords (identity is an anonymous session cookie; privacy rules are enforced on it, but it is not strong authentication), JSON-file storage, no payments (intentionally none), no DMs, no feed, no Build Plates (hobbyist groups) yet, OAuth sharing/verification stubs, printer sends untested on hardware, Cura deep link unverified, resolution capped at 600 px (≈1.4 M triangles).
-- "18+" is self-declared (a date of birth typed in); with a printer saved by an admin on a shared server, any signed-in adult can send jobs to it. After an under-18 result **that browser** can't retry for 24 h (`PHOTO3D_AGE_LOCK_HOURS`). The network address only has a **soft** limit: it is locked for 15 minutes only after more than 10 refusals within 15 minutes (`PHOTO3D_AGE_IP_LOCK_AFTER`, `PHOTO3D_AGE_IP_LOCK_MINUTES`), so one person can't lock out a whole home, office or library.
-- The language/contact filter is word-list and pattern based: no grooming-phrase detection, many languages unlisted, bare 10-digit numbers pass, addresses are best effort. Not tested on real devices or with real users.
-Safety/legal: see `static/COMMUNITY_GUIDELINES.md` and `ROADMAP.md` → *Legal & safety* (Terms, Privacy and Rules are drafts, pending legal review; they are not a statement of legal compliance).
-
-## How long ZEIM keeps build files, and what happens when the disk is nearly full
-
-Each build lives in its own folder under the per-build data folder (`PHOTO3D_OUT`, default `outputs/`).
-
-| What | Kept | Setting |
-|---|---|---|
-| A build the person **starred ★** | until they delete it (or use "Delete everything I made" / "Delete my stuff"). Never removed by age, by the cap or by a low disk | – |
-| A build **shared to the Showcase** | 30 days | `PHOTO3D_KEEP_SAVED_DAYS` |
-| Any other build | 7 days | `PHOTO3D_KEEP_UNSAVED_DAYS` |
-| A folder that never finished (no `meta.json`) | 1 day | – |
-| Builds per person | 20; the oldest un-starred one rolls off, and if all 20 are starred ZEIM asks the person to un-star or delete one | `PHOTO3D_MAX_BUILDS` |
-
-Clean-up runs at start-up and every hour. It only looks at the direct sub-folders of the per-build folder and refuses to run on `library/`,
-`static/` or the code. Logs say how many were removed, never which.
-If free space drops below `PHOTO3D_DISK_MIN_FREE_MB` (500), ZEIM first removes expired builds, then the oldest un-starred ones (not from the last
-10 minutes) until `PHOTO3D_DISK_TARGET_FREE_MB` (1000) is free. If that is still not enough it refuses new heavy builds with a clear message
-rather than touching a starred build.
+Code directory name on disk: `photo3d`.
