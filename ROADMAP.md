@@ -42,7 +42,7 @@ ZEIM is **18+ only** and free. Decision 2026-10-12 (Zach): ZEIM launches with no
 - Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process (section added to Terms with a placeholder contact; TODO: register a DMCA designated agent with the US Copyright Office, small fee, needs Zach's OK before paying), trademark clearance of product/section names.
 - Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits (DMs don't exist yet).
 - Age signals: date of birth is self-declared today (18+ gate, bypassable); consider privacy-preserving age assurance where required.
-- Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are stored plain in `data/settings.json`), third-party licences (PrusaSlicer is AGPL — see `docs/licensing.md`: ZEIM must make its source available to its users).
+- Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are stored plain in `data/settings.json`), third-party licences (PrusaSlicer is AGPL-3.0 and is run unmodified as a separate command-line program; ZEIM's own code stays private — see `docs/licensing.md`, decision 2026-10-13).
 
 
 ## Edit workspace (shipped as an MVP)

@@ -14,7 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # System deps:
 #  - prusa-slicer      : slicer CLI the app shells out to (app/services/slicer.py looks for "prusa-slicer" on PATH).
-#                        It pulls in GUI libs (wxWidgets/GTK), so the layer is large (~1 GB). AGPL: see README.
+#                        It pulls in GUI libs (wxWidgets/GTK), so the layer is large (~1 GB). AGPL: unmodified, CLI only, see docs/licensing.md.
 #  - fonts-dejavu-core : the "add text" edit feature uses DejaVu Sans / Serif / Mono (app/core/meshedit.py).
 #  - fonts-dejavu-extra: bold variants.
 #  - curl is not installed; the healthcheck uses Python.

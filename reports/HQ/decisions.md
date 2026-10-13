@@ -1,4 +1,5 @@
 # HQ decisions
+- 2026-10-13: Zach decided PrusaSlicer licensing follows the MakerWorld model: ZEIM's own code stays PRIVATE; PrusaSlicer (AGPL-3.0) is used unmodified as a separate program called through its command line; ZEIM shares only PrusaSlicer's own source (attribution + upstream link on credits/footer). Nobody may modify, patch or link PrusaSlicer code into ZEIM. Repo visibility is not changed. (Team's reading, not legal advice.) Supersedes the 2026-10-12 "source must be available" note.
 - 2026-10-12: Zach decided ZEIM launches with no lawyers. Legal pages use plain wording from common free templates, with no compliance claims. DMCA agent registration (small fee) waits for Zach's OK. PrusaSlicer AGPL: source must be available to users; repo visibility is Zach's call.
 - 2026-10-12: Zach removed school features; no grades/school records held. No teacher tools, classrooms, class codes, assignments, quizzes or scores. ZEIM stays free and family-friendly; kids use it with their families.
 - Free, family-friendly. No paid content, no NSFW. Humble positioning (no "better than" claims).

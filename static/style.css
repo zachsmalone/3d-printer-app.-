@@ -626,3 +626,4 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 /* Account > People I follow */
 .follow-list { list-style: none; padding: 0; margin: 6px 0; }
 .follow-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+.sitefoot .attrib{display:block;font-size:.85em;margin-top:4px}

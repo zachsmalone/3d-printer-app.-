@@ -47,6 +47,7 @@ def run(name, launch, with_axe):
     links = pg.eval_on_selector_all(".sitefoot a", "a=>a.map(x=>[x.textContent.trim(), x.getAttribute('href'), x.getBoundingClientRect().height])")
     ok(f"{name}: footer has Rules, Privacy, Terms, Credits, each >= 44px", [l[0] for l in links][:3] == ["Rules", "Privacy", "Terms"] and all(l[2] >= 43.5 for l in links), links)
     for l in links:
+        if l[1].startswith("https://"): continue   # external (PrusaSlicer attribution)
         r = pg.request.get(URL + l[1]); ok(f"{name}: footer link {l[1]} exists (200)", r.status == 200, r.status)
     if with_axe: axe(pg, "Studio empty, 390 light")
     # build from the sample

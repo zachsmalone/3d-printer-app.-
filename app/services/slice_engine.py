@@ -1,7 +1,8 @@
 """In-app slicing: PrusaSlicer CLI wrapper, printer profiles, bed-fit check, G-code stats.
 
 The engine is run as a separate process (never imported), so ZEIM does not link
-against PrusaSlicer code. PrusaSlicer is AGPL-3.0, see the PR description.
+against PrusaSlicer code. PrusaSlicer is AGPL-3.0 and is used unmodified;
+see docs/licensing.md (never patch, modify or link it).
 """
 from __future__ import annotations
 
