@@ -7,6 +7,7 @@
     "python": {
       "fastapi": "Runs the ZEIM server and its API.",
       "uvicorn": "Serves ZEIM to your browser.",
+      "webauthn": "Checks passkey sign-ins (prepared, not switched on yet).",
       "httpx": "Talks to your own printer (Moonraker / OctoPrint) when you ask it to.",
       "python-multipart": "Receives the photos and files you upload.",
       "cryptography": "Keeps saved printer keys encrypted on disk.",

@@ -45,3 +45,6 @@ trimesh==5.1.1
 typing-extensions==4.16.0
 typing-inspection==0.4.4
 uvicorn==0.54.0
+webauthn==2.8.0
+cbor2==5.9.0
+pyOpenSSL==26.4.0

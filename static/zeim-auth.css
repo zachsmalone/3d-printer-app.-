@@ -1,0 +1,11 @@
+/* Account security panel. Uses the app's theme variables (style.css), so it follows light and dark mode. */
+.zeim-auth-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .5rem .75rem; margin: .35rem 0;
+  background: var(--panel); color: var(--txt); border: 1px solid var(--line); border-radius: var(--r-md, var(--r)); }
+.zeim-auth-row > span { flex: 1 1 14rem; overflow-wrap: anywhere; }
+[class^="zeim-auth"] button, .zeim-auth-row button { font: inherit; padding: .45rem .9rem; border-radius: var(--r-pill, 999px); border: 0;
+  background: var(--acc); color: var(--on-acc); cursor: pointer; }
+[class^="zeim-auth"] button:focus-visible, .zeim-auth-row input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.zeim-auth-row input { font: inherit; padding: .4rem .6rem; background: var(--sunk); color: var(--txt);
+  border: 1px solid var(--ctl); border-radius: var(--r-sm, 8px); min-width: 9rem; }
+.zeim-auth-danger { background: var(--bad) !important; color: var(--panel) !important; margin-top: 1rem; }
+.zeim-auth-status { min-height: 1.4em; color: var(--ok); } .zeim-auth-status.bad { color: var(--bad); }

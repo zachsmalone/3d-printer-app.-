@@ -20,3 +20,4 @@ segno==1.6.6
 shapely==2.1.2
 trimesh==5.1.1
 uvicorn==0.54.0
+webauthn==2.8.0

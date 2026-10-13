@@ -1,0 +1,3 @@
+# Already added to requirements.txt (webauthn==2.8.0). Everything else the auth package uses is the standard library.
+webauthn>=2.1,<3        # py_webauthn: WebAuthn attestation/assertion verification (we do not hand-roll crypto)
+cryptography>=42        # pulled in by webauthn; also used by tests/softauth.py
