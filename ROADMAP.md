@@ -36,13 +36,13 @@ Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, imp
 `history.BuildStore` records carry `owner`/`visibility`; `community/*` modules sit behind small functions over JSON files (swap for a DB); routers are mounted in `app/main.py`; public pages are server-rendered with stable URLs. Planned: profiles, follows/feed, comments, shares, creator pages, saved collections.
 
 ## Legal & safety (REQUIRED before any public launch)
-ZEIM is **18+ only**, free, and not for school use. Terms, Privacy and Rules are **drafts, pending legal review**. **The following needs legal review and is NOT done:**
+ZEIM is **18+ only**, free, and not for school use. Decision 2026-10-12 (Zach): ZEIM launches with no lawyers. Terms, Privacy and Rules are plain-words pages based on common free templates; they make no compliance claims. **Still NOT done:**
 - **No NSFW.** No adult/mature content marketplace, no paid-mature tier. **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
 - Age: accounts are 18+ only; an under-18 date of birth is refused and not stored. Underage reports → moderator suspends (reversible). Accounts and data are never deleted by the app or admins. Data-retention policy and the final privacy notice are still to do. ZEIM holds no grades, scores or school records (school features removed 2026-10-12).
-- Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process, trademark clearance of product/section names.
+- Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process (section added to Terms with a placeholder contact; TODO: register a DMCA designated agent with the US Copyright Office, small fee, needs Zach's OK before paying), trademark clearance of product/section names.
 - Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits (DMs don't exist yet).
 - Age signals: date of birth is self-declared today (18+ gate, bypassable); consider privacy-preserving age assurance where required.
-- Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are stored plain in `data/settings.json`), third-party licences (PrusaSlicer is AGPL — review if distributing/hosting).
+- Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are stored plain in `data/settings.json`), third-party licences (PrusaSlicer is AGPL — see `docs/licensing.md`: ZEIM must make its source available to its users).
 
 
 ## Edit workspace (shipped as an MVP)

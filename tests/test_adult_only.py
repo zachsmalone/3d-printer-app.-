@@ -72,11 +72,12 @@ def test_no_teen_code_paths_left():
     assert "age_group" not in me and me["send"]["role"] == "adult"
 
 
-def test_wording_is_18_plus_with_no_kids_teen_or_coppa_language_and_legal_text_is_marked_draft():
+def test_wording_is_18_plus_with_no_kids_teen_or_coppa_language_and_legal_text_makes_no_compliance_claims():
     for f in ("terms.html", "privacy.html", "COMMUNITY_GUIDELINES.html", "COMMUNITY_GUIDELINES.md"):
         t = (config.STATIC / f).read_text()
         low = t.lower()
-        assert "18" in t and "draft, pending legal review" in low, f
+        assert "18" in t and "pending legal review" not in low, f
+        assert "compliant" not in low and "complies with" not in low, f
         for w in ("kids", "teen", "coppa", "grown-up", "13 and up", "13+"):
             assert w not in low, (f, w)
     readme = (config.STATIC.parent / "README.md").read_text().lower()
@@ -85,6 +86,8 @@ def test_wording_is_18_plus_with_no_kids_teen_or_coppa_language_and_legal_text_i
         low = (config.STATIC / f).read_text().lower()
         assert "teen" not in low and "kids" not in low and "grown-up" not in low, f
     assert 'value="underage_user"' in (config.STATIC / "index.html").read_text()
+    terms = (config.STATIC / "terms.html").read_text()
+    assert 'id="copyright"' in terms and "DMCA" in terms and "TODO: register a DMCA" in terms
 
 
 def publish(c, bid, vis="public", title="Lamp"):

@@ -1,4 +1,4 @@
-# Community Guidelines (draft, pending legal review)
+# Community Guidelines
 
 ZEIM accounts are for **adults 18 and over only**. All content must be **clean and safe for all**. Families can print designs together with an adult account holder.
 
@@ -15,4 +15,6 @@ ZEIM accounts are for **adults 18 and over only**. All content must be **clean a
 
 **Reporting:** use *Report* on any project or print photo. Reports of type "minor safety" hide the item instantly pending review. Reports of type "underage user" (the account holder seems to be under 18) go to a moderator, who can suspend the account; suspension is reversible and nothing is deleted.
 
-> Draft, pending legal review. These guidelines, the Terms and the privacy notice are not a statement of legal compliance.
+Copyright complaints follow the copyright (DMCA) process in the Terms (`terms.html#copyright`).
+
+<!-- TODO: register a DMCA designated agent with the US Copyright Office (small fee; needs Zach's OK before paying). -->

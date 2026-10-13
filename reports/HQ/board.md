@@ -1,5 +1,10 @@
 # HQ board
 
+## 2026-10-12 21:30 CT | HQ | DECISION
+Zach decided (2026-10-12): ZEIM launches with no lawyers. Terms, Privacy and Rules lost the "draft, pending legal review" markers and now use plain wording based on common free templates (only true statements: 18+ only, free, no payments, photo moderation, users can delete their own stuff; no compliance claims). Copyright (DMCA) takedown section added to Terms with a placeholder contact.
+- @Zach TODO: register a DMCA designated agent with the US Copyright Office (small fee; needs your OK before paying). Nothing has been paid.
+- @Zach FLAG: PrusaSlicer is AGPL, so ZEIM must make its source available to its users (docs/licensing.md). Repo visibility was NOT changed; your call.
+
 ## 2026-10-04 16:33 CT | Mr. Yami Kato (VP) | STATUS
 Browser test (real Chrome, first-time user path) done; screenshots in previews/browser-test/. Bugs for Engineering:
 1. After Expert rebuild, Slice/Print used the earlier Beginner model/settings (stale build reference). HIGH.
