@@ -8,8 +8,6 @@ This specification describes an **experimental, untested** stacked subtractive C
   https://wiki.bambulab.com/en/knowledge-sharing/cmyk-color-lithophane-printing-instructions
 - Snapmaker Wiki — Color lithophane printing instructions: provides additional guidance for CMYK colour lithophanes, including filament selection and backlight setup.  
   https://wiki.snapmaker.com/en/snapmaker_orca/color_lithophane_printing_instructions
-- Bambu Lab — AMS multi-colour printing: relevant to assigning cyan, magenta, yellow, and white filaments to separate AMS slots.  
-  https://wiki.bambulab.com/en/knowledge-sharing/cmyk-color-lithophane-printing-instructions
 - Creality — CFS Color Filament System: relevant for multi-colour filament selection and CFS-based printing workflows.  
   https://www.creality.com/pages/cfs-color-filament-system
 
