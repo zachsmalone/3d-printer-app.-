@@ -171,7 +171,7 @@ def check_fits(dims: tuple[float, float, float], profile: PrinterProfile) -> Non
         f"This model is {x:.0f} × {y:.0f} × {z:.0f} mm, but the {profile.name} can only print up to "
         f"{profile.bed_x:.0f} × {profile.bed_y:.0f} × {profile.max_z:.0f} mm. "
         f"Try scaling it down to about {pct}% or smaller in the Edit tab (Scale), or cut it into pieces with Edit → Split "
-        f"and print them one at a time, then slice it again.",
+        f"and print them one at a time, then slice it again (or turn on shrink-to-fit and ZEIM will do it for you).",
         422,
     )
 

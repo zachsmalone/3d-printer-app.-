@@ -93,6 +93,7 @@ def slice_model(
     bed_temp: Optional[str] = Form(None),
     material: Optional[str] = Form(None),
     scale_to_fit: bool = Form(False),
+    fit: bool = Form(False),
     actor: Actor = Depends(get_actor),
 ):
     if bool(file) == bool(model_id):
@@ -138,7 +139,7 @@ def slice_model(
         else:
             shutil.copyfile(resolve_model(model_id, actor), work / "input.stl")  # type: ignore[arg-type]
             stl = work / "input.stl"
-        fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit)
+        fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit or fit, info=(scaling := {}))
         res = eng.slice_stl(work / "model.stl", prof, work / "model.gcode")
     except eng.SliceError as e:
         shutil.rmtree(work, ignore_errors=True)
@@ -166,16 +167,30 @@ def slice_model(
         "model_size_mm": [round(v, 2) for v in res.size_mm],
         "printer_id": prof.id, "printer": prof.name, "nozzle": prof.nozzle, "settings": chosen,
         "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
-        "scaled_pct": fitted, "will_print": badge,
+        "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf"},
     }
 
 
-def fit_to_printer(src: Path, dst: Path, prof, scale: bool):
-    """Copy the model, sitting on z=0 and centred on the chosen printer's bed; scaled down to fit when asked.
-    Returns the scale percent applied (None = unchanged). Without `scale`, a too-big model is refused by slice_stl."""
+FIT_MARGIN_MM = 2.0      # kept clear on each side in X/Y and above the model in Z
+MIN_FIT_SCALE = 0.10     # shrinking further than this is almost always a units mix-up
+
+
+def fit_scale(extents, limits, margin: float = FIT_MARGIN_MM) -> float:
+    """Uniform factor (<= 1) that fits `extents` in `limits` with `margin` mm to spare; 1.0 if it already fits."""
+    if all(d <= l + eng.FIT_TOLERANCE_MM for d, l in zip(extents, limits)):
+        return 1.0
+    usable = (limits[0] - 2 * margin, limits[1] - 2 * margin, limits[2] - margin)
+    return min(1.0, min(u / d for u, d in zip(usable, extents) if d > 0))
+
+
+def fit_to_printer(src: Path, dst: Path, prof, scale: bool, info: Optional[dict] = None):
+    """Copy the model, sitting on z=0 and centred on the chosen printer's bed; shrunk to fit when asked
+    (never enlarged). Returns the scale percent applied (None = unchanged) and fills `info` with the details.
+    Without `scale`, a too-big model is refused by slice_stl."""
     import trimesh
+    info = {} if info is None else info
     eng.stl_bounds(src)                                    # friendly "bad_model" for garbage before trimesh sees it
     try:
         mesh = trimesh.load(str(src), file_type="stl", force="mesh")
@@ -184,13 +199,21 @@ def fit_to_printer(src: Path, dst: Path, prof, scale: bool):
     except Exception:
         raise eng.SliceError("bad_model", "That file doesn't look like a valid STL model. Please export it as an STL and try again.", 400)
     pct = None
+    info.update(scaled=False, scale=1.0, margin_mm=FIT_MARGIN_MM,
+                original_size_mm=[round(float(v), 2) for v in mesh.extents] if len(mesh.vertices) else None)
     if scale and len(mesh.vertices):
         limits = (prof.bed_x, prof.bed_y, prof.max_z)
-        f = min(l / d for d, l in zip(mesh.extents, limits) if d > 0)
+        f = fit_scale(mesh.extents, limits)
+        if f < MIN_FIT_SCALE:
+            x, y, z = mesh.extents
+            raise eng.SliceError(
+                "cannot_fit",
+                f"This model would have to shrink to {f * 100:.0f}% to fit the printer, which is probably a "
+                f"units mix-up (it is {x:.0f} x {y:.0f} x {z:.0f} mm). Please check the size in the Edit tab.", 422)
         if f < 1:
-            f = f * 0.98                                   # a small margin from the bed edge
             mesh.apply_scale(f)
             pct = round(f * 100, 1)
+            info.update(scaled=True, scale=round(float(f), 4), percent=pct)
     lo, hi = mesh.bounds
     mesh.apply_translation([prof.bed_x / 2 - (lo[0] + hi[0]) / 2, prof.bed_y / 2 - (lo[1] + hi[1]) / 2, -lo[2]])
     dst.write_bytes(mesh.export(file_type="stl"))
