@@ -301,7 +301,7 @@ async function openItem(id) {
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
     <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4><ul class="pgallery" id="prGallery"></ul>
       ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn">📷 Add a photo of your print</summary>
-        <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo can be reported and is checked by a grown-up.</p>
+        <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo is checked by a moderator before anyone else can see it.</p>
         <div class="field"><label for="prFile">Photo</label><input type="file" id="prFile" accept="image/*"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
@@ -312,7 +312,7 @@ async function openItem(id) {
     const f = $("#prFile").files[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo first.");
     const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked);
     $("#prSend").disabled = true;
-    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your print photo is up.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
+    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
     catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
   };
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
@@ -443,7 +443,7 @@ document.addEventListener("click", e => { const a = e.target.closest("a[data-ope
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
   let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
-  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure><img src="${p.url}" alt="Photo of a print${p.caption ? ": " + esc(p.caption) : ""}" loading="lazy"><figcaption>${esc(p.caption)} <span class="help">${esc(p.by)}</span>
+  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure><img src="${p.url}" alt="Photo of a print${p.caption ? ": " + esc(p.caption) : ""}" loading="lazy"><figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
       ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}">⚑ Report</button>`}</figcaption></figure></li>`).join("")
     : `<li class="help">No print photos yet.</li>`;
   g.onclick = async e => {

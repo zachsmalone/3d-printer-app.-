@@ -441,7 +441,29 @@ def mod_queue(request: Request, x_admin_token: str = Header("")):
     _admin(x_admin_token, request)
     q = sorted(moderation.queue(), key=lambda r: r["created"])
     return {"reports": [{k: v for k, v in r.items() if k != "reporter"} | {"preview": _preview(r["item_id"])} for r in q],
-            "oldest_open_age_s": moderation.oldest_open_age_s()}
+            "oldest_open_age_s": moderation.oldest_open_age_s(), "pending_prints": _pending_prints()}
+
+
+def _pending_prints():
+    from ..community import social
+    return [{"id": p["id"], "item_id": p["item_id"], "caption": p.get("caption", ""), "by": "@" + (p.get("username") or "?"), "created": p["created"],
+             "thumb": f"/api/moderation/item/print:{p['id']}/thumb"} for p in social.pending()]
+
+
+@router.post("/moderation/prints/{pid}/{action}")
+def mod_print(pid: str, action: str, request: Request, x_admin_token: str = Header("")):
+    """Review an 'I printed this' photo: approve (shows in the gallery, counts for Trending) or reject (record and file deleted)."""
+    _admin(x_admin_token, request)
+    from ..community import social
+    import logging
+    if action not in ("approve", "reject"):
+        raise HTTPException(400, "action must be approve | reject")
+    try:
+        social.approve(pid) if action == "approve" else social.reject(pid)
+    except KeyError:
+        raise HTTPException(404)
+    logging.getLogger("zeim.audit").info("print photo %s: %s", action, pid)
+    return {"id": pid, "status": "approved" if action == "approve" else "deleted"}
 
 
 @router.get("/moderation/item/{iid}/thumb")

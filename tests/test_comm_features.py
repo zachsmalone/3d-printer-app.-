@@ -146,6 +146,15 @@ def test_printed_photo_goes_through_photo_safety_and_moderation():
     p = r.json()
     img = v.get(p["url"]).content
     assert b"SecretCam" not in img and b"GPS" not in img                               # EXIF / GPS stripped
+    # held for review: only the uploader sees it (as pending), nothing counts for Trending yet
+    assert client().get(url).json()["prints"] == [] and client().get(p["url"]).status_code == 404
+    mine = v.get(url).json()["prints"]; assert mine[0]["pending"] and mine[0]["status"] == "pending"
+    assert not [e for e in ACTIVITY.read() if e["k"] == "printed" and e["i"] == it["id"]]
+    pend = client().get("/api/moderation/queue", headers=ADMIN).json()["pending_prints"]
+    assert p["id"] in [x["id"] for x in pend]
+    assert client().post(f"/api/moderation/prints/{p['id']}/approve").status_code == 403          # admin token required
+    assert client().post(f"/api/moderation/prints/{p['id']}/approve", headers=ADMIN).json()["status"] == "approved"
+    assert [e for e in ACTIVITY.read() if e["k"] == "printed" and e["i"] == it["id"]]
     g = client().get(url).json()["prints"]
     assert [x["id"] for x in g] == [p["id"]] and g[0]["caption"] == "Came out great"
     assert client().get(f"/api/showcase/{it['id']}").json()["prints_count"] == 1
@@ -240,3 +249,19 @@ def test_orient_ops_in_the_editor_and_ui():
     js = open(os.path.join(ROOT, "static", "edit.js"), encoding="utf-8").read()
     assert "lay_flat" in js and "best_orient" in js and "Lay flat" in js and "Best position" in js
     assert "#slicer/orient" in open(os.path.join(ROOT, "static", "index.html")).read()
+
+
+def test_rejected_print_photo_is_deleted_with_its_file_and_old_photos_become_pending():
+    a = U("Ja"); it = publish(a, "Rej"); v = U("Jv")
+    p = v.post(f"/api/showcase/{it['id']}/prints", files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).json()
+    f = social.print_path(social.get_print(p["id"])); assert f.exists()
+    assert client().post(f"/api/moderation/prints/{p['id']}/reject", headers=ADMIN).json()["status"] == "deleted"
+    assert social.get_print(p["id"]) is None and not f.exists() and v.get(f"/api/showcase/{it['id']}/prints").json()["prints"] == []
+    assert client().post(f"/api/moderation/prints/{p['id']}/approve", headers=ADMIN).status_code == 404
+    # migration: a photo stored before review existed (no status) is pending, hidden from others
+    q = v.post(f"/api/showcase/{it['id']}/prints", files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).json()
+    PRINTS.update(lambda l: [r.pop("status", None) for r in l if r["id"] == q["id"]])
+    assert social.mark_existing_pending() >= 1 and social.get_print(q["id"])["status"] == "pending"
+    assert client().get(f"/api/showcase/{it['id']}/prints").json()["prints"] == []
+    assert "Waiting for review" in open(os.path.join(ROOT, "static", "community.js")).read()
+    assert "/api/moderation/prints/" in open(os.path.join(ROOT, "static", "moderation.js")).read()

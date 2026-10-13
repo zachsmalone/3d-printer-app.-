@@ -94,19 +94,69 @@ def add_print(item_id: str, sid: str, uid: str, username: str | None, data: byte
     pid = secrets.token_hex(6)
     (PDIR / f"{pid}.{ext}").write_bytes(data)
     rec = {"id": pid, "item_id": item_id, "owner_sid": sid, "uid": uid, "username": username, "ext": ext,
-           "caption": caption, "created": time.time(), "photo_ack": ack}
-    PRINTS.update(lambda l: l.append(rec))
-    record("printed", item_id, sid)
+           "caption": caption, "created": time.time(), "photo_ack": ack, "status": "pending"}
+    PRINTS.update(lambda l: l.append(rec))      # held for moderator review (all ages); Trending counts it only once approved
     return rec
+
+
+def status(p: dict) -> str:
+    return p.get("status") or "pending"          # records from before review existed count as pending
+
+
+def mark_existing_pending() -> int:
+    """Startup migration: every photo without a status (made before review existed) becomes pending."""
+    n = {"n": 0}
+
+    def f(l):
+        for p in l:
+            if not p.get("status"):
+                p["status"] = "pending"; n["n"] += 1
+    if any(not p.get("status") for p in PRINTS.read()):
+        PRINTS.update(f)
+    return n["n"]
+
+
+def pending() -> list[dict]:
+    return sorted([p for p in PRINTS.read() if status(p) == "pending"], key=lambda p: p["created"])
+
+
+def approve(pid: str) -> dict:
+    out = {}
+
+    def f(l):
+        for p in l:
+            if p["id"] == pid:
+                p["status"] = "approved"; p["reviewed"] = time.time(); out.update(p)
+    PRINTS.update(f)
+    if not out:
+        raise KeyError(pid)
+    record("printed", out["item_id"], out["owner_sid"])
+    return out
+
+
+def reject(pid: str) -> bool:
+    """Rejected photos are deleted: the record and the file."""
+    p = get_print(pid)
+    if not p:
+        raise KeyError(pid)
+    (PDIR / f"{pid}.{p['ext']}").unlink(missing_ok=True)
+    PRINTS.update(lambda l: l.__setitem__(slice(None), [x for x in l if x["id"] != pid]))
+    unrecord("printed", p["item_id"], p["owner_sid"])
+    return True
 
 
 def mod_key(pid: str) -> str:
     return "print:" + pid
 
 
-def prints_for(item_id: str) -> list[dict]:
+def visible_to(p: dict, sid: str | None) -> bool:
+    return status(p) == "approved" or (sid is not None and p["owner_sid"] == sid)
+
+
+def prints_for(item_id: str, sid: str | None = None) -> list[dict]:
+    """Approved photos, plus the viewer's own pending ones (shown to them as 'Waiting for review')."""
     hidden = set(MODERATION.read()["hidden"])
-    return sorted([p for p in PRINTS.read() if p["item_id"] == item_id and mod_key(p["id"]) not in hidden],
+    return sorted([p for p in PRINTS.read() if p["item_id"] == item_id and mod_key(p["id"]) not in hidden and visible_to(p, sid)],
                   key=lambda p: -p["created"])
 
 

@@ -61,6 +61,11 @@ for r in (builds.router, edit.router, printing.router, printing.files_router, se
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router):
     app.include_router(r)
 try:
+    from .community import social as _social
+    _social.mark_existing_pending()      # 'I printed this' photos made before review existed are held for review
+except Exception:
+    _logging.getLogger("zeim").exception("print-photo migration failed")
+try:
     from .community import usernames as _usernames
     _usernames.migrate()               # accounts made before usernames existed get one (adults keep their display name if it is free)
 except Exception:
