@@ -1,5 +1,19 @@
 # HQ board
 
+## 2026-10-13 18:37 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~18:37)
+Lead builder was idle. `haruto/work` was 5 behind origin/zeim (lithophane shapes landed on tip separately). Fast-forwarded `haruto/work` to tip `c11603f`. Nothing unpushed on main; CI on zeim green (board: lithophane shapes shipped). Lithophane shapes **SHIPPED** earlier today (heart/circle/star/square smooth outlines, full-sphere Globe, Cylinder/Cup, night-light sleeve; suite ~983). Re-dispatched lead builder on the unfinished 16:34 materials order. Box health: removed ~760MB stale `/tmp/zeim-tests-*` + Chrome temp dirs; disk ~11%, `/tmp` ~189M; killed leftover litho scratch servers on 8799; live :8765 (200) + ngrok up on tip. No open PRs. No new >6h reversible Zach questions. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget, DMCA fee OK, delete leftover `data/classrooms*` (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (evening summary at ~8:34 CT run).
+
+**Build order this run (lead builder):**
+1. Safety / honest materials: add ABS (and ASA/PC if sourced) to `app/data/printers/materials.json` with sourced temps + "not K1-tested"; before slice, show ventilation/enclosure warning when material is ABS/ASA/PC (or any filament with significant fumes); rename `nozel_temp_c` → `nozzle_temp_c` in `data/materials/filaments.json` (TPU 95A) and update any readers.
+2. K1 slicer polish: material-specific filament density for grams estimate (PLA 1.24, PETG ~1.27, ABS ~1.04, TPU ~1.21) — label as estimate; stop hardcoding PLA-only in `app/services/slicer.py` / `slice_engine.py`.
+3. Pilot if time: multi-object plate → one slice path gap-check.
+4. Do not touch hosting spend, legal, or delete classrooms data. Lithophane *color* UI (CMYK/AMS) stays later; shapes already shipped.
+
+**Specialists (HQ):** re-verify tip `c11603f` — lithophane shape picker (7 shapes, smoothness, Globe sphere, Cylinder/Cup food-safety note), licensing attribution still present, materials work when it lands. Prior filter/a11y/bed-fit verifies still stand unless regressions found.
+
+## 2026-10-13 16:34 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~16:34)
+Lead builder was idle; `haruto/work` was 3 commits behind origin/zeim. Fast-forwarded to tip `734967e` (licensing MakerWorld model + Smart Fix map #25 + CMYK litho specs #26). Re-dispatched lead builder on ABS/materials fumes + density (did not land before lithophane shapes ship). Quiet to Zach.
+
 ## 2026-10-13 16:00 CT | Lead builder | DECISION (AGPL decided)
 Zach decided (2026-10-13): ZEIM follows the MakerWorld model. ZEIM's own code stays **private**; PrusaSlicer (AGPL-3.0) is used **unmodified** as a separate command-line program; ZEIM shares only PrusaSlicer's own source (link on credits page and footer). Nobody may modify, patch or link PrusaSlicer code into ZEIM. Repo visibility unchanged. "AGPL repo visibility" removed from Zach's open questions. See `docs/licensing.md` (team's reading, not legal advice).
 
