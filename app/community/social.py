@@ -90,11 +90,19 @@ def clear_person(sid: str):
 
 
 # ---------------- "I printed this" photos ----------------
-def add_print(item_id: str, sid: str, uid: str, username: str | None, data: bytes, ext: str, caption: str, ack) -> dict:
+def add_print(item_id: str, sid: str, uid: str, username: str | None, data: bytes, ext: str, caption: str, ack,
+             mod_result: str | None = None) -> dict:
+    """Store a print photo. Always pending for a human — the image-moderation hook never auto-approves."""
+    from . import imagemod
+    verdict = mod_result or imagemod.review_upload(data, {"item_id": item_id, "uid": uid})
+    if verdict == imagemod.REJECT:
+        raise ValueError("That photo was refused. Please try a different one.")
+    # Even if a future hook returns APPROVE, we still hold for a human (Zach: never auto-approve).
     pid = secrets.token_hex(6)
     (PDIR / f"{pid}.{ext}").write_bytes(data)
     rec = {"id": pid, "item_id": item_id, "owner_sid": sid, "uid": uid, "username": username, "ext": ext,
-           "caption": caption, "created": time.time(), "photo_ack": ack, "status": "pending"}
+           "caption": caption, "created": time.time(), "photo_ack": ack, "status": "pending",
+           "moderation": imagemod.NEEDS_HUMAN_REVIEW if verdict == imagemod.APPROVE else verdict}
     PRINTS.update(lambda l: l.append(rec))      # held for moderator review (all ages); Trending counts it only once approved
     return rec
 
