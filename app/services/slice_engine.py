@@ -170,7 +170,8 @@ def check_fits(dims: tuple[float, float, float], profile: PrinterProfile) -> Non
         "too_big",
         f"This model is {x:.0f} × {y:.0f} × {z:.0f} mm, but the {profile.name} can only print up to "
         f"{profile.bed_x:.0f} × {profile.bed_y:.0f} × {profile.max_z:.0f} mm. "
-        f"Try scaling it down to about {pct}% or smaller in the Edit tab, then slice it again.",
+        f"Try scaling it down to about {pct}% or smaller in the Edit tab (Scale), or cut it into pieces with Edit → Split "
+        f"and print them one at a time, then slice it again.",
         422,
     )
 
@@ -201,7 +202,7 @@ def run_engine(engine: str, ini: Path, stl: Path, out: Path, timeout: int = SLIC
     if proc.returncode != 0 or not out.exists() or out.stat().st_size == 0:
         log.error("slicer failed rc=%s: %s", proc.returncode, tail)
         if "could not fit" in tail.lower():
-            raise SliceError("too_big", "This model doesn't fit on the printer bed. Try scaling it down.", 422)
+            raise SliceError("too_big", "This model doesn't fit on the printer bed. Try scaling it down, or cut it into pieces with Edit → Split.", 422)
         raise SliceError("slice_failed", "The slicer couldn't process this model. If it has holes or "
                          "broken surfaces, run Fix in the Edit tab and try again.", 500)
 

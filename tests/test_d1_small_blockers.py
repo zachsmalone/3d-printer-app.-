@@ -63,3 +63,10 @@ def test_no_school_features_in_docs():
             if "removed" in line.lower() or "not planned" in line.lower():
                 continue
             assert not re.search(r"classroom|teacher|class students|school address", line, re.I), (name, line)
+
+
+def test_new_slice_engine_too_big_also_suggests_split():
+    from app.services import slice_engine as eng
+    with pytest.raises(eng.SliceError) as e:
+        eng.check_fits((440, 100, 100), eng.CREALITY_K1)
+    assert "Split" in e.value.message and "Scale" in e.value.message and "50%" in e.value.message
