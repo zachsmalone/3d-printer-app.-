@@ -201,6 +201,14 @@ def my_followers(actor: Actor = Depends(get_actor)):
     return {"enabled": True, "followers": privacy.followers_of(actor.user["id"])}
 
 
+@router.get("/me/following")
+def my_following(actor: Actor = Depends(get_actor)):
+    """Only YOU can see who you follow; each row has what the Unfollow button needs."""
+    if not actor.user:
+        raise HTTPException(401, "sign up first")
+    return {"enabled": privacy.social_on(actor.user), "following": privacy.following_of(actor.user)}
+
+
 @router.get("/me/projects")
 def my_projects(actor: Actor = Depends(get_actor)):
     return {"projects": [catalog.public(i, actor) for i in catalog.mine(actor)]}

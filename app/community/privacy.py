@@ -155,6 +155,19 @@ def followers_of(uid: str) -> list[dict]:
             if uid in u.get("following", []) and social_on(u) and not restricted(u)]
 
 
+def following_of(user: dict) -> list[dict]:
+    """The people THIS account follows, by username (never the display name, which may be a real name), so it can manage them.
+    An account that is gone, suspended or has turned following off is still listed (unnamed) so it can be unfollowed."""
+    users = {u["id"]: u for u in USERS.read().values()}
+    out = []
+    for uid in dict.fromkeys(user.get("following", [])):
+        u = users.get(uid)
+        ok = bool(u) and not restricted(u) and social_on(u) and of(u)["profile"] != "private"
+        out.append({"id": uid, "name": ("@" + u["username"]) if ok and u.get("username") else ("a ZEIM maker" if ok else "an account that's no longer available"),
+                    "available": ok, "profile_url": f"/u/{uid}" if ok else None})
+    return out
+
+
 # ---- signed, expiring file links (so a slicer on the owner's PC can fetch a PRIVATE build without cookies) ----
 _KEY_FILE = config.DATA / "link.key"
 

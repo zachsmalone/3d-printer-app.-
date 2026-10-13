@@ -109,7 +109,8 @@ function renderAccount() {
       ${ME.suspended ? '<p class="help">This account is suspended, so everything stays <b>Private</b>. You can still make, edit and download your projects.</p>' : ""}
       <label class="inl"><input type="checkbox" id="pv_social" ${pv.social === "on" ? "checked" : ""}> Allow following (I can follow others and others can follow me)</label>
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
-      <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button></div>
+      <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button><button class="btn small ghost" id="pv_following" aria-expanded="false" aria-controls="pv_followingList">People I follow</button></div>
+      <div id="pv_followingList" hidden></div>
       <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>
@@ -126,6 +127,18 @@ function renderAccount() {
       catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
     };
     $("#pv_save").onclick = async () => { try { await api("/api/me/privacy", J("PUT", { profile: $("#pv_profile").value, default_visibility: $("#pv_def").value, social: $("#pv_social").checked ? "on" : "off" })); await refreshMe(); renderAccount(); toast("Privacy saved", "ok"); } catch (e) { toast(e.message, "err"); } };
+    // People I follow: only you see this list; Unfollow works even for an account that has since gone away
+    const drawFollowing = async () => {
+      const box = $("#pv_followingList"); let f;
+      try { f = await api("/api/me/following"); } catch (e) { box.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
+      box.innerHTML = f.following.length ? `<h4 id="pv_fH">People I follow</h4><ul class="follow-list" aria-labelledby="pv_fH">${f.following.map(x => `<li>${x.profile_url ? `<a href="${esc(x.profile_url)}" target="_blank" rel="noopener noreferrer">${esc(x.name)}</a>` : `<span>${esc(x.name)}</span>`}
+        <button type="button" class="btn small ghost" data-unfollow="${esc(x.id)}" aria-label="Unfollow ${esc(x.name)}">Unfollow</button></li>`).join("")}</ul>` : `<p class="help">You don't follow anyone yet. Use "Follow creator" on a project you like.</p>`;
+      box.querySelectorAll("[data-unfollow]").forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        try { await api("/api/follow/" + encodeURIComponent(b.dataset.unfollow), { method: "DELETE" }); toast("Unfollowed", "ok"); await drawFollowing(); $("#pv_following").focus(); }
+        catch (e) { b.disabled = false; toast(e.message, "err"); } });
+    };
+    $("#pv_following").onclick = async () => { const box = $("#pv_followingList"), open = box.hidden; box.hidden = !open; $("#pv_following").setAttribute("aria-expanded", open); if (open) await drawFollowing(); };
     $("#pv_followers").onclick = async () => { const f = await api("/api/me/followers"); toast(!f.enabled ? "Following is off, so there are no followers." : f.followers.length ? "Followers: " + f.followers.map(x => x.display_name).join(", ") : "No followers yet."); };
   }
 }

@@ -619,3 +619,7 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .orig-more { margin: 8px 0; }
 .orig-more h4 { margin: 12px 0 4px; }
 .orig-more ul { margin: 4px 0; padding-left: 1.2em; }
+
+/* Account > People I follow */
+.follow-list { list-style: none; padding: 0; margin: 6px 0; }
+.follow-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
