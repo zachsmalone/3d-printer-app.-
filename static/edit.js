@@ -198,6 +198,7 @@ function renderTools() {
       <button class="bigtool ${E.tool === "scale" ? "on" : ""}" data-big="scale"><span class="ico">↔</span><b>Scale</b><small>Make it bigger or smaller</small></button>
       <button class="bigtool ${E.tool === "hollow" ? "on" : ""}" data-big="hollow" ${cap.hollow ? "" : "disabled"}><span class="ico">🕳</span><b>Hollow</b><small>Save filament with a wall</small></button>
       <button class="bigtool ${E.tool === "base" ? "on" : ""}" data-big="base" ${cap.boolean ? "" : "disabled"}><span class="ico">▭</span><b>Add base</b><small>Flat plate for a stronger first layer</small></button>
+      <button class="bigtool ${E.tool === "split" ? "on" : ""}" data-big="split" type="button" aria-pressed="${E.tool === "split" ? "true" : "false"}"><span class="ico">✂</span><b>Split to fit my printer</b><small>Cut into pieces that fit the bed (connectors Simulated)</small></button>
     </div>
     <div id="bDrawer"></div></div>`;
   const expert = `<div data-lvl="expert">
@@ -215,10 +216,38 @@ function renderTools() {
       <div class="tool-row"><button class="btn small" data-op1="mirror:x">⇋ Mirror X</button><button class="btn small" data-op1="mirror:y">⇋ Mirror Y</button><button class="btn small" data-op1="mirror:z">⇋ Mirror Z</button></div>
       <div class="tool-row"><button class="btn small" data-op1="place:drop">⤓ Drop to bed</button><button class="btn small" data-op1="place:center">◎ Center on bed</button><button class="btn small" data-op1="place:both">Both</button></div>
     </details>
-    <details class="tool"><summary>✂ Cut / split with a plane</summary>
-      <form data-form="cut" data-ghost="cut"><div class="grid2"><div class="field"><label>Plane axis</label><select name="axis"><option value="z">Z (horizontal)</option><option value="x">X</option><option value="y">Y</option></select></div>${lenInput("position", ctr[2], "Position")}
-        <div class="field"><label>Keep</label><select name="keep"><option value="above">Above / + side</option><option value="below">Below / − side</option><option value="both">Both pieces</option></select></div>${lenInput("gap", 5, "Gap between pieces")}</div>
-        <label class="inl"><input type="checkbox" name="lay_flat" checked> Lay cut face flat on the bed</label><div><button class="btn small">Cut</button></div></form></details>
+    <details class="tool smartsplit" open><summary>✂ Smart Split</summary>
+      <p class="help">When a model is bigger than your printer bed, ZEIM cuts it into pieces that fit. Join options add magnet holes, dovetail tabs, alignment pins, or plain glue faces. Connector fit is <b>Simulated</b> until you test-print — starting sizes come from ZEIM split specs (e.g. 6×3 mm magnets).</p>
+      <form data-form="smart_split">
+        <div class="grid2">
+          <div class="field"><label for="ssMode">How to cut</label><select name="mode" id="ssMode"><option value="auto">Auto — fit my printer bed</option><option value="manual">Manual — one cut plane</option></select></div>
+          <div class="field"><label for="ssJoin">Join with</label><select name="join" id="ssJoin"><option value="glue">Plain glue faces</option><option value="magnet">Magnet holes (6×3 mm)</option><option value="dovetail">Dovetail tabs</option><option value="pin">Alignment pins</option></select></div>
+        </div>
+        <div class="grid2" data-ss="manual" hidden>
+          <div class="field"><label for="ssAxis">Plane axis</label><select name="axis" id="ssAxis"><option value="z">Z (horizontal)</option><option value="x">X</option><option value="y">Y</option></select></div>
+          ${lenInput("position", ctr[0], "Position")}
+        </div>
+        <div class="grid2" data-ss="magnet" hidden>
+          ${numInput("magnet_diameter", 6, "Magnet Ø", "mm")}${numInput("magnet_thickness", 3, "Magnet thickness", "mm")}
+          ${numInput("clearance", 0.25, "Clearance", "mm")}${numInput("count", 2, "Pockets per cut", "")}
+        </div>
+        <div class="grid2" data-ss="pin" hidden>
+          ${numInput("pin_diameter", 4, "Pin Ø", "mm")}${numInput("engagement", 6, "Engagement", "mm")}
+          ${numInput("clearance", 0.2, "Hole clearance", "mm")}${numInput("count", 2, "Pins per cut", "")}
+        </div>
+        <div class="grid2" data-ss="dovetail" hidden>
+          ${numInput("depth", 3, "Tab depth", "mm")}${numInput("mouth_width", 8.5, "Mouth width", "mm")}
+          ${numInput("root_width", 6, "Root width", "mm")}${numInput("clearance", 0.15, "Clearance", "mm")}
+        </div>
+        <p class="help" role="status" aria-live="polite">Uses your chosen printer (${(typeof P !== "undefined" && P.pref) ? esc((P.cat?.printers||[]).find(x=>x.id===P.pref.printer_id)?.name || P.pref.printer_id) : "Creality K1"}). Label: Simulated.</p>
+        <div><button type="submit" class="btn small primary">Split</button></div>
+      </form>
+      <details class="tool"><summary>Classic single-plane cut (no connectors)</summary>
+        <form data-form="cut" data-ghost="cut"><div class="grid2"><div class="field"><label>Plane axis</label><select name="axis" aria-label="Cut plane axis"><option value="z">Z (horizontal)</option><option value="x">X</option><option value="y">Y</option></select></div>${lenInput("position", ctr[2], "Position")}
+          <div class="field"><label>Keep</label><select name="keep" aria-label="Which side to keep"><option value="above">Above / + side</option><option value="below">Below / − side</option><option value="both">Both pieces</option></select></div>${lenInput("gap", 5, "Gap between pieces")}</div>
+          <label class="inl"><input type="checkbox" name="lay_flat" checked> Lay cut face flat on the bed</label><div><button class="btn small">Cut</button></div></form>
+      </details>
+    </details>
     <details class="tool"><summary>🕳 Hollow</summary>${cap.hollow ? `<form data-form="hollow"><div class="grid2">${lenInput("wall", 2, "Wall thickness")}${lenInput("drain_diameter", 0, "Drain hole Ø (0 = none)")}</div><button class="btn small">Hollow</button>
       <p class="help">Distance-field method, accurate to about one voxel (reported). Thin plates/lithophanes can't be hollowed.</p></form>` : `<p class="help">Needs manifold3d + scikit-image on the server.</p>`}</details>
     <details class="tool"><summary>▭ Base / brim</summary>${cap.boolean ? `<form data-form="base"><div class="grid3t"><div class="field"><label>Shape</label><select name="style"><option value="outline">Follow outline</option><option value="rect">Rectangle</option><option value="round">Round</option></select></div>${lenInput("margin", 3, "Margin")}${lenInput("thickness", 2, "Thickness")}</div><button class="btn small">Add base</button><p class="help">Thin (0.3–0.6 mm) = brim.</p></form>` : `<p class="help">Needs manifold3d.</p>`}</details>
@@ -243,6 +272,7 @@ function renderTools() {
   $("#editPanel").innerHTML = unitSel + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px">＋ Open another model</button>`;
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
+  syncSmartSplit();
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 $("#editPanel").addEventListener("click", e => {
@@ -272,7 +302,16 @@ $("#editPanel").addEventListener("input", e => {
   if (f.dataset.form === "boolean") syncShapeFields();
   if (f.dataset.ghost) updateGhost(f);
 });
-$("#editPanel").addEventListener("change", e => { const f = e.target.form; if (f?.dataset.form === "cut" && e.target.name === "axis") { const i = { x: 0, y: 1, z: 2 }[e.target.value]; f.position.value = fmt(A().center_mm[i]); } if (f?.dataset.form === "boolean") syncShapeFields(); if (f?.dataset.ghost) updateGhost(f); });
+$("#editPanel").addEventListener("change", e => { const f = e.target.form; if (f?.dataset.form === "cut" && e.target.name === "axis") { const i = { x: 0, y: 1, z: 2 }[e.target.value]; f.position.value = fmt(A().center_mm[i]); } if (f?.dataset.form === "smart_split") syncSmartSplit(f); if (f?.dataset.form === "boolean") syncShapeFields(); if (f?.dataset.ghost) updateGhost(f); });
+function syncSmartSplit(f) {
+  if (!f) f = $("form[data-form=smart_split]"); if (!f) return;
+  const mode = val(f, "mode") || "auto", join = val(f, "join") || "glue";
+  $$("[data-ss]", f).forEach(el => {
+    const keys = el.dataset.ss.split(" ");
+    if (keys.includes("manual")) el.hidden = mode !== "manual";
+    else el.hidden = !keys.includes(join);
+  });
+}
 $("#editPanel").addEventListener("focusin", e => { const f = e.target.closest("form[data-ghost]"); if (f) updateGhost(f); });
 function syncShapeFields() {
   const f = $("form[data-form=boolean]"); if (!f) return;
@@ -286,6 +325,15 @@ $("#editPanel").addEventListener("submit", e => {
     rotate: () => ({ rx: +val(f, "rx"), ry: +val(f, "ry"), rz: +val(f, "rz") }),
     scale: () => { const sz = A().size_mm; return { sx: len(f, "sx") / sz[0], sy: len(f, "sy") / sz[1], sz: len(f, "sz") / sz[2], pivot: "base" }; },
     cut: () => ({ axis: val(f, "axis"), position: len(f, "position"), keep: val(f, "keep"), lay_flat: f.lay_flat.checked, gap: len(f, "gap") }),
+    smart_split: () => {
+      const join = val(f, "join") || "glue", mode = val(f, "mode") || "auto";
+      const o = { mode, join, printer_id: (typeof P !== "undefined" && P.pref) ? P.pref.printer_id : undefined, gap: 5 };
+      if (mode === "manual") { o.axis = val(f, "axis"); o.position = len(f, "position"); }
+      if (join === "magnet") { o.magnet_diameter = +val(f, "magnet_diameter"); o.magnet_thickness = +val(f, "magnet_thickness"); o.clearance = +val(f, "clearance"); o.count = +val(f, "count"); }
+      if (join === "pin") { o.pin_diameter = +val(f, "pin_diameter"); o.engagement = +val(f, "engagement"); o.clearance = +val(f, "clearance"); o.count = +val(f, "count"); }
+      if (join === "dovetail") { o.depth = +val(f, "depth"); o.mouth_width = +val(f, "mouth_width"); o.root_width = +val(f, "root_width"); o.clearance = +val(f, "clearance"); }
+      return o;
+    },
     hollow: () => ({ wall: len(f, "wall"), drain_diameter: len(f, "drain_diameter") }),
     base: () => ({ style: val(f, "style"), margin: len(f, "margin"), thickness: len(f, "thickness") }),
     boolean: () => ({ kind: val(f, "kind"), primitive: primSpec(f) }),
@@ -295,7 +343,7 @@ $("#editPanel").addEventListener("submit", e => {
   }[kind];
   if (!P) return;
   clearGhost();
-  doOp(kind, P(), ({ hollow: "Hollowing…", boolean: "Computing boolean…", text: "Building text…", base: "Adding base…", simplify: "Simplifying…" })[kind], f.querySelector("button:not([type=button])"));
+  doOp(kind, P(), ({ hollow: "Hollowing…", boolean: "Computing boolean…", text: "Building text…", base: "Adding base…", simplify: "Simplifying…", smart_split: "Smart Split…" })[kind], f.querySelector("button:not([type=button])"));
 });
 function primSpec(f) {
   const shape = val(f, "shape"), pos = [len(f, "px"), len(f, "py"), len(f, "pz")];
@@ -322,6 +370,13 @@ function renderDrawer() {
   if (t === "hollow") d.innerHTML = `<div class="tooldrawer"><b>Hollow</b><div class="seg wide" id="bWall">${[["1.2", "Thin"], ["2", "Standard"], ["3", "Thick"]].map(([v, n], i) => `<button data-w="${v}" class="${i === 1 ? "on" : ""}">${n} · ${v} mm</button>`).join("")}</div>
     <label class="inl"><input type="checkbox" id="bDrain" checked> Add a small drain hole (needed for resin; optional for filament)</label><div style="margin-top:8px"><button class="btn primary small" id="bHollowGo">Hollow it</button></div></div>`;
   if (t === "base") d.innerHTML = `<div class="tooldrawer"><b>Add base</b><p class="help">A 2 mm plate that follows the model's footprint, with 3 mm margin.</p><button class="btn primary small" id="bBaseGo">Add base</button></div>`;
+  if (t === "split") {
+    const pname = (typeof P !== "undefined" && P.pref) ? ((P.cat?.printers || []).find(x => x.id === P.pref.printer_id)?.name || "your printer") : "your printer";
+    d.innerHTML = `<div class="tooldrawer"><b>Split to fit my printer</b>
+      <p class="help">Cuts this model into pieces that fit <em>${esc(pname)}</em>. Join faces are plain glue faces (Experienced mode has magnets, dovetails and pins). Connector fit is <b>Simulated</b> until you test-print.</p>
+      <button type="button" class="btn primary small" id="bSplitGo">Split to fit my printer</button>
+      <p class="help" id="bSplitOut" role="status" aria-live="polite"></p></div>`;
+  }
 }
 $("#editPanel").addEventListener("click", e => {
   const id = e.target.id, d = e.target.closest("[data-pct]");
@@ -330,6 +385,14 @@ $("#editPanel").addEventListener("click", e => {
   if (e.target.closest("#bWall button")) { $$("#bWall button").forEach(b => b.classList.toggle("on", b === e.target.closest("button"))); }
   if (id === "bHollowGo") { const w = +($("#bWall .on")?.dataset.w || 2); doOp("hollow", { wall: w, drain_diameter: $("#bDrain").checked ? 3 : 0 }, "Hollowing…"); E.tool = null; }
   if (id === "bBaseGo") { doOp("base", { style: "outline", margin: 3, thickness: 2 }, "Adding base…"); E.tool = null; }
+  if (id === "bSplitGo") {
+    const pid = (typeof P !== "undefined" && P.pref) ? P.pref.printer_id : undefined;
+    doOp("smart_split", { mode: "auto", join: "glue", printer_id: pid, gap: 5 }, "Smart Split…").then(() => {
+      const r = E.p?.report || {};
+      const out = $("#bSplitOut"); if (out) out.textContent = r.message || "Split done.";
+    });
+    E.tool = null;
+  }
 });
 
 /* ---------- ghost previews (cut plane / boolean tool) ---------- */
