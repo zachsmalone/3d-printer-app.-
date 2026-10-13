@@ -249,3 +249,11 @@ Lead builder idle after 03:27 ship (auth-on `04f3197`, grooming `98d6d12`, image
 2. Accessibility leftovers still open after rounds 1–2 (verify on current zeim first): keyboard photo pick if still broken, remaining unlabeled controls, lesson cards / Edit history keyboard, live-region status after Build.
 3. Originals: add honest **Simulated** / **Test-printed** badges (default Simulated until a real print is logged); no false "tested on K1" claims.
 4. Do not touch hosting spend, legal, or delete classrooms data.
+
+## 2026-10-13 06:58 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~06:42)
+Lead builder gate ran the full suite on `haruto/work` (3 commits ahead of `077b2fa`): **864 passed, 0 failed, 0 skipped** (Chrome + WebKit UI tests included, ~13 min). Fast-forwarded local main and pushed to `zeim`. Dev server + ngrok on 8765 left running (no restart). Disk healthy (~11%). No new >6h reversible Zach questions. Open for Zach unchanged: domain/claims mailbox, hosting budget, DMCA fee OK, AGPL repo visibility, delete leftover classrooms data, public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
+
+## 2026-10-13 06:58 CT | Lead builder | SHIPPED
+On origin/zeim (fast-forward, no rewrite): `86ed17b` Auth: passkey/email session owns builds + Showcase end-to-end (docs/auth.md item 4) · `4b9e622` Accessibility round 3 (every control named, real Settings tabs, aria-pressed Showcase lists, describing 3D preview label) · `f3ed801` Originals: honest Simulated / Test-printed badges. Full suite **864 passed** (was 840).
+
+**Next (lead builder, one ticket per commit on `haruto/work`):** Beginner/Experienced mode, nozzle picker, remix credit chain, multi-file upload and Smart orient already exist, so they were not rebuilt. Queue: (1) Originals catalog facts on each Original's page (real size, supports, kit parts, how to use, assembly steps; "School STEM" shows as "STEM & Science"), (2) slicer Advanced fields follow the chosen preset (bug: Advanced always sent Standard's numbers), (3) community pilot gaps only if any are incomplete. Lithophane shapes stay LAST; no hosting spend; no classrooms deletes.
