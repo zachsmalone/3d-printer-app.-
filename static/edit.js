@@ -3,7 +3,7 @@ import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
-import { loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
+import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
@@ -97,6 +97,7 @@ async function sendMulti(mode, auto = false) {
   multiFiles.forEach(f => fd.append("files", f));
   fd.append("mode", mode); fd.append("units", $("#editUnits").value); fd.append("beginner", !isExpert());
   if (auto) fd.append("auto_delete_oldest", "true");
+  try { await loadCatalog(); fd.append("printer_id", P.pref.printer_id); } catch { }   // one-plate bed check uses the chosen printer's bed
   $("#multiMsg").textContent = mode === "plate" ? "Arranging the parts on one plate…" : "Importing each file…";
   busy(true, "Importing…");
   try {

@@ -247,3 +247,14 @@ def test_showcase_badge_endpoint():
 def test_build_badge_is_owner_only(fake_engine, tmp_path, monkeypatch):
     from app.services.history import store
     assert client().get("/api/willprint/build/abc123").status_code in (400, 404)
+
+
+def test_one_plate_bed_check_uses_the_chosen_printer():
+    from tests.test_comm_features import U, _cube
+    c = U("Mp")
+    two = [("files", (f"p{n}.stl", _cube(120), "model/stl")) for n in range(2)]
+    k1max = c.post("/api/edit/multi", files=two, data={"mode": "plate", "printer_id": "creality_k1_max"}).json()     # 300 x 300 bed
+    mini = c.post("/api/edit/multi", files=two, data={"mode": "plate", "printer_id": "bambu_a1_mini"}).json()       # 180 x 180 bed
+    assert k1max["plate"]["fits"] is True and mini["plate"]["fits"] is False and mini["plate"]["bed_mm"][:2] == [180.0, 180.0]
+    assert c.post("/api/edit/multi", files=two, data={"mode": "plate", "printer_id": "nope"}).status_code == 400
+    assert 'fd.append("printer_id", P.pref.printer_id)' in (ROOT / "static/edit.js").read_text()

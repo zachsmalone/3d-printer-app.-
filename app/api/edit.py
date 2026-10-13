@@ -222,6 +222,7 @@ def new_multi(
     bed_y: float = Form(220.0),
     bed_z: float = Form(250.0),
     gap_mm: float = Form(5.0),
+    printer_id: str = Form(""),
 ):
     """Several STL / OBJ / 3MF files at once. mode=plate: 'Parts of one print' (auto-spaced on one plate + bed-fit check, one project);
     mode=separate: 'Separate prints' (one project each)."""
@@ -235,6 +236,12 @@ def new_multi(
         raise HTTPException(400, "Choose at least one 3D file.")
     if len(files) > MAX_MULTI_FILES:
         raise HTTPException(400, f"Up to {MAX_MULTI_FILES} files at a time.")
+    if printer_id:                                   # the chosen catalog printer's bed wins over the generic default
+        from ..services import print_setup as ps
+        try:
+            bed_x, bed_y, bed_z = ps.bed_of(ps.resolve(printer_id)[0])
+        except ps.SetupError as e:
+            raise HTTPException(400, str(e))
     if not (20 <= bed_x <= 2000 and 20 <= bed_y <= 2000 and 20 <= bed_z <= 2000 and 0 <= gap_mm <= 50):
         raise HTTPException(400, "Bed size must be 20..2000 mm and the gap 0..50 mm.")
     loaded, total = [], 0
