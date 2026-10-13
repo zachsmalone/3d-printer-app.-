@@ -60,8 +60,9 @@ def test_moderation_page_never_shows_object_object():
 def test_no_school_features_in_docs():
     for name in ("README.md", "ROADMAP.md"):
         for line in (ROOT / name).read_text().splitlines():
-            if "removed" in line.lower() or "not planned" in line.lower():
-                continue
+            low = line.lower()
+            if "removed" in low or "not planned" in low or re.search(r"\bno\b[^.]*(school|teacher|class)", low):
+                continue                                  # "no school features / no teachers" is the point, not a leftover
             assert not re.search(r"classroom|teacher|class students|school address", line, re.I), (name, line)
 
 
