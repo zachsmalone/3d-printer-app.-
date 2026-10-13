@@ -62,6 +62,20 @@
         <label class="card" data-mode="relief"><input type="radio" name="style" value="relief"><span class="ico" aria-hidden="true">⛰</span><b>Relief</b><small>Your picture as raised hills and valleys</small></label>
         <label class="card" data-mode="popart"><input type="radio" name="style" value="popart"><span class="ico" aria-hidden="true">🎨</span><b>Pop-art</b><small>Flat colour layers stacked up</small></label>
       </fieldset>
+      <fieldset class="cards shapes" id="shapeCards" aria-describedby="shapeHelp"><legend>Lithophane shape</legend>
+<label class="card" data-shape="rect"><input type="radio" name="litho_shape" value="rect" checked><span class="ico" aria-hidden="true">▭</span><b>Rectangle</b><small>Flat panel</small></label>
+<label class="card" data-shape="square"><input type="radio" name="litho_shape" value="square"><span class="ico" aria-hidden="true">◻</span><b>Square</b><small>Flat panel</small></label>
+<label class="card" data-shape="circle"><input type="radio" name="litho_shape" value="circle"><span class="ico" aria-hidden="true">◯</span><b>Circle</b><small>Flat, round</small></label>
+<label class="card" data-shape="heart"><input type="radio" name="litho_shape" value="heart"><span class="ico" aria-hidden="true">♡</span><b>Heart</b><small>Flat heart</small></label>
+<label class="card" data-shape="star"><input type="radio" name="litho_shape" value="star"><span class="ico" aria-hidden="true">☆</span><b>Star</b><small>Flat star</small></label>
+<label class="card" data-shape="globe"><input type="radio" name="litho_shape" value="globe"><span class="ico" aria-hidden="true">◍</span><b>Globe</b><small>Curved, stands up</small></label>
+<label class="card" data-shape="nightlight"><input type="radio" name="litho_shape" value="nightlight"><span class="ico" aria-hidden="true">🕯</span><b>Night-light</b><small>Slips over a tea-light</small></label>
+      </fieldset>
+      <p class="help" id="shapeHelp">Flat shapes lie on the bed. Globe and night-light covers print standing up.</p>
+      <div class="grid2" id="curvedOpts" hidden>
+        <div class="field"><label for="diameter_mm" id="diaLbl">Light diameter <em>mm</em></label><input type="number" id="diameter_mm" value="40" min="10" max="200" step="1"></div>
+        <div class="field"><label for="height_mm">Height <em>mm</em></label><input type="number" id="height_mm" value="60" min="10" max="240" step="1"></div>
+      </div>
     </section>
 
     <section class="step">

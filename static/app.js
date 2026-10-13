@@ -91,8 +91,19 @@ function applyMode() {
   $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); });
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
+  applyShape();
   $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
 }
+/* lithophane shape picker: flat outlines + curved shells (globe / night-light); curved ones take diameter + height instead of width */
+const CURVED = ["globe", "nightlight"];
+const litShape = () => ($("#shapeCards input:checked") || {}).value || "rect";
+function applyShape() {
+  const lit = S.mode === "lithophane", curved = lit && CURVED.includes(litShape());
+  $("#shapeCards").hidden = !lit; $("#shapeHelp").hidden = !lit; $("#curvedOpts").hidden = !curved;
+  $("#width_mm").closest(".field").hidden = curved;
+  $("#diaLbl").firstChild.textContent = litShape() === "globe" ? "Globe diameter " : "Light diameter ";
+}
+$("#shapeCards").onchange = applyShape;
 $("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked
 $("#presetSeg").onchange = () => { S.preset = ($("#presetSeg input:checked") || {}).value || "standard"; applyMode(); };
 $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
@@ -151,6 +162,10 @@ function formData(autoDelete) {
   fd.append("file", S.file); fd.append("mode", S.mode); fd.append("photo_ack", pick.acked());      // CR-5 (the built-in sample needs no tick: the server knows that file)
   fd.append("beginner", !isExpert()); fd.append("preset", S.preset);
   fd.append("width_mm", $("#width_mm").value);
+  if (S.mode === "lithophane") {
+    fd.append("shape", litShape());
+    if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
+  }
   if (autoDelete) fd.append("auto_delete_oldest", "true");
   if (isExpert()) {
     $$("#expertOpts [name]").forEach(el => {

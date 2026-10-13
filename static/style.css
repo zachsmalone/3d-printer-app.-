@@ -627,3 +627,7 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .follow-list { list-style: none; padding: 0; margin: 6px 0; }
 .follow-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
 .sitefoot .attrib{display:block;font-size:.85em;margin-top:4px}
+
+/* lithophane shape picker: 2-up on phones, every card a 44 px+ target */
+#shapeCards{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:12px}
+#shapeCards .card{min-height:64px;min-width:44px}
