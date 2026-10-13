@@ -38,7 +38,7 @@ cd /workspace/photo3d
 python3 -m venv --system-site-packages .venv && . .venv/bin/activate && pip install -r requirements.txt   # first time
 ./run.sh                 # background, http://localhost:8765, THIS COMPUTER ONLY (PORT=9000 ./run.sh to change; logs: server.log; stop: kill $(cat server.pid))
 HOST=0.0.0.0 ./run.sh    # opt-in: reachable from your network (LAN testing). There is NO real login yet - anyone who can connect can use it; a warning is logged.
-PHOTO3D_MODE=shared      # default for any server others use (see 'Deployment modes'); ./run.sh sets local for your own machine
+PHOTO3D_MODE=shared      # default for any server others use; ./run.sh sets local for your own machine
 python -m pytest -q tests          # end-to-end tests: tests/test_app.py + tests/test_features.py (temp data dirs; slicer + printer upload tests use mocks)
 PYTHONPATH=. python tests/render_previews.py ; python tests/ui_smoke.py ; python tests/ui_edit.py ; python tests/ui_showcase.py   # preview PNGs / headless UI smoke tests (ui_edit.py writes previews/ui_edit*.png)
 ```
