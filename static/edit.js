@@ -3,6 +3,7 @@ import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
+import { loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
@@ -145,7 +146,17 @@ function loadProject(p, keepCamera = false) {
   $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button></li>`).join("");
   renderTools();
   renderHistoryCard();
+  renderSlicePanel();
 }
+async function renderSlicePanel() {
+  if (!E.p) return;
+  const id = E.p.id;
+  try { await loadCatalog(); } catch { return; }
+  $("#slicePanel").innerHTML = panelHTML(); wirePanel(() => E.p.id);
+  $("#editWill").innerHTML = "";
+  try { const r = await checkBuild(id); if (E.p?.id === id) $("#editWill").innerHTML = badgeHTML(r, { detail: true }); } catch { }
+}
+document.addEventListener("zeim:printer", renderSlicePanel);
 function renderHistoryCard() { loadHistory().catch(() => { }); }
 $("#editOps").onclick = e => { const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 

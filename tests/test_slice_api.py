@@ -135,7 +135,7 @@ def sid_of(client):
 def fake_engine(monkeypatch):
     calls = []
 
-    def fake_run(engine, ini, stl, out, timeout=0):
+    def fake_run(engine, ini, stl, out, timeout=0, **kw):
         calls.append((ini.read_text(), stl))
         out.write_text(SAMPLE_GCODE)
 

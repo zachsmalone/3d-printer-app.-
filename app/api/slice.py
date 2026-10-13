@@ -78,12 +78,31 @@ def slice_model(
     file: Optional[UploadFile] = File(None),
     model_id: Optional[str] = Form(None),
     profile: str = Form(eng.DEFAULT_PROFILE),
+    printer_id: Optional[str] = Form(None),
+    nozzle: Optional[str] = Form(None),
+    preset: Optional[str] = Form(None),
+    layer_height: Optional[str] = Form(None),
+    walls: Optional[str] = Form(None),
+    top_bottom: Optional[str] = Form(None),
+    infill: Optional[str] = Form(None),
+    infill_pattern: Optional[str] = Form(None),
+    supports: Optional[str] = Form(None),
+    brim: Optional[str] = Form(None),
+    speed: Optional[str] = Form(None),
+    nozzle_temp: Optional[str] = Form(None),
+    bed_temp: Optional[str] = Form(None),
+    material: Optional[str] = Form(None),
+    scale_to_fit: bool = Form(False),
     actor: Actor = Depends(get_actor),
 ):
     if bool(file) == bool(model_id):
         _fail(400, "bad_request", "Send either an STL file or a model id (not both, not neither).")
+    opts = {"preset": preset, "layer_height": layer_height, "walls": walls, "top_bottom": top_bottom, "infill": infill,
+            "infill_pattern": infill_pattern, "supports": supports, "brim": brim, "speed": speed,
+            "nozzle_temp": nozzle_temp, "bed_temp": bed_temp, "material": material}
     try:
-        prof = eng.get_profile(profile)
+        eng.get_profile(profile)                     # legacy field: still validated (only creality_k1)
+        prof, chosen = eng.profile_for(printer_id or profile, nozzle, opts)
     except eng.SliceError as e:
         _fail(e.status, e.code, e.message)
 
@@ -117,9 +136,10 @@ def slice_model(
                     _fail(400, "bad_model", str(e))
                 stl.write_bytes(mesh.export(file_type="stl"))
         else:
-            stl = resolve_model(model_id, actor)  # type: ignore[arg-type]
-
-        res = eng.slice_stl(stl, prof, work / "model.gcode")
+            shutil.copyfile(resolve_model(model_id, actor), work / "input.stl")  # type: ignore[arg-type]
+            stl = work / "input.stl"
+        fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit)
+        res = eng.slice_stl(work / "model.stl", prof, work / "model.gcode")
     except eng.SliceError as e:
         shutil.rmtree(work, ignore_errors=True)
         _fail(e.status, e.code, e.message)
@@ -128,8 +148,13 @@ def slice_model(
         raise
     finally:
         _slots.release()
-        if file is not None:
-            (work / "input.stl").unlink(missing_ok=True)
+        (work / "input.stl").unlink(missing_ok=True)
+    from app.services import slicer as _sl, willprint
+    stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
+    try:
+        badge = willprint.check_file(work / "model.stl", prof.id, prof.nozzle, slices_ok=True)
+    except Exception:
+        badge = None
 
     return {
         "slice_id": slice_id,
@@ -139,7 +164,54 @@ def slice_model(
         "print_time_human": eng.humanize(res.print_time_seconds),
         "filament_grams": res.filament_grams,
         "model_size_mm": [round(v, 2) for v in res.size_mm],
+        "printer_id": prof.id, "printer": prof.name, "nozzle": prof.nozzle, "settings": chosen,
+        "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
+        "scaled_pct": fitted, "will_print": badge,
+        "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
+                      "3mf": f"/api/slice/{slice_id}/model.3mf"},
     }
+
+
+def fit_to_printer(src: Path, dst: Path, prof, scale: bool):
+    """Copy the model, sitting on z=0 and centred on the chosen printer's bed; scaled down to fit when asked.
+    Returns the scale percent applied (None = unchanged). Without `scale`, a too-big model is refused by slice_stl."""
+    import trimesh
+    eng.stl_bounds(src)                                    # friendly "bad_model" for garbage before trimesh sees it
+    try:
+        mesh = trimesh.load(str(src), file_type="stl", force="mesh")
+        if mesh.bounds is None:
+            raise ValueError
+    except Exception:
+        raise eng.SliceError("bad_model", "That file doesn't look like a valid STL model. Please export it as an STL and try again.", 400)
+    pct = None
+    if scale and len(mesh.vertices):
+        limits = (prof.bed_x, prof.bed_y, prof.max_z)
+        f = min(l / d for d, l in zip(mesh.extents, limits) if d > 0)
+        if f < 1:
+            f = f * 0.98                                   # a small margin from the bed edge
+            mesh.apply_scale(f)
+            pct = round(f * 100, 1)
+    lo, hi = mesh.bounds
+    mesh.apply_translation([prof.bed_x / 2 - (lo[0] + hi[0]) / 2, prof.bed_y / 2 - (lo[1] + hi[1]) / 2, -lo[2]])
+    dst.write_bytes(mesh.export(file_type="stl"))
+    return pct
+
+
+@router.get("/{slice_id}/model.{ext}")
+def download_model(slice_id: str, ext: str):
+    """The model exactly as sliced: sized for the chosen printer, placed on its bed. 3MF is built from it on demand."""
+    if not _SLICE_ID.match(slice_id) or ext not in ("stl", "3mf"):
+        _fail(404, "not_found", "File not found.")
+    stl = slices_root() / slice_id / "model.stl"
+    if not stl.is_file():
+        _fail(404, "not_found", "That file has expired. Please slice again.")
+    if ext == "stl":
+        return FileResponse(stl, media_type="model/stl", filename="zeim-model.stl")
+    out = stl.with_suffix(".3mf")
+    if not out.is_file():
+        import trimesh
+        out.write_bytes(trimesh.load(str(stl), force="mesh").export(file_type="3mf"))
+    return FileResponse(out, media_type="model/3mf", filename="zeim-model.3mf")
 
 
 @router.get("/{slice_id}/gcode")
@@ -150,4 +222,4 @@ def download_gcode(slice_id: str):
     path = slices_root() / slice_id / "model.gcode"
     if not path.is_file():
         _fail(404, "not_found", "That G-code has expired. Please slice again.")
-    return FileResponse(path, media_type="text/plain", filename="model.gcode")
+    return FileResponse(path, media_type="text/plain", filename="zeim-model.gcode")

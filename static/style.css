@@ -591,3 +591,25 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .plist a,.creator-link{display:inline-flex;align-items:center;min-height:44px}
 .favs{margin-top:24px}
 #dlgMulti .bigtool,#editPanel [data-orient]{min-height:44px}
+/* ---- printer picker, slicer panel, Will it print? ---- */
+.slicepanel{margin-top:var(--s4,16px);padding:var(--s4,16px);border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+.slicepanel h3{margin:0 0 6px}
+.slicepanel select,.slicepanel input[type=number],.printerpick select{min-height:44px;width:100%}
+.segmented{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
+.segmented button{min-height:44px;min-width:44px;padding:0 16px;border:0;background:var(--panel);color:var(--txt);font:inherit;cursor:pointer}
+.segmented button[aria-pressed=true]{background:var(--acc);color:var(--on-acc)}
+.presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0}
+.preset{display:flex;gap:8px;align-items:flex-start;min-height:44px;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;background:var(--sunk)}
+.preset:has(input:checked){border-color:var(--acc);background:var(--tint)}
+.preset input{min-width:20px;min-height:20px;margin-top:2px}.preset small{display:block;color:var(--mut)}
+.slicepanel label.chk{display:flex;gap:8px;align-items:center;min-height:44px}
+.slicepanel .slicers,.slicepanel .row{display:flex;flex-wrap:wrap;gap:8px}.slicepanel .slicers .btn,.slicepanel .row .btn{min-height:44px}
+.slicestats .pill{font-size:15px;margin-right:6px}
+.pill.willprint{white-space:nowrap}.pill.warn{color:var(--warn);border-color:var(--warn)}.pill.willprint.bad{border-color:var(--bad)}
+.willbox{margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}
+.willbox p{margin:0 0 6px}.checks{list-style:none;margin:0;padding:0}.checks li{padding:2px 0;color:var(--txt)}
+.checks li.ok::marker,.checks li.bad::marker{content:none}
+.openin-steps{margin:8px 0 0;padding-left:18px;color:var(--mut);font-size:14px}.openin-steps li{margin:4px 0}
+.su-printer summary{min-height:44px;display:flex;align-items:center;cursor:pointer}
+.cardfoot .wp:empty{display:none}
+.cardfoot .pill.willprint{white-space:normal}

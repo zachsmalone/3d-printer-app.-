@@ -68,7 +68,7 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
                     "is remote). Links are signed, work for one file only, and expire after 10 minutes, so a private build stays private."}
 
 
-def _slice(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini=None):
+def _slice(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini=None, **chosen):
     st = slicer.status()
     if not st["available"]:
         return st
@@ -76,16 +76,21 @@ def _slice(bid, layer_height, fill_density, upright, supports, brim, bed, profil
         model = load_model(bid)
     except KeyError:
         raise HTTPException(404, "unknown build")
+    if chosen.get("printer_id") or chosen.get("opts"):
+        return slicer.slice_model(model, store.dir(bid), layer_height, fill_density, upright, supports,
+                                  brim, bed, profile_ini, **chosen)
     return slicer.slice_model(model, store.dir(bid), layer_height, fill_density, upright, supports,
                               brim, bed, profile_ini)
 
 
 @router.post("/slice/{bid}")
 def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float = Form(0.2), fill_density: int = Form(15),
-                upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0), printer_id: str = Form("")):
+                upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0), printer_id: str = Form(""),
+                catalog_printer: str = Form(""), nozzle: str = Form("")):
     meta_for(bid, actor, owner_only=True)
     pr = settings.get_printer(printer_id) if printer_id else None      # same bed/profile the "Send" of that printer will use
-    res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr))
+    chosen = {"printer_id": catalog_printer, "nozzle": nozzle} if catalog_printer else {}
+    res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr), **chosen)
     res["bed"] = list(printers.bed_of(pr))
     if res.get("ok"):
         res["download"] = f"/files/{bid}/model.gcode"

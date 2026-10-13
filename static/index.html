@@ -203,6 +203,8 @@
         </div>
       </div>
       <p class="help" id="editMsg"></p>
+      <div id="editWill" aria-live="polite"></div>
+      <section class="slicepanel" id="slicePanel" aria-label="Slicer settings"></section>
       <details class="auto" open><summary>🧾 Steps <small id="editHeadNote"></small></summary><ol class="oplist" id="editOps"></ol></details>
     </div>
   </section>
@@ -319,6 +321,7 @@
   <div class="pagehead"><div><h1>Account</h1><p class="help" id="accSummary">Your page: profile, sign-in and your printers.</p></div></div>
   <ul class="grid toolgrid">
     <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><button class="btn big primary" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></li>
+    <li class="toolcard"><h2>Your printer</h2><p class="help">Pick your printer and nozzle. The Slicer, exports and "Will it print?" use it.</p><div id="accPrinter"></div></li>
     <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
     <li class="toolcard"><h2>Learn</h2><p class="help">Short family-friendly lessons.</p><a class="btn big" href="#learn">Open Learn</a></li>
   </ul>
@@ -407,4 +410,5 @@
 <script type="module" src="/static/app.js"></script>
 <script type="module" src="/static/community.js"></script>
 <script type="module" src="/static/edit.js"></script>
+<script type="module" src="/static/printer.js"></script>
 </body></html>

@@ -1,4 +1,5 @@
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, MODE_LABEL, ago, applyMode } from "/static/app.js";
+import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -67,6 +68,7 @@ function renderAccount() {
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 20 letters, numbers or underscores. Under 18? ZEIM makes you a friendly nickname instead, and you can change it later. Not your real name, email or phone number.</small></div>
       <div class="field"><label for="su_dob">Date of birth <em>used only to apply age-appropriate safety defaults</em></label><input id="su_dob" type="date"></div>
+      <details class="su-printer"><summary>Your printer <em>optional</em></summary><div id="su_printer"><p class="help">Loading printers…</p></div></details>
       <button class="btn primary" id="su_go">Create account</button>
       <details class="recover"><summary>Signed out before? Get your account back with a recovery code</summary>
         <div class="field"><label for="rc_code">Recovery code</label><input id="rc_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
@@ -79,8 +81,10 @@ function renderAccount() {
         $("#rc_done").onclick = () => location.reload();
       } catch (e) { inlineMsg($("#rc_go"), e.message); }
     };
+    loadCatalog().then(() => { if ($("#su_printer")) { $("#su_printer").innerHTML = pickerHTML("su", P.pref, { optional: true }); wirePicker("su"); } }).catch(() => { });
     $("#su_go").onclick = async () => {
-      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim() })); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
+      const pick = $("#su_pr") ? readPicker("su") : null;
+      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim(), ...(pick || {}) })); if (pick) savePref(pick).catch(() => { }); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
         if (e.status === 403 && /^We can't create an account/.test(e.message)) {     // the neutral age refusal: a calm panel instead of an unchanged form
           $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still build and use the ${esc(CFG.sections.learn)} lessons without an account.</p></div>`;
@@ -197,7 +201,8 @@ async function loadShowcase() {
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for under-18 creators.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
     <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
-    ${i.original ? origHTML(i) : ""}<div class="cardfoot">${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
+    ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
+  showcaseBadges();
   if (!r.items.length) {
     const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
@@ -269,6 +274,15 @@ $("#nzAcctMake").onclick = () => { $("#dlgNzAcct").close(); window.__nzWantSignu
 $("#nzAcctLater").onclick = () => { $("#dlgNzAcct").close(); window.__nzOpener?.focus(); };
 document.addEventListener("zeim:me", () => { if (window.__nzWantSignup && ME?.signed_up) { window.__nzWantSignup = false; nzSay("Account made. You can nozzle projects now."); } });
 
+/* "Will it print?" on cards: geometry checks for the chosen printer, a few at a time so the feed stays quick. */
+async function showcaseBadges() {
+  try { await loadCatalog(); } catch { return; }
+  const els = [...document.querySelectorAll("#shGrid [data-wp]")].filter(e => e.dataset.wp);
+  for (let k = 0; k < els.length; k += 4)
+    await Promise.all(els.slice(k, k + 4).map(async el => { try { el.innerHTML = badgeHTML(await checkShowcase(el.dataset.wp)); } catch { } }));
+}
+document.addEventListener("zeim:printer", () => { if (!$("#viewShowcase").hidden) showcaseBadges(); });
+
 async function openItem(id) {
   const i = await api("/api/showcase/" + id);
   $("#itTitle").textContent = i.title;
@@ -283,10 +297,11 @@ async function openItem(id) {
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}</div>
+    <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
     <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4><ul class="pgallery" id="prGallery"></ul>
       ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn">📷 Add a photo of your print</summary>
-        <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo is checked by a moderator before anyone else can see it.</p>
+        <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo can be reported and is checked by a grown-up.</p>
         <div class="field"><label for="prFile">Photo</label><input type="file" id="prFile" accept="image/*"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
@@ -297,11 +312,15 @@ async function openItem(id) {
     const f = $("#prFile").files[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo first.");
     const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked);
     $("#prSend").disabled = true;
-    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
+    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your print photo is up.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
     catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
   };
   if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };
+  if (!i.no_model && !i.example && i.files?.length) loadCatalog().then(async () => {
+    const put = r => { const w = $("#itWill"); if (!w) return; w.innerHTML = badgeHTML(r, { detail: true }) + (r.checks?.slices?.ok == null ? `<button type="button" class="btn" id="itSliceCheck">Test-slice it for my printer</button>` : "");
+      const b = $("#itSliceCheck"); if (b) b.onclick = async () => { b.disabled = true; b.textContent = "Slicing…"; try { put(await checkShowcase(id, true)); } catch (e) { b.textContent = e.message; } }; };
+    put(await checkShowcase(id)); }).catch(() => { });
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
   if ($("#itReport")) $("#itReport").onclick = () => {
     $$("#dlgReport [name=repReason]").forEach(r => r.checked = false); $("#repDetails").value = ""; clearInline($("#repSend"));
@@ -424,7 +443,7 @@ document.addEventListener("click", e => { const a = e.target.closest("a[data-ope
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
   let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
-  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure><img src="${p.url}" alt="Photo of a print${p.caption ? ": " + esc(p.caption) : ""}" loading="lazy"><figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
+  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure><img src="${p.url}" alt="Photo of a print${p.caption ? ": " + esc(p.caption) : ""}" loading="lazy"><figcaption>${esc(p.caption)} <span class="help">${esc(p.by)}</span>
       ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}">⚑ Report</button>`}</figcaption></figure></li>`).join("")
     : `<li class="help">No print photos yet.</li>`;
   g.onclick = async e => {

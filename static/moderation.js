@@ -32,22 +32,6 @@ async function load() {
       card.append(row); list.append(card);
       if (p.thumb) { fetch(p.thumb, { headers: { "X-Admin-Token": TOKEN } }).then(x => x.ok ? x.blob() : null).then(bl => { if (bl) { const im = el("img", { alt: "", width: 120 }); im.src = URL.createObjectURL(bl); card.prepend(im); } }); }
     }
-    // 'I printed this' photos waiting for review (all ages): approve shows it in the gallery, reject deletes it
-    const pl = $("#plist") || (() => { const d = el("div", { id: "plist" }); list.after(d); return d; })();
-    pl.replaceChildren(el("h2", {}, `Print photos waiting for review (${q.pending_prints.length})`));
-    for (const p of q.pending_prints) {
-      const card = el("div", { className: "printer" });
-      card.append(el("b", {}, "I printed this "), el("span", { className: "help" }, `${p.by} · project ${p.item_id}`));
-      if (p.caption) card.append(el("p", {}, p.caption));
-      const row = el("div", { className: "row" });
-      for (const [a, label] of [["approve", "Approve"], ["reject", "Reject and delete"]]) {
-        const b = el("button", { type: "button", className: "btn small" + (a === "reject" ? " danger" : "") }, label);
-        b.onclick = async () => { b.disabled = true; try { await call(`/api/moderation/prints/${p.id}/${a}`, { method: "POST" }); await load(); } catch (e) { $("#msg").textContent = e.message; b.disabled = false; } };
-        row.append(b);
-      }
-      card.append(row); pl.append(card);
-      fetch(p.thumb, { headers: { "X-Admin-Token": TOKEN } }).then(x => x.ok ? x.blob() : null).then(bl => { if (bl) { const im = el("img", { alt: "Print photo to review", width: 160 }); im.src = URL.createObjectURL(bl); card.prepend(im); } });
-    }
   } catch (e) { $("#msg").textContent = e.message; $("#list").replaceChildren(); }
 }
 $("#tokForm").addEventListener("submit", e => { e.preventDefault(); TOKEN = $("#tok").value; load(); });

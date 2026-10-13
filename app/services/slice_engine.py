@@ -80,6 +80,31 @@ PROFILES = {CREALITY_K1.id: CREALITY_K1}
 DEFAULT_PROFILE = CREALITY_K1.id
 
 
+def merge_ini(base: str, overrides: dict) -> str:
+    """Base PrusaSlicer ini with keys replaced (or added). Values never contain newlines from users: all are numbers/enums."""
+    out, seen = [], set()
+    for line in base.strip().splitlines():
+        k = line.split("=", 1)[0].strip()
+        if "=" in line and k in overrides:
+            out.append(f"{k} = {overrides[k]}"); seen.add(k)
+        else:
+            out.append(line)
+    out += [f"{k} = {v}" for k, v in overrides.items() if k not in seen]
+    return "\n".join(out) + "\n"
+
+
+def profile_for(printer_id=None, nozzle=None, opts: dict | None = None, base_ini: str | None = None):
+    """(PrinterProfile, settings) for a catalog printer + nozzle + slicer panel. THE single place slicing config is built."""
+    from app.services import print_setup as ps
+    try:
+        s = ps.settings_for(printer_id, nozzle, opts)
+    except ps.SetupError as e:
+        raise SliceError("bad_settings", str(e), 400)
+    x, y, z = ps.bed_of(s["printer_id"])
+    ini = merge_ini(base_ini or _K1_INI, ps.ini_overrides(s))
+    return PrinterProfile(s["printer_id"], s["printer"], x, y, z, s["nozzle"], s["material"], ini), s
+
+
 def get_profile(profile_id: str) -> PrinterProfile:
     try:
         return PROFILES[profile_id]
@@ -161,9 +186,9 @@ def find_engine() -> Optional[str]:
     return None
 
 
-def run_engine(engine: str, ini: Path, stl: Path, out: Path, timeout: int = SLICE_TIMEOUT_S) -> None:
+def run_engine(engine: str, ini: Path, stl: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110)) -> None:
     # Argument list, no shell: nothing user-controlled is interpreted.
-    cmd = [engine, "--export-gcode", "--center", "110,110", "--load", str(ini), "--output", str(out), str(stl)]
+    cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(stl)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
@@ -259,6 +284,6 @@ def slice_stl(stl: Path, profile: PrinterProfile, out_gcode: Path) -> SliceResul
     with tempfile.TemporaryDirectory(prefix="zeim-slice-") as td:
         ini = Path(td) / "profile.ini"
         ini.write_text(profile.ini.strip() + "\n")
-        run_engine(engine, ini, stl, out_gcode)
+        run_engine(engine, ini, stl, out_gcode, center=(profile.bed_x / 2, profile.bed_y / 2))
     seconds, grams = parse_gcode_stats(out_gcode)
     return SliceResult(out_gcode, seconds, grams, size, profile)
