@@ -38,7 +38,8 @@ def status():
     return {"available": True, "path": p, "version": first[0] if first else ""}
 
 
-PLA_DENSITY = 1.24      # g/cm3 - PrusaSlicer's default profile has density 0, which made every weight "0.00 g"
+PLA_DENSITY = 1.24      # g/cm3 - fallback only. PrusaSlicer's default profile has density 0 ("0.00 g"); the chosen material's
+                        # estimate (print_setup.DENSITY_G_CM3: PETG 1.27, ABS 1.04, TPU 1.21...) is what slice_model passes.
 _STAT_PATTERNS = {
     "print_time": r"^; estimated printing time \(normal mode\) = (.+)$",
     "filament_mm": r"^; filament used \[mm\] = ([\d.]+)",
@@ -117,7 +118,7 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
         prof, s = eng.profile_for(printer_id, nozzle, {k: v for k, v in o.items() if k != "layer_height"}, base)
         s["layer_height"] = float(layer_height)
     ov = {"layer_height": f"{float(layer_height):g}" if "layer_height" not in (opts or {}) else f"{s['layer_height']:g}",
-          "filament_density": str(PLA_DENSITY)}
+          "filament_density": f"{s.get('filament_density') or PLA_DENSITY:g}"}
     if not printer_id:                 # no catalog printer chosen: the bed of the network printer (or the generic bed)
         ov["bed_shape"] = f"0x0,{bed[0]:g}x0,{bed[0]:g}x{bed[1]:g},0x{bed[1]:g}"
         center = (bed[0] / 2, bed[1] / 2)
@@ -134,5 +135,7 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
     layers = len(re.findall(r"^;LAYER_CHANGE", text, re.M))
     return {"available": True, "ok": True, "gcode": "model.gcode", "layers": layers,
             "size_kb": round(gcode.stat().st_size / 1024), "stats": stats, "settings": s,
-            "stats_note": f"Estimates from the slicer using {s['material']}. Your filament, printer and settings will change them.",
+            "stats_note": (f"Estimates from the slicer using {s['material']} (about {s.get('filament_density') or PLA_DENSITY:g} g/cm³, an estimate). "
+                           "Your filament, printer and settings will change them."),
+            "filament_density": s.get("filament_density") or PLA_DENSITY,
             "slicer": st.get("version", ""), "log": ""}

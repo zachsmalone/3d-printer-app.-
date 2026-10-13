@@ -34,6 +34,22 @@ SUPPORTS = ("off", "auto", "everywhere")
 MATERIALS = catalog.MATERIAL_NAMES             # PLA, PETG, TPU, ABS, ASA, PC (all sourced in materials.json)
 FILAMENTS_PATH = Path(__file__).resolve().parents[2] / "data" / "materials" / "filaments.json"
 FILAMENT_ID = {"PLA": "pla", "PETG": "petg", "TPU": "tpu_95a", "ABS": "abs", "ASA": "asa", "PC": "pc"}
+# Filament density for the grams estimate (g/cm3). ESTIMATES: real spools vary by brand and colour, so the UI says "about".
+# PLA 1.24, PETG 1.27, ASA 1.07 and PC (Blend) 1.22 match Prusament's technical data sheets; ABS 1.04 and TPU 1.21 are typical
+# generic values (Prusament TPU 95A's sheet says 1.25). PrusaSlicer turns filament length into grams with this number.
+DENSITY_G_CM3 = {"PLA": 1.24, "PETG": 1.27, "TPU": 1.21, "ABS": 1.04, "ASA": 1.07, "PC": 1.22}
+DEFAULT_DENSITY = DENSITY_G_CM3["PLA"]
+
+
+def density_of(material: str) -> float:
+    return DENSITY_G_CM3.get(material, DEFAULT_DENSITY)
+
+
+def grams_note(material: str) -> str:
+    return (f"Grams are an estimate using about {density_of(material):g} g/cm³ for {material}. "
+            "Your filament brand and colour will change it a little.")
+
+
 FUME_MATERIALS = ("ABS", "ASA", "PC")          # always warned; any other filament whose fumes are marked "Significant" is too
 # Beginner presets. Layer height is a fraction of the nozzle so a preset means the same thing on every nozzle.
 PRESETS = {
@@ -261,7 +277,8 @@ def settings_for(printer_id=None, nozzle=None, opts: dict | None = None) -> dict
             "nozzle_temp": noz_c, "bed_temp": bed_c,
             "first_layer_nozzle_temp": max(noz_c, min(t["first_layer_nozzle_c"], max_noz)) if "nozzle_temp" not in o else noz_c,
             "first_layer_bed_temp": min(t["first_layer_bed_c"], max_bed) if "bed_temp" not in o else bed_c,
-            "material_warning": material_safety(material), "temp_notes": temp_notes}
+            "material_warning": material_safety(material), "temp_notes": temp_notes,
+            "filament_density": density_of(material), "grams_note": grams_note(material)}
 
 
 def _mvs(pid, n, material):
@@ -276,7 +293,8 @@ def ini_overrides(s: dict) -> dict:
     x, y, z = _v(p, "bed_size_mm")
     out = {"bed_shape": f"0x0,{x:g}x0,{x:g}x{y:g},0x{y:g}", "max_print_height": f"{z:g}",
            "nozzle_diameter": f"{s['nozzle']:g}", "filament_diameter": f"{_v(p, 'filament_diameter_mm', 1.75):g}",
-           "filament_type": s["material"], "layer_height": f"{s['layer_height']:g}",
+           "filament_type": s["material"], "filament_density": f"{s.get('filament_density') or density_of(s['material']):g}",
+           "layer_height": f"{s['layer_height']:g}",
            # Lithophane: first layer matches the rest (sharper vertical detail). Others: thicker first layer for bed stick.
            "first_layer_height": (f"{s['layer_height']:g}" if s.get("preset") == "lithophane"
                                  else f"{min(max(s['layer_height'], s['nozzle'] * 0.5), s['nozzle'] * LAYER_MAX):g}"),

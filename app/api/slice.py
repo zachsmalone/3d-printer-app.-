@@ -171,6 +171,7 @@ def slice_model(
         "print_time_seconds": res.print_time_seconds,
         "print_time_human": eng.humanize(res.print_time_seconds),
         "filament_grams": res.filament_grams,
+        "filament_density_g_cm3": chosen.get("filament_density"), "grams_note": chosen.get("grams_note") or "",
         "model_size_mm": [round(v, 2) for v in res.size_mm],
         "printer_id": prof.id, "printer": prof.name, "nozzle": prof.nozzle, "settings": chosen,
         "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,

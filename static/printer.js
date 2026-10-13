@@ -164,8 +164,9 @@ export function wirePanel(getModelId) {
     try {
       const r = await api("/api/slice", { method: "POST", body: fd });
       const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
-      out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
+      out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
+        ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a><a class="btn" href="${r.downloads.stl}" download>⬇ STL</a></div>

@@ -102,7 +102,7 @@ def profile_for(printer_id=None, nozzle=None, opts: dict | None = None, base_ini
     except ps.SetupError as e:
         raise SliceError("bad_settings", str(e), 400)
     x, y, z = ps.bed_of(s["printer_id"])
-    ini = merge_ini(base_ini or _K1_INI, ps.ini_overrides(s))
+    ini = merge_ini(base_ini or _K1_INI, ps.ini_overrides(s))      # includes filament_density for the chosen material (grams estimate)
     return PrinterProfile(s["printer_id"], s["printer"], x, y, z, s["nozzle"], s["material"], ini), s
 
 
