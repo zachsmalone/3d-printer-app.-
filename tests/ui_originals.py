@@ -3,7 +3,7 @@ category chips filter. 390px, Chrome + WebKit (axe in Chrome)."""
 import json, os, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]; bad = []
-AXE = os.environ.get("AXE_JS") or "/workspace/a11y-tools/node_modules/axe-core/axe.min.js"
+AXE = os.environ.get("AXE_JS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 def ok(n, c, x=""):
     print(("PASS " if c else "FAIL ") + n, "" if c else x)
     if not c: bad.append(n)
@@ -12,7 +12,7 @@ def run(name, launch, with_axe):
     try: b = launch()
     except Exception as e: print(f"SKIP {name}: {str(e).splitlines()[0][:80]}"); return
     errs = []
-    ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+    ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True, bypass_csp=True)   # lets the vendored axe script load under the app CSP
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700); pg.click("#mainNav [data-view=showcase]"); pg.click('#shTabs [data-tab=free]')
     pg.wait_for_selector('#shGrid .pcard[data-item="zo-pencil-cup"]')
@@ -27,7 +27,8 @@ def run(name, launch, with_axe):
     pg.wait_for_timeout(300)
     ok(f"{name}: category chip filters", sorted(cards(pg)) == ["Open-Reed Predator Call", "Owl Whistle"], cards(pg))
     ok(f"{name}: chips are 44px tall", pg.locator('#shCats [data-cat=""]').bounding_box()["height"] >= 43.5)
-    if with_axe and os.path.exists(AXE):
+    if with_axe:
+        assert os.path.exists(AXE), "axe missing: " + AXE
         pg.add_script_tag(path=AXE)
         v = pg.evaluate("axe.run(document.querySelector('#shGrid').closest('section') || document, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa']}}).then(r=>r.violations.map(v=>({id:v.id,n:v.nodes.length,t:v.nodes.slice(0,3).map(n=>n.target.join(' '))})))")
         ok(f"{name}: axe on the Showcase", not v, json.dumps(v)[:800])

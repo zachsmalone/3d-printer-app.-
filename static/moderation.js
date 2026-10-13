@@ -2,10 +2,18 @@
 let TOKEN = "";
 const $ = s => document.querySelector(s);
 const el = (tag, props = {}, ...kids) => { const e = Object.assign(document.createElement(tag), props); kids.forEach(k => e.append(k)); return e; };
+// Never show "[object Object]": a string detail as-is, a structured one by its message, a 422 list as plain words.
+function errText(j, r) {
+  const d = j?.detail ?? j?.message;
+  if (typeof d === "string" && d) return d;
+  if (d && typeof d === "object" && !Array.isArray(d) && typeof d.message === "string") return d.message;
+  if (Array.isArray(d)) return "Something in that request isn't right. Please try again.";
+  return r.statusText || "Something went wrong. Please try again.";
+}
 async function call(path, opt = {}) {
   const r = await fetch(path, { ...opt, headers: { ...(opt.headers || {}), "X-Admin-Token": TOKEN, "Content-Type": "application/json" } });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.detail || r.statusText);
+  if (!r.ok) throw new Error(errText(j, r));
   return j;
 }
 const ago = s => s == null ? "" : s < 90 ? s + " seconds" : s < 5400 ? Math.round(s / 60) + " minutes" : s < 172800 ? Math.round(s / 3600) + " hours" : Math.round(s / 86400) + " days";

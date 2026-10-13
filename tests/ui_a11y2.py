@@ -4,12 +4,12 @@ friendly error text, 3px focus ring in Dark, skip link, stacked-dialog focus tra
 import json, os, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]; bad = []
-AXE = os.environ.get("AXE_JS") or "/workspace/a11y-tools/node_modules/axe-core/axe.min.js"
+AXE = os.environ.get("AXE_JS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 def ok(n, c, x=""):
     print(("PASS " if c else "FAIL ") + n, "" if c else x)
     if not c: bad.append(n)
 def axe_rules(pg, root, rules):
-    if not os.path.exists(AXE): return []
+    if not os.path.exists(AXE): raise SystemExit("FAIL axe missing: " + AXE)
     pg.add_script_tag(path=AXE)
     return pg.evaluate(f"axe.run(document.querySelector('{root}'), {{runOnly:{{type:'rule',values:{json.dumps(rules)}}}}}).then(r=>r.violations.map(v=>({{id:v.id,t:v.nodes.slice(0,3).map(n=>n.target.join(' '))}})))")
 def run(name, launch, with_axe):

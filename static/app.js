@@ -325,7 +325,7 @@ $("#btnSlice").onclick = async () => {
   try {
     const r = await api(`/api/slice/${printId}`, { method: "POST", body: sliceOpts() });
     if (!r.available) $("#sliceOut").textContent = r.message;
-    else if (!r.ok) $("#sliceOut").textContent = "Slicer failed: " + (r.log || r.message);
+    else if (!r.ok) $("#sliceOut").textContent = r.code === "too_big" ? r.message : "Slicer failed: " + (r.log || r.message);
     else {
       const t = r.stats.print_time, g = r.stats.filament_g;
       const est = [t ? "about " + esc(t) : "", g ? "about " + Number(g).toFixed(1) + " g of filament" : ""].filter(Boolean).join(", ");

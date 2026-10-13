@@ -5,14 +5,14 @@ from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PNG = open(os.path.join(ROOT, "static", "sample.png"), "rb").read()
-AXE = os.environ.get("AXE_JS") or "/workspace/a11y-tools/node_modules/axe-core/axe.min.js"
+AXE = os.environ.get("AXE_JS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 bad = []
 def ok(n, c, x=""):
     print(("PASS " if c else "FAIL ") + n, "" if c else x)
     if not c: bad.append(n)
 
 def axe(pg, label):
-    if not os.path.exists(AXE): return
+    if not os.path.exists(AXE): raise SystemExit("FAIL axe missing: " + AXE)
     pg.add_script_tag(path=AXE)
     r = pg.evaluate("axe.run(document, {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice']}}).then(r=>r.violations.map(v=>({id:v.id,n:v.nodes.length,t:v.nodes.slice(0,3).map(n=>n.target.join(' '))})))")
     ok(f"axe: {label}", not r, json.dumps(r)[:700])

@@ -58,6 +58,34 @@ def parse_stats(text: str) -> dict:
     return stats
 
 
+BED_MARGIN_MM = 2.0      # keep a little room for the skirt / brim edge
+
+
+def _max_height(profile_ini) -> float | None:
+    try:
+        m = re.search(r"^max_print_height\s*=\s*([\d.]+)", Path(profile_ini).read_text(errors="ignore"), re.M)
+        return float(m.group(1)) if m and float(m.group(1)) > 0 else None
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def bed_fit(extents, bed, profile_ini=None) -> dict | None:
+    """None if the model fits the printer's bed (either way round), else a friendly refusal BEFORE the slicer runs."""
+    x, y, z = (float(v) for v in extents)
+    bx, by = (float(bed[0]) - BED_MARGIN_MM, float(bed[1]) - BED_MARGIN_MM)
+    flat_ok = (x <= bx and y <= by) or (y <= bx and x <= by)
+    hmax = _max_height(profile_ini) if profile_ini else None
+    tall_ok = hmax is None or z <= hmax
+    if flat_ok and tall_ok:
+        return None
+    size = f"{x:.0f} × {y:.0f} × {z:.0f} mm"
+    room = f"{bed[0]:.0f} × {bed[1]:.0f} mm" + (f", {hmax:.0f} mm tall" if hmax else "")
+    return {"available": True, "ok": False, "code": "too_big",
+            "message": f"This model is too big for your printer's bed. It is {size}; your printer has room for {room}. "
+                       "Make it smaller (lower the width, or Edit → Scale), or cut it into pieces with Edit → Split and print them one at a time.",
+            "size_mm": [round(x, 1), round(y, 1), round(z, 1)], "bed_mm": [float(bed[0]), float(bed[1])]}
+
+
 def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
                 upright=False, supports=False, brim=0.0, bed=(250, 210), profile_ini=None,
                 printer_id=None, nozzle=None, opts=None) -> dict:
@@ -73,6 +101,9 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
     if upright:  # stand the model on its long edge (typical for lithophanes)
         mesh.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]))
     mesh.apply_translation([0, 0, -mesh.bounds[0][2]])
+    fit = bed_fit(mesh.extents, bed, profile_ini)
+    if fit:
+        return fit
     outdir.mkdir(parents=True, exist_ok=True)
     stl = outdir / "slice_input.stl"
     mesh.export(stl)

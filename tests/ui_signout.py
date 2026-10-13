@@ -3,7 +3,7 @@ browser is empty; an adult gets back in with the code.  390px, Chrome + WebKit (
 import json, os, re, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
-AXE = os.environ.get("AXE_JS") or "/workspace/a11y-tools/node_modules/axe-core/axe.min.js"
+AXE = os.environ.get("AXE_JS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 bad = []
 def ok(n, c, x=""):
     print(("PASS " if c else "FAIL ") + n, "" if c else x)
@@ -23,7 +23,8 @@ def run(name, launch, with_axe):
     pg.click("#soCodeBtn"); pg.wait_for_selector("#soCode .code")
     code = pg.inner_text("#soCode .code").strip()
     ok(f"{name}: a recovery code is shown", len(re.sub(r"[^A-Z0-9]", "", code)) == 16, code)
-    if with_axe and os.path.exists(AXE):
+    if with_axe:
+        assert os.path.exists(AXE), "axe missing: " + AXE
         pg.add_script_tag(path=AXE)
         r = pg.evaluate("axe.run(document.querySelector('#dlgSignout'), {runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21a','wcag21aa','best-practice']}}).then(r=>r.violations.map(v=>v.id))")
         ok(f"axe: sign-out dialog", not r, r)

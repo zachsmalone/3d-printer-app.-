@@ -469,7 +469,8 @@ dialog::backdrop{background:rgba(43,33,24,.45);backdrop-filter:blur(4px)}
 /* phones: compact app bar on top, tab bar at the bottom */
 @media (max-width:768px){
   .topbar{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--panel);flex-wrap:nowrap;padding-top:calc(6px + env(safe-area-inset-top));padding-bottom:6px}
-  .topbar .modepick label,.topbar .modepick .ico{display:none}
+  .topbar .modepick .ico{display:none}
+  .topbar .modepick label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}   /* visually hidden, still names the Mode select for screen readers (axe select-name) */
   .topbar .brand{order:0;margin-right:auto}.topbar .modepick{order:1;margin-left:0;flex:0 1 auto}
   #btnAccount{order:2}#btnSettings{order:3}.topbar{gap:var(--s1)}
   .topbar .btn .i{width:24px;height:24px;min-width:24px}
