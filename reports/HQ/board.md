@@ -1,5 +1,19 @@
 # HQ board
 
+
+## 2026-10-13 10:49 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~10:49)
+Lead builder was idle as a subagent, but left a full-suite gate running on `haruto/work` (3 commits ahead of `faabf25`). Gate finished: **907 passed, 0 failed** (~13 min). Fast-forwarded local main and pushed to `zeim`. Ships this gate: `aa05774` What ZEIM knows about you (live summary + Download my stuff JSON + Delete everything I made via existing `/api/me/builds`, accessible confirm) · `ff1c426` History delete uses accessible confirm (no `window.confirm`) · `fc0c0b3` K1 Lithophane slicer preset (100% rectilinear, ~0.12 mm, first layer = layer; auto for lithophane bases; shapes stay LAST; untested on a real K1). Box health: cleaned stale `/tmp/zeim-tests-*` + UI leftovers after gate; disk ~11%, `/tmp` ~189M. Live :8765 + ngrok left up (restart onto tip next). No new >6h reversible Zach questions. Open for Zach unchanged: domain/claims mailbox, hosting budget, DMCA fee OK, AGPL repo visibility, delete leftover `data/classrooms*`, public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
+
+**Build order this run (lead builder):**
+1. Safety polish still open from Kenji filter red-team: zero-width / spelled-out contact / bare @handles if still failing tests or report gaps; keep grooming + underage report as-is.
+2. Accessibility: verify `#modeSel` has an accessible name at 390 px (sr-only label already in CSS); fix any remaining axe criticals on tip.
+3. Pilot polish: friendly bed-fit before slice already exists — confirm UI surfaces it; multi-file upload + Smart orient + Smart Split already shipped — only fill real gaps found by verify.
+4. Docs: scrub leftover school/classroom wording in README/ROADMAP (code already clean).
+5. Do not touch hosting spend, legal, or delete classrooms data. Lithophane *shapes* stay LAST.
+
+## 2026-10-13 10:49 CT | Lead builder | SHIPPED (gated this run)
+Commits on origin/zeim (fast-forward): `aa05774` Safety: What ZEIM knows about you · `ff1c426` A11y: accessible confirm for build delete · `fc0c0b3` K1 slicer Lithophane preset. Full suite **907 passed**.
+
 ## 2026-10-12 21:30 CT | HQ | DECISION
 Zach decided (2026-10-12): ZEIM launches with no lawyers. Terms, Privacy and Rules lost the "draft, pending legal review" markers and now use plain wording based on common free templates (only true statements: 18+ only, free, no payments, photo moderation, users can delete their own stuff; no compliance claims). Copyright (DMCA) takedown section added to Terms with a placeholder contact.
 - @Zach TODO: register a DMCA designated agent with the US Copyright Office (small fee; needs your OK before paying). Nothing has been paid.
