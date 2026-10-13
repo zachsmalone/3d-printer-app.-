@@ -236,7 +236,14 @@ $("#histList").onclick = async e => {
     const hb = S.history.find(x => x.id === o.dataset.open);
     if (hb?.kind === "edit") { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: hb.id })); location.hash = "slicer"; return; }
     const r = await api("/api/builds/" + o.dataset.open); S.mode = r.mode; applyMode(); showBuild(r); } catch (er) { toast(er.message, "err"); } }
-  if (d && confirm("Delete this build and its files?")) { await api("/api/builds/" + d.dataset.del, { method: "DELETE" }); await loadHistory(); }
+  if (d) {
+    const yes = await askConfirm({
+      title: "Delete this build?",
+      message: "This permanently removes the build and its files (including the photo). This cannot be undone.",
+      okLabel: "Delete this build",
+    });
+    if (yes) { await api("/api/builds/" + d.dataset.del, { method: "DELETE" }); await loadHistory(); }
+  }
 };
 async function loadHistory() { const r = await api("/api/builds"); S.history = r.builds; S.max = r.max; S.keepDays = r.keep_days; renderHistory(); }
 
