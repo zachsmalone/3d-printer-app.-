@@ -102,3 +102,9 @@ def test_ui_and_docs():
     assert "No NSFW" not in readme and "Mild NSFW" in readme
     for f in ("static/COMMUNITY_GUIDELINES.md", "static/COMMUNITY_GUIDELINES.html", "static/terms.html"):
         t = open(os.path.join(ROOT, f)).read(); assert "blurred" in t and "xplicit" in t, f
+
+
+def test_mild_nsfw_blur_confirm_and_hide_in_a_real_browser():
+    from test_b4_ui import _run
+    out = _run("ui_nsfw.py")
+    assert "PASS webkit" in out, out
