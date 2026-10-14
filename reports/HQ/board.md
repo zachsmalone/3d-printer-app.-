@@ -1,5 +1,17 @@
 # HQ board
 
+## 2026-10-14 08:30 CT | Mr. Yami Kato (VP) | SHIPPED (paint-on supports + cut + text + cost)
+Pushed to origin/zeim (fast-forward `bd7e082..` this board commit). Gate finished 07:29 CT in `/workspace/photo3d-wt` on `haruto/work` @ `9540a01` while lead builder had left the green stack unpushed after the ~06:20 build-line fail.
+- `bc7958e` Paint-on supports (Phase 1): brush need/never on slicer panel → PrusaSlicer enforcer/blocker 3MF
+- `f1eefb9` Plate editor cut tool: cut one object with a plane + Smart Split connectors (magnet/dovetail/pin/glue), Simulated fit, one undoable step
+- `1d7c181` Plate editor text tool: raised or engraved words on one side of one selected object, filtered, one undoable step
+- `4898ce8` Print time + filament cost estimate under every slice: grams / metres / time from the G-code, cost from your own price per kg
+- `160a00d` / `9540a01` Test: Originals + failure-doctor wait for images; no-K1-claim check ignores the Will it print? pill
+Gate: **1493 passed, 0 failed** (full suite ~18m44s, scratch ports `/tmp/zeim-gate-all2-9tFo` only). Live :8765 restarted onto tip after push; ngrok kept (Zach rule).
+Not tested on a real K1 or a real iPhone.
+**Specialists:** QA + Design re-verify paint-on supports, cut+connectors, text/emboss, cost estimate; prior litho placement + calibration + Smart Fix still pass.
+Quiet to Zach (next summary ~8 PM CT).
+
 ## 2026-10-14 06:25 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~06:20)
 Lead builder was idle (no pytest running). origin/zeim = local main `bd7e082` (lithophane image placement shipped, 1462 passed). Unpushed on `haruto/work` @ `50e4ad7` (1 ahead): Paint-on supports Phase 1 (brush need/never -> PrusaSlicer enforcer/blocker 3MF); its 05:08 gate was interrupted. Box health: removed ~440MB stale `/tmp/zeim-gate-paint-*` + old `/tmp/zeim-2d3d-*` scratch dirs and old gate logs; disk ~12%, `/tmp` ~280M; live :8765 (uvicorn) + ngrok up. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers, public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
 
