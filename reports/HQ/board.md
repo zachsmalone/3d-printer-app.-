@@ -1,5 +1,16 @@
 # HQ board
 
+## 2026-10-14 02:30 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~02:27)
+Lead builder was idle (no subagent, no pytest running). origin/zeim = local main `b043a8a` (mild NSFW shipped, 1039 passed). Unpushed, ungated work found: `layer-preview` branch (`/tmp/zeim-2d3d-wt`, 3 ahead of tip: `3280624` Logo & Drawing to 3D, `64aca4d` WebKit test fix, `9568b30` layer-by-layer preview) — `haruto/work` holds the first two. `printers-expand` (`/workspace/photo3d-printers`, `6fa9f78`, 49 sourced profiles across 15 brands, brand-grouped picker) is 1 ahead / 8 behind. Live :8765 already restarted at 02:23 onto tip (NSFW moderation route answers). Box health: removed stale Playwright artifact/profile dirs; disk ~12%, `/tmp` ~260M; live :8765 (200) + ngrok up. No open PRs. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers, delete leftover classrooms data (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
+
+**Build order this run (lead builder):**
+1. Pilot: gate `layer-preview` (2D-to-3D trace+extrude + layer-by-layer preview) on top of main; full suite green on scratch port; push via The Path (haruto/work -> main -> origin/zeim).
+2. Pilot: rebase `printers-expand` onto the new tip, check every profile has a source URL and sane bed/nozzle limits, full suite, push.
+3. Zach 18:46 queue next: calibration wizard (first-layer/temp/flow/retraction tests for the picked printer + filament, plain-words steps), then failure photo doctor (Smart Fix) using the existing Smart Fix map. Never claim K1-tested.
+4. Do not touch hosting spend, Stripe wiring, legal pages for payments, or delete any data. No full photo-to-3D AI yet.
+
+**Specialists (HQ):** after 2D-to-3D + layer preview land, verify: trace on logo/drawing, cookie cutter + keyring, thin-line warning; layer slider/Play on phone width; mild NSFW checks still pass.
+
 ## 2026-10-13 23:40 CT | Lead builder (Haruto line) | SHIPPED (mild NSFW)
 Pushed to origin/zeim (fast-forward `b8066ff..eba7ee8`). Mild NSFW from `/workspace/photo3d-nsfw` (`418b174` + `5590381`) cherry-picked onto tip; conflicts in README, safety.py, social.py, COMMUNITY_GUIDELINES.html, index.html, style.css resolved by keeping both sides (grooming filter + image-mod hook + a11y labels + plate editor/materials CSS kept; "pending legal review" notice not re-added; README keeps core-free + optional plans).
 - `5a13267` Mild NSFW: required "Is this NSFW?" answer on publish and on "I printed this" photos; tagged items listed as blurred "Mature content" cards in feeds/search/favorites (not hidden by default); "Are you sure?" once per visit before opening (focus on Go back, Esc = Go back); account setting "Hide mature content entirely"; moderators flip the tag (report action or `POST /api/moderation/item/{id}/nsfw`), new report reason "Should be marked NSFW", "remove" for explicit. Mild words (nude, nudity, naked, topless, nsfw) pass the filter only on tagged items; explicit terms stay blocked everywhere. Rules, Terms and README updated.
