@@ -186,6 +186,25 @@ export function wirePanel(getModelId) {
     finally { $("#spGo").disabled = false; }
   };
   $("#spGo").onclick = () => doSlice(false);
+  applySmartFix();
+}
+
+/* Changes the maker said yes to in the Failure photo doctor (Smart Fix): filled into Advanced once, shown with Undo. */
+function applySmartFix() {
+  let pend = {};
+  try { pend = JSON.parse(sessionStorage.getItem("zeim.smartfix.apply") || "{}"); } catch { }
+  const ids = Object.keys(pend).filter(id => /^sp[A-Za-z]+$/.test(id) && $("#" + id));
+  if (!ids.length) return;
+  const before = {};
+  ids.forEach(id => { const el = $("#" + id); before[id] = el.value; el.value = pend[id].to; });
+  sessionStorage.removeItem("zeim.smartfix.apply");
+  if ($("#spAdvanced")?.getAttribute("aria-pressed") !== "true") $("#spAdvanced").click();
+  const note = document.createElement("div");
+  note.className = "matwarn"; note.id = "spSmartFix"; note.setAttribute("role", "status");
+  note.innerHTML = `<p><b>Smart Fix changes in use:</b> ${ids.map(id => `${esc(pend[id].label)} ${esc(String(pend[id].to))}${pend[id].unit ? " " + esc(pend[id].unit) : ""}`).join(", ")}.</p>
+    <div class="row"><button type="button" class="btn" id="spSmartUndo">Undo</button></div>`;
+  $("#spAdv").prepend(note);
+  $("#spSmartUndo").onclick = () => { ids.forEach(id => { $("#" + id).value = before[id]; }); note.remove(); };
 }
 
 /* ---------- Account: "Your printer" card ---------- */
