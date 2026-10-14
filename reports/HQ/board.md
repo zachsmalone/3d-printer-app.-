@@ -1,5 +1,14 @@
 # HQ board
 
+## 2026-10-14 02:58 CT | Lead builder (Haruto line) | SHIPPED (2D-to-3D + layer preview)
+Pushed to origin/zeim (fast-forward `b043a8a..` this board commit). `haruto/work` rebased onto main (`ebdf916`, Yami's 02:27 board entry) and the `layer-preview` branch (`/tmp/zeim-2d3d-wt`) added on top; no conflicts.
+- `53e20dd` Logo & Drawing to 3D: trace a logo, sketch or drawing (PNG/JPG/SVG; Otsu or by colour, despeckle, smoothing, holes kept) into a raised shape with optional base and keyring hole, a cookie cutter, a stamp (raised or pressed in) or colour layers (one 3MF piece per colour); thin-line warning + auto-thicken; same upload checks as every photo.
+- `e61d9a7` Test: the Logo & Drawing browser test must pass in WebKit too (no silent skip).
+- `92a12ca` Layer-by-layer preview: after Slice, "Layer preview" reads the G-code into layers (outer/inner wall, infill, top/bottom, supports, skirt), slider + Prev/Next + Play, layers below drawn faint, legend; `GET /api/slice/<id>/layers` (cached, gzipped, thinned to a point budget for phones).
+Gate on `haruto/work` @ `92a12ca`: **1070 passed, 0 failed, 0 skipped** (full suite incl. Chrome + WebKit UI, 15m13s, no re-runs). Scratch ports only. Killed an orphaned scratch `app.serve` (port 54705, data in `/tmp/zeim-layers`) left from the layer-preview build.
+Not tested on a real K1 or a real iPhone (layer preview checked at 390 px in Chrome + WebKit only; print times/grams are estimates).
+**Specialists:** QA + Design re-verify on `92a12ca`: trace on a real logo and a kid's drawing, cookie cutter + keyring, thin-line warning; layer slider/Play/Prev/Next at phone width; mild NSFW blur/confirm still pass.
+
 ## 2026-10-14 02:30 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~02:27)
 Lead builder was idle (no subagent, no pytest running). origin/zeim = local main `b043a8a` (mild NSFW shipped, 1039 passed). Unpushed, ungated work found: `layer-preview` branch (`/tmp/zeim-2d3d-wt`, 3 ahead of tip: `3280624` Logo & Drawing to 3D, `64aca4d` WebKit test fix, `9568b30` layer-by-layer preview) — `haruto/work` holds the first two. `printers-expand` (`/workspace/photo3d-printers`, `6fa9f78`, 49 sourced profiles across 15 brands, brand-grouped picker) is 1 ahead / 8 behind. Live :8765 already restarted at 02:23 onto tip (NSFW moderation route answers). Box health: removed stale Playwright artifact/profile dirs; disk ~12%, `/tmp` ~260M; live :8765 (200) + ngrok up. No open PRs. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers, delete leftover classrooms data (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
 
