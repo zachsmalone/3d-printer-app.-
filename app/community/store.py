@@ -1,14 +1,51 @@
-"""Tiny locked JSON file store (stand-in for a database)."""
+"""Tiny locked JSON file store (stand-in for a database).
+
+A storage-mode switch lets the app fall back to JSON while a DB-backed
+implementation is introduced. The JSON files are backed up before any migration
+and remain read-only as a rollback fallback.
+"""
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import threading
+import time
 from pathlib import Path
 
-from ..config import DATA
+from ..config import DATA, STORAGE_MODE
 
 _lock = threading.RLock()
+
+
+def _backup_dir() -> Path:
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    path = DATA / "backups" / f"json-backup-{ts}"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def backup_json_data() -> Path:
+    """Copy every JSON file to a timestamped backup directory."""
+    if not DATA.exists():
+        return _backup_dir()
+    backup = _backup_dir()
+    for p in sorted(DATA.glob("*.json")):
+        shutil.copy2(p, backup / p.name)
+    return backup
+
+
+def freeze_json_fallback() -> list[Path]:
+    """Make the JSON files read-only to preserve them as a rollback source."""
+    changed = []
+    for p in sorted(DATA.glob("*.json")):
+        try:
+            if (p.stat().st_mode & 0o222) != 0:
+                os.chmod(p, p.stat().st_mode & ~0o222)
+                changed.append(p)
+        except OSError:
+            pass
+    return changed
 
 
 class JsonFile:
@@ -16,8 +53,17 @@ class JsonFile:
         self.path: Path = DATA / name
         self.default = default
 
+    def _warn_if_db_mode(self):
+        if STORAGE_MODE == "db":
+            import logging
+            logging.getLogger("zeim.storage").warning(
+                "ZEIM_STORAGE=db is active; JSON fallback is read-only and backups remain in %s",
+                (DATA / "backups").as_posix(),
+            )
+
     def read(self):
         with _lock:
+            self._warn_if_db_mode()
             if self.path.exists():
                 try:
                     return json.loads(self.path.read_text())
@@ -28,6 +74,7 @@ class JsonFile:
     def write(self, data):
         """Atomic (temp file + rename) and private: only the account that runs the server can read these files (mode 600)."""
         with _lock:
+            self._warn_if_db_mode()
             tmp = self.path.with_name(self.path.name + ".tmp")
             fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "w") as fh:

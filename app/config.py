@@ -6,6 +6,9 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = Path(__import__("os").environ.get("PHOTO3D_OUT") or ROOT / "outputs")      # one directory per build (history)
 DATA = Path(__import__("os").environ.get("PHOTO3D_DATA") or ROOT / "data")        # settings, users, etc. (never zipped)
 STATIC = ROOT / "static"
+STORAGE_MODE = (os.environ.get("ZEIM_STORAGE") or os.environ.get("PHOTO3D_STORAGE") or "json").strip().lower()
+if STORAGE_MODE not in {"json", "db"}:
+    STORAGE_MODE = "json"
 # ZEIM Originals: 378 MB, not in git. Deploys must ship library/originals separately (or point PHOTO3D_ORIGINALS at it).
 ORIGINALS = Path(os.environ.get("PHOTO3D_ORIGINALS", str(ROOT / "library" / "originals")))
 MAX_BUILDS = int(__import__("os").environ.get("PHOTO3D_MAX_BUILDS", "20"))   # builds kept per person (oldest un-starred roll off; starred ones never do)
