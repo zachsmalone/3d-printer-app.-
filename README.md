@@ -1,35 +1,47 @@
 # ZEIM
 
-**ZEIM** is a free-to-use, all-in-one 3D-printing maker app and community for adults (**18+ only**).
+**ZEIM** is an all-in-one 3D-printing maker app and community for adults (**18+ only**): find a design, fix it, slice it, turn a photo into a lithophane, and share what you print, all in one place.
 
-The core app (make, slice, lithophanes, plate editor, community, downloads) is free forever. Optional Semi Pro ($3.50/mo) and Pro ($5.50/mo) supporter plans are planned after the pilot to help cover hosting costs; they add extras like faster jobs and more storage, never lock core features. No NSFW. No school features — no teachers, classes, or grades.
+- **Core is free forever:** make, slice, lithophanes, plate editor, community and downloads.
+- **Optional supporter plans (after the pilot):** **Semi Pro $3.50/mo** (priority slicing, more cloud storage, supporter badge, no wait on heavy jobs) and **Pro $5.50/mo** (everything in Semi Pro plus fastest jobs, early access to new tools, and later AI photo-to-3D credits). Plans help cover hosting costs (about $400/mo) and never lock core features. Tier perks may change.
+- **Clean and safe:** no NSFW, no school features. All "I printed this" photos are moderator-reviewed.
+- **Inclusive:** FDM and resin printers both supported.
 
-One place to find designs, fix and slice them, turn a photo into a lithophane, and share what you print. Built with pride for makers who want the full path from idea to print without the clutter.
-
-Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md).
+Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md). Groups are called **Build Plates**.
 
 ## What you get
 
 | Tab | What it does |
 |---|---|
-| **Showcase** | The landing feed. Trending, Following, search with history, favorites, follows, remix credit chain, and **I printed this** photos held for moderator review. |
-| **Slicer** | In-app slicing built on PrusaSlicer. Printer and nozzle picker (0.1–1.0 mm), Beginner / Advanced settings, a **Will it print?** badge, multi-file upload as one plate or separate prints, shrink-to-fit, and **Open in your slicer** (3MF / STL) for Creality, Bambu Lab, Prusa, Elegoo, and Anycubic. First tested on a Creality K1. |
-| **CAD** | Coming soon. |
-| **Lithophane** | Photo → lithophane. Shapes planned: heart, globe, circle, star, square, night-light cover — plus color options. |
-| **Smart Fix** | Mesh repair and auto-orient. |
-| **Account** | Your account, Settings, and light / dark mode. |
+| **Showcase** | Trending, Following, search with history, favorites, follows, remix credit chains, and moderator-reviewed **I printed this** photos. |
+| **Slicer** | In-app slicing with PrusaSlicer (run unmodified). Printer and nozzle picker (0.1-1.0 mm), Beginner / Advanced settings, **Will it print?** badge, multi-file upload, and **Open in your slicer** (3MF / STL) for Creality, Bambu Lab, Prusa, Elegoo and Anycubic. First tested on a Creality K1. |
+| **Plate editor** | Shapr3D-style: select, move, rotate and resize single items, auto-center, arrange, group/ungroup, merge/separate, duplicate, hide and delete. |
+| **Lithophane** | Photo to lithophane: heart, circle, star, square, full-sphere globe, Cylinder / Cup wrap and night-light, with a backlit **Light on** preview (warm or cool light). |
+| **Smart Fix** | Mesh repair, auto-orient and smart split. |
+| **2D to 3D** | Logo / drawing tracing to extruded shapes (keychains, signs, cookie cutters), then layered colour prints. |
+| **Account** | Account, settings, and light / dark mode. |
 
-**ZEIM Originals** — our in-house flagship designs. Each is simulation-checked and badged **Simulated** or **Test-printed**.
+**ZEIM Originals** are our in-house designs, each badged **Simulated** or **Test-printed**.
 
-Groups are called **Build Plates**.
+## Coming next
 
-## Roadmap
+1. First layer-by-layer preview, calibration wizard, and failure photo doctor.
+2. Paint-on supports, cut tool with connectors, text/emboss, snap measure.
+3. Print time and filament cost estimate, a "Print this next" queue, and one-click remix (credit kept).
+4. Full resin support: resin slicing, auto-hollow with drain holes, resin supports, resin lithophane settings, and safety notes (gloves, ventilation, IPA).
+5. Free CC-licensed community models, each credited to its creator and source site.
+6. Database storage upgrade.
+7. Optional supporter plans (after the pilot).
+8. Full AI photo-to-3D (after launch, once hosting costs are known).
 
-- **Launch-ready target:** around **Nov 12, 2026** (invite-only pilot first)
-- **Simple model editor:** about 3–4 months after launch
-- **Full CAD / sculpting:** 6–12 months
+## Timeline
 
-Details and status: [`ROADMAP.md`](ROADMAP.md).
+- **Invite-only pilot first**, then **public launch around Nov 12, 2026**.
+- Details and status: [`ROADMAP.md`](ROADMAP.md).
+
+## Credits
+
+Slicing powered by [PrusaSlicer](https://github.com/prusa3d/PrusaSlicer) (AGPL-3.0), run unmodified as a separate program. See [`docs/licensing.md`](docs/licensing.md).
 
 ## Run
 
