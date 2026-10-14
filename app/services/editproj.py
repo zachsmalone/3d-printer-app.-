@@ -161,7 +161,11 @@ def check_op_text(op: str, params: dict) -> dict:
             raise ValueError(f"'{k}' is too long.")
         if op == "text" and isinstance(v, (dict, list)):
             raise ValueError(f"'{k}' must be a simple value.")
-    if op == "text":
+    if op == "plate" and params.get("action") == "text":     # plate editor text on one object: same cap + filter
+        for k in ("text", "font", "mode", "face"):
+            if isinstance(params.get(k), (dict, list)):
+                raise ValueError(f"'{k}' must be a simple value.")
+    if op == "text" or (op == "plate" and params.get("action") == "text"):
         txt = params.get("text", "")
         if not isinstance(txt, str):
             raise ValueError("Text must be text.")
@@ -174,7 +178,7 @@ def check_op_text(op: str, params: dict) -> dict:
 def _replay_safe(o: dict) -> bool:
     """Ops stored before the filter existed (or by an older word list) are re-checked when a project is replayed:
     a text step that no longer passes is skipped instead of being rendered into the mesh and its exports."""
-    if o.get("op") != "text":
+    if o.get("op") != "text" and not (o.get("op") == "plate" and (o.get("params") or {}).get("action") == "text"):
         return True
     from ..community import safety
     t = o.get("params", {}).get("text", "")

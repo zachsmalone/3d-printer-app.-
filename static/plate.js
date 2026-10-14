@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { $, $$, esc } from "/static/app.js";
 
 const PL = { sel: new Set(), ctx: null, bed: null, drag: null, plane: null,
+  txt: { open: false, text: "", mode: "emboss", face: "top", height: 8, depth: 1, font: "sans", rotation: 0, offset_u: 0, offset_v: 0 },
   cut: { open: false, axis: "z", offset: null, join: "none", material: "PLA", magnet_diameter: 6, magnet_thickness: 3, pin_diameter: 4, count: 2, lay_flat: false, for: null } };
 const objs = () => PL.ctx?.p?.plate?.objects || [];
 const groupOf = i => objs()[i]?.group;
@@ -56,6 +57,7 @@ function panelHTML() {
       <button type="button" class="btn small ghost" data-pact="selall">Select all</button>
     </div>
     <p class="help" id="plateOut" role="status" aria-live="polite">${esc(PL.ctx.p.report?.action ? PL.ctx.p.report.message || "" : "")}</p>
+    ${PL.ctx.p.report?.action === "text" && PL.ctx.p.report.text?.note ? `<p class="help" id="plateTextNote">${esc(PL.ctx.p.report.text.note)}</p>` : ""}
     ${PL.ctx.p.report?.action === "cut" && PL.ctx.p.report.cut ? `<p class="help simnote" id="plateCutNote"><span class="pill">Simulated</span> ${esc(PL.ctx.p.report.cut.note || "")}</p>` : ""}
     <div id="plateSel" ${s.length ? "" : "hidden"}>
       <h3 class="ptitle">${s.length === 1 ? esc(one.name) : `${s.length} selected`}</h3>
@@ -85,7 +87,7 @@ function panelHTML() {
         <button type="button" class="btn small" data-pact="separate" title="Split into its separate pieces">Separate</button>
       </div>
       <p class="help">Group: move together, still separate bodies. Merge: one body. Separate: split a model into its loose pieces.</p>
-      ${one ? cutHTML(one) : ""}
+      ${one ? cutHTML(one) + textHTML(one) : ""}
     </div></details>`;
 }
 
@@ -123,6 +125,37 @@ function cutHTML(o) {
       <button class="btn small primary" id="pCutGo">✂ Cut into 2 pieces</button>
     </form></details>`;
 }
+/* ---------- text tool: raised or engraved words on one side of the selected object ---------- */
+const FACES = [["top", "Top"], ["front", "Front"], ["back", "Back"], ["left", "Left"], ["right", "Right"], ["bottom", "Bottom (underside)"]];
+const FONT_NAMES = { "sans": "Plain", "sans-bold": "Plain bold", "serif": "Classic", "serif-bold": "Classic bold", "mono": "Typewriter" };
+function textHTML(o) {
+  const t = PL.txt, fonts = PL.ctx.p.capabilities?.fonts || Object.keys(FONT_NAMES);
+  const hMax = Math.max(1, Math.floor(Math.max(o.size[0], o.size[1], o.size[2])));
+  const num = (id, name, label, val, mn, mx, st) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" name="${name}" value="${val}" min="${mn}" max="${mx}" step="${st}"></div>`;
+  return `<details class="pcut ptext" id="pText" ${t.open ? "open" : ""}><summary>🔤 Add text</summary>
+    <form data-plate="text" class="pform" aria-describedby="pTextHelp">
+      <div class="field"><label for="pTxt">Words (up to 60 letters)</label><input id="pTxt" name="text" maxlength="60" value="${esc(t.text)}" placeholder="Your name" autocomplete="off" required></div>
+      <fieldset class="seg-radio"><legend>Style</legend>
+        <label><input type="radio" name="mode" value="emboss" ${t.mode === "emboss" ? "checked" : ""}> Raised</label>
+        <label><input type="radio" name="mode" value="deboss" ${t.mode === "deboss" ? "checked" : ""}> Engraved (cut in)</label></fieldset>
+      <div class="grid2">
+        <div class="field"><label for="pTxtFace">Side</label><select id="pTxtFace" name="face">${FACES.map(([v, l]) => `<option value="${v}" ${t.face === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="pTxtFont">Letters</label><select id="pTxtFont" name="font">${fonts.map(f => `<option value="${f}" ${t.font === f ? "selected" : ""}>${FONT_NAMES[f] || f}</option>`).join("")}</select></div>
+      </div>
+      <div class="grid3t">${num("pTxtH", "height", "Letter height <em>mm</em>", t.height, 1, hMax, 0.5)}${num("pTxtD", "depth", "Depth <em>mm</em>", t.depth, 0.2, 10, 0.1)}${num("pTxtR", "rotation", "Turn <em>°</em>", t.rotation, -360, 360, 1)}</div>
+      <details><summary>Move the text on that side (mm)</summary><div class="grid2">
+        ${num("pTxtU", "offset_u", "Right / left", t.offset_u, -1000, 1000, 0.5)}${num("pTxtV", "offset_v", "Up / down", t.offset_v, -1000, 1000, 0.5)}</div></details>
+      <p class="help" id="pTextHelp">The text sits on the flat side of the object's box; on curved parts some letters may float or sink, and ZEIM tells you. Words are checked like any other words others can see. Undo removes it.</p>
+      <button class="btn small primary" id="pTextGo">🔤 Add text</button>
+    </form></details>`;
+}
+function readText(f) {
+  const t = PL.txt, n = k => (f[k].value === "" ? null : +f[k].value);
+  t.text = f.text.value; t.mode = f.querySelector("input[name=mode]:checked")?.value || "emboss"; t.face = f.face.value; t.font = f.font.value;
+  ["height", "depth", "rotation", "offset_u", "offset_v"].forEach(k => { if (n(k) != null) t[k] = n(k); });
+  return t;
+}
+
 function readCut(f) {
   const c = PL.cut, n = k => (f[k] && f[k].value !== "" ? +f[k].value : null);
   c.axis = f.querySelector("input[name=axis]:checked")?.value || "z";
@@ -245,12 +278,24 @@ export function wirePanel(root) {
     if (act === "merge" && sel.length) PL.sel = new Set([sel[0]]);       // the merged body takes the first object's place
     return PL.ctx.doOp("plate", { action: act, sel }, "Updating the plate…", $("#plateOut"));
   });
-  root.addEventListener("toggle", e => { if (e.target.id === "pCut") { PL.cut.open = e.target.open; drawCutPlane(); } }, true);
-  const onCut = e => { const f = e.target.closest("form[data-plate=cut]"); if (f) syncCut(f, e.target); };
+  root.addEventListener("toggle", e => {
+    if (e.target.id === "pCut") { PL.cut.open = e.target.open; drawCutPlane(); }
+    if (e.target.id === "pText") PL.txt.open = e.target.open;
+  }, true);
+  const onCut = e => {
+    const f = e.target.closest("form[data-plate=cut]"); if (f) return syncCut(f, e.target);
+    const t = e.target.closest("form[data-plate=text]"); if (t) readText(t);
+  };
   root.addEventListener("input", onCut); root.addEventListener("change", onCut);
   root.addEventListener("submit", e => {
     const f = e.target.closest("form[data-plate]"); if (!f) return;
     e.preventDefault(); e.stopImmediatePropagation();
+    if (f.dataset.plate === "text") {
+      const t = readText(f);
+      if (!t.text.trim()) { $("#plateOut").textContent = "Type some words first."; return f.text.focus(); }
+      const q = { text: t.text.trim(), mode: t.mode, face: t.face, font: t.font, height: t.height, depth: t.depth, rotation: t.rotation, offset_u: t.offset_u, offset_v: t.offset_v };
+      return PL.ctx.doOp("plate", { action: "text", sel: selList(), ...q }, "Adding text…", $("#plateOut"));
+    }
     if (f.dataset.plate === "cut") {
       const c = readCut(f), q = { axis: c.axis, offset: c.offset, join: c.join, lay_flat: c.lay_flat && c.axis !== "z" };
       if (["magnet", "pin", "dovetail"].includes(c.join)) q.material = c.material;

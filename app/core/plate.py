@@ -13,7 +13,8 @@ import trimesh
 MAX_OBJECTS = 60
 DEFAULT_BED = (220.0, 220.0, 250.0)
 ACTIONS = {"transform", "duplicate", "delete", "center", "arrange", "group", "ungroup", "merge", "separate",
-           "lay_flat", "hide", "show", "cut"}
+           "lay_flat", "hide", "show", "cut", "text"}
+TEXT_KEYS = ("text", "font", "mode", "face", "height", "depth", "rotation", "offset_u", "offset_v")
 CUT_JOINS = ("none", "glue", "magnet", "dovetail", "pin")
 CUT_MATERIALS = ("PLA", "PETG")
 
@@ -499,6 +500,21 @@ def apply(m, p) -> tuple[trimesh.Trimesh, dict]:
         msg = (f"Cut Object {i + 1} across {cut['axis'].upper()} at {cut['offset_mm']:g} mm into 2 pieces ({jn}). "
                f"Fit is Simulated. Undo puts it back.")
         extra_rep["cut"] = cut
+    elif act == "text":
+        if len(sel) != 1:
+            raise PlateError("Select one object to add text to.")
+        from . import meshedit
+        i = sel[0]
+        lo, hi = objs[i].bounds
+        try:
+            o, trep = meshedit.op_text(objs[i], {k: p[k] for k in TEXT_KEYS if k in p})
+        except meshedit.OpError as e:
+            raise PlateError(str(e))
+        lo2 = o.bounds[0]
+        objs[i] = _move(o, [0, 0, -lo2[2]]) if lo2[2] < lo[2] - 1e-6 else o      # raised text on the underside: keep it on the bed
+        mode = p.get("mode", "emboss")
+        msg = (f"{'Raised' if mode == 'emboss' else 'Engraved'} text on the {p.get('face', 'top')} of Object {i + 1}. Undo removes it.")
+        extra_rep["text"] = {"note": trep.get("note", ""), "mode": mode, "face": p.get("face", "top")}
     elif act == "lay_flat":
         from . import orient
         for i in sel:
@@ -516,8 +532,10 @@ def apply(m, p) -> tuple[trimesh.Trimesh, dict]:
 def label(p: dict) -> str:
     names = {"transform": "Move / rotate / resize", "duplicate": "Duplicate", "delete": "Delete", "center": "Auto-centre",
              "arrange": "Auto-arrange", "group": "Group", "ungroup": "Ungroup", "merge": "Merge", "separate": "Separate",
-             "lay_flat": "Lay flat", "hide": "Hide", "show": "Show", "cut": "Cut"}
+             "lay_flat": "Lay flat", "hide": "Hide", "show": "Show", "cut": "Cut", "text": "Text"}
     n = len(p.get("sel") or [])
+    if p.get("action") == "text":
+        return f"Plate: {'Engrave' if p.get('mode') == 'deboss' else 'Raised'} text “{p.get('text', '')}”" + (f" ({n} selected)" if n else "")
     if p.get("action") == "cut":
         j = str(p.get("join") or "none")
         return f"Plate: Cut {str(p.get('axis') or 'z').upper()} at {p.get('offset', 'middle')} mm" + ("" if j == "none" else f" ({j})")

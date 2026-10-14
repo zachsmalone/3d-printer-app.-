@@ -15,7 +15,7 @@ Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md). Group
 |---|---|
 | **Showcase** | Trending, Following, search with history, favorites, follows, remix credit chains, and moderator-reviewed **I printed this** photos. |
 | **Slicer** | In-app slicing with PrusaSlicer (run unmodified). Printer and nozzle picker (0.1-1.0 mm), Beginner / Advanced settings, **Will it print?** badge, multi-file upload, and **Open in your slicer** (3MF / STL) for Creality, Bambu Lab, Prusa, Elegoo and Anycubic. First tested on a Creality K1. |
-| **Plate editor** | Shapr3D-style: select, move, rotate and resize single items, auto-center, arrange, group/ungroup, merge/separate, duplicate, hide and delete, and **cut** one object with a plane (magnet, dovetail, pin or glue connectors; fit Simulated). |
+| **Plate editor** | Shapr3D-style: select, move, rotate and resize single items, auto-center, arrange, group/ungroup, merge/separate, duplicate, hide and delete, and **cut** one object with a plane (magnet, dovetail, pin or glue connectors; fit Simulated), and add raised or engraved **text** to one object. |
 | **Lithophane** | Photo to lithophane: heart, circle, star, square, full-sphere globe, Cylinder / Cup wrap and night-light, with a backlit **Light on** preview (warm or cool light). |
 | **Smart Fix** | Mesh repair, auto-orient and smart split. |
 | **2D to 3D** | Logo / drawing tracing to extruded shapes (keychains, signs, cookie cutters), then layered colour prints. |
