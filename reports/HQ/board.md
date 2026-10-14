@@ -1,5 +1,27 @@
 # HQ board
 
+## 2026-10-14 04:45 CT | Lead builder (Haruto line) | SHIPPED (printers + calibration + Smart Fix)
+Pushed to origin/zeim (fast-forward `4aac698..` this board commit). `haruto/work` @ `d210d38` gated and merged to main; no conflicts.
+- `4aa17c5` Printer catalog: add 49 sourced profiles across 15 brands; group picker by brand.
+- `5b68cbf` Printer catalog sanity: every setting of all 67 profiles has an https source; bed/nozzle/temperature limits in a believable range; every FDM printer builds a slicer config for every nozzle + material (temps capped); resin refused; picker one optgroup per brand.
+- `9d67ac2` Calibration wizard (Smart Fix page): first layer, temperature tower, flow cup and retraction pillars for the picked printer + nozzle + filament; plain-words steps, good/bad looks and the real PrusaSlicer keys (Smart Fix map), never auto-applied; STL download or slice in ZEIM (tower gets one M104 per band, capped to the printer); ABS/ASA/PC ask once; resin gets the exposure-test + safety note; Chrome + WebKit test.
+- `d210d38` Failure photo doctor (Smart Fix page): pick from the 25-problem library and/or describe it, optional photo; fixes in plain words with the real PrusaSlicer keys (Smart Fix map), not-verified and on-the-printer fixes labelled; 'Use in my next slice' only for verified keys the panel has, asks first (before -> after), Slicer shows it with Undo; photo goes through the normal upload checks (permission box, sniff, EXIF strip, moderation hook) and is not kept; Chrome + WebKit test.
+Gate on `haruto/work` @ `d210d38`: **1411 passed, 0 failed, 0 skipped** (full suite incl. Chrome + WebKit UI, 15m21s, no re-runs). Scratch ports only (`PHOTO3D_DATA`/`OUT` under `/tmp/zeim-gate-cal-*`). Live :8765 restarted onto this tip after push.
+Not tested on a real K1 or a real iPhone (calibration + doctor UI checked in Chrome + WebKit only; printer specs sourced from maker pages, not K1-tested).
+**Specialists:** QA + Design + Safety re-verify on `d210d38`: brand-grouped picker + https source URLs; calibration wizard plain-words + never auto-apply + ABS/ASA/PC ask + resin exposure/safety; Smart Fix map keys + optional photo upload checks + Use in next slice ask+Undo; mild NSFW + layer preview + 2D-to-3D still pass.
+
+## 2026-10-14 04:28 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~04:25)
+Lead builder was idle (no pytest). origin/zeim = local main `4aac698` (2D-to-3D + layer preview shipped, 1070 passed; CI green). Unpushed on `haruto/work` @ `d210d38` (**4 ahead**): printers catalog + sanity (`4aa17c5`, `5b68cbf`), calibration wizard (`9d67ac2`), failure photo doctor / Smart Fix (`d210d38`). Box health: cleaned stale Chrome temp dirs; disk ~12%, `/tmp` ~280M; live :8765 (uvicorn, 200) + ngrok up. No open PRs. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers, delete leftover classrooms data (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
+
+**Build order this run (lead builder):**
+1. Pilot: full-suite gate on `haruto/work` @ `d210d38` (scratch ports only, never :8765). If green: The Path — FF main → push origin/zeim; board SHIPPED with hashes + pass count.
+2. After ship: lithophane image placement (move/zoom/rotate inside shape) from `/workspace/photo3d-lithocrop` (`b9cb410`, rebase onto new tip) — Zach wants Fit/Fill/Reset + live preview on iPhone; gate + push.
+3. Then Zach 18:46 queue leftovers: paint-on supports, cut tool with connectors in plate editor (hide/show+delete already on tip if present).
+4. Do not touch hosting spend, Stripe wiring, legal pages for payments, or delete any data. No full photo-to-3D AI yet.
+
+**Specialists (HQ):** after printers + calibration + Smart Fix land, verify: brand-grouped picker + source URLs; calibration wizard plain-words + no auto-apply; Smart Fix map keys + optional photo upload checks; mild NSFW + layer preview + 2D-to-3D still pass.
+
+
 ## 2026-10-14 02:58 CT | Lead builder (Haruto line) | SHIPPED (2D-to-3D + layer preview)
 Pushed to origin/zeim (fast-forward `b043a8a..` this board commit). `haruto/work` rebased onto main (`ebdf916`, Yami's 02:27 board entry) and the `layer-preview` branch (`/tmp/zeim-2d3d-wt`) added on top; no conflicts.
 - `53e20dd` Logo & Drawing to 3D: trace a logo, sketch or drawing (PNG/JPG/SVG; Otsu or by colour, despeckle, smoothing, holes kept) into a raised shape with optional base and keyring hole, a cookie cutter, a stamp (raised or pressed in) or colour layers (one 3MF piece per colour); thin-line warning + auto-thicken; same upload checks as every photo.
