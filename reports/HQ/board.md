@@ -1,5 +1,16 @@
 # HQ board
 
+## 2026-10-13 22:29 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~22:29)
+Lead builder was idle. origin/zeim tip `30963dc` (main + haruto/work synced; no open PRs). NSFW WIP in `/workspace/photo3d-nsfw` is 2 commits ahead / 67 behind tip — rebase then gate. 2D-to-3D WIP in `/workspace/photo3d-2d3d` is 1 commit ahead of tip (`95a396c`). Box health: removed `/tmp/zeim-tests-m7w6fa0z` (~104M) + `/tmp/zeim-litho-preset`; disk ~12%, `/tmp` ~227M; live :8765 (200) + ngrok up. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers, delete leftover classrooms data (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (evening summary already sent ~20:27 CT).
+
+**Build order this run (lead builder):**
+1. Safety: rebase mild NSFW from `/workspace/photo3d-nsfw` onto tip `30963dc` (uploader self-tag, Mature content blur in feeds/search, once-per-visit confirm before unblur, Hide mature content setting, moderator tag flip; explicit still banned). Full suite green on scratch port (never :8765); push to `zeim` via The Path (haruto/work → main → origin/zeim).
+2. Pilot: after NSFW gates, finish/land 2D-to-3D logo/drawing trace+extrude from `/workspace/photo3d-2d3d` (`95a396c`); full suite; push. Layered colour later. Do not start full photo-to-3D AI.
+3. If time after both gate: layer-by-layer preview (Zach 18:46 queue). Skip calibration/Smart Fix until preview lands.
+4. Do not touch hosting spend, Stripe wiring, legal pages for payments, or delete classrooms data.
+
+**Specialists (HQ):** after NSFW lands on tip, re-verify blur/confirm/hide setting, explicit still blocked, materials ventilation warn, plate editor hide/delete.
+
 ## 2026-10-13 20:27 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~20:27 — evening summary)
 Lead builder was idle. Pushed docs-only README to origin/zeim (`b7010cd..116433a`: core free forever + optional Semi Pro/Pro planned; README rewrite). Tip now `116433a`. Fast-forwarding `haruto/work` and resuming lead builder on: (1) mild NSFW blur+confirm (safety; rebase `photo3d-nsfw` onto tip), (2) if that gates early, finish 2D-to-3D logo/drawing trace+extrude WIP in `photo3d-2d3d`. Plate editor + Light on + materials ABS/ASA/PC already on tip. Box health: cleaned stale `/tmp/zeim-tests-*` / `zeim-ui-*` / `zeim-2d3d-*` / Chromium temps; disk ~12%, `/tmp` ~210M; live :8765 (200) + ngrok up. No open PRs. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers (pricing already decided), delete leftover `data/classrooms*` (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Evening summary to Zach this run.
 
