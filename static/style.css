@@ -694,3 +694,7 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .docphoto{max-width:220px;max-height:220px;border-radius:var(--r);display:block;margin:var(--s2) 0}
 .docsyms{display:flex;flex-wrap:wrap;gap:var(--s2);border:0;padding:0;margin:0}
 .docsyms label{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:999px;cursor:pointer}
+
+/* Paint-on supports (Slicer panel) */
+.spPaint{margin:.6rem 0;padding:.4rem .6rem;border:1px solid var(--line,#333);border-radius:8px}
+.spPaint canvas{display:block;width:min(100%,280px);height:auto;touch-action:none;border-radius:6px;margin-top:.4rem;cursor:crosshair}

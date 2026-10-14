@@ -188,9 +188,10 @@ def find_engine() -> Optional[str]:
     return None
 
 
-def run_engine(engine: str, ini: Path, stl: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110)) -> None:
+def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110)) -> None:
     # Argument list, no shell: nothing user-controlled is interpreted.
-    cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(stl)]
+    # model is an STL or a PrusaSlicer-friendly 3MF (paint-on support enforcers/blockers).
+    cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired:
@@ -273,10 +274,14 @@ class SliceResult:
     profile: PrinterProfile
 
 
-def slice_stl(stl: Path, profile: PrinterProfile, out_gcode: Path) -> SliceResult:
-    lo, hi = stl_bounds(stl)
+def slice_model_path(model: Path, profile: PrinterProfile, out_gcode: Path, *,
+                    bounds_stl: Path | None = None) -> SliceResult:
+    """Slice an STL or a paint-on-supports 3MF. Bed-fit uses `bounds_stl` (the plain model) when given,
+    so painted enforcer/blocker volumes never change the size check."""
+    src = bounds_stl or model
+    lo, hi = stl_bounds(src) if src.suffix.lower() == ".stl" else _mesh_bounds(src)
     size = (hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2])
-    check_fits(size, profile)  # friendly refusal first, before touching the engine
+    check_fits(size, profile)
     engine = find_engine()
     if engine is None:
         raise SliceError("slicer_unavailable", "Slicing isn't available on this server yet "
@@ -286,6 +291,23 @@ def slice_stl(stl: Path, profile: PrinterProfile, out_gcode: Path) -> SliceResul
     with tempfile.TemporaryDirectory(prefix="zeim-slice-") as td:
         ini = Path(td) / "profile.ini"
         ini.write_text(profile.ini.strip() + "\n")
-        run_engine(engine, ini, stl, out_gcode, center=(profile.bed_x / 2, profile.bed_y / 2))
+        run_engine(engine, ini, model, out_gcode, center=(profile.bed_x / 2, profile.bed_y / 2))
     seconds, grams = parse_gcode_stats(out_gcode)
     return SliceResult(out_gcode, seconds, grams, size, profile)
+
+
+def _mesh_bounds(path: Path) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
+    """Bounds of a mesh file via trimesh (used for 3MF when no separate STL is given)."""
+    import trimesh
+    try:
+        m = trimesh.load(str(path), force="mesh")
+        if m.bounds is None:
+            raise ValueError
+        lo, hi = m.bounds
+        return (float(lo[0]), float(lo[1]), float(lo[2])), (float(hi[0]), float(hi[1]), float(hi[2]))
+    except Exception:
+        raise SliceError("bad_model", "That file doesn't look like a valid 3D model. Please try again.", 400)
+
+
+def slice_stl(stl: Path, profile: PrinterProfile, out_gcode: Path) -> SliceResult:
+    return slice_model_path(stl, profile, out_gcode)

@@ -2,6 +2,7 @@
    Choice: signed-up users keep it on their profile (PUT /api/me/printer); everyone else in localStorage. Default Creality K1 at 0.4 mm. */
 import { api, esc, $, toast } from "/static/app.js";
 import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
+import { mountPaint, getStrokes } from "/static/supportpaint.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const KEY = "zeim.printer";
@@ -109,6 +110,7 @@ export function panelHTML(hintMode) {
     <div class="segmented" role="group" aria-label="Settings level"><button type="button" id="spBeginner" aria-pressed="${beginner}">Beginner</button><button type="button" id="spAdvanced" aria-pressed="${!beginner}">Advanced</button></div>
     <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === wantPreset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>
     <div class="grid2">${sel("spMat", "Material", mats, "PLA")}${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
+    <div id="spPaintHost"></div>
     <div id="spMatWarn" aria-live="polite">${matWarnHTML("PLA")}</div>
     <div id="spAdv" ${beginner ? "hidden" : ""}><div class="grid3">
       ${num("spLayer", "Layer height", presetLayer(pv, lh.recommended, lo, hi), lo, hi, 0.01, `mm (${lo} to ${hi})`).replace("<input ", `<input data-rec="${lh.recommended}" `)}
@@ -135,6 +137,8 @@ function readPanel() {
   fd.append("material", $("#spMat").value); fd.append("supports", $("#spSup").value);
   if (adv) for (const [k, id] of [["layer_height", "spLayer"], ["walls", "spWalls"], ["top_bottom", "spTB"], ["infill", "spInfill"], ["infill_pattern", "spPattern"], ["brim", "spBrim"], ["speed", "spSpeed"], ["nozzle_temp", "spNozT"], ["bed_temp", "spBedT"]]) fd.append(k, $("#" + id).value);
   if ($("#spFit").checked) fd.append("scale_to_fit", "true");
+  const paint = getStrokes();
+  if (paint.length) fd.append("support_paint", JSON.stringify(paint));
   return fd;
 }
 export function openInHTML(dl) {
@@ -145,6 +149,7 @@ export function openInHTML(dl) {
 export function wirePanel(getModelId) {
   const mat = $("#spMat");
   if (!mat) return;
+  mountPaint($("#spPaintHost"));
   const mode = adv => { localStorage.setItem("zeim.slicerMode", adv ? "advanced" : "beginner"); $("#spAdv").hidden = !adv; $("#spBeginner").setAttribute("aria-pressed", !adv); $("#spAdvanced").setAttribute("aria-pressed", adv); };
   $("#spBeginner").onclick = () => mode(false); $("#spAdvanced").onclick = () => mode(true);
   // reference temps, capped to what this printer can reach (the server caps them the same way and says so)
@@ -165,8 +170,12 @@ export function wirePanel(getModelId) {
     try {
       const r = await api("/api/slice", { method: "POST", body: fd });
       const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
+      const paintNote = r.support_paint
+        ? `<p class="help">Paint-on supports: ${r.support_paint.enforcers || 0} need / ${r.support_paint.blockers || 0} never. ${esc(r.support_paint.supports_note || r.support_paint.note || "")}</p>`
+        : "";
       out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
+        ${paintNote}
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}

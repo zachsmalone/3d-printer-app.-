@@ -95,6 +95,7 @@ def slice_model(
     scale_to_fit: bool = Form(False),
     fit: bool = Form(False),
     ventilation_ok: bool = Form(False),
+    support_paint: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
     if bool(file) == bool(model_id):
@@ -147,7 +148,30 @@ def slice_model(
             shutil.copyfile(resolve_model(model_id, actor), work / "input.stl")  # type: ignore[arg-type]
             stl = work / "input.stl"
         fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit or fit, info=(scaling := {}))
-        res = eng.slice_stl(work / "model.stl", prof, work / "model.gcode")
+        paint_info = None
+        model_for_engine = work / "model.stl"
+        if support_paint:
+            from app.services import support_paint as spaint
+            import trimesh
+            try:
+                strokes = spaint.parse_strokes(support_paint)
+            except spaint.PaintError as e:
+                _fail(400, "bad_paint", str(e))
+            if strokes:
+                mesh = trimesh.load(str(work / "model.stl"), force="mesh")
+                paint_info = spaint.write_paint_3mf(mesh, strokes, work / "model_paint.3mf")
+                model_for_engine = work / "model_paint.3mf"
+                # Painted "need support" areas require supports on; leave the maker's Auto/Everywhere choice.
+                if paint_info["enforcers"] and chosen.get("supports") == "off":
+                    opts = {**opts, "supports": "auto"}
+                    try:
+                        prof, chosen = eng.profile_for(printer_id or profile, nozzle, opts)
+                    except eng.SliceError as e:
+                        _fail(e.status, e.code, e.message)
+                    paint_info = {**paint_info, "supports_forced": "auto",
+                                  "supports_note": "You painted areas that need supports, so ZEIM turned Supports on (Auto). You can still pick Everywhere."}
+        res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
+                                   bounds_stl=work / "model.stl")
     except eng.SliceError as e:
         shutil.rmtree(work, ignore_errors=True)
         _fail(e.status, e.code, e.message)
@@ -177,6 +201,7 @@ def slice_model(
         "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
         "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
         "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
+        "support_paint": paint_info,
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
     }
