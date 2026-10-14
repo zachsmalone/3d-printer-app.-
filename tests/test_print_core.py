@@ -36,7 +36,7 @@ def ini_dict(text):
 # ---- 1) picker ------------------------------------------------------------------------------------------------------
 def test_catalog_has_18_printers_nozzles_and_k1_default():
     j = client().get("/api/printers/catalog").json()
-    assert len(j["printers"]) == 18 and j["nozzles"] == [0.2, 0.4, 0.6, 0.8, 1.0]
+    assert len(j["printers"]) == 67 and j["nozzles"] == [0.2, 0.4, 0.6, 0.8, 1.0]
     assert j["default"] == {"printer_id": "creality_k1", "nozzle": 0.4}
     resin = [p for p in j["printers"] if p["technology"] == "Resin"]
     assert resin and all(p["nozzles"] == [] and p["stock_nozzle_mm"] is None for p in resin)

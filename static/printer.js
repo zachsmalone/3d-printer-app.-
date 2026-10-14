@@ -36,7 +36,7 @@ export function mfrHTML(pid, n) {
 
 /* Picker markup. `uid` keeps ids unique when the picker appears twice on a page (sign-up + Account). */
 export function pickerHTML(uid, pref = P.pref, { optional = false } = {}) {
-  const opts = (optional ? `<option value="">Not now</option>` : "") + P.cat.printers.map(p => `<option value="${p.id}" ${p.id === pref.printer_id && !optional ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (resin)" : ""}</option>`).join("");
+  const opts = (optional ? `<option value="">Not now</option>` : "") + [...new Set(P.cat.printers.map(p => p.brand))].map(b => `<optgroup label="${esc(b)}">` + P.cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}" ${p.id === pref.printer_id && !optional ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (resin)" : ""}</option>`).join("") + `</optgroup>`).join("");  // grouped by brand
   const pid = optional ? P.cat.default.printer_id : pref.printer_id;
   return `<div class="grid2 printerpick" data-uid="${uid}">
     <div class="field"><label for="${uid}_pr">Printer${optional ? " <em>optional</em>" : ""}</label><select id="${uid}_pr">${opts}</select></div>

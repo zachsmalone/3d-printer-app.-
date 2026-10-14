@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 import pytest
 from app import printers
 
-IDS = ['anycubic_kobra3', 'anycubic_photon_mono_m5s', 'bambu_a1', 'bambu_a1_mini', 'bambu_p1s', 'bambu_x1c', 'creality_ender3_v3', 'creality_ender3_v3_se', 'creality_k1', 'creality_k1_max', 'creality_k1c', 'elegoo_mars4', 'elegoo_neptune4', 'elegoo_neptune4_pro', 'elegoo_saturn3', 'prusa_core_one', 'prusa_mini_plus', 'prusa_mk4']
+IDS = ['ankermake_m5', 'anycubic_kobra3', 'anycubic_kobra3_max', 'anycubic_kobra_s1', 'anycubic_kobra_s1_max', 'anycubic_photon_mono_m5s', 'anycubic_photon_mono_m7', 'artillery_sidewinder_x4_plus', 'artillery_sidewinder_x4_pro', 'bambu_a1', 'bambu_a1_mini', 'bambu_h2c', 'bambu_h2d', 'bambu_h2s', 'bambu_p1p', 'bambu_p1s', 'bambu_p2s', 'bambu_x1c', 'bambu_x1e', 'creality_cr10_se', 'creality_ender3_v3', 'creality_ender3_v3_ke', 'creality_ender3_v3_plus', 'creality_ender3_v3_se', 'creality_ender5_s1', 'creality_halot_mage', 'creality_hi', 'creality_k1', 'creality_k1_max', 'creality_k1_se', 'creality_k1c', 'creality_k2', 'creality_k2_plus', 'creality_k2_pro', 'creality_sparkx_i7', 'elegoo_centauri_carbon', 'elegoo_mars4', 'elegoo_mars5_ultra', 'elegoo_neptune4', 'elegoo_neptune4_max', 'elegoo_neptune4_plus', 'elegoo_neptune4_pro', 'elegoo_saturn3', 'elegoo_saturn4_ultra', 'flashforge_ad5x', 'flashforge_adventurer_5m', 'flashforge_adventurer_5m_pro', 'formlabs_form4', 'phrozen_sonic_mini_8k_s', 'prusa_core_one', 'prusa_mini_plus', 'prusa_mk3s_plus', 'prusa_mk4', 'prusa_sl1s', 'prusa_xl', 'qidi_plus4', 'qidi_q1_pro', 'qidi_x_max3', 'snapmaker_artisan', 'snapmaker_j1', 'sovol_sv06', 'sovol_sv06_plus', 'sovol_sv08', 'ultimaker_s5', 'voron_24_300', 'voron_24_350', 'voron_trident_300']
 
 @pytest.mark.parametrize("pid", IDS)
 def test_every_printer_loads(pid):
@@ -19,15 +19,15 @@ def test_exact_catalog_and_material_exclusion():
 
 
 def test_filters():
-    assert len(printers.load_catalog(technology="FDM")) == 15
-    assert len(printers.load_catalog(technology="Resin")) == 3
+    assert len(printers.load_catalog(technology="FDM")) == 57
+    assert len(printers.load_catalog(technology="Resin")) == 10
     with pytest.raises(printers.ProfileValidationError):
         printers.load_catalog(technology="SLA")
 
 
 def test_manufacturer_sources_only():
-    domains = ("bambulab.com", "creality.com", "prusa3d.com", "elegoo.com", "anycubic.com")
-    owners = ("/CrealityOfficial/", "/ELEGOO-3D/")
+    domains = ("bambulab.com", "creality.com", "prusa3d.com", "elegoo.com", "anycubic.com", "sovol3d.com", "qidi3d.com", "flashforge.com", "vorondesign.com", "formlabs.com", "phrozen3d.com", "ultimaker.com", "artillery3d.com", "snapmaker.com", "ankermake.com")
+    owners = ("/CrealityOfficial/", "/ELEGOO-3D/", "/VoronDesign/")
     for profile in printers.load_catalog().values():
         for item in profile["settings"].values():
             for url in item["sources"]:
