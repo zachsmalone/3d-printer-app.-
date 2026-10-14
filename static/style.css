@@ -646,6 +646,14 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .plate .pselect:focus-visible, .plate .picon:focus-visible { outline: 3px solid #7aa2ff; outline-offset: 2px; }
 .plate .ptitle { margin: 10px 0 4px; font-size: 1rem; }
 .plate .warn { color: #e08a5a; } .plate .ok { color: #5fbf7f; } .plate .muted { opacity: .8; font-style: italic; }
+.plate .pcut { margin-top: 10px; border-top: 1px solid var(--line, #33405c); padding-top: 8px; }
+.plate .pcut summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 600; }
+.plate .seg-radio { border: 0; padding: 0; margin: 4px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.plate .seg-radio label { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; }
+.plate .pcut input[type=range] { flex: 1; min-height: 44px; }
+.plate .pcut .check { min-height: 44px; display: flex; align-items: center; gap: 8px; }
+.plate .pcut #pCutGo, .plate .pcut select { min-height: 44px; }
+.plate .simnote .pill { margin-right: 4px; }
 .plate .tool-row .btn, #litLightBox .btn, #litLightBox select { min-height: 44px; }
 #litLightBox { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 #litLightBox[hidden] { display: none; }

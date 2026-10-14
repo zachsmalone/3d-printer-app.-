@@ -201,7 +201,8 @@ def _add_magnet(below, above, origin, normal, p: dict) -> tuple:
         hole_a = _cyl_along(normal, pt, r, depth, toward_sign=+1.0)
         below = meshedit._boolean(below, hole_b, "difference")
         above = meshedit._boolean(above, hole_a, "difference")
-    return below, above, {"magnet_mm": [mag_d, mag_t], "clearance_mm": clear, "pockets": len(pts)}
+    return below, above, {"magnet_mm": [mag_d, mag_t], "clearance_mm": clear, "pockets": len(pts),
+                          "at": [[round(float(c), 3) for c in pt] for pt in pts]}
 
 
 def _add_pin(below, above, origin, normal, p: dict) -> tuple:
@@ -224,7 +225,8 @@ def _add_pin(below, above, origin, normal, p: dict) -> tuple:
         below = meshedit._boolean(below, root, "union")
         hole = _cyl_along(normal, pt, (pin_d + clear) / 2, half + 0.4, toward_sign=+1.0)
         above = meshedit._boolean(above, hole, "difference")
-    return below, above, {"pin_diameter_mm": pin_d, "engagement_mm": engage, "clearance_mm": clear, "pins": len(pts)}
+    return below, above, {"pin_diameter_mm": pin_d, "engagement_mm": engage, "clearance_mm": clear, "pins": len(pts),
+                          "at": [[round(float(c), 3) for c in pt] for pt in pts]}
 
 
 def _dovetail_prism(origin, normal, u, length, depth, mouth, root, into_sign: float) -> trimesh.Trimesh:
@@ -276,8 +278,12 @@ def _add_dovetail(below, above, origin, normal, p: dict) -> tuple:
     if len(near) < 3:
         near = pts
     cu = near @ u
-    span = float(cu.max() - cu.min())
+    cv = near @ v
+    span = float(cv.max() - cv.min())          # the tab runs along v (it is extruded along v), so size it from the v extent
     length = max(8.0, min(span * 0.45, 40.0))
+    # Centre the tab on the cut face (not on the world axis): models are not always centred on (0, 0)
+    origin = np.asarray(origin, float)
+    origin = origin - u * (origin @ u) - v * (origin @ v) + u * 0.5 * float(cu.min() + cu.max()) + v * 0.5 * float(cv.min() + cv.max())
     # Male on below (+normal into the gap / toward above): tab protrudes +normal
     male = _dovetail_prism(origin, normal, u, length, depth, mouth, root, into_sign=+1.0)
     # Female in above: slightly larger pocket opening toward -normal (into above from face = +normal direction from origin into above)
@@ -285,7 +291,8 @@ def _add_dovetail(below, above, origin, normal, p: dict) -> tuple:
                              depth + clear, mouth + 2 * clear, root + 2 * clear, into_sign=+1.0)
     below = meshedit._boolean(below, male, "union")
     above = meshedit._boolean(above, female, "difference")
-    return below, above, {"depth_mm": depth, "mouth_mm": mouth, "root_mm": root, "clearance_mm": clear}
+    return below, above, {"depth_mm": depth, "mouth_mm": mouth, "root_mm": root, "clearance_mm": clear, "length_mm": round(length, 2),
+                          "at": [[round(float(c), 3) for c in origin]]}
 
 
 def _add_glue_marks(below, above, origin, normal, p: dict) -> tuple:

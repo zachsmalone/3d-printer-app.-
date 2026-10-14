@@ -13,7 +13,9 @@ import trimesh
 MAX_OBJECTS = 60
 DEFAULT_BED = (220.0, 220.0, 250.0)
 ACTIONS = {"transform", "duplicate", "delete", "center", "arrange", "group", "ungroup", "merge", "separate",
-           "lay_flat", "hide", "show"}
+           "lay_flat", "hide", "show", "cut"}
+CUT_JOINS = ("none", "glue", "magnet", "dovetail", "pin")
+CUT_MATERIALS = ("PLA", "PETG")
 
 
 class PlateError(ValueError):
@@ -185,6 +187,181 @@ def merge(meshes) -> tuple[trimesh.Trimesh, str]:
     return trimesh.Trimesh(joined.vertices, joined.faces, process=False), "joined"
 
 
+# ---------------------------------------------------------------- cut one object with a plane (+ Smart Split connectors)
+def _cyl_vol(r, h, sections=48):
+    """Volume of the 48-sided cylinders Smart Split cuts / adds (a polygon prism, a hair under pi r^2 h)."""
+    return 0.5 * sections * r * r * np.sin(2 * np.pi / sections) * h
+
+
+def _clearance_default(join: str, material: str) -> float:
+    """Starting clearances from data/split/split-specs.json (magnet glue fit: +0.25 mm PLA / +0.30 mm PETG)."""
+    from . import smartsplit
+    sp = smartsplit.specs()
+    if join == "dovetail":
+        return float(sp["dovetails"]["starting_geometry"]["per_side_clearance_mm"][material])
+    if join == "pin":
+        return float(sp["alignment_pins"]["starting_geometry"]["hole_clearance_mm"][material])
+    if join == "magnet":
+        return 0.25 if material == "PLA" else 0.30
+    return 0.0
+
+
+WALL_MM = 1.2      # split specs: keep at least 1.2 mm (about 3 perimeters) of plastic around a pocket
+
+
+def _section_2d(o, origin, normal, u, v):
+    """The object's cross-section on the cut plane as a shapely shape in (u, v) mm (even-odd, so holes stay holes)."""
+    from shapely.geometry import Polygon
+    sec = o.section(plane_origin=origin, plane_normal=normal)
+    if sec is None:
+        return None
+    geom = None
+    for loop in sec.discrete:
+        if len(loop) < 3:
+            continue
+        pg = Polygon(np.c_[loop @ u, loop @ v]).buffer(0)
+        if pg.is_empty:
+            continue
+        geom = pg if geom is None else geom.symmetric_difference(pg)
+    return geom
+
+
+def _connector_inside(o, origin, normal, join, detail) -> bool:
+    """True when every pocket / pin hole / dovetail slot sits inside the cut face with WALL_MM of plastic around it."""
+    from shapely.geometry import Point, box as sbox
+    from . import smartsplit
+    u, v = smartsplit._inplane_axes(normal)
+    face = _section_2d(o, origin, normal, u, v)
+    if face is None or face.is_empty:
+        return False
+    inner = face.buffer(-WALL_MM)
+    pts = [np.asarray(a, float) for a in detail.get("at") or []]
+    if join == "magnet":
+        r = (detail["magnet_mm"][0] + detail["clearance_mm"]) / 2
+        shapes = [Point(float(pt @ u), float(pt @ v)).buffer(r, 48) for pt in pts]
+    elif join == "pin":
+        r = (detail["pin_diameter_mm"] + detail["clearance_mm"]) / 2
+        shapes = [Point(float(pt @ u), float(pt @ v)).buffer(r, 48) for pt in pts]
+    else:
+        c, w, L = pts[0], detail["mouth_mm"] + 2 * detail["clearance_mm"], detail["length_mm"] + 0.2
+        cu, cv = float(c @ u), float(c @ v)
+        shapes = [sbox(cu - w / 2, cv - L / 2, cu + w / 2, cv + L / 2)]
+    return bool(shapes) and all(inner.contains(sh) for sh in shapes)
+
+
+def cut_object(o: trimesh.Trimesh, p: dict, bed=None, others=None) -> tuple[list, dict]:
+    """Cut ONE object with a flat plane across X, Y or Z, optionally adding a Smart Split connector on the two cut faces.
+    `offset` is mm from the object's low side along that axis. `bed` (x, y, z) and `others` (bounds of the other visible
+    objects) only steer where the second piece is put. Returns ([piece_a, piece_b], info). Fit is Simulated."""
+    from . import meshedit, smartsplit
+    axis = str(p.get("axis") or "z").lower()
+    if axis not in ("x", "y", "z"):
+        raise PlateError("Cut across X, Y or Z.")
+    ai = "xyz".index(axis)
+    join = str(p.get("join") or "none").lower()
+    if join not in CUT_JOINS:
+        raise PlateError("Join must be none, glue, magnet, dovetail or pin.")
+    material = str(p.get("material") or "PLA").upper()
+    if material not in CUT_MATERIALS:
+        raise PlateError("Material must be PLA or PETG (it sets the starting gap).")
+    lo, hi = o.bounds
+    ext = float(hi[ai] - lo[ai])
+    if ext < 2.0:
+        raise PlateError(f"This object is only {ext:.1f} mm along {axis.upper()}, too thin to cut there.")
+    off = _num(p, "offset", ext / 2, -1e5, 1e5)
+    if not 0.5 <= off <= ext - 0.5:
+        raise PlateError(f"Put the cut inside the object: between 0.5 and {ext - 0.5:.1f} mm from its {('left', 'front', 'bottom')[ai]} side.")
+    pos = float(lo[ai] + off)
+    if join != "none" and not meshedit.have_boolean():
+        raise PlateError("Magnet, dovetail, pin and glue joins need manifold3d on the server. Choose None for a plain cut.")
+    try:
+        below, above, normal = smartsplit._slice_one(o, axis, pos)
+    except meshedit.OpError as e:
+        raise PlateError(str(e))
+    closed = bool(below.is_watertight and above.is_watertight)
+    detail, origin = {}, normal * pos
+    if join != "none":
+        if not closed:
+            raise PlateError("This object isn't watertight, so the cut faces can't take a connector. Run Fix first, or choose None.")
+        q = {} if join == "glue" else {"clearance": _num(p, "clearance", _clearance_default(join, material), 0.05, 1.0)}
+        for k in ("magnet_diameter", "magnet_thickness", "pin_diameter", "count"):
+            if p.get(k) not in (None, ""):
+                q[k] = p[k]
+        v0b, v0a = float(below.volume), float(above.volume)
+        try:
+            below, above, detail = smartsplit.apply_join(below, above, origin, normal, join, q)
+        except meshedit.OpError as e:
+            raise PlateError(f"The {join} join didn't work on this cut ({e}). Try another spot, a smaller connector, or None.")
+        db, da = float(below.volume) - v0b, float(above.volume) - v0a       # + added, - removed
+        exp_b = exp_a = None
+        if join == "magnet":
+            r = (detail["magnet_mm"][0] + detail["clearance_mm"]) / 2
+            exp_b = exp_a = -detail["pockets"] * _cyl_vol(r, detail["magnet_mm"][1] + 0.15)
+        elif join == "pin":
+            d, half, c = detail["pin_diameter_mm"], detail["engagement_mm"] / 2, detail["clearance_mm"]
+            exp_b = detail["pins"] * _cyl_vol(d / 2, half)
+            exp_a = -detail["pins"] * _cyl_vol((d + c) / 2, half + 0.4)
+        elif join == "dovetail":
+            d, m_, r_, c, L = (detail[k] for k in ("depth_mm", "mouth_mm", "root_mm", "clearance_mm", "length_mm"))
+            exp_b = (m_ + r_) / 2 * d * L
+            exp_a = -((m_ + 2 * c) + (r_ + 2 * c)) / 2 * (d + c) * (L + 0.2)
+        if join in ("magnet", "pin", "dovetail") and not _connector_inside(o, origin, normal, join, detail):
+            need = {"magnet": "magnet pockets", "pin": "pins and holes", "dovetail": "dovetail tab"}[join]
+            raise PlateError(f"The {need} {'does' if join == 'dovetail' else 'do'} not fit inside this cut face with a {WALL_MM:g} mm wall around them. "
+                             "Move the cut to a wider spot, use a smaller size or fewer, or choose Glue or None.")
+        if exp_b is not None:
+            tol = lambda got, exp: abs(got - exp) <= 0.03 * abs(exp) + 0.05
+            bodies_ok = len(below.split(only_watertight=False)) == 1 and len(above.split(only_watertight=False)) == 1
+            if not (tol(db, exp_b) and tol(da, exp_a) and bodies_ok and below.is_watertight and above.is_watertight):
+                need = {"magnet": "magnet pockets", "pin": "pins and holes", "dovetail": "dovetail tab"}[join]
+                raise PlateError(f"The {need} {'does' if join == 'dovetail' else 'do'} not fit inside this cut face (it would break through the side or the far face). "
+                                 "Move the cut to a thicker spot, use a smaller size or fewer, or choose Glue or None.")
+        detail = {**detail, "material": material}
+    # Place the two pieces side by side on the bed. Z cuts: both already stand on a flat face.
+    pieces = [(below, normal, join in ("pin", "dovetail", "glue")), (above, -normal, False)]   # (mesh, cut-face outward normal, raised connector?)
+    lay = bool(p.get("lay_flat")) and axis != "z"
+    out, laid = [], []
+    for k, (m, n, raised) in enumerate(pieces):
+        q = m.copy()
+        if lay and not raised:
+            q.apply_transform(trimesh.geometry.align_vectors(n, [0, 0, -1])); laid.append(k)
+        out.append(q)
+    gap = _num(p, "gap", 5.0, 0, 100)
+    c0 = (lo + hi) / 2
+    b_lo, b_hi = out[0].bounds
+    out[0] = _move(out[0], [c0[0] - (b_lo[0] + b_hi[0]) / 2, c0[1] - (b_lo[1] + b_hi[1]) / 2, -b_lo[2]])
+    b_lo, b_hi = out[0].bounds
+    a_lo, a_hi = out[1].bounds
+    j = 1 if axis == "y" else 0                                    # Y cuts open along Y, the rest along X
+    # Second piece next to the first: try the cut's opening side first, then the other sides; keep it on the bed and off
+    # the other objects when it can (Auto-arrange is there for anything harder).
+    bx, by = (bed or DEFAULT_BED)[:2]
+    others = others or []
+    best = None
+    for k, (jj, sgn) in enumerate([(j, 1), (j, -1), (1 - j, 1), (1 - j, -1)]):
+        d = np.zeros(3)
+        d[jj] = (b_hi[jj] + gap - a_lo[jj]) if sgn > 0 else (b_lo[jj] - gap - a_hi[jj])
+        d[1 - jj] = (b_lo[1 - jj] + b_hi[1 - jj]) / 2 - (a_lo[1 - jj] + a_hi[1 - jj]) / 2
+        d[2] = -a_lo[2]
+        lo2, hi2 = a_lo + d, a_hi + d
+        off_bed = lo2[0] < -bx / 2 or hi2[0] > bx / 2 or lo2[1] < -by / 2 or hi2[1] > by / 2
+        hits = sum(1 for olo, ohi in others if lo2[0] < ohi[0] and olo[0] < hi2[0] and lo2[1] < ohi[1] and olo[1] < hi2[1])
+        score = (int(off_bed), hits, k)
+        if best is None or score < best[0]:
+            best = (score, d)
+    out[1] = _move(out[1], best[1])
+    note = ("Connector fit is Simulated: starting sizes come from ZEIM's split specs for " + material +
+            ". Print a small test piece first. Not tested on a real printer." if join != "none" else
+            "Plain flat cut faces. Fit is Simulated until you test-print.")
+    if lay and join in ("pin", "dovetail", "glue"):
+        note += " The piece with the raised connector stays standing so the connector points up."
+    if not closed:
+        note += " The object wasn't watertight, so the cut faces may be open. Run Fix on the model for capped faces."
+    info = {"axis": axis, "offset_mm": round(off, 2), "position_mm": round(pos, 2), "join": join, "verification": "Simulated",
+            "note": note, "watertight": [bool(x.is_watertight) for x in out], "laid_on_cut_face": laid, **({"connector": detail} if detail else {})}
+    return out, info
+
+
 # ---------------------------------------------------------------- the op
 def _bed(p):
     b = p.get("bed") or DEFAULT_BED
@@ -217,7 +394,7 @@ def apply(m, p) -> tuple[trimesh.Trimesh, dict]:
         raise PlateError("That object isn't on the plate any more.")
     if not sel and act not in ("arrange",):
         raise PlateError("Select an object first.")
-    msg = ""
+    msg, extra_rep = "", {}
     if act == "transform":
         new = transform_set([objs[i] for i in sel], p)
         for i, o in zip(sel, new):
@@ -306,6 +483,22 @@ def apply(m, p) -> tuple[trimesh.Trimesh, dict]:
             raise PlateError(f"That makes more than {MAX_OBJECTS} objects.")
         objs, groups, hidden = out_o, out_g, out_h
         msg = f"Split into {made + len(sel)} separate parts." if made else "Already one piece: nothing to separate."
+    elif act == "cut":
+        if len(sel) != 1:
+            raise PlateError("Select one object to cut.")
+        if n + 1 > MAX_OBJECTS:
+            raise PlateError(f"Up to {MAX_OBJECTS} objects on one plate.")
+        i = sel[0]
+        others = [tuple(objs[k].bounds) for k in range(n) if k != i and not hidden[k]]
+        pieces, cut = cut_object(objs[i], p, _bed(p), others)
+        top = max(groups) + 1
+        objs = objs[:i] + pieces + objs[i + 1:]
+        groups = groups[:i] + [top, top + 1] + groups[i + 1:]
+        hidden = hidden[:i] + [hidden[i], hidden[i]] + hidden[i + 1:]
+        jn = {"none": "plain cut", "glue": "glue marks", "magnet": "magnet pockets", "dovetail": "dovetail tab", "pin": "pins + holes"}[cut["join"]]
+        msg = (f"Cut Object {i + 1} across {cut['axis'].upper()} at {cut['offset_mm']:g} mm into 2 pieces ({jn}). "
+               f"Fit is Simulated. Undo puts it back.")
+        extra_rep["cut"] = cut
     elif act == "lay_flat":
         from . import orient
         for i in sel:
@@ -317,14 +510,17 @@ def apply(m, p) -> tuple[trimesh.Trimesh, dict]:
             objs[i] = _move(o, [c[0] - c2[0], c[1] - c2[1], -lo2[2]])
         msg = f"Laid {len(sel)} object{'s' * (len(sel) > 1)} flat."
     out, layout = combine(objs, groups, hidden)
-    return out, {"message": msg, "layout": layout, "action": act}
+    return out, {"message": msg, "layout": layout, "action": act, **extra_rep}
 
 
 def label(p: dict) -> str:
     names = {"transform": "Move / rotate / resize", "duplicate": "Duplicate", "delete": "Delete", "center": "Auto-centre",
              "arrange": "Auto-arrange", "group": "Group", "ungroup": "Ungroup", "merge": "Merge", "separate": "Separate",
-             "lay_flat": "Lay flat", "hide": "Hide", "show": "Show"}
+             "lay_flat": "Lay flat", "hide": "Hide", "show": "Show", "cut": "Cut"}
     n = len(p.get("sel") or [])
+    if p.get("action") == "cut":
+        j = str(p.get("join") or "none")
+        return f"Plate: Cut {str(p.get('axis') or 'z').upper()} at {p.get('offset', 'middle')} mm" + ("" if j == "none" else f" ({j})")
     return "Plate: " + names.get(p.get("action"), "edit") + (f" ({n} selected)" if n else "")
 
 

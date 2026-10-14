@@ -3,7 +3,8 @@
 import * as THREE from "three";
 import { $, $$, esc } from "/static/app.js";
 
-const PL = { sel: new Set(), ctx: null, bed: null, drag: null };
+const PL = { sel: new Set(), ctx: null, bed: null, drag: null, plane: null,
+  cut: { open: false, axis: "z", offset: null, join: "none", material: "PLA", magnet_diameter: 6, magnet_thickness: 3, pin_diameter: 4, count: 2, lay_flat: false, for: null } };
 const objs = () => PL.ctx?.p?.plate?.objects || [];
 const groupOf = i => objs()[i]?.group;
 const expand = set => { const gs = new Set([...set].map(groupOf)); return new Set(objs().filter(o => gs.has(o.group)).map(o => o.i)); };
@@ -23,10 +24,12 @@ export function renderPlate(ctx) {
   if (prevIds !== p.id) PL.sel.clear();
   PL.sel = new Set([...PL.sel].filter(i => i < pl.objects.length));
   const act = p.report?.action;
-  if (act === "duplicate" || act === "separate") { /* keep it simple: clear selection after the count changes */ PL.sel.clear(); }
+  if (act === "duplicate" || act === "separate" || act === "cut") { /* keep it simple: clear selection after the count changes */ PL.sel.clear(); }
   drawBed(pl.bed_mm);
   paint();
-  return panelHTML();
+  const html = panelHTML();
+  setTimeout(drawCutPlane, 0);       // after the panel is in the page
+  return html;
 }
 
 function panelHTML() {
@@ -53,6 +56,7 @@ function panelHTML() {
       <button type="button" class="btn small ghost" data-pact="selall">Select all</button>
     </div>
     <p class="help" id="plateOut" role="status" aria-live="polite">${esc(PL.ctx.p.report?.action ? PL.ctx.p.report.message || "" : "")}</p>
+    ${PL.ctx.p.report?.action === "cut" && PL.ctx.p.report.cut ? `<p class="help simnote" id="plateCutNote"><span class="pill">Simulated</span> ${esc(PL.ctx.p.report.cut.note || "")}</p>` : ""}
     <div id="plateSel" ${s.length ? "" : "hidden"}>
       <h3 class="ptitle">${s.length === 1 ? esc(one.name) : `${s.length} selected`}</h3>
       <form data-plate="transform" class="pform">
@@ -81,7 +85,78 @@ function panelHTML() {
         <button type="button" class="btn small" data-pact="separate" title="Split into its separate pieces">Separate</button>
       </div>
       <p class="help">Group: move together, still separate bodies. Merge: one body. Separate: split a model into its loose pieces.</p>
+      ${one ? cutHTML(one) : ""}
     </div></details>`;
+}
+
+/* ---------- cut tool: one selected object, a flat plane across X / Y / Z, optional Smart Split connector ---------- */
+const AX = { x: 0, y: 1, z: 2 };
+const SIDE = { x: "left", y: "front", z: "bottom" };
+const JOINS = [["none", "Nothing (plain flat faces)"], ["glue", "Glue (small bumps to line the pieces up)"], ["magnet", "Magnets (a pocket in each piece)"],
+  ["dovetail", "Dovetail (a tab that slides in)"], ["pin", "Pins (printed pins + matching holes)"]];
+function cutOffset(o) {
+  const c = PL.cut, ext = o.size[AX[c.axis]];
+  if (c.for !== `${o.i}:${c.axis}:${ext}` || c.offset == null) { c.offset = r1(ext / 2); c.for = `${o.i}:${c.axis}:${ext}`; }
+  return Math.min(Math.max(c.offset, 0.5), r1(ext - 0.5));
+}
+function cutHTML(o) {
+  const c = PL.cut, ext = o.size[AX[c.axis]], off = cutOffset(o), j = c.join;
+  const num = (id, name, label, val, mn, mx, st) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" name="${name}" value="${val}" min="${mn}" max="${mx}" step="${st}"></div>`;
+  return `<details class="pcut" id="pCut" ${c.open ? "open" : ""}><summary>✂ Cut this object</summary>
+    <form data-plate="cut" class="pform" aria-describedby="pCutHelp">
+      <fieldset class="seg-radio"><legend>Cut across</legend>
+        ${["z", "x", "y"].map(a => `<label><input type="radio" name="axis" value="${a}" ${c.axis === a ? "checked" : ""}> ${a.toUpperCase()}${a === "z" ? " (flat, like slicing the top off)" : ""}</label>`).join("")}
+      </fieldset>
+      <div class="field"><label for="pCutAt">Where: mm from the ${SIDE[c.axis]} of the object (0.5 to ${r1(ext - 0.5)})</label>
+        <div class="row"><input id="pCutAtR" type="range" min="0.5" max="${r1(ext - 0.5)}" step="0.1" value="${off}" aria-label="Cut position slider">
+        <input id="pCutAt" type="number" name="offset" min="0.5" max="${r1(ext - 0.5)}" step="0.1" value="${off}" style="max-width:6em"></div></div>
+      <p class="help" id="pCutPlane" aria-live="polite">The red plane on the model shows where it will cut.</p>
+      <div class="field"><label for="pJoin">Join the two pieces with</label><select id="pJoin" name="join">${JOINS.map(([v, t]) => `<option value="${v}" ${j === v ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+      <div class="grid3t" ${j === "magnet" ? "" : "hidden"} data-cutfor="magnet">
+        ${num("pMagD", "magnet_diameter", "Magnet Ø <em>mm</em>", c.magnet_diameter, 2, 30, 0.5)}${num("pMagT", "magnet_thickness", "Thickness <em>mm</em>", c.magnet_thickness, 0.5, 20, 0.5)}</div>
+      <div class="grid3t" ${j === "pin" ? "" : "hidden"} data-cutfor="pin">${num("pPinD", "pin_diameter", "Pin Ø <em>mm</em>", c.pin_diameter, 1.5, 12, 0.5)}</div>
+      <div class="grid3t" ${j === "magnet" || j === "pin" ? "" : "hidden"} data-cutfor="magnet pin">${num("pCount", "count", "How many", c.count, 1, j === "pin" ? 4 : 6, 1)}</div>
+      <div class="field" ${j === "none" || j === "glue" ? "hidden" : ""} data-cutfor="magnet pin dovetail"><label for="pCutMat">Material (sets the starting gap)</label>
+        <select id="pCutMat" name="material"><option ${c.material === "PLA" ? "selected" : ""}>PLA</option><option ${c.material === "PETG" ? "selected" : ""}>PETG</option></select></div>
+      <label class="check" ${c.axis === "z" ? "hidden" : ""} data-cutfor="xy"><input type="checkbox" name="lay_flat" id="pCutLay" ${c.lay_flat ? "checked" : ""}> Lay the pieces on their cut face (flat side down)</label>
+      <p class="help" id="pCutHelp">Fit is <b>Simulated</b>: connector sizes are starting values from ZEIM's split specs, not tested on your printer. Print a small test piece first. The cut is one step: Undo puts the object back.</p>
+      <button class="btn small primary" id="pCutGo">✂ Cut into 2 pieces</button>
+    </form></details>`;
+}
+function readCut(f) {
+  const c = PL.cut, n = k => (f[k] && f[k].value !== "" ? +f[k].value : null);
+  c.axis = f.querySelector("input[name=axis]:checked")?.value || "z";
+  c.offset = n("offset"); c.join = f.join.value; c.material = f.material.value; c.lay_flat = !!f.lay_flat?.checked;
+  ["magnet_diameter", "magnet_thickness", "pin_diameter", "count"].forEach(k => { if (n(k) != null) c[k] = n(k); });
+  return c;
+}
+function syncCut(f, changed) {
+  const c = PL.cut, prevAxis = c.axis;
+  if (changed?.id === "pCutAtR") f.offset.value = changed.value;
+  readCut(f);
+  if (c.axis !== prevAxis) {
+    c.offset = null; const t = $("#plateTool"); if (t) { t.outerHTML = panelHTML(); }
+    $(`#pCut input[name=axis][value=${c.axis}]`)?.focus(); return drawCutPlane();
+  }
+  const r = $("#pCutAtR", f); if (r && changed?.id !== "pCutAtR" && c.offset != null) r.value = c.offset;
+  $$("[data-cutfor]", f).forEach(el => { const k = el.dataset.cutfor.split(" "); el.hidden = !(k.includes(c.join) || (k.includes("xy") && c.axis !== "z")); });
+  drawCutPlane();
+}
+function clearCutPlane() { const v = PL.ctx?.viewer; if (PL.plane && v) v.scene.remove(PL.plane); PL.plane = null; $("#pCut")?.removeAttribute("data-plane"); }
+function drawCutPlane() {
+  clearCutPlane();
+  const v = PL.ctx?.viewer, s = selList(), d = $("#pCut");
+  if (!v || !d || !d.open || s.length !== 1) return;
+  const o = objs()[s[0]], c = PL.cut, a = AX[c.axis], off = cutOffset(o);
+  const pos = o.min[a] + off, pad = 8, [sx, sy, sz] = o.size;
+  const [w, h] = c.axis === "z" ? [sx + pad, sy + pad] : c.axis === "x" ? [sz + pad, sy + pad] : [sx + pad, sz + pad];
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }));
+  if (c.axis === "x") m.rotation.y = Math.PI / 2;
+  if (c.axis === "y") m.rotation.x = Math.PI / 2;
+  const ctr = [...o.center]; ctr[a] = pos; m.position.set(...ctr);
+  m.name = "cutPlane"; m.renderOrder = 2; v.scene.add(m); PL.plane = m;
+  d.dataset.plane = `${c.axis}:${r1(pos)}`;
+  const t = $("#pCutPlane"); if (t) t.textContent = `The red plane shows the cut: ${c.axis.toUpperCase()} = ${r1(pos)} mm on the bed (${r1(off)} mm from the ${SIDE[c.axis]} of the object).`;
 }
 
 function selBox() {
@@ -93,6 +168,7 @@ function selBox() {
 /* ---------- viewer: bed outline, highlight, hidden ghosts ---------- */
 function drawBed(bed) {
   const v = PL.ctx.viewer; if (!v) return;
+  clearCutPlane();
   if (PL.bed) v.scene.remove(PL.bed);
   const [x, y] = bed, pts = [[-x / 2, -y / 2], [x / 2, -y / 2], [x / 2, y / 2], [-x / 2, y / 2], [-x / 2, -y / 2]].map(([a, b]) => new THREE.Vector3(a, b, 0));
   PL.bed = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x7aa2ff }));
@@ -110,7 +186,7 @@ export function paint() {
   });
   const live = $("#plateLive"); if (live) live.textContent = PL.sel.size ? `${PL.sel.size} selected` : "Nothing selected";
 }
-function rerender() { const t = $("#plateTool"); if (t) { t.outerHTML = panelHTML(); } paint(); }
+function rerender() { const t = $("#plateTool"); if (t) { t.outerHTML = panelHTML(); } paint(); drawCutPlane(); }
 
 export function select(i, add) {
   if (i == null) { if (!add) PL.sel.clear(); }
@@ -169,9 +245,19 @@ export function wirePanel(root) {
     if (act === "merge" && sel.length) PL.sel = new Set([sel[0]]);       // the merged body takes the first object's place
     return PL.ctx.doOp("plate", { action: act, sel }, "Updating the plate…", $("#plateOut"));
   });
+  root.addEventListener("toggle", e => { if (e.target.id === "pCut") { PL.cut.open = e.target.open; drawCutPlane(); } }, true);
+  const onCut = e => { const f = e.target.closest("form[data-plate=cut]"); if (f) syncCut(f, e.target); };
+  root.addEventListener("input", onCut); root.addEventListener("change", onCut);
   root.addEventListener("submit", e => {
     const f = e.target.closest("form[data-plate]"); if (!f) return;
     e.preventDefault(); e.stopImmediatePropagation();
+    if (f.dataset.plate === "cut") {
+      const c = readCut(f), q = { axis: c.axis, offset: c.offset, join: c.join, lay_flat: c.lay_flat && c.axis !== "z" };
+      if (["magnet", "pin", "dovetail"].includes(c.join)) q.material = c.material;
+      if (c.join === "magnet") Object.assign(q, { magnet_diameter: c.magnet_diameter, magnet_thickness: c.magnet_thickness, count: c.count });
+      if (c.join === "pin") Object.assign(q, { pin_diameter: c.pin_diameter, count: c.count });
+      return PL.ctx.doOp("plate", { action: "cut", sel: selList(), ...q }, "Cutting…", $("#plateOut"));
+    }
     const num = n => f[n].value === "" ? null : +f[n].value;
     const size = {}; [["sx", "x"], ["sy", "y"], ["sz", "z"]].forEach(([n, k]) => { if (num(n)) size[k] = num(n); });
     plateOp("transform", { x: num("x"), y: num("y"), rz: num("rz") || 0, scale_pct: num("scale_pct") || 100, size_mm: size });
