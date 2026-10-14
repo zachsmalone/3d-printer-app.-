@@ -77,7 +77,7 @@ def test_cr5_edit_photo_needs_the_box_but_a_3d_file_and_the_sample_do_not(ack_on
 # ------------------------------------------------------------------------------------------------ CR-11
 def _item_for_reports():
     pub = client(ADULT); bid = photo_build(pub)
-    r = pub.post("/api/showcase", json={"build_id": bid, "title": "Reportable", "description": "a thing", "tags": [], "accept_guidelines": True, "visibility": "public"})
+    r = pub.post("/api/showcase", json={"build_id": bid, "title": "Reportable", "description": "a thing", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"})
     assert r.status_code == 200, r.text
     return r.json()["id"]
 

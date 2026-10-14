@@ -99,7 +99,7 @@ def _print_public(p: dict, actor: Actor) -> dict:
     name = (tu or {}).get("username") or p.get("username")
     return {"id": p["id"], "url": f"/api/prints/{p['id']}/photo", "caption": p.get("caption", ""),
             "by": "@" + name if name else "a ZEIM maker", "created": p["created"], "mine": p["owner_sid"] == actor.sid,
-            "status": social.status(p), "pending": social.status(p) != "approved"}
+            "status": social.status(p), "pending": social.status(p) != "approved", "nsfw": bool(p.get("nsfw"))}
 
 
 @router.get("/showcase/{iid}/prints")
@@ -108,12 +108,13 @@ def list_prints(iid: str, actor: Actor = Depends(get_actor)):
         catalog.get(iid, actor)
     except catalog.Denied as e:
         raise HTTPException(e.status, e.msg)
-    return {"prints": [_print_public(p, actor) for p in social.prints_for(iid, actor.sid)]}
+    return {"prints": [_print_public(p, actor) for p in social.prints_for(iid, actor.sid)
+                       if not (p.get("nsfw") and catalog.hides_mature(actor) and p["owner_sid"] != actor.sid)]}
 
 
 @router.post("/showcase/{iid}/prints")
 def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), photo: UploadFile = File(...),
-              caption: str = Form(""), photo_ack: bool = Form(False)):
+              caption: str = Form(""), photo_ack: bool = Form(False), nsfw: str = Form("")):
     """Same pipeline as every other photo: permission box (CR-5), content sniffing, EXIF/GPS stripped by re-encoding, size caps;
     the caption goes through the chat filter; the image-moderation hook runs (default: needs human review, never auto-approves);
     every photo can be reported (minor_safety hides it at once) and reviewed in the queue."""
@@ -133,17 +134,18 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
     if len(data) > MAX_PRINT_PHOTO:
         raise HTTPException(413, "Photo too large (max 25 MB).")
     try:
-        cap = text_in(caption, 140, "Caption")
-        cap = safety.gate(actor, cap, "prints:caption") if cap else ""
         ack = imagesafe.check_ack(data, photo_ack)
         clean, ext, _ = imagesafe.sanitize(data)
+        is_nsfw = safety.parse_nsfw(nsfw)
+        cap = text_in(caption, 140, "Caption")
+        cap = safety.gate(actor, cap, "prints:caption", is_nsfw) if cap else ""
     except imagesafe.ImageRefused as e:
         raise HTTPException(415, str(e))
     except safety.ChatBlocked as e:
         return JSONResponse(status_code=e.status, content=e.payload)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack)
+    rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack, is_nsfw)
     return _print_public(rec, actor)
 
 

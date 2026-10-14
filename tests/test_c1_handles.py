@@ -7,7 +7,7 @@ _n = itertools.count(1)
 
 def _adult_with_item():
     a = client(); me = a.post("/api/me/signup", json={"display_name": "Margaret Realname", "dob": "1982-03-04", "username": f"MossMaker{next(_n)}"}).json()
-    it = a.post("/api/showcase", json={"build_id": photo_build(a), "title": "Lamp", "description": "d", "tags": [], "accept_guidelines": True, "visibility": "public"}).json()
+    it = a.post("/api/showcase", json={"build_id": photo_build(a), "title": "Lamp", "description": "d", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     return a, me, it
 
 

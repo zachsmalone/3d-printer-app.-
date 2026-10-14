@@ -47,7 +47,7 @@ def test_only_the_owner_can_star_and_the_flag_shows_in_the_list():
 
 def test_age_rules_7_days_ordinary_30_days_saved_never_for_starred():
     c = client(ADULT); plain, shared, starred, old_star = (photo_build(c) for _ in range(4))
-    r = c.post("/api/showcase", json={"build_id": shared, "title": "Saved one", "accept_guidelines": True, "visibility": "private"}); assert r.status_code == 200, r.text
+    r = c.post("/api/showcase", json={"build_id": shared, "title": "Saved one", "accept_guidelines": True, "nsfw": False, "visibility": "private"}); assert r.status_code == 200, r.text
     assert store.get(shared)["saved"] is True
     c.post(f"/api/builds/{starred}/favorite", json={"favorite": True}); c.post(f"/api/builds/{old_star}/favorite", json={"favorite": True})
     for bid in (plain, shared, starred): _age(bid, 8)
@@ -116,7 +116,7 @@ def test_a_sweep_frees_room_with_unstarred_builds_and_the_build_then_goes_throug
 
 def test_delete_my_stuff_and_delete_everything_remove_starred_builds_and_their_files():
     a = client(ADULT); b2 = photo_build(a); a.post(f"/api/builds/{b2}/favorite", json={"favorite": True})
-    b3 = photo_build(a); a.post("/api/showcase", json={"build_id": b3, "title": "Shared", "accept_guidelines": True, "visibility": "private"})
+    b3 = photo_build(a); a.post("/api/showcase", json={"build_id": b3, "title": "Shared", "accept_guidelines": True, "nsfw": False, "visibility": "private"})
     out = a.delete("/api/me/builds").json()
     assert out["ok"] and out["builds"] == 2 and out["shared"] == 1
     assert not store.dir(b2).exists() and not store.dir(b3).exists() and a.get("/api/builds").json()["builds"] == []

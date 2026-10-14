@@ -1,4 +1,4 @@
-"""Reporting + moderation queue (STUB-level but functional locally). Family-friendly only.
+"""Reporting + moderation queue (STUB-level but functional locally). Mild NSFW is allowed when tagged; explicit content is removed.
 
 Reports are stored; `minor_safety` reports hide the item immediately pending review.
 `underage_user` = "this account holder seems to be under 18" (ZEIM is 18+ only). It names the ACCOUNT (account_id); a moderator
@@ -19,8 +19,9 @@ from .store import MODERATION
 
 _audit = logging.getLogger("zeim.audit")
 _who = lambda sid: hashlib.sha256(("rep:" + (sid or "")).encode()).hexdigest()[:8]       # a stable short tag; never the session id itself
-REASONS = ["minor_safety", "underage_user", "not_family_friendly", "copyright", "harassment", "personal_info", "other"]
-ACTIONS = ("hide", "restore", "dismiss", "suspend")
+REASONS = ["minor_safety", "underage_user", "not_family_friendly", "copyright", "harassment", "personal_info", "should_be_nsfw", "other"]
+# mark_nsfw / unmark_nsfw flip the item's mature tag; remove = take explicit content down (same as hide, logged as removal)
+ACTIONS = ("hide", "restore", "dismiss", "suspend", "mark_nsfw", "unmark_nsfw", "remove")
 
 
 def report(item_id: str, sid: str, reason: str, details: str, account_id: str | None = None) -> dict:
@@ -66,7 +67,7 @@ def resolve(report_id: str, action: str) -> dict:
         i = r["item_id"]
         if action == "suspend" and not r.get("account_id"):
             raise ValueError("this report names no account to suspend")
-        if action in ("hide", "suspend") and i and not i.startswith("user:") and i not in m["hidden"]:
+        if action in ("hide", "suspend", "remove") and i and not i.startswith("user:") and i not in m["hidden"]:
             m["hidden"].append(i)
         elif action == "restore" and i in m["hidden"]:
             m["hidden"].remove(i)
@@ -74,6 +75,8 @@ def resolve(report_id: str, action: str) -> dict:
         r["resolved"] = datetime.now(timezone.utc).isoformat()
         out.update(r)
     MODERATION.update(f)
+    if action in ("mark_nsfw", "unmark_nsfw"):
+        set_nsfw(out["item_id"], action == "mark_nsfw")
     if action == "suspend":
         suspend(out["account_id"], "report " + report_id)
     _audit.info("moderation %s: item=%s report=%s reporter=%s reported_at=%s at=%s", action, out["item_id"], report_id, _who(out["reporter"]), out["created"], out["resolved"])
@@ -116,4 +119,27 @@ def unsuspend(account_id: str) -> bool:
     USERS.update(f)
     if done:
         _audit.info("moderation unsuspend: account=%s", account_id)
+    return bool(done)
+
+
+def set_nsfw(item_id: str, on: bool) -> bool:
+    """Moderator flips the mature tag on a Showcase project or a print photo ("print:<id>"). Returns False if not found."""
+    from .store import LISTINGS
+    done = []
+    if item_id.startswith("print:"):
+        from .store import PRINTS
+
+        def f(l):
+            for p in l:
+                if p["id"] == item_id[6:]:
+                    p["nsfw"] = bool(on); done.append(1)
+        PRINTS.update(f)
+    else:
+        def g(l):
+            for i in l:
+                if i["id"] == item_id:
+                    i["nsfw"] = bool(on); done.append(1)
+        LISTINGS.update(g)
+    if done:
+        _audit.info("moderation nsfw=%s: item=%s", bool(on), item_id)
     return bool(done)

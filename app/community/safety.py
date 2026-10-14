@@ -567,16 +567,25 @@ def scan_contact(text: str) -> str | None:
     return None
 
 
-def scan(text: str) -> str | None:
+# Mild-NSFW vocabulary: allowed ONLY on items the maker tagged NSFW (artistic nudity, figure sculpts). Everything else on the
+# word lists (porn, sexual acts, "nudes" as in sexting, ...) stays blocked on every item, tagged or not.
+MILD_NSFW_WORDS = frozenset({"nude", "nudity", "naked", "topless", "nsfw"})
+
+
+def _strip_mild(text: str) -> str:
+    return " ".join(w for w in normalize(text or "").split() if re.sub(r"[^\w]", "", w) not in MILD_NSFW_WORDS)
+
+
+def scan(text: str, nsfw: bool = False) -> str | None:
     if len(text or "") > MAX_SCAN_CHARS:
         return "too_long"
-    return scan_language(text) or scan_contact(text) or scan_grooming(text)
+    return scan_language(_strip_mild(text) if nsfw else text) or scan_contact(text) or scan_grooming(text)
 
 
-def check(text: str, context: str = "") -> str:
+def check(text: str, context: str = "", nsfw: bool = False) -> str:
     """Return the cleaned text, or raise ChatBlocked(422) with the user-facing message. Nothing is stored/sent on a block."""
     text = (text or "").strip()
-    r = scan(text)
+    r = scan(text, nsfw)
     if r == "too_long":
         raise ChatBlocked(413, {"code": "too_long", "message": "That text is too long. Please make it shorter.", "context": context})
     if r == "unavailable":
@@ -588,9 +597,22 @@ def check(text: str, context: str = "") -> str:
     return text
 
 
-def gate(actor: Actor, text: str, context: str) -> str:
-    """Single entry point for every free-text field other people can read (feedback, titles, descriptions, nicknames…)."""
-    return check(text, context)
+def gate(actor: Actor, text: str, context: str, nsfw: bool = False) -> str:
+    """Single entry point for every free-text field other people can read (feedback, titles, descriptions, nicknames…).
+    nsfw=True (the item is tagged mild NSFW) lets MILD_NSFW_WORDS through; explicit terms are still refused."""
+    return check(text, context, nsfw)
+
+
+def parse_nsfw(v) -> bool:
+    """The required 'Is this NSFW (mild nudity / mature art)?' answer. Missing/unclear = refused, never guessed."""
+    if isinstance(v, bool):
+        return v
+    s = str(v if v is not None else "").strip().lower()
+    if s in ("yes", "true", "1", "on"):
+        return True
+    if s in ("no", "false", "0", "off"):
+        return False
+    raise ValueError("Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.")
 
 
 def filter_only(text: str, what: str) -> str:

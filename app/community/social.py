@@ -91,7 +91,7 @@ def clear_person(sid: str):
 
 # ---------------- "I printed this" photos ----------------
 def add_print(item_id: str, sid: str, uid: str, username: str | None, data: bytes, ext: str, caption: str, ack,
-             mod_result: str | None = None) -> dict:
+             mod_result: str | None = None, nsfw: bool = False) -> dict:
     """Store a print photo. Always pending for a human — the image-moderation hook never auto-approves."""
     from . import imagemod
     verdict = mod_result or imagemod.review_upload(data, {"item_id": item_id, "uid": uid})
@@ -102,7 +102,8 @@ def add_print(item_id: str, sid: str, uid: str, username: str | None, data: byte
     (PDIR / f"{pid}.{ext}").write_bytes(data)
     rec = {"id": pid, "item_id": item_id, "owner_sid": sid, "uid": uid, "username": username, "ext": ext,
            "caption": caption, "created": time.time(), "photo_ack": ack, "status": "pending",
-           "moderation": imagemod.NEEDS_HUMAN_REVIEW if verdict == imagemod.APPROVE else verdict}
+           "moderation": imagemod.NEEDS_HUMAN_REVIEW if verdict == imagemod.APPROVE else verdict,
+           "nsfw": bool(nsfw)}
     PRINTS.update(lambda l: l.append(rec))      # held for moderator review (all ages); Trending counts it only once approved
     return rec
 

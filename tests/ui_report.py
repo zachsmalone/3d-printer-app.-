@@ -17,7 +17,7 @@ def run(name, launch):
     owner = b.new_context(); r = owner.request
     r.post(URL + "/api/me/signup", data={"display_name": "Ada", "dob": "1985-05-05"})
     g = r.post(URL + "/api/generate", multipart={"file": {"name": "a.png", "mimeType": "image/png", "buffer": PNG}, "mode": "relief", "photo_ack": "true"}).json()
-    item = r.post(URL + "/api/showcase", data={"build_id": g["id"], "title": "Desk fox", "description": "", "tags": [], "accept_guidelines": True, "visibility": "public"}).json()
+    item = r.post(URL + "/api/showcase", data={"build_id": g["id"], "title": "Desk fox", "description": "", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     errs = []; dialogs = []
     ctx = b.new_context(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e))); pg.on("dialog", lambda d: (dialogs.append(d.type), d.dismiss()))
@@ -32,7 +32,7 @@ def run(name, launch):
     pg.click("#shGrid .pcard:has-text('Desk fox')"); pg.wait_for_selector("#itReport", timeout=8000)
     box = pg.locator("#itReport").bounding_box(); ok(f"{name}: Report button is >= 44px", box["height"] >= 44, box)
     pg.click("#itReport"); pg.wait_for_selector("#dlgReport[open]")
-    ok(f"{name}: dialog shows seven plain-language choices and no code words", pg.locator("#dlgReport [name=repReason]").count() == 7 and "minor_safety" not in pg.inner_text("#dlgReport"))
+    ok(f"{name}: dialog shows eight plain-language choices and no code words", pg.locator("#dlgReport [name=repReason]").count() == 8 and "minor_safety" not in pg.inner_text("#dlgReport"))
     small = pg.locator("#dlgReport label.choice").evaluate_all("els => els.map(e => e.getBoundingClientRect().height).filter(h => h < 44)")
     ok(f"{name}: every choice is a >= 44px target", not small, small)
     ok(f"{name}: dialog fits 390px", pg.evaluate("(() => { const d = document.querySelector('#dlgReport .dlg'); return d.scrollWidth <= d.clientWidth + 1 && d.getBoundingClientRect().width <= 390; })()"))

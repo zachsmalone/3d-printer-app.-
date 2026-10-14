@@ -96,7 +96,7 @@ def test_credit_line_uses_the_items_own_manifest_data_and_invents_nothing():
 
 def test_download_page_and_showcase_json_carry_the_credit_line():
     pub = client(ADULT); bid = photo_build(pub)
-    r = pub.post("/api/showcase", json={"build_id": bid, "title": "Credited", "description": "d", "tags": [], "accept_guidelines": True, "visibility": "public"}); assert r.status_code == 200, r.text
+    r = pub.post("/api/showcase", json={"build_id": bid, "title": "Credited", "description": "d", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"}); assert r.status_code == 200, r.text
     iid = r.json()["id"]
     assert r.json()["credit"]["creator"] == "@" + pub.get("/api/me").json()["username"]          # community credit = username only (never the display name)
     h = client().get(f"/p/{iid}").text
@@ -117,7 +117,7 @@ def test_items_offer_no_fake_download():
     assert [f["name"] for f in one["files"]] == ["pencil-cup.stl"] and one["no_model"] is False
     assert c.get("/api/showcase/zo-pencil-cup/files/example_model.stl").status_code == 404
     pub = client(ADULT); bid = photo_build(pub)
-    r = pub.post("/api/showcase", json={"build_id": bid, "title": "Real", "description": "d", "tags": [], "accept_guidelines": True, "visibility": "public"}).json()
+    r = pub.post("/api/showcase", json={"build_id": bid, "title": "Real", "description": "d", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     assert r["no_model"] is False and r["files"]
 
 

@@ -67,7 +67,7 @@ def test_a_name_you_leave_stays_reserved_for_you_and_nobody_else():
 
 def test_credit_follows_the_account_so_a_rename_updates_every_old_credit():
     a = client(ADULT); uid = me(a)["id"]; bid = photo_build(a)
-    item = a.post("/api/showcase", json={"build_id": bid, "title": "Fox", "accept_guidelines": True, "visibility": "public"}).json()
+    item = a.post("/api/showcase", json={"build_id": bid, "title": "Fox", "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     v = client(); first = me(a)["username"]
     assert v.get(f"/api/showcase/{item['id']}").json()["credit"]["creator"] == "@" + first
     assert a.put("/api/me/username", json={"username": "Renamed_Maker"}).status_code == 200
@@ -114,7 +114,7 @@ def test_email_is_never_in_a_public_response():
     uid = me(a)["id"]
     USERS.update(lambda d: [u.__setitem__("email", secret) for u in d.values() if u["id"] == uid])
     bid = photo_build(a)
-    item = a.post("/api/showcase", json={"build_id": bid, "title": "Mine", "accept_guidelines": True, "visibility": "public"}).json()
+    item = a.post("/api/showcase", json={"build_id": bid, "title": "Mine", "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     other = client(ADULT)
     outs = [other.get(f"/api/users/{uid}"), other.get(f"/u/{uid}"), other.get(f"/api/showcase/{item['id']}"), other.get(f"/p/{item['id']}"),
             other.get("/api/showcase?tab=free"), other.get("/credits"), a.get("/api/me"), a.get("/api/me/export") if False else a.get("/api/me")]
@@ -125,7 +125,7 @@ def test_email_is_never_in_a_public_response():
 
 def test_credit_is_by_username_never_the_display_name():
     a = client(ADULT); un = me(a)["username"]; bid = photo_build(a)
-    item = a.post("/api/showcase", json={"build_id": bid, "title": "Fox", "accept_guidelines": True, "visibility": "public"}).json()
+    item = a.post("/api/showcase", json={"build_id": bid, "title": "Fox", "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     v = client(); got = v.get(f"/api/showcase/{item['id']}").json()
     assert got["creator_username"] == un and got["credit"]["creator"] == "@" + un and "Ada Adult" not in got["credit"]["creator"]
     assert "@" + un in v.get(f"/p/{item['id']}").text

@@ -67,9 +67,9 @@ def test_s02_long_text_rejected_fast_everywhere():
     a = client(ADULT); bid = photo_build(a)
     cases = [
         ("signup", lambda: TestClient(app).post("/api/me/signup", json={"display_name": BIG, "dob": "1990-01-01"})),
-        ("publish title", lambda: a.post("/api/showcase", json={"build_id": bid, "title": BIG, "accept_guidelines": True})),
-        ("publish desc", lambda: a.post("/api/showcase", json={"build_id": bid, "title": "T", "description": BIG, "accept_guidelines": True})),
-        ("publish tag", lambda: a.post("/api/showcase", json={"build_id": bid, "title": "T", "tags": [BIG], "accept_guidelines": True})),
+        ("publish title", lambda: a.post("/api/showcase", json={"build_id": bid, "title": BIG, "accept_guidelines": True, "nsfw": False})),
+        ("publish desc", lambda: a.post("/api/showcase", json={"build_id": bid, "title": "T", "description": BIG, "accept_guidelines": True, "nsfw": False})),
+        ("publish tag", lambda: a.post("/api/showcase", json={"build_id": bid, "title": "T", "tags": [BIG], "accept_guidelines": True, "nsfw": False})),
         ("report details", lambda: a.post("/api/showcase/zo-pencil-cup/report", json={"reason": "other", "details": BIG})),
         ("links", lambda: a.put("/api/me/links", json={"instagram": BIG})),
         ("build title", lambda: gen(a, title=BIG)),
@@ -98,5 +98,5 @@ def test_s02_big_json_body_refused_before_parsing():
 
 def test_s02_normal_text_still_works():
     a = client(ADULT); bid = photo_build(a)
-    r = a.post("/api/showcase", json={"build_id": bid, "title": "T" * 80, "description": "d" * 500, "tags": ["x" * 30] * 8, "accept_guidelines": True})
+    r = a.post("/api/showcase", json={"build_id": bid, "title": "T" * 80, "description": "d" * 500, "tags": ["x" * 30] * 8, "accept_guidelines": True, "nsfw": False})
     assert r.status_code == 200, r.text

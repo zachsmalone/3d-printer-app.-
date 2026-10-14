@@ -649,3 +649,9 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .plate .tool-row .btn, #litLightBox .btn, #litLightBox select { min-height: 44px; }
 #litLightBox { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 #litLightBox[hidden] { display: none; }
+
+/* mild NSFW: blurred thumbnail + label on cards (the item page shows it unblurred after a once-per-session confirm) */
+.pcard { position: relative; }
+.ph.nsfw img { filter: blur(22px) saturate(.6); transform: scale(1.1); }
+.ph.nsfw { overflow: hidden; }
+.mature-label { position: absolute; top: 10px; left: 10px; background: #111c; color: #fff; font-weight: 700; font-size: .8rem; padding: 3px 8px; border-radius: 6px; }

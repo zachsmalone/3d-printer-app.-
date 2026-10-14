@@ -91,7 +91,7 @@ def test_wording_is_18_plus_with_no_kids_teen_or_coppa_language_and_legal_text_m
 
 
 def publish(c, bid, vis="public", title="Lamp"):
-    return c.post("/api/showcase", json={"build_id": bid, "title": title, "accept_guidelines": True, "visibility": vis})
+    return c.post("/api/showcase", json={"build_id": bid, "title": title, "accept_guidelines": True, "nsfw": False, "visibility": vis})
 
 
 def test_report_underage_user_then_moderator_suspends_and_nothing_is_deleted():

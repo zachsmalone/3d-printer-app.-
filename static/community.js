@@ -228,7 +228,7 @@ async function loadShowcase() {
   loadRecent();
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
-  $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>
+  $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "🧊")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
     <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl">⬇ ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
@@ -312,11 +312,25 @@ async function showcaseBadges() {
 }
 document.addEventListener("zeim:printer", () => { if (!$("#viewShowcase").hidden) showcaseBadges(); });
 
+/* Mild NSFW: cards are blurred with a "Mature content" label; opening one asks once per browser session, then shows it unblurred. */
+const matLabel = i => i.nsfw ? '<span class="mature-label">Mature content<span class="sr-only">: picture blurred</span></span>' : "";
+const MAT_KEY = "zeim_mature_ok";
+function confirmMature() {
+  if (sessionStorage.getItem(MAT_KEY) === "1") return Promise.resolve(true);
+  const d = $("#dlgMature"), back = document.activeElement;
+  return new Promise(res => {
+    const done = ok => { d.onclose = null; if (d.open) d.close(); if (ok) sessionStorage.setItem(MAT_KEY, "1"); else back?.focus?.(); res(ok); };
+    $("#matYes").onclick = () => done(true); $("#matNo").onclick = () => done(false);
+    d.oncancel = e => { e.preventDefault(); done(false); };           // Esc = Go back
+    d.showModal(); $("#matNo").focus();
+  });
+}
 async function openItem(id) {
   const i = await api("/api/showcase/" + id);
+  if (i.nsfw && !i.owned && !(await confirmMature())) return;
   $("#itTitle").textContent = i.title;
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
-    ${i.thumb ? `<img src="${i.thumb}" alt="Preview picture of ${esc(i.title)}" style="max-width:100%;border-radius:10px">` : ""}
+    ${i.thumb ? `<img src="${i.thumb}" alt="${i.nsfw ? "Preview picture (mature content)" : `Preview picture of ${esc(i.title)}`}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
     ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
@@ -334,12 +348,15 @@ async function openItem(id) {
         <div class="field"><label for="prFile">Photo</label><input type="file" id="prFile" accept="image/*"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
+        <fieldset class="reasons"><legend>Is this NSFW (mild nudity / mature art)? <em>required</em></legend>
+          <label class="choice"><input type="radio" name="prNsfw" value="no"> <span>No</span></label><label class="choice"><input type="radio" name="prNsfw" value="yes"> <span>Yes</span></label></fieldset>
         <div class="row"><button class="btn primary" id="prSend" type="button">Share photo</button></div></details>` : ""}</section>`;
   if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
   loadPrints(id);
   if ($("#prSend")) $("#prSend").onclick = async () => {
     const f = $("#prFile").files[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo first.");
-    const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked);
+    const nv = $("[name=prNsfw]:checked")?.value; if (!nv) return inlineMsg($("#prSend"), "Please answer: Is this NSFW (mild nudity / mature art)?");
+    const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked); fd.append("nsfw", nv);
     $("#prSend").disabled = true;
     try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
     catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
@@ -371,19 +388,26 @@ async function openItem(id) {
 /* publish */
 $("#btnPublish").onclick = () => {
   if (!ME.signed_up) { toast("Create an account first to share projects.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
-  $("#pub_title").value = S.current.title; $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $("#dlgPublish").showModal();
+  $("#pub_title").value = S.current.title; $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $$("[name=pub_nsfw]").forEach(r => r.checked = false); $("#dlgPublish").showModal();
 };
 $("#btnDoPublish").onclick = async () => {
+  const nsfw = $("[name=pub_nsfw]:checked")?.value;
+  if (!nsfw) return inlineMsg($("#btnDoPublish"), "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.");
   try {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
-      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim() }));
+      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim(), nsfw: nsfw === "yes" }));
     clearInline($("#btnDoPublish")); $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
   } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
 };
 
 /* What ZEIM knows about you (Kenji S-07): live view, download metadata, delete everything I made */
 $("#btnMyData").onclick = openData;
+$("#hideMature").onchange = async e => {
+  if (!ME?.signed_up) { e.target.checked = false; return toast("Make a free account to change this setting.", "err"); }
+  try { await api("/api/me/mature", J("PUT", { hide_mature: e.target.checked })); ME.hide_mature = e.target.checked; loadShowcase(); } catch (er) { toast(er.message, "err"); }
+};
 async function openData() {
+  $("#hideMature").checked = !!ME?.hide_mature;
   const d = await api("/api/me/data");
   const ints = Object.entries(d.interests || {}).sort((a, b) => b[1] - a[1]);
   const acct = d.account;
@@ -485,7 +509,7 @@ async function loadFavorites() {
   const g = $("#favGrid"); if (!g) return;
   if (!ME?.signed_up) { g.innerHTML = `<li class="empty"><p>Make a free account to save favorites.</p></li>`; return; }
   let r; try { r = await api("/api/me/favorites"); } catch { return; }
-  g.innerHTML = r.items.length ? r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : "🧊"}</div>
+  g.innerHTML = r.items.length ? r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : "🧊"}</div>${matLabel(i)}
     <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${esc(i.creator)}</span></div><div class="cardfoot">${favHTML(i)}</div></li>`).join("")
     : `<li class="empty"><p>No favorites yet. Tap the heart on any project to save it here.</p><a class="btn" href="#showcase">Open Showcase</a></li>`;
 }

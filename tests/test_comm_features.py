@@ -28,7 +28,7 @@ def U(n="Maker", dob="1990-01-01"):
 
 def publish(c, title="Pub", **extra):
     r = c.post("/api/showcase", json={"build_id": photo_build(c), "title": title, "description": "d", "tags": ["lamp"],
-                                      "accept_guidelines": True, "visibility": "public", **extra})
+                                      "accept_guidelines": True, "nsfw": False, "visibility": "public", **extra})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -127,7 +127,7 @@ def test_remix_chain_links_back_through_every_step():
     third = publish(c, "Third", remix_of=second["id"])
     ch = client().get(f"/api/showcase/{third['id']}").json()["remix_chain"]
     assert [x["title"] for x in ch] == ["Second", "First"] and ch[0]["url"] == f"/p/{second['id']}" and ch[1]["creator"].startswith("@")
-    assert c.post("/api/showcase", json={"build_id": photo_build(c), "title": "x", "accept_guidelines": True, "visibility": "public",
+    assert c.post("/api/showcase", json={"build_id": photo_build(c), "title": "x", "accept_guidelines": True, "nsfw": False, "visibility": "public",
                                          "remix_of": "nope99"}).status_code == 422
     a.put(f"/api/showcase/{first['id']}/visibility", json={"visibility": "private"})
     ch = client().get(f"/api/showcase/{third['id']}").json()["remix_chain"]
@@ -141,7 +141,7 @@ def test_printed_photo_goes_through_photo_safety_and_moderation():
     url = f"/api/showcase/{it['id']}/prints"
     assert client().post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).status_code == 401
     assert v.post(url, files={"photo": ("p.jpg", b"not an image", "image/jpeg")}).status_code == 415
-    r = v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"caption": "Came out great", "photo_ack": "true"})
+    r = v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"caption": "Came out great", "photo_ack": "true", "nsfw": "no"})
     assert r.status_code == 200, r.text
     p = r.json()
     img = v.get(p["url"]).content
@@ -174,7 +174,7 @@ def test_printed_photo_goes_through_photo_safety_and_moderation():
 def test_printed_photo_caption_uses_chat_filter_and_ack_is_required_when_on(monkeypatch):
     a = U("Ca"); it = publish(a, "Cap"); v = U("Cv")
     url = f"/api/showcase/{it['id']}/prints"
-    r = v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"caption": "email me at kid@example.com"})
+    r = v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"caption": "email me at kid@example.com", "nsfw": "no"})
     assert r.status_code >= 400
     monkeypatch.setattr(config, "PHOTO_ACK_REQUIRED", True)
     assert v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).status_code == 415
@@ -253,13 +253,13 @@ def test_orient_ops_in_the_editor_and_ui():
 
 def test_rejected_print_photo_is_deleted_with_its_file_and_old_photos_become_pending():
     a = U("Ja"); it = publish(a, "Rej"); v = U("Jv")
-    p = v.post(f"/api/showcase/{it['id']}/prints", files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).json()
+    p = v.post(f"/api/showcase/{it['id']}/prints", files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"nsfw": "no"}).json()
     f = social.print_path(social.get_print(p["id"])); assert f.exists()
     assert client().post(f"/api/moderation/prints/{p['id']}/reject", headers=ADMIN).json()["status"] == "deleted"
     assert social.get_print(p["id"]) is None and not f.exists() and v.get(f"/api/showcase/{it['id']}/prints").json()["prints"] == []
     assert client().post(f"/api/moderation/prints/{p['id']}/approve", headers=ADMIN).status_code == 404
     # migration: a photo stored before review existed (no status) is pending, hidden from others
-    q = v.post(f"/api/showcase/{it['id']}/prints", files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).json()
+    q = v.post(f"/api/showcase/{it['id']}/prints", files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"nsfw": "no"}).json()
     PRINTS.update(lambda l: [r.pop("status", None) for r in l if r["id"] == q["id"]])
     assert social.mark_existing_pending() >= 1 and social.get_print(q["id"])["status"] == "pending"
     assert client().get(f"/api/showcase/{it['id']}/prints").json()["prints"] == []

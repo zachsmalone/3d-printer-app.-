@@ -29,7 +29,7 @@ def axe(pg, label):
 
 def publish(r, title):
     g = r.post(URL + "/api/generate", multipart={"file": {"name": "a.png", "mimeType": "image/png", "buffer": PNG}, "mode": "relief", "photo_ack": "true"}).json()
-    return r.post(URL + "/api/showcase", data={"build_id": g["id"], "title": title, "description": "", "tags": [], "accept_guidelines": True, "visibility": "public"}).json()["id"]
+    return r.post(URL + "/api/showcase", data={"build_id": g["id"], "title": title, "description": "", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()["id"]
 
 def run(name, launch, with_axe):
     try: b = launch()

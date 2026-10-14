@@ -150,7 +150,7 @@ def test_community_flow(monkeypatch):
     assert cl.post("/api/classrooms", json={"name": "x"}).status_code == 404   # school features removed (2026-10-12): no classrooms route at all
     # publish needs guidelines confirmation
     assert cl.post("/api/showcase", json={"build_id": bid, "title": "T"}).status_code == 422
-    p = cl.post("/api/showcase", json={"build_id": bid, "title": "My lithophane", "tags": ["gift", "Portrait"], "accept_guidelines": True, "visibility": "public"}).json()
+    p = cl.post("/api/showcase", json={"build_id": bid, "title": "My lithophane", "tags": ["gift", "Portrait"], "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     assert c.get(f"/api/showcase/{p['id']}/files/{p['files'][0]['name']}").status_code == 200
     assert "My lithophane" in c.get(f"/p/{p['id']}").text
     # tabs

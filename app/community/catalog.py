@@ -198,7 +198,7 @@ def public(i: dict, actor: Actor) -> dict:
             "can_like_reason": ("" if (pub and i.get("owner_sid") != actor.sid) else
                                 "own" if i.get("owner_sid") == actor.sid else "not_public"),
             "can_follow": privacy.can_follow(actor, tu, bool(i.get("example"))),"id": i["id"], "title": i["title"], "creator": i["creator"], "creator_id": i["creator_id"],
-            "example": i.get("example", False), "tags": i["tags"], "mode": i["mode"],
+            "example": i.get("example", False), "nsfw": bool(i.get("nsfw")), "tags": i["tags"], "mode": i["mode"],
             "downloads": i.get("_downloads", 0) if show_counts else None, "description": i["description"], "created": i["created"],
             "owned": bool(i.get("owner_sid") and i["owner_sid"] == actor.sid), "following_creator": following,
             "share_url": f"/p/{i['id']}",
@@ -259,9 +259,18 @@ def categories(actor: Actor) -> list[str]:
     return sorted({i["category"] for i in _all() if i.get("category") and ok(i)})
 
 
+def hides_mature(actor: Actor) -> bool:
+    """Account setting 'Hide mature content entirely' (default off: NSFW items are listed as blurred cards)."""
+    return bool(actor.user and actor.user.get("hide_mature"))
+
+
+def mature_ok(i: dict, actor: Actor) -> bool:
+    return not (i.get("nsfw") and hides_mature(actor) and i.get("owner_sid") != actor.sid)
+
+
 def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None, category: str = "") -> list[dict]:
     ok = _visible(actor, USERS.read())
-    items = [i for i in _all() if ok(i)]
+    items = [i for i in _all() if ok(i) and mature_ok(i, actor)]
     if category:
         items = [i for i in items if i.get("category") == category]
     if q:
@@ -312,12 +321,14 @@ def set_visibility(actor: Actor, item_id: str, level: str) -> dict:
     return found
 
 
-def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "") -> dict:
+def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None) -> dict:
     if not actor.user:
         raise Denied(401, "Create an account to publish.")
     if not accept_guidelines:
         raise Denied(422, "You must confirm this project follows the Community Guidelines "
-                          "(clean and safe for all, no content involving minors in any unsafe context).")
+                          "(mild NSFW only when tagged; nothing explicit; no content involving minors in any unsafe context).")
+    if nsfw is None:
+        raise Denied(422, "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.")
     title = (title or "").strip()[:80]
     if not title:
         raise Denied(422, "title required")
@@ -355,7 +366,8 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "example": False, "tags": [t.strip().lower() for t in tags if t.strip()][:8], "mode": mode,
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
-            "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False}
+            "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
+            "nsfw": bool(nsfw)}
     if remix_of:
         item["remix_of"] = remix_of
     LISTINGS.update(lambda l: l.append(item))

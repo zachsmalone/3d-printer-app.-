@@ -361,13 +361,16 @@
 <dialog id="dlgPublish"><div class="dlg">
   <div class="dh"><h3>🌐 Share this build to the Showcase</h3><button class="x" data-close>✕</button></div>
   <div class="body">
-    <p class="help">Free for everyone to download. Clean and safe for all projects only.</p>
+    <p class="help">Free for everyone to download. Mild NSFW (artistic nudity, figure sculpts) is allowed when you tag it; anything explicit or sexual is not.</p>
+    <fieldset class="reasons" id="pub_nsfw_fs"><legend>Is this NSFW (mild nudity / mature art)? <em>required</em></legend>
+      <label class="choice"><input type="radio" name="pub_nsfw" value="no"> <span>No</span></label>
+      <label class="choice"><input type="radio" name="pub_nsfw" value="yes"> <span>Yes: it is shown blurred with a "Mature content" label</span></label></fieldset>
     <div class="field"><label for="pub_vis">Who can see this</label><select id="pub_vis"><option value="private">🔒 Private — only me (default)</option><option value="followers">👥 Followers only</option><option value="public">🌐 Public — anyone, listed in Showcase</option></select></div>
     <div class="field"><label for="pub_title">Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
     <div class="field"><label for="pub_desc">Description</label><input id="pub_desc" maxlength="500"></div>
     <div class="field"><label for="pub_remix">Remixed from <em>optional: paste the Showcase link</em></label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
     <div class="field"><label for="pub_tags">Tags <em>comma separated</em></label><input id="pub_tags" placeholder="portrait, gift, lithophane"></div>
-    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (clean and safe for all; nothing sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
+    <label class="inl"><input type="checkbox" id="pub_ok"> I confirm this follows the <a href="/static/COMMUNITY_GUIDELINES.html" target="_blank">Community Guidelines</a> (mild nudity only when tagged NSFW; nothing explicit, sexual, violent or unsafe; nothing involving minors in any unsafe context). If it is made from a photo: <b>the photo is mine, or I have permission from everyone in it</b>, and it shows no addresses, school names or license plates.</label>
   </div>
   <div class="df"><button class="btn primary" id="btnDoPublish">Publish</button></div>
 </div></dialog>
@@ -392,6 +395,7 @@
 
 <dialog id="dlgData" aria-labelledby="dataTitle"><div class="dlg">
   <div class="dh"><h3 id="dataTitle">🔒 What ZEIM knows about you</h3><button class="x" data-close aria-label="Close">✕</button></div>
+  <div class="body"><label class="inl"><input type="checkbox" id="hideMature"> Hide mature content entirely <em>(off: NSFW projects show as blurred cards)</em></label></div>
   <div class="body" id="dataBody"></div>
   <div class="df" style="flex-wrap:wrap;gap:8px">
     <a class="btn" id="btnDownloadStuff" href="/api/me/export" download="zeim-my-data.json">⬇ Download my stuff</a>
@@ -412,7 +416,8 @@
     <fieldset class="reasons"><legend>What is the problem?</legend>
       <label class="choice"><input type="radio" name="repReason" value="minor_safety"> <span>Something about a person or a child is not safe</span></label>
       <label class="choice"><input type="radio" name="repReason" value="underage_user"> <span>The account holder seems to be under 18</span></label>
-      <label class="choice"><input type="radio" name="repReason" value="not_family_friendly"> <span>Not clean and safe for all</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="not_family_friendly"> <span>Explicit or sexual content</span></label>
+      <label class="choice"><input type="radio" name="repReason" value="should_be_nsfw"> <span>Should be marked NSFW</span></label>
       <label class="choice"><input type="radio" name="repReason" value="harassment"> <span>Mean or unkind</span></label>
       <label class="choice"><input type="radio" name="repReason" value="personal_info"> <span>Shares private information</span></label>
       <label class="choice"><input type="radio" name="repReason" value="copyright"> <span>Copyright, or someone's work without credit</span></label>
@@ -429,6 +434,9 @@
 <div id="toasts"></div>
 <div id="nzStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div><div id="nzAlert" class="sr-only" role="alert"></div>
 <div id="modeStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+<dialog id="dlgMature" aria-labelledby="matH" aria-describedby="matP"><div class="dlg"><div class="dh"><h3 id="matH">Mature content</h3></div>
+  <div class="body"><p id="matP">Are you sure? This may contain nudity.</p><p class="help">We only ask once per visit.</p></div>
+  <div class="df"><button type="button" class="btn" id="matNo">Go back</button><button type="button" class="btn primary" id="matYes">Show it</button></div></div></dialog>
 <dialog id="dlgSignout" aria-labelledby="soH"><div class="dlg"><div class="dh"><h3 id="soH">Sign out of this browser?</h3><button class="x" data-close aria-label="Close">✕</button></div>
   <div class="body" id="soBody"></div>
   <div class="df"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn primary" id="soGo" aria-disabled="true" aria-describedby="soWhy">Sign out</button></div><p class="help" id="soWhy">Tick the box above to sign out.</p></div></dialog>

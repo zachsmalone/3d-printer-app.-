@@ -125,7 +125,7 @@ def test_originals_carry_no_invented_numbers_and_stay_out_of_ranking_until_real_
     assert [i["created"] for i in ex] == sorted((i["created"] for i in ex), reverse=True)
     assert v.post("/api/showcase/zo-pencil-cup/like", json={"liked": True}).json()["likes"] == 1        # real counts only
     # a real project with a single like outranks every example
-    o = client(ADULT); p = o.post("/api/showcase", json={"build_id": photo_build(o), "title": "Real lamp", "accept_guidelines": True, "visibility": "public"}).json()
+    o = client(ADULT); p = o.post("/api/showcase", json={"build_id": photo_build(o), "title": "Real lamp", "accept_guidelines": True, "nsfw": False, "visibility": "public"}).json()
     v.post(f"/api/showcase/{p['id']}/like", json={"liked": True}); v.post(f"/api/showcase/{p['id']}/like", json={"liked": True}) if False else None
     w = client({"display_name": "Looker2", "dob": "1990-01-01"}); w.post(f"/api/showcase/{p['id']}/like", json={"liked": True})
     assert v.get("/api/showcase?tab=trending").json()["items"][0]["id"] in (p["id"], "zo-pencil-cup")

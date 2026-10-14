@@ -288,7 +288,7 @@ def test_new_accounts_default_private_builds_and_a_public_profile():
 
 
 def publish(c, build, vis=None, title="Moon lamp", **kw):
-    body = {"build_id": build, "title": title, "tags": ["lamp"], "accept_guidelines": True, **kw}
+    body = {"build_id": build, "title": title, "tags": ["lamp"], "accept_guidelines": True, "nsfw": False, **kw}
     if vis: body["visibility"] = vis
     return c.post("/api/showcase", json=body)
 
@@ -296,8 +296,8 @@ def publish(c, build, vis=None, title="Moon lamp", **kw):
 def test_showcase_visibility_everywhere():
     o, other = client(ADULT), client({"display_name": "Visitor", "dob": "1990-01-01"})
     clear(o); b = photo_build(o)
-    assert client().post("/api/showcase", json={"build_id": b, "title": "x", "accept_guidelines": True}).status_code in (401, 403, 422)
-    assert other.post("/api/showcase", json={"build_id": b, "title": "steal", "accept_guidelines": True}).status_code == 422   # not their build
+    assert client().post("/api/showcase", json={"build_id": b, "title": "x", "accept_guidelines": True, "nsfw": False}).status_code in (401, 403, 422)
+    assert other.post("/api/showcase", json={"build_id": b, "title": "steal", "accept_guidelines": True, "nsfw": False}).status_code == 422   # not their build
     p = publish(o, b, title="Zebra moonlamp").json()
     assert p["visibility"] == "private"                                              # default private
     pid, fname = p["id"], p["files"][0]["name"]

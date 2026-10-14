@@ -7,7 +7,7 @@ from tests.b1 import client, photo_build, ADULT, SUSPENDED, UNDER18
 
 def _publish_one(with_owner=False):
     pub = client(ADULT)
-    r = pub.post("/api/showcase", json={"build_id": photo_build(pub), "title": "Pub", "description": "d", "tags": [], "accept_guidelines": True, "visibility": "public"})
+    r = pub.post("/api/showcase", json={"build_id": photo_build(pub), "title": "Pub", "description": "d", "tags": [], "accept_guidelines": True, "nsfw": False, "visibility": "public"})
     assert r.status_code == 200, r.text
     return (r.json()["id"], pub) if with_owner else r.json()["id"]
 

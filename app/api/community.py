@@ -33,7 +33,7 @@ def get_config():
 # ---------------- identity ----------------
 @router.get("/me")
 def me(request: Request, actor: Actor = Depends(get_actor)):
-    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor)}
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor), "hide_mature": catalog.hides_mature(actor)}
 
 
 def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
@@ -299,13 +299,14 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
         if not isinstance(raw_tags, list) or len(raw_tags) > 20:
             raise ValueError("Use at most 8 tags.")
         tags = [text_in(t, 30, "Each tag") for t in raw_tags][:8]
-        body["title"] = safety.gate(actor, title, "showcase:title")
-        body["description"] = safety.gate(actor, desc, "showcase:description")
-        body["tags"] = [safety.gate(actor, t, "showcase:tag") for t in tags]
+        nsfw = None if body.get("nsfw") is None else safety.parse_nsfw(body.get("nsfw"))     # missing -> 422 from create_project
+        body["title"] = safety.gate(actor, title, "showcase:title", bool(nsfw))
+        body["description"] = safety.gate(actor, desc, "showcase:description", bool(nsfw))
+        body["tags"] = [safety.gate(actor, t, "showcase:tag", bool(nsfw)) for t in tags]
         i = catalog.create_project(actor, title=body.get("title"), description=body.get("description", ""),
                                    tags=body.get("tags") or [], build_id=str(body.get("build_id", ""))[:40],
                                    accept_guidelines=bool(body.get("accept_guidelines")),
-                                   visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200])
+                                   visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:
@@ -472,6 +473,16 @@ def delete_everything_i_made(actor: Actor = Depends(get_actor)):
     return {"ok": True, "builds": builds, "shared": len(mine)}
 
 
+@router.put("/me/mature")
+def set_mature(body: dict, actor: Actor = Depends(get_actor)):
+    """Account setting 'Hide mature content entirely' (default off = NSFW items show as blurred cards)."""
+    if not actor.user:
+        raise HTTPException(401, "Make a free account to change this setting.")
+    on = bool(body.get("hide_mature"))
+    USERS.update(lambda d: d[actor.sid].__setitem__("hide_mature", on))
+    return {"hide_mature": on}
+
+
 @router.put("/me/personalization")
 def set_personalization(body: dict, actor: Actor = Depends(get_actor)):
     personalization.set_enabled(actor.sid, bool(body.get("enabled")))
@@ -506,7 +517,7 @@ def _preview(item_id: str) -> dict:
     i = next((x for x in catalog._all() if x["id"] == item_id), None)
     if not i:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
-    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]),       # @username via the account id, never the display name
+    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]), "nsfw": bool(i.get("nsfw")),       # @username via the account id, never the display name
             "thumb": f"/api/moderation/item/{item_id}/thumb" if i.get("has_thumb") else None}
 
 
@@ -615,6 +626,16 @@ def mod_resolve(rid: str, body: dict, request: Request, x_admin_token: str = Hea
         raise HTTPException(404)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/moderation/item/{iid}/nsfw")
+def mod_nsfw(iid: str, body: dict, request: Request, x_admin_token: str = Header("")):
+    """Moderator flips the mature tag on a project or print photo ("print:<id>") without a report."""
+    _admin(x_admin_token, request)
+    on = bool(body.get("nsfw"))
+    if not moderation.set_nsfw(iid, on):
+        raise HTTPException(404)
+    return {"id": iid, "nsfw": on}
 
 
 @router.post("/moderation/users/{uid}/suspend")
