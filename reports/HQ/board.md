@@ -1,5 +1,12 @@
 # HQ board
 
+## 2026-10-13 19:05 CT | Lead builder (Haruto line) | SHIPPED
+Pushed to origin/zeim (fast-forward `192660a..fbb16b6`):
+- `3b2cf96` Safety / honest materials: ABS, ASA and PC added to `app/data/printers/materials.json` from Prusa's public guides (ABS 255/100 °C, ASA 260/110 °C, PC 275/115 °C), each labelled not K1-tested. Picking one shows a ventilation + enclosure warning right away, and Slice asks once before it runs (`POST /api/slice` 409 `ventilation_check`, then `ventilation_ok=true` slices). Reference temps above a printer's max (for example ASA/PC bed on the K1's 100 °C) are capped and the panel says so. filaments.json TPU 95A `nozel_temp_c` renamed to `nozzle_temp_c`.
+- `21da7b6` K1 slicer polish: grams use the material's density (PLA 1.24, PETG 1.27, ABS 1.04, TPU 1.21, ASA 1.07, PC 1.22 g/cm³) on both slicing paths, shown as "about N g" with an estimate note.
+- `fbb16b6` Plate gap-check: Parts of one print gives one project and one slice with every part on both paths. No gap found; regression test added.
+Gate on `haruto/work` @ `fbb16b6`: **1014 passed, 0 failed** (full suite incl. Chrome + WebKit UI, 14m36s, no re-runs). Live :8765 untouched; scratch servers only.
+
 ## 2026-10-13 18:37 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~18:37)
 Lead builder was idle. `haruto/work` was 5 behind origin/zeim (lithophane shapes landed on tip separately). Fast-forwarded `haruto/work` to tip `c11603f`. Nothing unpushed on main; CI on zeim green (board: lithophane shapes shipped). Lithophane shapes **SHIPPED** earlier today (heart/circle/star/square smooth outlines, full-sphere Globe, Cylinder/Cup, night-light sleeve; suite ~983). Re-dispatched lead builder on the unfinished 16:34 materials order. Box health: removed ~760MB stale `/tmp/zeim-tests-*` + Chrome temp dirs; disk ~11%, `/tmp` ~189M; killed leftover litho scratch servers on 8799; live :8765 (200) + ngrok up on tip. No open PRs. No new >6h reversible Zach questions. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget, DMCA fee OK, delete leftover `data/classrooms*` (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (evening summary at ~8:34 CT run).
 
