@@ -582,7 +582,7 @@ def mod_queue(request: Request, x_admin_token: str = Header("")):
 def _pending_prints():
     from ..community import social
     return [{"id": p["id"], "item_id": p["item_id"], "caption": p.get("caption", ""), "by": "@" + (p.get("username") or "?"), "created": p["created"],
-             "thumb": f"/api/moderation/item/print:{p['id']}/thumb"} for p in social.pending()]
+             "nsfw": bool(p.get("nsfw")), "thumb": f"/api/moderation/item/print:{p['id']}/thumb"} for p in social.pending()]
 
 
 @router.post("/moderation/prints/{pid}/{action}")

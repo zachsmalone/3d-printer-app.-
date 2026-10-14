@@ -33,10 +33,12 @@ async function load() {
       if (p.hidden) card.append(el("p", { className: "help" }, "Currently hidden."));
       const row = el("div", { className: "row" });
       if (p.suspended) card.append(el("p", { className: "help" }, "Account suspended."));
+      if (p.nsfw) card.append(el("p", { className: "help" }, "Tagged NSFW (shown blurred as Mature content)."));
       const acts = [["hide", "Hide"], ["restore", "Restore"], ["dismiss", "Dismiss"]];
+      if (!r.item_id?.startsWith("user:")) acts.push(p.nsfw ? ["unmark_nsfw", "Remove NSFW tag"] : ["mark_nsfw", "Mark NSFW"], ["remove", "Remove (explicit)"]);
       if (r.account_id) acts.push(["suspend", "Suspend account"]);     // e.g. 'underage_user': ZEIM is 18+ only. Data deletion: README "Underage accounts"
       for (const [a, label] of acts) {
-        const b = el("button", { type: "button", className: "btn small" + (a === "hide" || a === "suspend" ? " danger" : "") }, label);
+        const b = el("button", { type: "button", className: "btn small" + (a === "hide" || a === "suspend" || a === "remove" ? " danger" : "") }, label);
         b.onclick = async () => { b.disabled = true; try { await call(`/api/moderation/${r.id}/resolve`, { method: "POST", body: JSON.stringify({ action: a }) }); await load(); } catch (e) { $("#msg").textContent = e.message; b.disabled = false; } };
         row.append(b);
       }
@@ -50,7 +52,11 @@ async function load() {
       const card = el("div", { className: "printer" });
       card.append(el("b", {}, "I printed this "), el("span", { className: "help" }, `${p.by} · project ${p.item_id}`));
       if (p.caption) card.append(el("p", {}, p.caption));
+      card.append(el("p", { className: "help" }, p.nsfw ? "Tagged NSFW by the uploader (shown blurred)." : "Not tagged NSFW."));
       const row = el("div", { className: "row" });
+      const tb = el("button", { type: "button", className: "btn small" }, p.nsfw ? "Remove NSFW tag" : "Mark NSFW");
+      tb.onclick = async () => { tb.disabled = true; try { await call(`/api/moderation/item/print:${p.id}/nsfw`, { method: "POST", body: JSON.stringify({ nsfw: !p.nsfw }) }); await load(); } catch (e) { $("#msg").textContent = e.message; tb.disabled = false; } };
+      row.append(tb);
       for (const [a, label] of [["approve", "Approve"], ["reject", "Reject and delete"]]) {
         const b = el("button", { type: "button", className: "btn small" + (a === "reject" ? " danger" : "") }, label);
         b.onclick = async () => { b.disabled = true; try { await call(`/api/moderation/prints/${p.id}/${a}`, { method: "POST" }); await load(); } catch (e) { $("#msg").textContent = e.message; b.disabled = false; } };

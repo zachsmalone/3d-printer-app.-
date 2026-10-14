@@ -81,6 +81,9 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
         raise HTTPException(404)
     i = catalog.resolve(i)
     thumb = f"<img src='/api/showcase/{pid}/thumb' class=sharethumb alt=''>" if i.get("has_thumb") else ""
+    if i.get("nsfw") and i.get("owner_sid") != actor.sid:      # mild NSFW: picture stays hidden until the visitor confirms (no JS needed)
+        thumb = ("<details class=mature-share><summary class=btn><b>Mature content</b> - Are you sure? This may contain nudity. "
+                 "Show it</summary>" + (thumb.replace("alt=''", "alt='Preview picture (mature content)'") if thumb else "") + "</details>")
     ex = "<p class=pill>EXAMPLE seed data - not a real creator project</p>" if i.get("example") else ""
     files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
     _pub = catalog.public(i, actor)

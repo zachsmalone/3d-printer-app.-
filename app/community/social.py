@@ -91,7 +91,7 @@ def clear_person(sid: str):
 
 # ---------------- "I printed this" photos ----------------
 def add_print(item_id: str, sid: str, uid: str, username: str | None, data: bytes, ext: str, caption: str, ack,
-             mod_result: str | None = None, nsfw: bool = False) -> dict:
+             mod_result: str | None = None, *, nsfw: bool = False) -> dict:
     """Store a print photo. Always pending for a human — the image-moderation hook never auto-approves."""
     from . import imagemod
     verdict = mod_result or imagemod.review_upload(data, {"item_id": item_id, "uid": uid})

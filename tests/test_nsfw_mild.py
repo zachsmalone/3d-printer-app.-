@@ -59,7 +59,26 @@ def test_print_photo_question_and_flag():
     url = f"/api/showcase/{it['id']}/prints"
     assert v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}).status_code == 400
     p = v.post(url, files={"photo": ("p.jpg", jpeg_with_gps(), "image/jpeg")}, data={"nsfw": "yes", "caption": "nude bust"})
-    assert p.status_code == 200, p.text and p.json()["nsfw"] is True
+    assert p.status_code == 200, p.text
+    assert p.json()["nsfw"] is True
+    q = client().get("/api/moderation/queue", headers=ADMIN).json()["pending_prints"]
+    assert any(x["id"] == p.json()["id"] and x["nsfw"] is True for x in q)
+    assert client().post(f"/api/moderation/item/print:{p.json()['id']}/nsfw", json={"nsfw": False}, headers=ADMIN).json()["nsfw"] is False
+
+
+def test_share_page_hides_mature_picture_until_confirmed():
+    a = U("Ns"); it = pub(a, "Figure", True).json(); v = U("Ny")
+    html = v.get(f"/p/{it['id']}").text
+    assert "<details class=mature-share>" in html and "Are you sure? This may contain nudity." in html and "sharethumb" in html
+    assert "mature-share" not in a.get(f"/p/{it['id']}").text            # the owner sees their own picture
+    clean = pub(a, "Vase", False).json()
+    assert "mature-share" not in v.get(f"/p/{clean['id']}").text
+
+
+def test_print_gallery_and_moderation_ui_wiring():
+    js = open(os.path.join(ROOT, "static/community.js")).read(); mj = open(os.path.join(ROOT, "static/moderation.js")).read()
+    assert "data-prshow" in js and "prmature" in js and "confirmMature()" in js
+    assert "mark_nsfw" in mj and "unmark_nsfw" in mj and '"remove"' in mj and "/nsfw`" in mj
 
 
 def test_moderator_flips_tag_and_report_reason():

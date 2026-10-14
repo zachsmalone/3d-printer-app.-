@@ -526,11 +526,12 @@ document.addEventListener("click", e => { const a = e.target.closest("a[data-ope
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
   let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
-  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure><img src="${p.url}" alt="Photo of a print${p.caption ? ": " + esc(p.caption) : ""}" loading="lazy"><figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
+  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure${p.nsfw && !p.mine ? ' class="prmature"' : ""}><img src="${p.url}" alt="${p.nsfw ? "Photo of a print (mature content)" : `Photo of a print${p.caption ? ": " + esc(p.caption) : ""}`}" loading="lazy">${p.nsfw && !p.mine ? `<button type="button" class="btn small mature-label" data-prshow="${p.id}">Mature content: show</button>` : ""}<figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
       ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}">⚑ Report</button>`}</figcaption></figure></li>`).join("")
     : `<li class="help">No print photos yet.</li>`;
   g.onclick = async e => {
-    const d = e.target.closest("[data-prdel]"), rp = e.target.closest("[data-prrep]");
+    const d = e.target.closest("[data-prdel]"), rp = e.target.closest("[data-prrep]"), sh = e.target.closest("[data-prshow]");
+    if (sh) { if (await confirmMature()) { const f = sh.closest("figure"); f.classList.remove("prmature"); sh.remove(); } return; }
     try {
       if (d) { await api(`/api/prints/${d.dataset.prdel}`, { method: "DELETE" }); toast("Photo deleted", "ok"); loadPrints(id); }
       if (rp) { const r2 = await api(`/api/prints/${rp.dataset.prrep}/report`, J("POST", { reason: "not_family_friendly", details: "" })); toast(r2.auto_hidden ? "Thank you. The photo is hidden while a moderator looks at it." : "Thank you. We got your report.", "ok"); }

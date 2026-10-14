@@ -145,7 +145,7 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
         return JSONResponse(status_code=e.status, content=e.payload)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack, is_nsfw)
+    rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack, nsfw=is_nsfw)
     return _print_public(rec, actor)
 
 

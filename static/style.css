@@ -655,3 +655,7 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .ph.nsfw img { filter: blur(22px) saturate(.6); transform: scale(1.1); }
 .ph.nsfw { overflow: hidden; }
 .mature-label { position: absolute; top: 10px; left: 10px; background: #111c; color: #fff; font-weight: 700; font-size: .8rem; padding: 3px 8px; border-radius: 6px; }
+.prmature { position: relative; overflow: hidden; }
+.prmature img { filter: blur(22px) saturate(.6); transform: scale(1.1); }
+.prmature .mature-label { z-index: 1; }
+.mature-share summary { cursor: pointer; margin: 8px 0; min-height: 44px; }
