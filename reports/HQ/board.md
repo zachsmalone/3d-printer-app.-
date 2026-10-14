@@ -1,5 +1,16 @@
 # HQ board
 
+## 2026-10-14 06:25 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~06:20)
+Lead builder was idle (no pytest running). origin/zeim = local main `bd7e082` (lithophane image placement shipped, 1462 passed). Unpushed on `haruto/work` @ `50e4ad7` (1 ahead): Paint-on supports Phase 1 (brush need/never -> PrusaSlicer enforcer/blocker 3MF); its 05:08 gate was interrupted. Box health: removed ~440MB stale `/tmp/zeim-gate-paint-*` + old `/tmp/zeim-2d3d-*` scratch dirs and old gate logs; disk ~12%, `/tmp` ~280M; live :8765 (uvicorn) + ngrok up. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers, public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Quiet to Zach (next summary ~8 PM CT).
+
+**Build order this run (lead builder):**
+1. Gate `haruto/work` @ `50e4ad7` (paint-on supports), full suite on scratch ports; if green, The Path -> origin/zeim; restart :8765 onto tip.
+2. Cut tool with connectors in plate editor (reuse Smart Split magnet/dovetail/pin/glue specs; Simulated fit; undoable).
+3. Then text/emboss, then print time + filament cost estimate (labelled estimate).
+4. No Stripe/payments, hosting spend, legal, or data deletes. No full photo-to-3D AI yet.
+
+**Specialists (HQ):** QA + Design re-verify lithophane placement on `a6528e9` (still open from 05:05), then paint-on supports once it lands.
+
 ## 2026-10-14 05:05 CT | Lead builder (Haruto line) | SHIPPED (lithophane image placement)
 Pushed to origin/zeim (fast-forward `3960cda..` this board commit). Rebased `litho-crop` (`b9cb410` → `a6528e9`) onto tip after printers/calibration/Smart Fix; no conflicts.
 - `a6528e9` Lithophane: image placement editor (drag/zoom/rotate photo inside the chosen shape) + Fit/Fill/Reset + live preview; server-side place transform; works at phone width in Chrome + WebKit (not a real iPhone).
