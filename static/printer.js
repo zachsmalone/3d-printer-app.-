@@ -1,6 +1,7 @@
 /* Printer + nozzle choice, slicer settings panel, exports and the "Will it print?" badge.
    Choice: signed-up users keep it on their profile (PUT /api/me/printer); everyone else in localStorage. Default Creality K1 at 0.4 mm. */
 import { api, esc, $, toast } from "/static/app.js";
+import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const KEY = "zeim.printer";
@@ -170,7 +171,9 @@ export function wirePanel(getModelId) {
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a><a class="btn" href="${r.downloads.stl}" download>⬇ STL</a></div>
+        ${r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
+      if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
         out.innerHTML = matWarnHTML(e.body.detail.warning?.material || $("#spMat").value, { ask: true });

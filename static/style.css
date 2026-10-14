@@ -668,3 +668,14 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 #traceOpts input[type=range]{min-height:44px;width:100%}
 #traceOpts .chk label{min-height:44px;display:flex;align-items:center;gap:8px}
 #traceOpts select,#traceOpts input[type=number]{min-height:44px}
+
+/* layer-by-layer preview (Slicer result) */
+.layerprev { margin: 12px 0; }
+.layerprev canvas { display: block; width: 100%; max-width: 560px; aspect-ratio: 1 / 1; border-radius: 10px; border: 1px solid var(--line, #33405c); background: #101826; }
+.layerprev .lprow { display: flex; gap: 8px; align-items: center; margin: 8px 0; max-width: 560px; }
+.layerprev .lprow input[type=range] { flex: 1; min-height: 44px; min-width: 0; }
+.layerprev .btn { min-height: 44px; min-width: 44px; }
+.layerprev .lpinfo { font-weight: 600; margin: 4px 0; }
+.lplegend { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9rem; }
+.lplegend li { display: flex; align-items: center; gap: 6px; margin: 0; }
+.lplegend .lpsw { display: inline-block; flex: 0 0 14px; width: 14px; height: 14px; max-height: 14px; border-radius: 3px; align-self: center; }

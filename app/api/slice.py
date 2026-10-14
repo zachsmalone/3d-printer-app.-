@@ -10,8 +10,8 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, Response
 
 from app import config
 from app.community.identity import Actor, get_actor
@@ -178,7 +178,7 @@ def slice_model(
         "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
         "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
-                      "3mf": f"/api/slice/{slice_id}/model.3mf"},
+                      "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
     }
 
 
@@ -255,3 +255,31 @@ def download_gcode(slice_id: str):
     if not path.is_file():
         _fail(404, "not_found", "That G-code has expired. Please slice again.")
     return FileResponse(path, media_type="text/plain", filename="zeim-model.gcode")
+
+
+@router.get("/{slice_id}/layers")
+def layer_preview(slice_id: str, request: Request):
+    """Layer-by-layer preview data read from this slice's G-code (same unguessable-id capability as /gcode).
+    Parsed once, cached gzipped next to the G-code (removed with it after 24 h)."""
+    import gzip
+    import json
+    from app.services import gcode_layers
+    if not _SLICE_ID.match(slice_id):
+        _fail(404, "not_found", "Layer preview not found.")
+    work = slices_root() / slice_id
+    gc, cache = work / "model.gcode", work / "layers.json.gz"
+    if not gc.is_file():
+        _fail(404, "not_found", "That slice has expired. Please slice again.")
+    if not cache.is_file():
+        try:
+            data = gcode_layers.parse(gc.read_text(errors="ignore"))
+        except gcode_layers.GcodeError as e:
+            _fail(422, "no_layers", str(e))
+        tmp = work / f"layers.{uuid.uuid4().hex}.tmp"
+        tmp.write_bytes(gzip.compress(json.dumps(data, separators=(",", ":")).encode(), 6))
+        tmp.replace(cache)
+    body = cache.read_bytes()
+    h = {"Vary": "Accept-Encoding", "Cache-Control": "no-store"}
+    if "gzip" in request.headers.get("accept-encoding", "").lower():
+        return Response(body, media_type="application/json", headers={**h, "Content-Encoding": "gzip"})
+    return Response(gzip.decompress(body), media_type="application/json", headers=h)
