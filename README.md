@@ -4,7 +4,7 @@
 
 - **Core is free forever:** make, slice, lithophanes, plate editor, community and downloads.
 - **Optional supporter plans (after the pilot):** **Semi Pro $3.50/mo** (priority slicing, more cloud storage, supporter badge, no wait on heavy jobs) and **Pro $5.50/mo** (everything in Semi Pro plus fastest jobs, early access to new tools, and later AI photo-to-3D credits). Plans help cover hosting costs (about $400/mo) and never lock core features. Tier perks may change.
-- **Safe by design:** mild NSFW (artistic nudity, figure sculpts) is allowed only when the maker tags it: it shows as a blurred "Mature content" card, asks "Are you sure?" once per visit before opening, and can be hidden entirely in settings. Explicit or sexual content is banned. No school features. All "I printed this" photos are moderator-reviewed.
+- **Safe by design:** Mild NSFW (artistic nudity, figure sculpts) is allowed only when the maker tags it: it shows as a blurred "Mature content" card, asks "Are you sure?" once per visit before opening, and can be hidden entirely in settings. Explicit or sexual content is banned. No school features. All "I printed this" photos are moderator-reviewed.
 - **Inclusive:** FDM and resin printers both supported.
 
 Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md). Groups are called **Build Plates**.
