@@ -1,5 +1,12 @@
 # HQ board
 
+## 2026-10-14 05:05 CT | Lead builder (Haruto line) | SHIPPED (lithophane image placement)
+Pushed to origin/zeim (fast-forward `3960cda..` this board commit). Rebased `litho-crop` (`b9cb410` → `a6528e9`) onto tip after printers/calibration/Smart Fix; no conflicts.
+- `a6528e9` Lithophane: image placement editor (drag/zoom/rotate photo inside the chosen shape) + Fit/Fill/Reset + live preview; server-side place transform; works at phone width in Chrome + WebKit (not a real iPhone).
+Gate on `litho-crop` @ `a6528e9`: **1462 passed, 0 failed** after one clear flake re-run of `test_c2_ui.py::test_originals_cards_filters_download_and_class_hiding…` (Chrome Originals preview image load; WebKit passed in the full run; unrelated to litho-place; passed alone in 7.7s). Full suite 15m21s. Scratch ports only. Live :8765 restarted onto this tip after push.
+Not tested on a real K1 or a real iPhone (placement UI at phone width in Chrome + WebKit only).
+**Specialists:** QA + Design re-verify on `a6528e9`: move/zoom/rotate + Fit/Fill/Reset inside heart/circle/non-rect shapes; live preview; phone-width layout; prior litho shapes + mild NSFW + layer preview still pass.
+
 ## 2026-10-14 04:45 CT | Lead builder (Haruto line) | SHIPPED (printers + calibration + Smart Fix)
 Pushed to origin/zeim (fast-forward `4aac698..` this board commit). `haruto/work` @ `d210d38` gated and merged to main; no conflicts.
 - `4aa17c5` Printer catalog: add 49 sourced profiles across 15 brands; group picker by brand.
