@@ -107,7 +107,18 @@ function applyShape() {
   $("#width_mm").closest(".field").hidden = curved;
   $("#diaLbl").firstChild.textContent = { globe: "Globe diameter ", cup: "Cup inside diameter " }[litShape()] || "Light diameter ";
   $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
+  $("#placeEditor").hidden = !lit || litShape() === "rect" || !S.file;
+  if (place && !$("#placeEditor").hidden) place.redraw();
 }
+/* image placement inside the shape (Zach: shapes cut the photo off) - see /static/lithoplace.js */
+import { mountPlace } from "/static/lithoplace.js";
+const litAspect = () => {
+  const sh = litShape(); if (sh === "globe") return 2; if (!CURVED.includes(sh)) return 1;
+  const d = +$("#diameter_mm").value || 40, h = +$("#height_mm").value || 60;
+  return Math.min(8, Math.max(0.3, Math.PI * (d + (sh === "nightlight" ? 1 : 0)) / Math.max(4, h - (sh === "cup" ? 2 : 0) - 4)));
+};
+var place = mountPlace($("#placeRoot"), { shape: litShape, aspect: litAspect });
+["#diameter_mm", "#height_mm"].forEach(s => $(s).addEventListener("input", () => place.redraw()));
 $("#shapeCards").onchange = applyShape;
 $("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked
 $("#presetSeg").onchange = () => { S.preset = ($("#presetSeg input:checked") || {}).value || "standard"; applyMode(); };
@@ -136,6 +147,7 @@ function clearFile() {
   const img = $("#dropPreview"); img.onerror = null; img.hidden = true; img.removeAttribute("src");
   $("#dropHint").hidden = false; $("#dropHint").innerHTML = DROP_HINT0;
   $("#photoChosen").hidden = true; $("#photoChosenName").textContent = "";
+  place.setImage(null); $("#placeEditor").hidden = true;
   $("#btnBuild").disabled = true; $("#buildHint").textContent = "Choose or take a photo to begin."; setPath(1, "Step 1 of 3: choose a photo.");
 }
 function setFile(f) {
@@ -145,6 +157,7 @@ function setFile(f) {
   S.file = f; S.pending = null;
   const img = $("#dropPreview"); img.onerror = () => { img.hidden = true; $("#dropHint").hidden = false; $("#dropHint").innerHTML = "<b>Photo ready</b><span>(This browser can't preview it, ZEIM will still open it.)</span>"; };
   img.src = URL.createObjectURL(f); img.hidden = false; $("#dropHint").hidden = true;
+  place.setImage(img.src); applyShape();
   $("#btnBuild").disabled = false; $("#buildHint").textContent = "Photo ready: " + (f.name || "camera photo");
   setPath(1, "Photo chosen."); pick.msg(""); $("#photoChosen").hidden = false; $("#photoChosenName").textContent = "✔ " + (f.name || "camera photo");
   document.dispatchEvent(new CustomEvent("zeim:file", { detail: f }));
@@ -171,6 +184,10 @@ function formData(autoDelete) {
   if (S.mode === "lithophane") {
     fd.append("shape", litShape());
     if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
+    if (litShape() !== "rect" && !place.isDefault()) {
+      const p = place.get(); fd.append("place_x", p.x.toFixed(4)); fd.append("place_y", p.y.toFixed(4));
+      fd.append("place_scale", p.scale.toFixed(4)); fd.append("place_rotation", p.rotation.toFixed(2));
+    }
   }
   if (autoDelete) fd.append("auto_delete_oldest", "true");
   if (S.mode === "trace2d") { fd.set("beginner", "false"); fd.append("trace", JSON.stringify(window.zeimTraceOpts ? window.zeimTraceOpts() : {})); return fd; }

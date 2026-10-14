@@ -205,6 +205,10 @@ def generate(
     shape: str = Form("rect"),               # lithophane outline: rect | heart | circle | star | square | globe | nightlight
     diameter_mm: float = Form(40.0),         # curved shapes: globe diameter / light diameter the night-light slips over
     height_mm: float = Form(60.0),           # curved shapes: height
+    place_x: str = Form(""),                 # image placement inside the shape (see litho_shapes.check_place)
+    place_y: str = Form(""),
+    place_scale: str = Form(""),
+    place_rotation: str = Form(""),
     base_mm: float = Form(2.0),
     relief_mm: float = Form(6.0),
     levels: int = Form(4),
@@ -251,6 +255,14 @@ def generate(
             raise HTTPException(400, "shape must be one of " + " | ".join(litho_shapes.SHAPES))
         if shape in litho_shapes.CURVED_SHAPES and not (10 <= diameter_mm <= 200 and 10 <= height_mm <= 240):
             raise HTTPException(400, "diameter_mm must be 10..200 and height_mm 10..240")
+    place = None
+    if mode == "lithophane" and shape != "rect":
+        raw = {k: v for k, v in (("x", place_x), ("y", place_y), ("scale", place_scale), ("rotation", place_rotation))
+               if str(v).strip() != ""}
+        try:
+            place = litho_shapes.check_place(raw)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
 
     disk_guard()
     with store.lock:  # serialise so concurrent builds can't exceed the cap
@@ -274,6 +286,8 @@ def generate(
             params.update(shape=shape)
             if shape in litho_shapes.CURVED_SHAPES:
                 params.update(diameter_mm=diameter_mm, height_mm=height_mm)
+            if place:
+                params.update(place=place)
         t0 = time.time()
         try:
             model = geometry.build(im, mode, params)

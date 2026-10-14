@@ -183,7 +183,7 @@ def prism_mask_solid(mask: np.ndarray, pitch: float, z0: float, z1: float):
 def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness=3.0,
                border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0,
                auto_contrast=True, invert=False, shape="rect", diameter_mm=40.0, height_mm=60.0,
-               color_mode="mono", **_) -> Model:
+               color_mode="mono", place=None, **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
     if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
@@ -196,7 +196,8 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
         v, f, info, thick = litho_shapes.build(
             im, shape, width_mm=width_mm, min_thickness=min_thickness, max_thickness=max_thickness,
             border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma, auto_contrast=auto_contrast,
-            invert=invert, diameter_mm=diameter_mm, height_mm=height_mm, color_mode=color_mode)
+            invert=invert, diameter_mm=diameter_mm, height_mm=height_mm, color_mode=color_mode,
+            place=litho_shapes.check_place(place))
         m = Model([Body("lithophane", v, f)], "lithophane")
         m.info = {**info, "shape": shape}
         m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)

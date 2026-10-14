@@ -34,15 +34,67 @@ TARGET_PITCH = 0.35              # mm per map pixel (matches a 0.4 mm nozzle)
 MAX_SIDE = 600
 
 
+PLACE_LIMITS = dict(x=(-1.0, 1.0), y=(-1.0, 1.0), scale=(0.1, 8.0))
+
+
+def check_place(place):
+    """Validate an image placement {x, y, scale, rotation}. x/y: offset of the photo centre as a fraction of the
+    shape box width/height (+x right, +y down); scale: 1 = fill (today's centre crop), rotation: degrees clockwise.
+    Returns a clean dict, or None when it is the identity (so the default output stays byte-identical)."""
+    if not place:
+        return None
+    import math
+    out = {}
+    for k, d in (("x", 0.0), ("y", 0.0), ("scale", 1.0), ("rotation", 0.0)):
+        try:
+            v = float(place.get(k, d))
+        except (TypeError, ValueError):
+            raise ValueError(f"placement {k} must be a number")
+        if not math.isfinite(v):
+            raise ValueError(f"placement {k} must be a finite number")
+        if k in PLACE_LIMITS:
+            lo, hi = PLACE_LIMITS[k]
+            if not lo <= v <= hi:
+                raise ValueError(f"placement {k} must be {lo:g}..{hi:g}")
+        else:
+            if abs(v) > 3600:
+                raise ValueError("placement rotation must be -3600..3600 degrees")
+            v = v % 360.0
+        out[k] = v
+    if out["x"] == 0 and out["y"] == 0 and out["scale"] == 1 and out["rotation"] == 0:
+        return None
+    return out
+
+
+def place_image(im: Image.Image, nx: int, ny: int, place, wrap=False) -> Image.Image:
+    """Render the photo into an nx x ny box with the user's move / zoom / rotate. Empty area = white (thinnest).
+    wrap=True (globe / cup / night-light): the box goes all the way round, so x slides the photo round the wrap
+    (no gap at the seam) instead of off the edge."""
+    nx, ny = int(nx), int(ny)
+    if wrap and place["x"]:
+        a = np.asarray(place_image(im, nx, ny, {**place, "x": 0.0}))
+        return Image.fromarray(np.roll(a, int(round(place["x"] * nx)), axis=1))
+    base = max(nx / im.width, ny / im.height)                  # scale 1 == ImageOps.fit cover
+    k = base * place["scale"]
+    w, h = max(1, round(im.width * k)), max(1, round(im.height * k))
+    small = im.convert("RGB").resize((w, h), Image.LANCZOS)
+    if place["rotation"]:
+        small = small.rotate(-place["rotation"], resample=Image.BICUBIC, expand=True, fillcolor=(255, 255, 255))
+    canvas = Image.new("RGB", (nx, ny), (255, 255, 255))
+    cx = nx / 2 + place["x"] * nx; cy = ny / 2 + place["y"] * ny
+    canvas.paste(small, (int(round(cx - small.width / 2)), int(round(cy - small.height / 2))))
+    return canvas
+
+
 def thickness_map(im: Image.Image, nx: int, ny: int, min_thickness, max_thickness, smooth=0.8, gamma=1.0,
-                  auto_contrast=True, invert=False, color_mode="mono"):
-    """(ny, nx) thickness in mm, bright = thin. The picture is centre-cropped to nx:ny first."""
+                  auto_contrast=True, invert=False, color_mode="mono", place=None, wrap=False):
+    """(ny, nx) thickness in mm, bright = thin. The picture is centre-cropped to nx:ny first (or placed by `place`)."""
     from .geometry import _luma, _tone
     if color_mode not in COLOR_MODES:
         raise ValueError(f"color_mode {color_mode!r} is not available yet")
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
-    small = ImageOps.fit(im, (int(nx), int(ny)), Image.LANCZOS)
+    small = place_image(im, nx, ny, place, wrap) if place else ImageOps.fit(im, (int(nx), int(ny)), Image.LANCZOS)
     g = _tone(_luma(np.asarray(small, np.float64)), auto_contrast, gamma, smooth)
     if invert:
         g = 1 - g
@@ -117,14 +169,14 @@ def _bilinear(img, u, v):
 
 
 def flat_shape(im, shape, width_mm=100.0, min_thickness=0.8, max_thickness=3.0, border_mm=3.0,
-               resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, color_mode="mono"):
+               resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, color_mode="mono", place=None):
     """Polar mesh inside the vector outline: rings scaled from the centre to the exact (smooth) edge, so the
     outer wall and rim follow the curve with no pixel steps. One watertight solid on z=0."""
     from scipy.spatial import cKDTree
     n = int(np.clip(resolution, 32, MAX_SIDE))
     half = width_mm / 2
     pitch = width_mm / n
-    thick_img = thickness_map(im, n + 1, n + 1, min_thickness, max_thickness, smooth, gamma, auto_contrast, invert, color_mode)
+    thick_img = thickness_map(im, n + 1, n + 1, min_thickness, max_thickness, smooth, gamma, auto_contrast, invert, color_mode, place)
     A = N_OUTLINE
     ang = np.linspace(0, 2 * np.pi, A, endpoint=False)
     edge = np.stack([np.cos(ang), np.sin(ang)], -1) * outline_radius(shape, ang)[:, None] * half   # (A,2) mm
@@ -215,10 +267,10 @@ CUP_BOTTOM_MM = 2.0
 
 def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8, max_thickness=3.0,
                  border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False,
-                 color_mode="mono"):
+                 color_mode="mono", place=None):
     scale = min(1.0, resolution / 200.0) if resolution else 1.0
     tmap = lambda c, r: thickness_map(im, c, r, min_thickness, max_thickness, smooth, gamma, auto_contrast,
-                                      invert, color_mode)
+                                      invert, color_mode, place, wrap=True)
     if shape == "globe":
         # full sphere, equirectangular: image columns = longitude (360), rows = latitude (+90 top .. -90 bottom)
         r_in = diameter_mm / 2
@@ -284,11 +336,11 @@ def build(im, shape, **params):
     """Returns (vertices, faces, info, thickness map for the preview thumb)."""
     if shape in FLAT_SHAPES:
         keys = ("width_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth", "gamma",
-                "auto_contrast", "invert", "color_mode")
+                "auto_contrast", "invert", "color_mode", "place")
         return flat_shape(im, shape, **{k: params[k] for k in keys if k in params})
     if shape in CURVED_SHAPES:
         keys = ("diameter_mm", "height_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth",
-                "gamma", "auto_contrast", "invert", "color_mode")
+                "gamma", "auto_contrast", "invert", "color_mode", "place")
         return curved_shape(im, shape, **{k: params[k] for k in keys if k in params})
     raise ValueError(f"unknown shape {shape!r}")
 
