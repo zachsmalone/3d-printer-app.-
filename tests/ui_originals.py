@@ -16,10 +16,16 @@ def run(name, launch, with_axe):
     pg = ctx.new_page(); pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700); pg.click("#mainNav [data-view=showcase]"); pg.click('#shTabs [data-tab=free]')
     pg.wait_for_selector('#shGrid .pcard[data-item="zo-pencil-cup"]')
+    try: pg.wait_for_selector('#shGrid .pcard[data-item="zo-pencil-cup"] .willprint', timeout=10000)   # same card state every run
+    except Exception: pass
     t = pg.inner_text('#shGrid .pcard[data-item="zo-pencil-cup"]')
+    # the async "Will it print?" pill names the printer you picked ("on the Creality K1"); that is not a test claim, so the
+    # no-K1 check reads the card without it (it used to fail only when the pill rendered before the check ran)
+    t_no_badge = pg.evaluate("""() => { const c = document.querySelector('#shGrid .pcard[data-item="zo-pencil-cup"]').cloneNode(true);
+        c.querySelectorAll('.willprint').forEach(e => e.remove()); return c.innerText || c.textContent; }""")
     ok(f"{name}: card shows credit, difficulty, Suggested FDM, Untested print, caveat", all(s in t for s in ('"Pencil Cup" by ZEIM · CC BY 4.0', "Easy", "Suggested: FDM", "Untested print", "Fit not checked")), t)
     ok(f"{name}: card shows the honest Simulated badge (no printer claim)", pg.locator('#shGrid .pcard[data-item="zo-pencil-cup"] .proof[data-proof=simulated]').inner_text() == "Simulated"
-       and "computer only" in t and "K1" not in t and "Test-printed" not in t, t)
+       and "computer only" in t and "K1" not in t_no_badge and "Test-printed" not in t, t)
     ok(f"{name}: no EXAMPLE cards left", "EXAMPLE" not in pg.inner_text("#shGrid"))
     href = pg.get_attribute('#shGrid .pcard[data-item="zo-pencil-cup"] a[download]', "href")
     r = ctx.request.get(URL + href)
