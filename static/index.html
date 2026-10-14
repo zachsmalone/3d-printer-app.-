@@ -387,7 +387,14 @@
     <li class="toolcard"><h2>Hollow</h2><p class="help">Save material with a hollow inside and a drain hole.</p><a class="btn" href="#slicer/hollow">Hollow a model</a></li>
     <li class="toolcard"><h2>Smart orient</h2><p class="help">Lay flat on the largest flat face, or let ZEIM find the position with the least overhang and support. Manual rotate too.</p><a class="btn" href="#slicer/smartorient">Orient a model</a></li>
     <li class="toolcard"><h2>Simplify</h2><p class="help">Lower the triangle count while keeping the shape.</p><a class="btn" href="#slicer/simplify">Simplify a model</a></li>
+    <li class="toolcard"><h2>Calibrate your printer</h2><p class="help">Four quick test prints for your printer and filament: first layer, temperature, flow and stringing. Plain steps and what to look for.</p><button type="button" class="btn" id="calOpen">Start calibration</button></li>
   </ul>
+  <section class="calbox" id="calBox" aria-labelledby="calH" hidden>
+    <h2 id="calH" tabindex="-1">Calibration wizard</h2>
+    <p class="help">Pick your printer, nozzle and filament. Print the tests in order. Numbers are starting points (estimates), not tested by ZEIM on your printer.</p>
+    <div id="calPick"></div>
+    <div id="calPlan"></div>
+  </section>
 </main>
 
 <main class="page" id="viewAccount" hidden>
@@ -504,4 +511,5 @@
 <script type="module" src="/static/edit.js"></script>
 <script type="module" src="/static/printer.js"></script>
 <script type="module" src="/static/trace2d.js"></script>
+<script type="module" src="/static/calibrate.js"></script>
 </body></html>

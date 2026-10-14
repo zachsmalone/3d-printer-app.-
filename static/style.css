@@ -679,3 +679,18 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .lplegend { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9rem; }
 .lplegend li { display: flex; align-items: center; gap: 6px; margin: 0; }
 .lplegend .lpsw { display: inline-block; flex: 0 0 14px; width: 14px; height: 14px; max-height: 14px; border-radius: 3px; align-self: center; }
+/* Calibration wizard + failure photo doctor (Smart Fix page) */
+.calbox,.docbox{margin-top:var(--s5);background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--sh-1)}
+.calbox h2:focus,.docbox h2:focus{outline:none}
+.caltests{list-style:none;padding:0;display:flex;flex-direction:column;gap:var(--s3)}
+.caltest details{border:1px solid var(--line);border-radius:var(--r);padding:var(--s3) var(--s4)}
+.caltest summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.caltest summary h3{display:inline;margin:0;font-size:var(--fs-md, 1.05rem)}
+.caltest h4{margin:var(--s3) 0 var(--s1)}
+.caltest ol,.caltest ul,.docfix ul{margin:0;padding-left:1.3em}
+.caltest .row .btn,.docbox .row .btn{min-height:44px}
+.docfix{border:1px solid var(--line);border-radius:var(--r);padding:var(--s3) var(--s4);margin:var(--s3) 0}
+.docfix h3{margin:0 0 var(--s2)}
+.docphoto{max-width:220px;max-height:220px;border-radius:var(--r);display:block;margin:var(--s2) 0}
+.docsyms{display:flex;flex-wrap:wrap;gap:var(--s2);border:0;padding:0;margin:0}
+.docsyms label{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:999px;cursor:pointer}

@@ -10,6 +10,7 @@ from .api import settings as settings_api
 from .api import slice as slice_api
 from .api import printsetup
 from .api import export as export_api
+from .api import calibration as calibration_api
 from . import config
 from .config import STATIC
 
@@ -57,7 +58,7 @@ def _start_retention():
     retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
 for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
-          export_api.router):
+          export_api.router, calibration_api.router):
     app.include_router(r)
 
 # Passkey + email-code login (docs/auth.md). Localhost / ZEIM_ENV=dev get safe defaults.
