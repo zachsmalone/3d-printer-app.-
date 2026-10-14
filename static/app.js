@@ -60,7 +60,7 @@ const api = async (url, opt) => {
   return j;
 };
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(iso).toLocaleDateString(); };
-const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", popart: "Pop-art", edit: "Edited model" };
+const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", popart: "Pop-art", trace2d: "Logo & Drawing", edit: "Edited model" };
 
 let viewer;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
@@ -77,8 +77,8 @@ function applyLevel(announce = false) {
   document.body.dataset.level = S.level;
   $("#modeSel").value = S.level; $("#modeIco").textContent = LEVEL_ICO[S.level]; $("#modeLine").textContent = LEVEL_LINE[S.level];
   document.dispatchEvent(new CustomEvent("zeim:level"));
-  $("#beginnerOpts").hidden = isExpert();
-  $("#expertOpts").hidden = !isExpert();
+  $("#beginnerOpts").hidden = isExpert() || S.mode === "trace2d";
+  $("#expertOpts").hidden = !isExpert() || S.mode === "trace2d";
   if (announce) say(LEVEL_SAY[S.level]);
 }
 $("#modeSel").onchange = e => {
@@ -92,7 +92,11 @@ function applyMode() {
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   applyShape();
-  $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
+  const tr = S.mode === "trace2d";               // 'Logo & Drawing to 3D' has its own settings panel at both levels
+  $("#traceOpts").hidden = !tr;
+  $("#beginnerOpts").hidden = tr || isExpert(); $("#expertOpts").hidden = tr || !isExpert();
+  if (!tr) $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
+  document.dispatchEvent(new CustomEvent("zeim:mode", { detail: S.mode }));
 }
 /* lithophane shape picker: flat outlines + curved shells (globe / night-light); curved ones take diameter + height instead of width */
 const CURVED = ["globe", "nightlight", "cup"];
@@ -143,6 +147,7 @@ function setFile(f) {
   img.src = URL.createObjectURL(f); img.hidden = false; $("#dropHint").hidden = true;
   $("#btnBuild").disabled = false; $("#buildHint").textContent = "Photo ready: " + (f.name || "camera photo");
   setPath(1, "Photo chosen."); pick.msg(""); $("#photoChosen").hidden = false; $("#photoChosenName").textContent = "✔ " + (f.name || "camera photo");
+  document.dispatchEvent(new CustomEvent("zeim:file", { detail: f }));
   if (!isExpert()) build(false);                         // Beginner: the photo builds straight away, no hidden second step
   else $("#btnBuild").scrollIntoView({ block: "nearest", behavior: "smooth" });   // Expert: tune the settings, then press Build
 }
@@ -168,6 +173,7 @@ function formData(autoDelete) {
     if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
   }
   if (autoDelete) fd.append("auto_delete_oldest", "true");
+  if (S.mode === "trace2d") { fd.set("beginner", "false"); fd.append("trace", JSON.stringify(window.zeimTraceOpts ? window.zeimTraceOpts() : {})); return fd; }
   if (isExpert()) {
     $$("#expertOpts [name]").forEach(el => {
       if (el.name === "width_mm") return;

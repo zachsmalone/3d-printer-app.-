@@ -73,6 +73,10 @@ def load_model(bid: str) -> geometry.Model:
     m = store.cache.get(bid)
     if m is None:
         meta = store.get(bid)
+        if meta.get("mode") == "trace2d":
+            from ..core import trace2d
+            m = store.cache[bid] = trace2d.build((store.dir(bid) / meta["source"]).read_bytes(), None, meta["params"])
+            return m
         if meta.get("kind") == "edit":
             from ..services import editproj
             m = store.cache[bid] = editproj.model(bid)
@@ -210,8 +214,9 @@ def generate(
     multi_body: bool = Form(True),
     palette: str = Form(""),
     photo_ack: bool = Form(False),
+    trace: str = Form(""),                   # mode=trace2d ('Logo & Drawing to 3D'): JSON of the trace2d options
 ):
-    if mode not in ("lithophane", "relief", "popart"):
+    if mode not in ("lithophane", "relief", "popart", "trace2d"):
         raise HTTPException(400, f"unknown mode {mode}")
     try:
         title = text_in(title, 80, "Title")
@@ -223,6 +228,8 @@ def generate(
     sample_title = imagesafe.builtin_title(data)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
+    if mode == "trace2d":
+        return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest)
     try:
         ack = imagesafe.check_ack(data, photo_ack)        # CR-5: "this is my photo / I have permission" (built-in sample exempt)
         data, src_ext, _ = imagesafe.sanitize(data)       # HEIC -> JPEG, rotation applied, EXIF/GPS dropped, extension from content
@@ -296,6 +303,106 @@ def generate(
     return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
             "history": [summary(m) for m in store.list(actor.sid)]}
+
+
+# ---------------- 'Logo & Drawing to 3D' (trace2d) ----------------
+def trace_input(data: bytes, photo_ack: bool, trace_json: str, width_mm: float):
+    """Same upload safety as every photo: permission tick (CR-5) + sanitize (format sniffed, EXIF/GPS dropped, size caps).
+    SVG is the one extra format: parsed as vectors with entities/network/DTDs off, embedded pictures refused, size capped.
+    -> (clean bytes, ext, PIL image or None, params)."""
+    import json
+    from ..core import trace2d
+    try:
+        opts = json.loads(trace_json) if trace_json else {}
+        if not isinstance(opts, dict):
+            raise ValueError
+    except ValueError:
+        raise HTTPException(400, "The drawing settings didn't come through. Please try again.")
+    opts["width_mm"] = width_mm
+    try:
+        ack = imagesafe.check_ack(data, photo_ack)
+        if trace2d.is_svg(data):
+            trace2d.svg_to_geom(data)                     # refuses unsafe / unreadable SVG before anything is stored
+            clean, ext, im = data, "svg", None
+        else:
+            clean, ext, _ = imagesafe.sanitize(data)
+            im = geometry.load_image(clean)
+            geometry.check_params(im, "trace2d", {"width_mm": width_mm})
+        params = trace2d.clean_params(opts)
+    except (imagesafe.ImageRefused, trace2d.TraceError) as e:
+        raise HTTPException(400, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, imagesafe.UNREADABLE)
+    return clean, ext, im, params, ack
+
+
+def _trace_notes(info: dict) -> list:
+    """Notes for the result table (label / value / why), same shape as Beginner auto-notes."""
+    rows = [{"label": "Tip", "value": "✔", "why": n} for n in info.get("notes", [])]
+    for c in info.get("colour_changes", []):
+        rows.append({"label": "Colour", "value": c["colour"], "why": f"from {c['from_mm']:g} mm to {c['to_mm']:g} mm"})
+    if "wall_mm" in info:
+        rows.append({"label": "Cutting wall", "value": f"{info['wall_mm']:g} mm", "why": "thin enough to cut, thick enough to print"})
+    return rows
+
+
+def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest):
+    from ..core import trace2d
+    from ..services import willprint
+    clean, ext, im, params, ack = trace_input(data, photo_ack, trace_json, width_mm)
+    disk_guard()
+    with store.lock:
+        try:
+            store.reserve(actor.sid, auto_delete_oldest)
+        except HistoryFull:
+            return full_response(actor)
+        t0 = time.time()
+        try:
+            model = trace2d.build(clean, im, params)
+        except trace2d.TraceError as e:
+            raise HTTPException(400, str(e))
+        bid = uuid.uuid4().hex[:12]
+        d = store.dir(bid)
+        d.mkdir(parents=True)
+        src = "source." + ext
+        (d / src).write_bytes(clean)
+        for e, fn in exporters.WRITERS.items():
+            (d / f"model.{e}").write_bytes(fn(model))
+        Image.fromarray(model.thumb).save(d / "thumb.png")
+        stats = mesh_stats(model)
+        model.info = {**model.info, "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), "creality_k1")}
+        meta = {"id": bid, "mode": "trace2d", "beginner": False, "preset": None,
+                "title": title.strip() or sample_title or "My drawing build",
+                "source": src, "params": params, "auto_notes": _trace_notes(model.info), "info": model.info,
+                "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
+        store.save(meta)
+        store.cache[bid] = model
+    return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
+            "seconds": round(time.time() - t0, 2), "preview": preview_payload(model),
+            "history": [summary(m) for m in store.list(actor.sid)]}
+
+
+@router.post("/trace2d/preview")
+def trace_preview(actor: Actor = Depends(get_actor), file: UploadFile = File(...), photo_ack: bool = Form(False),
+                  trace: str = Form(""), width_mm: float = Form(80.0)):
+    """Live 2D preview of the traced outline (nothing is stored). Same upload checks as a build."""
+    from ..core import trace2d
+    data = file.file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(413, "image too large (max 25 MB)")
+    if not (5 <= width_mm <= 400):
+        raise HTTPException(400, "Width must be between 5 and 400 mm.")
+    clean, ext, im, params, _ = trace_input(data, photo_ack, trace, width_mm)
+    try:
+        t = trace2d.trace(clean, im, params)
+    except trace2d.TraceError as e:
+        raise HTTPException(400, str(e))
+    minx, miny, maxx, maxy = t["ink"].bounds
+    return {"svg": trace2d.preview_svg(t), "holes": t["holes"], "pieces": t["pieces"], "threshold": t["threshold"],
+            "size_mm": [round(maxx - minx, 1), round(maxy - miny, 1)], "warnings": t["warnings"], "notes": t["notes"],
+            "thin": not t["thin"].is_empty, "colours": [t["bg"]] + [c for _, c in t["layers"]], "from_svg": t["svg"]}
 
 
 @router.get("/download/{bid}/{ext}")

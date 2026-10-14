@@ -61,6 +61,7 @@
         <label class="card" data-mode="lithophane"><input type="radio" name="style" value="lithophane" checked><span class="ico" aria-hidden="true">💡</span><b>Lithophane</b><small>A picture that glows with a light behind it</small></label>
         <label class="card" data-mode="relief"><input type="radio" name="style" value="relief"><span class="ico" aria-hidden="true">⛰</span><b>Relief</b><small>Your picture as raised hills and valleys</small></label>
         <label class="card" data-mode="popart"><input type="radio" name="style" value="popart"><span class="ico" aria-hidden="true">🎨</span><b>Pop-art</b><small>Flat colour layers stacked up</small></label>
+        <label class="card" data-mode="trace2d"><input type="radio" name="style" value="trace2d"><span class="ico" aria-hidden="true">✏️</span><b>Logo &amp; Drawing to 3D</b><small>A logo, sketch or kid's drawing as a clean 3D shape, cookie cutter or stamp</small></label>
       </fieldset>
       <fieldset class="cards shapes" id="shapeCards" aria-describedby="shapeHelp"><legend>Lithophane shape</legend>
 <label class="card" data-shape="rect"><input type="radio" name="litho_shape" value="rect" checked><span class="ico" aria-hidden="true">▭</span><b>Rectangle</b><small>Flat panel</small></label>
@@ -83,6 +84,59 @@
       <h2><i>3</i> Size &amp; settings</h2>
       <div class="field"><label for="width_mm">Width <em>mm</em></label>
         <div class="range"><input type="range" id="widthRange" min="30" max="300" step="5" value="100"><input type="number" name="width_mm" id="width_mm" value="100" min="5" max="1000" step="1"></div></div>
+
+      <div id="traceOpts" hidden>
+        <p class="help">Best with a flat picture: a logo, icon, sketch or drawing on a plain background. PNG, JPG or SVG.</p>
+        <fieldset class="field seg wide" id="tOut"><legend>What to make</legend>
+          <label><input type="radio" name="t_out" value="extrude" checked>Shape</label><label><input type="radio" name="t_out" value="cutter">Cookie cutter</label><label><input type="radio" name="t_out" value="stamp">Stamp</label><label><input type="radio" name="t_out" value="layers">Colour layers</label>
+        </fieldset>
+        <p class="help" id="tOutHelp"></p>
+        <details open><summary>Tracing</summary>
+          <div class="grid2">
+            <div class="field" data-tnot="layers"><label for="t_color_mode">Find the shape by</label><select id="t_color_mode" data-t="color_mode"><option value="false">Light and dark</option><option value="true">Colour</option></select></div>
+            <div class="field" data-tnot="layers"><label for="t_colors">Colours in the picture</label><input type="number" id="t_colors" data-t="colors" value="2" min="2" max="6"></div>
+            <div class="field chk" data-tnot="layers"><label><input type="checkbox" id="t_auto" checked> Pick the light/dark cut-off for me</label></div>
+            <div class="field" data-tnot="layers"><label for="t_threshold">Light/dark cut-off <output id="t_thrOut">auto</output></label><input type="range" id="t_threshold" min="0" max="255" value="128" disabled></div>
+            <div class="field"><label for="t_despeckle">Clean up specks <output id="t_despOut">30</output></label><input type="range" id="t_despeckle" data-t="despeckle" min="0" max="500" step="5" value="30"></div>
+            <div class="field"><label for="t_smooth">Smooth edges <output id="t_smOut">1</output></label><input type="range" id="t_smooth" data-t="smooth" min="0" max="3" step="0.5" value="1"></div>
+            <div class="field chk"><label><input type="checkbox" id="t_invert" data-t="invert"> Swap shape and background</label></div>
+          </div></details>
+        <details open data-tout="extrude"><summary>Shape</summary>
+          <div class="grid2">
+            <div class="field"><label for="t_height_mm">Shape height <em>mm</em></label><input type="number" id="t_height_mm" data-t="height_mm" value="3" min="0.4" max="50" step="0.2"></div>
+            <div class="field"><label for="t_base">Base plate</label><select id="t_base" data-t="base"><option value="none">No base</option><option value="rect">Rectangle</option><option value="rounded">Rounded rectangle</option><option value="outline">Follows the outline</option></select></div>
+            <div class="field"><label for="t_base_mm">Base thickness <em>mm</em></label><input type="number" id="t_base_mm" data-t="base_mm" value="2" min="0.4" max="20" step="0.2"></div>
+            <div class="field"><label for="t_base_margin_mm">Base margin <em>mm</em></label><input type="number" id="t_base_margin_mm" data-t="base_margin_mm" value="3" min="0" max="30" step="0.5"></div>
+            <div class="field chk"><label><input type="checkbox" id="t_keyring" data-t="keyring"> Add a keyring hole</label></div>
+          </div></details>
+        <details open data-tout="cutter"><summary>Cookie cutter</summary>
+          <div class="grid2">
+            <div class="field"><label for="t_wall_mm">Cutting wall <em>mm</em></label><input type="number" id="t_wall_mm" data-t="wall_mm" value="1" min="0.6" max="3" step="0.1"></div>
+            <div class="field"><label for="t_cutter_mm">Cutter height <em>mm</em></label><input type="number" id="t_cutter_mm" data-t="cutter_mm" value="14" min="5" max="40" step="0.5"></div>
+            <div class="field"><label for="t_flange_mm">Grip flange width <em>mm</em></label><input type="number" id="t_flange_mm" data-t="flange_mm" value="5" min="0" max="15" step="0.5"></div>
+          </div></details>
+        <details open data-tout="stamp"><summary>Stamp</summary>
+          <div class="grid2">
+            <div class="field"><label for="t_stamp_style">Design is</label><select id="t_stamp_style" data-t="stamp_style"><option value="raised">Raised (an ink stamp)</option><option value="recessed">Pressed in (for clay or dough)</option></select></div>
+            <div class="field"><label for="t_relief_mm">Depth <em>mm</em></label><input type="number" id="t_relief_mm" data-t="relief_mm" value="1.5" min="0.4" max="10" step="0.1"></div>
+            <div class="field"><label for="t_sbase_mm">Base thickness <em>mm</em></label><input type="number" id="t_sbase_mm" data-t="base_mm" value="3" min="0.4" max="20" step="0.2"></div>
+            <div class="field chk"><label><input type="checkbox" id="t_mirror" data-t="mirror" checked> Mirror it, so stamped prints read the right way</label></div>
+          </div></details>
+        <details open data-tout="layers"><summary>Colour layers</summary>
+          <div class="grid2">
+            <div class="field"><label for="t_layers">Number of colours</label><input type="number" id="t_layers" data-t="layers" value="3" min="2" max="4"></div>
+            <div class="field"><label for="t_layer_mm">Height of each colour <em>mm</em></label><input type="number" id="t_layer_mm" data-t="layer_mm" value="1" min="0.2" max="6" step="0.2"></div>
+            <div class="field"><label for="t_lbase_mm">Base thickness <em>mm</em></label><input type="number" id="t_lbase_mm" data-t="base_mm" value="1.6" min="0.4" max="20" step="0.2"></div>
+          </div></details>
+        <details open data-tnot="cutter"><summary>Thin lines</summary>
+          <div class="grid2">
+            <div class="field"><label for="t_min_feature_mm">Thinnest line that prints <em>mm</em></label><input type="number" id="t_min_feature_mm" data-t="min_feature_mm" value="0.8" min="0.2" max="3" step="0.1"></div>
+            <div class="field chk"><label><input type="checkbox" id="t_thicken" data-t="thicken"> Make thin lines thicker</label></div>
+          </div></details>
+        <div class="tprev-wrap"><h3 class="tprev-h">Traced outline</h3>
+          <div id="tracePrev" class="tprev" role="img" aria-label="Traced outline preview. Choose a picture to see it."><span class="help">Choose a picture to see the traced outline here.</span></div>
+          <p class="help" id="traceStatus" aria-live="polite"></p></div>
+      </div>
 
       <div id="beginnerOpts">
         <fieldset class="field seg wide" id="presetSeg"><legend>Thickness</legend>
@@ -322,6 +376,7 @@
     <li class="toolcard"><h2>Cut &amp; split</h2><p class="help">Slice a model with a plane into parts that fit your printer.</p><a class="btn" href="#slicer/cut">Open Cut / split</a></li>
     <li class="toolcard"><h2>Orient &amp; place</h2><p class="help">Drop to the bed, centre, mirror, rotate and scale.</p><a class="btn" href="#slicer/orient">Open Orient</a></li>
     <li class="toolcard"><h2>Text &amp; base</h2><p class="help">Add raised text or a base plate.</p><a class="btn" href="#slicer/text">Open Text</a></li>
+    <li class="toolcard"><h2>Logo &amp; Drawing to 3D</h2><p class="help">Turn a logo, sketch or drawing (PNG, JPG or SVG) into a clean shape, cookie cutter, stamp or colour layers.</p><button type="button" class="btn" id="cadTrace">Open Logo &amp; Drawing</button></li>
   </ul>
 </main>
 
@@ -448,4 +503,5 @@
 <script type="module" src="/static/community.js"></script>
 <script type="module" src="/static/edit.js"></script>
 <script type="module" src="/static/printer.js"></script>
+<script type="module" src="/static/trace2d.js"></script>
 </body></html>

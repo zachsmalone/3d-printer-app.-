@@ -659,3 +659,12 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 .prmature img { filter: blur(22px) saturate(.6); transform: scale(1.1); }
 .prmature .mature-label { z-index: 1; }
 .mature-share summary { cursor: pointer; margin: 8px 0; min-height: 44px; }
+
+/* Logo & Drawing to 3D: traced-outline preview */
+.tprev-wrap{margin-top:10px}.tprev-h{font-size:14px;margin:4px 0}
+.tprev{min-height:140px;max-height:320px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--ctl);border-radius:10px;padding:8px}
+.tprev svg{max-width:100%;max-height:300px;width:100%;height:auto}
+#tOut{flex-wrap:wrap}#tOut label{min-height:44px;min-width:44px}
+#traceOpts input[type=range]{min-height:44px;width:100%}
+#traceOpts .chk label{min-height:44px;display:flex;align-items:center;gap:8px}
+#traceOpts select,#traceOpts input[type=number]{min-height:44px}

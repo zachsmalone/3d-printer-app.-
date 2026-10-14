@@ -34,7 +34,7 @@ def run(name, launch, with_axe):
     prim = pg.evaluate("[...document.querySelectorAll('main .btn.primary')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.top<844&&!e.disabled}).map(e=>e.id)")
     ok(f"{name}: one primary action above the fold", len(prim) == 1 and prim[0] in ("sTake", "sChoose"), prim)
     ok(f"{name}: Build button says Make my 3D model", "Make my 3D model" in pg.inner_text("#btnBuild"))
-    ok(f"{name}: style and thickness are radio groups with legends", pg.locator("#modeCards legend").count() == 1 and pg.locator("#modeCards input[type=radio]").count() == 3
+    ok(f"{name}: style and thickness are radio groups with legends", pg.locator("#modeCards legend").count() == 1 and pg.locator("#modeCards input[type=radio]").count() == 4
        and pg.locator("#presetSeg legend").inner_text() == "Thickness" and pg.locator("#presetSeg input[type=radio]").count() == 3)
     pg.click("#modeCards [data-mode=relief]")
     ok(f"{name}: choosing Relief checks the radio", pg.is_checked("#modeCards input[value=relief]"))
