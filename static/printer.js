@@ -3,6 +3,7 @@
 import { api, esc, $, toast } from "/static/app.js";
 import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
 import { mountPaint, getStrokes } from "/static/supportpaint.js";
+import { costHTML, wireCost } from "/static/cost.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const KEY = "zeim.printer";
@@ -175,6 +176,7 @@ export function wirePanel(getModelId) {
         : "";
       out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
+        ${costHTML(r)}
         ${paintNote}
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
@@ -182,6 +184,7 @@ export function wirePanel(getModelId) {
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a><a class="btn" href="${r.downloads.stl}" download>⬇ STL</a></div>
         ${r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
+      wireCost();
       if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once

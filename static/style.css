@@ -608,6 +608,12 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .slicepanel label.chk{display:flex;gap:8px;align-items:center;min-height:44px}
 .slicepanel .slicers,.slicepanel .row{display:flex;flex-wrap:wrap;gap:8px}.slicepanel .slicers .btn,.slicepanel .row .btn{min-height:44px}
 .slicestats .pill{font-size:15px;margin-right:6px}
+.costbox{border:1px solid var(--line,#33405c);border-radius:12px;padding:8px 12px;margin:8px 0}
+.costbox .costrow{flex-wrap:wrap;gap:8px;align-items:center}
+.costbox select,.costbox input{min-height:44px}
+.costbox #costKg{max-width:8em}
+.costbox #costCur{width:auto;min-width:4.5em}
+.costbox .costout{font-weight:600;margin:6px 0 2px}
 .pill.willprint{white-space:nowrap}.pill.warn{color:var(--warn);border-color:var(--warn)}.pill.willprint.bad{border-color:var(--bad)}
 html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its light-yellow fill in dark mode, so its text stays dark (axe color-contrast: 'Simulated' badge, Will-it-print) */
 .willbox{margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--sunk)}

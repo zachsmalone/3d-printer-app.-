@@ -14,7 +14,7 @@ Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md). Group
 | Tab | What it does |
 |---|---|
 | **Showcase** | Trending, Following, search with history, favorites, follows, remix credit chains, and moderator-reviewed **I printed this** photos. |
-| **Slicer** | In-app slicing with PrusaSlicer (run unmodified). Printer and nozzle picker (0.1-1.0 mm), Beginner / Advanced settings, **Will it print?** badge, multi-file upload, and **Open in your slicer** (3MF / STL) for Creality, Bambu Lab, Prusa, Elegoo and Anycubic. First tested on a Creality K1. |
+| **Slicer** | In-app slicing with PrusaSlicer (run unmodified). Printer and nozzle picker (0.1-1.0 mm), Beginner / Advanced settings, **Will it print?** badge, print time and grams from the G-code with an optional filament cost estimate (your own price per kg, kept in your browser), multi-file upload, and **Open in your slicer** (3MF / STL) for Creality, Bambu Lab, Prusa, Elegoo and Anycubic. First tested on a Creality K1. |
 | **Plate editor** | Shapr3D-style: select, move, rotate and resize single items, auto-center, arrange, group/ungroup, merge/separate, duplicate, hide and delete, and **cut** one object with a plane (magnet, dovetail, pin or glue connectors; fit Simulated), and add raised or engraved **text** to one object. |
 | **Lithophane** | Photo to lithophane: heart, circle, star, square, full-sphere globe, Cylinder / Cup wrap and night-light, with a backlit **Light on** preview (warm or cool light). |
 | **Smart Fix** | Mesh repair, auto-orient and smart split. |
@@ -26,8 +26,8 @@ Our five pillars live in [`reports/HQ/pillars.md`](reports/HQ/pillars.md). Group
 ## Coming next
 
 1. First layer-by-layer preview, calibration wizard, and failure photo doctor.
-2. Paint-on supports, cut tool with connectors, text/emboss, snap measure.
-3. Print time and filament cost estimate, a "Print this next" queue, and one-click remix (credit kept).
+2. Snap measure (paint-on supports, the plate cut tool with connectors and plate text are in).
+3. A "Print this next" queue and one-click remix (credit kept).
 4. Full resin support: resin slicing, auto-hollow with drain holes, resin supports, resin lithophane settings, and safety notes (gloves, ventilation, IPA).
 5. Free CC-licensed community models, each credited to its creator and source site.
 6. Database storage upgrade.
