@@ -727,7 +727,15 @@ def op_smart_split(m, p):
     return smartsplit.smart_split(m, p)
 
 
-OPS = {"lay_flat": op_lay_flat, "best_orient": op_best_orient, "smart_split": op_smart_split, "translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
+def op_plate(m, p):
+    from . import plate
+    try:
+        return plate.apply(m, p)
+    except plate.PlateError as e:
+        raise OpError(str(e))
+
+
+OPS = {"plate": op_plate, "lay_flat": op_lay_flat, "best_orient": op_best_orient, "smart_split": op_smart_split, "translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
        "repair": op_repair, "simplify": op_simplify, "cut": op_cut, "hollow": op_hollow, "base": op_base,
        "boolean": op_boolean, "text": op_text}
 
@@ -752,6 +760,7 @@ def label(op: str, p: dict) -> str:
             "boolean": lambda: f"{str(g('kind')).title()} {(p.get('primitive') or {}).get('type', '')}",
             "text": lambda: f"{str(g('mode', 'emboss')).title()} “{g('text')}”",
             "import": lambda: str(g("label", "Import")),
+            "plate": lambda: __import__("app.core.plate", fromlist=["label"]).label(p),
         }[op]()
     except Exception:
         return op

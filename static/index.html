@@ -136,6 +136,9 @@
         <button class="btn small" id="vLeft" type="button">↶ Turn left</button><button class="btn small" id="vRight" type="button">Turn right ↷</button>
         <button class="btn small ghost" id="vReset">⟲ Reset view</button>
         <button class="btn small ghost" id="vWire">▦ Wireframe</button>
+        <span id="litLightBox" hidden><button class="btn small" id="vLight" type="button" aria-pressed="false" title="Show it as if a light is behind it">💡 Light on</button>
+        <label for="vLightColor" class="sr-only">Light colour</label><select id="vLightColor" class="small"><option value="warm">Warm light</option><option value="cool">Cool light</option><option value="white">White light</option></select>
+        <span class="pill" id="vLightNote" hidden title="Brightness from wall thickness: thin glows, thick stays dark. Real filament varies.">Preview estimate</span></span>
     </div>
 
     <p class="touch-hint" id="touchHint">Drag the model to turn it. To scroll the page, swipe on the thin edge strips beside it.</p>

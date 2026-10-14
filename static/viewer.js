@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "/static/vendor/OrbitControls.js";
+import { backlitColors } from "/static/lithlight.js";
 
 const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
 
@@ -40,8 +41,9 @@ export class Viewer {
       gg.computeVertexNormals();
       const color = b.color || (mode === "lithophane" ? "#f2ead8" : "#8fb0e0");
       const m = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05, flatShading: false, wireframe: this.wire });
-      this.group.add(new THREE.Mesh(gg, m));
+      const mesh = new THREE.Mesh(gg, m); mesh.userData.object = b.object ?? null; this.group.add(mesh);
     }
+    this.backlit = false; this.scene.background = null;
     if (!opts.keepCamera) this.reset();
   }
   reset() {
@@ -57,6 +59,18 @@ export class Viewer {
   turn(deg) {
     const t = this.controls.target, v = this.camera.position.clone().sub(t), a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
     this.camera.position.set(t.x + v.x * c - v.y * sn, t.y + v.x * sn + v.y * c, t.z + v.z); this.controls.update();
+  }
+  /* "Light on": the lithophane as if lit from behind (per-vertex colour from wall thickness, unlit material on a dark backdrop). */
+  setBacklight(on, shape = "rect", light = "warm") {
+    this.backlit = on;
+    this.scene.background = on ? new THREE.Color(0x0b0d12) : null;
+    for (const m of this.group.children) {
+      if (!m.userData.lit) m.userData.lit = m.material;
+      if (!on) { m.material = m.userData.lit; continue; }
+      const pos = m.geometry.getAttribute("position");
+      m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, light), 3));
+      m.material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, wireframe: this.wire });
+    }
   }
   toggleWire() { this.wire = !this.wire; this.group.children.forEach(m => m.material.wireframe = this.wire); }
 }

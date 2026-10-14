@@ -208,6 +208,7 @@ function showBuild(r) {
   r.visibility = r.visibility || "private";
   $("#viewerEmpty").hidden = true; $("#vtools").hidden = false; $("#result").hidden = false;
   viewer?.load(r.preview, r.mode);
+  S.lightOn = false; syncLight();
   const st = r.stats, sz = st.size_mm.map(x => x.toFixed(1)).join(" × ");
   const nb = st.bodies?.length || 1;
   $("#viewer").setAttribute("aria-label", `3D preview: ${MODE_LABEL[r.mode] || "model"}, ${sz.replace(/ × /g, " by ")} millimetres, ${nb} ${nb > 1 ? "pieces" : "piece"}` +
@@ -230,6 +231,18 @@ $("#vReset").onclick = () => viewer?.reset();
 $("#vLeft").onclick = () => viewer?.turn(-30);
 $("#vRight").onclick = () => viewer?.turn(30);
 $("#vWire").onclick = () => viewer?.toggleWire();
+/* "Light on": backlit lithophane preview estimate (thin = bright, thick = dark) */
+const litShapeOf = r => r?.info?.shape || r?.params?.shape || "rect";
+function syncLight() {
+  const lit = S.current?.mode === "lithophane";
+  $("#litLightBox").hidden = !lit;
+  if (!lit) S.lightOn = false;
+  $("#vLight").setAttribute("aria-pressed", S.lightOn ? "true" : "false");
+  $("#vLightNote").hidden = !S.lightOn;
+  viewer?.setBacklight(!!S.lightOn, litShapeOf(S.current), $("#vLightColor").value);
+}
+$("#vLight").onclick = () => { S.lightOn = !S.lightOn; syncLight(); };
+$("#vLightColor").onchange = () => { if (S.lightOn) syncLight(); };
 
 /* ---------- history ---------- */
 function renderHistory() {

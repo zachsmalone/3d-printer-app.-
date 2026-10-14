@@ -84,7 +84,7 @@ def as_model(m: trimesh.Trimesh, title: str) -> Model:
 
 def model(bid: str) -> Model:
     meta = store.get(bid)
-    return as_model(mesh_at(bid, meta), meta["title"])
+    return as_model(printable_at(bid, meta), meta["title"])
 
 
 def ensure_exports(bid: str):
@@ -100,7 +100,7 @@ def ensure_exports(bid: str):
         return
     with _lock:
         meta = store.get(bid)
-        m = mesh_at(bid, meta)
+        m = printable_at(bid, meta)
         mdl = as_model(m, meta["title"])
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(mdl))
@@ -181,11 +181,35 @@ def _replay_safe(o: dict) -> bool:
     return isinstance(t, str) and len(t) <= TEXT_MAX and not safety.scan(t)
 
 
+def bed_of(meta: dict) -> list:
+    b = ((meta.get("base") or {}).get("plate") or {}).get("bed_mm") or []
+    return [float(x) for x in b[:3]] + [220.0, 220.0, 250.0][len(b[:3]):] if b else [220.0, 220.0, 250.0]
+
+
+def layout_at(meta: dict, m: trimesh.Trimesh, head: int | None = None) -> dict:
+    """The plate layout (objects / groups / hidden) at a step; stale or missing -> connected components."""
+    from ..core import plate
+    head = meta["head"] if head is None else head
+    L = (meta.get("plate_layouts") or {}).get(str(head))
+    return L if plate.valid(L, m) else None
+
+
+def printable_at(bid: str, meta: dict) -> trimesh.Trimesh:
+    """What gets exported and sliced: the current mesh minus hidden plate objects."""
+    from ..core import plate
+    m = mesh_at(bid, meta)
+    L = (meta.get("plate_layouts") or {}).get(str(meta["head"]))
+    return plate.printable(m, L) if L else m
+
+
 def add_op(bid: str, op: str, params: dict) -> dict:
     params = check_op_text(op, params)
     with _lock:
         meta = store.get(bid)
         cur = mesh_at(bid, meta)
+        if op == "plate":                                 # the server's own layout + bed, never the client's
+            params = {**params, "layout": layout_at(meta, cur)}
+            params.setdefault("bed", bed_of(meta))
         new, rep = meshedit.apply(cur, op, params)       # raises OpError → nothing is stored
         ops = meta["ops"][:meta["head"]]                  # drop the redo tail
         ops.append({"op": op, "params": params, "label": meshedit.label(op, params)})
@@ -196,6 +220,12 @@ def add_op(bid: str, op: str, params: dict) -> dict:
         _STATES.setdefault(bid, OrderedDict())[meta["head"]] = new
         meta["stats"] = _stats(new, meta["title"])
         meta["last_report"] = rep
+        pl = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < meta["head"]}
+        if op == "plate" and isinstance(rep, dict) and rep.get("layout"):
+            pl[str(meta["head"])] = rep["layout"]
+        elif pl.get(str(meta["head"] - 1)) and len(new.faces) == len(cur.faces):   # move/rotate/scale keep the objects
+            pl[str(meta["head"])] = pl[str(meta["head"] - 1)]
+        meta["plate_layouts"] = pl
         store.save(meta)
         store.cache.pop(bid, None)
     return rep
@@ -245,6 +275,24 @@ def preview(m: trimesh.Trimesh) -> dict:
             "indices": base64.b64encode(np.asarray(f).astype("<u4").tobytes()).decode()}]}
 
 
+def preview_objects(m: trimesh.Trimesh, layout: dict) -> dict:
+    """One preview body per plate object (so the viewer can select / highlight each)."""
+    from ..core import plate as _plate
+    objs = _plate.objects(m, layout)
+    total = max(1, len(m.faces))
+    bodies, dec = [], False
+    for i, o in enumerate(objs):
+        f = o.faces
+        cap = max(200, int(MAX_PREVIEW_FACES * len(f) / total))
+        if len(f) > cap:
+            dec = True
+            f = f[np.linspace(0, len(f) - 1, cap).astype(int)]
+        bodies.append({"name": f"Object {i + 1}", "color": None, "object": i,
+                       "positions": base64.b64encode(np.asarray(o.vertices).astype("<f4").tobytes()).decode(),
+                       "indices": base64.b64encode(np.asarray(f).astype("<u4").tobytes()).decode()})
+    return {"decimated": dec, "bodies": bodies}
+
+
 def payload(bid: str, report=None) -> dict:
     from ..api.builds import summary
     meta = store.get(bid)
@@ -252,7 +300,11 @@ def payload(bid: str, report=None) -> dict:
     ensure_exports(bid)
     meta = store.get(bid)
     ops = [{"i": i + 1, "op": o["op"], "label": o["label"]} for i, o in enumerate(meta["ops"])]
-    return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": preview(m),
+    from ..core import plate as _plate
+    L = layout_at(meta, m)
+    pinfo = _plate.describe(m, L, tuple(bed_of(meta)))
+    prev = preview_objects(m, pinfo["layout"]) if len(pinfo["objects"]) > 1 else preview(m)
+    return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": prev, "plate": pinfo,
             "ops": ops, "head": meta["head"], "can_undo": meta["head"] > 0, "can_redo": meta["head"] < len(meta["ops"]),
             "analysis": meshedit.analyze(m), "base": meta["base"], "warnings": meta.get("warnings", []),
             "report": report if report is not None else meta.get("last_report"),

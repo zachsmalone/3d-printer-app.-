@@ -3,6 +3,7 @@ import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
+import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate } from "/static/plate.js";
 import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -28,6 +29,7 @@ function ensureViewer() {
   const el = viewer.renderer.domElement; let down = null;
   el.addEventListener("pointerdown", e => down = [e.clientX, e.clientY]);
   el.addEventListener("pointerup", e => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) < 4) onPick(e); down = null; });
+  wireDrag(viewer);
   return viewer;
 }
 
@@ -270,12 +272,14 @@ function renderTools() {
       <tr><td>Triangles</td><td>${a.triangles.toLocaleString()}</td></tr><tr><td>Watertight</td><td>${a.watertight ? "yes" : "no"} (open edges: ${a.boundary_edges}, non-manifold: ${a.nonmanifold_edges})</td></tr>
       <tr><td>Pieces</td><td>${a.components ?? "n/a"}</td></tr><tr><td>Bounds min</td><td>${a.min_mm.map(fmt).join(", ")}</td></tr><tr><td>Bounds max</td><td>${a.max_mm.map(fmt).join(", ")}</td></tr><tr><td>Centre of mass</td><td>${a.center_of_mass_mm.map(fmt).join(", ")}</td></tr></table></details>
   </div>`;
-  $("#editPanel").innerHTML = unitSel + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px">＋ Open another model</button>`;
+  const plateHTML = renderPlate({ p: E.p, viewer, doOp, measuring: () => E.measure });
+  $("#editPanel").innerHTML = unitSel + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px">＋ Open another model</button>`;
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
   syncSmartSplit();
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
+wirePlatePanel($("#editPanel"));
 $("#editPanel").addEventListener("click", e => {
   const u = e.target.closest("[data-unit]"); if (u) { E.unit = u.dataset.unit; localStorage.eunit = E.unit; loadProject(E.p, true); return; }
   const big = e.target.closest("[data-big]");
@@ -424,6 +428,7 @@ function clearMeasure() { E.pts = []; measureObjs.forEach(o => viewer?.scene.rem
 function toggleMeasure() { E.measure = !E.measure; clearMeasure(); if (E.measure) { $("#eMeasureOut").hidden = false; $("#eMeasureOut").textContent = "Click the first point on the model…"; } const b = $("#toggleMeasure"); if (b) b.textContent = E.measure ? "Stop measuring" : "Measure two points"; }
 $("#eMeasure").onclick = toggleMeasure;
 function onPick(e) {
+  if (!E.measure && viewer) return pickAt(e);           // plate editor: select / shift-select objects
   if (!E.measure || !viewer) return;
   const r = viewer.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, viewer.camera);
