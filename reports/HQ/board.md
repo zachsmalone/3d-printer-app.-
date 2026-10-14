@@ -333,3 +333,5 @@ Zach 2026-10-13 18:48 CT ("I want to be inclusive"): full resin support approved
 
 ## 2026-10-13 19:09 CT | Executor | SHIPPED
 Plate editor (Slicer tab): object list with eye (Hide/Show, "Hidden, won't print", left out of export/slice + checks) and Delete; click/shift-click select with highlight, drag on bed, X/Y/rotate Z/size %/per-axis mm, Duplicate, Auto-center, Auto-arrange, Group/Ungroup, Merge/Separate, Lay flat, per-object bed-fit/overlap warnings; every change is an undoable step. Lithophane "Light on" backlit preview estimate (I=exp(-0.9 t), warm/cool/white, flat + globe/cup/night-light). Suite 996 passed.
+Zach 2026-10-13 19:29 CT approved: 2D-to-3D (a) logo/drawing trace + extrude (keychains, signs, cookie cutters) and (b) layered colour print for AMS/CFS. Full single-photo AI 3D deferred until after launch (GPU cost).
+Zach 2026-10-13 19:44 CT DECISION: optional subscriptions after pilot: Semi Pro $3.50/mo, Pro $5.50/mo. Core (make, slice, lithophanes, plate editor, community, downloads) stays free. Needs payment provider (Stripe), terms/privacy updates; perk split TBD with Zach. Budget target ~$400/mo hosting.

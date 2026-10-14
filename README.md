@@ -1,8 +1,8 @@
 # ZEIM
 
-**ZEIM** is a free, all-in-one 3D-printing maker app and community for adults (**18+ only**).
+**ZEIM** is a free-to-use, all-in-one 3D-printing maker app and community for adults (**18+ only**).
 
-No payments. No NSFW. No school features — no teachers, classes, or grades.
+The core app (make, slice, lithophanes, plate editor, community, downloads) is free forever. Optional Semi Pro ($3.50/mo) and Pro ($5.50/mo) supporter plans are planned after the pilot to help cover hosting costs; they add extras like faster jobs and more storage, never lock core features. No NSFW. No school features — no teachers, classes, or grades.
 
 One place to find designs, fix and slice them, turn a photo into a lithophane, and share what you print. Built with pride for makers who want the full path from idea to print without the clutter.
 
