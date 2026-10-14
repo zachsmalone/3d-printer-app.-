@@ -22,6 +22,10 @@ def run(name, launch, png, stl):
     ok(f"{name}: 25 problems to pick", pg.locator("#docSyms input").count() == 25)
     pg.check("#docSyms input[value=stringing]")
     pg.set_input_files("#docPhoto", png)
+    try:                                    # the preview appears after the browser reads the file; don't race it under load
+        pg.wait_for_selector("#docPrev", state="visible", timeout=10000); pg.wait_for_selector("#docAck", state="visible", timeout=10000)
+    except Exception:
+        pass
     ok(f"{name}: photo preview + permission box", pg.is_visible("#docPrev") and pg.is_visible("#docAck"))
     pg.check("#docAck")
     pg.click("#docGo")

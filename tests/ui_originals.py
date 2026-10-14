@@ -24,7 +24,12 @@ def run(name, launch, with_axe):
     href = pg.get_attribute('#shGrid .pcard[data-item="zo-pencil-cup"] a[download]', "href")
     r = ctx.request.get(URL + href)
     ok(f"{name}: STL link downloads the file", r.status == 200 and len(r.body()) > 100, (href, r.status))
-    ok(f"{name}: preview image loads", pg.evaluate("[...document.querySelectorAll('#shGrid .pcard img')].every(i => i.complete && i.naturalWidth > 0)"))
+    loaded = False
+    for _ in range(50):                     # images load after the cards render; under full-suite load that can take a few seconds
+        loaded = pg.evaluate("[...document.querySelectorAll('#shGrid .pcard img')].every(i => i.complete && i.naturalWidth > 0)")
+        if loaded: break
+        pg.wait_for_timeout(200)
+    ok(f"{name}: preview image loads", loaded)
     pg.click('#shCats [data-cat="Wildlife Calls"]'); pg.wait_for_selector('#shCats [data-cat="Wildlife Calls"][aria-pressed=true]')
     pg.wait_for_timeout(300)
     ok(f"{name}: category chip filters", sorted(cards(pg)) == ["Open-Reed Predator Call", "Owl Whistle"], cards(pg))
