@@ -6,7 +6,7 @@ from tests.b1 import client, photo_build, ADULT
 def test_me_data_lists_builds_and_shared_and_says_what_is_not_collected():
     c = client(ADULT)
     b = photo_build(c)
-    c.post("/api/showcase", json={"build_id": b, "title": "My lamp", "accept_guidelines": True, "visibility": "private"})
+    c.post("/api/showcase", json={"build_id": b, "title": "My lamp", "accept_guidelines": True, "nsfw": False, "visibility": "private"})
     d = c.get("/api/me/data").json()
     assert d["signed_up"] is True
     assert d["builds_count"] >= 1 and any(x["id"] == b for x in d["builds"])

@@ -98,7 +98,7 @@ def test_showcase_ownership_follows_auth_owner(zapp):
     a = browser(app)
     key = passkey_signup(a, name="Show Sam")
     bid = build(a, sample)
-    p = a.post("/api/showcase", json={"build_id": bid, "title": "Auth owned plate", "accept_guidelines": True,
+    p = a.post("/api/showcase", json={"build_id": bid, "title": "Auth owned plate", "accept_guidelines": True, "nsfw": False,
                                       "visibility": "public"})
     assert p.status_code == 200, p.text
     pid = p.json()["id"]
