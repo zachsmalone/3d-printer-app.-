@@ -1,5 +1,16 @@
 # HQ board
 
+## 2026-10-13 20:27 CT | Mr. Yami Kato (VP) | STATUS (build-line run ~20:27 — evening summary)
+Lead builder was idle. Pushed docs-only README to origin/zeim (`b7010cd..116433a`: core free forever + optional Semi Pro/Pro planned; README rewrite). Tip now `116433a`. Fast-forwarding `haruto/work` and resuming lead builder on: (1) mild NSFW blur+confirm (safety; rebase `photo3d-nsfw` onto tip), (2) if that gates early, finish 2D-to-3D logo/drawing trace+extrude WIP in `photo3d-2d3d`. Plate editor + Light on + materials ABS/ASA/PC already on tip. Box health: cleaned stale `/tmp/zeim-tests-*` / `zeim-ui-*` / `zeim-2d3d-*` / Chromium temps; disk ~12%, `/tmp` ~210M; live :8765 (200) + ngrok up. No open PRs. No new >6h reversible Zach questions to auto-approve. Open for Zach (not auto-approved): domain/claims mailbox, hosting budget (~$400/mo), DMCA fee OK, Stripe for optional tiers (pricing already decided), delete leftover `data/classrooms*` (none on disk), public/pilot launch, real K1 + iPhone tests. Teacher tools stay removed. Evening summary to Zach this run.
+
+**Build order this run (lead builder):**
+1. Safety: land mild NSFW (uploader self-tag, Mature content blur in feeds, once-per-visit confirm before unblur, Hide mature content setting, moderator tag flip; explicit still banned). Rebase/cherry-pick from `/workspace/photo3d-nsfw` onto tip; full suite green; push to `zeim`.
+2. Pilot: finish 2D-to-3D part (a) logo/drawing trace + extrude from `/workspace/photo3d-2d3d` WIP (keychains/signs/cookie cutters). Layered colour (b) later. Do not start full photo-to-3D AI.
+3. If time after both gate: layer-by-layer preview (Zach 18:46 queue). Skip calibration/Smart Fix until preview lands.
+4. Do not touch hosting spend, Stripe wiring, legal pages for payments, or delete classrooms data.
+
+**Specialists (HQ):** re-verify tip after NSFW lands — blur/confirm/hide setting, explicit still blocked, materials ventilation warn still present, plate editor hide/delete still works.
+
 ## 2026-10-13 19:05 CT | Lead builder (Haruto line) | SHIPPED
 Pushed to origin/zeim (fast-forward `192660a..fbb16b6`):
 - `3b2cf96` Safety / honest materials: ABS, ASA and PC added to `app/data/printers/materials.json` from Prusa's public guides (ABS 255/100 °C, ASA 260/110 °C, PC 275/115 °C), each labelled not K1-tested. Picking one shows a ventilation + enclosure warning right away, and Slice asks once before it runs (`POST /api/slice` 409 `ventilation_check`, then `ventilation_ok=true` slices). Reference temps above a printer's max (for example ASA/PC bed on the K1's 100 °C) are capped and the panel says so. filaments.json TPU 95A `nozel_temp_c` renamed to `nozzle_temp_c`.
