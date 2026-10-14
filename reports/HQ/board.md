@@ -326,3 +326,7 @@ Commits on origin/zeim (fast-forward): `f87d9a7` A11y: stabilize #nzAcctLater ax
 
 ## 2026-10-13 17:20 CT | Executor | SHIPPED
 Lithophane shapes shipped on origin/zeim: heart/circle/star/square with smooth vector outlines (no pixel steps), full-sphere equirectangular Globe (bottom opening + flat foot), new Cylinder / Cup (2 mm bottom, open top), Night-light sleeve; API shape/diameter/height + bed-fit; UI picker. Suite 983 passed + 1 timing flake (test_b5_ui sign-out webkit) passed on re-run.
+
+## Zach approved 2026-10-13 18:46 CT: top-tier feature queue (after plate editor + backlit litho preview)
+Priority first: layer-by-layer preview, calibration wizard, failure photo doctor (Smart Fix). Then: paint-on supports, cut tool with connectors in plate editor, text/emboss, snap measure, print time + filament cost estimate, "Print this next" queue, one-click remix into plate editor (credit kept). Plate editor also gets hide/show + delete per item.
+Zach 2026-10-13 18:48 CT ("I want to be inclusive"): full resin support approved: resin slicing path (layer images / common resin formats, research first via Perplexity on which open slicer + formats), auto-hollow + drain holes, resin supports, resin lithophane settings, resin safety notes (gloves, ventilation, IPA).
