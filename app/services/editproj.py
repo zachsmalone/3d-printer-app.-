@@ -101,6 +101,10 @@ def ensure_exports(bid: str):
     with _lock:
         meta = store.get(bid)
         m = printable_at(bid, meta)
+        quality = export_quality(m)
+        meta["quality_gate"] = quality
+        if not quality["ok"]:
+            meta["warnings"] = list(dict.fromkeys((meta.get("warnings") or []) + [quality["message"]]))
         mdl = as_model(m, meta["title"])
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(mdl))
@@ -293,6 +297,35 @@ def preview_objects(m: trimesh.Trimesh, layout: dict) -> dict:
     return {"decimated": dec, "bodies": bodies}
 
 
+def export_quality(m: trimesh.Trimesh) -> dict:
+    """Fast print-ready gate before export: refuse silent bad geometry and explain the fix."""
+    a = meshedit.analyze(m)
+    issues = []
+    if not a["watertight"]:
+        issues.append("not watertight")
+    if a["boundary_edges"] > 0:
+        issues.append(f"{a['boundary_edges']} open boundary edge(s)")
+    if a["nonmanifold_edges"] > 0:
+        issues.append(f"{a['nonmanifold_edges']} non-manifold edge(s)")
+    if a["triangles"] < 4:
+        issues.append("too few triangles")
+    max_dim = max(a["size_mm"], default=0.0)
+    if max_dim <= 0 or not np.isfinite(max_dim):
+        issues.append("invalid geometry")
+    elif max_dim > 1000:
+        issues.append("model is too large for a practical print")
+    if a["volume_mm3"] <= 0 and a["watertight"]:
+        issues.append("zero or negative volume")
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "message": "Model is print-safe to export." if not issues else "Fix the model before export: " + "; ".join(issues) + ". Run Repair or simplify the mesh, then validate again.",
+        "watertight": a["watertight"],
+        "size_mm": a["size_mm"],
+        "triangles": a["triangles"],
+    }
+
+
 def payload(bid: str, report=None) -> dict:
     from ..api.builds import summary
     meta = store.get(bid)
@@ -304,8 +337,10 @@ def payload(bid: str, report=None) -> dict:
     L = layout_at(meta, m)
     pinfo = _plate.describe(m, L, tuple(bed_of(meta)))
     prev = preview_objects(m, pinfo["layout"]) if len(pinfo["objects"]) > 1 else preview(m)
+    analysis = meshedit.analyze(m)
+    quality = export_quality(m)
     return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": prev, "plate": pinfo,
             "ops": ops, "head": meta["head"], "can_undo": meta["head"] > 0, "can_redo": meta["head"] < len(meta["ops"]),
-            "analysis": meshedit.analyze(m), "base": meta["base"], "warnings": meta.get("warnings", []),
+            "analysis": analysis, "quality_gate": quality, "base": meta["base"], "warnings": meta.get("warnings", []),
             "report": report if report is not None else meta.get("last_report"),
             "original": f"/api/edit/{bid}/original", "capabilities": capabilities()}

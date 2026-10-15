@@ -136,14 +136,15 @@ function loadProject(p, keepCamera = false) {
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis;
+  const q = p.quality_gate || { ok: true, issues: [], message: "Model is print-safe to export." };
   $("#editStats").innerHTML = `<span class="pill">${a.size_mm.map(x => fmt(x)).join(" × ")} ${E.unit}</span><span class="pill">${a.triangles.toLocaleString()} triangles</span>` +
-    `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${a.watertight ? "ok" : "bad"}">${a.watertight ? "✔ watertight" : "✖ not watertight"}</span>` +
+    `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${q.ok ? "ok" : "bad"}">${q.ok ? "✔ print-safe" : "✖ needs repair"}</span>` +
     (a.internal_voids ? `<span class="pill bad" title="A sealed hollow inside the model. Hollow with a drain hole is intended; unexpected voids trap air or resin">${a.internal_voids} sealed void${a.internal_voids > 1 ? "s" : ""}</span>` : "") + (a.components > 1 ? `<span class="pill" title="Separate pieces in this model">${a.components} pieces</span>` : "") + (p.preview.decimated ? `<span class="pill" title="Exports use the full mesh">preview simplified</span>` : "");
   $("#editVis").value = p.visibility || "private";
   $("#eUndo").disabled = !p.can_undo; $("#eRedo").disabled = !p.can_redo;
-  const msgs = [...(p.warnings || [])]; if (p.report?.message) msgs.unshift(p.report.message);
+  const msgs = [...(p.warnings || [])]; if (!q.ok && q.message) msgs.unshift(q.message); if (p.report?.message) msgs.unshift(p.report.message);
   if (p.report?.note) msgs.push(p.report.note);
-  $("#editMsg").innerHTML = msgs.map(m => `<span class="${/not watertight|isn't|Still/.test(m) ? "warn" : ""}">${esc(m)}</span>`).join("<br>");
+  $("#editMsg").innerHTML = msgs.map(m => `<span class="${/not watertight|needs repair|Fix the model|isn't|Still/.test(m) ? "warn" : ""}">${esc(m)}</span>`).join("<br>");
   const total = p.ops.length;
   $("#editHeadNote").textContent = `(${p.head} of ${total} applied — click a step to jump)`;
   $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button></li>`).join("");
