@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
-from ..community import catalog, links, moderation, personalization, privacy, recovery, safety, usernames
+from ..community import catalog, discovery, links, moderation, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS
@@ -242,15 +242,20 @@ def unfollow(uid: str, actor: Actor = Depends(get_actor)):
 
 # ---------------- showcase ----------------
 @router.get("/showcase")
-def showcase(tab: str = "trending", q: str = "", category: str = "", actor: Actor = Depends(get_actor)):
+def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
     if tab not in branding.SHOWCASE_TABS:
         raise HTTPException(400, "unknown tab")
+    try:
+        discovery.check_sort(sort)                     # newest | likes | printed, or the tab's own order
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     prefs = personalization.get(actor.sid)
     q = q.strip()[:80]
     if q:
         personalization.record_search(actor.sid, q, catalog.known_tags(actor))
     items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {}, category.strip()[:60])
+    items = discovery.apply_sort(items, sort)
     out = {"categories": catalog.categories(actor), "category": category.strip()[:60],
            "originals_notice": _originals_notice(),"tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
            "subtitle": "Newest projects first." if tab == "free" else "",
@@ -287,7 +292,9 @@ def showcase_item(iid: str, actor: Actor = Depends(get_actor)):
     except catalog.Denied as e:
         raise D(e)
     personalization.record_view(actor.sid, i["tags"])
-    return catalog.public(i, actor)
+    out = catalog.public(i, actor)
+    out["related"] = discovery.related(i, actor)      # up to 6 compact summaries (same maker, then same tag)
+    return out
 
 
 @router.post("/showcase")
@@ -306,7 +313,8 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
         i = catalog.create_project(actor, title=body.get("title"), description=body.get("description", ""),
                                    tags=body.get("tags") or [], build_id=str(body.get("build_id", ""))[:40],
                                    accept_guidelines=bool(body.get("accept_guidelines")),
-                                   visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw)
+                                   visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw,
+                                   license_id=body.get("license_id"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:

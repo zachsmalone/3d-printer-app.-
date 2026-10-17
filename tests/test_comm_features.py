@@ -122,8 +122,9 @@ def test_downloads_count_toward_trending_once_per_person():
 # ---------------- 5) remix chain ----------------
 def test_remix_chain_links_back_through_every_step():
     a, b, c = U("Ra"), U("Rb"), U("Rc")
-    first = publish(a, "First")
-    second = publish(b, "Second", remix_of=first["share_url"])
+    # user projects default to Private use (non-remixable): the chain needs remixable licences
+    first = publish(a, "First", license_id="cc-by-4.0")
+    second = publish(b, "Second", remix_of=first["share_url"], license_id="cc-by-4.0")
     third = publish(c, "Third", remix_of=second["id"])
     ch = client().get(f"/api/showcase/{third['id']}").json()["remix_chain"]
     assert [x["title"] for x in ch] == ["Second", "First"] and ch[0]["url"] == f"/p/{second['id']}" and ch[1]["creator"].startswith("@")

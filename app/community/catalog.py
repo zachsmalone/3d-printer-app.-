@@ -213,6 +213,7 @@ def public(i: dict, actor: Actor) -> dict:
             "supports_level": i.get("supports_level", "") if i.get("original") else "", "supports_detail": i.get("supports_detail", "") if i.get("original") else "",
             "creator_username": i.get("creator_username"), "credit": credit_line(i),
             "favorited": bool(actor.user) and _social().is_fav(actor.sid, i["id"]), "can_favorite": bool(actor.user),
+            "license_id": i.get("license_id") or "",
             "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
@@ -321,7 +322,12 @@ def set_visibility(actor: Actor, item_id: str, level: str) -> dict:
     return found
 
 
-def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None) -> dict:
+def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None, license_id: str | None = None) -> dict:
+    from . import licensing
+    try:
+        lid = licensing.check(license_id)              # new projects always carry one (default: private use)
+    except ValueError as e:
+        raise Denied(400, str(e))                     # spec: an invalid value is a 400
     if not actor.user:
         raise Denied(401, "Create an account to publish.")
     if not accept_guidelines:
@@ -346,9 +352,12 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
     if remix_of:
         remix_of = remix_of.rsplit("/p/", 1)[-1].strip("/ ")        # accept a share link or a bare id
         try:
-            get(remix_of, actor)                                     # you can only credit a project you can see
+            src = get(remix_of, actor)                                # you can only credit a project you can see
         except Denied:
             raise Denied(422, "We couldn't find the project you remixed. Paste its Showcase link.")
+        if not licensing.may_remix(src.get("license_id")):
+            raise Denied(422, "That project's licence doesn't allow publishing remixes of it. "
+                                "Pick a project marked as remixable, or ask its maker to change the licence.")
     from ..services import editproj
     editproj.ensure_exports(build_id)       # edit projects write their STL/3MF lazily
     pid = secrets.token_hex(5)
@@ -367,7 +376,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
-            "nsfw": bool(nsfw)}
+            "nsfw": bool(nsfw), "license_id": lid}
     if remix_of:
         item["remix_of"] = remix_of
     LISTINGS.update(lambda l: l.append(item))
