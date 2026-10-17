@@ -11,6 +11,7 @@ from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
 from ..core import autotune, exporters, geometry, imagesafe, meshedit
 from ..core import features as features_mod
+from ..core import thickness as thickness_mod
 from ..services import editproj
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
@@ -150,6 +151,16 @@ def new_project(
 def get_project(bid: str, actor: Actor = Depends(get_actor)):
     _edit_meta(bid, actor)
     return editproj.payload(bid)
+
+
+@router.get("/{bid}/thickness")
+def thickness(bid: str, min_wall: float = 0.8, actor: Actor = Depends(get_actor)):
+    """Where the model is thinner than `min_wall` mm (read-only, sampled estimate)."""
+    meta = _edit_meta(bid, actor)
+    try:
+        return thickness_mod.analyze(editproj.mesh_at(bid, meta), min_wall)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.get("/{bid}/features")
