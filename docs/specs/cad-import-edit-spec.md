@@ -3,9 +3,10 @@
 ## Goal
 
 An editor that stands next to Shapr3D in capability for the things a maker actually does — sketch,
-extrude, cut, fillet, text, holes, patterns — with one thing Shapr3D does not offer: **any file you
-import stays fully editable**. In Shapr3D, geometry made elsewhere comes in as a dead reference you
-can only position; in ZEIM, an imported STL/OBJ/3MF becomes the base of a living feature tree that
+extrude, cut, fillet, text, holes, patterns — with one thing Shapr3D does not offer: **any mesh file you
+import stays fully editable**. In Shapr3D, STEP/BREP imports arrive as editable solids, but mesh
+imports (STL/OBJ - what 3D printing users actually have) can only be moved, scaled and booleaned,
+not face-edited (official Shapr3D docs, checked 2026-10-17); in ZEIM, an imported STL/OBJ/3MF becomes the base of a living feature tree that
 the user keeps editing.
 
 ## Honest scope statement
