@@ -229,23 +229,24 @@ function wireFaceTool() {
         <div class="grid2"><div class="field"><label for="faceMode">Do</label><select id="faceMode"><option value="add">Add (boss)</option><option value="cut">Cut (hole / pocket)</option></select></div>
         <div class="field"><label for="faceShape">Shape</label><select id="faceShape"><option value="box">Box</option><option value="cylinder">Cylinder</option><option value="polygon">Outline (typed points)</option></select></div></div>
         <div class="field" data-fs="polygon" hidden><label for="facePts">Outline points, one “u, v” pair per line (mm from the face centre, in order round the shape)</label><textarea id="facePts" rows="4" placeholder="-5, -5&#10;5, -5&#10;0, 8"></textarea></div>
-        <div class="grid3t" data-fs="box"><div class="field"><label for="faceW">Width mm</label><input id="faceW" type="number" min="0.01" step="any" value="10"></div><div class="field"><label for="faceD">Depth mm</label><input id="faceD" type="number" min="0.01" step="any" value="10"></div></div>
-        <div class="grid3t" data-fs="cylinder" hidden><div class="field"><label for="faceDia">Diameter mm</label><input id="faceDia" type="number" min="0.01" step="any" value="6"></div></div>
-        <div class="grid3t"><div class="field"><label for="faceH">Height / depth mm</label><input id="faceH" type="number" min="0.01" step="any" value="5"></div><div class="field"><label for="faceOff">Offset along face mm</label><input id="faceOff" type="number" step="any" value="0"></div></div>
+        <div class="grid3t" data-fs="box"><div class="field"><label for="faceW">Width mm</label><input id="faceW" type="text" inputmode="decimal" data-num value="10"></div><div class="field"><label for="faceD">Depth mm</label><input id="faceD" type="text" inputmode="decimal" data-num value="10"></div></div>
+        <div class="grid3t" data-fs="cylinder" hidden><div class="field"><label for="faceDia">Diameter mm</label><input id="faceDia" type="text" inputmode="decimal" data-num value="6"></div></div>
+        <div class="grid3t"><div class="field"><label for="faceH">Height / depth mm</label><input id="faceH" type="text" inputmode="decimal" data-num value="5"></div><div class="field"><label for="faceOff">Offset along face mm</label><input id="faceOff" type="text" inputmode="decimal" data-num value="0"></div></div>
         <button type="button" class="btn small" id="faceGo">Apply</button><p class="help" id="faceMsg" role="status" aria-live="polite"></p>`;
       const sync = () => box.querySelectorAll("[data-fs]").forEach(el => { el.hidden = el.dataset.fs !== $("#faceShape").value; });
       $("#faceShape").onchange = sync; sync();
       $("#faceSel").onchange = () => markFace(planes[+$("#faceSel").value]); markFace(planes[0]);
       $("#facePick").onclick = () => { E.facePick = !E.facePick; E.measure = false; clearMeasure(); $("#facePick").textContent = E.facePick ? "Click a face on the model… (click here to cancel)" : "Click a face on the model"; $("#faceMsg").textContent = E.facePick ? "Click a flat face on the 3D model." : ""; };
       $("#faceGo").onclick = () => {
-        const p = planes[+$("#faceSel").value], shape = $("#faceShape").value, num = (sel) => +$(sel).value;
+        const p = planes[+$("#faceSel").value], shape = $("#faceShape").value, dn = E.p.dims || {};
+        const num = (sel) => { const v = $(sel).value.trim(); return /^\$[A-Za-z_][A-Za-z0-9_]*$/.test(v) && v.slice(1) in dn ? v : (v === "" ? NaN : +v); };   // a number, or a named dimension ($name) that exists
         const params = { shape, mode: $("#faceMode").value, plane: { normal: p.normal, point: p.origin }, height: num("#faceH"), offset: num("#faceOff") };
         if (shape === "box") { params.width = num("#faceW"); params.depth = num("#faceD"); }
         else if (shape === "polygon") {
           params.points = $("#facePts").value.split("\n").map(l => l.trim()).filter(Boolean).map(l => l.split(/[\s,;]+/).filter(Boolean).map(Number));
           if (params.points.some(q => q.length !== 2 || !q.every(Number.isFinite))) { $("#faceMsg").textContent = "Each line needs two numbers, like: 5, -3"; return; }
         } else params.diameter = num("#faceDia");
-        if (![params.height, params.offset, params.width ?? 1, params.depth ?? 1, params.diameter ?? 1].every(Number.isFinite)) { $("#faceMsg").textContent = "Enter numbers for every size."; return; }
+        if (![params.height, params.offset, params.width ?? 1, params.depth ?? 1, params.diameter ?? 1].every(v => typeof v === "string" || Number.isFinite(v))) { $("#faceMsg").textContent = "Enter a number, or a named dimension that exists (like $wall) for every size."; return; }
         doOp("on_face", params, "Adding to the face…", $("#faceGo"));
       };
     } catch (e) { box.innerHTML = `<p class="help warn">${esc(e.message)}</p>`; }
