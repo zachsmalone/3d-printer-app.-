@@ -112,5 +112,6 @@ LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")
 ADMIN_FAIL_LIMIT = _int("PHOTO3D_ADMIN_FAIL_LIMIT", 10)       # wrong admin tokens per 10 min per address, then 429 (even for the right one)
 
 # ---- web hardening (Safety re-check 1) ----
+BLOCK_PRIVATE_PRINTERS = _flag("PHOTO3D_BLOCK_PRIVATE_PRINTERS", False)   # hosted deployments: refuse printer URLs on loopback/private networks (SSRF)
 API_DOCS = _flag("PHOTO3D_API_DOCS", False)            # /docs, /redoc, /openapi.json are off unless asked for (they list every route)
 COOKIE_SECURE = (os.environ.get("PHOTO3D_COOKIE_SECURE") or "auto").strip().lower()   # auto = Secure when the request arrived over https

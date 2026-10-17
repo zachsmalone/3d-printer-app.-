@@ -7,7 +7,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import ipaddress
+import socket
+from urllib.parse import urlsplit
+
 import httpx
+
+from .. import config
 
 PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
 DEFAULT_BED = (250.0, 210.0)       # the generic bed used when no printer is chosen; ONE place, used by /api/slice and /api/send alike
@@ -35,6 +41,27 @@ TYPES = [
 IMPLEMENTED = {t["type"] for t in TYPES if t["implemented"]}
 
 
+def check_url(url: str) -> None:
+    """Refuse printer addresses that could turn the server into a proxy (SSRF). Always blocked: credentials in the URL,
+    link-local (incl. cloud metadata 169.254.169.254), unspecified and multicast addresses. With PHOTO3D_BLOCK_PRIVATE_PRINTERS=1
+    (hosted deployments) loopback and private networks are blocked too. Called when saving AND before every request, so a
+    hostname that later resolves elsewhere is still caught. Raises ValueError."""
+    u = urlsplit(str(url or "").strip())
+    if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password:
+        raise ValueError("Printer address must look like http://host or http://host:port (no username or password in it).")
+    try:
+        port = u.port
+        infos = socket.getaddrinfo(u.hostname, port or (443 if u.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+    except (ValueError, socket.gaierror, UnicodeError):
+        return  # unresolvable now: the request itself will fail with a clear message, and is re-checked at send time
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%")[0])
+        if ip.is_link_local or ip.is_unspecified or ip.is_multicast or ip.is_reserved:
+            raise ValueError("That printer address is not allowed (link-local or reserved network).")
+        if config.BLOCK_PRIVATE_PRINTERS and (ip.is_loopback or ip.is_private):
+            raise ValueError("This server does not allow printers on private or local networks. Use the slicer hand-off or download the G-code.")
+
+
 def _client(p):
     return httpx.Client(base_url=p["url"].rstrip("/"), timeout=60,
                         headers={"X-Api-Key": p["api_key"]} if p.get("api_key") else {})
@@ -48,6 +75,10 @@ def send(printer: dict, gcode: "Path | None", name: str, start: bool) -> dict:
                            "Use 'Open in slicer' or download the G-code and send it manually."}
     if not printer.get("url"):
         return {"ok": False, "message": "printer URL is not configured"}
+    try:
+        check_url(printer["url"])
+    except ValueError as e:
+        return {"ok": False, "message": str(e)}
     try:
         with _client(printer) as c, open(gcode, "rb") as fh:
             if t == "octoprint":
@@ -90,6 +121,10 @@ def test(printer: dict) -> dict:
         return {"ok": False, "message": f"'{t}' is not implemented yet, so it cannot be tested.", "detail": {}}
     if not printer.get("url"):
         return {"ok": False, "message": "Add the printer's address first.", "detail": {}}
+    try:
+        check_url(printer["url"])
+    except ValueError as e:
+        return {"ok": False, "message": str(e), "detail": {}}
     try:
         with httpx.Client(base_url=printer["url"].rstrip("/"), timeout=5, follow_redirects=False,
                           headers={"X-Api-Key": printer["api_key"]} if printer.get("api_key") else {}) as c:
