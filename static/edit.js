@@ -184,6 +184,36 @@ $("#editOps").onclick = async e => {
   }
    const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 
+function wireFaceTool() {
+  const load = $("#faceLoad"); if (!load) return;
+  const box = $("#faceBox"), id = E.p.id, f1 = n => (+n).toFixed(1);
+  load.onclick = async () => {
+    load.disabled = true; load.textContent = "Looking…";
+    try {
+      const r = await api(`/api/edit/${id}/features`);
+      if (!r.ok) { box.innerHTML = `<p class="help warn">${esc(r.reason || "Could not analyse this model.")}</p>`; return; }
+      const planes = r.planes.slice(0, 30);
+      if (!planes.length) { box.innerHTML = `<p class="help">No flat faces found.</p>`; return; }
+      box.innerHTML = `<div class="field"><label for="faceSel">Face (largest first)</label><select id="faceSel">${planes.map((p, i) => `<option value="${i}">${i + 1}. ${f1(p.area)} mm² — facing (${p.normal.map(x => (+x).toFixed(2)).join(", ")})</option>`).join("")}</select></div>
+        <div class="grid2"><div class="field"><label for="faceMode">Do</label><select id="faceMode"><option value="add">Add (boss)</option><option value="cut">Cut (hole / pocket)</option></select></div>
+        <div class="field"><label for="faceShape">Shape</label><select id="faceShape"><option value="box">Box</option><option value="cylinder">Cylinder</option></select></div></div>
+        <div class="grid3t" data-fs="box"><div class="field"><label for="faceW">Width mm</label><input id="faceW" type="number" min="0.01" step="any" value="10"></div><div class="field"><label for="faceD">Depth mm</label><input id="faceD" type="number" min="0.01" step="any" value="10"></div></div>
+        <div class="grid3t" data-fs="cylinder" hidden><div class="field"><label for="faceDia">Diameter mm</label><input id="faceDia" type="number" min="0.01" step="any" value="6"></div></div>
+        <div class="grid3t"><div class="field"><label for="faceH">Height / depth mm</label><input id="faceH" type="number" min="0.01" step="any" value="5"></div><div class="field"><label for="faceOff">Offset along face mm</label><input id="faceOff" type="number" step="any" value="0"></div></div>
+        <button type="button" class="btn small" id="faceGo">Apply</button><p class="help" id="faceMsg" role="status" aria-live="polite"></p>`;
+      const sync = () => box.querySelectorAll("[data-fs]").forEach(el => { el.hidden = el.dataset.fs !== $("#faceShape").value; });
+      $("#faceShape").onchange = sync; sync();
+      $("#faceGo").onclick = () => {
+        const p = planes[+$("#faceSel").value], shape = $("#faceShape").value, num = (sel) => +$(sel).value;
+        const params = { shape, mode: $("#faceMode").value, plane: { normal: p.normal, point: p.origin }, height: num("#faceH"), offset: num("#faceOff") };
+        if (shape === "box") { params.width = num("#faceW"); params.depth = num("#faceD"); } else params.diameter = num("#faceDia");
+        if (![params.height, params.offset, params.width ?? 1, params.depth ?? 1, params.diameter ?? 1].every(Number.isFinite)) { $("#faceMsg").textContent = "Enter numbers for every size."; return; }
+        doOp("on_face", params, "Adding to the face…", $("#faceGo"));
+      };
+    } catch (e) { box.innerHTML = `<p class="help warn">${esc(e.message)}</p>`; }
+    finally { load.disabled = false; load.textContent = "Find faces"; }
+  };
+}
 async function act(url, body, text = "Working…", near = null) {
   if (!E.p) return;
   busy(true, text);
@@ -279,6 +309,10 @@ function renderTools() {
       <div class="grid3t" data-shape="box">${lenInput("bx", 10, "Width X")}${lenInput("by", 10, "Depth Y")}${lenInput("bz", 10, "Height Z")}</div>
       <div class="grid3t" data-shape="cylinder sphere">${lenInput("dia", 10, "Diameter")}<span data-shape="cylinder">${lenInput("h", 20, "Height")}</span><div class="field" data-shape="cylinder"><label>Axis</label><select name="axis"><option>z</option><option>x</option><option>y</option></select></div></div>
       <div class="grid3t">${lenInput("px", ctr[0], "Center X")}${lenInput("py", ctr[1], "Center Y")}${lenInput("pz", ctr[2], "Center Z")}</div><button class="btn small">Apply</button></form>` : `<p class="help">Boolean operations need manifold3d on the server.</p>`}</details>
+    <details class="tool" id="faceTool"><summary>🎯 On a face (add / cut)</summary>
+      <p class="help">Pick a flat face found in your model, then add a box or cylinder on it, or cut a hole or pocket into it. Faces are found from the mesh, so sizes and positions are approximate, and the spot is fixed in space (moving the model later will not carry it).</p>
+      <div id="faceBox"><button type="button" class="btn small" id="faceLoad">Find faces</button></div>
+    </details>
     <details class="tool"><summary>🔤 Text (emboss / deboss)</summary>${cap.boolean ? `<form data-form="text"><div class="field"><label>Text</label><input name="text" maxlength="60" value="ZEIM"></div>
       <div class="grid2"><div class="field"><label>Font</label><select name="font">${cap.fonts.map(f => `<option>${f}</option>`).join("")}</select></div><div class="field"><label>Mode</label><select name="mode"><option value="emboss">Emboss (raised)</option><option value="deboss">Deboss (engraved)</option></select></div>
       ${lenInput("height", 8, "Letter height")}${lenInput("depth", 1, "Depth")}<div class="field"><label>Face</label><select name="face"><option>top</option><option>front</option><option>back</option><option>left</option><option>right</option><option>bottom</option></select></div>${numInput("rotation", 0, "Rotate", "°")}${lenInput("offset_u", 0, "Shift →")}${lenInput("offset_v", 0, "Shift ↑")}</div>
@@ -297,6 +331,7 @@ function renderTools() {
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
   syncSmartSplit();
+  wireFaceTool();
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 wirePlatePanel($("#editPanel"));
