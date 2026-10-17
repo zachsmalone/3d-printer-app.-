@@ -132,7 +132,7 @@ document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
 /* ---------- applying a project payload ---------- */
 function loadProject(p, keepCamera = false) {
-  E.p = p; E.measure = false; clearMeasure(); clearGhost();
+  E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearMeasure(); clearGhost();
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis;
@@ -206,9 +206,10 @@ function wireFaceTool() {
     try {
       const r = await api(`/api/edit/${id}/features`);
       if (!r.ok) { box.innerHTML = `<p class="help warn">${esc(r.reason || "Could not analyse this model.")}</p>`; return; }
-      const planes = r.planes.slice(0, 30);
+      const planes = r.planes.slice(0, 30); E.planes = planes;
       if (!planes.length) { box.innerHTML = `<p class="help">No flat faces found.</p>`; return; }
       box.innerHTML = `<div class="field"><label for="faceSel">Face (largest first)</label><select id="faceSel">${planes.map((p, i) => `<option value="${i}">${i + 1}. ${f1(p.area)} mm² — facing (${p.normal.map(x => (+x).toFixed(2)).join(", ")})</option>`).join("")}</select></div>
+        <button type="button" class="btn small ghost" id="facePick">Click a face on the model</button>
         <div class="grid2"><div class="field"><label for="faceMode">Do</label><select id="faceMode"><option value="add">Add (boss)</option><option value="cut">Cut (hole / pocket)</option></select></div>
         <div class="field"><label for="faceShape">Shape</label><select id="faceShape"><option value="box">Box</option><option value="cylinder">Cylinder</option><option value="polygon">Outline (typed points)</option></select></div></div>
         <div class="field" data-fs="polygon" hidden><label for="facePts">Outline points, one “u, v” pair per line (mm from the face centre, in order round the shape)</label><textarea id="facePts" rows="4" placeholder="-5, -5&#10;5, -5&#10;0, 8"></textarea></div>
@@ -218,6 +219,7 @@ function wireFaceTool() {
         <button type="button" class="btn small" id="faceGo">Apply</button><p class="help" id="faceMsg" role="status" aria-live="polite"></p>`;
       const sync = () => box.querySelectorAll("[data-fs]").forEach(el => { el.hidden = el.dataset.fs !== $("#faceShape").value; });
       $("#faceShape").onchange = sync; sync();
+      $("#facePick").onclick = () => { E.facePick = !E.facePick; E.measure = false; clearMeasure(); $("#facePick").textContent = E.facePick ? "Click a face on the model… (click here to cancel)" : "Click a face on the model"; $("#faceMsg").textContent = E.facePick ? "Click a flat face on the 3D model." : ""; };
       $("#faceGo").onclick = () => {
         const p = planes[+$("#faceSel").value], shape = $("#faceShape").value, num = (sel) => +$(sel).value;
         const params = { shape, mode: $("#faceMode").value, plane: { normal: p.normal, point: p.origin }, height: num("#faceH"), offset: num("#faceOff") };
@@ -506,7 +508,22 @@ function updateGhost(f) {
 function clearMeasure() { E.pts = []; measureObjs.forEach(o => viewer?.scene.remove(o)); measureObjs = []; $("#eMeasureOut").hidden = true; $("#eMeasure").classList.toggle("on", E.measure); }
 function toggleMeasure() { E.measure = !E.measure; clearMeasure(); if (E.measure) { $("#eMeasureOut").hidden = false; $("#eMeasureOut").textContent = "Click the first point on the model…"; } const b = $("#toggleMeasure"); if (b) b.textContent = E.measure ? "Stop measuring" : "Measure two points"; }
 $("#eMeasure").onclick = toggleMeasure;
+function pickFace(e) {
+  const r = viewer.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, viewer.camera);
+  const hit = rc.intersectObjects(viewer.group.children, false)[0], msg = $("#faceMsg"); if (!hit || !hit.face || !msg) return;
+  const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld), tol = Math.max(...A().size_mm) * 0.01;
+  let best = -1, bestD = Infinity;
+  (E.planes || []).forEach((p, i) => {                       // same plane = same direction and the click lies on it (detected on the server; approximate)
+    const pn = new THREE.Vector3(...p.normal), d = Math.abs(hit.point.clone().sub(new THREE.Vector3(...p.origin)).dot(pn));
+    if (pn.dot(n) > Math.cos(Math.PI * 3 / 180) && d < tol && d < bestD) { best = i; bestD = d; }
+  });
+  if (best < 0) { msg.textContent = "That spot isn't on a detected flat face. Try another, or choose from the list."; return; }
+  $("#faceSel").value = best; E.facePick = false; $("#facePick").textContent = "Click a face on the model";
+  msg.textContent = `Picked face ${best + 1}. Set the sizes and press Apply.`;
+}
 function onPick(e) {
+  if (E.facePick && viewer) return pickFace(e);
   if (!E.measure && viewer) return pickAt(e);           // plate editor: select / shift-select objects
   if (!E.measure || !viewer) return;
   const r = viewer.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
