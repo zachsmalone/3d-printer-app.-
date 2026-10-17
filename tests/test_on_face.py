@@ -185,3 +185,27 @@ def test_api_rejects_malformed_plane_vectors():
         op = c.post(f"/api/edit/{bid}/op", json={"op": "on_face", "params": {
             "shape": "cylinder", "plane": {"normal": bad_normal, "point": [0, 0, 5]}}})
         assert op.status_code in (400, 422), (bad_normal, op.text)  # clear client error, not a 500
+
+
+def test_polygon_outline_adds_a_prism_with_the_right_volume():
+    m = _plate()
+    tri = [[-5, -5], [5, -5], [0, 8]]                                   # area = 0.5*10*13 = 65
+    out, rep = meshedit.op_on_face(m, {"shape": "polygon", "mode": "add", "plane": _top_plane(m), "points": tri, "height": 4})
+    assert out.is_watertight and abs(float(out.volume) - PLATE_VOLUME - 65 * 4) < 1.0
+    assert abs(out.bounds[1][2] - 9.0) < 0.01 and "3-point outline" in rep["message"]
+
+
+def test_polygon_outline_cuts_a_pocket():
+    m = _plate()
+    sq = [[-5, -5], [5, -5], [5, 5], [-5, 5]]
+    out, _ = meshedit.op_on_face(m, {"shape": "polygon", "mode": "cut", "plane": _top_plane(m), "points": sq, "height": 3})
+    assert out.is_watertight and abs(PLATE_VOLUME - float(out.volume) - 100 * 3) < 1.0
+
+
+@pytest.mark.parametrize("pts", [None, [[0, 0], [1, 1]], [[0, 0], [10, 10], [0, 10], [10, 0]],        # too few / bow-tie
+                                 [[0, 0], [1, 0], [float("nan"), 1]], [[0, 0], [1e9, 0], [0, 1]], [["a", 0], [1, 0], [0, 1]],
+                                 [[0, 0]] * 3, [[i, i * i] for i in range(201)]])
+def test_polygon_outline_rejects_bad_sketches(pts):
+    m = _plate()
+    with pytest.raises(meshedit.OpError):
+        meshedit.op_on_face(m, {"shape": "polygon", "mode": "add", "plane": _top_plane(m), "points": pts, "height": 3})

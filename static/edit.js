@@ -196,7 +196,8 @@ function wireFaceTool() {
       if (!planes.length) { box.innerHTML = `<p class="help">No flat faces found.</p>`; return; }
       box.innerHTML = `<div class="field"><label for="faceSel">Face (largest first)</label><select id="faceSel">${planes.map((p, i) => `<option value="${i}">${i + 1}. ${f1(p.area)} mm² — facing (${p.normal.map(x => (+x).toFixed(2)).join(", ")})</option>`).join("")}</select></div>
         <div class="grid2"><div class="field"><label for="faceMode">Do</label><select id="faceMode"><option value="add">Add (boss)</option><option value="cut">Cut (hole / pocket)</option></select></div>
-        <div class="field"><label for="faceShape">Shape</label><select id="faceShape"><option value="box">Box</option><option value="cylinder">Cylinder</option></select></div></div>
+        <div class="field"><label for="faceShape">Shape</label><select id="faceShape"><option value="box">Box</option><option value="cylinder">Cylinder</option><option value="polygon">Outline (typed points)</option></select></div></div>
+        <div class="field" data-fs="polygon" hidden><label for="facePts">Outline points, one “u, v” pair per line (mm from the face centre, in order round the shape)</label><textarea id="facePts" rows="4" placeholder="-5, -5&#10;5, -5&#10;0, 8"></textarea></div>
         <div class="grid3t" data-fs="box"><div class="field"><label for="faceW">Width mm</label><input id="faceW" type="number" min="0.01" step="any" value="10"></div><div class="field"><label for="faceD">Depth mm</label><input id="faceD" type="number" min="0.01" step="any" value="10"></div></div>
         <div class="grid3t" data-fs="cylinder" hidden><div class="field"><label for="faceDia">Diameter mm</label><input id="faceDia" type="number" min="0.01" step="any" value="6"></div></div>
         <div class="grid3t"><div class="field"><label for="faceH">Height / depth mm</label><input id="faceH" type="number" min="0.01" step="any" value="5"></div><div class="field"><label for="faceOff">Offset along face mm</label><input id="faceOff" type="number" step="any" value="0"></div></div>
@@ -206,7 +207,11 @@ function wireFaceTool() {
       $("#faceGo").onclick = () => {
         const p = planes[+$("#faceSel").value], shape = $("#faceShape").value, num = (sel) => +$(sel).value;
         const params = { shape, mode: $("#faceMode").value, plane: { normal: p.normal, point: p.origin }, height: num("#faceH"), offset: num("#faceOff") };
-        if (shape === "box") { params.width = num("#faceW"); params.depth = num("#faceD"); } else params.diameter = num("#faceDia");
+        if (shape === "box") { params.width = num("#faceW"); params.depth = num("#faceD"); }
+        else if (shape === "polygon") {
+          params.points = $("#facePts").value.split("\n").map(l => l.trim()).filter(Boolean).map(l => l.split(/[\s,;]+/).filter(Boolean).map(Number));
+          if (params.points.some(q => q.length !== 2 || !q.every(Number.isFinite))) { $("#faceMsg").textContent = "Each line needs two numbers, like: 5, -3"; return; }
+        } else params.diameter = num("#faceDia");
         if (![params.height, params.offset, params.width ?? 1, params.depth ?? 1, params.diameter ?? 1].every(Number.isFinite)) { $("#faceMsg").textContent = "Enter numbers for every size."; return; }
         doOp("on_face", params, "Adding to the face…", $("#faceGo"));
       };

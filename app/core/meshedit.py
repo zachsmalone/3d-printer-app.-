@@ -404,8 +404,8 @@ def op_on_face(m, p):
     so it is editable, undoable and replays deterministically.
     """
     shape = p.get("shape", "box")
-    if shape not in ("box", "cylinder"):
-        raise OpError("shape must be box | cylinder")
+    if shape not in ("box", "cylinder", "polygon"):
+        raise OpError("shape must be box | cylinder | polygon")
     mode = p.get("mode", "add")
     if mode not in ("add", "cut"):
         raise OpError("mode must be add | cut")
@@ -425,7 +425,11 @@ def op_on_face(m, p):
     n = n / ln
     height = _num(p, "height", 10, 0.01, 5000)
     offset = _num(p, "offset", 0, -500, 500)
-    if shape == "box":
+    poly = None
+    if shape == "polygon":
+        poly = _sketch_polygon(p.get("points"))
+        footprint = tuple(float(x) for x in np.ptp(np.array(poly.exterior.coords), axis=0))
+    elif shape == "box":
         width = _num(p, "width", 10, 0.01, 5000)
         depth = _num(p, "depth", 10, 0.01, 5000)
         footprint = (width, depth)
@@ -447,11 +451,14 @@ def op_on_face(m, p):
         z0, z1 = offset - height, offset + skim
     zc = (z0 + z1) / 2
 
-    if shape == "box":
+    if shape == "polygon":
+        tool = trimesh.creation.extrude_polygon(poly, z1 - z0)
+        tool.apply_translation([0, 0, z0])
+    elif shape == "box":
         tool = trimesh.creation.box(extents=(footprint[0], footprint[1], z1 - z0))
     else:
         tool = trimesh.creation.cylinder(radius=footprint[0] / 2, height=z1 - z0, sections=64)
-    T = np.eye(4); T[:3, :3] = np.column_stack([u, v, n]); T[:3, 3] = point + n * zc
+    T = np.eye(4); T[:3, :3] = np.column_stack([u, v, n]); T[:3, 3] = point if shape == "polygon" else point + n * zc
     tool.apply_transform(T)
 
     # Refuse obvious misses instead of silently doing nothing.
@@ -465,8 +472,28 @@ def op_on_face(m, p):
         raise OpError("that spot is not on solid material - the shape would come off detached")
     if mode == "cut" and abs(float(out.volume) - vol_before) < 1e-6:
         raise OpError("nothing to cut there - that spot is not on solid material")
-    what = (f"{footprint[0]:g}×{footprint[1]:g} mm box" if shape == "box" else f"Ø{footprint[0]:g} mm cylinder")
+    what = (f"{footprint[0]:g}×{footprint[1]:g} mm box" if shape == "box" else f"{len(poly.exterior.coords) - 1}-point outline" if shape == "polygon" else f"Ø{footprint[0]:g} mm cylinder")
     return out, {"message": ("Added " if mode == "add" else "Cut ") + what + f", {height:g} mm, on the picked face"}
+
+
+SKETCH_MAX_POINTS = 200
+
+
+def _sketch_polygon(points):
+    """A typed 2D outline in the face's own (u, v) millimetres -> a valid, simple shapely polygon. Raises OpError."""
+    from shapely.geometry import Polygon
+    if not isinstance(points, list) or not 3 <= len(points) <= SKETCH_MAX_POINTS:
+        raise OpError(f"points must be a list of 3 to {SKETCH_MAX_POINTS} [u, v] pairs")
+    try:
+        pts = [(float(a), float(b)) for a, b in points]
+    except (TypeError, ValueError):
+        raise OpError("each point must be [u, v] numbers")
+    if not all(np.isfinite(c) and abs(c) <= 5000 for xy in pts for c in xy):
+        raise OpError("point values must be finite and within ±5000 mm")
+    poly = Polygon(pts)
+    if not poly.is_valid or poly.area < 1e-4:
+        raise OpError("the outline crosses itself or is too small; draw a simple closed shape")
+    return poly
 
 
 def _component_count(m: trimesh.Trimesh) -> int:
@@ -846,7 +873,7 @@ def label(op: str, p: dict) -> str:
             "hollow": lambda: f"Hollow {g('wall', 2):g} mm wall" + (f" + Ø{g('drain_diameter'):g} drain" if p.get('drain_diameter') else ""),
             "base": lambda: f"Add base ({g('style', 'outline')}, {g('thickness', 2):g} mm)",
             "boolean": lambda: f"{str(g('kind')).title()} {(p.get('primitive') or {}).get('type', '')}",
-            "on_face": lambda: ("Add " if g("mode", "add") == "add" else "Cut ") + (f"Ø{g('diameter', 10):g} hole/cyl" if g("shape", "box") == "cylinder" else f"{g('width', 10):g}×{g('depth', 10):g} box") + f", {g('height', 10):g} mm on face",
+            "on_face": lambda: ("Add " if g("mode", "add") == "add" else "Cut ") + ("outline" if g("shape", "box") == "polygon" else f"Ø{g('diameter', 10):g} hole/cyl" if g("shape", "box") == "cylinder" else f"{g('width', 10):g}×{g('depth', 10):g} box") + f", {g('height', 10):g} mm on face",
             "text": lambda: f"{str(g('mode', 'emboss')).title()} “{g('text')}”",
             "import": lambda: str(g("label", "Import")),
             "plate": lambda: __import__("app.core.plate", fromlist=["label"]).label(p),
