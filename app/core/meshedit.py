@@ -394,6 +394,94 @@ def op_boolean(m, p):
     return out, {"message": f"{kind} with {p['primitive']['type']}"}
 
 
+def op_on_face(m, p):
+    """Place a dimensioned shape on a picked face and add or cut it (direct editing, mesh-native).
+
+    The op is anchored to the picked face's PLANE - a unit normal plus a point on the face, as the
+    feature detector reports them - never to triangle ids (those would not survive later edits that
+    change the triangulation). This is a fixed workplane, not an associative face reference: a later
+    translate/rotate of the model does not move the anchor. Like every op it is stored in the history,
+    so it is editable, undoable and replays deterministically.
+    """
+    shape = p.get("shape", "box")
+    if shape not in ("box", "cylinder"):
+        raise OpError("shape must be box | cylinder")
+    mode = p.get("mode", "add")
+    if mode not in ("add", "cut"):
+        raise OpError("mode must be add | cut")
+    plane = p.get("plane") or {}
+    if not isinstance(plane, dict) or not plane.get("normal") or not plane.get("point"):
+        raise OpError("plane must be {normal: [x,y,z], point: [x,y,z]} from the face picker")
+    try:
+        n = np.array([float(v) for v in plane["normal"]], dtype=float).reshape(-1)
+        point = np.array([float(v) for v in plane["point"]], dtype=float).reshape(-1)
+    except (TypeError, ValueError):
+        raise OpError("plane.normal and plane.point must be numbers")
+    if n.shape != (3,) or point.shape != (3,):
+        raise OpError("plane.normal and plane.point must each be [x, y, z]")
+    ln = float(np.linalg.norm(n))
+    if not np.isfinite(ln) or ln < 1e-9 or not np.isfinite(point).all():
+        raise OpError("the face's plane is degenerate; pick the face again")
+    n = n / ln
+    height = _num(p, "height", 10, 0.01, 5000)
+    offset = _num(p, "offset", 0, -500, 500)
+    if shape == "box":
+        width = _num(p, "width", 10, 0.01, 5000)
+        depth = _num(p, "depth", 10, 0.01, 5000)
+        footprint = (width, depth)
+    else:
+        diameter = _num(p, "diameter", 10, 0.01, 5000)
+        footprint = (diameter,)
+
+    # Local frame on the plane: u, v span the face, n is outward (area-weighted face normals
+    # of a proper solid point away from the material, which is what the detector reports).
+    a = np.zeros(3); a[int(np.argmin(np.abs(n)))] = 1.0
+    u = np.cross(n, a); u /= np.linalg.norm(u)
+    v = np.cross(n, u)
+
+    if mode == "add":
+        z0, z1 = offset, offset + height
+    else:
+        # Cut into the material; a small skim above the plane avoids coincident-face booleans.
+        skim = max(0.02, 0.01 * height)
+        z0, z1 = offset - height, offset + skim
+    zc = (z0 + z1) / 2
+
+    if shape == "box":
+        tool = trimesh.creation.box(extents=(footprint[0], footprint[1], z1 - z0))
+    else:
+        tool = trimesh.creation.cylinder(radius=footprint[0] / 2, height=z1 - z0, sections=64)
+    T = np.eye(4); T[:3, :3] = np.column_stack([u, v, n]); T[:3, 3] = point + n * zc
+    tool.apply_transform(T)
+
+    # Refuse obvious misses instead of silently doing nothing.
+    if not _bounds_overlap(m, tool):
+        raise OpError("that spot is outside the model - nothing to " + ("add onto" if mode == "add" else "cut"))
+    comps_before = _component_count(m)
+    vol_before = float(m.volume)
+    out = _boolean(m, tool, "union" if mode == "add" else "difference")
+    # A bounding-box check can pass over a hole or a concave region; verify the edit really happened.
+    if mode == "add" and _component_count(out) > comps_before:
+        raise OpError("that spot is not on solid material - the shape would come off detached")
+    if mode == "cut" and abs(float(out.volume) - vol_before) < 1e-6:
+        raise OpError("nothing to cut there - that spot is not on solid material")
+    what = (f"{footprint[0]:g}×{footprint[1]:g} mm box" if shape == "box" else f"Ø{footprint[0]:g} mm cylinder")
+    return out, {"message": ("Added " if mode == "add" else "Cut ") + what + f", {height:g} mm, on the picked face"}
+
+
+def _component_count(m: trimesh.Trimesh) -> int:
+    try:
+        pieces = m.split(only_watertight=False)
+        return len(pieces) if pieces is not None else 1
+    except Exception:
+        return 1
+
+
+def _bounds_overlap(a: trimesh.Trimesh, b: trimesh.Trimesh, tol: float = 0.0) -> bool:
+    amin, amax = _bounds(a); bmin, bmax = _bounds(b)          # _bounds returns (lo, hi)
+    return bool(((amax >= bmin - tol) & (amin <= bmax + tol)).all())
+
+
 def op_base(m, p):
     """Flat base plate (or thin brim) under the model. style: rect | round | outline (follows the footprint)."""
     style = p.get("style", "outline")
@@ -737,7 +825,7 @@ def op_plate(m, p):
 
 OPS = {"plate": op_plate, "lay_flat": op_lay_flat, "best_orient": op_best_orient, "smart_split": op_smart_split, "translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
        "repair": op_repair, "simplify": op_simplify, "cut": op_cut, "hollow": op_hollow, "base": op_base,
-       "boolean": op_boolean, "text": op_text}
+       "boolean": op_boolean, "text": op_text, "on_face": op_on_face}
 
 
 def label(op: str, p: dict) -> str:
@@ -758,6 +846,7 @@ def label(op: str, p: dict) -> str:
             "hollow": lambda: f"Hollow {g('wall', 2):g} mm wall" + (f" + Ø{g('drain_diameter'):g} drain" if p.get('drain_diameter') else ""),
             "base": lambda: f"Add base ({g('style', 'outline')}, {g('thickness', 2):g} mm)",
             "boolean": lambda: f"{str(g('kind')).title()} {(p.get('primitive') or {}).get('type', '')}",
+            "on_face": lambda: ("Add " if g("mode", "add") == "add" else "Cut ") + (f"Ø{g('diameter', 10):g} hole/cyl" if g("shape", "box") == "cylinder" else f"{g('width', 10):g}×{g('depth', 10):g} box") + f", {g('height', 10):g} mm on face",
             "text": lambda: f"{str(g('mode', 'emboss')).title()} “{g('text')}”",
             "import": lambda: str(g("label", "Import")),
             "plate": lambda: __import__("app.core.plate", fromlist=["label"]).label(p),
