@@ -11,6 +11,7 @@ from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
 from ..core import autotune, exporters, geometry, imagesafe, meshedit
 from ..core import features as features_mod
+from ..core import printcheck as printcheck_mod
 from ..core import thickness as thickness_mod
 from ..services import editproj
 from ..services.history import HistoryFull, store
@@ -25,6 +26,15 @@ def _edit_meta(bid: str, actor: Actor, owner_only=False) -> dict:
     if meta.get("kind") != "edit":
         raise HTTPException(404, "not an edit project")
     return meta
+
+
+@router.get("/tolerance")
+def tolerance(process: str = "fdm", fit: str = "normal", nominal: float = 6.0, kind: str = "hole"):
+    """Suggested hole/peg size for a fit (starting point, not measured)."""
+    try:
+        return printcheck_mod.tolerance(process, fit, nominal, kind)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.get("/capabilities")
@@ -159,6 +169,16 @@ def thickness(bid: str, min_wall: float = 0.8, actor: Actor = Depends(get_actor)
     meta = _edit_meta(bid, actor)
     try:
         return thickness_mod.analyze(editproj.mesh_at(bid, meta), min_wall)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@router.get("/{bid}/printcheck")
+def printcheck(bid: str, process: str = "fdm", min_wall: float | None = None, actor: Actor = Depends(get_actor)):
+    """Bed fit + overhang + thin walls in one read-only, approximate report (uses this project's bed)."""
+    meta = _edit_meta(bid, actor)
+    try:
+        return printcheck_mod.run(editproj.mesh_at(bid, meta), editproj.bed_of(meta), process, min_wall)
     except ValueError as e:
         raise HTTPException(400, str(e))
 
