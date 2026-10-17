@@ -35,6 +35,15 @@ Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, imp
 ## Social features (design hooks already in place)
 `history.BuildStore` records carry `owner`/`visibility`; `community/*` modules sit behind small functions over JSON files (swap for a DB); routers are mounted in `app/main.py`; public pages are server-rendered with stable URLs. Planned: profiles, follows/feed, comments, shares, creator pages, saved collections.
 
+## Launch readiness (judgement estimate, ~55-65%)
+Core product is solid; blockers are trust, safety and infrastructure. Order of work:
+1. Real auth, database (SQLite/Postgres) + object storage, CSRF, upload scanning.
+2. Safety: moderation workflow, image checks / hash matching, report SLAs and appeals, DMCA agent, retention policy.
+3. Deploy with backups + monitoring; small private beta; test large/self-intersecting meshes and load.
+4. Full slice-settings UI (per-printer/material/object overrides), Edit polish (sketch-extrude, fillet/chamfer, gizmos), first-run guided flow.
+5. After launch: PrusaLink/Bambu/Duet, feed, notifications, verified OAuth.
+Launch with a narrow hook (photo to lithophane) and make only claims that are true.
+
 ## Legal & safety (REQUIRED before any public launch)
 ZEIM is **18+ only** and free. Decision 2026-10-12 (Zach): ZEIM launches with no lawyers. Terms, Privacy and Rules are plain-words pages based on common free templates; they make no compliance claims. **Still NOT done:**
 - **No NSFW.** No adult/mature content marketplace, no paid-mature tier. **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
@@ -42,7 +51,7 @@ ZEIM is **18+ only** and free. Decision 2026-10-12 (Zach): ZEIM launches with no
 - Terms of Service, Community Guidelines (`COMMUNITY_GUIDELINES.md` is a draft), DMCA/copyright takedown process (section added to Terms with a placeholder contact; TODO: register a DMCA designated agent with the US Copyright Office, small fee, needs Zach's OK before paying), trademark clearance of product/section names.
 - Moderation at scale: trained reviewers, report SLAs, appeals, audit logs, hash-matching/CSAM detection, rate limits (DMs don't exist yet).
 - Age signals: date of birth is self-declared today (18+ gate, bypassable); consider privacy-preserving age assurance where required.
-- Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are stored plain in `data/settings.json`), third-party licences (PrusaSlicer is AGPL-3.0 and is run unmodified as a separate command-line program; ZEIM's own code stays private — see `docs/licensing.md`, decision 2026-10-13).
+- Security: real auth, CSRF, upload scanning, secrets management (OAuth tokens are Fernet-encrypted at rest locally; printer API keys are Fernet-encrypted in `data/settings.json`; the key lives in `PHOTO3D_SECRET_KEY` or a 0600 key file, so set the env var in production), third-party licences (PrusaSlicer is AGPL-3.0 and is run unmodified as a separate command-line program; ZEIM's own code stays private — see `docs/licensing.md`, decision 2026-10-13).
 
 
 ## Edit workspace (shipped as an MVP)
