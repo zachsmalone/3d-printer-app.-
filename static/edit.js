@@ -184,6 +184,20 @@ $("#editOps").onclick = async e => {
   }
    const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 
+function wirePrintCheck() {
+  const run = $("#pcRun"); if (!run) return;
+  const box = $("#pcBox");
+  run.onclick = async () => {
+    run.disabled = true; run.textContent = "Checking…";
+    try {
+      const r = await api(`/api/edit/${E.p.id}/printcheck?process=${encodeURIComponent($("#pcProc").value)}`);
+      box.innerHTML = (r.ok ? `<p class="help">No problems found.</p>` : `<ul>${r.issues.map(i => `<li class="warn">${esc(i)}</li>`).join("")}</ul>`)
+        + `<p class="help">Approximate check from sampling — a guide, not a guarantee. Slice and preview before printing.</p>`;
+    } catch (er) { box.innerHTML = `<p class="help warn">${esc(er.message)}</p>`; }
+    finally { run.disabled = false; run.textContent = "Check bed fit, overhangs & thin walls"; }
+  };
+}
+
 function wireFaceTool() {
   const load = $("#faceLoad"); if (!load) return;
   const box = $("#faceBox"), id = E.p.id, f1 = n => (+n).toFixed(1);
@@ -325,6 +339,10 @@ function renderTools() {
     <details class="tool"><summary>🩹 Repair &amp; simplify</summary>
       <form data-form="repair"><label class="inl"><input type="checkbox" name="fix_normals" checked> Fix normals</label> <label class="inl"><input type="checkbox" name="fill_holes" checked> Fill holes</label> <label class="inl"><input type="checkbox" name="remove_duplicates" checked> Remove duplicates</label> <label class="inl"><input type="checkbox" name="keep_largest"> Drop floating bits</label><div><button class="btn small">Repair</button></div></form>
       ${cap.simplify ? `<form data-form="simplify"><div class="field"><label>Keep <em><span id="keepPct">50</span>% of triangles</em></label><input type="range" name="keep_ratio" min="0.05" max="0.95" step="0.05" value="0.5"></div><button class="btn small">Simplify</button></form>` : ""}</details>
+    <details class="tool"><summary>✅ Print check</summary>
+      <div class="grid2"><div class="field"><label for="pcProc">Process</label><select id="pcProc"><option value="fdm">FDM (filament)</option><option value="resin">Resin</option></select></div></div>
+      <button class="btn small" id="pcRun" type="button">Check bed fit, overhangs &amp; thin walls</button>
+      <div id="pcBox" aria-live="polite"></div></details>
     <details class="tool"><summary>📏 Measure &amp; info</summary>
       <button class="btn small" id="toggleMeasure">${E.measure ? "Stop measuring" : "Measure two points"}</button>
       <table class="info-table"><tr><td>Size (${E.unit})</td><td>${sz.map(fmt).join(" × ")}</td></tr><tr><td>Volume</td><td>${(a.volume_mm3 / 1000).toFixed(2)} cm³</td></tr><tr><td>Surface area</td><td>${(a.area_mm2 / 100).toFixed(1)} cm²</td></tr>
@@ -337,6 +355,7 @@ function renderTools() {
   syncShapeFields();
   syncSmartSplit();
   wireFaceTool();
+  wirePrintCheck();
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 wirePlatePanel($("#editPanel"));
