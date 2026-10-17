@@ -44,6 +44,28 @@ Core product is solid; blockers are trust, safety and infrastructure. Order of w
 5. After launch: PrusaLink/Bambu/Duet, feed, notifications, verified OAuth.
 Launch with a narrow hook (photo to lithophane) and make only claims that are true.
 
+## Launch research findings (2026-10-17, external research; not legal advice)
+Source: a Perplexity research report supplied by Zach. Claims are unverified by us; re-check sources and prices before relying on them.
+- **Launch scope:** a narrow, adult-only "photo → printable keepsake" (lithophane/relief) pilot: private by default, downloadable files, a few verified printer profiles. Public sharing and remote printer control are separate launch gates. Do not claim general "photo to 3D" or CAD parity. The moat is completion (crop → preview → thickness/orientation → frame/base → verified slice → real print), since free lithophane tools already exist.
+- **Niches to test (hypotheses):** private photo keepsakes; phone-first small edits; mesh-preserving repair/personalise (keep originals, disclose simplification); cross-brand guided slicing for 1-2 printer families; reproducible project pages (model, edits, printer/material/profile, real print photos).
+- **Legal/safety gates before public uploads:** register a DMCA designated agent ($6, renew every 3 years) and publish matching contact, repeat-infringer policy and notice/counter-notice steps; written NCMEC CyberTipline procedure with restricted one-year preservation (18 USC 2258A) and a human escalation contact; apply for PhotoDNA / Google child-safety tools, add Cloudflare CSAM scanning as an extra layer, quarantine new public images until review; neutral age screen, reject under-18, store minimal age evidence; privacy notice, terms, retention schedule (failed uploads 24-72h, logs 14-30d, backups 30-90d, legal holds override); UK Online Safety Act and EU DSA scope review (an 18+ checkbox is not a substitute).
+- **Printers:** a hosted server cannot reach a user's LAN address, and user-supplied printer URLs are an SSRF risk: use a paired local connector or file/deep-link handoff, never default public port-forwarding. Order: keep OctoPrint/Moonraker, add PrusaLink (HTTP Digest, `PUT /api/v1/files/{storage}/{path}`, keep auto-start off), then Duet/Repetier on demand. Bambu: critical commands need authorization outside Developer Mode, so keep it experimental or handoff only.
+- **Licensing:** run PrusaSlicer (AGPL-3.0) unmodified as a pinned separate CLI; do not copy/link its code; re-check if modified or if distributing binaries/containers. manifold3d (Apache-2.0), trimesh (MIT), DejaVu (Bitstream Vera terms) and LDNOOBW (CC BY 4.0) need a third-party notices page.
+- **Hosting estimate (planning only):** about $30-65/mo at 100 MAU, $65-190 at 1,000, $320-850 at 10,000, driven by storage, slicing CPU and abuse. Use object storage (R2/B2) separate from the app host plus independent backups; test a restore.
+- **Auth:** email code/link bootstrap, then passkeys (`py_webauthn`), a second passkey and recovery codes; recent-auth for sensitive changes; revocable sessions, CSRF, rate limits; stronger protection for the founder/moderator account.
+
+### Top 10 first actions (effort estimates are rough)
+1. Fix pilot scope and print-test plan (4-8h + print time).
+2. Persistent accounts, sessions, recovery, admin protection (3-7d).
+3. Move multi-user JSON records to a transactional DB; access tests for private originals, thumbnails, exports, signed links (3-7d).
+4. Upload hardening: content checks, quotas, quarantine, timeouts, memory-limited workers (3-6d).
+5. NCMEC procedure and secure preservation; apply for detection tools (1-2d + approval).
+6. DMCA agent registration and policy pages (2-4h + $6).
+7. Truthful privacy/terms/rules, retention schedule, deletion/export (1-3d).
+8. Staging/production, automated backups, restore test, alerts (2-4d).
+9. Secure printer pairing: no arbitrary backend URLs, encrypted credentials, explicit print confirmation, real-device tests (2-5d).
+10. Third-party notices, geographic scope review, then a capped pilot with a staffed report mailbox (1-3d).
+
 ## Legal & safety (REQUIRED before any public launch)
 ZEIM is **18+ only** and free. Decision 2026-10-12 (Zach): ZEIM launches with no lawyers. Terms, Privacy and Rules are plain-words pages based on common free templates; they make no compliance claims. **Still NOT done:**
 - **No NSFW.** No adult/mature content marketplace, no paid-mature tier. **Nothing involving minors in a sexual, exploitative or unsafe context is ever allowed; zero tolerance**, immediate removal, escalation and mandatory reporting where required (e.g., NCMEC in the US).
