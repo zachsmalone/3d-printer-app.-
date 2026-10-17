@@ -186,6 +186,20 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     return _act(bid, actor, lambda: editproj.add_op(bid, op, params))
 
 
+@router.put("/{bid}/step/{i}")
+def edit_step(bid: str, i: int, body: dict, actor: Actor = Depends(get_actor)):
+    """Change one step's parameters; every later step is replayed (all-or-nothing)."""
+    params = body.get("params")
+    if not isinstance(params, dict):
+        raise HTTPException(400, "params must be an object")
+    return _act(bid, actor, lambda: editproj.edit_step(bid, i, params))
+
+
+@router.delete("/{bid}/step/{i}")
+def delete_step(bid: str, i: int, actor: Actor = Depends(get_actor)):
+    return _act(bid, actor, lambda: editproj.delete_step(bid, i))
+
+
 @router.post("/{bid}/undo")
 def undo(bid: str, actor: Actor = Depends(get_actor)):
     return _act(bid, actor, lambda: editproj.undo(bid))

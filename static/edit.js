@@ -147,7 +147,7 @@ function loadProject(p, keepCamera = false) {
   $("#editMsg").innerHTML = msgs.map(m => `<span class="${/not watertight|needs repair|Fix the model|isn't|Still/.test(m) ? "warn" : ""}">${esc(m)}</span>`).join("<br>");
   const total = p.ops.length;
   $("#editHeadNote").textContent = `(${p.head} of ${total} applied — click a step to jump)`;
-  $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button></li>`).join("");
+  $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button>${o.editable ? ` <button type="button" class="stepbtn" data-editstep="${o.i}" title="Change this step's numbers; later steps are replayed" aria-label="Edit step ${o.i}">✎</button> <button type="button" class="stepbtn" data-delstep="${o.i}" title="Delete this step; later steps are replayed" aria-label="Delete step ${o.i}">✕</button>` : ""}</li>`).join("");
   renderTools();
   renderHistoryCard();
   renderSlicePanel();
@@ -163,7 +163,26 @@ async function renderSlicePanel() {
 }
 document.addEventListener("zeim:printer", renderSlicePanel);
 function renderHistoryCard() { loadHistory().catch(() => { }); }
-$("#editOps").onclick = e => { const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
+$("#editOps").onclick = async e => {
+  const ed = e.target.closest("[data-editstep]"), del = e.target.closest("[data-delstep]");
+  if (ed || del) {
+    const i = +(ed || del).dataset[ed ? "editstep" : "delstep"], o = E.p.ops.find(x => x.i === i);
+    if (!o) return;
+    busy(true, ed ? "Replaying…" : "Deleting…");
+    try {
+      if (ed) {
+        const t = prompt(`Edit step ${i} (${o.label}). Change the values and keep the format:`, JSON.stringify(o.params));
+        if (t === null) return;
+        let params; try { params = JSON.parse(t); } catch { toast("That isn't valid values text.", "err"); return; }
+        loadProject(await api(`/api/edit/${E.p.id}/step/${i}`, J("PUT", { params })), true);
+      } else {
+        if (!confirm(`Delete step ${i} (${o.label})? Later steps are replayed; if they can't be, nothing changes.`)) return;
+        loadProject(await api(`/api/edit/${E.p.id}/step/${i}`, J("DELETE")), true);
+      }
+    } catch (er) { toast(er.message, "err"); } finally { busy(false); }
+    return;
+  }
+   const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 
 async function act(url, body, text = "Working…", near = null) {
   if (!E.p) return;

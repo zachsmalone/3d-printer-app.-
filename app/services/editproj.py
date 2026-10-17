@@ -239,6 +239,50 @@ def add_op(bid: str, op: str, params: dict) -> dict:
     return rep
 
 
+def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
+    """Edit (new_op) or delete (None) step i (1-based), then replay every later step on top. All-or-nothing: if any step
+    fails on the new result, nothing is stored. The history ends at the last step afterwards (the redo tail is dropped)."""
+    with _lock:
+        meta = store.get(bid)
+        ops = meta["ops"][:meta["head"]]
+        if not 1 <= i <= len(ops):
+            raise meshedit.OpError("no such step")
+        if any(o["op"] == "plate" for o in ops[i - 1:]):
+            raise meshedit.OpError("Steps from the plate editor (arrange/merge/etc.) and the steps before them can't be edited or deleted; undo to before them first.")
+        new_ops = ops[:i - 1] + ([new_op] if new_op else []) + ops[i:]
+        m = mesh_at(bid, meta, head=i - 1)
+        for k, o in enumerate(new_ops[i - 1:], start=i):
+            if not _replay_safe(o):
+                raise meshedit.OpError(f"Step {k} contains text that is not allowed.")
+            try:
+                m, _ = meshedit.apply(m, o["op"], o["params"])
+            except meshedit.OpError as e:
+                raise meshedit.OpError(f"Step {k} ({o['label']}) would fail after this change: {e}")
+        meta["ops"] = new_ops
+        meta["head"] = len(new_ops)
+        _STATES[bid] = OrderedDict([(meta["head"], m)])
+        meta["plate_layouts"] = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < i}
+        meta["stats"] = _stats(m, meta["title"])
+        meta["last_report"] = None
+        store.save(meta)
+        store.cache.pop(bid, None)
+    return {"rewritten": i, "steps": len(new_ops)}
+
+
+def edit_step(bid: str, i: int, params: dict) -> dict:
+    meta = store.get(bid)
+    if not 1 <= i <= meta["head"]:
+        raise meshedit.OpError("no such step")
+    o = meta["ops"][i - 1]
+    params = check_op_text(o["op"], params)
+    meshedit.apply(mesh_at(bid, meta, head=i - 1), o["op"], params)      # validate this step alone first (clear error)
+    return _rewrite(bid, i, {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)})
+
+
+def delete_step(bid: str, i: int) -> dict:
+    return _rewrite(bid, i, None)
+
+
 def goto(bid: str, head: int):
     with _lock:
         meta = store.get(bid)
@@ -336,7 +380,9 @@ def payload(bid: str, report=None) -> dict:
     m = mesh_at(bid, meta)
     ensure_exports(bid)
     meta = store.get(bid)
-    ops = [{"i": i + 1, "op": o["op"], "label": o["label"]} for i, o in enumerate(meta["ops"])]
+    ops = [{"i": i + 1, "op": o["op"], "label": o["label"],
+             "params": {k: v for k, v in (o.get("params") or {}).items() if k != "layout" and isinstance(v, (str, int, float, bool, dict, list, type(None)))},
+             "editable": o["op"] not in ("plate", "import")} for i, o in enumerate(meta["ops"])]
     from ..core import plate as _plate
     L = layout_at(meta, m)
     pinfo = _plate.describe(m, L, tuple(bed_of(meta)))

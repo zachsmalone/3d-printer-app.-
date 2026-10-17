@@ -30,6 +30,7 @@ Scaffold/stub only: OAuth providers (no posting/verification), PrusaLink/Bambu/D
 - **Growth**: shareable project pages (already built), one-click share to linked social accounts, maker-club partnerships.
 
 ## CAD-lite (long term)
+**Decision 2026-10-17:** ZEIMCad (SolveSpace-derived Rust port) is a separate GPL-3 project on its own branch (`PerplexCopilot`); it is not part of the private ZEIM app code. Boundary: ZEIM's own Python (feature detector, feature tree, replay engine) stays original and must never re-express ZEIMCad/SolveSpace code; ideas yes, code no. If ZEIM ever needs its constraint solver, it runs as a separate tool or service (like the PrusaSlicer CLI). Its `.exe` is a build artifact (CI should build it and run `--self-check`); the next milestone for the port is a C++ reference harness on the pinned SolveSpace revision.
 Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, import-and-edit of Showcase remixes, all in the browser.
 
 ## Social features (design hooks already in place)
