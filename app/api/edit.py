@@ -10,6 +10,7 @@ from ..community import privacy, safety
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
 from ..core import autotune, exporters, geometry, imagesafe, meshedit
+from ..core import features as features_mod
 from ..services import editproj
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
@@ -149,6 +150,13 @@ def new_project(
 def get_project(bid: str, actor: Actor = Depends(get_actor)):
     _edit_meta(bid, actor)
     return editproj.payload(bid)
+
+
+@router.get("/{bid}/features")
+def features(bid: str, actor: Actor = Depends(get_actor)):
+    """Flat faces, cylinders and holes found in the current mesh (read-only, approximate)."""
+    meta = _edit_meta(bid, actor)
+    return features_mod.detect(editproj.mesh_at(bid, meta))
 
 
 def _act(bid, actor, fn):
