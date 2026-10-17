@@ -432,7 +432,8 @@ impl Vector {
     }
 
     /// Intersection of two lines, in 3d. This returns the point on the first line
-    /// that is closest to the second line (util.cpp `AtIntersectionOfLines`).
+    /// that is closest to the second line (util.cpp `AtIntersectionOfLines`),
+    /// translated literally.
     pub fn at_intersection_of_lines(
         a0: Vector, a1: Vector, b0: Vector, b1: Vector,
         skew: &mut bool, parama: &mut f64, paramb: &mut f64,
@@ -442,20 +443,15 @@ impl Vector {
 
         let (pa, pb) = Vector::closest_point_between_lines(a0, da, b0, db);
 
-        // Check for degenerate line
-        if da.mag_squared() < LENGTH_EPS * LENGTH_EPS {
-            *skew = true;
-            *parama = 0.0;
-            *paramb = 0.0;
-            return Vector::from(0.0, 0.0, 0.0);
-        }
-
-        let p = a0.plus(da.scaled_by(pa));
-
-        *skew = !(p.minus(b0.plus(db.scaled_by(pb))).equals_tol(Vector::from(0.0, 0.0, 0.0)));
         *parama = pa;
         *paramb = pb;
-        p
+
+        // And from either of those, we get the intersection point.
+        let pi = a0.plus(da.scaled_by(pa));
+
+        // Check if the intersection points on each line are actually coincident...
+        *skew = !pi.equals_tol(b0.plus(db.scaled_by(pb)));
+        pi
     }
 
     /// Intersection of a plane and a line; `parallel` reports whether they were
@@ -517,11 +513,9 @@ impl Vector4 {
     }
 
     pub fn perspective_project(self) -> Vector {
-        if self.w == 0.0 {
-            Vector::from(0.0, 0.0, 0.0)
-        } else {
-            Vector::from(self.x / self.w, self.y / self.w, self.z / self.w)
-        }
+        // Translated literally from Vector4::PerspectiveProject (util.cpp):
+        // plain division, no zero-guard (a zero w produces inf/nan by design).
+        Vector::from(self.x / self.w, self.y / self.w, self.z / self.w)
     }
 }
 
@@ -612,11 +606,18 @@ impl Point2d {
     }
 
     pub fn angle(self) -> f64 {
-        self.y.atan2(self.x)
+        // Translated literally from Point2d::Angle (util.cpp):
+        //     M_PI + remainder(a - M_PI, 2*M_PI)
+        // which maps the atan2 result into [0, 2*pi). C's remainder rounds to
+        // nearest; the half-to-even vs half-away edge is measure-zero here.
+        let a = self.y.atan2(self.x);
+        let x = a - std::f64::consts::PI;
+        let y = 2.0 * std::f64::consts::PI;
+        std::f64::consts::PI + (x - y * (x / y).round())
     }
 
     pub fn angle_to(self, p: Point2d) -> f64 {
-        (p.minus(self)).angle()
+        p.minus(self).angle()
     }
 
     pub fn magnitude(self) -> f64 {
@@ -628,12 +629,13 @@ impl Point2d {
     }
 
     pub fn with_magnitude(self, v: f64) -> Point2d {
+        // Translated literally from Point2d::WithMagnitude (util.cpp): a zero
+        // vector gets {v, 0}, not an error.
         let m = self.magnitude();
-        if m == 0.0 {
-            Point2d::from(0.0, 0.0)
-        } else {
-            self.scaled_by(v / m)
+        if m < 1e-20 {
+            return Point2d::from(v, 0.0);
         }
+        Point2d { x: self.x * v / m, y: self.y * v / m }
     }
 
     pub fn normal(self) -> Point2d {

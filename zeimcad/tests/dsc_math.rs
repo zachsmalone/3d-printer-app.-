@@ -94,7 +94,10 @@ fn quaternion_times_and_to_the() {
     let q2 = Quaternion::from_axis_angle(Vector::from(0.0, 0.0, 1.0), 0.3);
     let both = q1.times(q2);
     let expected = Quaternion::from_axis_angle(Vector::from(0.0, 0.0, 1.0), 0.9);
-    assert!(both.w - expected.w < 1e-9 && (both.vz - expected.vz).abs() < 1e-9);
+    for (a, b, what) in [(both.w, expected.w, "w"), (both.vx, expected.vx, "vx"),
+                         (both.vy, expected.vy, "vy"), (both.vz, expected.vz, "vz")] {
+        assert!((a - b).abs() < 1e-9, "quaternion product {what}: {a} != {b}");
+    }
 
     // ToThe(0.5) of a 0.6-rad rotation is a 0.3-rad rotation.
     let half = q1.to_the(0.5);
@@ -214,26 +217,53 @@ fn mat4_multiply_matches_original_ordering() {
 #[test]
 fn banded_matrix_solve() {
     // A 3x3 system that fits the banded structure: A is tridiagonal-with-extras,
-    // B the right-hand side; X must satisfy A*X = B.
-    let mut m = BandedMatrix::new(3);
+    // B the right-hand side; X must satisfy A*X = B on the ORIGINAL matrix
+    // (the solver mutates its own copy).
     let a = [
         [4.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         [2.0, 5.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         [0.0, 2.0, 6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     ];
+    let b = [7.0, 16.0, 20.0];
+
+    let mut m = BandedMatrix::new(3);
     for (i, row) in a.iter().enumerate() {
         m.a[i] = row.to_vec();
     }
-    m.b = vec![7.0, 16.0, 20.0];
+    m.b = b.to_vec();
 
     m.solve();
 
-    // Verify the solution against the residual.
+    // Verify the solution against the residual on the original system.
     for i in 0..3 {
-        let mut r = -m.b[i];
+        let mut r = -b[i];
         for j in 0..3 {
-            r += m.a[i][j] * m.x[j];
+            r += a[i][j] * m.x[j];
         }
         assert!(r.abs() < 1e-9, "residual too large: {r}");
     }
+}
+
+#[test]
+fn point2d_angle_wraps_into_0_to_2pi() {
+    // Point2d::Angle in the original maps atan2 into [0, 2*pi).
+    let a = Point2d::from(-1.0, -1.0).angle();   // atan2 gives -3*pi/4
+    assert!((a - 5.0 * std::f64::consts::PI / 4.0).abs() < 1e-9, "angle = {a}");
+    let zero = Point2d::from(1.0, 0.0).angle();
+    assert!(zero.abs() < 1e-9 || (zero - 2.0 * std::f64::consts::PI).abs() < 1e-9);
+}
+
+#[test]
+fn point2d_with_magnitude_of_zero_vector() {
+    // The original returns {v, 0} for a zero vector (with a debug print), not an error.
+    assert_eq!(Point2d::from(0.0, 0.0).with_magnitude(5.0), Point2d::from(5.0, 0.0));
+}
+
+#[test]
+fn vector4_perspective_project_follows_original_semantics() {
+    // Plain division; a zero w produces inf/nan by design (no guard in the original).
+    let p = Vector4::from(2.0, 4.0, 6.0, 8.0);
+    assert_eq!(p.perspective_project(), Vector::from(2.0, 3.0, 4.0));
+    let degenerate = Vector4::from(0.0, 1.0, 2.0, 3.0).perspective_project();
+    assert!(degenerate.x.is_infinite());
 }
