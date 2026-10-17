@@ -107,6 +107,9 @@ function applyShape() {
   $("#width_mm").closest(".field").hidden = curved;
   $("#diaLbl").firstChild.textContent = { globe: "Globe diameter ", cup: "Cup inside diameter " }[litShape()] || "Light diameter ";
   $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
+  const hangOk = lit && ["rect", "square", "circle"].includes(litShape());
+  $("#hangOpts").hidden = !hangOk; if (!hangOk) { $("#hang").value = ""; $("#stand").checked = false; }
+  $("#hangHoleFld").hidden = !$("#hang").value;
   $("#placeEditor").hidden = !lit || litShape() === "rect" || !S.file;
   if (place && !$("#placeEditor").hidden) place.redraw();
 }
@@ -120,6 +123,7 @@ const litAspect = () => {
 var place = mountPlace($("#placeRoot"), { shape: litShape, aspect: litAspect });
 ["#diameter_mm", "#height_mm"].forEach(s => $(s).addEventListener("input", () => place.redraw()));
 $("#shapeCards").onchange = applyShape;
+$("#hang").onchange = applyShape;
 $("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked
 $("#presetSeg").onchange = () => { S.preset = ($("#presetSeg input:checked") || {}).value || "standard"; applyMode(); };
 $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
@@ -184,6 +188,10 @@ function formData(autoDelete) {
   if (S.mode === "lithophane") {
     fd.append("shape", litShape());
     if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
+    if (!$("#hangOpts").hidden) {
+      if ($("#hang").value) { fd.append("hang", $("#hang").value); fd.append("hole_d", $("#hole_d").value); }
+      if ($("#stand").checked) fd.append("stand", "true");
+    }
     if (litShape() !== "rect" && !place.isDefault()) {
       const p = place.get(); fd.append("place_x", p.x.toFixed(4)); fd.append("place_y", p.y.toFixed(4));
       fd.append("place_scale", p.scale.toFixed(4)); fd.append("place_rotation", p.rotation.toFixed(2));
