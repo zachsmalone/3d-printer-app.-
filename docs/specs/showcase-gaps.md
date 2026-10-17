@@ -28,14 +28,14 @@ source's own date where one is published. This is a spec, not legal advice.
 
 **User complaints that shape what adults want** (anecdotes, not prevalence): Thingiverse is
 repeatedly slammed for "terrible search", the "download all" removal, and a slow, buggy site
-([r/3Dprinting, 2026-01-09](https://www.reddit.com/r/3Dprinting/comments/1q2nwng/what_happened_to_thingiverse/),
-[r/3Dprinting, 2025-11-03](https://www.reddit.com/r/3Dprinting/comments/tz2ivg/have_people_abandoned_thingiverse/));
+([r/3Dprinting, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/1q2nwng/what_happened_to_thingiverse/),
+[r/3Dprinting, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/tz2ivg/have_people_abandoned_thingiverse/));
 Printables is praised in comparison for working search and a better viewer
-([r/3Dprinting, 2025-12-05](https://www.reddit.com/r/3Dprinting/comments/zm5uy1/printables_or_thingiverse/));
+([r/3Dprinting, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/zm5uy1/printables_or_thingiverse/));
 and on smaller platforms users report that "few makes are uploaded, feedback is almost
 non-existent" while praising Printables' remix view ("view child remixes alongside the
-original") ([r/3Dprinting, 2025-11-03](https://www.reddit.com/r/3Dprinting/comments/1cvt43g/ive_been_out_of_the_hobby_for_a_couple_years/),
-[r/elegoo, 2026-10-17](https://www.reddit.com/r/elegoo/comments/1x4tzhi/help_us_make_nexprint_better/)).
+original") ([r/3Dprinting, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/1cvt43g/ive_been_out_of_the_hobby_for_a_couple_years/),
+[r/elegoo, accessed 2026-10-17](https://www.reddit.com/r/elegoo/comments/1x4tzhi/help_us_make_nexprint_better/)).
 Search that works, honest makes, and remix lineage are the expectations ZEIM must meet.
 
 ## What ZEIM already has (verified in code)

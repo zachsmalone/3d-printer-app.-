@@ -35,11 +35,11 @@ dates in parentheses. Repo status is against `app/core/litho_shapes.py`, `litho_
 
 ## What users struggle with (r/3Dprinting)
 
-Vertical orientation, brim, and wobble dominate first-print threads ([first lithophane tips, 2025-11-03](https://www.reddit.com/r/3Dprinting/comments/zat1cq/first_complete_lithophane_tips/));
-polarity confusion (tool defaulted to negative) ([lithophane question, 2026-01-15](https://www.reddit.com/r/3Dprinting/comments/neyv0t/lithophane_question/));
+Vertical orientation, brim, and wobble dominate first-print threads ([first lithophane tips, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/zat1cq/first_complete_lithophane_tips/));
+polarity confusion (tool defaulted to negative) ([lithophane question, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/neyv0t/lithophane_question/));
 prints too dark (max thickness too high) and thickness silently scaling when the STL is resized
 in the slicer ([JLC3DP problems section, 2026-10-17](https://jlc3dp.com/blog/lithophane-3d-print));
-long print times ([first print thread, 2025-11-04](https://www.reddit.com/r/3Dprinting/comments/rve8rd/super_happy_with_my_first_lithophane/)).
+long print times ([first print thread, accessed 2026-10-17](https://www.reddit.com/r/3Dprinting/comments/rve8rd/super_happy_with_my_first_lithophane/)).
 
 ## The ranking (value ÷ effort)
 
@@ -65,9 +65,10 @@ sleeve, cup in `litho_shapes.py`), so the top two *missing* items are #1 and #2,
 
 - Holes are cut through the rim (max-thickness material) with a manifold boolean, so the mesh
   stays watertight and the holes are structurally strong; the border auto-widens to
-  `inset + hole_d/2` when needed and the real rim is guaranteed to reach that width (the
-  rect-path pad grows until `pad * final pitch` covers it). The picture area shrinks slightly —
-  the same tradeoff ItsLitho's frame makes.
+  `inset + hole_d/2 + wall` when needed and the real full-thickness rim is guaranteed to
+  reach that width (the rect-path pad grows until `(pad - 1) * final pitch` covers it — the
+  last padded row is a transition cell). The picture area shrinks slightly — the same
+  tradeoff ItsLitho's frame makes.
 - The stand is a one-piece U-channel sized to the panel's width and max thickness (groove
   exactly `groove_depth` deep, measured on the mesh), exported as a second body in the same
   download, parked beside the plate so the two parts never overlap in a combined print.

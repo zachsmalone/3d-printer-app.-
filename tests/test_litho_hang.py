@@ -52,8 +52,8 @@ def test_check_hang_accepts():
 
 
 def test_border_needed_keeps_hole_in_rim():
-    # rim must reach past the far side of the hole: inset + radius
-    assert litho_hang.border_needed(4.0, 6.0) == 8.0
+    # rim must reach past the far side of the hole plus a printable wall: inset + radius + WALL
+    assert litho_hang.border_needed(4.0, 6.0) == 6.0 + 2.0 + litho_hang.WALL_MM
 
 
 # ------------------------------------------------------------------ placement maths
@@ -103,16 +103,17 @@ def test_punch_makes_a_watertight_handle():
         assert t.is_watertight
         assert t.euler_number == 2 - 2 * holes                     # +1 handle per hole
     # circle path: rim is geometrically exact there, so volumes compare cleanly
-    before = mesh(build(shape="circle", border_mm=8))
-    after = mesh(build(shape="circle", border_mm=8, hang="top"))
+    # (border 12 covers the 9.6 mm the hole + wall needs, so both builds get the same rim)
+    before = mesh(build(shape="circle", border_mm=12))
+    after = mesh(build(shape="circle", border_mm=12, hang="top"))
     assert after.is_watertight and after.volume < before.volume
     assert np.allclose(after.bounds, before.bounds, atol=1e-6)
 
 
 def test_hole_volume_matches_cylinder():
     # circle rim is max thickness (3 mm): the removed plug is ~ pi r^2 * 3
-    before = mesh(build(shape="circle", border_mm=8))
-    after = mesh(build(shape="circle", border_mm=8, hang="top", hole_d=4.0))
+    before = mesh(build(shape="circle", border_mm=12))
+    after = mesh(build(shape="circle", border_mm=12, hang="top", hole_d=4.0))
     assert before.volume - after.volume == pytest.approx(np.pi * 4 * 3.0, rel=0.05)
 
 
@@ -162,11 +163,11 @@ def test_border_widened_to_fit_hole():
     ta, tb = mesh(a), mesh(b)
     assert ta.bounds[1][0] == pytest.approx(tb.bounds[1][0], abs=1e-6)      # width unchanged
     assert b.info["border_cells"] > a.info["border_cells"]                   # rim grew
-    actual = b.info["border_cells"] * b.info["pitch_mm"]
-    assert actual >= b.info["inset_mm"] + b.info["hole_d"] / 2              # covers the hole
-    # the rect rim loop guarantees the REAL rim reaches the requested width, even wide ones
+    actual = (b.info["border_cells"] - 1) * b.info["pitch_mm"]   # last padded row is a transition cell
+    assert actual >= b.info["inset_mm"] + b.info["hole_d"] / 2 + litho_hang.WALL_MM
+    # the rect rim loop guarantees the REAL full-thickness band reaches the requested width
     wide = build(border_mm=12, hang="top")
-    assert wide.info["border_cells"] * wide.info["pitch_mm"] >= 12
+    assert (wide.info["border_cells"] - 1) * wide.info["pitch_mm"] >= 12
 
 
 def test_default_build_unchanged():
@@ -191,24 +192,33 @@ def test_default_matches_pre_hang_pipeline():
 
 
 def test_rim_solid_around_hole_on_white_image():
-    # worst case: a blank white photo is the thinnest lithophane; the rim around the
-    # hole must still be full max-thickness material so the print hangs safely
+    # worst case: a blank white photo is the thinnest lithophane; the material in a
+    # printable wall around the hole must still be full max thickness so it hangs safely.
+    # Sampled by ray casting (the thickness ramp dips BETWEEN grid vertices, so a
+    # vertex-only check would miss it).
     m = geometry.build(Image.new("RGB", (160, 120), (255, 255, 255)), "lithophane",
                        dict(shape="rect", width_mm=100, resolution=40, hang="top",
                             auto_contrast=False, smooth=0))
     t = trimesh.Trimesh(m.bodies[0].vertices, m.bodies[0].faces)
     ymax = t.bounds[1][1]
-    cy = ymax - 6.0
-    rim = t.vertices[(t.vertices[:, 2] > 0) & (t.vertices[:, 1] > ymax - 8.4)]
-    outside_hole = rim[np.hypot(rim[:, 0] - 50.0, rim[:, 1] - cy) > 2.5]
-    assert np.all(np.round(outside_hole[:, 2], 6) == 3.0)          # full thickness, not 0.8
+    cx, cy = 50.0, ymax - 6.0
+    ang = np.linspace(0, 2 * np.pi, 24)[:-1]
+    pts = np.stack([cx + (2.0 + 0.5) * np.cos(ang), cy + (2.0 + 0.5) * np.sin(ang)], -1)
+    origins = np.column_stack([pts, np.full(len(pts), 10.0)])
+    locs, idx_ray, _ = t.ray.intersects_location(origins, np.tile([0, 0, -1], (len(pts), 1)))
+    top = np.full(len(pts), -np.inf)
+    for loc, ir in zip(locs, idx_ray):                             # a ray can hit several triangles
+        top[ir] = max(top[ir], loc[2])
+    assert np.all(top > -np.inf)                                  # every sample hit the plate
+    assert top.min() >= 3.0 - 0.05                               # full thickness all around the hole
 
 
 def test_actual_rim_covers_hole():
-    # the real rim (border_cells * final pitch) must cover inset + radius
+    # the real full-thickness band ((cells - 1) * pitch; the last padded row transitions)
+    # must cover the hole plus its printable wall
     m = build(hang="top")
-    actual = m.info["border_cells"] * m.info["pitch_mm"]
-    assert actual >= m.info["inset_mm"] + m.info["hole_d"] / 2
+    actual = (m.info["border_cells"] - 1) * m.info["pitch_mm"]
+    assert actual >= m.info["inset_mm"] + m.info["hole_d"] / 2 + litho_hang.WALL_MM
 
 
 # ------------------------------------------------------------------ API chain

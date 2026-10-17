@@ -228,11 +228,12 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
     if border_mm > 0:
         pad = max(1, int(round(border_mm / (width_mm / (nx - 1)))))
         if hang:
-            # the final pitch shrinks as pad grows, so the old rounding can undershoot the
-            # requested rim; grow pad until the real rim (pad * final pitch) is at least border_mm
+            # The final pitch shrinks as pad grows, and the LAST padded row is a transition
+            # cell, so the guaranteed full-thickness band is (pad - 1) * final pitch, not
+            # pad * pitch. Grow pad until that band covers the requested rim.
             if border_mm >= width_mm * 0.45:
                 raise ValueError("hanging holes need a narrower rim: reduce hole_d and inset_mm or widen the plate")
-            while pad * (width_mm / (nx - 1 + 2 * pad)) < border_mm:
+            while (pad - 1) * (width_mm / (nx - 1 + 2 * pad)) < border_mm:
                 pad += 1
         thick = np.pad(thick, pad, constant_values=max_thickness)
     pitch = width_mm / (nx - 1 + 2 * pad)          # width_mm is the OUTSIDE width: picture + border together (it used to be picture only)

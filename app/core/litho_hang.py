@@ -36,8 +36,9 @@ def check_hang(hang, hole_d=4.0, inset_mm=6.0, spacing_mm=40.0) -> dict:
 
 
 def border_needed(hole_d: float, inset_mm: float) -> float:
-    """Rim width that keeps the whole hole inside solid rim material (max thickness)."""
-    return inset_mm + hole_d / 2.0
+    """Rim width that keeps the hole AND a printable wall around it inside solid rim
+    material (max thickness): the hole reaches `inset + r` inward, plus WALL_MM."""
+    return inset_mm + hole_d / 2.0 + WALL_MM
 
 
 def positions(hang: str, width_mm: float, height_mm: float,
