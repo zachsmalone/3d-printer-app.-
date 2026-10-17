@@ -18,6 +18,7 @@ import numpy as np
 import trimesh
 from PIL import Image
 
+from ..core import dims as dimmod
 from ..core import exporters, geometry, meshedit, meshthumb
 from ..core.geometry import Body, Model
 from .history import store
@@ -49,6 +50,15 @@ def _base(bid: str, meta: dict) -> trimesh.Trimesh:
     return m
 
 
+def _apply(meta: dict, m, o: dict):
+    """meshedit.apply with this project's named dimensions substituted ("$name" -> number)."""
+    try:
+        params = dimmod.resolve(o["op"], o["params"], meta.get("dims"))
+    except dimmod.DimError as e:
+        raise meshedit.OpError(str(e))
+    return meshedit.apply(m, o["op"], params)
+
+
 def mesh_at(bid: str, meta: dict | None = None, head: int | None = None) -> trimesh.Trimesh:
     meta = meta or store.get(bid)
     head = meta["head"] if head is None else head
@@ -64,7 +74,7 @@ def mesh_at(bid: str, meta: dict | None = None, head: int | None = None) -> trim
             o = meta["ops"][k]
             if not _replay_safe(o):
                 continue
-            m, _ = meshedit.apply(m, o["op"], o["params"])
+            m, _ = _apply(meta, m, o)
         cache[head] = m
         while len(cache) > 6:
             cache.popitem(last=False)
@@ -218,7 +228,7 @@ def add_op(bid: str, op: str, params: dict) -> dict:
         if op == "plate":                                 # the server's own layout + bed, never the client's
             params = {**params, "layout": layout_at(meta, cur)}
             params.setdefault("bed", bed_of(meta))
-        new, rep = meshedit.apply(cur, op, params)       # raises OpError → nothing is stored
+        new, rep = _apply(meta, cur, {"op": op, "params": params})       # raises OpError → nothing is stored
         ops = meta["ops"][:meta["head"]]                  # drop the redo tail
         ops.append({"op": op, "params": params, "label": meshedit.label(op, params)})
         meta["ops"] = ops
@@ -255,7 +265,7 @@ def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
             if not _replay_safe(o):
                 raise meshedit.OpError(f"Step {k} contains text that is not allowed.")
             try:
-                m, _ = meshedit.apply(m, o["op"], o["params"])
+                m, _ = _apply(meta, m, o)
             except meshedit.OpError as e:
                 raise meshedit.OpError(f"Step {k} ({o['label']}) would fail after this change: {e}")
         meta["ops"] = new_ops
@@ -275,8 +285,40 @@ def edit_step(bid: str, i: int, params: dict) -> dict:
         raise meshedit.OpError("no such step")
     o = meta["ops"][i - 1]
     params = check_op_text(o["op"], params)
-    meshedit.apply(mesh_at(bid, meta, head=i - 1), o["op"], params)      # validate this step alone first (clear error)
+    _apply(meta, mesh_at(bid, meta, head=i - 1), {"op": o["op"], "params": params})      # validate this step alone first (clear error)
     return _rewrite(bid, i, {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)})
+
+
+def set_dims(bid: str, dims: dict) -> dict:
+    """Replace the project's named dimensions and replay every step with them. All-or-nothing; keeps the undo/redo position."""
+    dims = dimmod.check_dims(dims)
+    with _lock:
+        meta = store.get(bid)
+        old = meta.get("dims") or {}
+        ops = meta["ops"]
+        needed = set()
+        for o in ops:
+            if o["op"] not in dimmod.SKIP_OPS:
+                needed |= dimmod.used_names(o["params"])
+        missing = sorted(needed - set(dims))
+        if missing:
+            raise meshedit.OpError("Still used by a step: " + ", ".join("$" + n for n in missing))
+        trial = {**meta, "dims": dims}
+        m = _base(bid, trial)
+        for k, o in enumerate(ops, start=1):
+            if not _replay_safe(o):
+                continue
+            try:
+                m, _ = _apply(trial, m, o)
+            except meshedit.OpError as e:
+                raise meshedit.OpError(f"Step {k} ({o['label']}) would fail with these values: {e}")
+        meta["dims"] = dims
+        _STATES[bid] = OrderedDict()
+        meta["stats"] = _stats(mesh_at(bid, meta), meta["title"])
+        meta["last_report"] = None
+        store.save(meta)
+        store.cache.pop(bid, None)
+    return {"dims": dims, "changed": dims != old}
 
 
 def delete_step(bid: str, i: int) -> dict:
@@ -390,7 +432,7 @@ def payload(bid: str, report=None) -> dict:
     analysis = meshedit.analyze(m)
     quality = export_quality(m)
     return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": prev, "plate": pinfo,
-            "ops": ops, "head": meta["head"], "can_undo": meta["head"] > 0, "can_redo": meta["head"] < len(meta["ops"]),
+            "dims": meta.get("dims") or {}, "ops": ops, "head": meta["head"], "can_undo": meta["head"] > 0, "can_redo": meta["head"] < len(meta["ops"]),
             "analysis": analysis, "quality_gate": quality, "base": meta["base"], "warnings": meta.get("warnings", []),
             "report": report if report is not None else meta.get("last_report"),
             "original": f"/api/edit/{bid}/original", "capabilities": capabilities()}

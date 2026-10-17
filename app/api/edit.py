@@ -226,6 +226,12 @@ def edit_step(bid: str, i: int, body: dict, actor: Actor = Depends(get_actor)):
     return _act(bid, actor, lambda: editproj.edit_step(bid, i, params))
 
 
+@router.put("/{bid}/dims")
+def set_dims(bid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Replace the named dimensions ({"dims": {"wall": 2.4}}); steps using "$wall" are replayed (all-or-nothing)."""
+    return _act(bid, actor, lambda: editproj.set_dims(bid, body.get("dims")))
+
+
 @router.delete("/{bid}/step/{i}")
 def delete_step(bid: str, i: int, actor: Actor = Depends(get_actor)):
     return _act(bid, actor, lambda: editproj.delete_step(bid, i))

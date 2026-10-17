@@ -184,6 +184,22 @@ $("#editOps").onclick = async e => {
   }
    const li = e.target.closest("[data-goto]"); if (li) act(`/api/edit/${E.p.id}/goto`, { head: +li.dataset.goto }, "Jumping…"); };
 
+function wireDims() {
+  const b = $("#dimSave"); if (!b) return;
+  b.onclick = async () => {
+    const dims = {}, msg = $("#dimMsg");
+    for (const line of $("#dimTxt").value.split("\n").map(l => l.trim()).filter(Boolean)) {
+      const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*[=:]\s*(-?[0-9]*\.?[0-9]+)$/);
+      if (!m) { msg.textContent = `Couldn't read “${line}”. Use: name = number`; return; }
+      dims[m[1]] = +m[2];
+    }
+    b.disabled = true;
+    try { loadProject(await api(`/api/edit/${E.p.id}/dims`, J("PUT", { dims })), true); }
+    catch (er) { msg.textContent = er.message; }
+    finally { b.disabled = false; }
+  };
+}
+
 function wirePrintCheck() {
   const run = $("#pcRun"); if (!run) return;
   const box = $("#pcBox");
@@ -342,6 +358,10 @@ function renderTools() {
     <details class="tool"><summary>🩹 Repair &amp; simplify</summary>
       <form data-form="repair"><label class="inl"><input type="checkbox" name="fix_normals" checked> Fix normals</label> <label class="inl"><input type="checkbox" name="fill_holes" checked> Fill holes</label> <label class="inl"><input type="checkbox" name="remove_duplicates" checked> Remove duplicates</label> <label class="inl"><input type="checkbox" name="keep_largest"> Drop floating bits</label><div><button class="btn small">Repair</button></div></form>
       ${cap.simplify ? `<form data-form="simplify"><div class="field"><label>Keep <em><span id="keepPct">50</span>% of triangles</em></label><input type="range" name="keep_ratio" min="0.05" max="0.95" step="0.05" value="0.5"></div><button class="btn small">Simplify</button></form>` : ""}</details>
+    <details class="tool"><summary>🏷 Named dimensions</summary>
+      <p class="help">Give a size a name, then type <code>$name</code> instead of a number in a step (✎ on the history). Change it here and every step using it updates.</p>
+      <div class="field"><label for="dimTxt">One per line, like: wall = 2.4</label><textarea id="dimTxt" rows="3">${esc(Object.entries(E.p.dims || {}).map(([k, v]) => `${k} = ${v}`).join("\n"))}</textarea></div>
+      <button class="btn small" id="dimSave" type="button">Save &amp; update model</button><p class="help" id="dimMsg" role="status" aria-live="polite"></p></details>
     <details class="tool"><summary>✅ Print check</summary>
       <div class="grid2"><div class="field"><label for="pcProc">Process</label><select id="pcProc"><option value="fdm">FDM (filament)</option><option value="resin">Resin</option></select></div></div>
       <button class="btn small" id="pcRun" type="button">Check bed fit, overhangs &amp; thin walls</button>
@@ -359,6 +379,7 @@ function renderTools() {
   syncSmartSplit();
   wireFaceTool();
   wirePrintCheck();
+  wireDims();
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 wirePlatePanel($("#editPanel"));
