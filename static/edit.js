@@ -132,7 +132,7 @@ document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
 /* ---------- applying a project payload ---------- */
 function loadProject(p, keepCamera = false) {
-  E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearMeasure(); clearGhost();
+  E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearFaceMark(); clearMeasure(); clearGhost();
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis;
@@ -219,6 +219,7 @@ function wireFaceTool() {
         <button type="button" class="btn small" id="faceGo">Apply</button><p class="help" id="faceMsg" role="status" aria-live="polite"></p>`;
       const sync = () => box.querySelectorAll("[data-fs]").forEach(el => { el.hidden = el.dataset.fs !== $("#faceShape").value; });
       $("#faceShape").onchange = sync; sync();
+      $("#faceSel").onchange = () => markFace(planes[+$("#faceSel").value]); markFace(planes[0]);
       $("#facePick").onclick = () => { E.facePick = !E.facePick; E.measure = false; clearMeasure(); $("#facePick").textContent = E.facePick ? "Click a face on the model… (click here to cancel)" : "Click a face on the model"; $("#faceMsg").textContent = E.facePick ? "Click a flat face on the 3D model." : ""; };
       $("#faceGo").onclick = () => {
         const p = planes[+$("#faceSel").value], shape = $("#faceShape").value, num = (sel) => +$(sel).value;
@@ -375,7 +376,7 @@ $("#editPanel").addEventListener("click", e => {
   if (ori) { e.preventDefault(); return doOp(ori.dataset.orient, {}).then(() => { const r = E.p?.report || {}; $$("[data-orient-out]").forEach(x => x.textContent = r.message || (ori.dataset.orient === "lay_flat" ? "Laid flat." : "Turned to the best position.")); }); }
   const rot = e.target.closest("[data-rot]"); if (rot) { e.preventDefault(); return doOp("rotate", { rx: 0, ry: 0, rz: 0, [rot.dataset.rot]: 90 }); }
   if (e.target.id === "toggleMeasure") toggleMeasure();
-  if (e.target.id === "editClose") { E.p = null; $("#editStart").hidden = false; $("#editPanel").hidden = true; $("#editResult").hidden = true; $("#editVtools").hidden = true; $("#editEmpty").hidden = false; viewer?.group.clear(); clearGhost(); fillBuildSelect(); }
+  if (e.target.id === "editClose") { E.p = null; $("#editStart").hidden = false; $("#editPanel").hidden = true; $("#editResult").hidden = true; $("#editVtools").hidden = true; $("#editEmpty").hidden = false; viewer?.group.clear(); clearGhost(); clearFaceMark(); fillBuildSelect(); }
 });
 $("#editPanel").addEventListener("input", e => {
   const f = e.target.form; if (!f) return;
@@ -482,6 +483,16 @@ $("#editPanel").addEventListener("click", e => {
 });
 
 /* ---------- ghost previews (cut plane / boolean tool) ---------- */
+let faceMark = null;
+function clearFaceMark() { if (faceMark) { viewer?.scene.remove(faceMark); faceMark.geometry.dispose(); faceMark = null; } }
+function markFace(p) {                                      // a translucent disc on the chosen face plane (area-equivalent size): a visual cue only
+  clearFaceMark(); if (!viewer || !p) return;
+  const n = new THREE.Vector3(...p.normal).normalize(), r = Math.sqrt(Math.max(p.area, 1) / Math.PI) * 0.6;
+  const g = new THREE.CircleGeometry(r, 40), m = new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthTest: false });
+  faceMark = new THREE.Mesh(g, m); faceMark.renderOrder = 8;
+  faceMark.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+  faceMark.position.set(...p.origin).addScaledVector(n, 0.05); viewer.scene.add(faceMark);
+}
 function clearGhost() { if (ghost) { viewer.scene.remove(ghost); ghost.geometry.dispose(); ghost = null; } }
 function updateGhost(f) {
   if (!viewer || !E.p) return; clearGhost();
@@ -519,7 +530,7 @@ function pickFace(e) {
     if (pn.dot(n) > Math.cos(Math.PI * 3 / 180) && d < tol && d < bestD) { best = i; bestD = d; }
   });
   if (best < 0) { msg.textContent = "That spot isn't on a detected flat face. Try another, or choose from the list."; return; }
-  $("#faceSel").value = best; E.facePick = false; $("#facePick").textContent = "Click a face on the model";
+  $("#faceSel").value = best; markFace(E.planes[best]); E.facePick = false; $("#facePick").textContent = "Click a face on the model";
   msg.textContent = `Picked face ${best + 1}. Set the sizes and press Apply.`;
 }
 function onPick(e) {
