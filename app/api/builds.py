@@ -209,6 +209,11 @@ def generate(
     place_y: str = Form(""),
     place_scale: str = Form(""),
     place_rotation: str = Form(""),
+    hang: str = Form(""),                    # lithophane hanging holes: "" | top | two
+    hole_d: float = Form(4.0),               # hanging hole diameter (mm)
+    inset_mm: float = Form(6.0),             # hanging hole centre from the top edge (mm)
+    spacing_mm: float = Form(40.0),          # distance between the two holes of hang=two (mm)
+    stand: bool = Form(False),               # lithophane display stand as a second body
     base_mm: float = Form(2.0),
     relief_mm: float = Form(6.0),
     levels: int = Form(4),
@@ -288,6 +293,7 @@ def generate(
                 params.update(diameter_mm=diameter_mm, height_mm=height_mm)
             if place:
                 params.update(place=place)
+            params.update(hang=hang, hole_d=hole_d, inset_mm=inset_mm, spacing_mm=spacing_mm, stand=stand)
         t0 = time.time()
         try:
             model = geometry.build(im, mode, params)

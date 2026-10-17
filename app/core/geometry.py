@@ -183,14 +183,22 @@ def prism_mask_solid(mask: np.ndarray, pitch: float, z0: float, z1: float):
 def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness=3.0,
                border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0,
                auto_contrast=True, invert=False, shape="rect", diameter_mm=40.0, height_mm=60.0,
-               color_mode="mono", place=None, **_) -> Model:
+               color_mode="mono", place=None, hang="", hole_d=4.0, inset_mm=6.0,
+               spacing_mm=40.0, stand=False, **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
     if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
         raise ValueError(f"color_mode {color_mode!r} is not available yet")
     shape = shape or "rect"
+    from . import litho_hang, litho_shapes
+    if hang:                                    # validate + widen the rim before any mesh is built
+        hang_opts = litho_hang.check_hang(hang, hole_d, inset_mm, spacing_mm)
+        if shape in litho_shapes.CURVED_SHAPES:
+            raise ValueError("hanging holes are only available for flat lithophane shapes")
+        border_mm = max(border_mm, litho_hang.border_needed(hole_d, inset_mm))
+    if stand and shape in litho_shapes.CURVED_SHAPES:
+        raise ValueError("the display stand is only available for flat lithophane shapes")
     if shape != "rect":
-        from . import litho_shapes
         if shape not in litho_shapes.SHAPES:
             raise ValueError(f"unknown lithophane shape {shape!r}")
         v, f, info, thick = litho_shapes.build(
@@ -198,7 +206,15 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
             border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma, auto_contrast=auto_contrast,
             invert=invert, diameter_mm=diameter_mm, height_mm=height_mm, color_mode=color_mode,
             place=litho_shapes.check_place(place))
+        if hang or stand:                       # attachments for flat shapes: hang holes, display stand
+            half = width_mm / 2.0
+            poly = (litho_shapes.outline(shape, 8192) * half) + half   # plate mm coords, y up
+            v, f, info = _flat_attachments(v, f, info, width_mm, max_thickness,
+                                           poly, hang, hang_opts if hang else None, stand)
         m = Model([Body("lithophane", v, f)], "lithophane")
+        if stand:
+            y0 = v[:, 1].max() + 5.0 + info["stand"]["depth_mm"] / 2.0   # park it beside the plate: parts must not overlap in a combined print
+            m.bodies.append(litho_stand_body(width_mm, max_thickness, y0))
         m.info = {**info, "shape": shape}
         m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)
         return m
@@ -211,13 +227,63 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
     pad = 0
     if border_mm > 0:
         pad = max(1, int(round(border_mm / (width_mm / (nx - 1)))))
+        if hang:
+            # The final pitch shrinks as pad grows, and the LAST padded row is a transition
+            # cell, so the guaranteed full-thickness band is (pad - 1) * final pitch, not
+            # pad * pitch. Grow pad until that band covers the requested rim.
+            if border_mm >= width_mm * 0.45:
+                raise ValueError("hanging holes need a narrower rim: reduce hole_d and inset_mm or widen the plate")
+            while (pad - 1) * (width_mm / (nx - 1 + 2 * pad)) < border_mm:
+                pad += 1
         thick = np.pad(thick, pad, constant_values=max_thickness)
     pitch = width_mm / (nx - 1 + 2 * pad)          # width_mm is the OUTSIDE width: picture + border together (it used to be picture only)
     v, f = heightfield_solid(thick, pitch)
+    info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4), border_cells=pad)
+    if hang or stand:
+        H = v[:, 1].max()
+        poly = np.array([[0.0, 0.0], [width_mm, 0.0], [width_mm, H], [0.0, H]])
+        v, f, info = _flat_attachments(v, f, info, width_mm, max_thickness,
+                                       poly, hang, hang_opts if hang else None, stand)
     m = Model([Body("lithophane", v, f)], "lithophane")
-    m.info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4), border_cells=pad)
+    if stand:
+        y0 = v[:, 1].max() + 5.0 + info["stand"]["depth_mm"] / 2.0   # park it beside the plate: parts must not overlap in a combined print
+        m.bodies.append(litho_stand_body(width_mm, max_thickness, y0))
+    m.info = info
     m.thumb = thumbnail.lithophane_backlit(thick, min_thickness, max_thickness)
     return m
+
+
+def _flat_attachments(v, f, info, width_mm, max_thickness, poly, hang, hang_opts, want_stand):
+    """Apply the Phase-2 flat-plate attachments to a built flat lithophane mesh.
+
+    Hanging holes are cut through the rim (litho_hang); the display stand is sized here
+    (litho_stand) and added as a second body by the caller. Returns (v, f, info).
+    """
+    from . import litho_hang, litho_stand
+    if hang:
+        centres = litho_hang.positions(hang, v[:, 0].max(), v[:, 1].max(),
+                                       hang_opts["hole_d"], hang_opts["inset_mm"], hang_opts["spacing_mm"])
+        litho_hang.fit_check(centres, hang_opts["hole_d"], poly)
+        v, f = litho_hang.punch(v, f, centres, hang_opts["hole_d"], max_thickness)
+        info = {**info, "hang": hang, "hole_d": hang_opts["hole_d"],
+                "inset_mm": hang_opts["inset_mm"], "spacing_mm": hang_opts["spacing_mm"]}
+    if want_stand:
+        info = {**info, "stand": litho_stand.stand(width_mm, max_thickness)[2]}
+    return v, f, info
+
+
+def litho_stand_body(width_mm: float, max_thickness: float, y_offset: float = 0.0):
+    """Second model body: the display stand matching a flat lithophane (see litho_stand).
+
+    `y_offset` parks the stand beside the plate so the two parts never overlap in the
+    combined export (both print flat on the bed, side by side).
+    """
+    from . import litho_stand
+    v, f, _ = litho_stand.stand(width_mm, max_thickness)
+    if y_offset:
+        v = v.copy()
+        v[:, 1] += y_offset
+    return Body("stand", v, f)
 
 
 def relief(im: Image.Image, width_mm=100.0, base_mm=2.0, relief_mm=6.0, resolution=200,
