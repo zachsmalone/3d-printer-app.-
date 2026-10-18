@@ -1,4 +1,4 @@
-"""Lithophane shapes: flat outlines (heart, circle, star, square) and curved shells (globe, night-light cover).
+"""Lithophane shapes: flat outlines (heart, circle, star, square, hexagon) and curved shells (globe, night-light cover).
 
 Same pipeline as the flat rectangle in geometry.lithophane: photo -> grayscale -> tone -> thickness map
 (bright = thin, dark = thick, between min_thickness and max_thickness).
@@ -11,7 +11,7 @@ Same pipeline as the flat rectangle in geometry.lithophane: photo -> grayscale -
   - globe: a FULL sphere, photo wrapped equirectangularly (360 x 180), hollow, open at the bottom (edge at 45 deg S)
     over a flat foot ring so a light goes in and it prints without supports.
   - cup: "Cylinder / Cup" - the photo round a cylinder wall, solid 2 mm printed bottom, open top (pen holder / cup).
-* Flat outlines are smooth vector curves (analytic circle/heart/star/square, 640 points), not pixel masks.
+* Flat outlines are smooth vector curves (analytic circle/heart/star/square/hexagon, 640 points), not pixel masks.
 
 color_mode hook: only "mono" exists. thickness_map() is the single place a future colour mode would plug in
 (e.g. return per-channel maps / extra bodies); everything downstream takes the map it returns.
@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 
 from . import thumbnail
 
-FLAT_SHAPES = ("heart", "circle", "star", "square")
+FLAT_SHAPES = ("heart", "circle", "star", "square", "hexagon")
 CURVED_SHAPES = ("globe", "nightlight", "cup")
 SHAPES = ("rect",) + FLAT_SHAPES + CURVED_SHAPES
 COLOR_MODES = ("mono",)          # future: "cmyk" etc. - not built yet
@@ -130,6 +130,10 @@ def outline_radius(shape: str, ang: np.ndarray) -> np.ndarray:
         return _ray_hit(np.stack([rr * np.cos(a), rr * np.sin(a)], -1), ang)
     if shape == "heart":
         return _ray_hit(heart_curve(), ang)
+    if shape == "hexagon":
+        # regular hexagon, pointy top, vertices on the unit circle
+        a = np.arange(6) * np.pi / 3 + np.pi / 6
+        return _ray_hit(np.stack([np.cos(a), np.sin(a)], -1), ang)
     raise ValueError(f"unknown flat shape {shape!r}")
 
 
@@ -343,8 +347,3 @@ def build(im, shape, **params):
                 "gamma", "auto_contrast", "invert", "color_mode", "place")
         return curved_shape(im, shape, **{k: params[k] for k in keys if k in params})
     raise ValueError(f"unknown shape {shape!r}")
-
-
-def thumb(thick, tmin, tmax):
-    img = thumbnail.lithophane_backlit(np.nan_to_num(thick, nan=tmax * 3), tmin, tmax)
-    return img
