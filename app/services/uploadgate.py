@@ -74,16 +74,19 @@ def scan_bytes(data: bytes) -> tuple[bool, str, str]:
     if not config.CLAMAV:
         return True, "", "off"
     import socket
+    import struct
     try:
         s = socket.socket(socket.AF_UNIX)
         s.settimeout(30)
         s.connect(config.CLAMAV_SOCKET)
         try:
             s.sendall(b"zINSTREAM\0")
+            # clamd INSTREAM framing: each chunk is <4-byte network-order length><data>,
+            # terminated by a zero-length chunk (4 zero bytes) — NOT hex text.
             for i in range(0, len(data), 32768):
                 chunk = data[i:i + 32768]
-                s.sendall(f"{len(chunk):x}".encode() + b"\0" + chunk)
-            s.sendall(b"0\0")
+                s.sendall(struct.pack("!I", len(chunk)) + chunk)
+            s.sendall(struct.pack("!I", 0))
             s.shutdown(socket.SHUT_WR)
             reply = b""
             while True:
@@ -93,12 +96,14 @@ def scan_bytes(data: bytes) -> tuple[bool, str, str]:
                 reply += part
         finally:
             s.close()
-        verdict = reply.decode("utf-8", "replace").strip()
+        verdict = reply.decode("utf-8", "replace").strip().strip("\0").strip()
         if "FOUND" in verdict.upper():
             return False, verdict.split("FOUND")[0].strip(), "infected"
-        if "OK" in verdict.upper():
+        if verdict.upper().endswith("OK") and len(verdict) >= 2:      # explicit successful scan only
             return True, "", "clean"
-        return True, verdict, "clean"      # unknown reply: do not block on a confused scanner
+        # empty / malformed / error replies are NOT a clean verdict: hold the upload
+        log.warning("clamd gave an unusable verdict (%r) — upload quarantined pending scan", verdict[:120])
+        return True, "", "unscanned"
     except Exception as e:
         log.warning("PHOTO3D_CLAMAV=1 but clamd unreachable (%s) — upload quarantined pending scan", e)
         return True, "", "unscanned"

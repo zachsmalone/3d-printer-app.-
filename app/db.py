@@ -190,20 +190,22 @@ def build_get(bid: str) -> dict | None:
 
 def build_save(meta: dict) -> None:
     c = conn()
-    c.execute(
-        "INSERT INTO builds(id, owner_sid, visibility, created, favorite, saved, payload) "
-        "VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET owner_sid=excluded.owner_sid, "
-        "visibility=excluded.visibility, created=excluded.created, favorite=excluded.favorite, "
-        "saved=excluded.saved, payload=excluded.payload",
-        _meta_to_row(meta),
-    )
-    c.commit()
+    with _TX_LOCK:                                   # a bare commit must not land mid-transaction
+        c.execute(
+            "INSERT INTO builds(id, owner_sid, visibility, created, favorite, saved, payload) "
+            "VALUES(?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET owner_sid=excluded.owner_sid, "
+            "visibility=excluded.visibility, created=excluded.created, favorite=excluded.favorite, "
+            "saved=excluded.saved, payload=excluded.payload",
+            _meta_to_row(meta),
+        )
+        c.commit()
 
 
 def build_delete(bid: str) -> None:
     c = conn()
-    c.execute("DELETE FROM builds WHERE id=?", (bid,))
-    c.commit()
+    with _TX_LOCK:
+        c.execute("DELETE FROM builds WHERE id=?", (bid,))
+        c.commit()
 
 
 def build_update(bid: str, fn):

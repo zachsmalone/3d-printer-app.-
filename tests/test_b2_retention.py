@@ -136,3 +136,47 @@ def test_delete_my_stuff_and_delete_everything_remove_starred_builds_and_their_f
 def test_defaults_are_documented_and_configurable():
     assert (config.MAX_BUILDS, config.KEEP_UNSAVED_DAYS, config.KEEP_SAVED_DAYS) == (20, 30, 30)
     assert "PHOTO3D_KEEP_UNSAVED_DAYS" in open(config.ROOT / "app" / "config.py").read()
+
+
+def test_capacity_of_only_starred_and_saved_builds_is_full_not_evicted(monkeypatch):
+    """Starred/saved builds are never rolled off for capacity: a full history of only-exempt
+    builds raises HistoryFull instead of deleting someone's saved work."""
+    monkeypatch.setattr(config, "UPLOADS_PER_HOUR", 0)     # the gate's hourly limit is not under test here
+    c = client(ADULT)
+    from app.services.history import HistoryFull
+    for i in range(config.MAX_BUILDS):
+        bid = photo_build(c)
+        if i < 2:
+            c.post(f"/api/builds/{bid}/favorite", json={"favorite": True})
+        else:
+            c.post("/api/showcase", json={"build_id": bid, "title": f"S{i}", "accept_guidelines": True,
+                                          "nsfw": False, "visibility": "private"})
+    before = {m["id"] for m in c.get("/api/builds").json()["builds"]}
+    assert len(before) == config.MAX_BUILDS
+    r = c.post("/api/generate", files={"file": ("photo.png", _png_bytes(), "image/png")}, data={"mode": "relief"})
+    assert r.status_code == 409 and r.json()["code"] == "history_full"   # full: refuse, never evict
+    assert {m["id"] for m in c.get("/api/builds").json()["builds"]} == before
+
+
+def test_disk_sweep_skips_saved_builds_too():
+    """The disk-pressure sweep removes oldest UNPROTECTED builds — saved ones are exempt."""
+    c = client(ADULT)
+    plain = photo_build(c)
+    saved = photo_build(c)
+    c.post("/api/showcase", json={"build_id": saved, "title": "Kept", "accept_guidelines": True,
+                                 "nsfw": False, "visibility": "private"})
+    old = time.time() - 40 * 86400
+    for bid in (plain, saved):
+        m = store.get(bid); m["created"] = datetime.fromtimestamp(old, timezone.utc).isoformat(); store.save(m)
+    out = retention.sweep_for_space(now=time.time() + 60) if False else None
+    # direct call with a target that forces sweeping
+    out = retention.sweep_for_space()
+    assert not _exists(plain) and _exists(saved)
+
+
+def _png_bytes():
+    import io
+    from PIL import Image
+    b = io.BytesIO()
+    Image.new("RGB", (50, 40), (1, 2, 3)).save(b, "PNG")
+    return b.getvalue()

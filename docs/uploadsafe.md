@@ -132,12 +132,21 @@ file is next touched — it is three lines at the top of each upload-reading han
 ```python
 from ..services import uploadgate          # module level
 
-data = await file.read() if file else b""  # existing read; cap it as today (MAX_UPLOAD)
+# read with the SAME cap the route already enforces (MAX_UPLOAD + 1, then 413 over):
+data = file.file.read(MAX_UPLOAD + 1) if file else b""
+if len(data) > MAX_UPLOAD:
+    raise HTTPException(413, "file too large")
 try:
-    uploadgate.gate(data, actor.sid, source="edit")
+    checked = uploadgate.gate(data, actor.sid, source="edit")
 except uploadgate.GateError as e:
     raise HTTPException(e.status, e.message)
+# checked.scan_state == "unscanned" -> the upload is quarantined (services/quarantine.py):
+# hold the bytes BEFORE parsing, do not publish artifacts, and return status metadata only —
+# see app/api/builds.py's generate flow for the exact pattern (hold_bytes -> mark(bid, hold)).
 ```
+
+The gate must run BEFORE any parsing of the bytes, and the returned scan state must be honored
+(a quarantined upload is never served, shared, or mirrored to object storage).
 
 What this buys (all already implemented + tested in `app/services/uploadgate.py`):
   * per-account hourly rate limit (shared with photo uploads, db-backed in db mode);

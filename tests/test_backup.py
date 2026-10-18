@@ -112,23 +112,37 @@ def _age_keypair(tmp_path):
 
 
 def test_encrypted_backup_roundtrip_no_plaintext_left(tmp_path):
-    import subprocess
+    """Round-trip with a REAL database in the backup: encrypt -> decrypt -> checksums -> DB
+    integrity -> app-readable restore -> no plaintext left behind."""
     if not shutil.which("age"):
         pytest.skip("age binary not installed")
     from scripts import backup as B, restore_verify as RV
     data = tmp_path / "data"; data.mkdir()
     (data / "users.json").write_text('{"a": 1}')
+    c = sqlite3.connect(data / "zeim.sqlite3")
+    c.execute("CREATE TABLE documents (name TEXT PRIMARY KEY, doc TEXT)")
+    c.execute("INSERT INTO documents VALUES ('users', '{\"a\": 1}')")
+    c.commit(); c.close()
     recipient, key = _age_keypair(tmp_path)
     report = B.create_backup(data, tmp_path / "out", tmp_path / "bk", encrypt_to=recipient)
     assert report["encrypted"] is True
+    assert report["databases"] == ["zeim.sqlite3"]
     archive = Path(report["archive"])
     assert archive.name.endswith(".tar.age") and archive.stat().st_size > 0
-    # the plaintext backup directory is gone — only the encrypted archive exists
+    # no plaintext backup dir, no staging dir, no temp archive left anywhere
     assert not archive.parent.joinpath(archive.name.replace(".tar.age", "")).exists()
-    # decrypt with the right identity -> the backup verifies (checksums + DB integrity)
+    assert not list(archive.parent.glob(".staging-*"))
+    assert not list(archive.parent.glob(".tmp-*"))
+    # decrypt with the right identity -> verifies + restores + the DB is actually readable
     unpacked = RV.unpack_archive(archive, key)
-    v = RV.verify_backup(unpacked)
-    assert v["ok"] is True
+    assert RV.verify_backup(unpacked)["ok"] is True
+    restored = RV.restore(unpacked, tmp_path / "target")
+    assert restored["databases"] == ["zeim.sqlite3"]
+    c = sqlite3.connect(tmp_path / "target" / "zeim.sqlite3")
+    assert c.execute("SELECT doc FROM documents WHERE name='users'").fetchone()[0] == '{"a": 1}'
+    c.close()
+    RV.cleanup_unpacked(unpacked)
+    assert not unpacked.exists()                 # no decrypted plaintext lingers
 
 
 def test_wrong_identity_cannot_decrypt(tmp_path):
@@ -162,12 +176,15 @@ def test_corrupt_ciphertext_fails_loudly(tmp_path):
 
 
 def test_missing_age_binary_never_falls_back_to_plaintext(tmp_path, monkeypatch):
+    """Failed encryption leaves NOTHING behind: no plaintext dir, no staging dir, no archive."""
     from scripts import backup as B
     data = tmp_path / "data"; data.mkdir()
     (data / "users.json").write_text('{"a": 1}')
     monkeypatch.setattr(B.shutil, "which", lambda _n: None)
     with pytest.raises(RuntimeError, match="age binary not found"):
         B.create_backup(data, tmp_path / "out", tmp_path / "bk", encrypt_to="age1fake")
+    bk = tmp_path / "bk"
+    assert not list(bk.glob("zeim-*")) and not list(bk.glob(".staging-*")) and not list(bk.glob(".tmp-*"))
 
 
 def test_retention_prunes_tar_age_archives_too(tmp_path):
@@ -184,3 +201,35 @@ def test_retention_prunes_tar_age_archives_too(tmp_path):
     assert out["kept"] == 14 and out["removed"] == 2
     assert len(list(bk.glob("*.tar.age"))) == 14
     assert all(p.is_file() for p in bk.glob("zeim-*"))          # no plaintext dirs remain
+
+
+def test_retention_keeps_14_daily_plus_8_sunday_weeklies_over_a_long_calendar(tmp_path):
+    """A fixed 70-day calendar: after retention, the newest 14 dailies AND the last 8 Sundays
+    survive (both plaintext dirs and encrypted archives) — the weekly rule really fires."""
+    import datetime as _dt
+    from scripts import backup as B
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text("{}")
+    bk = tmp_path / "bk"
+    start = _dt.datetime(2026, 8, 1, 3, 0, 0)          # a Saturday
+    for d in range(70):                                 # one backup per day
+        now = (start + _dt.timedelta(days=d)).timestamp()
+        B.create_backup(data, tmp_path / "out", bk, now=now)
+    B.enforce_retention(bk, now=(start + _dt.timedelta(days=70)).timestamp())
+    kept = sorted(p.name for p in bk.glob("zeim-*"))
+    # all Sundays in the calendar that are among the last 8 Sundays survive
+    sundays = [start + _dt.timedelta(days=d) for d in range(70) if (start + _dt.timedelta(days=d)).weekday() == 6]
+    for s in sundays[-8:]:
+        assert any(s.strftime("%Y%m%d") in name for name in kept), s.date()
+    assert len(kept) == len(set(kept))
+    # and the same holds for encrypted archives
+    bk2 = tmp_path / "bk2"
+    if shutil.which("age"):
+        recipient, _ = _age_keypair(tmp_path)
+        for d in range(70):
+            now = (start + _dt.timedelta(days=d)).timestamp()
+            B.create_backup(data, tmp_path / "out", bk2, now=now, encrypt_to=recipient)
+        B.enforce_retention(bk2, now=(start + _dt.timedelta(days=70)).timestamp())
+        kept2 = sorted(p.name for p in bk2.glob("*.tar.age"))
+        for s in sundays[-8:]:
+            assert any(s.strftime("%Y%m%d") in name for name in kept2), s.date()

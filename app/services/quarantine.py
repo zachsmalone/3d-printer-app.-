@@ -16,6 +16,9 @@ admin token and audited like every other moderation action.
 from __future__ import annotations
 
 import logging
+import shutil
+import uuid
+from pathlib import Path
 
 from .. import config
 from ..community import moderation
@@ -34,57 +37,78 @@ def is_quarantined(bid: str) -> bool:
         return False
 
 
-def mark(bid: str) -> None:
-    """Flag a build as pending its malware scan (called by the upload flow when the scanner was down)."""
+def _root() -> Path:
+    """DATA/quarantine — 0700, never served by any route (only this module touches it)."""
+    p = Path(config.DATA) / "quarantine"
+    p.mkdir(parents=True, exist_ok=True)
+    p.chmod(0o700)
+    return p
+
+
+def hold_bytes(raw: bytes) -> Path:
+    """Park the ORIGINAL upload bytes (pre-sanitize) in the restricted hold area. Returns the
+    hold dir; quarantine.mark(bid, hold) claims it once the build id exists."""
+    d = _root() / f".hold-{uuid.uuid4().hex[:12]}"
+    d.mkdir()
+    (d / "original.bin").write_bytes(raw)
+    return d
+
+
+def mark(bid: str, hold: Path | None = None) -> None:
+    """Flag a build as pending its malware scan (called by the upload flow when the scanner was
+    down) and claim the held original bytes for later re-scan."""
     meta = store.get(bid)
     if meta.get("quarantined"):
+        if hold is not None:
+            shutil.rmtree(hold, ignore_errors=True)
         return
     meta["quarantined"] = True
     store.save(meta)
+    if hold is not None:
+        dest = _root() / bid
+        if dest.exists():
+            shutil.rmtree(hold, ignore_errors=True)      # already held (should not happen)
+        else:
+            hold.rename(dest)
     moderation._log("quarantine", item=bid, reason="scanner unavailable at upload")
     log.warning("build quarantined: scanner was unreachable at upload time")
 
 
-def _stored_bytes(bid: str) -> bytes | None:
-    """The bytes that could be served: the stored source file (if any), else the first model."""
-    try:
-        meta = store.get(bid)
-    except KeyError:
-        return None
-    src = meta.get("source")
-    if src:
-        p = store.dir(bid) / src
-        if p.exists():
-            return p.read_bytes()
-    p = store.dir(bid) / "model.stl"
+def _held_bytes(bid: str) -> bytes | None:
+    """The ORIGINAL upload bytes held in the restricted area — what the pending scan reviews."""
+    p = _root() / bid / "original.bin"
     return p.read_bytes() if p.exists() else None
 
 
 def rescan(bid: str) -> str:
-    """Scan a quarantined build's stored bytes. -> 'off' | 'clean' | 'infected' | 'unavailable'.
-    A clean (or scanner-off) result clears the flag; infected keeps it."""
+    """Scan the HELD ORIGINAL bytes. -> 'clean' | 'infected' | 'held'.
+    Only an explicit clean scan (or an admin release) lifts the hold: a disabled scanner or
+    missing held bytes leaves the build held — never a silent release."""
     from . import uploadgate
     if not is_quarantined(bid):
-        return "off" if not config.CLAMAV else "clean"
-    data = _stored_bytes(bid)
-    if data is None:
-        _clear(bid, "nothing stored to scan")
         return "clean"
+    data = _held_bytes(bid)
+    if data is None:
+        log.error("quarantined build %s has no held bytes — staying held (admin release only)", bid)
+        return "held"
     clean, signature, state = uploadgate.scan_bytes(data)
     if state == "infected":
         log.error("quarantined build re-scanned: STILL INFECTED (%s)", signature)
         moderation._log("quarantine_scan", item=bid, verdict="infected", signature=signature)
         return "infected"
-    if state == "unscanned":
-        return "unavailable"
-    _clear(bid, "scan clean" if state == "clean" else "scanner disabled")
-    return "clean"
+    if state == "clean":
+        _clear(bid, "scan clean")
+        return "clean"
+    return "held"                       # scanner off / unreachable / unusable verdict: keep holding
 
 
 def _clear(bid: str, why: str) -> None:
     meta = store.get(bid)
     if meta.pop("quarantined", None):
         store.save(meta)
+        held = _root() / bid
+        if held.exists():
+            shutil.rmtree(held, ignore_errors=True)     # the held original goes too
         moderation._log("quarantine_release", item=bid, reason=why)
         log.info("quarantine lifted for build (%s)", why)
 
@@ -107,5 +131,5 @@ def guard(bid: str) -> None:
     verdict = rescan(bid)
     if verdict == "infected":
         raise HTTPException(422, "That file was flagged by the malware scanner and can't be downloaded or shared.")
-    if verdict == "unavailable":
+    if verdict != "clean":
         raise HTTPException(409, QUARANTINE_MSG)

@@ -172,7 +172,8 @@ def delete_build(bid: str, actor: Actor = Depends(get_actor)):
 @router.post("/builds/delete-oldest")
 def delete_oldest(actor: Actor = Depends(get_actor)):
     with store.lock:
-        items = [m for m in store.list(actor.sid) if not m.get("favorite")]       # never a starred build
+        items = [m for m in store.list(actor.sid)
+                 if not (m.get("favorite") or m.get("saved"))]          # never a starred/saved build
         if not items:
             return {"ok": True, "deleted": None}
         store.delete(items[0]["id"])
@@ -245,9 +246,13 @@ def generate(
         checked = uploadgate.gate(data, actor.sid, source="generate")
     except uploadgate.GateError as e:
         raise HTTPException(e.status, e.message)
+    hold = None
+    if getattr(checked, "scan_state", "off") == "unscanned":
+        from ..services import quarantine
+        hold = quarantine.hold_bytes(data)              # the ORIGINAL bytes, pre-sanitize, 0700
     if mode == "trace2d":
         return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest,
-                               unscanned=getattr(checked, "scan_state", "off") == "unscanned")
+                               unscanned=hold is not None, hold=hold)
     try:
         ack = imagesafe.check_ack(data, photo_ack)        # CR-5: "this is my photo / I have permission" (built-in sample exempt)
         data, src_ext, _ = imagesafe.sanitize(data)       # HEIC -> JPEG, rotation applied, EXIF/GPS dropped, extension from content
@@ -322,7 +327,7 @@ def generate(
         # object storage (when configured): the bucket is the durable copy of the artifacts;
         # local disk stays the slicer's/editor's working surface
         from ..services import filestore
-        if filestore.enabled():
+        if filestore.enabled() and hold is None:         # quarantined builds are NOT published to the bucket
             filestore.put_build(bid, "source", data)      # stable key; ext does not matter to the bucket
             for ext in exporters.WRITERS:
                 filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
@@ -337,9 +342,14 @@ def generate(
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
-        if getattr(checked, "scan_state", "off") == "unscanned":
+        if hold is not None:
             from ..services import quarantine
-            quarantine.mark(bid)                     # scanner was down: hold the files until a scan clears them
+            quarantine.mark(bid, hold)               # scanner was down: hold the original until a scan clears it
+    if hold is not None:
+        # pending its malware scan: status metadata only — no preview, nothing served
+        return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
+                "seconds": round(time.time() - t0, 2), "quarantined": True,
+                "history": [summary(m) for m in store.list(actor.sid)]}
     return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
             "history": [summary(m) for m in store.list(actor.sid)]}
@@ -388,7 +398,8 @@ def _trace_notes(info: dict) -> list:
     return rows
 
 
-def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest, unscanned=False):
+def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest,
+                    unscanned=False, hold=None):
     from ..core import trace2d
     from ..services import willprint
     clean, ext, im, params, ack = trace_input(data, photo_ack, trace_json, width_mm)
@@ -412,7 +423,7 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
             (d / f"model.{e}").write_bytes(fn(model))
         Image.fromarray(model.thumb).save(d / "thumb.png")
         from ..services import filestore
-        if filestore.enabled():
+        if filestore.enabled() and hold is None:         # quarantined builds are NOT published to the bucket
             filestore.put_build(bid, "source", clean)
             for e in exporters.WRITERS:
                 filestore.put_build(bid, f"model.{e}", (d / f"model.{e}").read_bytes())
@@ -425,9 +436,14 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
-        if unscanned:
+        if hold is not None:
             from ..services import quarantine
-            quarantine.mark(bid)                     # scanner was down: hold the files until a scan clears them
+            quarantine.mark(bid, hold)               # scanner was down: hold the original until a scan clears it
+    if hold is not None:
+        # pending its malware scan: status metadata only — no preview, nothing served
+        return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
+                "seconds": round(time.time() - t0, 2), "quarantined": True,
+                "history": [summary(m) for m in store.list(actor.sid)]}
     return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(model),
             "history": [summary(m) for m in store.list(actor.sid)]}

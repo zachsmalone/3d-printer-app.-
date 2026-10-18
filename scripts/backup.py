@@ -37,30 +37,34 @@ WEEKLY_KEEP = 8
 
 
 def _ts_of(path: Path) -> str:
-    """zeim-YYYYMMDD-HHMMSS[.tar.age] -> YYYYMMDD-HHMMSS."""
-    return path.name.split(".")[0].split("-")[-1]
+    """zeim-YYYYMMDD-HHMMSS[.tar.age] -> YYYYMMDD-HHMMSS (the DATE matters: weekly retention
+    keys off it — losing it would silently keep only the newest dailies)."""
+    return path.name.split(".")[0].split("-", 1)[-1]
 
 
-def _age_encrypt_dir(backup_dir: Path, recipient: str) -> Path:
-    """tar+age the plaintext backup into <dir>.tar.age, then remove the plaintext dir.
-    Raises on any failure — encrypted mode never silently falls back to plaintext."""
+def _age_encrypt_dir(staging: Path, final_dir: Path, recipient: str) -> Path:
+    """tar+age the staged backup into <final>.tar.age (published atomically by rename),
+    then remove the staging dir. Raises on any failure — encrypted mode never silently
+    falls back to plaintext."""
     import subprocess
     if not shutil.which("age"):
         raise RuntimeError("age binary not found — install age (e.g. apt install age) or drop --encrypt-to")
-    archive = backup_dir.parent / f"{backup_dir.name}.tar.age"
+    tmp_archive = staging.parent / f".tmp-{final_dir.name}.tar.age"
+    archive = final_dir.parent / f"{final_dir.name}.tar.age"
     # tar from a pipe so no plaintext archive ever exists on disk
-    cmd = ["tar", "-cf", "-", "-C", str(backup_dir.parent), backup_dir.name]
+    cmd = ["tar", "-cf", "-", "-C", str(staging.parent), staging.name]
     enc = ["age", "-e", "-r", recipient]
-    with open(archive, "wb") as out:
+    with open(tmp_archive, "wb") as out:
         tar_p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         age_p = subprocess.Popen(enc, stdin=tar_p.stdout, stdout=out, stderr=subprocess.PIPE)
         tar_p.stdout.close()
         _, err = age_p.communicate()
         tar_p.wait()
-    if age_p.returncode != 0 or tar_p.returncode != 0 or not archive.exists() or archive.stat().st_size == 0:
-        archive.unlink(missing_ok=True)
+    if age_p.returncode != 0 or tar_p.returncode != 0 or not tmp_archive.exists() or tmp_archive.stat().st_size == 0:
+        tmp_archive.unlink(missing_ok=True)
         raise RuntimeError(f"age encryption failed: {err.decode(errors='replace')[:400]}")
-    shutil.rmtree(backup_dir)          # plaintext exists no more
+    os.rename(tmp_archive, archive)              # atomic publish of the encrypted artifact
+    shutil.rmtree(staging)                       # plaintext exists no more
     return archive
 
 
@@ -104,15 +108,36 @@ def _checksum_dir(backup_dir: Path) -> dict:
 def create_backup(data_dir: Path, out_dir: Path, backup_root: Path, now: float | None = None,
                   encrypt_to: str | None = None) -> dict:
     """Make one timestamped backup. Returns a report dict (never raises for missing pieces).
-    With encrypt_to (an age recipient): the plaintext dir becomes <dir>.tar.age — failure to
-    encrypt raises (never a silent plaintext backup)."""
+    Built in a PRIVATE staging dir and published atomically (rename), so a failed run never
+    leaves a half-built backup that a later restore could mistake for a good one.
+    With encrypt_to (an age recipient): the published artifact is <dir>.tar.age — failure to
+    encrypt raises AND removes the staging dir (never a silent plaintext backup)."""
     now = time.time() if now is None else now
     ts = time.strftime("%Y%m%d-%H%M%S", time.localtime(now))
-    backup_dir = backup_root / f"zeim-{ts}"
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    backup_dir.chmod(0o700)                     # plaintext snapshots are private
+    staging = backup_root / f".staging-{ts}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    staging.chmod(0o700)
+    final_dir = backup_root / f"zeim-{ts}"
 
-    report = {"backup": str(backup_dir), "databases": [], "json_files": [], "output_files": 0, "ok": True}
+    report = {"backup": str(final_dir), "databases": [], "json_files": [], "output_files": 0, "ok": True}
+    try:
+        _build_snapshot(data_dir, out_dir, staging, now, report)
+        if encrypt_to:
+            # tar+age straight out of staging: no plaintext archive or published dir ever exists
+            archive = _age_encrypt_dir(staging, final_dir, encrypt_to)
+            report["encrypted"] = True
+            report["archive"] = str(archive)
+        else:
+            os.rename(staging, final_dir)             # atomic publish
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)      # no half-built backup survives a failure
+        raise
+    return report
+
+
+def _build_snapshot(data_dir: Path, out_dir: Path, backup_dir: Path, now: float, report: dict) -> None:
     # 1. databases via the live-safe backup API
     for name in ("zeim.sqlite3", "auth.sqlite3"):
         dest = backup_dir / name
@@ -131,11 +156,6 @@ def create_backup(data_dir: Path, out_dir: Path, backup_root: Path, now: float |
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now)),
         "checksums": _checksum_dir(backup_dir),
     }, indent=1))
-    if encrypt_to:
-        archive = _age_encrypt_dir(backup_dir, encrypt_to)
-        report["encrypted"] = True
-        report["archive"] = str(archive)
-    return report
 
 
 def _is_sunday(path: Path) -> bool:

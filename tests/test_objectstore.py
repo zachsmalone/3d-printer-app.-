@@ -245,3 +245,34 @@ def _png_bytes() -> bytes:
     b = io.BytesIO()
     Image.new("RGB", (60, 40), (10, 120, 200)).save(b, "PNG")
     return b.getvalue()
+
+
+def test_provider_outage_cannot_orphan_remote_copies(s3):
+    """A provider outage during deletion leaves a DURABLE pending record; recovery retries
+    until the remote copies are really gone — never a silent orphan."""
+    import json as _json
+    from pathlib import Path as _P
+    from app import config
+    from app.services import filestore
+    filestore.put_build("bX", "model.stl", b"x")
+    calls = {"n": 0}
+    real_delete = objectstore.delete
+
+    def flaky(key):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("provider down")
+        return real_delete(key)
+
+    objectstore.delete = flaky                       # outage on the first key
+    try:
+        filestore.delete_build("bX")                  # records keys durably, then tries
+    finally:
+        objectstore.delete = real_delete
+    pending = _json.loads((_P(config.DATA) / "pending_deletions.json").read_text())
+    assert "bX" in pending and pending["bX"]          # the outage could not orphan the record
+    # provider is back: the retry drains the queue and the remote copy is really gone
+    assert filestore.retry_pending() == 0
+    pending = _json.loads((_P(config.DATA) / "pending_deletions.json").read_text())
+    assert "bX" not in pending
+    assert not [k for k in _FakeS3.objects if "bX" in k]

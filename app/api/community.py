@@ -674,13 +674,14 @@ def admin_metrics(request: Request, x_admin_token: str = Header("")):
     there is no queue, so there is no queue depth; slice failures appear in the app logs."""
     _admin(x_admin_token, request)
     from .. import config
-    from ..services import quarantine, retention
+    from ..services import quarantine, retention, slicestats
     from ..services.history import store
     q = moderation.queue()
     return {
         "moderation": {"open_reports": len(q), "oldest_open_age_s": moderation.oldest_open_age_s()},
         "quarantined_builds": sum(1 for m in store.list() if m.get("quarantined")),
         "storage": {"mode": config.STORAGE_MODE},
+        "slicing": slicestats.snapshot(),               # synchronous design: totals + failures, no queue
         "disk_free_mb": round(retention.free_bytes() / (1024 * 1024)),
     }
 

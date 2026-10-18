@@ -1,6 +1,8 @@
 """Print hand-off: slicer deep links, built-in slice, network printer send."""
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -71,6 +73,22 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
 
 
 def _slice(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini=None, **chosen):
+    from ..services import slicestats
+    t0 = time.time()
+    st = slicer.status()
+    if not st["available"]:
+        slicestats.record(False, "slicer unavailable")
+        return st
+    try:
+        out = _slice_inner(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini, **chosen)
+    except Exception as e:
+        slicestats.record(False, str(e))
+        raise
+    slicestats.record(True)
+    return out
+
+
+def _slice_inner(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini=None, **chosen):
     st = slicer.status()
     if not st["available"]:
         return st

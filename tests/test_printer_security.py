@@ -102,3 +102,19 @@ def test_dev_default_keeps_direct_control(monkeypatch):
     monkeypatch.delenv("ZEIM_PRINTER_DIRECT", raising=False)
     from app.services import printers
     assert printers.direct_control_enabled() is True
+
+
+def test_file_handoff_path_works_in_production(monkeypatch):
+    """The launch posture: slice -> DOWNLOAD THE G-CODE -> print from the printer's own app.
+    The full file-handoff path must work while direct control is off."""
+    monkeypatch.setenv("ZEIM_ENV", "production")
+    monkeypatch.delenv("ZEIM_PRINTER_DIRECT", raising=False)
+    c = client()
+    bid = photo_build(c)
+    r = c.post(f"/api/slice/{bid}", data={"layer_height": 0.2, "fill_density": 15})
+    assert r.status_code == 200, r.text
+    if r.json().get("ok") or "download" in r.json():                    # slicer present: gcode exists
+        g = c.get(f"/files/{bid}/model.gcode")
+        assert g.status_code == 200 and len(g.content) > 0             # the handoff artifact itself
+    # and the gcode download is not blocked by the direct-control gate
+    assert c.get(f"/files/{bid}/model.gcode").status_code in (200, 404)

@@ -13,6 +13,11 @@ and `visibility` field; the same method names work against either backend.
 """
 from __future__ import annotations
 
+
+def _protected(meta: dict) -> bool:
+    """Starred or saved: never evicted for capacity (matches services.retention.protected)."""
+    return bool(meta.get("favorite") or meta.get("saved"))
+
 import json
 import shutil
 import threading
@@ -79,7 +84,7 @@ class BuildStore:
         if db is not None:
             items = db.build_list(owner)
             while len(items) >= self.limit:
-                loose = [m for m in items if not m.get("favorite")]
+                loose = [m for m in items if not _protected(m)]
                 if not loose:
                     raise HistoryFull()
                 oldest = loose[0]
@@ -91,7 +96,7 @@ class BuildStore:
             return
         items = self.list(owner)
         while len(items) >= self.limit:
-            loose = [m for m in items if not m.get("favorite")]       # starred builds are never rolled off
+            loose = [m for m in items if not _protected(m)]           # starred/saved builds are never rolled off
             if not loose:
                 raise HistoryFull()
             victim = loose[0]["id"]                                    # oldest un-starred build rolls off

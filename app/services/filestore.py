@@ -13,8 +13,11 @@ not a code change.
 """
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 
+from .. import config
 from . import objectstore
 
 log = logging.getLogger("zeim.storage")
@@ -48,12 +51,58 @@ def signed_url(key: str, ttl_s: int = 900) -> str | None:
     return objectstore.signed_url(key, ttl_s)
 
 
+def _pending_path() -> Path:
+    return Path(config.DATA) / "pending_deletions.json"
+
+
+def _load_pending() -> dict:
+    try:
+        return json.loads(_pending_path().read_text())
+    except Exception:
+        return {}
+
+
+def _save_pending(d: dict) -> None:
+    p = _pending_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(d, indent=1))
+
+
+def _artifact_names() -> tuple[str, ...]:
+    return ("source", "thumb.png", *sorted(f"model.{e}" for e in ("stl", "obj", "3mf", "ply")))
+
+
 def delete_build(bid: str) -> None:
-    """Best-effort removal of a build's artifacts from object storage (local deletion is the caller's job)."""
+    """Remove a build's artifacts from object storage, DURABLY: the keys are recorded in
+    DATA/pending_deletions.json BEFORE any local metadata is gone, and retried until they
+    succeed — a provider outage never silently orphans remote copies (local deletion is the
+    caller's job; this never raises)."""
     if not enabled():
         return
-    for name in ("source", "thumb.png", *sorted(f"model.{e}" for e in ("stl", "obj", "3mf", "ply"))):
-        try:
-            objectstore.delete(artifact_key(bid, name))
-        except Exception:                        # never let cleanup break a delete flow
-            log.exception("object-storage cleanup failed for build %s", bid)
+    keys = [artifact_key(bid, n) for n in _artifact_names()]
+    pending = _load_pending()
+    pending[bid] = keys                       # recorded before we try
+    _save_pending(pending)
+    retry_pending(bids=[bid])
+
+
+def retry_pending(bids: list[str] | None = None) -> int:
+    """Retry recorded deletions (all, or the given builds). Returns how many builds still
+    have pending keys. Called from delete_build and safe to call from cron/startup."""
+    if not enabled():
+        return 0
+    pending = _load_pending()
+    for bid in list(pending):
+        if bids is not None and bid not in bids:
+            continue
+        for k in list(pending[bid]):
+            try:
+                objectstore.delete(k)
+                pending[bid].remove(k)
+            except Exception:
+                log.warning("object-storage deletion still pending for %s (will retry)", bid)
+                break
+        if not pending[bid]:
+            del pending[bid]                   # fully deleted remotely: forget it
+    _save_pending(pending)
+    return len(pending)

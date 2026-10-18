@@ -57,10 +57,16 @@ def _age_days(meta: dict, now: float) -> float:
     return (now - t) / 86400
 
 
+def protected(meta: dict) -> bool:
+    """Starred OR saved (shared to the Showcase): never auto-deleted — not by expiry, not by
+    history-slot eviction, not by disk-pressure sweep. One predicate everywhere."""
+    return bool(meta.get("favorite") or meta.get("saved"))
+
+
 def keep_days(meta: dict) -> float | None:
     """None = kept until the person deletes it. Launch-checklist policy: ordinary builds
     expire after 30 days; starred AND saved (shared to Showcase) builds are exempt."""
-    if meta.get("favorite") or meta.get("saved"):
+    if protected(meta):
         return None
     return float(config.KEEP_UNSAVED_DAYS)
 
@@ -121,7 +127,7 @@ def sweep_for_space(bs: BuildStore = _store, now: float | None = None) -> dict:
     if free_bytes(bs.root) >= target:
         return out
     with bs.lock:
-        metas = [m for m in bs.list() if not m.get("favorite") and _age_days(m, now) * 86400 > 600]
+        metas = [m for m in bs.list() if not protected(m) and _age_days(m, now) * 86400 > 600]
         for m in sorted(metas, key=lambda m: m["created"]):
             if free_bytes(bs.root) >= target:
                 break
