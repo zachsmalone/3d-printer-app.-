@@ -169,3 +169,34 @@ def appearance(bid: str, body: dict, actor: Actor = Depends(get_actor)):
         store.save(meta)
         store.cache.pop(bid, None)
     return {"appearance": out}
+
+
+MAX_SCENE_FACES = 200_000
+
+
+@router.get("/{bid}/scene")
+def scene(bid: str, actor: Actor = Depends(get_actor)):
+    """Per-body geometry for the workspace viewer (base64 float32 positions / uint32 indices) plus the
+    sharp 'feature' edges (segments, for display and edge picking), the appearance and the history."""
+    import base64
+
+    import numpy as np
+    meta = _edit(bid, actor)
+    m = editproj.mesh_at(bid, meta)
+    if len(m.faces) > MAX_SCENE_FACES:
+        raise HTTPException(413, "This model is too detailed for the CAD workspace view; open it in the editor instead.")
+    out = []
+    for i, b in enumerate(cadops.bodies(m)):
+        b = b.copy(); b.merge_vertices()
+        ang = b.face_adjacency_angles
+        e = b.face_adjacency_edges[ang > np.radians(25)]
+        segs = b.vertices[e].reshape(-1, 6)
+        out.append({"index": i, "name": f"Body {i + 1}",
+                    "positions": base64.b64encode(b.vertices.astype("<f4").tobytes()).decode(),
+                    "indices": base64.b64encode(b.faces.astype("<u4").tobytes()).decode(),
+                    "edges": base64.b64encode(segs.astype("<f4").tobytes()).decode(),
+                    "size": np.round(b.extents, 3).tolist(), "center": np.round(b.bounds.mean(axis=0), 3).tolist()})
+    p = editproj.payload(bid)
+    return {"id": bid, "title": meta.get("title"), "bodies": out, "appearance": meta.get("appearance") or {},
+            "ops": p["ops"], "head": p["head"], "can_undo": p["can_undo"], "can_redo": p["can_redo"],
+            "analysis": p["analysis"], "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")}}

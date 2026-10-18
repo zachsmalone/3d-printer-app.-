@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CAD workspace — ZEIM</title>
+<script>try{var t=localStorage.theme;if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/cad.css">
+<script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
+</head>
+<body class="cadws">
+<header class="cw-top">
+  <a class="cw-btn" href="/" aria-label="Back to ZEIM home" title="ZEIM home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></a>
+  <input id="cwTitle" class="cw-title" value="My design" aria-label="Design name" maxlength="60">
+  <span class="cw-mode" id="cwMode" aria-live="polite">Modeling</span>
+  <span class="cw-sp"></span>
+  <button class="cw-btn" id="cwUndo" aria-label="Undo (Ctrl+Z)" title="Undo · Ctrl/⌘+Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+  <button class="cw-btn" id="cwRedo" aria-label="Redo (Ctrl+Shift+Z)" title="Redo · Ctrl/⌘+Shift+Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+  <div class="cw-menu">
+    <button class="cw-btn wide" id="cwExport" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
+    <div class="cw-pop" id="cwExportMenu" role="menu" hidden>
+      <a role="menuitem" id="cwDlStl" href="#">Download STL</a>
+      <a role="menuitem" id="cwDl3mf" href="#">Download 3MF</a>
+      <a role="menuitem" id="cwToSlicer" href="#">Open in Slicer &amp; plate editor</a>
+    </div>
+  </div>
+</header>
+
+<main class="cw-main">
+  <nav class="cw-rail" id="cwRail" aria-label="Tools"></nav>
+  <div class="cw-stage" id="cwStage">
+    <div class="cw-hint" id="cwHint" role="status" aria-live="polite"><b id="cwHintT">Sketch</b><span id="cwHintS">Pick a plane or a flat face, then draw.</span></div>
+    <div class="cw-cubewrap" title="View cube: tap a face to look along it"><div class="cw-cube" id="cwCube" aria-label="View cube"></div></div>
+    <div class="cw-chips">
+      <button class="cw-chip" id="cwGrid" title="Grid size (tap to change)" aria-label="Grid size">10 mm</button>
+      <button class="cw-chip" id="cwSnap" aria-pressed="true" title="Snapping to grid and points">Snap on</button>
+      <button class="cw-chip" id="cwHome" title="Fit view (Home)">Fit</button>
+    </div>
+    <div class="cw-panel" id="cwTool" hidden aria-live="polite"></div>
+    <div class="cw-bl">
+      <button class="cw-pill" id="cwSection" aria-pressed="false" title="Section view · X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18"/><path d="M6 6h12v12H6z" stroke-dasharray="2 2"/></svg><span>Section</span></button>
+      <button class="cw-pill" id="cwMeasure" aria-pressed="false" title="Measure · D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span>Measure</span></button>
+      <button class="cw-pill" id="cwSearch" title="Search tools · Ctrl/⌘+F"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/></svg><span>Search</span></button>
+      <button class="cw-pill" id="cwDesel" title="Deselect all · Esc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>Deselect</span></button>
+    </div>
+    <div class="cw-section" id="cwSectionBar" hidden>
+      <label>Cut along <select id="cwSecAxis"><option value="z">Z</option><option value="y">Y</option><option value="x">X</option></select></label>
+      <input type="range" id="cwSecPos" min="0" max="1000" value="500" aria-label="Section position">
+      <span id="cwSecVal">0 mm</span>
+    </div>
+    <div id="cwLabels" class="cw-labels"></div>
+    <div class="cw-busy" id="cwBusy" hidden><div class="spin"></div><span>Working…</span></div>
+    <div class="cw-empty" id="cwEmpty"><b>Start with a sketch</b><span>Tap <em>Sketch</em> (K), choose a plane, draw a closed shape, then Extrude it.</span></div>
+  </div>
+  <aside class="cw-side" id="cwSide" aria-label="History and items">
+    <div class="cw-tabs" role="tablist">
+      <button role="tab" id="tabHist" aria-selected="true" aria-controls="cwHist">History</button>
+      <button role="tab" id="tabItems" aria-selected="false" aria-controls="cwItems">Items</button>
+    </div>
+    <ol class="cw-hist" id="cwHist" role="tabpanel" aria-labelledby="tabHist"></ol>
+    <div class="cw-items" id="cwItems" role="tabpanel" aria-labelledby="tabItems" hidden></div>
+    <p class="cw-msg" id="cwMsg" role="alert"></p>
+  </aside>
+</main>
+
+<dialog class="cw-search" id="cwSearchDlg" aria-label="Search tools">
+  <input id="cwSearchIn" placeholder="Search tools…" aria-label="Search tools">
+  <ul id="cwSearchList" role="listbox"></ul>
+</dialog>
+<script type="module" src="/static/cad.js"></script>
+</body>
+</html>

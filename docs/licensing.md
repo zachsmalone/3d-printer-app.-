@@ -18,3 +18,19 @@ TODO: register a DMCA designated agent with the US Copyright Office (small fee; 
 
 ## Legal pages
 Decision 2026-10-12 (Zach): ZEIM launches with no lawyers. Terms, Privacy and Rules are plain-words pages based on common free templates. Keep every statement true (18+ only, free, no payments, photo moderation, users can delete their own stuff) and do not add compliance claims.
+
+## CAD workspace (2026-10-18)
+The CAD workspace (`static/cad.html`, `static/cad.js`, `static/cad.css`, `app/core/sketch.py`, `app/core/cadops.py`, `app/api/cad.py`) is original ZEIM code.
+
+- **Inspiration only.** Its layout ideas (tool rail with shortcuts, editable History, Items with visibility, view cube, section view, measure, sketch tools and constraints) come from watching how desktop/tablet CAD apps such as Shapr3D behave publicly (screenshots, public docs, videos). No Shapr3D code, icons, images, wording or styling were copied. Icons are ZEIM's own inline SVG; colours come from the ZEIM theme.
+- **Solver is first-principles.** The sketch constraint solver is plain nonlinear least squares over residual functions written for ZEIM. Per ROADMAP.md, nobody working on it read or re-expressed ZEIMCad (GPL) or SolveSpace (GPL) code.
+- **Libraries used (all permissive, already in requirements/static):**
+  | Library | Licence | Used for |
+  |---|---|---|
+  | manifold3d | Apache-2.0 | extrude, revolve, booleans, Minkowski (fillet/chamfer), patterns |
+  | shapely | BSD-3-Clause | sketch profile regions, offset, trim intersections |
+  | scipy | BSD-3-Clause | `least_squares` for the constraint solver |
+  | numpy | BSD-3-Clause | maths |
+  | trimesh | MIT | mesh handling, body splitting |
+  | three.js (+ OrbitControls) | MIT | 3D view in the browser |
+  No new dependency was added.

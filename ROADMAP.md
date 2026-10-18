@@ -38,6 +38,7 @@ ZEIM aims to be four things in one place, each built as **original code** (commo
 CAD sketch/constraint features are written by ZEIM from first principles in Python. Nobody working on them reads ZEIMCad's Rust or SolveSpace code. ZEIMCad stays a separate GPL project. Only claims that are true go in the app: say what is done and what is not.
 
 ## CAD-lite (long term)
+**Status 2026-10-18 (branch `cad-workspace`):** first CAD workspace built: sketch + original least-squares constraint solver, extrude/revolve/boolean/approximate fillet-chamfer/shell/face offset/move/scale/pattern/align/mirror as editable history steps, History/Items panels, view cube, section, measure. Done / not done list: docs/specs/cad-workspace.md.
 **Decision 2026-10-17:** ZEIMCad (SolveSpace-derived Rust port) is a separate GPL-3 project on its own branch (`PerplexCopilot`); it is not part of the private ZEIM app code. Boundary: ZEIM's own Python (feature detector, feature tree, replay engine) stays original and must never re-express ZEIMCad/SolveSpace code; ideas yes, code no. If ZEIM ever needs its constraint solver, it runs as a separate tool or service (like the PrusaSlicer CLI). Its `.exe` is a build artifact (CI should build it and run `--self-check`); the next milestone for the port is a C++ reference harness on the pinned SolveSpace revision.
 Parametric primitives + booleans, text/emboss, sketch-extrude, snap/measure, import-and-edit of Showcase remixes, all in the browser.
 
