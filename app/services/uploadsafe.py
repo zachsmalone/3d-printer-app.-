@@ -270,8 +270,11 @@ def _count_3mf_model(root) -> dict:
                 t = sum(1 for x in c.iter() if tag(x) == "triangle")
                 objects[e.attrib["id"]] = {"mesh": (v, t)}
             elif tag(c) == "components":
+                # 3MF production extension: a component with p:path lives in ANOTHER model part
+                # of the archive (Bambu/Orca). It is counted by the mesh loader's face cap, not here.
                 objects[e.attrib["id"]] = {"components": [x.attrib.get("objectid")
-                                                            for x in c if tag(x) == "component"]}
+                                                            for x in c if tag(x) == "component"
+                                                            and not any(k.endswith("}path") for k in x.attrib)]}
     memo: dict[str, tuple[int, int]] = {}
 
     def resolve(oid: str, depth: int = 0) -> tuple[int, int]:  # (vertices, triangles) of one object
