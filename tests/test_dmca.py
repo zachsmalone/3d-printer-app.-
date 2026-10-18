@@ -38,7 +38,7 @@ def _clean():
 
 def test_legal_routes_serve_the_pages():
     for path, needle in (("/legal/terms", "dmca"), ("/legal/privacy", "privacy"),
-                         ("/legal/community-guidelines", "rules"), ("/legal/dmca", "dmca")):
+                         ("/legal/community-guidelines", "rules"), ("/legal/takedown", "dmca")):
         r = client().get(path)
         assert r.status_code == 200 and needle in r.text.lower(), (path, needle)
 
@@ -56,14 +56,14 @@ def test_dmca_notice_intake_requires_the_formal_elements():
     notice = dict(NOTICE, item_ref=it["id"])
     for missing in ("reporter_name", "reporter_contact", "original_work", "item_ref"):
         bad = {k: v for k, v in notice.items() if k != missing}
-        assert client().post("/api/report/dmca", json=bad).status_code == 422
+        assert client().post("/api/report/takedown", json=bad).status_code == 422
     bad = dict(notice); bad["good_faith"] = False
-    assert client().post("/api/report/dmca", json=bad).status_code == 422
+    assert client().post("/api/report/takedown", json=bad).status_code == 422
 
 
 def test_dmca_notice_lands_in_the_admin_queue_with_metadata():
     a = U("DmcaB"); it = publish(a)
-    r = client().post("/api/report/dmca", json=dict(NOTICE, item_ref=f"https://zeim.test/showcase/{it['id']}"))
+    r = client().post("/api/report/takedown", json=dict(NOTICE, item_ref=f"https://zeim.test/showcase/{it['id']}"))
     assert r.status_code == 200, r.text
     rep = r.json()
     assert rep["status"] == "open"
@@ -79,7 +79,7 @@ def test_three_actioned_dmca_reports_flag_a_repeat_infringer_without_suspending(
     uid = next(u["id"] for u in USERS.read().values() if u.get("display_name") == "DmcaC")
     ids = [publish(owner, f"P{i}")["id"] for i in range(3)]
     for iid in ids:
-        client().post("/api/report/dmca", json=dict(NOTICE, item_ref=iid))
+        client().post("/api/report/takedown", json=dict(NOTICE, item_ref=iid))
     q = client().get("/api/moderation/queue", headers=ADMIN).json()["reports"]
     for row in [x for x in q if x["item_id"] in ids]:
         client().post(f"/api/moderation/{row['id']}/resolve", json={"action": "remove"}, headers=ADMIN)
@@ -91,7 +91,7 @@ def test_three_actioned_dmca_reports_flag_a_repeat_infringer_without_suspending(
     uid2 = next(u["id"] for u in USERS.read().values() if u.get("display_name") == "DmcaD")
     ids2 = [publish(owner2, f"Q{i}")["id"] for i in range(2)]
     for iid in ids2:
-        client().post("/api/report/dmca", json=dict(NOTICE, item_ref=iid))
+        client().post("/api/report/takedown", json=dict(NOTICE, item_ref=iid))
     q = client().get("/api/moderation/queue", headers=ADMIN).json()["reports"]
     for row in [x for x in q if x["item_id"] in ids2]:
         client().post(f"/api/moderation/{row['id']}/resolve", json={"action": "remove"}, headers=ADMIN)

@@ -91,6 +91,10 @@ def _sniff_image(data: bytes) -> tuple[str, int, int] | None:
             raise Rejected("image_bad_header")
         w, h = struct.unpack(">II", data[16:24])
         return "png", w, h
+    if data[4:8] == b"ftyp" and data[8:12] in (b"heic", b"heix", b"mif1", b"msf1", b"hevc"):
+        # HEIC/HEIF (iPhone photos): the container gives no cheap dimensions — the decoder
+        # (pillow-heif via imagesafe.sanitize) enforces the pixel cap when it actually decodes.
+        return "heic", 0, 0
     if data[:3] == b"\xff\xd8\xff":                           # JPEG: walk the segments to a SOF
         i = 2
         while i + 9 < len(data):
@@ -345,10 +349,12 @@ def check(data: bytes, *, max_bytes: int = MAX_BYTES, max_pixels: int = MAX_IMAG
         raise Rejected("image_bad_header") if e.reason == "image_bad_header" else e
     if img:
         fmt, w, h = img
-        if w <= 0 or h <= 0:
+        if fmt != "heic" and (w <= 0 or h <= 0):     # heic dims come from the decoder, not the header
             raise Rejected("image_bad_header")
-        if w * h > max_pixels:
+        if fmt != "heic" and w * h > max_pixels:
             raise Rejected("image_too_many_pixels", width=w, height=h)
+        if fmt == "heic":
+            return Checked("image", "heic", len(data))
         return Checked("image", fmt, len(data), image={"width": w, "height": h, "pixels": w * h})
     if data[:4] == b"PK\x03\x04":
         fmt, arch, mesh = _sniff_3mf(data, max_archive_members=max_archive_members,

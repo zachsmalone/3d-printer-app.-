@@ -436,10 +436,10 @@ def user_appeal(item_kind: str, item_id: str, body: dict, actor: Actor = Depends
         raise HTTPException(403, "Only the person the decision was about can appeal it.")
 
 
-@router.post("/report/dmca")
+@router.post("/report/takedown")
 def report_dmca(request: Request, body: dict, actor: Actor = Depends(get_actor)):
     """Formal DMCA takedown notice intake (Task 5). No account needed — rights holders may not be users.
-    The notice must carry the elements from /legal/dmca (name, contact, the original work, the ZEIM
+    The notice must carry the elements from /legal/takedown (name, contact, the original work, the ZEIM
     item, the good-faith + accuracy statements, signature ack). It lands in the admin queue as a
     copyright report with the notice attached (admin-only), and the takedown contact is notified
     (email when SMTP is configured; always logged)."""
@@ -448,7 +448,7 @@ def report_dmca(request: Request, body: dict, actor: Actor = Depends(get_actor))
         if not str(body.get(f) or "").strip():
             raise HTTPException(422, f"A DMCA notice needs: {f}")
     if not (body.get("good_faith") and body.get("accuracy") and body.get("signature")):
-        raise HTTPException(422, "The notice needs the good-faith, accuracy and signature statements (see /legal/dmca).")
+        raise HTTPException(422, "The notice needs the good-faith, accuracy and signature statements (see /legal/takedown).")
     item_ref = str(body["item_ref"]).strip()[:200]
     item_id = item_ref.rsplit("/", 1)[-1].split("?")[0].strip()
     if not item_id.isalnum() or not item_id:

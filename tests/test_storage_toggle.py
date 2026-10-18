@@ -42,3 +42,8 @@ def test_storage_mode_accepts_db(monkeypatch):
     import app.config as config
     importlib.reload(config)
     assert config.STORAGE_MODE == "db"
+    # restore the module for the rest of the session: without this reload the leaked
+    # "db" mode silently changes storage behaviour for every later test file
+    monkeypatch.delenv("ZEIM_STORAGE", raising=False)
+    importlib.reload(config)
+    assert config.STORAGE_MODE == "json"

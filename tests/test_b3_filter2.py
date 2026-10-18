@@ -49,5 +49,5 @@ def test_upload_body_cap_and_report_dialog_links():
     assert r.status_code == 413
     html = open("static/index.html", encoding="utf-8").read()
     dlg = html[html.index('id="dlgReport"'):html.index('id="toasts"')]
-    for href in ("/static/COMMUNITY_GUIDELINES.html", "/static/privacy.html", "/static/terms.html"):
+    for href in ("/legal/community-guidelines", "/legal/privacy", "/legal/terms"):
         assert href in dlg, href

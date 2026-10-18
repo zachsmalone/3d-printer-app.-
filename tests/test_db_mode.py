@@ -67,20 +67,22 @@ def test_doc_update_is_atomic_under_threads(db_mode):
 
 
 def test_json_file_never_written_in_db_mode(db_mode):
-    from app.community.store import PREFS
-    PREFS.write({"a": 1})
-    assert not PREFS.path.exists()          # the DB is the one source of truth
-    row = db.conn().execute("SELECT doc FROM documents WHERE name='prefs'").fetchone()
+    from app.community.store import JsonFile
+    probe = JsonFile("dbmode_probe", {})          # a name no other test uses
+    probe.write({"a": 1})
+    assert not probe.path.exists()               # the DB is the one source of truth
+    row = db.conn().execute("SELECT doc FROM documents WHERE name='dbmode_probe'").fetchone()
     assert row is not None
 
 
 def test_db_failure_raises_no_json_fallback(db_mode, monkeypatch):
-    from app.community.store import USERS
+    from app.community.store import JsonFile
+    probe = JsonFile("dbmode_probe2", {})
     # a broken DATA dir must raise, never silently write JSON
     monkeypatch.setattr(config, "DATA", db_mode / "no" / "such" / "dir\0bad")
     with pytest.raises(Exception):
-        USERS.write({"x": 1})
-    assert not USERS.path.exists()
+        probe.write({"x": 1})
+    assert not probe.path.exists()
 
 
 # --- BuildStore in db mode ---

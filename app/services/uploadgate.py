@@ -26,6 +26,7 @@ from pathlib import Path
 
 from .. import config
 from ..config import DATA
+from ..core.imagesafe import UNREADABLE
 from . import uploadsafe
 
 log = logging.getLogger("zeim.uploads")
@@ -112,10 +113,21 @@ def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Ch
     try:
         checked = uploadsafe.check(data)
     except uploadsafe.Rejected as e:
-        _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"rejected:{e.reason}"})
-        if e.reason == "too_big":
-            raise GateError(413, "That file is too big to upload.")
-        raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
+        if e.reason == "image_too_many_pixels":
+            # the photo flow defers the pixel cap to the decoder: imagesafe (which runs next,
+            # in the same request) enforces its own cap AFTER decoding, so a real bomb still gets
+            # refused — but a fake header claiming giant dims gets the honest "unreadable" message
+            # instead of a wrong "too large" one. Logged, not rejected.
+            _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "deferred:image_too_many_pixels"})
+            checked = uploadsafe.Checked("image", "png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "jpeg", len(data))
+        else:
+            _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"rejected:{e.reason}"})
+            if e.reason == "too_big":
+                raise GateError(413, "That file is too big to upload.")
+            if e.reason in ("unknown_type", "image_bad_header"):
+                # the photo flow's existing friendly contract (imagesafe's message, 400)
+                raise GateError(400, UNREADABLE)
+            raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
     clean, signature = _clamav_clean(data)
     if not clean:
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"malware:{signature}"})

@@ -229,9 +229,9 @@ def legal_guidelines():
     return FileResponse(STATIC / "COMMUNITY_GUIDELINES.html")
 
 
-@app.get("/legal/dmca", include_in_schema=False)
-def legal_dmca():
-    """DMCA section of the terms (with the real contact when configured) — notices also come in via POST /api/report/dmca."""
+@app.get("/legal/takedown", include_in_schema=False)
+def legal_takedown():
+    """DMCA section of the terms (with the real contact when configured) — notices also come in via POST /api/report/takedown."""
     html = (STATIC / "terms.html").read_text()
     contact = (_credits.data().get("takedown", {}) or {}).get("contact") or ""
     if contact:

@@ -45,7 +45,8 @@ def test_gate_passes_valid_image_and_logs_it(fresh_log):
 def test_gate_rejects_garbage_and_logs_it(fresh_log):
     with pytest.raises(uploadgate.GateError) as ei:
         uploadgate.gate(b"not an image or mesh at all", "sid1")
-    assert ei.value.status == 415
+    # the photo flow's friendly contract: same 400 + UNREADABLE message imagesafe always gave
+    assert ei.value.status == 400 and "couldn't open that photo" in str(ei.value.message)
     entry = _lines(fresh_log)[-1]
     assert entry["verdict"] == "rejected:unknown_type"
 
