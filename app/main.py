@@ -1,6 +1,6 @@
 """App factory. Run: uvicorn app.main:app --port 8765"""
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import branding
@@ -207,6 +207,21 @@ def healthz():
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/workbench", include_in_schema=False)
+def workbench_redirect():
+    """Canonical URL for the opt-in Perplexity workbench; the main app is unchanged."""
+    return RedirectResponse("/workbench/", status_code=307)
+
+
+@app.get("/workbench/", include_in_schema=False)
+def workbench():
+    """Independent, browser-local design prototype; no existing APIs are replaced."""
+    return FileResponse(
+        STATIC / "perplexity-workbench" / "index.html",
+        headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"},
+    )
 
 
 # ---------------- legal pages (Phase 1 Task 5: public routes; DMCA contact comes from app/credits.json) ----------------

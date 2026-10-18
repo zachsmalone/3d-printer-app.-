@@ -1,5 +1,12 @@
 # ZEIM
 
+## Perplexity workbench (REA / ArtCraft direction)
+
+The `Perplexity` branch adds an opt-in design workbench at **`/workbench/`** without
+replacing the existing app. See [setup and rebuild instructions](workbench/perplexity/README.md)
+and the [design/provenance notes](docs/design/perplexity/README.md). Advanced CAD and
+print-quality goals are explicitly separated from the working prototype features.
+
 **ZEIM** is an all-in-one 3D-printing maker app and community for adults (**18+ only**): find a design, fix it, slice it, turn a photo into a lithophane, and share what you print, all in one place.
 
 - **Core is free forever:** make, slice, lithophanes, plate editor, community and downloads.

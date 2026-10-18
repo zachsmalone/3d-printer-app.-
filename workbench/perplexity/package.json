@@ -1,0 +1,19 @@
+{
+  "name": "zeim-perplexity-workbench",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Opt-in ZEIM workbench design direction with REA evidence and ArtCraft architecture provenance.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@fontsource/manrope": "5.2.8",
+    "lucide": "1.59.0",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

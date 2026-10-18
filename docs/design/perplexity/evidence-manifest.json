@@ -1,0 +1,291 @@
+{
+  "format": "zeim-rea-artcraft-evidence",
+  "version": 1,
+  "observed_at": "2026-10-18",
+  "base_branch": "zeim",
+  "base_commit": "c5aabcfbb2def4ce28681f6d9bce440025f96e53",
+  "work_branch": "Perplexity",
+  "rea": {
+    "package": "rea-agents",
+    "version": "6.5.0"
+  },
+  "artcraft": {
+    "repository": "https://github.com/storytold/artcraft",
+    "commit": "d4e4ac69bbd93d237eaf5d0260bc6a5ff3a5e373",
+    "provenance": "source-assisted architecture reference; no source/assets copied"
+  },
+  "workbench_bundle_sha256": "d9b30fd295e51081149b3a98b90c6fd071fbae6b1f9d45376e82ec90fa9b8016",
+  "workbench_html_sha256": "46a2731938dc5682de7cf388cac308486100ff696dff1bb9c87ca06a08f85bf2",
+  "original_homepage_sha256": "ae5438977b59826e2ef9ab8b29fa1486c7a6aeed830c463bfb52d9ef84e88b9f",
+  "evidence": [
+    {
+      "label": "tinkercad-home",
+      "evidence_id": "ev_fa1d4b92a74a3ae4a49d8383812947136628985a5a48630dc10d5f516cd3997f",
+      "file_sha256": "a08fb1c8333d5fd989d63b97e0aa59e7a0868d7a82b284b1f74e8a14a6654117",
+      "kind": "observed-public-page",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "tinkercad-gallery",
+      "evidence_id": "ev_71ba90aa6a26d5effa2d1833f0db364de6c024e4967d1dd3d1a0248052638331",
+      "file_sha256": "312b9f08ee24f8fc38b9701801f9151994ccec344690954fa7b3d331e29bf8b4",
+      "kind": "observed-public-page",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "shapr3d-home",
+      "evidence_id": "ev_aa14293467bd6dfd7123d584f8e3a50f1ad8666f000b733af00355fe1af24220",
+      "file_sha256": "94644a6234cf4419d58c3a5e3aeaac63bd64990ef76bd73f79d5f363a93ed07c",
+      "kind": "observed-public-page",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "ugee-home",
+      "evidence_id": "ev_ff02fb261c68f364f1d008e3947f0862ce470c095134f0f1927ec0f73ea449ed",
+      "file_sha256": "2da2c5ec5dd7b46747505497218e2233e7c8cff49335336fb5263e8f223a9c53",
+      "kind": "observed-public-page",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "makerworld-home",
+      "evidence_id": "ev_b3096b59928f7ca7cf0bebba321b40f17ee182b7c91b08f2f2267613acb7c4eb",
+      "file_sha256": "5092007deb28a11cbd85c20eed5a50ae360858d462375ac7aad8526fdc294a68",
+      "kind": "challenge-only",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "printables-home",
+      "evidence_id": "ev_fd6fb2f12a2ba76436256a7db27c027112ac925008b3115e54391a2aeabafa0d",
+      "file_sha256": "c91f89498c6860c1d2f3571e98a172125ea707d790e516c09a79e3ea08d114df",
+      "kind": "challenge-only",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "thingiverse-home",
+      "evidence_id": "ev_faa8035a19c5c751d049c99812b2d8b313f630987f4ec12db957096eba506a5b",
+      "file_sha256": "37dedb0d9287e5ccebc34f3d8b5b43c83c15757c0a74e9b74945d0399211ed43",
+      "kind": "challenge-only",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "myminifactory-home",
+      "evidence_id": "ev_b011b6be57de11173b3319ad03b31254c46ce699ad3a3b85f0835be6d6b11bc9",
+      "file_sha256": "783b02bbd625fc03b4c3c2addaee5df3d81d6a28f3eff32f98204c77c1cdaa4c",
+      "kind": "challenge-only",
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "zeim-integration",
+      "evidence_id": "ev_cbab3a0f2e27e6d729e6bd2fc81e9815e4227e9c434d4c4fd658035ecae8dad8",
+      "file_sha256": "8d2f5a4952d76dbb25bde2140a6f495e4c0cbaa1ba37b3e5bdbd1592e7d22854",
+      "kind": "observed-own-app",
+      "steps": [
+        {
+          "step_id": "scenario_start",
+          "status": "completed"
+        },
+        {
+          "step_id": "ready",
+          "status": "completed"
+        },
+        {
+          "step_id": "appearance",
+          "status": "completed"
+        },
+        {
+          "step_id": "blueprint",
+          "status": "completed"
+        },
+        {
+          "step_id": "dark-on",
+          "status": "completed"
+        },
+        {
+          "step_id": "dark-off",
+          "status": "completed"
+        },
+        {
+          "step_id": "grid-off",
+          "status": "completed"
+        },
+        {
+          "step_id": "left-inspector",
+          "status": "completed"
+        },
+        {
+          "step_id": "studio",
+          "status": "completed"
+        },
+        {
+          "step_id": "wireframe",
+          "status": "completed"
+        },
+        {
+          "step_id": "solid",
+          "status": "completed"
+        },
+        {
+          "step_id": "appearance-again",
+          "status": "completed"
+        },
+        {
+          "step_id": "reset",
+          "status": "completed"
+        },
+        {
+          "step_id": "lithophane",
+          "status": "completed"
+        },
+        {
+          "step_id": "panel-width",
+          "status": "completed"
+        },
+        {
+          "step_id": "invalid-thickness",
+          "status": "completed"
+        },
+        {
+          "step_id": "generation-blocked",
+          "status": "completed"
+        },
+        {
+          "step_id": "valid-thickness",
+          "status": "completed"
+        },
+        {
+          "step_id": "thickness-view",
+          "status": "completed"
+        },
+        {
+          "step_id": "source-view",
+          "status": "completed"
+        },
+        {
+          "step_id": "backlit-view",
+          "status": "completed"
+        }
+      ],
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+        "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+        "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+        "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+        "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+        "Storage values are hashed only after declared-secret redaction.",
+        "Browser host platform and architecture were not observed."
+      ],
+      "raw_evidence_in_repository": false
+    },
+    {
+      "label": "zeim-integration-strict-locator-failed",
+      "evidence_id": "ev_9cff3bc8adb465abd45e243d95637b0a3f507e8526bb513a5c57e872352721e3",
+      "file_sha256": "ef5d0db6888261e7ecbf4bc32774a1f48da386d402e36725cb1cf510c665842f",
+      "kind": "failed-scenario",
+      "steps": [
+        {
+          "step_id": "scenario_start",
+          "status": "completed"
+        },
+        {
+          "step_id": "ready",
+          "status": "failed"
+        },
+        {
+          "step_id": "appearance",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "blueprint",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "dark-on",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "dark-off",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "grid-off",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "left-inspector",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "studio",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "wireframe",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "solid",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "appearance-again",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "reset",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "lithophane",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "panel-width",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "invalid-thickness",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "generation-blocked",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "valid-thickness",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "thickness-view",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "source-view",
+          "status": "cancelled"
+        },
+        {
+          "step_id": "backlit-view",
+          "status": "cancelled"
+        }
+      ],
+      "limitations": [
+        "Artifact identity is unavailable for this observation.",
+        "Event sequence records provider receipt order; simultaneous browser causality is not inferred.",
+        "Network content is retained only when selected; Playwright response-body bytes are API results and are not guaranteed to match wire bytes.",
+        "Request bytes are limited to what Playwright exposes; not_exposed does not establish body absence or multipart file coverage.",
+        "Network content reads settle within 5 seconds each and the observer does not request bodies from unfinished responses.",
+        "Playwright scenario events do not expose request initiator stacks; receipt order does not prove causality.",
+        "Storage values are hashed only after declared-secret redaction.",
+        "Browser host platform and architecture were not observed."
+      ],
+      "raw_evidence_in_repository": false
+    }
+  ],
+  "limits": [
+    "Complete raw REA evidence retained in the original task workspace, not redistributed here.",
+    "No physical print or calibrated optical validation.",
+    "Original competitor challenge captures do not establish competitor app behavior.",
+    "Integration scenario used a disposable, loopback-only ZEIM test instance with no production account data.",
+    "One initial scenario failed at an ambiguous readiness locator; the corrected test-id scenario completed all declared actions."
+  ]
+}

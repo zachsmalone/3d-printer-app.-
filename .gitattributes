@@ -1,0 +1,4 @@
+# Generated bundle contains upstream Three.js GLSL template-string whitespace.
+# Preserve it verbatim; editable sources keep normal whitespace checks.
+static/perplexity-workbench/app.js linguist-generated=true -whitespace
+static/perplexity-workbench/style.css linguist-generated=true

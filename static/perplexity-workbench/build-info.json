@@ -1,0 +1,11 @@
+{
+  "name": "zeim-perplexity-workbench",
+  "version": "0.1.0",
+  "branch": "Perplexity",
+  "dependencies": {
+    "@fontsource/manrope": "5.2.8",
+    "lucide": "1.59.0",
+    "three": "0.186.1"
+  },
+  "scope": "Opt-in prototype, not a replacement for ZEIM CAD or lithophane APIs."
+}
