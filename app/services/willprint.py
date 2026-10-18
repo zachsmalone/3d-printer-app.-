@@ -33,7 +33,7 @@ def thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     from ..core import guard
     try:
         return guard.run(_thin_walls, mesh, min_mm, mem_mb=1200, timeout=60)
-    except guard.Tripped:
+    except (guard.Tripped, guard.Busy):
         return {"ok": None, "skipped": "limit", "thin_fraction": None, "min_mm": min_mm,
                 "note": "Thin-wall check skipped: it needed more memory or time than allowed."}
 

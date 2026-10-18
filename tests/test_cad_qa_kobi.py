@@ -135,3 +135,45 @@ def test_b1_b4_api_paths_end_cleanly():
     r = c.post(f"/api/edit/{j['id']}/op", json={"op": "remesh", "params": {"edge": 0.15}})
     assert r.status_code in (400, 422) and "triangles" in r.text
     assert c.get(f"/api/cad/{j['id']}/scene").status_code == 200
+
+
+def test_cadrt8_guard_respects_tighter_parent_limit():
+    """Under `ulimit -v` the guard must clamp (never raise the limit) and still work or refuse kindly."""
+    import subprocess, sys, textwrap
+    code = textwrap.dedent("""
+        import resource, numpy as np
+        from app.core import guard
+        vm = guard._vm_bytes()
+        resource.setrlimit(resource.RLIMIT_AS, (vm + 700 * 2**20, vm + 700 * 2**20))
+        assert guard.run(abs, -3) == 3                       # works under the inherited limit
+        try:
+            guard.run(np.ones, (400_000_000,)); print("NOTRIP")
+        except guard.Tripped:
+            print("TRIPPED")
+        resource.setrlimit(resource.RLIMIT_AS, (guard._vm_bytes() + 2**20, resource.getrlimit(resource.RLIMIT_AS)[1]))
+        try:
+            guard.run(abs, -1); print("RAN")
+        except guard.Tripped:
+            print("REFUSED")
+    """)
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr[-800:]
+    assert "TRIPPED" in r.stdout and ("REFUSED" in r.stdout or "RAN" in r.stdout)
+
+
+def test_cadrt9_concurrency_cap_and_more_ops_guarded(monkeypatch):
+    for op in ("align", "face_offset", "body_transform", "sculpt_stroke"):
+        assert op in meshedit.HEAVY_OPS
+    for _ in range(guard.MAX_CHILDREN):
+        guard._slots.acquire()
+    monkeypatch.setattr(guard, "WAIT_S", 0.2)
+    try:
+        with pytest.raises(guard.Busy):
+            guard.run(abs, -1)
+        big = trimesh.creation.icosphere(subdivisions=6)
+        with pytest.raises(meshedit.OpError, match="busy"):
+            meshedit.apply(big, "translate", {"dx": 1})
+    finally:
+        for _ in range(guard.MAX_CHILDREN):
+            guard._slots.release()
+    assert guard.run(abs, -1) == 1

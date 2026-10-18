@@ -59,7 +59,7 @@ def run(m: trimesh.Trimesh, bed, process: str = "fdm", min_wall: float | None = 
     from . import guard
     try:
         th = guard.run(thickness.analyze, m, wall, mem_mb=1200, timeout=60)
-    except guard.Tripped:
+    except (guard.Tripped, guard.Busy):
         th = {"min_wall_mm": wall, "ok": False, "reason": "Thickness check skipped: it needed more memory or time than allowed. Simplify first."}
     bedfit = fits_bed(m, tuple(bed))
     issues = []
