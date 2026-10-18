@@ -15,6 +15,6 @@ ZEIM accounts are for **adults 18 and over only**. **Mild NSFW** (artistic nudit
 
 **Reporting:** use *Report* on any project or print photo. Reports of type "minor safety" hide the item instantly pending review. Reports of type "underage user" (the account holder seems to be under 18) go to a moderator, who can suspend the account; suspension is reversible and nothing is deleted.
 
-Copyright complaints follow the copyright (DMCA) process in the Terms (`terms.html#copyright`).
+Copyright complaints follow the copyright (DMCA) process in the Terms (`terms.html#copyright`). Send notices to nightmareopsstudio@gmail.com.
 
-<!-- TODO: register a DMCA designated agent with the US Copyright Office (small fee; needs Zach's OK before paying). -->
+<!-- TODO: register a DMCA designated agent with the US Copyright Office (small fee; needs Zach's OK before paying) and confirm the contact matches the registered agent. -->
