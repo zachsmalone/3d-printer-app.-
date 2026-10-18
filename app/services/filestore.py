@@ -15,6 +15,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import threading
+
+_PENDING_LOCK = threading.Lock()
 from pathlib import Path
 
 from .. import config
@@ -56,16 +60,25 @@ def _pending_path() -> Path:
 
 
 def _load_pending() -> dict:
+    """Pending deletions are SAFETY data: a corrupt file must never read as 'nothing pending'.
+    Raises RuntimeError on corruption — callers either preserve it loudly or (delete_build,
+    where recording the new deletion is mandatory) move it aside for manual recovery."""
     try:
         return json.loads(_pending_path().read_text())
-    except Exception:
+    except FileNotFoundError:
         return {}
+    except Exception as e:
+        raise RuntimeError(f"pending_deletions.json unreadable ({e}) — refusing to treat it as empty")
 
 
 def _save_pending(d: dict) -> None:
+    """Atomic (tmp + rename) so a crash mid-write can never truncate the safety record.
+    Callers hold _PENDING_LOCK (the whole load/modify/save sequence must be serialized)."""
     p = _pending_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(d, indent=1))
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, indent=1))
+    os.replace(tmp, p)
 
 
 def _artifact_names() -> tuple[str, ...]:
@@ -80,29 +93,44 @@ def delete_build(bid: str) -> None:
     if not enabled():
         return
     keys = [artifact_key(bid, n) for n in _artifact_names()]
-    pending = _load_pending()
-    pending[bid] = keys                       # recorded before we try
-    _save_pending(pending)
+    try:
+        pending = _load_pending()
+    except RuntimeError as e:
+        # the safety record is corrupt: preserve it for manual recovery (never overwrite
+        # silently) — the new deletion is still recorded, or the outage would orphan it too
+        log.error("%s; preserved as pending_deletions.corrupt-*.json", e)
+        import time as _time
+        try:
+            _pending_path().rename(_pending_path().with_name(
+                f"pending_deletions.corrupt-{int(_time.time())}.json"))
+        except Exception:
+            pass
+        pending = {}
+    with _PENDING_LOCK:
+        pending[bid] = keys                   # recorded before we try
+        _save_pending(pending)
     retry_pending(bids=[bid])
 
 
 def retry_pending(bids: list[str] | None = None) -> int:
     """Retry recorded deletions (all, or the given builds). Returns how many builds still
-    have pending keys. Called from delete_build and safe to call from cron/startup."""
+    have pending keys. Called from delete_build and safe to call from cron/startup.
+    A corrupt record RAISES (loudly) rather than reading as 'nothing pending'."""
     if not enabled():
         return 0
     pending = _load_pending()
-    for bid in list(pending):
-        if bids is not None and bid not in bids:
-            continue
-        for k in list(pending[bid]):
-            try:
-                objectstore.delete(k)
-                pending[bid].remove(k)
-            except Exception:
-                log.warning("object-storage deletion still pending for %s (will retry)", bid)
-                break
-        if not pending[bid]:
-            del pending[bid]                   # fully deleted remotely: forget it
-    _save_pending(pending)
-    return len(pending)
+    with _PENDING_LOCK:                         # serialize the whole load/modify/save sequence
+        for bid in list(pending):
+            if bids is not None and bid not in bids:
+                continue
+            for k in list(pending[bid]):
+                try:
+                    objectstore.delete(k)
+                    pending[bid].remove(k)
+                except Exception:
+                    log.warning("object-storage deletion still pending for %s (will retry)", bid)
+                    break
+            if not pending[bid]:
+                del pending[bid]               # fully deleted remotely: forget it
+        _save_pending(pending)
+        return len(pending)

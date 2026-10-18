@@ -4,7 +4,7 @@ Rules (all configurable by environment variable, see app/config.py):
   * a build the person STARRED (favorite) is never removed by age or by a low disk. Only the person deleting it, or "Delete my stuff"
     / deleting the account, removes it.
   * a build that was SAVED on purpose (shared to the Showcase or sent to a class) is kept 30 days (PHOTO3D_KEEP_SAVED_DAYS);
-  * any other build is kept 7 days (PHOTO3D_KEEP_UNSAVED_DAYS).
+  * any other build is kept 30 days (PHOTO3D_KEEP_UNSAVED_DAYS).
   * a folder with no build metadata at all (a build that never finished) is removed after one day.
 Cleanup only ever looks at the direct sub-folders of the per-build data folder (OUT). It refuses to run if that folder is, or sits inside,
 library/, static/ or the code. Logs say HOW MANY were removed, never which files or whose.

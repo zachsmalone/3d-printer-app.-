@@ -217,12 +217,14 @@ def test_retention_keeps_14_daily_plus_8_sunday_weeklies_over_a_long_calendar(tm
         B.create_backup(data, tmp_path / "out", bk, now=now)
     B.enforce_retention(bk, now=(start + _dt.timedelta(days=70)).timestamp())
     kept = sorted(p.name for p in bk.glob("zeim-*"))
-    # all Sundays in the calendar that are among the last 8 Sundays survive
+    # EXACT retained set: the newest 14 dailies UNION the last 8 Sundays — nothing else survives
     sundays = [start + _dt.timedelta(days=d) for d in range(70) if (start + _dt.timedelta(days=d)).weekday() == 6]
-    for s in sundays[-8:]:
-        assert any(s.strftime("%Y%m%d") in name for name in kept), s.date()
+    expected = {(start + _dt.timedelta(days=d)).strftime("%Y%m%d") for d in range(56, 70)}   # newest 14
+    expected |= {s.strftime("%Y%m%d") for s in sundays[-8:]}                              # last 8 Sundays
+    actual = {n.split(".")[0].replace("zeim-", "")[:8] for n in kept}
+    assert actual == expected, (sorted(actual - expected), sorted(expected - actual))
     assert len(kept) == len(set(kept))
-    # and the same holds for encrypted archives
+    # and the exact same set holds for encrypted archives
     bk2 = tmp_path / "bk2"
     if shutil.which("age"):
         recipient, _ = _age_keypair(tmp_path)
@@ -231,5 +233,26 @@ def test_retention_keeps_14_daily_plus_8_sunday_weeklies_over_a_long_calendar(tm
             B.create_backup(data, tmp_path / "out", bk2, now=now, encrypt_to=recipient)
         B.enforce_retention(bk2, now=(start + _dt.timedelta(days=70)).timestamp())
         kept2 = sorted(p.name for p in bk2.glob("*.tar.age"))
-        for s in sundays[-8:]:
-            assert any(s.strftime("%Y%m%d") in name for name in kept2), s.date()
+        actual2 = {n.split(".")[0].replace("zeim-", "")[:8] for n in kept2}
+        assert actual2 == expected, (sorted(actual2 - expected), sorted(expected - actual2))
+
+
+def test_age_invocation_failure_leaves_nothing(tmp_path, monkeypatch):
+    """Any failure starting the age encryption (not just a missing binary) must leave NOTHING —
+    no half-written ciphertext, no tmp artifacts, no plaintext fallback."""
+    import subprocess as _sp
+    from scripts import backup as B
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text("{}")
+    recipient, _ = _age_keypair(tmp_path)
+
+    def boom(*a, **k):
+        raise OSError("cannot start process")
+    monkeypatch.setattr(_sp, "Popen", boom)
+    try:
+        B.create_backup(data, tmp_path / "out", tmp_path / "bk", now=1000.0, encrypt_to=recipient)
+        assert False, "should have raised"
+    except (RuntimeError, OSError):
+        pass
+    leftovers = sorted(p.name for p in (tmp_path / "bk").glob("*")) if (tmp_path / "bk").exists() else []
+    assert not leftovers, leftovers                # nothing at all: no ciphertext, no tmp, no plaintext

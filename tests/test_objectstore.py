@@ -276,3 +276,22 @@ def test_provider_outage_cannot_orphan_remote_copies(s3):
     pending = _json.loads((_P(config.DATA) / "pending_deletions.json").read_text())
     assert "bX" not in pending
     assert not [k for k in _FakeS3.objects if "bX" in k]
+
+
+def test_corrupt_pending_deletion_record_is_never_read_as_empty(s3, tmp_path, monkeypatch):
+    """The pending-deletion queue is safety data: a corrupt record must never read as 'nothing
+    pending' — retry raises loudly, delete_build preserves the corrupt copy for manual recovery
+    and still records the new deletion."""
+    from app.services import filestore
+    # seed a corrupt queue
+    filestore._pending_path().write_text("{ this is not json")
+    with pytest.raises(RuntimeError):
+        filestore.retry_pending()
+    # a new delete still records durably (never refused by the corrupt file) — and with the
+    # provider up it completes, leaving a clean empty queue (not the corrupt garbage)
+    filestore.delete_build("bid-corrupt-1")
+    p = filestore._pending_path()
+    assert json.loads(p.read_text()) == {}
+    # and the corrupt original was preserved for manual recovery, not overwritten silently
+    leftovers = list(p.parent.glob("pending_deletions.corrupt-*.json"))
+    assert leftovers and b"this is not json" in leftovers[0].read_bytes()

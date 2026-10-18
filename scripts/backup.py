@@ -55,11 +55,23 @@ def _age_encrypt_dir(staging: Path, final_dir: Path, recipient: str) -> Path:
     cmd = ["tar", "-cf", "-", "-C", str(staging.parent), staging.name]
     enc = ["age", "-e", "-r", recipient]
     with open(tmp_archive, "wb") as out:
-        tar_p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        age_p = subprocess.Popen(enc, stdin=tar_p.stdout, stdout=out, stderr=subprocess.PIPE)
-        tar_p.stdout.close()
-        _, err = age_p.communicate()
-        tar_p.wait()
+        try:
+            tar_p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            age_p = subprocess.Popen(enc, stdin=tar_p.stdout, stdout=out, stderr=subprocess.PIPE)
+            tar_p.stdout.close()
+            _, err = age_p.communicate()
+            tar_p.wait()
+        except Exception:
+            # any failure in the age invocation leaves NOTHING — no half-written ciphertext
+            for p in ("age", "tar"):
+                try:
+                    local_p = locals().get(f"{p}_p")
+                    if local_p is not None:
+                        local_p.kill()
+                except Exception:
+                    pass
+            tmp_archive.unlink(missing_ok=True)
+            raise
     if age_p.returncode != 0 or tar_p.returncode != 0 or not tmp_archive.exists() or tmp_archive.stat().st_size == 0:
         tmp_archive.unlink(missing_ok=True)
         raise RuntimeError(f"age encryption failed: {err.decode(errors='replace')[:400]}")

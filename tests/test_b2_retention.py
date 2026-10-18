@@ -1,6 +1,7 @@
 """Build-file retention, favorites, the 20-build cap and the disk guard (Kenji's cleanup rules + Yami's approval).
-Rules under test: starred builds are NEVER removed by age, by the cap, or by a low disk (only by their owner / 'Delete my stuff');
-ordinary builds go after 7 days, builds shared or sent to a class after 30; cleanup only ever looks inside the per-build folder."""
+Rules under test: starred OR saved builds are NEVER removed by age, by the cap, or by a low disk
+(only by their owner); ordinary builds go after 30 days (KEEP_UNSAVED_DAYS); cleanup only ever
+looks inside the per-build folder. The expiry boundary is tested with fixed integer timestamps."""
 import json, logging, os, shutil, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -180,3 +181,20 @@ def _png_bytes():
     b = io.BytesIO()
     Image.new("RGB", (50, 40), (1, 2, 3)).save(b, "PNG")
     return b.getvalue()
+
+
+def test_thirty_day_expiry_boundary_is_exact():
+    """Fixed integer timestamps, no clock dependence: an ordinary build is kept at age 30d-1s
+    and at exactly 30d, and expires at 30d+1s."""
+    c = client(ADULT)
+    bid = photo_build(c)
+    created = 1_000_000_000                            # fixed epoch
+    m = store.get(bid)
+    m["created"] = datetime.fromtimestamp(created, timezone.utc).isoformat()
+    store.save(m)
+    day = 86400
+    assert retention.purge_expired(store, now=created + 29 * day)["expired"] == 0
+    assert retention.purge_expired(store, now=created + 30 * day)["expired"] == 0    # exactly 30d: kept
+    assert _exists(bid)
+    out = retention.purge_expired(store, now=created + 30 * day + 1)
+    assert out["expired"] == 1 and not _exists(bid)                                  # 30d+1s: gone
