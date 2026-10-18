@@ -55,6 +55,26 @@ def test_try_mount_skips_without_crash_when_secrets_missing(monkeypatch, caplog)
     assert not any(isinstance(p, str) and p.startswith("/api/auth") for p in paths)
 
 
+def test_try_mount_crashes_in_explicit_production(monkeypatch):
+    """ZEIM_ENV=production (or PHOTO3D_PUBLIC_LAUNCH=1) with a broken auth config must NOT silently
+    fall back to the legacy cookie login — the process refuses to start (fail closed)."""
+    import app.config as config
+    monkeypatch.setattr(config, "HOST", "0.0.0.0")
+    for k in ("ZEIM_RP_ID", "ZEIM_ORIGINS", "ZEIM_AUTH_PEPPER"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.delenv("PHOTO3D_PUBLIC_LAUNCH", raising=False)
+    app = FastAPI()
+    monkeypatch.setenv("ZEIM_ENV", "production")
+    with pytest.raises(ConfigError):
+        try_mount_auth(app)
+    # same when the public-launch flag is set instead of ZEIM_ENV
+    monkeypatch.delenv("ZEIM_ENV", raising=False)
+    monkeypatch.setenv("PHOTO3D_PUBLIC_LAUNCH", "1")
+    app2 = FastAPI()
+    with pytest.raises(ConfigError):
+        try_mount_auth(app2)
+
+
 def test_try_mount_on_loopback_uses_dev_defaults(monkeypatch, tmp_path):
     import app.config as config
     monkeypatch.setattr(config, "HOST", "127.0.0.1")

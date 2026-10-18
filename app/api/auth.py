@@ -356,6 +356,9 @@ def try_mount_auth(app: FastAPI) -> bool:
     * Otherwise needs strong ZEIM_RP_ID / ZEIM_ORIGINS / ZEIM_AUTH_PEPPER (AuthConfig refuses weak ones).
     * If those are missing outside that local case: log a clear warning and leave the old cookie
       login running (do not crash the app). Email codes stay off without SMTP (mailer_from_env).
+    * FAIL-CLOSED EXCEPTION: when ZEIM_ENV=production is set explicitly, or PHOTO3D_PUBLIC_LAUNCH=1,
+      a bad auth config is a launch blocker, not a warning — the ConfigError is re-raised so the
+      process refuses to start instead of silently downgrading to the legacy cookie login.
     Returns True when the /api/auth routes are live.
     """
     import logging
@@ -382,6 +385,12 @@ def try_mount_auth(app: FastAPI) -> bool:
         app.state.auth_mounted = False
         app.state.auth_service = None
         app.state.legacy_resolver = None
+        prod = (os.environ.get("ZEIM_ENV") or "").strip().lower() == "production" \
+            or os.environ.get("PHOTO3D_PUBLIC_LAUNCH") == "1"
+        if prod:
+            log.critical("Refusing to start: ZEIM_ENV=production / PHOTO3D_PUBLIC_LAUNCH=1 with a broken "
+                         "auth config would silently downgrade to the legacy cookie login. Fix the config: %s", e)
+            raise
         log.warning("passkey/email login is OFF — old cookie login still works. "
                     "Set ZEIM_RP_ID, ZEIM_ORIGINS (https) and ZEIM_AUTH_PEPPER (32+ chars), "
                     "or run with ZEIM_ENV=dev / listen on localhost. Detail: %s", e)
