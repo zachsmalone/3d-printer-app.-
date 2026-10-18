@@ -389,7 +389,9 @@ def report(iid: str, request: Request, body: dict, actor: Actor = Depends(get_ac
     try:
         i = catalog.get(iid, actor)
         owner = USERS.read().get(i.get("owner_sid") or "") or {}
-        return moderation.report(iid, actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"), owner.get("id"))
+        return moderation.report(iid, actor.sid, str(body.get("reason", ""))[:40], text_in(body.get("details"), 1000, "Details"), owner.get("id"),
+                                 ip=request.client.host if request.client else "",
+                                 user_agent=request.headers.get("user-agent", ""))
     except catalog.Denied as e:
         raise D(e)
     except ValueError as e:
@@ -404,9 +406,30 @@ def report_user(uid: str, request: Request, body: dict, actor: Actor = Depends(g
     if not u or not privacy.can_view_profile(actor, uid):
         raise HTTPException(404, "unknown user")
     try:
-        return moderation.report("user:" + uid, actor.sid, str(body.get("reason", "underage_user"))[:40], text_in(body.get("details"), 1000, "Details"), uid)
+        return moderation.report("user:" + uid, actor.sid, str(body.get("reason", "underage_user"))[:40], text_in(body.get("details"), 1000, "Details"), uid,
+                                ip=request.client.host if request.client else "",
+                                user_agent=request.headers.get("user-agent", ""))
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/moderation/appeal/{item_kind}/{item_id}")
+def user_appeal(item_kind: str, item_id: str, body: dict, actor: Actor = Depends(get_actor)):
+    """The person a decision was about asks for a second look (Task 6 appeals flow).
+    item_kind: 'showcase' or 'user'. Only the affected account can appeal; the report re-enters
+    the moderation queue as "appealed" for a moderator to re-decide."""
+    guards.showcase_gate(actor)
+    if item_kind not in ("showcase", "user") or not item_id.replace(":", "").replace("-", "").isalnum():
+        raise HTTPException(400, "unknown appeal target")
+    try:
+        return moderation.appeal_for_item(("user:" if item_kind == "user" else "") + item_id,
+                                         actor.sid, text_in(body.get("text", ""), 1000, "Appeal"))
+    except KeyError:
+        raise HTTPException(404, "no decided report about this yet")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except PermissionError:
+        raise HTTPException(403, "Only the person the decision was about can appeal it.")
 
 
 # ---------------- personalization (view / disable / clear) ----------------
@@ -585,6 +608,38 @@ def mod_queue(request: Request, x_admin_token: str = Header("")):
     q = sorted(moderation.queue(), key=lambda r: r["created"])
     return {"reports": [{k: v for k, v in r.items() if k != "reporter"} | {"preview": _preview(r["item_id"])} for r in q],
             "oldest_open_age_s": moderation.oldest_open_age_s(), "pending_prints": _pending_prints()}
+
+
+@router.get("/moderation/audit")
+def mod_audit(request: Request, x_admin_token: str = Header("")):
+    """Persistent moderation audit trail (newest first): every report, decision, appeal, preservation
+    and escalation, with timestamps. Admin only."""
+    _admin(x_admin_token, request)
+    return {"entries": moderation.audit_trail()}
+
+
+@router.post("/moderation/report/{report_id}/preserve")
+def mod_preserve(report_id: str, request: Request, x_admin_token: str = Header("")):
+    """Securely preserve the reported content + context for possible law-enforcement reporting
+    (files land in DATA/preservation/<report_id>/, mode 700, never served). Admin only."""
+    _admin(x_admin_token, request)
+    try:
+        return moderation.preserve(report_id)
+    except KeyError:
+        raise HTTPException(404, "unknown report")
+
+
+@router.post("/moderation/report/{report_id}/escalate-ncmec")
+def mod_escalate(report_id: str, request: Request, body: dict | None = None, x_admin_token: str = Header("")):
+    """Mark a report as escalated for NCMEC CyberTipline reporting (requires preservation first).
+    This NEVER auto-submits: a human files the report per docs/legal/ncmec-procedure.md. Admin only."""
+    _admin(x_admin_token, request)
+    try:
+        return moderation.escalate_ncmec(report_id, (body or {}).get("note", ""))
+    except KeyError:
+        raise HTTPException(404, "unknown report")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 def _pending_prints():
