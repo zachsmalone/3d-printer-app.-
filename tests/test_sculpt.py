@@ -344,6 +344,7 @@ def test_a_folding_stroke_through_the_history_path_changes_nothing():
         "brush": "flatten", "center": [0, 0, 20], "radius": 0.5, "strength": 1.0,
         "iterations": 1, "plane": {"point": [22, 0, 20], "normal": [1, 0, 0]}}})
     assert mv.status_code in (400, 422), mv.text                # refused by the service
+    assert "folded" in (mv.json().get("detail") or "")         # ...by the fold check specifically
     ops_after = c.get(f"/api/edit/{bid}").json()["ops"]
     assert ops_after == ops_before                              # history untouched
     stl_after = c.get(f"/api/download/{bid}/stl", follow_redirects=True).content
@@ -371,8 +372,11 @@ def test_editing_a_flatten_step_keeps_its_stored_plane():
     steps2 = c.get(f"/api/edit/{bid}").json()["ops"]
     assert steps2[1]["params"]["plane"] == stored_plane        # NOT re-derived
     # and an EARLIER step change (bigger sphere) must not move the stored plane either
-    c.put(f"/api/parts/{bid}/recipe", json={"recipe": {"parts": [
+    pr = c.put(f"/api/parts/{bid}/recipe", json={"recipe": {"parts": [
         {"kind": "sphere", "dims": {"diameter": 44}, "position": [0, 0, 0], "role": "solid"}]}})
+    assert pr.status_code == 200, pr.text                      # a rejected rewrite would
+    rec = c.get(f"/api/parts/{bid}/recipe").json()["recipe"]  # falsely "pass" this test
+    assert rec["parts"][0]["dims"]["diameter"] == 44           # the recipe REALLY changed
     steps3 = c.get(f"/api/edit/{bid}").json()["ops"]
     assert steps3[1]["params"]["plane"] == stored_plane        # replay reuses it
 
@@ -399,3 +403,34 @@ def test_zero_strength_flatten_needs_no_derivable_plane():
     out, rep = sculpt.op_sculpt(m, {"brush": "flatten", "center": [0.2, 0.2, 0.25],
                                     "radius": 2, "strength": 0.0, "iterations": 3})
     assert np.array_equal(out.vertices, m.vertices)
+
+
+def test_zero_to_positive_strength_edit_persists_the_derived_plane():
+    """The reviewer's save-path case: a zero-strength flatten saves NO plane (nothing
+    to move). Editing that step to positive strength without supplying one must DERIVE
+    the plane and PERSIST it with the step — and a later earlier-step change must not
+    move that resolved plane."""
+    from app.services import editproj
+    c = client()
+    r = c.post("/api/parts/new", json={"recipe": {"parts": [
+        {"kind": "sphere", "dims": {"diameter": 40}, "position": [0, 0, 0], "role": "solid"}]}})
+    bid = r.json()["id"]
+    mv = c.post(f"/api/edit/{bid}/op", json={"op": "sculpt", "params": {
+        "brush": "flatten", "center": [0, 0, 20], "radius": 6, "strength": 0.0, "iterations": 1}})
+    assert mv.status_code == 200, mv.text
+    steps = c.get(f"/api/edit/{bid}").json()["ops"]
+    assert "plane" not in steps[1]["params"]                   # zero-strength: no plane
+    # edit to positive strength WITHOUT a plane: derived AND persisted
+    editproj.edit_step(bid, 2, {"brush": "flatten", "center": [0, 0, 20], "radius": 6,
+                                "strength": 0.5, "iterations": 1})
+    steps2 = c.get(f"/api/edit/{bid}").json()["ops"]
+    assert "plane" in steps2[1]["params"]                     # persisted, not discarded
+    resolved = steps2[1]["params"]["plane"]
+    # a later earlier-step change must not move that resolved plane
+    pr = c.put(f"/api/parts/{bid}/recipe", json={"recipe": {"parts": [
+        {"kind": "sphere", "dims": {"diameter": 46}, "position": [0, 0, 0], "role": "solid"}]}})
+    assert pr.status_code == 200, pr.text
+    rec = c.get(f"/api/parts/{bid}/recipe").json()["recipe"]
+    assert rec["parts"][0]["dims"]["diameter"] == 46
+    steps3 = c.get(f"/api/edit/{bid}").json()["ops"]
+    assert steps3[1]["params"]["plane"] == resolved           # replay reuses it

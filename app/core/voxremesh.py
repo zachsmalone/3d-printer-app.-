@@ -109,5 +109,6 @@ def op_voxremesh(m: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
            # the destructive limit is disclosed on EVERY successful remesh, unconditionally —
            # never only when the volume drift happens to be large enough to notice.
            "message": f"Voxel remesh at {pitch:.2f} mm ({len(out.faces)} triangles, watertight). "
-                      f"Sealed internal cavities can be filled; through-holes survive.{note}"}
+                      f"Sealed internal cavities can be filled; through-holes may survive. "
+                      f"Features below the voxel pitch can disappear.{note}"}
     return _check(out), rep

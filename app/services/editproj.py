@@ -302,7 +302,13 @@ def edit_step(bid: str, i: int, params: dict) -> dict:
     stored = o.get("params") or {}
     if o["op"] == "sculpt" and "plane" in stored and "plane" not in params:
         params = {**params, "plane": stored["plane"]}
-    _apply(meta, mesh_at(bid, meta, head=i - 1), {"op": o["op"], "params": params})      # validate this step alone first (clear error)
+    _, rep = _apply(meta, mesh_at(bid, meta, head=i - 1), {"op": o["op"], "params": params})   # validate this step alone first (clear error)
+    # merge any once-resolved values the op asks to persist (sculpt's derived flatten
+    # plane) — same pattern as add_op, so the SAVED step carries them and replays
+    # reuse them instead of re-deriving (e.g. zero-strength -> positive-strength edit).
+    persist = rep.pop("_persist", None) if isinstance(rep, dict) else None
+    if persist:
+        params = {**params, **persist}
     return _rewrite(bid, i, {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)})
 
 
