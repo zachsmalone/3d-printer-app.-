@@ -12,6 +12,8 @@ server.pid
 .env
 .env.*
 !.env.example
+!.env.staging.example
+!.env.production.example
 *.key
 *.pem
 # user data / generated output
