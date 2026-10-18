@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parts builder — ZEIM</title>
+<script>try{var t=localStorage.theme;if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
+<script src="/static/theme.js" defer></script>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 14px}
+  .cols{display:grid;grid-template-columns:minmax(340px,430px) 1fr;gap:16px;align-items:start}
+  @media (max-width:900px){.cols{grid-template-columns:1fr}}
+  .viewer{background:var(--panel);border:1px solid var(--ctl);border-radius:12px;min-height:520px;position:relative;overflow:hidden}
+  .part{background:var(--panel2);border:1px solid var(--ctl);border-radius:10px;padding:10px;margin-bottom:10px}
+  .part.on{border-color:var(--accink);box-shadow:0 0 0 1px var(--accink) inset}
+  .prow{display:flex;gap:6px;align-items:center}
+  .prow input[type=number]{padding:5px 7px}
+  .dim3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .dim2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .mini{font-size:11px;color:var(--mut)}
+  .roleHole{color:#e6690f}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <a class="btn small" href="/">← ZEIM</a>
+    <h1 style="font-size:22px;margin:0">Parts builder</h1>
+    <span class="help">Build from primitives — the recipe stays editable for later</span>
+  </header>
+
+  <div class="cols">
+    <section aria-label="Recipe">
+      <div class="field"><label>Title</label><input id="title" type="text" value="My parts build" maxlength="60"></div>
+
+      <div class="sticky" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="mini" style="width:100%">Add a primitive:</span>
+        <button class="btn small" data-add="box">▭ Box</button>
+        <button class="btn small" data-add="cylinder">◯ Cylinder</button>
+        <button class="btn small" data-add="sphere">● Sphere</button>
+        <button class="btn small" data-add="cone">▲ Cone</button>
+        <button class="btn small" data-add="tube">◎ Tube</button>
+        <button class="btn small" data-add="torus">◎ Torus</button>
+      </div>
+
+      <div id="parts"></div>
+      <p class="help" id="partsHelp" hidden></p>
+
+      <button class="btn primary big" id="btnCreate">✨ Build my model</button>
+      <button class="btn big" id="btnUpdate" hidden>Update the model</button>
+      <p class="help" id="status">Combine primitives: solids add, holes cut. Every part is editable later — change any number and press update.</p>
+      <p class="help" id="handoff" hidden></p>
+    </section>
+
+    <section aria-label="Preview">
+      <div class="viewer" id="viewer"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <button class="btn small ghost" id="vReset">⟲ Reset view</button>
+        <button class="btn small ghost" id="vWire">▦ Wireframe</button>
+        <span class="help" id="stats"></span>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="/static/boot.js"></script>
+<script type="module" src="/static/builder.js"></script>
+</body>
+</html>

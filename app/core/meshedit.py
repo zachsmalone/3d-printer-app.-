@@ -850,9 +850,14 @@ def op_plate(m, p):
         raise OpError(str(e))
 
 
+from . import parts        # the parts builder op (bottom of this table): recipe -> mesh
+from . import voxremesh    # the voxel-remesh op: one-click watertight rebuild
+
 OPS = {"plate": op_plate, "lay_flat": op_lay_flat, "best_orient": op_best_orient, "smart_split": op_smart_split, "translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
        "repair": op_repair, "simplify": op_simplify, "cut": op_cut, "hollow": op_hollow, "base": op_base,
-       "boolean": op_boolean, "text": op_text, "on_face": op_on_face}
+       "boolean": op_boolean, "text": op_text, "on_face": op_on_face,
+       "parts": parts.op_parts,        # the parts builder (app/core/parts.py): recipe -> mesh
+       "voxremesh": voxremesh.op_voxremesh}   # voxel remesh (app/core/voxremesh.py): watertight rebuild
 
 
 def label(op: str, p: dict) -> str:
@@ -864,6 +869,8 @@ def label(op: str, p: dict) -> str:
             "scale": lambda: "Scale ×" + ("%g" % g('factor') if p.get('factor') is not None else f"({g('sx', 1):.3g}, {g('sy', 1):.3g}, {g('sz', 1):.3g})"),
             "mirror": lambda: f"Mirror {str(g('axis')).upper()}",
             "place": lambda: "Drop to bed" + (" + centre" if p.get("center_xy") else ""),
+            "parts": lambda: f"Parts ({len((p.get('parts') or []))} primitives)",
+            "voxremesh": lambda: "Voxel remesh (watertight rebuild)",
             "repair": lambda: "Fix / repair",
             "lay_flat": lambda: "Lay flat",
             "best_orient": lambda: "Best position (least overhang)",
