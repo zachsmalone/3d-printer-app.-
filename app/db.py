@@ -48,6 +48,11 @@ CREATE TABLE IF NOT EXISTS builds(
 );
 CREATE INDEX IF NOT EXISTS idx_builds_owner ON builds(owner_sid, created);
 CREATE INDEX IF NOT EXISTS idx_builds_visibility ON builds(visibility);
+CREATE TABLE IF NOT EXISTS upload_events(
+    sid TEXT NOT NULL,
+    ts  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_upload_events_sid ON upload_events(sid, ts);
 """
 
 
@@ -227,3 +232,19 @@ def build_claim_unowned(sid: str) -> int:
         except Exception:
             c.rollback()
             raise
+
+
+# --- per-account upload counter (backs app/services/uploadgate.py; shared by all workers) ---
+
+def upload_events_prune(now: float, window_s: float) -> None:
+    conn().execute("DELETE FROM upload_events WHERE ts < ?", (now - window_s,))
+    conn().commit()
+
+
+def upload_events_count(sid: str, since: float) -> int:
+    return conn().execute("SELECT COUNT(*) FROM upload_events WHERE sid=? AND ts >= ?", (sid, since)).fetchone()[0]
+
+
+def upload_events_add(sid: str, ts: float) -> None:
+    conn().execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, ts))
+    conn().commit()

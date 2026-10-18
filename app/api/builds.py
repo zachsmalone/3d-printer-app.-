@@ -17,7 +17,7 @@ from .textcap import text_in
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS, MAX_UPLOAD, PREVIEW_RES
 from ..core import autotune, exporters, geometry, imagesafe
-from ..services import retention
+from ..services import retention, uploadgate
 from ..services.history import HistoryFull, store
 
 router = APIRouter(prefix="/api")
@@ -237,6 +237,10 @@ def generate(
     sample_title = imagesafe.builtin_title(data)
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
+    try:
+        uploadgate.gate(data, actor.sid, source="generate")
+    except uploadgate.GateError as e:
+        raise HTTPException(e.status, e.message)
     if mode == "trace2d":
         return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest)
     try:

@@ -115,3 +115,12 @@ ADMIN_FAIL_LIMIT = _int("PHOTO3D_ADMIN_FAIL_LIMIT", 10)       # wrong admin toke
 BLOCK_PRIVATE_PRINTERS = _flag("PHOTO3D_BLOCK_PRIVATE_PRINTERS", False)   # hosted deployments: refuse printer URLs on loopback/private networks (SSRF)
 API_DOCS = _flag("PHOTO3D_API_DOCS", False)            # /docs, /redoc, /openapi.json are off unless asked for (they list every route)
 COOKIE_SECURE = (os.environ.get("PHOTO3D_COOKIE_SECURE") or "auto").strip().lower()   # auto = Secure when the request arrived over https
+
+# ---- upload gate (app/services/uploadgate.py) ----
+# Per-account upload limit per hour (0 = off). Enforced at /api/generate; the counter is
+# SQLite-backed in db mode (shared by all workers) and in-process in json mode.
+UPLOADS_PER_HOUR = _int("PHOTO3D_UPLOADS_PER_HOUR", 10)
+# Optional local malware scan of uploads via clamd (INSTREAM). Nothing is ever sent anywhere
+# else; if clamd is unreachable, uploads are allowed and the miss is logged.
+CLAMAV = _flag("PHOTO3D_CLAMAV", False)
+CLAMAV_SOCKET = (os.environ.get("PHOTO3D_CLAMAV_SOCKET") or "/var/run/clamav/clamd.ctl").strip()

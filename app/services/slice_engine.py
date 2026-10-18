@@ -21,6 +21,7 @@ from typing import Optional
 log = logging.getLogger("zeim.slice")
 
 SLICE_TIMEOUT_S = int(os.environ.get("PHOTO3D_SLICE_TIMEOUT", "300"))
+SLICE_MEM_MB = int(os.environ.get("PHOTO3D_SLICE_MEM_MB", "2048"))
 FIT_TOLERANCE_MM = 0.05
 
 
@@ -188,12 +189,22 @@ def find_engine() -> Optional[str]:
     return None
 
 
+def _slice_rlimits():
+    """Cap the slicer process's memory (RLIMIT_AS) so one huge mesh can't OOM the host.
+    Default 2048 MB, env-tunable (PHOTO3D_SLICE_MEM_MB, 0 = off)."""
+    import resource
+    mb = SLICE_MEM_MB
+    if mb <= 0:
+        return
+    resource.setrlimit(resource.RLIMIT_AS, (mb * 1024 * 1024, mb * 1024 * 1024))
+
+
 def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110)) -> None:
     # Argument list, no shell: nothing user-controlled is interpreted.
     # model is an STL or a PrusaSlicer-friendly 3MF (paint-on support enforcers/blockers).
     cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, preexec_fn=_slice_rlimits)
     except subprocess.TimeoutExpired:
         raise SliceError("slice_timeout", "Slicing took too long and was stopped. Try a smaller or "
                          "simpler model.", 504)
