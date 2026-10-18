@@ -443,11 +443,15 @@ OPS = {"sketch_extrude": op_sketch_extrude, "revolve": op_revolve, "body_boolean
        "round_edges": op_round_edges, "face_offset": op_face_offset, "body_transform": op_body_transform,
        "pattern": op_pattern, "align": op_align}
 
+from . import sculptws as _sculptws   # noqa: E402  (workspace sculpt strokes + remesh)
+OPS.update(_sculptws.OPS)
 from . import meshedit as _meshedit   # noqa: E402  (register even when this module is imported first)
 _meshedit.OPS.update(OPS)
 
 
 def label(op: str, p: dict) -> str | None:
+    if op in _sculptws.OPS:
+        return _sculptws.label(op, p)
     g = lambda k, d="": p.get(k, d)
     b = lambda: "" if int(p.get("body", -1) or -1) < 0 else f" · Body {int(p['body']) + 1}"
     try:

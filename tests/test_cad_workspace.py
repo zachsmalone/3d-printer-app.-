@@ -183,3 +183,31 @@ def test_imported_stl_is_editable_with_cad_tools():
     assert [o["op"] for o in p["ops"]] == ["sketch_extrude", "sketch_extrude", "round_edges", "face_offset", "body_transform"] and p["analysis"]["watertight"]
     # the uploaded file is untouched and editing step 1 replays the rest
     assert c.put(f"/api/edit/{bid}/step/1", json={"params": {**boss, "distance": 4}}).status_code == 200
+
+
+def test_sculpt_strokes_and_remesh():
+    from app.core import sculptws
+    m = trimesh.creation.icosphere(subdivisions=4, radius=20)
+    top = [[0, 0, 20]]
+    hi = lambda x: x.vertices[:, 2].max()
+    d, _ = sculptws.op_sculpt_stroke(m, {"brush": "draw", "points": top, "normal": [0, 0, 1], "radius": 6, "strength": 1})
+    assert hi(d) > 20.5
+    cv, _ = sculptws.op_sculpt_stroke(m, {"brush": "carve", "points": top, "normal": [0, 0, 1], "radius": 6, "strength": 1})
+    assert hi(cv) < 19.6
+    g, _ = sculptws.op_sculpt_stroke(m, {"brush": "grab", "points": top, "normal": [0, 0, 1], "radius": 6, "strength": 1, "delta": [0, 0, 5]})
+    assert hi(g) == pytest.approx(25, abs=0.3)
+    fl, _ = sculptws.op_sculpt_stroke(m, {"brush": "flatten", "points": top, "normal": [0, 0, 1], "radius": 8, "strength": 1})
+    assert hi(fl) < 20
+    sy, _ = sculptws.op_sculpt_stroke(m, {"brush": "draw", "points": [[20, 0, 0]], "normal": [1, 0, 0], "radius": 5, "strength": 1, "symmetry_x": True})
+    assert sy.vertices[:, 0].max() > 20.5 and sy.vertices[:, 0].min() < -20.5
+    for b in ("smooth", "inflate", "pinch"):
+        sculptws.op_sculpt_stroke(m, {"brush": b, "points": top, "radius": 5})
+    rm, _ = sculptws.op_remesh(trimesh.creation.box((20, 20, 20)), {"edge": 2})
+    assert len(rm.faces) > 500 and rm.is_watertight
+    with pytest.raises(Exception):
+        sculptws.op_sculpt_stroke(m, {"brush": "melt", "points": top})
+    bid = _new()["id"]                                  # strokes are ordinary history steps
+    assert c.post(f"/api/edit/{bid}/op", json={"op": "remesh", "params": {"edge": 2}}).status_code == 200
+    r = c.post(f"/api/edit/{bid}/op", json={"op": "sculpt_stroke", "params": {"brush": "draw", "points": [[10, 10, 10]], "normal": [0, 0, 1], "radius": 4}})
+    assert r.status_code == 200 and r.json()["ops"][-1]["label"].startswith("Sculpt Draw")
+    assert c.post(f"/api/edit/{bid}/undo").json()["head"] == 2

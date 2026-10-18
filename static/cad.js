@@ -212,6 +212,7 @@ const MODEL_TOOLS = [
   { id: "pattern", key: "P", label: "Pattern", sub: "linear · circular", tip: "Repeat a body in a row or around a centre." },
   { id: "align", key: "A", label: "Align", sub: "to value or body", tip: "Line up a body's side or centre with a value or another body." },
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
+  { id: "sculpt", key: "U", label: "Sculpt", sub: "brushes · remesh", tip: "Shape the mesh with brushes: draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts on the model; two fingers (or drag off the model) orbit." },
   { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
   { id: "visualize", key: "V", label: "Visualize", sub: "colour + finish", tip: "Pick body colours and finishes (display only; prints stay one colour)." },
 ];
@@ -272,6 +273,7 @@ function panel(title, html, onApply, applyLabel = "Apply") {
 }
 const HINTS = {
   repair: ["Fix mesh", "Repair an imported mesh."],
+  sculpt: ["Sculpt", "Drag on the model to sculpt. Two fingers or drag off the model to orbit. Each stroke is a step (undo works)."],
   null: ["Select", "Tap a body to select it, or pick a tool on the left."],
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
   revolve: ["Revolve", "Choose the axis and angle, then Apply."], boolean: ["Boolean", "Choose the target and tool bodies."],
@@ -282,6 +284,8 @@ const HINTS = {
   visualize: ["Visualize", "Pick a colour and finish for each body."],
 };
 function setTool(id) {
+  controls.touches.TWO = id === "sculpt" ? THREE.TOUCH.DOLLY_ROTATE : THREE.TOUCH.DOLLY_PAN;   // sculpt: one finger sculpts, two orbit
+  if (id !== "sculpt") ring.visible = false;
   S.tool = id; renderRail(); $("#cwTool").hidden = true;
   const [t, s] = HINTS[id] || HINTS.null; hint(t, s);
   if (S.measure && id) toggleMeasure(false);
@@ -350,6 +354,20 @@ const TOOL_PANELS = {
     panel("Mirror", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${seg("tAx", [["x", "Across X"], ["y", "Across Y"], ["z", "Across Z"]], "x")}
       ${v3("tPv:Through", [0, 0, 0])}<label class="cw-toggle"><span>Keep the original</span><input type="checkbox" id="tKeep" checked></label>`,
       () => addOp("body_transform", { body: +$("#tBody").value, mirror: segVal("tAx"), pivot: vec("tPv"), copy: $("#tKeep").checked }));
+  },
+  sculpt() {
+    const B = S.brush || (S.brush = { brush: "draw", radius: 5, strength: 0.5, sym: false, edge: 1 });
+    panel("Sculpt", `${seg("tBrush", [["draw", "Draw"], ["carve", "Carve"], ["smooth", "Smooth"], ["inflate", "Inflate"], ["pinch", "Pinch"], ["flatten", "Flatten"], ["grab", "Grab"]], B.brush)}
+      <div class="f"><label for="tRad">Size <b id="tRadV">${B.radius} mm</b></label><input id="tRad" type="range" min="0.5" max="40" step="0.5" value="${B.radius}"></div>
+      <div class="f"><label for="tStr">Strength <b id="tStrV">${Math.round(B.strength * 100)}%</b></label><input id="tStr" type="range" min="0.05" max="1" step="0.05" value="${B.strength}"></div>
+      <label class="cw-toggle"><span>Symmetry X (mirror across X = 0)</span><input type="checkbox" id="tSym" ${B.sym ? "checked" : ""}></label>
+      <div class="f"><label for="tEdge">Detail (remesh edge, mm)</label>${num("tEdge", B.edge)}</div>
+      <p class="help">Low detail? Remesh first so brushes have points to move. Strokes are steps in History: undo with Ctrl/⌘+Z. The brush is a sphere: on thin walls the back moves too.</p>`,
+      () => addOp("remesh", { edge: val("tEdge") }).then(() => setTool("sculpt")), "Remesh for detail");
+    const sync = () => { B.brush = segVal("tBrush"); B.radius = val("tRad"); B.strength = val("tStr"); B.sym = $("#tSym").checked; B.edge = val("tEdge");
+      $("#tRadV").textContent = B.radius + " mm"; $("#tStrV").textContent = Math.round(B.strength * 100) + "%"; };
+    $("#cwTool").querySelectorAll("input").forEach(i => i.oninput = sync); $("#tBrush").addEventListener("change", sync);
+    $("#tCancel").textContent = "Done";
   },
   repair() { panel("Fix mesh", `<p class="help">Repairs holes, flipped and duplicate faces. Imported files that aren't closed solids need this before Boolean, Fillet or Extrude join/cut.</p>`, () => addOp("repair", {})); },
   visualize() {
@@ -907,6 +925,53 @@ function pickRegion(ev) {
   drawPending(); return true;
 }
 
+/* ---------------------------------------------------------------- sculpt strokes (capture phase: before the orbit controls) */
+let stroke = null; const pointers = new Set();
+const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffb26b, depthTest: false, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
+ring.visible = false; scene.add(ring);
+function previewDab(c, n, k) {   // approximate live feedback (draw/carve/inflate/grab); the server result replaces it on release
+  const B = S.brush, r = B.radius, dir = B.brush === "carve" ? -1 : 1;
+  for (const g of world.children) { const pos = g.children[0].geometry.attributes.position, a = pos.array;
+    for (let i = 0; i < a.length; i += 3) { const dx = a[i] - c.x, dy = a[i + 1] - c.y, dz = a[i + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz; if (d2 >= r * r) continue;
+      const w = (1 - d2 / (r * r)) ** 2 * (B.brush === "grab" ? 1 : B.strength * 0.15 * r * dir);
+      if (B.brush === "grab") { a[i] += k.x * w; a[i + 1] += k.y * w; a[i + 2] += k.z * w; } else { a[i] += n.x * w; a[i + 1] += n.y * w; a[i + 2] += n.z * w; } }
+    pos.needsUpdate = true; g.children[0].geometry.computeVertexNormals(); }
+}
+stage.addEventListener("pointerdown", ev => {
+  pointers.add(ev.pointerId);
+  if (S.tool !== "sculpt" || S.mode !== "model") return;
+  if (pointers.size > 1) { if (stroke) { stroke = null; load(true); } controls.enabled = true; return; }   // two fingers: orbit
+  if (ev.button > 0) return;
+  const h = pickBody(ev); if (!h) return;                                                                // off the model: orbit
+  controls.enabled = false; ev.stopPropagation();
+  stroke = { pts: [h.point.clone()], n: h.normal.clone(), start: h.point.clone(), plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), h.point), last: h.point.clone() };
+  if (!["grab", "smooth", "pinch", "flatten"].includes(S.brush.brush)) previewDab(h.point, h.normal);
+}, true);
+stage.addEventListener("pointermove", ev => {
+  if (S.tool !== "sculpt") { ring.visible = false; return; }
+  const h = stroke && S.brush.brush === "grab" ? null : pickBody(ev);
+  if (h) { ring.visible = true; ring.position.copy(h.point); ring.scale.setScalar(S.brush.radius); ring.lookAt(h.point.clone().add(h.normal)); } else if (!stroke) ring.visible = false;
+  if (!stroke) return;
+  if (S.brush.brush === "grab") {
+    ray.setFromCamera(ndc(ev), camera); const q = new THREE.Vector3(); if (!ray.ray.intersectPlane(stroke.plane, q)) return;
+    const k = q.clone().sub(stroke.last); stroke.last = q; stroke.delta = q.clone().sub(stroke.start); previewDab(stroke.start.clone().add(stroke.delta).sub(k), null, k); return;
+  }
+  if (h && h.point.distanceTo(stroke.pts[stroke.pts.length - 1]) > S.brush.radius / 3 && stroke.pts.length < 400) {
+    stroke.pts.push(h.point.clone()); if (!["smooth", "pinch", "flatten"].includes(S.brush.brush)) previewDab(h.point, stroke.n);
+  }
+}, true);
+async function endStroke(ev) {
+  pointers.delete(ev.pointerId);
+  if (!stroke) return;
+  const st = stroke, B = S.brush; stroke = null; controls.enabled = true;
+  const r = (v) => v.toArray().map(x => Math.round(x * 1e4) / 1e4);
+  const params = { brush: B.brush, radius: B.radius, strength: B.strength, symmetry_x: B.sym, points: st.pts.map(r), normal: r(st.n) };
+  if (B.brush === "grab") { if (!st.delta) return; params.delta = r(st.delta); params.strength = 1; }
+  await run(async () => { await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "sculpt_stroke", params } }); await load(true); });
+}
+stage.addEventListener("pointerup", endStroke, true);
+stage.addEventListener("pointercancel", endStroke, true);
+
 /* ---------------------------------------------------------------- stage pointer routing */
 let downAt = null;
 renderer.domElement.addEventListener("pointerdown", ev => {
@@ -922,6 +987,7 @@ renderer.domElement.addEventListener("pointerup", ev => {
 });
 renderer.domElement.addEventListener("dblclick", () => { if (S.mode === "sketch") endChain(); });
 function modelTap(ev) {
+  if (S.tool === "sculpt") return;
   if (S.measure) {
     const e = pickEdge(ev), h = pickBody(ev);
     if (h) { if (S.measPts.length >= 2) S.measPts = []; S.measPts.push(h.point); }

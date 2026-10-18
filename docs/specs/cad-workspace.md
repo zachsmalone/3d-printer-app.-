@@ -38,6 +38,9 @@ Left rail (icon + label + shortcut, beginner tooltip), History (expand → edit 
 
 Touch / Pencil: pointer events; one finger or Pencil draws in sketch mode, two fingers pan/zoom; 44 px targets; narrow screens collapse the rail to icons and move History under the view.
 
+## Sculpt mode (tool U)
+Brushes draw, carve, smooth, inflate, pinch, flatten, grab; size and strength sliders; X symmetry; "Remesh for detail" (uniform subdivision to an edge length, op `remesh`). One finger / Pencil / mouse on the model sculpts; two fingers (or dragging off the model) orbit. Each stroke is a `sculpt_stroke` history step (dab points + normal + settings), so undo/redo/delete and export to the Slicer work. Live preview while dragging is approximate (draw/carve/inflate/grab); the server result replaces it on release. Not done: dynamic topology while stroking, masks, brush falloff curves, alpha textures, front-only brushes (the brush is a sphere, so the back of thin walls moves too), voxel remesh from here (the editor has one).
+
 ## Not done yet (honest list)
 - True B-rep: geometry is a triangle mesh. Fillets/chamfers are approximate; no variable fillets; no face/edge persistent naming (body and face references are by number / position).
 - Shell with removed faces; face offset of curved faces; sweep / loft; sketch on a picked face of a later edited body re-uses the stored plane (it does not follow the face).
