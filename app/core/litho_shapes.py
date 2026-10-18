@@ -1,4 +1,4 @@
-"""Lithophane shapes: flat outlines (heart, circle, star, square, hexagon) and curved shells (globe, night-light cover).
+"""Lithophane shapes: flat outlines (heart, circle, star, square, hexagon, diamond) and curved shells (globe, night-light cover).
 
 Same pipeline as the flat rectangle in geometry.lithophane: photo -> grayscale -> tone -> thickness map
 (bright = thin, dark = thick, between min_thickness and max_thickness).
@@ -11,7 +11,7 @@ Same pipeline as the flat rectangle in geometry.lithophane: photo -> grayscale -
   - globe: a FULL sphere, photo wrapped equirectangularly (360 x 180), hollow, open at the bottom (edge at 45 deg S)
     over a flat foot ring so a light goes in and it prints without supports.
   - cup: "Cylinder / Cup" - the photo round a cylinder wall, solid 2 mm printed bottom, open top (pen holder / cup).
-* Flat outlines are smooth vector curves (analytic circle/heart/star/square/hexagon, 640 points), not pixel masks.
+* Flat outlines are smooth vector curves (analytic circle/heart/star/square/hexagon/diamond, 640 points), not pixel masks.
 
 color_mode hook: only "mono" exists. thickness_map() is the single place a future colour mode would plug in
 (e.g. return per-channel maps / extra bodies); everything downstream takes the map it returns.
@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 
 from . import thumbnail
 
-FLAT_SHAPES = ("heart", "circle", "star", "square", "hexagon")
+FLAT_SHAPES = ("heart", "circle", "star", "square", "hexagon", "diamond")
 CURVED_SHAPES = ("globe", "nightlight", "cup")
 SHAPES = ("rect",) + FLAT_SHAPES + CURVED_SHAPES
 COLOR_MODES = ("mono",)          # future: "cmyk" etc. - not built yet
@@ -133,6 +133,10 @@ def outline_radius(shape: str, ang: np.ndarray) -> np.ndarray:
     if shape == "hexagon":
         # regular hexagon, pointy top, vertices on the unit circle
         a = np.arange(6) * np.pi / 3 + np.pi / 6
+        return _ray_hit(np.stack([np.cos(a), np.sin(a)], -1), ang)
+    if shape == "diamond":
+        # diamond (square rotated 45 deg), pointy top
+        a = np.array([np.pi/2, np.pi, 3*np.pi/2, 0.0])
         return _ray_hit(np.stack([np.cos(a), np.sin(a)], -1), ang)
     raise ValueError(f"unknown flat shape {shape!r}")
 

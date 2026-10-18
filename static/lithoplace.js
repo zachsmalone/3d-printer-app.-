@@ -20,6 +20,7 @@ function outline(shape) {                     // -1..1 box, y up
   if (shape === "star") return Array.from({ length: 10 }, (_, i) => { const a = i * Math.PI / 5 + Math.PI / 2, r = i % 2 ? 0.45 : 1; return [r * Math.cos(a), r * Math.sin(a)]; });
   if (shape === "circle") return Array.from({ length: 120 }, (_, i) => [Math.cos(i * Math.PI / 60), Math.sin(i * Math.PI / 60)]);
   if (shape === "hexagon") return Array.from({ length: 6 }, (_, i) => { const a = i * Math.PI / 3 + Math.PI / 6; return [Math.cos(a), Math.sin(a)]; });
+  if (shape === "diamond") return Array.from({ length: 4 }, (_, i) => { const a = i * Math.PI / 2 + Math.PI / 2; return [Math.cos(a), Math.sin(a)]; });
   return [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 }
 

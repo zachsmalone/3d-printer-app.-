@@ -247,7 +247,7 @@ def generate(
     min_thickness: float = Form(0.8),
     max_thickness: float = Form(3.0),
     border_mm: float = Form(3.0),
-    shape: str = Form("rect"),               # lithophane outline: rect | heart | circle | star | square | hexagon | globe | nightlight | cup
+    shape: str = Form("rect"),               # lithophane outline: rect | heart | circle | star | square | hexagon | diamond | globe | nightlight | cup
     diameter_mm: float = Form(40.0),         # curved shapes: globe diameter / light diameter the night-light slips over
     height_mm: float = Form(60.0),           # curved shapes: height
     place_x: str = Form(""),                 # image placement inside the shape (see litho_shapes.check_place)
