@@ -12,6 +12,7 @@ reviewed") — the pending-upload architecture:
 from __future__ import annotations
 
 import io
+import json
 import socket
 import threading
 
@@ -325,3 +326,32 @@ def test_staged_context_replays_nondefault_fields(scan_on):
     assert params["base_mm"] == 4.5
     assert params["relief_mm"] == 2.5
     clamd.stop()
+
+
+def test_user_erasure_removes_pending_uploads_too(scan_on):
+    """"'Delete everything I made' covers parked (scanner-down) uploads: both the original
+    bytes and the request context are removed."""
+    c = client()
+    r = _gen(c, title="Erase me")
+    pid = r.json()["pending_id"]
+    d = quarantine._pending_root() / pid
+    assert (d / "original.bin").exists() and (d / "context.json").exists()
+    out = c.delete("/api/me/builds")
+    assert out.status_code == 200
+    assert out.json()["pending_uploads"] >= 1
+    assert not d.exists()                                   # both files gone with the directory
+
+
+def test_pending_uploads_expire_after_seven_days(scan_on):
+    """Retention: a parked upload is transient — anything not resumed within
+    PENDING_MAX_AGE_DAYS (default 7) is swept away."""
+    c = client()
+    r = _gen(c)
+    pid = r.json()["pending_id"]
+    ctx = json.loads((quarantine._pending_root() / pid / "context.json").read_text())
+    ctx["ts"] = ctx["ts"] - 8 * 86400                      # parked 8 days ago
+    (quarantine._pending_root() / pid / "context.json").write_text(json.dumps(ctx))
+    from app.services import retention
+    out = retention.purge_expired(store)                   # the retention sweep covers pendings
+    assert out["pending_expired"] == 1
+    assert not (quarantine._pending_root() / pid).exists()

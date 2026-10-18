@@ -85,6 +85,10 @@ def _object_url(key: str, cfg: dict) -> str:
     return f"{cfg['endpoint']}/{cfg['bucket']}/{quote(key.lstrip('/'))}"
 
 
+def _bucket_url(cfg: dict) -> str:
+    return f"{cfg['endpoint']}/{cfg['bucket']}"
+
+
 def put(key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
     """Store one object. Returns the (unsigned) object URL."""
     cfg = _cfg()
@@ -113,6 +117,36 @@ def delete(key: str) -> None:
     with httpx.Client(timeout=60) as c:
         r = c.delete(url, headers=headers)
         r.raise_for_status()
+
+
+def list_keys(prefix: str = "", page_size: int = 1000) -> list[str]:
+    """List the object keys actually IN the bucket (S3 ListObjectsV2, fully paginated via
+    continuation tokens). This is INVENTORY support — what the bucket really holds, which
+    local outputs cannot tell you. Raises on any listing failure (callers record it)."""
+    import xml.etree.ElementTree as ET
+    cfg = _cfg()
+    base = _bucket_url(cfg)
+    keys: list[str] = []
+    token = None
+    with httpx.Client(timeout=60) as c:
+        while True:
+            params = {"list-type": "2", "max-keys": str(min(page_size, 1000))}
+            if prefix:
+                params["prefix"] = prefix
+            if token:
+                params["continuation-token"] = token
+            url = str(httpx.URL(base).copy_with(params=params))
+            headers = _sign_request("GET", url, {}, b"", cfg)
+            r = c.get(url, headers=headers)
+            r.raise_for_status()
+            root = ET.fromstring(r.content)
+            ns = "{http://s3.amazonaws.com/doc/2006-03-01/}"
+            keys += [e.text for e in root.iter(f"{ns}Key")]
+            nxt = root.find(f"{ns}NextContinuationToken")
+            if nxt is None:
+                break
+            token = nxt.text
+    return keys
 
 
 def signed_url(key: str, ttl_s: int = 900) -> str:

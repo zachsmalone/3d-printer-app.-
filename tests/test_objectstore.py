@@ -88,6 +88,38 @@ class _Handler(BaseHTTPRequestHandler):
         self._auth()
         if self._reject_if_bad_sig():
             return
+        from urllib.parse import parse_qsl, urlsplit as _us
+        q = dict(parse_qsl(_us(self.path).query))
+        if "list-type" in q:                       # ListObjectsV2 (bucket inventory)
+            import base64 as _b64
+            req_path = self._clean_path().rstrip("/")
+            keys = sorted(k[len(req_path) + 1:] for k in _FakeS3.objects
+                          if k.startswith(req_path + "/"))
+            if q.get("prefix"):
+                keys = [k for k in keys if k.startswith(q["prefix"])]
+            start = 0
+            if q.get("continuation-token"):
+                try:
+                    start = int(_b64.b64decode(q["continuation-token"]))
+                except Exception:
+                    start = 0
+            page = keys[start:start + int(q.get("max-keys", "1000"))]
+            xml = ['<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">']
+            if start + len(page) < len(keys):
+                xml.append("<IsTruncated>true</IsTruncated>")
+                xml.append(f"<NextContinuationToken>{_b64.b64encode(str(start + len(page)).encode()).decode()}</NextContinuationToken>")
+            else:
+                xml.append("<IsTruncated>false</IsTruncated>")
+            for k in page:
+                xml.append(f"<Contents><Key>{k}</Key></Contents>")
+            xml.append("</ListBucketResult>")
+            body = "".join(xml).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if self._clean_path() in _FakeS3.objects:
             body = _FakeS3.objects[self._clean_path()]
             self.send_response(200)

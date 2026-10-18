@@ -109,6 +109,8 @@ def purge_expired(bs: BuildStore = _store, now: float | None = None) -> dict:
                 from ..services import filestore
                 filestore.delete_build(d.name)      # remote FIRST, durably recorded — raises => local survives
                 bs.delete(d.name); out["expired"] += 1
+    from ..services import quarantine
+    out["pending_expired"] = quarantine.sweep_expired(now)      # parked (scanner-down) uploads are transient too
     if out["expired"] or out["unfinished"]:
         log.info("retention: removed %d expired and %d unfinished builds (%d starred kept)", out["expired"], out["unfinished"], out["kept_starred"])
     return out

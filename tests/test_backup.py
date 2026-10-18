@@ -256,3 +256,49 @@ def test_age_invocation_failure_leaves_nothing(tmp_path, monkeypatch):
         pass
     leftovers = sorted(p.name for p in (tmp_path / "bk").glob("*")) if (tmp_path / "bk").exists() else []
     assert not leftovers, leftovers                # nothing at all: no ciphertext, no tmp, no plaintext
+
+
+from tests.test_objectstore import s3  # noqa: E402 — registers the s3 fixture on import
+
+
+def test_bucket_inventory_lists_what_the_bucket_actually_holds(s3, tmp_path):
+    """The backup's bucket inventory is the object store's OWN listing (paginated
+    ListObjectsV2) — including objects that no local output knows about."""
+    from scripts import backup as B
+    from app.services import filestore
+    for i in range(25):                              # more than one 10-key page
+        filestore.put_build(f"b{i:02d}", "model.stl", b"x")
+    filestore.put_build("ghost", "model.stl", b"x")  # in the bucket, NOT in local outputs
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text("{}")
+    rep = B.create_backup(data, tmp_path / "out", tmp_path / "bk", now=1000.0)
+    bdir = tmp_path / "bk" / ("zeim-" + time.strftime("%Y%m%d-%H%M%S", time.localtime(1000.0)))
+    inv = json.loads((bdir / "bucket_inventory.json").read_text())
+    assert inv["count"] == 26 and inv["error"] is None
+    assert any("ghost" in k for k in inv["keys"])     # the orphan is VISIBLE in the inventory
+    assert rep["bucket_inventory"] == 26
+
+
+def test_bucket_inventory_pagination_walks_every_page(s3):
+    """list_keys follows continuation tokens to the end — no silent truncation."""
+    from app.services import objectstore
+    for i in range(23):
+        objectstore.put(f"builds/p{i:02d}/model.stl", b"x")
+    keys = objectstore.list_keys(page_size=5)         # 5 pages
+    assert len(keys) == 23
+    assert keys == sorted(keys)                      # stable, complete listing
+
+
+def test_bucket_inventory_failure_is_recorded_not_fatal(s3, monkeypatch, tmp_path):
+    """A listing failure is recorded in the manifest — the DATA backup itself still succeeds."""
+    from scripts import backup as B
+    from app.services import objectstore
+
+    def down():
+        raise RuntimeError("provider down")
+    monkeypatch.setattr(objectstore, "list_keys", down)
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text("{}")
+    rep = B.create_backup(data, tmp_path / "out", tmp_path / "bk", now=1000.0)
+    assert rep["ok"] is True                          # the backup itself succeeded
+    assert str(rep["bucket_inventory"]).startswith("error: provider down")

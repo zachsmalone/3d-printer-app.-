@@ -216,16 +216,43 @@ function revealResult() {
   // wait until build() has put the page back (busy bar hidden) so the scroll target is final
   setTimeout(() => { const v = $("#viewer"); v.style.scrollMarginTop = ($(".topbar").offsetHeight + 8) + "px"; v.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); }, 60);
 }
+function buildDone(r) {                 /* shared success tail: a real build came back */
+  showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Make it again with these settings";
+  setPath(3, "Model ready. Step 3 of 3: save or print it.");
+  toast("Your model is ready ✔", "ok");
+  revealResult();
+}
+async function resumePending() {        /* the scanner was down: re-check the parked upload */
+  setPath(2, "Checking your parked upload. Step 2 of 3."); $("#busy").hidden = false; $("#btnBuild").disabled = true; S.building = true;
+  try {
+    const r = await api(`/api/uploads/resume/${S.pending}`, { method: "POST" });
+    if (r && r.status === "pending_scan") {   /* still parked: keep the resume action offered */
+      pick.msg(r.detail || "The malware scanner is still unavailable — your upload is parked, not lost. Try again shortly.");
+      return;
+    }
+    S.pending = null; $("#btnBuild").textContent = "Build my model";
+    buildDone(r);
+  } catch (e) {
+    if (e.status === 404) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg("Your parked upload is no longer available — please choose your photo again."); return; }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); return; }
+    toast("Resume didn't work: " + (e.message || "something went wrong") + " Your upload is still parked — try again.", "err");
+  } finally { $("#busy").hidden = true; $("#btnBuild").disabled = !S.file; S.building = false; }
+}
 async function build(autoDelete = false) {
+  if (S.pending) return resumePending();          /* parked earlier: re-check instead of re-uploading */
   if (!S.file) return;
-  S.pending = null;
   setPath(2, "Making your 3D model. Step 2 of 3."); $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; S.building = true;   // no printing/sending a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
-    showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Make it again with these settings";
-    setPath(3, "Model ready. Step 3 of 3: save or print it.");
-    toast("Your model is ready ✔", "ok");
-    revealResult();
+    if (r && r.status === "pending_scan") {        /* scanner down: parked, NOT built */
+      S.pending = r.pending_id;
+      setPath(2, "Your upload is parked — the malware scanner is temporarily unavailable.");
+      pick.msg(r.detail || "The malware scanner is temporarily unavailable, so your upload is parked — not lost, and not shared.");
+      $("#btnBuild").textContent = "▶ Resume my upload";
+      toast("Your upload is parked, not lost — press Resume in a little while.", "ok");
+      return;
+    }
+    buildDone(r);
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
     else if (e.status === 400 && /photo/i.test(e.message)) { clearFile(); pick.msg(e.message); }          // photo problems stay visible under the buttons; the refused photo is forgotten (QA-2)

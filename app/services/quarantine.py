@@ -133,6 +133,45 @@ def discard_pending(pid: str, why: str) -> bool:
     return True
 
 
+def purge_for(sid: str) -> int:
+    """User erasure ('Delete everything I made'): discard every pending upload owned by sid.
+    Returns how many were removed. Both the original bytes and the request context go."""
+    n = 0
+    for d in list(_pending_root().iterdir()):
+        if not d.is_dir():
+            continue
+        try:
+            ctx = json.loads((d / "context.json").read_text())
+            if ctx.get("sid") == sid:
+                shutil.rmtree(d, ignore_errors=True)
+                moderation._log("pending_discard", item=d.name, reason="user erasure")
+                n += 1
+        except Exception:
+            continue
+    return n
+
+
+def sweep_expired(now: float | None = None) -> int:
+    """Retention: pending uploads are transient (a scanner outage is hours, not weeks) —
+    anything not resumed within PENDING_MAX_AGE_DAYS is discarded. Returns how many."""
+    import time as _time
+    now = _time.time() if now is None else now
+    max_age = config.PENDING_MAX_AGE_DAYS * 86400
+    n = 0
+    for d in list(_pending_root().iterdir()):
+        if not d.is_dir():
+            continue
+        try:
+            ctx = json.loads((d / "context.json").read_text())
+            if now - float(ctx.get("ts", 0)) > max_age:
+                shutil.rmtree(d, ignore_errors=True)
+                moderation._log("pending_discard", item=d.name, reason="expired")
+                n += 1
+        except Exception:
+            continue
+    return n
+
+
 def list_pending() -> list[dict]:
     out = []
     for d in sorted(_pending_root().iterdir()):

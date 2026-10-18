@@ -149,6 +149,23 @@ def create_backup(data_dir: Path, out_dir: Path, backup_root: Path, now: float |
     return report
 
 
+def _bucket_inventory() -> dict | None:
+    """List the object store's actual keys (S3 ListObjectsV2, paginated). The manifest records
+    a listing failure instead of raising: the DATA backup is primary, the inventory is an add-on.
+    Returns None when object storage is not configured (no manifest written at all)."""
+    out: dict = {"created": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "keys": [], "count": 0, "error": None}
+    try:
+        from app.services import objectstore
+        if not objectstore.enabled():
+            return None
+        keys = objectstore.list_keys()
+        out["keys"] = keys
+        out["count"] = len(keys)
+    except Exception as e:
+        out["error"] = str(e)[:200]
+    return out
+
+
 def _build_snapshot(data_dir: Path, out_dir: Path, backup_dir: Path, now: float, report: dict) -> None:
     # 1. databases via the live-safe backup API
     for name in ("zeim.sqlite3", "auth.sqlite3"):
@@ -163,7 +180,14 @@ def _build_snapshot(data_dir: Path, out_dir: Path, backup_dir: Path, now: float,
     manifest = _outputs_manifest(out_dir)
     (backup_dir / "outputs.manifest.json").write_text(json.dumps(manifest, indent=1))
     report["output_files"] = len(manifest["files"])
-    # 4. self-verifying checksums
+    # 4. bucket inventory — what the object store ACTUALLY holds (ListObjectsV2). Distinct
+    #    from the outputs manifest (local files only): this is the reconciliation source for
+    #    restore. A listing FAILURE is recorded in the manifest — the DATA backup still proceeds.
+    inv = _bucket_inventory()
+    if inv is not None:
+        (backup_dir / "bucket_inventory.json").write_text(json.dumps(inv, indent=1))
+        report["bucket_inventory"] = inv.get("count") if not inv.get("error") else f"error: {inv['error']}"
+    # 5. self-verifying checksums
     (backup_dir / "backup.json").write_text(json.dumps({
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now)),
         "checksums": _checksum_dir(backup_dir),

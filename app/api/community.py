@@ -546,11 +546,13 @@ def delete_everything_i_made(actor: Actor = Depends(get_actor)):
     from ..community.store import LISTINGS as _L
     from ..community import ownership
     builds = ownership.purge_builds(actor.sid)
+    from ..services import quarantine as _q
+    pending = _q.purge_for(actor.sid)            # parked uploads (scanner-down) are the user's too
     mine = [i["id"] for i in _L.read() if i.get("owner_sid") == actor.sid]
     for pid in mine:
         _sh.rmtree(catalog.LDIR / pid, ignore_errors=True)
     _L.update(lambda l: l.__setitem__(slice(None), [i for i in l if i.get("owner_sid") != actor.sid]))
-    return {"ok": True, "builds": builds, "shared": len(mine)}
+    return {"ok": True, "builds": builds, "shared": len(mine), "pending_uploads": pending}
 
 
 @router.put("/me/mature")

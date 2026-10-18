@@ -150,6 +150,12 @@ The gate must run BEFORE any parsing of the bytes, and the returned scan state m
 (a pending upload is never parsed, built, served, shared, or mirrored to object storage; only
 a clean scan — via resume — ever builds it, and an infected verdict discards it).
 
+Note for the /edit/new wiring: do NOT reuse /api/uploads/resume as-is — it replays into the
+photo /api/generate pipeline. Editor uploads need their own route-specific, validated resume
+(same pattern: park bytes + request context at the service boundary, owner-only resume that
+re-runs the editor's own pipeline, discard on infected, retain on failure) inside the
+protected workstream.
+
 What this buys (all already implemented + tested in `app/services/uploadgate.py`):
   * per-account hourly rate limit (shared with photo uploads, db-backed in db mode);
   * the uploadsafe content checks (mesh bombs, archive caps, masquerading files);
