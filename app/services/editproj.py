@@ -113,8 +113,10 @@ def ensure_exports(bid: str):
         m = printable_at(bid, meta)
         quality = export_quality(m)
         meta["quality_gate"] = quality
-        if not quality["ok"]:
-            meta["warnings"] = list(dict.fromkeys((meta.get("warnings") or []) + [quality["message"]]))
+        # N2: the export-gate warning describes the CURRENT mesh, so drop the old one (e.g. "not watertight" from import)
+        # once Fix mesh makes it print-safe, and put the current one back if a later step / undo breaks it again
+        kept = [w for w in (meta.get("warnings") or []) if not w.startswith(_GATE_PREFIX)]
+        meta["warnings"] = list(dict.fromkeys(kept + ([] if quality["ok"] else [quality["message"]])))
         mdl = as_model(m, meta["title"])
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(mdl))
@@ -499,6 +501,9 @@ def preview_objects(m: trimesh.Trimesh, layout: dict) -> dict:
     return {"decimated": dec, "bodies": bodies}
 
 
+_GATE_PREFIX = "Fix the model before export: "
+
+
 def export_quality(m: trimesh.Trimesh) -> dict:
     """Fast print-ready gate before export: refuse silent bad geometry and explain the fix."""
     a = meshedit.analyze(m)
@@ -521,7 +526,7 @@ def export_quality(m: trimesh.Trimesh) -> dict:
     return {
         "ok": not issues,
         "issues": issues,
-        "message": "Model is print-safe to export." if not issues else "Fix the model before export: " + "; ".join(issues) + ". Run Repair or simplify the mesh, then validate again.",
+        "message": "Model is print-safe to export." if not issues else _GATE_PREFIX + "; ".join(issues) + ". Run Repair or simplify the mesh, then validate again.",
         "watertight": a["watertight"],
         "size_mm": a["size_mm"],
         "triangles": a["triangles"],
