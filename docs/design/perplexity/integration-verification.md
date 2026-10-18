@@ -31,6 +31,11 @@ Total: **166 Python tests passed, 2 skipped; 4 JavaScript geometry tests passed.
 This is a targeted regression set, not a claim that every repository test was run.
 Existing FastAPI/Starlette deprecation warnings were observed.
 
+The first GitHub Actions run reached Python collection but failed because the
+`pytest` console entry point did not place the repository root on `sys.path`.
+The workflow was corrected to use `python -m pytest`, matching the passing local
+invocation; this is a CI launch-path correction, not a skipped or disabled test.
+
 ## Browser checks
 
 Opened the real `/workbench/` route using a loopback-only uvicorn instance with fresh

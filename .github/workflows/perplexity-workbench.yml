@@ -31,4 +31,4 @@ jobs:
           python-version: "3.13"
           cache: pip
       - run: pip install -r requirements.txt -c constraints.txt pytest
-      - run: pytest tests/test_perplexity_workbench.py tests/test_b2_static.py -q
+      - run: python -m pytest tests/test_perplexity_workbench.py tests/test_b2_static.py -q
