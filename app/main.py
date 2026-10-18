@@ -1,6 +1,6 @@
 """App factory. Run: uvicorn app.main:app --port 8765"""
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import branding
@@ -207,6 +207,36 @@ def healthz():
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")
+
+
+# ---------------- legal pages (Phase 1 Task 5: public routes; DMCA contact comes from app/credits.json) ----------------
+@app.get("/legal/terms", include_in_schema=False)
+def legal_terms():
+    html = (STATIC / "terms.html").read_text()
+    contact = (_credits.data().get("takedown", {}) or {}).get("contact") or ""
+    if contact:
+        html = html.replace("[COPYRIGHT CONTACT TO BE ADDED]", contact)
+    return HTMLResponse(html)
+
+
+@app.get("/legal/privacy", include_in_schema=False)
+def legal_privacy():
+    return FileResponse(STATIC / "privacy.html")
+
+
+@app.get("/legal/community-guidelines", include_in_schema=False)
+def legal_guidelines():
+    return FileResponse(STATIC / "COMMUNITY_GUIDELINES.html")
+
+
+@app.get("/legal/dmca", include_in_schema=False)
+def legal_dmca():
+    """DMCA section of the terms (with the real contact when configured) — notices also come in via POST /api/report/dmca."""
+    html = (STATIC / "terms.html").read_text()
+    contact = (_credits.data().get("takedown", {}) or {}).get("contact") or ""
+    if contact:
+        html = html.replace("[COPYRIGHT CONTACT TO BE ADDED]", contact)
+    return HTMLResponse(html)
 
 
 @app.get("/favicon.ico")

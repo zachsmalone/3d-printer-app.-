@@ -104,9 +104,56 @@ def resolve(report_id: str, action: str) -> dict:
         set_nsfw(out["item_id"], action == "mark_nsfw")
     if action == "suspend":
         suspend(out["account_id"], "report " + report_id)
+    if out.get("reason") == "copyright" and out.get("dmca") and action in ("hide", "remove", "suspend"):
+        _strike(out.get("account_id"))          # DMCA repeat-infringer counter (flag at 3+, never auto-suspend)
     _audit.info("moderation %s: item=%s report=%s reporter=%s reported_at=%s at=%s", action, out["item_id"], report_id, _who(out["reporter"]), out["created"], out["resolved"])
     _log(action, report_id=report_id, item=out["item_id"], was_appealed=out.get("was_appealed", False))
     return out
+
+
+def report_dmca(item_id: str, owner_account_id: str | None, notice: dict, sid: str,
+                ip: str = "", user_agent: str = "") -> dict:
+    """Formal DMCA takedown notice (Task 5): a copyright report that carries the legal notice elements.
+    The notice fields (reporter name/contact, statements) are stored for the ADMIN queue only and are
+    never shown publicly. Every actioned DMCA report counts toward the repeat-infringer counter."""
+    out = report(item_id, sid, "copyright", "DMCA notice", owner_account_id, ip=ip, user_agent=user_agent)
+
+    def f(m):
+        r = next((x for x in m["reports"] if x["id"] == out["id"]), None)
+        if r is not None:
+            r["dmca"] = {"reporter_name": (notice.get("reporter_name") or "")[:200],
+                          "reporter_contact": (notice.get("reporter_contact") or "")[:200],
+                          "original_work": (notice.get("original_work") or "")[:1000],
+                          "good_faith": True, "accuracy": True, "signature": True}
+    MODERATION.update(f)
+    _log("dmca_notice", report_id=out["id"], item=item_id)
+    return out
+
+
+def copyright_strikes(account_id: str) -> int:
+    """How many DMCA/copyright reports against this account were actioned with a takedown.
+    Three or more marks the account a repeat infringer (DMCA safe-harbor expectation)."""
+    return sum(1 for r in MODERATION.read()["reports"]
+               if r.get("account_id") == account_id and r.get("reason") == "copyright"
+               and r.get("status") in ("actioned", "appealed") and r.get("dmca"))
+
+
+def _strike(account_id: str) -> None:
+    """Called after a DMCA report is actioned with a takedown: count strikes, flag at 3+ (never auto-suspend)."""
+    if not account_id:
+        return
+    n = copyright_strikes(account_id)
+    if n < 3:
+        return
+    from .store import USERS
+
+    def f(d):
+        for u in d.values():
+            if u.get("id") == account_id:
+                u["repeat_infringer"] = True
+    USERS.update(f)
+    _audit.critical("moderation REPEAT INFRINGER flagged: account=%s strikes=%s", account_id, n)
+    _log("repeat_infringer", account=account_id, strikes=n)
 
 
 def appeal(report_id: str, sid: str, text: str = "") -> dict:

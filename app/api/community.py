@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import io
+import logging
 
 import trimesh
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -11,10 +12,13 @@ from .. import branding, config
 from ..community import catalog, discovery, links, moderation, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
-from ..community.store import USERS
+from ..community.store import USERS, LISTINGS
 from ..core import ratelimit
+from ..services import credits as _credits
 from . import guards
 from .textcap import ip as _ip, text_in
+
+log = logging.getLogger("zeim.api")
 
 router = APIRouter(prefix="/api")
 
@@ -430,6 +434,46 @@ def user_appeal(item_kind: str, item_id: str, body: dict, actor: Actor = Depends
         raise HTTPException(400, str(e))
     except PermissionError:
         raise HTTPException(403, "Only the person the decision was about can appeal it.")
+
+
+@router.post("/report/dmca")
+def report_dmca(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    """Formal DMCA takedown notice intake (Task 5). No account needed — rights holders may not be users.
+    The notice must carry the elements from /legal/dmca (name, contact, the original work, the ZEIM
+    item, the good-faith + accuracy statements, signature ack). It lands in the admin queue as a
+    copyright report with the notice attached (admin-only), and the takedown contact is notified
+    (email when SMTP is configured; always logged)."""
+    report_limit(request, actor)
+    for f in ("reporter_name", "reporter_contact", "original_work", "item_ref"):
+        if not str(body.get(f) or "").strip():
+            raise HTTPException(422, f"A DMCA notice needs: {f}")
+    if not (body.get("good_faith") and body.get("accuracy") and body.get("signature")):
+        raise HTTPException(422, "The notice needs the good-faith, accuracy and signature statements (see /legal/dmca).")
+    item_ref = str(body["item_ref"]).strip()[:200]
+    item_id = item_ref.rsplit("/", 1)[-1].split("?")[0].strip()
+    if not item_id.isalnum() or not item_id:
+        raise HTTPException(422, "item_ref must be the Showcase item's address or id")
+    owner = USERS.read().get(next((i.get("owner_sid") for i in LISTINGS.read() if i.get("id") == item_id), "") or "") or {}
+    try:
+        rep = moderation.report_dmca(item_id, owner.get("id"), body, actor.sid,
+                                     ip=request.client.host if request.client else "",
+                                     user_agent=request.headers.get("user-agent", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    # notify the takedown contact: email when SMTP is configured, always logged
+    contact = (_credits.data().get("takedown", {}) or {}).get("contact") or ""
+    if contact:
+        try:
+            import os
+            from ..auth.mailer import mailer_from_env
+            mailer_from_env(os.environ).send(contact, "ZEIM: DMCA takedown notice",
+                                             f"A DMCA notice was filed for showcase item {item_id}. "
+                                             f"Review it in the moderation queue (report {rep['id']}).")
+        except Exception:
+            log.exception("DMCA notice email failed (logged instead)")
+    else:
+        log.warning("DMCA notice filed for item %s — takedown contact is NOT configured (app/credits.json)", item_id)
+    return {"ok": True, "report_id": rep["id"], "status": rep["status"]}
 
 
 # ---------------- personalization (view / disable / clear) ----------------
