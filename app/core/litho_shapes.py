@@ -351,3 +351,8 @@ def build(im, shape, **params):
                 "gamma", "auto_contrast", "invert", "color_mode", "place")
         return curved_shape(im, shape, **{k: params[k] for k in keys if k in params})
     raise ValueError(f"unknown shape {shape!r}")
+
+
+def thumb(thick, min_thickness, max_thickness):
+    """Back-lit preview thumbnail for the lithophane thickness map."""
+    return thumbnail.lithophane_backlit(thick, min_thickness, max_thickness)
