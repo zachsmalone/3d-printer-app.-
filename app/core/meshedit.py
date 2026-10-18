@@ -860,10 +860,15 @@ OPS = {"plate": op_plate, "lay_flat": op_lay_flat, "best_orient": op_best_orient
        "parts": parts.op_parts,        # the parts builder (app/core/parts.py): recipe -> mesh
        "voxremesh": voxremesh.op_voxremesh,   # voxel remesh (app/core/voxremesh.py): watertight rebuild
        "sculpt": sculpt.op_sculpt}             # sculpt brushes (app/core/sculpt.py): smooth/flatten/inflate
+from . import cadops as _cadops                 # CAD workspace solids (app/core/cadops.py): extrude/revolve/fillet/pattern...
+if hasattr(_cadops, "OPS"):                   # (when cadops is imported first it registers itself at its end)
+    OPS.update(_cadops.OPS)
 
 
 def label(op: str, p: dict) -> str:
     g = lambda k, d="": p.get(k, d)
+    if op in getattr(_cadops, "OPS", ()):
+        return _cadops.label(op, p) or op
     try:
         return {
             "translate": lambda: f"Move ({g('dx', 0):g}, {g('dy', 0):g}, {g('dz', 0):g}) mm",

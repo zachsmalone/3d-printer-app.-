@@ -309,7 +309,25 @@ def edit_step(bid: str, i: int, params: dict) -> dict:
     persist = rep.pop("_persist", None) if isinstance(rep, dict) else None
     if persist:
         params = {**params, **persist}
-    return _rewrite(bid, i, {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)})
+    new = {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)}
+    if o.get("name"):
+        new["name"] = o["name"]                       # a user-renamed step keeps its name
+    return _rewrite(bid, i, new)
+
+
+def rename_step(bid: str, i: int, name: str) -> dict:
+    """Give step i (1-based) a user name shown in the History panel ('' restores the automatic label)."""
+    with _lock:
+        meta = store.get(bid)
+        if not 1 <= i <= len(meta["ops"]):
+            raise meshedit.OpError("no such step")
+        if name:
+            meta["ops"][i - 1]["name"] = name
+        else:
+            meta["ops"][i - 1].pop("name", None)
+        store.save(meta)
+        store.cache.pop(bid, None)
+    return {"renamed": i}
 
 
 def set_dims(bid: str, dims: dict) -> dict:
@@ -445,7 +463,7 @@ def payload(bid: str, report=None) -> dict:
     m = mesh_at(bid, meta)
     ensure_exports(bid)
     meta = store.get(bid)
-    ops = [{"i": i + 1, "op": o["op"], "label": o["label"],
+    ops = [{"i": i + 1, "op": o["op"], "label": o["label"], "name": o.get("name") or "",
              "params": {k: v for k, v in (o.get("params") or {}).items() if k != "layout" and isinstance(v, (str, int, float, bool, dict, list, type(None)))},
              "editable": o["op"] not in ("plate", "import")} for i, o in enumerate(meta["ops"])]
     from ..core import plate as _plate

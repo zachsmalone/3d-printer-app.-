@@ -59,7 +59,8 @@ def _start_retention():
     from .services import retention
     retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
 from .api import parts as parts_api
-for r in (builds.router, edit.router, parts_api.router, printing.router, printing.files_router, settings_api.router,
+from .api import cad as cad_api
+for r in (builds.router, edit.router, parts_api.router, cad_api.router, printing.router, printing.files_router, settings_api.router,
           showcase_extras.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
           export_api.router, calibration_api.router, doctor_api.router):
