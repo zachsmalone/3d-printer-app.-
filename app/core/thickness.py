@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import trimesh
 
-MAX_FACES = 400_000
+MAX_FACES = 150_000
 SAMPLES_MAX = 5000
 
 

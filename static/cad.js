@@ -12,7 +12,7 @@ async function api(url, opt = {}) {
   if (opt.json !== undefined) { opt.body = JSON.stringify(opt.json); opt.headers = { "Content-Type": "application/json" }; delete opt.json; }
   const r = await fetch(url, opt);
   let j = null; try { j = await r.json(); } catch { }
-  if (!r.ok) { const d = j?.detail ?? j?.message; throw new Error(typeof d === "string" ? d : (r.statusText || "Something went wrong.")); }
+  if (!r.ok) { const d = j?.detail ?? j?.message; const er = new Error(typeof d === "string" ? d : (r.statusText || "Something went wrong.")); er.status = r.status; throw er; }
   return j;
 }
 
@@ -1175,7 +1175,7 @@ stage.addEventListener("dragover", e => e.preventDefault());
 stage.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) importFile(f); });
 $("#cwSaveCopy").onclick = async e => {
   e.preventDefault(); if (!S.bid) return msg("Nothing to save yet.");
-  await run(async () => { const fd = new FormData(); fd.append("from_build", S.bid); fd.append("title", (($("#cwTitle").value || "My design") + " v2").slice(0, 60));
+  await run(async () => { const fd = new FormData(); fd.append("from_build", S.bid); fd.append("title", (() => { const t = ($("#cwTitle").value || "My design").trim(), mm = t.match(/^(.*?) v(\d+)$/); return (mm ? `${mm[1]} v${+mm[2] + 1}` : `${t} v2`).slice(0, 60); })());
     const r = await api("/api/edit/new", { method: "POST", body: fd }); const id = r.id || r.project?.id; if (!id) throw new Error("Your recent builds are full.");
     await openProject(id); }, "Saved as a new version. The previous one is unchanged in your builds.");
 };
@@ -1195,5 +1195,18 @@ $("#cwFromBuild").onclick = async e => {
 
 /* ---------------------------------------------------------------- start */
 renderRail(); hint(...HINTS.null); loop();
-load().catch(e => { msg(e.message); S.bid = null; history.replaceState(null, "", location.pathname); load(); });
+/* Never silently drop a project (QA B4): if it exists but can't be shown here (e.g. too detailed),
+   keep it and offer Undo / the editor instead of an empty workspace. */
+load().catch(e => {
+  if (S.bid && e.status && e.status !== 404 && e.status !== 403) return lockedOut(e.message);
+  msg(e.message); S.bid = null; history.replaceState(null, "", location.pathname); load();
+});
+function lockedOut(text) {
+  const box = document.createElement("div"); box.className = "cw-modepop"; box.setAttribute("role", "alert");
+  const t = document.createElement("span"); t.textContent = text; box.append(t);
+  const u = document.createElement("button"); u.textContent = "Undo last step";
+  u.onclick = () => api(`/api/edit/${S.bid}/undo`, { method: "POST" }).then(() => location.reload(), er => msg(er.message));
+  const ed = document.createElement("a"); ed.textContent = "Open in the editor"; ed.className = "btn"; ed.href = `/?edit=${encodeURIComponent(S.bid)}`;
+  box.append(u, ed); stage.append(box);
+}
 window.__cad = { V3: THREE.Vector3, cam: camera, S, startSketch, setTool, finishSketch, addConstraint, solveSketch, viewAlong, toggleSection, openStep: i => { S.openStep = i; renderHist(); } };

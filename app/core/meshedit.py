@@ -259,8 +259,11 @@ def op_repair(m, p):
         trimesh.repair.fix_inversion(m)
         trimesh.repair.fix_normals(m, multibody=True)
         steps.append("made face directions consistent / outward")
+    nonflat = 0
     if p.get("fill_holes", True):
         was = m.is_watertight
+        if not was:
+            nonflat = _nonplanar_holes(m)
         trimesh.repair.fill_holes(m)
         if not m.is_watertight:
             fill_boundary_loops(m)
@@ -274,7 +277,37 @@ def op_repair(m, p):
     rep["message"] = ("Mesh is watertight ✔" if after["watertight"] else
                       "Still not watertight — it may have complex holes or self-intersections; the slicer may still cope, "
                       "or try Simplify/Hollow-free workflow in another tool.")
+    if nonflat and after["watertight"]:
+        # QA B7: a non-flat hole has no single right patch; the fill can cut a wedge out of the shape.
+        rep["warning"] = (f"{nonflat} filled hole(s) weren't flat, so the patch there is a guess and the volume may be off "
+                          f"(now {abs(float(m.volume)):,.1f} mm³). Check those areas before printing.")
+        rep["message"] += " · check filled areas"
     return m, rep
+
+
+def _nonplanar_holes(m) -> int:
+    """Count boundary loops that are not (nearly) planar."""
+    try:
+        mm = m.copy(); mm.merge_vertices()
+        edges = mm.edges_sorted
+        uniq, cnt = np.unique(edges, axis=0, return_counts=True)
+        bnd = uniq[cnt == 1]
+        if not len(bnd) or len(bnd) > 20000:
+            return 0
+        import networkx as nx
+        g = nx.Graph(); g.add_edges_from(bnd.tolist())
+        tol = 1e-3 * float(max(mm.extents.max(), 1e-9))
+        bad = 0
+        for comp in nx.connected_components(g):
+            pts = mm.vertices[list(comp)]
+            if len(pts) < 4:
+                continue
+            c = pts - pts.mean(axis=0)
+            dev = np.abs(c @ np.linalg.svd(c, full_matrices=False)[2][-1]).max()
+            bad += int(dev > tol)
+        return bad
+    except Exception:
+        return 0
 
 
 def op_simplify(m, p):
@@ -897,11 +930,26 @@ def label(op: str, p: dict) -> str:
         return op
 
 
+# Ops whose memory/time can blow up with mesh size: run under the runtime ceiling (core/guard.py).
+HEAVY_OPS = {"remesh", "pattern", "round_edges", "body_boolean", "boolean", "simplify", "sketch_extrude",
+             "revolve", "repair", "hollow", "shell", "smooth", "subdivide", "thicken"}
+HEAVY_MIN_FACES = 20_000          # tiny meshes are not worth a fork
+
+
 def apply(m: trimesh.Trimesh, op: str, params: dict) -> tuple[trimesh.Trimesh, dict]:
     fn = OPS.get(op)
     if not fn:
         raise OpError(f"unknown operation '{op}'")
-    out, rep = fn(m, params or {})
+    if op in HEAVY_OPS and len(m.faces) >= HEAVY_MIN_FACES:
+        from . import guard
+        try:
+            out, rep = guard.run(fn, m, params or {})
+        except guard.Tripped:
+            raise OpError("That step needs more memory or time than this server allows for one step, "
+                          "so it was stopped and your model is unchanged. Try a smaller value, fewer copies, "
+                          "or Simplify first.")
+    else:
+        out, rep = fn(m, params or {})
     return _check(out), rep
 
 

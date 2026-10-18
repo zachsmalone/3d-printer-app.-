@@ -52,7 +52,27 @@ def _to_manifold(m: trimesh.Trimesh):
     out = mf.Manifold(mf.Mesh(vert_properties=np.asarray(mm.vertices, np.float32), tri_verts=np.asarray(mm.faces, np.uint32)))
     if out.status() != mf.Error.NoError:
         raise OpError("This body isn't a closed solid, so solid tools can't use it. Run Fix / repair first.")
+    if out.volume() < 0 or (mm.is_watertight and mm.volume < 0):
+        raise OpError("This body is inside-out (negative volume). Run Fix mesh first so solid tools work correctly.")
     return out
+
+
+def _solid_or_none(x, n_bodies: int):
+    """Manifold -> trimesh that stays a closed 2-manifold after vertex merging (as every export does), else None."""
+    t = _from_manifold(x)
+    mm = trimesh.Trimesh(t.vertices.copy(), t.faces.copy(), process=False)
+    mm.merge_vertices()
+    if not mm.is_watertight:                  # sliver faces collapse to zero length when merged: drop + close the pin-holes
+        mm.update_faces(mm.nondegenerate_faces())
+        mm.update_faces(mm.unique_faces())
+        mm.remove_unreferenced_vertices()
+        trimesh.repair.fill_holes(mm)
+        trimesh.repair.fix_normals(mm)
+    if len(mm.faces) == 0 or not (mm.is_watertight and mm.is_winding_consistent):
+        return None
+    if len(bodies(mm)) != n_bodies:
+        return None
+    return mm
 
 
 def _from_manifold(x) -> trimesh.Trimesh:
@@ -122,6 +142,25 @@ def _join(a, b):
     return _new(np.vstack([a.vertices, b.vertices]), np.vstack([a.faces, b.faces + len(a.vertices)]))
 
 
+def _touching(m) -> bool:
+    """True if separate bodies share a face/edge exactly (after vertex merge some edges get >2 faces)."""
+    mm = trimesh.Trimesh(m.vertices, m.faces, process=False); mm.merge_vertices()
+    if len(mm.faces) == 0:
+        return False
+    _, cnt = np.unique(mm.edges_sorted, axis=0, return_counts=True)
+    return bool((cnt > 2).any())
+
+
+def _join_sep(a, b, hint="Use Union (Join) instead, or leave a small gap."):
+    """Keep b as separate bodies next to a, but refuse a result that would not be a clean solid
+    (bodies touching face-to-face become non-manifold when the file is saved). QA B2."""
+    out = _join(a, b)
+    if a is not None and b is not None and len(a.faces) and len(b.faces) and _touching(out):
+        raise OpError("The new body would touch another body face-to-face, which can't be kept as two separate "
+                      "solids in a print file. " + hint)
+    return out
+
+
 def _combine(cur, tool, mode, replace=False):
     """Apply a new solid to the model: new (separate body) / join / cut / intersect."""
     if replace or len(cur.faces) == 0:
@@ -129,7 +168,7 @@ def _combine(cur, tool, mode, replace=False):
             raise OpError("There is nothing to cut yet - make a solid first.")
         return tool
     if mode == "new":
-        return _join(cur, tool)
+        return _join_sep(cur, tool)
     a, b = _to_manifold(cur), _to_manifold(tool)
     r = {"join": a + b, "cut": a - b, "intersect": a ^ b}.get(mode)
     if r is None:
@@ -310,9 +349,16 @@ def op_round_edges(m, p):
         except (TypeError, ValueError, IndexError):
             raise OpError("edges must be [[x,y,z],[x,y,z]] pairs.")
         if caps is not None:
-            opened = (A - caps) + (opened ^ caps)
-    opened = opened.simplify(1e-3)            # merge the near-coincident sliver vertices Minkowski leaves behind
-    return _join(_from_manifold(opened), rest), {"message": f"{style.title()} {r:g} mm (approximate, convex edges)."}
+            opened = A - ((A - opened) ^ caps)
+    out = None
+    for tol in (1e-3, 5e-3, 2e-2, 5e-2, 0):           # merge the near-coincident sliver vertices Minkowski leaves behind
+        out = _solid_or_none(opened.simplify(tol), len(bodies(sel)))
+        if out is not None:
+            break
+    if out is None:                           # QA B3: never hand back a non-manifold mesh
+        raise OpError("The rounded result wouldn't be a clean closed solid on this shape, so it was not applied. "
+                      "Try a smaller radius or pick fewer edges.")
+    return _join(out, rest), {"message": f"{style.title()} {r:g} mm (approximate, convex edges)."}
 
 
 def op_face_offset(m, p):
@@ -380,7 +426,7 @@ def op_body_transform(m, p):
     moved = sel.copy(); moved.apply_transform(T)
     if np.linalg.det(T[:3, :3]) < 0:
         moved.invert()
-    out = _join(_join(rest, sel) if p.get("copy") else rest, moved)
+    out = _join_sep(_join(rest, sel) if p.get("copy") else rest, moved, "Move it slightly, or Union the bodies.")
     return out, {"message": "Transformed."}
 
 
@@ -421,7 +467,9 @@ def op_pattern(m, p):
             pat = trimesh.util.concatenate(copies)
     else:
         pat = trimesh.util.concatenate(copies)
-    return _join(rest, pat), {"message": f"{kind.title()} pattern ×{count}."}
+        if _touching(pat):
+            raise OpError("The copies would touch face-to-face, which can't be kept as separate solids. Turn on Fuse, or use a slightly larger spacing.")
+    return _join_sep(rest, pat, "Turn on Fuse, or use a slightly larger spacing."), {"message": f"{kind.title()} pattern ×{count}."}
 
 
 def op_align(m, p):
@@ -489,16 +537,17 @@ def clean_params(op: str, p: dict) -> dict:
     return out
 
 from . import sculptws as _sculptws   # noqa: E402  (workspace sculpt strokes + remesh)
-OPS.update(_sculptws.OPS)
+if hasattr(_sculptws, "OPS"):           # sculptws imported first: it registers itself at its end (QA B15)
+    OPS.update(_sculptws.OPS)
 from . import meshedit as _meshedit   # noqa: E402  (register even when this module is imported first)
 _meshedit.OPS.update(OPS)
 
 
 def label(op: str, p: dict) -> str | None:
-    if op in _sculptws.OPS:
+    if op in getattr(_sculptws, "OPS", ()):
         return _sculptws.label(op, p)
     g = lambda k, d="": p.get(k, d)
-    b = lambda: "" if int(p.get("body", -1) or -1) < 0 else f" · Body {int(p['body']) + 1}"
+    b = lambda: "" if int(p.get("body", -1) if p.get("body") is not None else -1) < 0 else f" · Body {int(p['body']) + 1}"
     try:
         return {
             "sketch_extrude": lambda: f"Extrude {float(g('distance', 10)):g} mm {g('direction', 'up')} ({g('mode', 'new')})",

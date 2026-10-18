@@ -65,17 +65,16 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
     mm = m.copy(); mm.merge_vertices()
     if len(mm.vertices) > MAX_VERTS:
         raise OpError(f"Too detailed to sculpt here ({len(mm.vertices):,} points; limit {MAX_VERTS:,}).")
-    v = mm.vertices.copy()
-    sets = [(dabs, n0, grab)]
-    if p.get("symmetry_x"):
-        M = np.array([-1.0, 1, 1])
-        sets.append((dabs * M, n0 * M, grab * M))
-    A = deg = None
-    if brush == "grab":
-        dabs_use = [(d[:1], n, g) for d, n, g in sets]       # grab: one dab at the start, moved by delta
-    else:
-        dabs_use = sets
-    for D, n, g in dabs_use:
+    v0 = mm.vertices.copy()
+    # X symmetry mirrors about the model's own centre plane (QA B5), not world x = 0;
+    # a client can pass the plane it showed the user as `sym_x`.
+    cx = float(p["sym_x"]) if isinstance(p.get("sym_x"), (int, float)) and np.isfinite(p["sym_x"]) else float(mm.bounds.mean(axis=0)[0])
+    M = np.array([-1.0, 1, 1])
+    nb = {}
+
+    def run(D, n, g):
+        v = v0.copy()
+        D = D[:1] if brush == "grab" else D                  # grab: one dab at the start, moved by delta
         for c in D:
             d = np.linalg.norm(v - c, axis=1)
             idx = np.nonzero(d < r)[0]
@@ -88,9 +87,9 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
                 vn = trimesh.Trimesh(v, mm.faces, process=False).vertex_normals[idx]
                 v[idx] += vn * (w * 0.15 * r)[:, None]
             elif brush == "smooth":
-                if A is None:
-                    A, deg = _neighbours(mm)
-                avg = (A[idx] @ v) / deg[idx, None]
+                if "A" not in nb:
+                    nb["A"], nb["deg"] = _neighbours(mm)
+                avg = (nb["A"][idx] @ v) / nb["deg"][idx, None]
                 v[idx] += (avg - v[idx]) * w[:, None]
             elif brush == "pinch":
                 t = c - v[idx]
@@ -101,22 +100,48 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
                 v[idx] -= np.outer(((v[idx] - ctr) @ n) * w, n)
             elif brush == "grab":
                 v[idx] += np.outer(w / max(s, 1e-9), g)          # grab follows the finger fully at the centre
+        return v - v0
+
+    d1 = run(dabs, n0, grab)
+    if p.get("symmetry_x"):
+        mir = dabs.copy(); mir[:, 0] = 2 * cx - mir[:, 0]
+        dm = run(mir, n0 * M, grab * M)                     # covers vertices with no mirror partner
+        # Exact symmetry (QA B6): both halves come from ONE stroke field. For a vertex whose mirror
+        # partner exists, its mirrored contribution is the partner's displacement, reflected.
+        from scipy.spatial import cKDTree
+        q = v0.copy(); q[:, 0] = 2 * cx - q[:, 0]
+        dist, j = cKDTree(v0).query(q)
+        tol = max(1e-6, 1e-4 * float(np.max(mm.extents)))
+        ok = dist <= tol
+        dm[ok] = d1[j[ok]] * M
+        d1 = d1 + dm
+    v = v0 + d1
     out = _new(v, mm.faces)
     return out, {"message": f"{brush.title()} stroke ({len(dabs)} dabs, {r:g} mm brush{', X symmetry' if p.get('symmetry_x') else ''})."}
+
+
+MAX_REMESH_FACES = 200_000      # = what the CAD workspace can show and sculpt (api/cad.MAX_SCENE_FACES)
 
 
 def op_remesh(m: trimesh.Trimesh, p: dict):
     """Uniform detail: split triangles until no edge is longer than `edge` mm (adds points to sculpt)."""
     e = _f(p, "edge", 1.0, 0.05, 100)
     mm = m.copy(); mm.merge_vertices()
-    est = float(mm.area) / (0.43 * e * e)
-    if est > 1_500_000:
-        raise OpError(f"That would make about {est:,.0f} triangles. Use a larger edge length.")
+    # subdivide_to_size halves every long edge until it fits, so a face whose longest edge is L
+    # becomes 4**ceil(log2(L/e)) faces. Sum that (exact for the splitter; the old area estimate was ~3x low).
+    longest = mm.edges_unique_length[mm.faces_unique_edges].max(axis=1) if len(mm.faces) else np.zeros(0)
+    k = np.ceil(np.log2(np.maximum(longest / e, 1.0)))
+    est = float(np.sum(4.0 ** np.minimum(k, 12)))
+    if est > MAX_REMESH_FACES:
+        raise OpError(f"That would make about {est:,.0f} triangles; the CAD workspace handles up to "
+                      f"{MAX_REMESH_FACES:,}. Use a larger edge length (or remesh only once).")
     try:
         v, f = trimesh.remesh.subdivide_to_size(mm.vertices, mm.faces, max_edge=e, max_iter=12)
     except ValueError as er:
         raise OpError(f"Remesh failed: {er}")
     out = _new(v, f); out.merge_vertices()
+    if len(out.faces) > MAX_REMESH_FACES:
+        raise OpError(f"Remesh made {len(out.faces):,} triangles (limit {MAX_REMESH_FACES:,}); left unchanged. Use a larger edge length.")
     return out, {"message": f"Remeshed to ≤ {e:g} mm edges ({len(out.faces):,} triangles)."}
 
 
@@ -129,3 +154,7 @@ def label(op, p):
     if op == "sculpt_stroke":
         return f"Sculpt {str(p.get('brush', '')).title()} ({float(p.get('radius', 5)):g} mm)" + (" · X sym" if p.get("symmetry_x") else "")
     return None
+
+
+from . import meshedit as _meshedit   # noqa: E402  register even when this module is imported first (QA B15)
+_meshedit.OPS.update(OPS)

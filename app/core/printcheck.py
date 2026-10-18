@@ -56,7 +56,11 @@ def run(m: trimesh.Trimesh, bed, process: str = "fdm", min_wall: float | None = 
         raise ValueError("process must be fdm | resin")
     wall = MIN_WALL_MM[process] if min_wall is None else float(min_wall)
     ov = orient.overhang(m) if len(m.faces) else {}
-    th = thickness.analyze(m, wall)
+    from . import guard
+    try:
+        th = guard.run(thickness.analyze, m, wall, mem_mb=1200, timeout=60)
+    except guard.Tripped:
+        th = {"min_wall_mm": wall, "ok": False, "reason": "Thickness check skipped: it needed more memory or time than allowed. Simplify first."}
     bedfit = fits_bed(m, tuple(bed))
     issues = []
     if not bedfit["fits_any_axis_orientation"]:

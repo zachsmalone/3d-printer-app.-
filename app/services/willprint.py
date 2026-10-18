@@ -22,7 +22,23 @@ def bed_fit(size, printer_id) -> dict:
             "fit_scale_pct": None if fits else max(1, int(scale * 100))}
 
 
+THIN_MAX_FACES = 150_000     # above this the ray-cast index costs GBs: skip with a note (QA B1)
+
+
 def thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
+    """Bounded wrapper: size cap first, then the ray cast in a memory-capped child (core/guard.py)."""
+    if len(mesh.faces) > THIN_MAX_FACES:
+        return {"ok": None, "skipped": "too_detailed", "thin_fraction": None, "min_mm": min_mm,
+                "note": f"Thin-wall check skipped: the model has {len(mesh.faces):,} triangles (checked up to {THIN_MAX_FACES:,})."}
+    from ..core import guard
+    try:
+        return guard.run(_thin_walls, mesh, min_mm, mem_mb=1200, timeout=60)
+    except guard.Tripped:
+        return {"ok": None, "skipped": "limit", "thin_fraction": None, "min_mm": min_mm,
+                "note": "Thin-wall check skipped: it needed more memory or time than allowed."}
+
+
+def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     """Cast a ray inward from sampled surface points; the distance to the opposite surface is the local wall thickness."""
     if len(mesh.faces) == 0:
         return {"ok": False, "thin_fraction": 1.0, "min_mm": min_mm}
@@ -51,13 +67,17 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
     min_wall = ps.line_width(n) if n else 0.4      # resin: 0.4 mm is a common minimum wall
     thin = thin_walls(mesh, min_wall)
     checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message}}
-    states = [fit["ok"], thin["ok"], slices_ok]
+    tiny = bool(size) and min(size) < 2 * min_wall            # B11: thinner overall than two lines
+    if tiny:
+        thin = {**thin, "ok": False, "note": f"The whole part is under {2 * min_wall:g} mm thick."}
+        checks["thin_wall"] = thin
+    states = [fit["ok"], thin["ok"] if not thin.get("skipped") else True, slices_ok]
     if fit["ok"] is False or slices_ok is False:
         verdict, label = "no", "Won't print as is"
     elif thin["ok"] is False:
         verdict, label = "maybe", "Might print: thin walls"
     elif all(s is True for s in states):
-        verdict, label = "yes", "Will print"
+        verdict, label = "yes", "Will print" + (" (thin-wall check skipped)" if thin.get("skipped") else "")
     else:
         verdict, label = "likely", "Fits: not sliced yet"
     tips = []
