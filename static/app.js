@@ -233,8 +233,9 @@ async function resumePending() {        /* the scanner was down: re-check the pa
     S.pending = null; $("#btnBuild").textContent = "Build my model";
     buildDone(r);
   } catch (e) {
+    if (e.status === 422) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg(e.message || "That file was flagged by the malware scanner. Nothing of it was kept — please choose a different photo."); return; }   /* terminal: the parked upload was discarded */
     if (e.status === 404) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg("Your parked upload is no longer available — please choose your photo again."); return; }
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); return; }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); return; }   /* parked upload RETAINED: press Build to retry */
     toast("Resume didn't work: " + (e.message || "something went wrong") + " Your upload is still parked — try again.", "err");
   } finally { $("#busy").hidden = true; $("#btnBuild").disabled = !S.file; S.building = false; }
 }

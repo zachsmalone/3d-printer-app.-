@@ -53,7 +53,9 @@ class _Handler(BaseHTTPRequestHandler):
             cred, given = parts["Credential"], parts["Signature"]
             values = {h.lower(): self.headers.get(h, "").strip() for h in signed}
             canonical_headers = "".join(f"{h}:{values[h]}\n" for h in signed)
-            canonical = "\n".join([self.command, quote(u.path, safe="/"), "", canonical_headers,
+            cq = "&".join(f"{quote(k, safe='-_.~')}={quote(v, safe='-_.~')}"
+                          for k, v in sorted(parse_qsl(u.query)))
+            canonical = "\n".join([self.command, quote(u.path, safe="/"), cq, canonical_headers,
                                    parts["SignedHeaders"], self.headers.get("x-amz-content-sha256", "")])
             amz = self.headers.get("x-amz-date", "")
         _key, datestamp, region, service, _tail = cred.split("/")
@@ -365,3 +367,24 @@ def test_persist_failure_prevents_local_removal(s3, monkeypatch):
     # the build is still there locally — the refusal worked
     from app.services.history import store
     assert store.get(bid) is not None
+
+
+def test_list_requests_tamper_rejected(s3):
+    """The SigV4 check for ListObjectsV2 covers the QUERY STRING: changing prefix or
+    continuation-token after signing must 403, not silently list something else."""
+    import httpx
+    from app.services import objectstore
+    for i in range(7):
+        objectstore.put(f"builds/t{i}/model.stl", b"x")
+    cfg = objectstore._cfg()
+    # sign a legitimate list request...
+    url = str(httpx.URL(objectstore._bucket_url(cfg)).copy_with(
+        params={"list-type": "2", "prefix": "builds/t", "max-keys": "5"}))
+    headers = objectstore._sign_request("GET", url, {}, b"", cfg)
+    # ...then tamper the prefix AFTER signing: the signature no longer covers the request
+    bad = httpx.URL(url).copy_with(params={"list-type": "2", "prefix": "builds/", "max-keys": "5"})
+    with httpx.Client() as c:
+        r = c.get(str(bad), headers=headers)
+        assert r.status_code == 403, r.status_code           # query string is signed: tampering fails
+        ok = c.get(url, headers=headers)
+        assert ok.status_code == 200                         # the untampered request still works

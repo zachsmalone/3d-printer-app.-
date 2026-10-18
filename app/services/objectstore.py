@@ -62,10 +62,17 @@ def _sign_request(method: str, url: str, headers: dict, payload: bytes, cfg: dic
     headers["x-amz-content-sha256"] = hashlib.sha256(payload).hexdigest()
     signed_headers = ";".join(sorted(k.lower() for k in headers))
     canonical_headers = "".join(f"{k.lower()}:{headers[k].strip()}\n" for k in sorted(headers, key=str.lower))
+    from urllib.parse import parse_qsl, urlsplit
+    # canonical query string (SigV4): every param sorted, strictly percent-encoded. ListObjectsV2
+    # requests carry query params — they MUST be covered by the signature (a real provider
+    # rejects a request whose query is not signed).
+    pairs = sorted((quote(k, safe="-_.~"), quote(v, safe="-_.~"))
+                   for k, v in parse_qsl(urlsplit(url).query, keep_blank_values=True))
+    cq = "&".join(f"{k}={v}" for k, v in pairs)
     canonical = "\n".join([
         method,
         quote(httpx.URL(url).path or "/", safe="/"),
-        "",                                  # no query params on these calls
+        cq,
         canonical_headers,
         signed_headers,
         headers["x-amz-content-sha256"],
