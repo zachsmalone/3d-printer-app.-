@@ -95,7 +95,7 @@ function resize() {
   renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
 }
 new ResizeObserver(resize).observe(stage); resize();
-function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); syncCube(); placeLabels(); }
+function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); syncCube(); placeLabels(); placeCtx(); }
 
 const FIN = { matte: [0.9, 0], satin: [0.55, 0.05], gloss: [0.2, 0.05], metal: [0.3, 0.9], glass: [0.05, 0] };
 const PALETTE = ["#8fb0e0", "#e0a47a", "#9ad1a5", "#d6a3e0", "#e6d27a", "#7ad6d6", "#e08f9a"];
@@ -167,7 +167,7 @@ function pickBody(ev) {
 function toScreen(v) { const p = v.clone().project(camera), r = renderer.domElement.getBoundingClientRect(); return [(p.x + 1) / 2 * r.width, (1 - p.y) / 2 * r.height, p.z]; }
 function pickEdge(ev) {
   const r = renderer.domElement.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
-  let best = null, bd = 14;
+  let best = null, bd = ev.pointerType === "touch" ? 24 : 14;
   for (const g of world.children) {
     if (!g.visible) continue;
     const a = g.children[1].geometry.attributes.position.array;
@@ -284,6 +284,7 @@ const HINTS = {
   visualize: ["Visualize", "Pick a colour and finish for each body."],
 };
 function setTool(id) {
+  hideCtx();
   controls.touches.TWO = id === "sculpt" ? THREE.TOUCH.DOLLY_ROTATE : THREE.TOUCH.DOLLY_PAN;   // sculpt: one finger sculpts, two orbit
   if (id !== "sculpt") ring.visible = false;
   S.tool = id; renderRail(); $("#cwTool").hidden = true;
@@ -386,6 +387,7 @@ const TOOL_PANELS = {
 
 /* ---------------------------------------------------------------- server round trips */
 async function load(keepCam) {
+  hideCtx();
   if (!S.bid) { S.scene = null; buildWorld(); renderHist(); return; }
   S.scene = await api(`/api/cad/${S.bid}/scene`);
   S.appearance = S.scene.appearance || {};
@@ -545,6 +547,7 @@ function planeFromFace(f) {
 let eidN = 1;
 const newId = () => { const used = new Set(S.sk.entities.map(e => e.id)); while (used.has("e" + eidN)) eidN++; return "e" + eidN++; };
 function startSketch(plane, sketch = null, editStep = 0) {
+  hideCtx();
   S.mode = "sketch"; S.tool = null; $("#cwTool").hidden = true;
   const F = frameOf(plane);
   S.sk = { plane, F, entities: structuredClone(sketch?.entities || []), constraints: structuredClone(sketch?.constraints || []), sel: new Set(), tool: "line",
@@ -972,6 +975,68 @@ async function endStroke(ev) {
 stage.addEventListener("pointerup", endStroke, true);
 stage.addEventListener("pointercancel", endStroke, true);
 
+/* ---------------------------------------------------------------- in-canvas context actions + push/pull handle */
+let CTX = null;
+function hideCtx() { if (CTX) { CTX.bar.remove(); CTX.handle?.remove(); CTX = null; } }
+function placeCtx() {
+  if (!CTX) return;
+  const [x, y] = toScreen(CTX.at); CTX.bar.style.left = x + "px"; CTX.bar.style.top = y + "px";
+  if (CTX.handle) { const [hx, hy] = toScreen(CTX.at.clone().addScaledVector(S.selFace.normal, CTX.len + (CTX.d || 0))); CTX.handle.style.left = hx + "px"; CTX.handle.style.top = hy + "px"; }
+}
+function showCtx(kind, at) {
+  hideCtx();
+  const bar = document.createElement("div"); bar.className = "cw-ctx"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", kind === "face" ? "Face actions" : "Edge actions");
+  if (kind === "face") bar.innerHTML = `<label class="sr-only" for="ctxD">Push or pull distance in mm</label><input id="ctxD" type="number" step="any" inputmode="decimal" value="0" title="Push/pull distance (mm): type a value or drag the arrow">
+    <button class="primary" data-c="pp" title="Move this face by the distance (push/pull)">Push/Pull</button><button data-c="sk" title="Sketch on this face">Sketch</button>
+    <button data-c="sh" title="Shell (hollow) the body">Shell</button><button data-c="fa" title="Round all outside edges">Fillet all</button><button data-c="sc" title="Sculpt mode">Sculpt</button><button data-c="x" aria-label="Close">✕</button>`;
+  else bar.innerHTML = `<label class="sr-only" for="ctxD">Radius in mm</label><input id="ctxD" type="number" step="any" inputmode="decimal" value="1" title="Radius / size (mm)">
+    <button class="primary" data-c="fi">Fillet</button><button data-c="ch">Chamfer</button><button data-c="ms" title="Measure this edge">Length</button><button data-c="x" aria-label="Close">✕</button>`;
+  stage.append(bar);
+  CTX = { bar, at: at.clone(), kind, len: 0, d: 0 };
+  if (kind === "face") {
+    const box = new THREE.Box3().setFromObject(world); CTX.len = Math.max(6, box.getSize(new THREE.Vector3()).length() * 0.12);
+    const hd = document.createElement("div"); hd.className = "cw-handle"; hd.textContent = "⇕"; hd.setAttribute("role", "slider"); hd.setAttribute("aria-label", "Drag to push or pull the face"); hd.tabIndex = 0;
+    stage.append(hd); CTX.handle = hd;
+    hd.addEventListener("pointerdown", ev => { ev.stopPropagation(); ev.preventDefault(); hd.setPointerCapture(ev.pointerId); CTX.drag = true; controls.enabled = false; CTX.base = facePreviewStart(); });
+    hd.addEventListener("pointermove", ev => {
+      if (!CTX?.drag) return;
+      ray.setFromCamera(ndc(ev), camera);   // closest point on the face-normal line to the pointer ray
+      const p0 = CTX.at, n = S.selFace.normal, w0 = p0.clone().sub(ray.ray.origin), b = n.dot(ray.ray.direction), dd = n.dot(w0), e = ray.ray.direction.dot(w0), den = 1 - b * b;
+      if (Math.abs(den) < 1e-6) return;
+      let t = (b * e - dd) / den - CTX.len; const g = S.snap ? S.grid / 10 : 0; if (g) t = Math.round(t / g) * g;
+      CTX.d = t; $("#ctxD").value = fmt(t); facePreview(t);
+    });
+    hd.addEventListener("pointerup", () => { if (!CTX?.drag) return; CTX.drag = false; controls.enabled = true; if (Math.abs(CTX.d) > 1e-6) ctxRun("pp"); });
+  }
+  bar.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if (b) ctxRun(b.dataset.c); });
+  bar.querySelector("#ctxD").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") ctxRun(kind === "face" ? "pp" : "fi"); });
+  hint(kind === "face" ? "Face" : "Edge", kind === "face" ? "Drag the arrow or type a distance to push/pull; or sketch on it." : "Type a radius, then Fillet or Chamfer this edge (approximate).");
+}
+function facePreviewStart() {   // remember positions on the picked face's plane for a live preview
+  const out = [], { point, normal } = S.selFace, tol = 1e-3 * Math.max(1, new THREE.Box3().setFromObject(world).getSize(new THREE.Vector3()).length());
+  for (const g of world.children) { if (g.userData.body !== S.selBody) continue; const a = g.children[0].geometry.attributes.position.array, idx = [];
+    for (let i = 0; i < a.length; i += 3) if (Math.abs((a[i] - point.x) * normal.x + (a[i + 1] - point.y) * normal.y + (a[i + 2] - point.z) * normal.z) < tol) idx.push(i);
+    out.push({ g, idx, orig: idx.map(i => [a[i], a[i + 1], a[i + 2]]) }); }
+  return out;
+}
+function facePreview(t) {
+  const n = S.selFace.normal;
+  for (const { g, idx, orig } of CTX.base || []) { const pos = g.children[0].geometry.attributes.position; idx.forEach((i, k) => { pos.array[i] = orig[k][0] + n.x * t; pos.array[i + 1] = orig[k][1] + n.y * t; pos.array[i + 2] = orig[k][2] + n.z * t; }); pos.needsUpdate = true; g.children[0].geometry.computeVertexNormals(); }
+}
+async function ctxRun(c) {
+  if (!CTX) return;
+  const v = parseFloat($("#ctxD").value), f = S.selFace, e = S.selEdges[0];
+  if (c === "x") { hideCtx(); return deselect(); }
+  hideCtx();
+  if (c === "pp") { if (!v) return msg("Type or drag a distance first."); return addOp("face_offset", { point: f.point.toArray(), normal: f.normal.toArray(), distance: v }); }
+  if (c === "sk") return startSketch(planeFromFace(f));
+  if (c === "sh") return setTool("shell");
+  if (c === "fa") { S.selEdges = []; return setTool("fillet"); }
+  if (c === "sc") return setTool("sculpt");
+  if (c === "fi" || c === "ch") return addOp("round_edges", { style: c === "fi" ? "fillet" : "chamfer", radius: v || 1, body: e.body, edges: [[e.a.toArray(), e.b.toArray()]] });
+  if (c === "ms") { S.measPts = [e.a, e.b]; setMeasLabel(`${fmt(e.a.distanceTo(e.b))} mm`, e.a.clone().add(e.b).multiplyScalar(0.5)); drawSelection(); renderSkLabels(); }
+}
+
 /* ---------------------------------------------------------------- stage pointer routing */
 let downAt = null;
 renderer.domElement.addEventListener("pointerdown", ev => {
@@ -988,6 +1053,14 @@ renderer.domElement.addEventListener("pointerup", ev => {
 renderer.domElement.addEventListener("dblclick", () => { if (S.mode === "sketch") endChain(); });
 function modelTap(ev) {
   if (S.tool === "sculpt") return;
+  if (!S.tool && !S.measure) {               // direct modelling: tap an edge or a face -> floating actions
+    const e = pickEdge(ev), h = pickBody(ev);
+    if (e && (!h || e.a.distanceTo(h.point) + e.b.distanceTo(h.point) - e.a.distanceTo(e.b) < 2)) {
+      S.selEdges = [e]; S.selFace = null; S.selBody = e.body; drawSelection(); showCtx("edge", e.a.clone().add(e.b).multiplyScalar(0.5)); return;
+    }
+    if (h) { S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal }; S.selEdges = []; drawSelection(); showCtx("face", h.point); return; }
+    hideCtx(); deselect(); return;
+  }
   if (S.measure) {
     const e = pickEdge(ev), h = pickBody(ev);
     if (h) { if (S.measPts.length >= 2) S.measPts = []; S.measPts.push(h.point); }
@@ -1007,6 +1080,7 @@ function modelTap(ev) {
   if (S.tool && TOOL_PANELS[S.tool] && !["extrude", "revolve", "visualize"].includes(S.tool)) TOOL_PANELS[S.tool]();
 }
 function deselect() {
+  hideCtx();
   S.selBody = -1; S.selFace = null; S.selEdges = []; S.measPts = []; setMeasLabel(null); renderSkLabels();
   if (S.sk) { S.sk.sel.clear(); drawSketch(); }
   drawSelection();
