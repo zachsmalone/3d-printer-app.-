@@ -147,3 +147,18 @@ def test_api_sketch_helpers_and_errors():
     assert c.post("/api/cad/new", json={"op": "pattern", "params": {}}).status_code == 400
     open_line = {"entities": [{"id": "a", "type": "line", "p0": [0, 0], "p1": [5, 0]}]}
     assert c.post("/api/cad/new", json={"op": "sketch_extrude", "params": {"sketch": open_line}}).status_code == 422
+
+
+def test_scene_endpoint_and_static_page():
+    import base64
+    import numpy as np
+    bid = _new()["id"]
+    s = c.get(f"/api/cad/{bid}/scene").json()
+    assert len(s["bodies"]) == 1 and s["downloads"]["stl"].endswith("/stl")
+    pos = np.frombuffer(base64.b64decode(s["bodies"][0]["positions"]), "<f4").reshape(-1, 3)
+    edges = np.frombuffer(base64.b64decode(s["bodies"][0]["edges"]), "<f4").reshape(-1, 6)
+    assert pos.max() == pytest.approx(20) and len(edges) == 12          # a box has 12 sharp edges
+    page = c.get("/static/cad.html").text
+    assert "cad.js" in page and "cwRail" in page and "<script>try{" in page
+    js = c.get("/static/cad.js").text
+    assert "/api/cad/sketch/solve" in js and "Shapr3D" not in js
