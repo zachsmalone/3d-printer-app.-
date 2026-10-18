@@ -145,6 +145,19 @@ def account_for_session(session, service=None) -> tuple[str | None, dict | None]
     return link_auth_account(session.account_id, name)
 
 
+def _legacy_record_upgraded(request: Request, user: dict) -> bool:
+    """Has this legacy cookie account been upgraded to a real passkey account?
+    True only when the auth service is mounted AND knows the account; an auth outage
+    must not lock people out of their still-cookie accounts."""
+    svc = _auth_service(request)
+    if svc is None or not user or not user.get("id"):
+        return False
+    try:
+        return svc.is_upgraded(user["id"])
+    except Exception:
+        return False
+
+
 def auth_actor(request: Request) -> Actor | None:
     """The account of a live passkey/email session on this request, or None (no auth mounted / no or dead session)."""
     svc = _auth_service(request)
@@ -190,6 +203,14 @@ def get_actor(request: Request, response: Response) -> Actor:
     sid = request.cookies.get(COOKIE)
     if sid and sid.startswith("acct_"):          # passkey-account keys are never valid as a browser cookie
         sid = None
+    user = USERS.read().get(sid) if (sid and len(sid) >= 16) else None
+    if user and _legacy_record_upgraded(request, user):
+        # The cookie account this browser presents has been secured with a passkey:
+        # the cookie is retired authority, not a fallback identity. Otherwise a copy of
+        # the old cookie on another browser could silently restore the old identity
+        # after a sign-out (or a revoked session) — the sign-out authority hole. The sid
+        # is dropped too, so it can never act as an ownership key for the old builds.
+        user, sid = None, None
     if not sid or len(sid) < 16:
         sid = secrets.token_urlsafe(24)
         response.set_cookie(COOKIE, sid, max_age=3600 * 24 * 365, **cookie_args(request))

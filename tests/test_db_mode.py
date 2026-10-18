@@ -116,16 +116,23 @@ def test_buildstore_favorite_saved_and_rolloff_parity(db_mode):
     _mkbuild(bs, "b2", "alice")
     bs.set_favorite("b1", True)
     bs.set_saved("b2")
-    # at capacity: the oldest UNstarred build (b2) rolls off, starred b1 stays
-    bs.reserve("alice")
-    assert [m["id"] for m in bs.list("alice")] == ["b1"]
-    assert bs.get("b1")["favorite"] is True
-    # all starred + at capacity => HistoryFull, nothing removed
-    _mkbuild(bs, "b3", "alice")
-    bs.set_favorite("b3", True)
+    # at capacity with BOTH protected (starred + saved): nothing rolls off — HistoryFull
     with pytest.raises(HistoryFull):
         bs.reserve("alice")
-    assert len(bs.list("alice")) == 2
+    assert sorted(m["id"] for m in bs.list("alice")) == ["b1", "b2"]
+    # an ordinary build DOES roll off when a slot is needed
+    bs2 = BuildStore(root=db_mode / "out2", limit=2)
+    _mkbuild(bs2, "c1", "bob")
+    _mkbuild(bs2, "c2", "bob")
+    bs2.set_favorite("c2", True)
+    bs2.reserve("bob")                                   # oldest unprotected (c1) rolls off
+    assert [m["id"] for m in bs2.list("bob")] == ["c2"]
+    # and all-protected at capacity => HistoryFull, nothing removed
+    _mkbuild(bs2, "c3", "bob")
+    bs2.set_saved("c3")
+    with pytest.raises(HistoryFull):
+        bs2.reserve("bob")
+    assert len(bs2.list("bob")) == 2
 
 
 def test_buildstore_delete_removes_row_and_dir(db_mode):
@@ -315,3 +322,25 @@ def test_concurrent_upload_limit_admits_at_most_the_limit(db_mode, tmp_path):
         assert p.returncode == 0, err.decode()[-400:]
         total += int(out.strip())
     assert total == 3                                            # limit is 3: never more, exactly the limit
+
+
+def test_multithreaded_admission_never_exceeds_the_limit(db_mode, tmp_path):
+    """Same-process threads hammering the count-and-insert: admitted total == the limit, exactly."""
+    import threading
+    import time as _t
+    limit = 5
+    admitted = []
+    lock = threading.Lock()
+
+    def hammer():
+        for _ in range(10):
+            if db.upload_events_hit("acct-mt", _t.time(), 3600, limit):
+                with lock:
+                    admitted.append(1)
+
+    threads = [threading.Thread(target=hammer) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(admitted) == limit           # never more than the limit; exactly the limit

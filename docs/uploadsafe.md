@@ -121,3 +121,46 @@ error messages.
   their own geometry representations are counted as whatever triangles they
   declare in the core model part, or refused if unresolvable.
 - It does not detect malware or scanning-probe payloads; it is a resource guard.
+
+## Handoff contract: wiring the gate into /api/edit/new (and /api/edit/new-multi)
+
+`app/api/edit.py` (and the `static/edit.js` flow that calls it) belongs to the Copilot
+workstream and is deliberately not modified here. This is the exact integration once that
+file is next touched — it is three lines at the top of each upload-reading handler
+(`new_project`, `new_multi`), right where the UploadFile is read and BEFORE any parsing:
+
+```python
+from ..services import uploadgate          # module level
+
+# read with the SAME cap the route already enforces (MAX_UPLOAD + 1, then 413 over):
+data = file.file.read(MAX_UPLOAD + 1) if file else b""
+if len(data) > MAX_UPLOAD:
+    raise HTTPException(413, "file too large")
+try:
+    checked = uploadgate.gate(data, actor.sid, source="edit")
+except uploadgate.GateError as e:
+    raise HTTPException(e.status, e.message)
+# checked.scan_state == "unscanned" (scanner on but unreachable) -> the upload is NOT built:
+# park it (services/quarantine.py stage_pending: original bytes + request context, 0700) and
+# return 202 {"status": "pending_scan", "pending_id": ...} — see app/api/builds.py's generate
+# flow + /api/uploads/resume for the exact pattern (resume re-runs the whole pipeline).
+```
+
+The gate must run BEFORE any parsing of the bytes, and the returned scan state must be honored
+(a pending upload is never parsed, built, served, shared, or mirrored to object storage; only
+a clean scan — via resume — ever builds it, and an infected verdict discards it).
+
+Note for the /edit/new wiring: do NOT reuse /api/uploads/resume as-is — it replays into the
+photo /api/generate pipeline. Editor uploads need their own route-specific, validated resume
+(same pattern: park bytes + request context at the service boundary, owner-only resume that
+re-runs the editor's own pipeline, discard on infected, retain on failure) inside the
+protected workstream.
+
+What this buys (all already implemented + tested in `app/services/uploadgate.py`):
+  * per-account hourly rate limit (shared with photo uploads, db-backed in db mode);
+  * the uploadsafe content checks (mesh bombs, archive caps, masquerading files);
+  * the audit log entry (never file bytes) in DATA/uploads.log.jsonl;
+  * ClamAV verdicts: infected -> refused + never stored; scanner-down -> parked as a pending
+    upload (never built) until a clean scan via /api/uploads/resume builds it.
+
+Acceptance test: `tests/test_edit_new_gate.py` (marked xfail until the wiring lands).

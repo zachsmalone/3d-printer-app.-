@@ -1,6 +1,7 @@
 """Build-file retention, favorites, the 20-build cap and the disk guard (Kenji's cleanup rules + Yami's approval).
-Rules under test: starred builds are NEVER removed by age, by the cap, or by a low disk (only by their owner / 'Delete my stuff');
-ordinary builds go after 7 days, builds shared or sent to a class after 30; cleanup only ever looks inside the per-build folder."""
+Rules under test: starred OR saved builds are NEVER removed by age, by the cap, or by a low disk
+(only by their owner); ordinary builds go after 30 days (KEEP_UNSAVED_DAYS); cleanup only ever
+looks inside the per-build folder. The expiry boundary is tested with fixed integer timestamps."""
 import json, logging, os, shutil, time
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -45,26 +46,37 @@ def test_only_the_owner_can_star_and_the_flag_shows_in_the_list():
     assert row["favorite"] is True and row["expires"] is None
 
 
-def test_age_rules_7_days_ordinary_30_days_saved_never_for_starred():
-    c = client(ADULT); plain, shared, starred, old_star = (photo_build(c) for _ in range(4))
+def test_age_rules_30_days_ordinary_saved_and_starred_exempt():
+    # the policy function, exactly: ordinary = 30 days, saved/starred exempt
+    assert retention.keep_days({}) == 30.0
+    assert retention.keep_days({"saved": True}) is None
+    assert retention.keep_days({"favorite": True}) is None
+    assert retention.keep_days({"saved": True, "favorite": True}) is None
+    # enforcement, with margins either side of the 30-day line
+    c = client(ADULT); plain, shared, starred, old_star, old_saved = (photo_build(c) for _ in range(5))
     r = c.post("/api/showcase", json={"build_id": shared, "title": "Saved one", "accept_guidelines": True, "nsfw": False, "visibility": "private"}); assert r.status_code == 200, r.text
     assert store.get(shared)["saved"] is True
     c.post(f"/api/builds/{starred}/favorite", json={"favorite": True}); c.post(f"/api/builds/{old_star}/favorite", json={"favorite": True})
-    for bid in (plain, shared, starred): _age(bid, 8)
+    c.post("/api/showcase", json={"build_id": old_saved, "title": "Old saved", "accept_guidelines": True, "nsfw": False, "visibility": "private"})
+    _age(old_saved, 400)
+    for bid in (plain, shared, starred): _age(bid, 29)
     _age(old_star, 400)
     out = retention.purge_expired()
-    assert not _exists(plain) and _exists(shared) and _exists(starred) and _exists(old_star)               # 8 days: ordinary gone, saved + starred stay
-    assert out["expired"] >= 1 and out["kept_starred"] >= 2
-    _age(shared, 31); retention.purge_expired(); assert not _exists(shared)
-    assert _exists(old_star)                                                                               # a starred build 400 days old is still here
+    # a day short of 30: nothing expires; saved/starred never do
+    assert _exists(plain) and _exists(shared) and _exists(starred) and _exists(old_star) and _exists(old_saved)
+    assert out["expired"] == 0
+    _age(plain, 31); retention.purge_expired()
+    assert not _exists(plain)                     # past the 30-day line: ordinary build gone
+    assert _exists(shared) and _exists(starred) and _exists(old_star) and _exists(old_saved)
     assert [x for x in c.get("/api/builds").json()["builds"] if x["id"] == starred][0]["expires"] is None
+    assert [x for x in c.get("/api/builds").json()["builds"] if x["id"] == old_saved][0]["expires"] is None
 
 
 def test_unfinished_folders_go_after_a_day_and_logs_carry_counts_not_names(caplog):
     junk = store.root / "abandoned1"; junk.mkdir(); (junk / "x.bin").write_bytes(b"1")
     fresh = store.root / "fresh1"; fresh.mkdir()
     old = time.time() - 2 * 86400; os.utime(junk, (old, old))
-    c = client(ADULT); bid = photo_build(c); _age(bid, 9)
+    c = client(ADULT); bid = photo_build(c); _age(bid, 31)      # past the 30-day ordinary-build line
     with caplog.at_level(logging.INFO, logger="zeim.cleanup"):
         retention.purge_expired()
     assert not junk.exists() and fresh.exists() and not _exists(bid)
@@ -123,5 +135,66 @@ def test_delete_my_stuff_and_delete_everything_remove_starred_builds_and_their_f
 
 
 def test_defaults_are_documented_and_configurable():
-    assert (config.MAX_BUILDS, config.KEEP_UNSAVED_DAYS, config.KEEP_SAVED_DAYS) == (20, 7, 30)
+    assert (config.MAX_BUILDS, config.KEEP_UNSAVED_DAYS, config.KEEP_SAVED_DAYS) == (20, 30, 30)
     assert "PHOTO3D_KEEP_UNSAVED_DAYS" in open(config.ROOT / "app" / "config.py").read()
+
+
+def test_capacity_of_only_starred_and_saved_builds_is_full_not_evicted(monkeypatch):
+    """Starred/saved builds are never rolled off for capacity: a full history of only-exempt
+    builds raises HistoryFull instead of deleting someone's saved work."""
+    monkeypatch.setattr(config, "UPLOADS_PER_HOUR", 0)     # the gate's hourly limit is not under test here
+    c = client(ADULT)
+    from app.services.history import HistoryFull
+    for i in range(config.MAX_BUILDS):
+        bid = photo_build(c)
+        if i < 2:
+            c.post(f"/api/builds/{bid}/favorite", json={"favorite": True})
+        else:
+            c.post("/api/showcase", json={"build_id": bid, "title": f"S{i}", "accept_guidelines": True,
+                                          "nsfw": False, "visibility": "private"})
+    before = {m["id"] for m in c.get("/api/builds").json()["builds"]}
+    assert len(before) == config.MAX_BUILDS
+    r = c.post("/api/generate", files={"file": ("photo.png", _png_bytes(), "image/png")}, data={"mode": "relief"})
+    assert r.status_code == 409 and r.json()["code"] == "history_full"   # full: refuse, never evict
+    assert {m["id"] for m in c.get("/api/builds").json()["builds"]} == before
+
+
+def test_disk_sweep_skips_saved_builds_too():
+    """The disk-pressure sweep removes oldest UNPROTECTED builds — saved ones are exempt."""
+    c = client(ADULT)
+    plain = photo_build(c)
+    saved = photo_build(c)
+    c.post("/api/showcase", json={"build_id": saved, "title": "Kept", "accept_guidelines": True,
+                                 "nsfw": False, "visibility": "private"})
+    old = time.time() - 40 * 86400
+    for bid in (plain, saved):
+        m = store.get(bid); m["created"] = datetime.fromtimestamp(old, timezone.utc).isoformat(); store.save(m)
+    out = retention.sweep_for_space(now=time.time() + 60) if False else None
+    # direct call with a target that forces sweeping
+    out = retention.sweep_for_space()
+    assert not _exists(plain) and _exists(saved)
+
+
+def _png_bytes():
+    import io
+    from PIL import Image
+    b = io.BytesIO()
+    Image.new("RGB", (50, 40), (1, 2, 3)).save(b, "PNG")
+    return b.getvalue()
+
+
+def test_thirty_day_expiry_boundary_is_exact():
+    """Fixed integer timestamps, no clock dependence: an ordinary build is kept at age 30d-1s
+    and at exactly 30d, and expires at 30d+1s."""
+    c = client(ADULT)
+    bid = photo_build(c)
+    created = 1_000_000_000                            # fixed epoch
+    m = store.get(bid)
+    m["created"] = datetime.fromtimestamp(created, timezone.utc).isoformat()
+    store.save(m)
+    day = 86400
+    assert retention.purge_expired(store, now=created + 29 * day)["expired"] == 0
+    assert retention.purge_expired(store, now=created + 30 * day)["expired"] == 0    # exactly 30d: kept
+    assert _exists(bid)
+    out = retention.purge_expired(store, now=created + 30 * day + 1)
+    assert out["expired"] == 1 and not _exists(bid)                                  # 30d+1s: gone

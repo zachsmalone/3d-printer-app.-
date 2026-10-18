@@ -171,6 +171,8 @@ def save_from_client(incoming: dict) -> dict:
         if q.get("url") and q.get("type") in printers_mod.IMPLEMENTED and not str(q["url"]).lower().startswith(("http://", "https://")):
             raise ValueError("Printer address must start with http:// or https://")
         if q.get("url") and q.get("type") in printers_mod.IMPLEMENTED:
+            if not printers_mod.direct_control_enabled():
+                raise ValueError(printers_mod.DIRECT_OFF_MESSAGE)
             printers_mod.check_url(q["url"])
         q["profile"] = q.get("profile") or ""
         if q["profile"] and q["profile"] not in printers_mod.PROFILES:

@@ -69,3 +69,21 @@ python -m scripts.restore_verify --backup backups/<newest> --target /tmp/drill-$
 
 Log the result (date, backup id, pass/fail, time taken). A restore that has never been
 practiced is a hypothesis, not a backup.
+
+
+## Encryption at rest (age) — done in the script, not a manual step
+
+`scripts/backup.py --encrypt-to <AGE_RECIPIENT>` (or env `ZEIM_BACKUP_AGE_RECIPIENT`) replaces
+the plaintext backup directory with `zeim-<ts>.tar.age` — an age-encrypted tarball. The plaintext
+copy is removed only after the archive exists and is non-empty; if age is missing or fails the
+run exits 1 (never a silent plaintext backup). Retention (14 daily + 8 weekly) prunes the
+archives the same way it pruned directories.
+
+Key management: `age-keygen` makes the keypair; the PUBLIC key (age1...) goes in the env/cron
+on the server, the PRIVATE key file lives ONLY off-site (password manager / offline USB). Restoring:
+
+```
+python -m scripts.restore_verify --backup backups/zeim-...tar.age --identity /path/to/age.key --target /tmp/drill
+```
+
+Drill expectation: decrypt -> checksums -> DB integrity -> app-readable, same as a plaintext drill.

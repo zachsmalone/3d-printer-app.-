@@ -4,7 +4,7 @@ Rules (all configurable by environment variable, see app/config.py):
   * a build the person STARRED (favorite) is never removed by age or by a low disk. Only the person deleting it, or "Delete my stuff"
     / deleting the account, removes it.
   * a build that was SAVED on purpose (shared to the Showcase or sent to a class) is kept 30 days (PHOTO3D_KEEP_SAVED_DAYS);
-  * any other build is kept 7 days (PHOTO3D_KEEP_UNSAVED_DAYS).
+  * any other build is kept 30 days (PHOTO3D_KEEP_UNSAVED_DAYS).
   * a folder with no build metadata at all (a build that never finished) is removed after one day.
 Cleanup only ever looks at the direct sub-folders of the per-build data folder (OUT). It refuses to run if that folder is, or sits inside,
 library/, static/ or the code. Logs say HOW MANY were removed, never which files or whose.
@@ -57,11 +57,18 @@ def _age_days(meta: dict, now: float) -> float:
     return (now - t) / 86400
 
 
+def protected(meta: dict) -> bool:
+    """Starred OR saved (shared to the Showcase): never auto-deleted — not by expiry, not by
+    history-slot eviction, not by disk-pressure sweep. One predicate everywhere."""
+    return bool(meta.get("favorite") or meta.get("saved"))
+
+
 def keep_days(meta: dict) -> float | None:
-    """None = kept until the person deletes it (starred)."""
-    if meta.get("favorite"):
+    """None = kept until the person deletes it. Launch-checklist policy: ordinary builds
+    expire after 30 days; starred AND saved (shared to Showcase) builds are exempt."""
+    if protected(meta):
         return None
-    return float(config.KEEP_SAVED_DAYS if meta.get("saved") else config.KEEP_UNSAVED_DAYS)
+    return float(config.KEEP_UNSAVED_DAYS)
 
 
 def expires_at(meta: dict) -> str | None:
@@ -99,9 +106,11 @@ def purge_expired(bs: BuildStore = _store, now: float | None = None) -> dict:
             if days is None:
                 out["kept_starred"] += 1
             elif _age_days(meta, now) > days:
-                bs.delete(d.name); out["expired"] += 1
                 from ..services import filestore
-                filestore.delete_build(d.name)      # object-storage copy too (best-effort)
+                filestore.delete_build(d.name)      # remote FIRST, durably recorded — raises => local survives
+                bs.delete(d.name); out["expired"] += 1
+    from ..services import quarantine
+    out["pending_expired"] = quarantine.sweep_expired(now)      # parked (scanner-down) uploads are transient too
     if out["expired"] or out["unfinished"]:
         log.info("retention: removed %d expired and %d unfinished builds (%d starred kept)", out["expired"], out["unfinished"], out["kept_starred"])
     return out
@@ -120,10 +129,12 @@ def sweep_for_space(bs: BuildStore = _store, now: float | None = None) -> dict:
     if free_bytes(bs.root) >= target:
         return out
     with bs.lock:
-        metas = [m for m in bs.list() if not m.get("favorite") and _age_days(m, now) * 86400 > 600]
+        metas = [m for m in bs.list() if not protected(m) and _age_days(m, now) * 86400 > 600]
         for m in sorted(metas, key=lambda m: m["created"]):
             if free_bytes(bs.root) >= target:
                 break
+            from ..services import filestore
+            filestore.delete_build(m["id"])        # remote FIRST, durably recorded — raises => local survives
             bs.delete(m["id"]); out["swept"] += 1
     if out["swept"]:
         log.warning("disk low: removed %d oldest unstarred builds to make room", out["swept"])

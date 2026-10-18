@@ -62,10 +62,17 @@ def _sign_request(method: str, url: str, headers: dict, payload: bytes, cfg: dic
     headers["x-amz-content-sha256"] = hashlib.sha256(payload).hexdigest()
     signed_headers = ";".join(sorted(k.lower() for k in headers))
     canonical_headers = "".join(f"{k.lower()}:{headers[k].strip()}\n" for k in sorted(headers, key=str.lower))
+    from urllib.parse import parse_qsl, urlsplit
+    # canonical query string (SigV4): every param sorted, strictly percent-encoded. ListObjectsV2
+    # requests carry query params — they MUST be covered by the signature (a real provider
+    # rejects a request whose query is not signed).
+    pairs = sorted((quote(k, safe="-_.~"), quote(v, safe="-_.~"))
+                   for k, v in parse_qsl(urlsplit(url).query, keep_blank_values=True))
+    cq = "&".join(f"{k}={v}" for k, v in pairs)
     canonical = "\n".join([
         method,
         quote(httpx.URL(url).path or "/", safe="/"),
-        "",                                  # no query params on these calls
+        cq,
         canonical_headers,
         signed_headers,
         headers["x-amz-content-sha256"],
@@ -83,6 +90,10 @@ def _sign_request(method: str, url: str, headers: dict, payload: bytes, cfg: dic
 
 def _object_url(key: str, cfg: dict) -> str:
     return f"{cfg['endpoint']}/{cfg['bucket']}/{quote(key.lstrip('/'))}"
+
+
+def _bucket_url(cfg: dict) -> str:
+    return f"{cfg['endpoint']}/{cfg['bucket']}"
 
 
 def put(key: str, data: bytes, content_type: str = "application/octet-stream") -> str:
@@ -113,6 +124,36 @@ def delete(key: str) -> None:
     with httpx.Client(timeout=60) as c:
         r = c.delete(url, headers=headers)
         r.raise_for_status()
+
+
+def list_keys(prefix: str = "", page_size: int = 1000) -> list[str]:
+    """List the object keys actually IN the bucket (S3 ListObjectsV2, fully paginated via
+    continuation tokens). This is INVENTORY support — what the bucket really holds, which
+    local outputs cannot tell you. Raises on any listing failure (callers record it)."""
+    import xml.etree.ElementTree as ET
+    cfg = _cfg()
+    base = _bucket_url(cfg)
+    keys: list[str] = []
+    token = None
+    with httpx.Client(timeout=60) as c:
+        while True:
+            params = {"list-type": "2", "max-keys": str(min(page_size, 1000))}
+            if prefix:
+                params["prefix"] = prefix
+            if token:
+                params["continuation-token"] = token
+            url = str(httpx.URL(base).copy_with(params=params))
+            headers = _sign_request("GET", url, {}, b"", cfg)
+            r = c.get(url, headers=headers)
+            r.raise_for_status()
+            root = ET.fromstring(r.content)
+            ns = "{http://s3.amazonaws.com/doc/2006-03-01/}"
+            keys += [e.text for e in root.iter(f"{ns}Key")]
+            nxt = root.find(f"{ns}NextContinuationToken")
+            if nxt is None:
+                break
+            token = nxt.text
+    return keys
 
 
 def signed_url(key: str, ttl_s: int = 900) -> str:

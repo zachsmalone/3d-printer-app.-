@@ -7,7 +7,10 @@
 <link rel="icon" type="image/png" href="/static/favicon.png">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/zeim-auth.css">
 <script src="/static/boot.js"></script>
+<script src="/static/zeim-auth.js" defer></script>
+<script src="/static/zeim-account.js" defer></script>
 <script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
 </head>
 <body>
@@ -256,6 +259,8 @@
       <div class="row"><button class="btn" id="editSample">Try a sample model</button></div>
       <h2 style="margin-top:16px"><i>or</i> Edit a Studio build</h2>
       <div class="row"><label for="editFromBuild" class="sr-only">Studio build to edit</label><select id="editFromBuild" style="flex:1"></select><button class="btn" id="editFromBuildGo">Edit it</button></div>
+      <h2 style="margin-top:16px"><i>or</i> Build from primitives</h2>
+      <div class="row"><a class="btn" href="/builder.html">Open the parts builder ▸</a><span class="help" style="align-self:center">Combine boxes, cylinders and more — solids add, holes cut, every size stays editable.</span></div>
       <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your 5 recent builds. Colours from multi-colour builds/3MF files are merged into one mesh.</p>
     </section>
     <section id="editPanel" hidden></section>

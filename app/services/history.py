@@ -13,6 +13,11 @@ and `visibility` field; the same method names work against either backend.
 """
 from __future__ import annotations
 
+
+def _protected(meta: dict) -> bool:
+    """Starred or saved: never evicted for capacity (matches services.retention.protected)."""
+    return bool(meta.get("favorite") or meta.get("saved"))
+
 import json
 import shutil
 import threading
@@ -79,20 +84,27 @@ class BuildStore:
         if db is not None:
             items = db.build_list(owner)
             while len(items) >= self.limit:
-                loose = [m for m in items if not m.get("favorite")]
+                loose = [m for m in items if not _protected(m)]
                 if not loose:
                     raise HistoryFull()
                 oldest = loose[0]
+                from ..services import filestore
+                # remote deletion FIRST and durably recorded — if the queue cannot be persisted
+                # this raises and the local row survives (never orphan remote copies)
+                filestore.delete_build(oldest["id"])
                 db.build_delete(oldest["id"])
                 self._purge_cached(oldest["id"])
                 items = [m for m in items if m["id"] != oldest["id"]]
             return
         items = self.list(owner)
         while len(items) >= self.limit:
-            loose = [m for m in items if not m.get("favorite")]       # starred builds are never rolled off
+            loose = [m for m in items if not _protected(m)]           # starred/saved builds are never rolled off
             if not loose:
                 raise HistoryFull()
-            self.delete(loose[0]["id"])                                 # oldest un-starred build rolls off
+            victim = loose[0]["id"]                                    # oldest un-starred build rolls off
+            from ..services import filestore
+            filestore.delete_build(victim)                            # remote FIRST: raises => local survives
+            self.delete(victim)
             items = self.list(owner)
 
     def set_saved(self, bid: str):

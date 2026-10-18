@@ -143,6 +143,10 @@
         container.appendChild(h(doc, "div", { "class": "zeim-auth-row" }, [
           h(doc, "span", { text: acct.email.hint + " (we only keep a scrambled copy)" }),
           h(doc, "button", { type: "button", text: "Remove", onclick: () => run(() => A.removeEmail(), "Email removed.") })]));
+      } else if (o.emailAvailable === false) {
+        /* The server cannot send email codes: offering the add-a-backup-email form
+           would present a known nonfunctional recovery setup as usable. */
+        container.appendChild(h(doc, "p", { text: "Email backup is not available on this ZEIM server.", "class": "zeim-auth-status" }));
       } else {
         const em = h(doc, "input", { type: "email", autocomplete: "email", placeholder: "you@example.com" });
         const code = h(doc, "input", { inputmode: "numeric", autocomplete: "one-time-code", placeholder: "6-digit code", maxlength: "7" });

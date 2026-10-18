@@ -58,7 +58,8 @@ def _start_retention():
     """Clean up expired build files now and every hour (starred builds are never touched; see services/retention.py)."""
     from .services import retention
     retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
-for r in (builds.router, edit.router, printing.router, printing.files_router, settings_api.router,
+from .api import parts as parts_api
+for r in (builds.router, edit.router, parts_api.router, printing.router, printing.files_router, settings_api.router,
           showcase_extras.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
           export_api.router, calibration_api.router, doctor_api.router):
@@ -128,7 +129,7 @@ def _inline_script_hashes() -> str:
     """CSP hashes of the few inline <script> blocks our own pages have (the importmap, the share-test page) so no 'unsafe-inline' is needed for scripts."""
     import base64, hashlib, re
     out = []
-    for f in ("index.html", "sharetest.html"):
+    for f in ("index.html", "sharetest.html", "builder.html"):
         try:
             html = (STATIC / f).read_text(encoding="utf-8")
         except OSError:
@@ -190,6 +191,12 @@ async def _chat_blocked(request: Request, exc: _ChatBlocked):
     """ONE error shape for every refused text: HTTP 422 (413 too long, 503 filter unavailable) with code, message, context and detail."""
     from fastapi.responses import JSONResponse
     return JSONResponse(status_code=exc.status, content={**exc.payload, "detail": exc.payload.get("message", "")})
+
+
+@app.get("/builder.html", include_in_schema=False)
+def builder_page():
+    """The parts builder — its own page so the (Copilot-owned) edit.js/viewer are never touched."""
+    return FileResponse(STATIC / "builder.html")
 
 
 @app.get("/sharetest", include_in_schema=False)

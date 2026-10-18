@@ -229,6 +229,12 @@ def add_op(bid: str, op: str, params: dict) -> dict:
             params = {**params, "layout": layout_at(meta, cur)}
             params.setdefault("bed", bed_of(meta))
         new, rep = _apply(meta, cur, {"op": op, "params": params})       # raises OpError → nothing is stored
+        # an op may resolve derived values once and ask for them to be SAVED with the step
+        # (sculpt's flatten plane): replay then reuses the stored value instead of
+        # re-deriving a different one after an earlier step changed. Same pattern as "plate".
+        persist = rep.pop("_persist", None) if isinstance(rep, dict) else None
+        if persist:
+            params = {**params, **persist}
         ops = meta["ops"][:meta["head"]]                  # drop the redo tail
         ops.append({"op": op, "params": params, "label": meshedit.label(op, params)})
         meta["ops"] = ops
@@ -274,6 +280,10 @@ def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
         meta["plate_layouts"] = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < i}
         meta["stats"] = _stats(m, meta["title"])
         meta["last_report"] = None
+        # a re-edited step changes the mesh WITHOUT changing head — the exports-staleness
+        # marker (exports_head == head) would otherwise think the files are fresh and
+        # downloads would serve the OLD model. Invalidate it: ensure_exports rewrites.
+        meta["exports_head"] = -1
         store.save(meta)
         store.cache.pop(bid, None)
     return {"rewritten": i, "steps": len(new_ops)}
@@ -285,7 +295,20 @@ def edit_step(bid: str, i: int, params: dict) -> dict:
         raise meshedit.OpError("no such step")
     o = meta["ops"][i - 1]
     params = check_op_text(o["op"], params)
-    _apply(meta, mesh_at(bid, meta, head=i - 1), {"op": o["op"], "params": params})      # validate this step alone first (clear error)
+    # a step may carry values resolved once and persisted with it (sculpt's flatten
+    # plane). If the caller edits the step WITHOUT re-supplying them, the STORED ones
+    # survive — re-deriving them after an earlier step changed would silently move the
+    # target. (The _rewrite below replays with the merged params, so validation holds.)
+    stored = o.get("params") or {}
+    if o["op"] == "sculpt" and "plane" in stored and "plane" not in params:
+        params = {**params, "plane": stored["plane"]}
+    _, rep = _apply(meta, mesh_at(bid, meta, head=i - 1), {"op": o["op"], "params": params})   # validate this step alone first (clear error)
+    # merge any once-resolved values the op asks to persist (sculpt's derived flatten
+    # plane) — same pattern as add_op, so the SAVED step carries them and replays
+    # reuse them instead of re-deriving (e.g. zero-strength -> positive-strength edit).
+    persist = rep.pop("_persist", None) if isinstance(rep, dict) else None
+    if persist:
+        params = {**params, **persist}
     return _rewrite(bid, i, {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)})
 
 

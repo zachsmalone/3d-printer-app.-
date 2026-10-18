@@ -12,7 +12,8 @@ if STORAGE_MODE not in {"json", "db"}:
 # ZEIM Originals: 378 MB, not in git. Deploys must ship library/originals separately (or point PHOTO3D_ORIGINALS at it).
 ORIGINALS = Path(os.environ.get("PHOTO3D_ORIGINALS", str(ROOT / "library" / "originals")))
 MAX_BUILDS = int(__import__("os").environ.get("PHOTO3D_MAX_BUILDS", "20"))   # builds kept per person (oldest un-starred roll off; starred ones never do)
-KEEP_UNSAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_UNSAVED_DAYS", "7"))    # ordinary builds are removed after this many days
+KEEP_UNSAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_UNSAVED_DAYS", "30"))   # ordinary builds: 30 days (launch checklist policy)
+PENDING_MAX_AGE_DAYS = int(__import__("os").environ.get("PHOTO3D_PENDING_MAX_AGE_DAYS", "7"))  # parked (scanner-down) uploads are transient
 KEEP_SAVED_DAYS = int(__import__("os").environ.get("PHOTO3D_KEEP_SAVED_DAYS", "30"))       # builds shared to the Showcase
 DISK_MIN_FREE_MB = int(__import__("os").environ.get("PHOTO3D_DISK_MIN_FREE_MB", "500"))    # below this, new builds first trigger a sweep, then are refused
 DISK_TARGET_FREE_MB = int(__import__("os").environ.get("PHOTO3D_DISK_TARGET_FREE_MB", "1000"))

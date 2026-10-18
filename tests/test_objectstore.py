@@ -53,7 +53,9 @@ class _Handler(BaseHTTPRequestHandler):
             cred, given = parts["Credential"], parts["Signature"]
             values = {h.lower(): self.headers.get(h, "").strip() for h in signed}
             canonical_headers = "".join(f"{h}:{values[h]}\n" for h in signed)
-            canonical = "\n".join([self.command, quote(u.path, safe="/"), "", canonical_headers,
+            cq = "&".join(f"{quote(k, safe='-_.~')}={quote(v, safe='-_.~')}"
+                          for k, v in sorted(parse_qsl(u.query)))
+            canonical = "\n".join([self.command, quote(u.path, safe="/"), cq, canonical_headers,
                                    parts["SignedHeaders"], self.headers.get("x-amz-content-sha256", "")])
             amz = self.headers.get("x-amz-date", "")
         _key, datestamp, region, service, _tail = cred.split("/")
@@ -87,6 +89,38 @@ class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         self._auth()
         if self._reject_if_bad_sig():
+            return
+        from urllib.parse import parse_qsl, urlsplit as _us
+        q = dict(parse_qsl(_us(self.path).query))
+        if "list-type" in q:                       # ListObjectsV2 (bucket inventory)
+            import base64 as _b64
+            req_path = self._clean_path().rstrip("/")
+            keys = sorted(k[len(req_path) + 1:] for k in _FakeS3.objects
+                          if k.startswith(req_path + "/"))
+            if q.get("prefix"):
+                keys = [k for k in keys if k.startswith(q["prefix"])]
+            start = 0
+            if q.get("continuation-token"):
+                try:
+                    start = int(_b64.b64decode(q["continuation-token"]))
+                except Exception:
+                    start = 0
+            page = keys[start:start + int(q.get("max-keys", "1000"))]
+            xml = ['<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">']
+            if start + len(page) < len(keys):
+                xml.append("<IsTruncated>true</IsTruncated>")
+                xml.append(f"<NextContinuationToken>{_b64.b64encode(str(start + len(page)).encode()).decode()}</NextContinuationToken>")
+            else:
+                xml.append("<IsTruncated>false</IsTruncated>")
+            for k in page:
+                xml.append(f"<Contents><Key>{k}</Key></Contents>")
+            xml.append("</ListBucketResult>")
+            body = "".join(xml).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/xml")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         if self._clean_path() in _FakeS3.objects:
             body = _FakeS3.objects[self._clean_path()]
@@ -245,3 +279,112 @@ def _png_bytes() -> bytes:
     b = io.BytesIO()
     Image.new("RGB", (60, 40), (10, 120, 200)).save(b, "PNG")
     return b.getvalue()
+
+
+def test_provider_outage_cannot_orphan_remote_copies(s3):
+    """A provider outage during deletion leaves a DURABLE pending record; recovery retries
+    until the remote copies are really gone — never a silent orphan."""
+    import json as _json
+    from pathlib import Path as _P
+    from app import config
+    from app.services import filestore
+    filestore.put_build("bX", "model.stl", b"x")
+    calls = {"n": 0}
+    real_delete = objectstore.delete
+
+    def flaky(key):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("provider down")
+        return real_delete(key)
+
+    objectstore.delete = flaky                       # outage on the first key
+    try:
+        filestore.delete_build("bX")                  # records keys durably, then tries
+    finally:
+        objectstore.delete = real_delete
+    pending = _json.loads((_P(config.DATA) / "pending_deletions.json").read_text())
+    assert "bX" in pending and pending["bX"]          # the outage could not orphan the record
+    # provider is back: the retry drains the queue and the remote copy is really gone
+    assert filestore.retry_pending() == 0
+    pending = _json.loads((_P(config.DATA) / "pending_deletions.json").read_text())
+    assert "bX" not in pending
+    assert not [k for k in _FakeS3.objects if "bX" in k]
+
+
+def test_corrupt_pending_deletion_record_is_never_read_as_empty(s3, tmp_path, monkeypatch):
+    """The pending-deletion queue is safety data: a corrupt record must never read as 'nothing
+    pending' — retry raises loudly, delete_build preserves the corrupt copy for manual recovery
+    and still records the new deletion."""
+    from app.services import filestore
+    # seed a corrupt queue
+    filestore._pending_path().write_text("{ this is not json")
+    with pytest.raises(RuntimeError):
+        filestore.retry_pending()
+    # a new delete still records durably (never refused by the corrupt file) — and with the
+    # provider up it completes, leaving a clean empty queue (not the corrupt garbage)
+    filestore.delete_build("bid-corrupt-1")
+    p = filestore._pending_path()
+    assert json.loads(p.read_text()) == {}
+    # and the corrupt original was preserved for manual recovery, not overwritten silently
+    leftovers = list(p.parent.glob("pending_deletions.corrupt-*.json"))
+    assert leftovers and b"this is not json" in leftovers[0].read_bytes()
+
+
+def test_concurrent_enqueues_all_survive_an_outage(s3, monkeypatch):
+    """Many threads enqueue deletions while the provider is down: every queued build must be
+    in the durable record afterwards (no lost updates from load/modify/save races)."""
+    import threading
+    from app.services import filestore, objectstore
+    def down(key):
+        raise RuntimeError("provider down")
+    monkeypatch.setattr(objectstore, "delete", down)
+    errs = []
+    def enqueue(i):
+        try:
+            filestore.delete_build(f"bid-{i}")
+        except Exception as e:
+            errs.append(e)
+    ts = [threading.Thread(target=enqueue, args=(i,)) for i in range(12)]
+    [t.start() for t in ts]; [t.join() for t in ts]
+    assert not errs, errs
+    rec = json.loads(filestore._pending_path().read_text())
+    assert {f"bid-{i}" for i in range(12)} <= set(rec)             # every enqueue survived
+
+
+def test_persist_failure_prevents_local_removal(s3, monkeypatch):
+    """If the pending-deletion queue cannot be persisted, the local build SURVIVES — the
+    failure propagates instead of orphaning remote copies."""
+    from app.services import filestore
+    from tests.b1 import client, photo_build
+    c = client()
+    bid = photo_build(c)
+    def no_save(d):
+        raise RuntimeError("disk full")
+    monkeypatch.setattr(filestore, "_save_pending", no_save)
+    with pytest.raises(RuntimeError):
+        c.delete(f"/api/builds/{bid}")
+    # the build is still there locally — the refusal worked
+    from app.services.history import store
+    assert store.get(bid) is not None
+
+
+def test_list_requests_tamper_rejected(s3):
+    """The SigV4 check for ListObjectsV2 covers the QUERY STRING: changing prefix or
+    continuation-token after signing must 403, not silently list something else."""
+    import httpx
+    from app.services import objectstore
+    for i in range(7):
+        objectstore.put(f"builds/t{i}/model.stl", b"x")
+    cfg = objectstore._cfg()
+    # sign a legitimate list request...
+    url = str(httpx.URL(objectstore._bucket_url(cfg)).copy_with(
+        params={"list-type": "2", "prefix": "builds/t", "max-keys": "5"}))
+    headers = objectstore._sign_request("GET", url, {}, b"", cfg)
+    # ...then tamper the prefix AFTER signing: the signature no longer covers the request
+    bad = httpx.URL(url).copy_with(params={"list-type": "2", "prefix": "builds/", "max-keys": "5"})
+    with httpx.Client() as c:
+        r = c.get(str(bad), headers=headers)
+        assert r.status_code == 403, r.status_code           # query string is signed: tampering fails
+        ok = c.get(url, headers=headers)
+        assert ok.status_code == 200                         # the untampered request still works

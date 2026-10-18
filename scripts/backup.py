@@ -11,15 +11,20 @@ What a backup contains (reports/backup.py makes one timestamped directory):
 
 Retention: keeps the newest 14 daily and 8 weekly (Sunday) backups, removes the rest.
 
-Encryption at rest + off-site delivery are deliberately separate steps (docs/ops/backup-restore.md):
-pipe the backup directory to `age` and sync it off the machine (restic/b2/rclone) from cron.
+Encryption at rest: pass --encrypt-to <AGE_RECIPIENT> (or set ZEIM_BACKUP_AGE_RECIPIENT) and
+the plaintext directory is replaced by zeim-<ts>.tar.age — an `age`-encrypted tarball of itself.
+The plaintext copy is removed only after the encrypted archive exists and is non-empty; if
+`age` is missing or fails, the run FAILS LOUDLY (exit 1) — encrypted mode never silently falls
+back to a plaintext backup. Off-site delivery stays a separate step (docs/ops/backup-restore.md).
 
 Usage:
   python -m scripts.backup --data data --out outputs --backup-root backups
+  python -m scripts.backup --data data --out outputs --backup-root backups --encrypt-to age1...
 """
 from __future__ import annotations
 
 import argparse
+import os
 import hashlib
 import json
 import shutil
@@ -29,6 +34,50 @@ from pathlib import Path
 
 DAILY_KEEP = 14
 WEEKLY_KEEP = 8
+
+
+def _ts_of(path: Path) -> str:
+    """zeim-YYYYMMDD-HHMMSS[.tar.age] -> YYYYMMDD-HHMMSS (the DATE matters: weekly retention
+    keys off it — losing it would silently keep only the newest dailies)."""
+    return path.name.split(".")[0].split("-", 1)[-1]
+
+
+def _age_encrypt_dir(staging: Path, final_dir: Path, recipient: str) -> Path:
+    """tar+age the staged backup into <final>.tar.age (published atomically by rename),
+    then remove the staging dir. Raises on any failure — encrypted mode never silently
+    falls back to plaintext."""
+    import subprocess
+    if not shutil.which("age"):
+        raise RuntimeError("age binary not found — install age (e.g. apt install age) or drop --encrypt-to")
+    tmp_archive = staging.parent / f".tmp-{final_dir.name}.tar.age"
+    archive = final_dir.parent / f"{final_dir.name}.tar.age"
+    # tar from a pipe so no plaintext archive ever exists on disk
+    cmd = ["tar", "-cf", "-", "-C", str(staging.parent), staging.name]
+    enc = ["age", "-e", "-r", recipient]
+    with open(tmp_archive, "wb") as out:
+        try:
+            tar_p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+            age_p = subprocess.Popen(enc, stdin=tar_p.stdout, stdout=out, stderr=subprocess.PIPE)
+            tar_p.stdout.close()
+            _, err = age_p.communicate()
+            tar_p.wait()
+        except Exception:
+            # any failure in the age invocation leaves NOTHING — no half-written ciphertext
+            for p in ("age", "tar"):
+                try:
+                    local_p = locals().get(f"{p}_p")
+                    if local_p is not None:
+                        local_p.kill()
+                except Exception:
+                    pass
+            tmp_archive.unlink(missing_ok=True)
+            raise
+    if age_p.returncode != 0 or tar_p.returncode != 0 or not tmp_archive.exists() or tmp_archive.stat().st_size == 0:
+        tmp_archive.unlink(missing_ok=True)
+        raise RuntimeError(f"age encryption failed: {err.decode(errors='replace')[:400]}")
+    os.rename(tmp_archive, archive)              # atomic publish of the encrypted artifact
+    shutil.rmtree(staging)                       # plaintext exists no more
+    return archive
 
 
 def _sha256(p: Path) -> str:
@@ -68,14 +117,56 @@ def _checksum_dir(backup_dir: Path) -> dict:
             for p in sorted(backup_dir.rglob("*")) if p.is_file() and p.name != "backup.json"}
 
 
-def create_backup(data_dir: Path, out_dir: Path, backup_root: Path, now: float | None = None) -> dict:
-    """Make one timestamped backup. Returns a report dict (never raises for missing pieces)."""
+def create_backup(data_dir: Path, out_dir: Path, backup_root: Path, now: float | None = None,
+                  encrypt_to: str | None = None) -> dict:
+    """Make one timestamped backup. Returns a report dict (never raises for missing pieces).
+    Built in a PRIVATE staging dir and published atomically (rename), so a failed run never
+    leaves a half-built backup that a later restore could mistake for a good one.
+    With encrypt_to (an age recipient): the published artifact is <dir>.tar.age — failure to
+    encrypt raises AND removes the staging dir (never a silent plaintext backup)."""
     now = time.time() if now is None else now
     ts = time.strftime("%Y%m%d-%H%M%S", time.localtime(now))
-    backup_dir = backup_root / f"zeim-{ts}"
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    staging = backup_root / f".staging-{ts}"
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    staging.chmod(0o700)
+    final_dir = backup_root / f"zeim-{ts}"
 
-    report = {"backup": str(backup_dir), "databases": [], "json_files": [], "output_files": 0, "ok": True}
+    report = {"backup": str(final_dir), "databases": [], "json_files": [], "output_files": 0, "ok": True}
+    try:
+        _build_snapshot(data_dir, out_dir, staging, now, report)
+        if encrypt_to:
+            # tar+age straight out of staging: no plaintext archive or published dir ever exists
+            archive = _age_encrypt_dir(staging, final_dir, encrypt_to)
+            report["encrypted"] = True
+            report["archive"] = str(archive)
+        else:
+            os.rename(staging, final_dir)             # atomic publish
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)      # no half-built backup survives a failure
+        raise
+    return report
+
+
+def _bucket_inventory() -> dict | None:
+    """List the object store's actual keys (S3 ListObjectsV2, paginated). The manifest records
+    a listing failure instead of raising: the DATA backup is primary, the inventory is an add-on.
+    Returns None when object storage is not configured (no manifest written at all)."""
+    out: dict = {"created": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "keys": [], "count": 0, "error": None}
+    try:
+        from app.services import objectstore
+        if not objectstore.enabled():
+            return None
+        keys = objectstore.list_keys()
+        out["keys"] = keys
+        out["count"] = len(keys)
+    except Exception as e:
+        out["error"] = str(e)[:200]
+    return out
+
+
+def _build_snapshot(data_dir: Path, out_dir: Path, backup_dir: Path, now: float, report: dict) -> None:
     # 1. databases via the live-safe backup API
     for name in ("zeim.sqlite3", "auth.sqlite3"):
         dest = backup_dir / name
@@ -89,16 +180,22 @@ def create_backup(data_dir: Path, out_dir: Path, backup_root: Path, now: float |
     manifest = _outputs_manifest(out_dir)
     (backup_dir / "outputs.manifest.json").write_text(json.dumps(manifest, indent=1))
     report["output_files"] = len(manifest["files"])
-    # 4. self-verifying checksums
+    # 4. bucket inventory — what the object store ACTUALLY holds (ListObjectsV2). Distinct
+    #    from the outputs manifest (local files only): this is the reconciliation source for
+    #    restore. A listing FAILURE is recorded in the manifest — the DATA backup still proceeds.
+    inv = _bucket_inventory()
+    if inv is not None:
+        (backup_dir / "bucket_inventory.json").write_text(json.dumps(inv, indent=1))
+        report["bucket_inventory"] = inv.get("count") if not inv.get("error") else f"error: {inv['error']}"
+    # 5. self-verifying checksums
     (backup_dir / "backup.json").write_text(json.dumps({
         "created": time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime(now)),
         "checksums": _checksum_dir(backup_dir),
     }, indent=1))
-    return report
 
 
 def _is_sunday(path: Path) -> bool:
-    ts = path.name.split("-")[-1]  # zeim-YYYYMMDD-HHMMSS
+    ts = _ts_of(path)  # zeim-YYYYMMDD-HHMMSS[.tar.age]
     try:
         return time.strptime(ts[:8], "%Y%m%d").tm_wday == 6
     except ValueError:
@@ -107,14 +204,18 @@ def _is_sunday(path: Path) -> bool:
 
 def enforce_retention(backup_root: Path, now: float | None = None,
                       daily_keep: int = DAILY_KEEP, weekly_keep: int = WEEKLY_KEEP) -> dict:
-    """Keep the newest `daily_keep` daily backups and `weekly_keep` weekly (Sunday) backups."""
+    """Keep the newest `daily_keep` daily backups and `weekly_keep` weekly (Sunday) backups.
+    Works for both plaintext directories and .tar.age archives."""
     now = time.time() if now is None else now
-    backups = sorted(p for p in backup_root.glob("zeim-*") if p.is_dir())
+    backups = sorted(p for p in backup_root.glob("zeim-*") if p.is_dir() or p.name.endswith(".tar.age"))
     weekly = [p for p in backups if _is_sunday(p)][-weekly_keep:]
     keep = set(backups[-daily_keep:]) | set(weekly)
     removed = [p for p in backups if p not in keep]
     for p in removed:
-        shutil.rmtree(p, ignore_errors=True)
+        if p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            p.unlink(missing_ok=True)
     return {"kept": len(backups) - len(removed), "removed": len(removed)}
 
 
@@ -123,8 +224,15 @@ def main(argv=None) -> int:
     ap.add_argument("--data", default="data")
     ap.add_argument("--out", default="outputs")
     ap.add_argument("--backup-root", default="backups")
+    ap.add_argument("--encrypt-to", default=os.environ.get("ZEIM_BACKUP_AGE_RECIPIENT", ""),
+                    help="age recipient (public key): replace the plaintext dir with a .tar.age archive")
     args = ap.parse_args(argv)
-    report = create_backup(Path(args.data), Path(args.out), Path(args.backup_root))
+    try:
+        report = create_backup(Path(args.data), Path(args.out), Path(args.backup_root),
+                               encrypt_to=args.encrypt_to or None)
+    except RuntimeError as e:
+        print(json.dumps({"ok": False, "error": str(e)}))
+        return 1
     report["retention"] = enforce_retention(Path(args.backup_root))
     print(json.dumps(report, indent=1))
     return 0 if report["ok"] else 1

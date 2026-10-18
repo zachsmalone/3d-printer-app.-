@@ -216,16 +216,44 @@ function revealResult() {
   // wait until build() has put the page back (busy bar hidden) so the scroll target is final
   setTimeout(() => { const v = $("#viewer"); v.style.scrollMarginTop = ($(".topbar").offsetHeight + 8) + "px"; v.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); }, 60);
 }
+function buildDone(r) {                 /* shared success tail: a real build came back */
+  showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Make it again with these settings";
+  setPath(3, "Model ready. Step 3 of 3: save or print it.");
+  toast("Your model is ready ✔", "ok");
+  revealResult();
+}
+async function resumePending() {        /* the scanner was down: re-check the parked upload */
+  setPath(2, "Checking your parked upload. Step 2 of 3."); $("#busy").hidden = false; $("#btnBuild").disabled = true; S.building = true;
+  try {
+    const r = await api(`/api/uploads/resume/${S.pending}`, { method: "POST" });
+    if (r && r.status === "pending_scan") {   /* still parked: keep the resume action offered */
+      pick.msg(r.detail || "The malware scanner is still unavailable — your upload is parked, not lost. Try again shortly.");
+      return;
+    }
+    S.pending = null; $("#btnBuild").textContent = "Build my model";
+    buildDone(r);
+  } catch (e) {
+    if (e.status === 422) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg(e.message || "That file was flagged by the malware scanner. Nothing of it was kept — please choose a different photo."); return; }   /* terminal: the parked upload was discarded */
+    if (e.status === 404) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg("Your parked upload is no longer available — please choose your photo again."); return; }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); return; }   /* parked upload RETAINED: press Build to retry */
+    toast("Resume didn't work: " + (e.message || "something went wrong") + " Your upload is still parked — try again.", "err");
+  } finally { $("#busy").hidden = true; $("#btnBuild").disabled = !S.file; S.building = false; }
+}
 async function build(autoDelete = false) {
+  if (S.pending) return resumePending();          /* parked earlier: re-check instead of re-uploading */
   if (!S.file) return;
-  S.pending = null;
   setPath(2, "Making your 3D model. Step 2 of 3."); $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; S.building = true;   // no printing/sending a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
-    showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Make it again with these settings";
-    setPath(3, "Model ready. Step 3 of 3: save or print it.");
-    toast("Your model is ready ✔", "ok");
-    revealResult();
+    if (r && r.status === "pending_scan") {        /* scanner down: parked, NOT built */
+      S.pending = r.pending_id;
+      setPath(2, "Your upload is parked — the malware scanner is temporarily unavailable.");
+      pick.msg(r.detail || "The malware scanner is temporarily unavailable, so your upload is parked — not lost, and not shared.");
+      $("#btnBuild").textContent = "▶ Resume my upload";
+      toast("Your upload is parked, not lost — press Resume in a little while.", "ok");
+      return;
+    }
+    buildDone(r);
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
     else if (e.status === 400 && /photo/i.test(e.message)) { clearFile(); pick.msg(e.message); }          // photo problems stay visible under the buttons; the refused photo is forgotten (QA-2)
@@ -452,13 +480,13 @@ function renderPrinters() {
     <div class="grid2">
       <div class="field"><label>Name</label><input data-f="name" value="${esc(p.name || "")}"></div>
       <div class="field"><label>Type</label><select data-f="type">${types.map(t => `<option value="${t.type}" ${t.type === p.type ? "selected" : ""}>${t.label}</option>`).join("")}</select></div>
-      <div class="field"><label>URL</label><input data-f="url" value="${esc(p.url || "")}" placeholder="http://printer.local"></div>
       <div class="field"><label>API key ${p.has_key ? "<em>(stored — leave blank to keep)</em>" : ""}</label><input data-f="api_key" type="password" placeholder="${p.has_key ? "••••••••" : ""}"></div>
       <div class="field"><label>Preset</label><select data-f="profile"><option value="">None (generic)</option>${(S.settings.printer_presets || []).map(x => `<option value="${x.id}" ${x.id === p.profile ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
       <div class="field"><label>Bed X mm</label><input data-f="bed_x" type="number" value="${p.bed_x || 250}"></div>
       <div class="field"><label>Bed Y mm</label><input data-f="bed_y" type="number" value="${p.bed_y || 210}"></div>
     </div><p class="help">${types.find(t => t.type === p.type)?.hint || ""}</p>
     ${(S.settings.printer_presets || []).find(x => x.id === p.profile) ? `<p class="help"><b>Experimental.</b> ${esc(S.settings.printer_presets.find(x => x.id === p.profile).hint)}</p>` : ""}
+    <p class="help">Direct control is off: slice, download the G-code and print from your printer's own app. (Arbitrary printer URLs can no longer be entered — they were an SSRF risk.)</p>
     <p class="help">Tested with a pretend printer only. Not tried on a real printer yet.</p>
     <button class="btn small" data-test="${i}" ${p.id ? "" : "disabled title='Save first, then test'"}>Test connection</button> <button class="btn small danger" data-rm="${i}">Remove</button>
     <p class="help" data-testout="${i}" role="status" aria-live="polite">${p.id ? "A test only asks the printer if it is there. It never starts a print." : "Save settings first, then you can test the connection."}</p></div>`).join("") || `<p class="help">No printers yet.</p>`;
@@ -466,7 +494,9 @@ function renderPrinters() {
 function readPrinters() {
   return $$("#printerList .printer").map(el => {
     const p = { ...S.settings.printers[+el.dataset.i] };
-    $$("[data-f]", el).forEach(i => p[i.dataset.f] = i.value); return p;
+    $$("[data-f]", el).forEach(i => p[i.dataset.f] = i.value);
+    delete p.url;                                   /* never send a printer URL (SSRF) */
+    return p;
   });
 }
 $("#printerList").onclick = async e => {

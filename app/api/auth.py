@@ -68,7 +68,32 @@ def _csrf(request: Request) -> None:
         raise HTTPException(403, detail={"code": "csrf", "message": "That request was blocked for your safety."})
 
 
-def _json(request: Request, body: dict, status: int = 200, token: Optional[str] = None, clear: bool = False) -> JSONResponse:
+def _legacy_cookie_is_same_account(request: Request, s) -> bool:
+    """Is this browser's legacy cookie account the SAME account the (possibly ephemeral)
+    session belongs to? An explicit sign-out must remove authority, not merely hide the
+    security panel while the old p3d_sid cookie silently signs the same user back in —
+    upgraded records keep their users.json key (it owns their builds), so the cookie must
+    be retired instead. A DIFFERENT legacy cookie on this browser is left alone: it was
+    never part of this session."""
+    if s is None:
+        return False
+    found = legacy_cookie_resolver(request)               # (legacy_id, name) or None
+    if not found:
+        return False
+    if getattr(s, "owner_id", None) == found[0]:
+        return True
+    aid = getattr(s, "account_id", None)                  # ephemeral legacy session: link via the auth account
+    if not aid:
+        return False
+    try:
+        row = _svc(request).store.one("SELECT legacy_id FROM accounts WHERE id=?", (aid,))
+        return bool(row and row["legacy_id"] and row["legacy_id"] == found[0])
+    except Exception:
+        return False
+
+
+def _json(request: Request, body: dict, status: int = 200, token: Optional[str] = None, clear: bool = False,
+         clear_legacy_too: bool = False, legacy_session=None) -> JSONResponse:
     cfg = _svc(request).cfg
     resp = JSONResponse(body, status_code=status, headers=_NO_STORE)
     if token:
@@ -76,6 +101,15 @@ def _json(request: Request, body: dict, status: int = 200, token: Optional[str] 
                         secure=cfg.secure_cookies, samesite="lax", path="/")
     if clear:
         resp.delete_cookie(cfg.cookie_name, path="/", secure=cfg.secure_cookies, httponly=True, samesite="lax")
+    if clear_legacy_too:
+        try:
+            from ..community.identity import COOKIE as _LEGACY_COOKIE
+            s = legacy_session or _cookie_session(request)
+            if _legacy_cookie_is_same_account(request, s):
+                resp.delete_cookie(_LEGACY_COOKIE, path="/", secure=cfg.secure_cookies, httponly=True, samesite="lax")
+        except Exception:
+            import logging
+            logging.getLogger("zeim.auth").exception("legacy-cookie retirement on sign-out failed")
     return resp
 
 
@@ -198,7 +232,7 @@ def logout(request: Request):
     s = _cookie_session(request)
     if s:
         _svc(request).logout(s)
-    return _json(request, {"signed_in": False}, clear=True)
+    return _json(request, {"signed_in": False}, clear=True, clear_legacy_too=True)
 
 
 @router.delete("/sessions/{session_id}")
@@ -207,7 +241,7 @@ def revoke_session(session_id: str, request: Request):
     if not _ID.match(session_id):
         raise HTTPException(404, detail={"code": "not_found", "message": "That device wasn't found."})
     _run(_svc(request).revoke_session, s.account_id, session_id)
-    return _json(request, {"ok": True}, clear=(session_id == s.id))
+    return _json(request, {"ok": True}, clear=(session_id == s.id), clear_legacy_too=(session_id == s.id))
 
 
 @router.post("/sessions/revoke-all")
@@ -216,7 +250,7 @@ def revoke_all(request: Request, payload: dict = Body(default={})):
     _csrf(request); s = _need_session(request); p = _dict(payload)
     keep = p.get("keep_current") is True
     n = _svc(request).revoke_all(s.account_id, s.id if keep else None)
-    return _json(request, {"ok": True, "signed_out": n}, clear=not keep)
+    return _json(request, {"ok": True, "signed_out": n}, clear=not keep, clear_legacy_too=not keep)
 
 
 # ------------------------------------------------------------------ add methods while signed in
@@ -233,7 +267,9 @@ def passkey_add_finish(request: Request, payload: dict = Body(...)):
     out = _run(svc.passkey_add_finish, s, p.get("ceremony_id"), p.get("credential"), p.get("name"))
     if legacy:                                              # upgrade complete: give this device a real session
         token, _ = svc.session_for_legacy(s.account_id, request.headers.get("user-agent"))
-        return _json(request, out, 201, token=token)
+        # ...and retire the legacy cookie on this browser: the passkey is the credential
+        # now (an explicit later sign-out must not silently fall back to the old cookie)
+        return _json(request, out, 201, token=token, clear_legacy_too=True, legacy_session=s)
     return _json(request, out, 201)
 
 

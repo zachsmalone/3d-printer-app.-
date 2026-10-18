@@ -102,6 +102,10 @@ def meta_for(bid: str, actor: Actor, owner_only: bool = False) -> dict:
 
 DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded file name (camera / school file names can hold a child's name)
 
+# every form field of /api/generate — captured verbatim into a pending upload's context so
+# /api/uploads/resume can replay the exact request once the malware scan clears
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+
 
 def disk_guard():
     """Refuse a new heavy build, kindly, when the disk is nearly full and nothing but starred builds could be removed."""
@@ -163,21 +167,58 @@ def get_build(bid: str, actor: Actor = Depends(get_actor)):
 @router.delete("/builds/{bid}")
 def delete_build(bid: str, actor: Actor = Depends(get_actor)):
     meta_for(bid, actor, owner_only=True)
-    store.delete(bid)
     from ..services import filestore
-    filestore.delete_build(bid)               # object-storage copy too (best-effort)
+    filestore.delete_build(bid)               # remote FIRST, durably recorded — raises => local survives
+    store.delete(bid)
     return {"ok": True}
+
+
+@router.post("/uploads/resume/{pid}")
+def resume_pending(pid: str, actor: Actor = Depends(get_actor)):
+    """Resume a pending upload (created when the malware scanner was down): re-scan the HELD
+    original bytes; a clean scan re-runs the full generate pipeline (every check re-runs);
+    an infected verdict discards it; a scanner still down keeps it pending. Owner only."""
+    from ..services import quarantine
+    if not pid.isalnum() or len(pid) != 12:
+        raise HTTPException(404)
+    ctx = quarantine.pending_context(pid)
+    if ctx is None:
+        raise HTTPException(404, "unknown pending upload")
+    if ctx.get("sid") != actor.sid:
+        raise HTTPException(404)                      # not yours: indistinguishable from missing
+    verdict = quarantine.scan_pending(pid)
+    if verdict == "infected":
+        quarantine.discard_pending(pid, "infected on scan")
+        raise HTTPException(422, "That file was flagged by the malware scanner. Nothing of it was kept.")
+    if verdict != "clean":
+        return JSONResponse(status_code=202, content={
+            "status": "pending_scan", "pending_id": pid, "detail": quarantine.PENDING_MSG})
+    # clean: replay the exact original request through the normal pipeline (the gate re-runs).
+    # The pending record is consumed ONLY on success or a validated rejection — if generation
+    # fails (history full, storage error), the upload is RETAINED and the user can retry.
+    raw = quarantine.pending_bytes(pid)
+    import io
+    from starlette.datastructures import UploadFile as _SU
+    up = _SU(file=io.BytesIO(raw), filename=ctx.get("filename") or "upload")
+    form = ctx.get("form") or {}
+    out = generate(actor=actor, file=up, **form)
+    # consume the pending record ONLY when a build was really created — a 409 history-full
+    # (or any non-build response, or an exception) RETAINS the upload so the user can retry
+    if isinstance(out, dict) and out.get("id"):
+        quarantine.discard_pending(pid, "resumed into a build")
+    return out
 
 
 @router.post("/builds/delete-oldest")
 def delete_oldest(actor: Actor = Depends(get_actor)):
     with store.lock:
-        items = [m for m in store.list(actor.sid) if not m.get("favorite")]       # never a starred build
+        items = [m for m in store.list(actor.sid)
+                 if not (m.get("favorite") or m.get("saved"))]          # never a starred/saved build
         if not items:
             return {"ok": True, "deleted": None}
-        store.delete(items[0]["id"])
         from ..services import filestore
-        filestore.delete_build(items[0]["id"])       # object-storage copy too (best-effort)
+        filestore.delete_build(items[0]["id"])       # remote FIRST, durably recorded — raises => local survives
+        store.delete(items[0]["id"])
         return {"ok": True, "deleted": items[0]["id"]}
 
 
@@ -242,9 +283,22 @@ def generate(
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
     try:
-        uploadgate.gate(data, actor.sid, source="generate")
+        checked = uploadgate.gate(data, actor.sid, source="generate")
     except uploadgate.GateError as e:
         raise HTTPException(e.status, e.message)
+    if getattr(checked, "scan_state", "off") == "unscanned":
+        # Scanner explicitly on but unreachable: the upload is NOT built — no artifacts, no
+        # metadata, nothing cached or served. The original bytes + request context are parked
+        # in restricted pending storage; resume (/api/uploads/resume/<pid>) runs the normal
+        # pipeline once a scan clears them.
+        from ..services import quarantine
+        frame = dict(locals())          # snapshot BEFORE the comprehension (version-safe)
+        ctx = {k: frame[k] for k in _GENERATE_FORM_FIELDS if k in frame}
+        pid = quarantine.stage_pending(actor.sid, data, ctx, file.filename or "upload")
+        return JSONResponse(status_code=202, content={
+            "status": "pending_scan", "pending_id": pid,
+            "detail": quarantine.PENDING_MSG,
+        })
     if mode == "trace2d":
         return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest)
     try:
@@ -452,6 +506,8 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     if ext not in exporters.WRITERS or not bid.isalnum():
         raise HTTPException(404)
     meta_for(bid, actor)
+    from ..services import quarantine
+    quarantine.guard(bid)                        # quarantined builds are not served
     from ..services import editproj, filestore
     editproj.ensure_exports(bid)
     p = store.dir(bid) / f"model.{ext}"

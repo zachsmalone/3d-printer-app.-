@@ -20,6 +20,41 @@ import sys
 from pathlib import Path
 
 
+def unpack_archive(archive: Path, identity: Path) -> Path:
+    """Decrypt+untar a .tar.age backup and return the backup directory (in a private scratch
+    dir beside the archive — call cleanup_unpacked when done so no plaintext lingers).
+    Raises on any failure (wrong identity, corrupt archive, missing age binary)."""
+    import subprocess
+    if not shutil.which("age"):
+        raise RuntimeError("age binary not found — install age (e.g. apt install age)")
+    work = archive.parent / f".unpack-{archive.name}"
+    if work.exists():
+        shutil.rmtree(work)
+    work.mkdir()
+    work.chmod(0o700)
+    with open(archive, "rb") as src:
+        dec = subprocess.Popen(["age", "-d", "-i", str(identity)], stdin=src,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        untar = subprocess.Popen(["tar", "-xf", "-", "-C", str(work)],
+                                stdin=dec.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        dec.stdout.close()
+        _, dec_err = dec.communicate()
+        untar.wait()
+    if dec.returncode != 0 or untar.returncode != 0:
+        shutil.rmtree(work, ignore_errors=True)
+        raise RuntimeError(f"decrypt/untar failed: {dec_err.decode(errors='replace')[:400]}")
+    inner = [p for p in work.iterdir() if p.is_dir()]
+    if len(inner) != 1:
+        shutil.rmtree(work, ignore_errors=True)
+        raise RuntimeError("archive did not contain exactly one backup directory")
+    return inner[0]
+
+
+def cleanup_unpacked(backup_dir: Path) -> None:
+    """Remove the scratch dir (and the decrypted plaintext in it) after a restore/verify."""
+    shutil.rmtree(backup_dir.parent, ignore_errors=True)
+
+
 def verify_backup(backup_dir: Path) -> dict:
     """Check a backup's internal consistency (checksums + DB integrity) without restoring."""
     result = {"checksums": "ok", "databases": {}, "ok": True}
@@ -89,24 +124,41 @@ def verify_outputs(backup_dir: Path, out_dir: Path) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Restore + verify a ZEIM backup")
-    ap.add_argument("--backup", required=True, help="backup directory (zeim-YYYYMMDD-HHMMSS)")
+    ap.add_argument("--backup", required=True, help="backup directory or .tar.age archive")
     ap.add_argument("--target", required=True, help="data directory to restore INTO (overwritten!)")
+    ap.add_argument("--identity", default=None,
+                    help="age identity file (private key) when --backup is a .tar.age archive")
     ap.add_argument("--verify-outputs", default=None, help="also check an outputs tree against the manifest")
     args = ap.parse_args(argv)
 
     backup_dir = Path(args.backup)
-    v = verify_backup(backup_dir)
-    print("verify:", json.dumps(v))
-    if not v["ok"]:
-        print("BACKUP FAILED VERIFICATION — not restoring. Take a fresh backup.", file=sys.stderr)
-        return 1
-    r = restore(backup_dir, Path(args.target))
-    print("restored:", json.dumps(r))
-    if args.verify_outputs:
-        o = verify_outputs(backup_dir, Path(args.verify_outputs))
-        print("outputs:", json.dumps(o))
-        return 0 if o["ok"] else 1
-    return 0
+    unpacked = None
+    if backup_dir.name.endswith(".tar.age"):
+        if not args.identity:
+            print("--identity (the age private key) is required for a .tar.age backup", file=sys.stderr)
+            return 1
+        try:
+            backup_dir = unpack_archive(backup_dir, Path(args.identity))
+            unpacked = backup_dir
+        except RuntimeError as e:
+            print(json.dumps({"ok": False, "error": str(e)}), file=sys.stderr)
+            return 1
+    try:
+        v = verify_backup(backup_dir)
+        print("verify:", json.dumps(v))
+        if not v["ok"]:
+            print("BACKUP FAILED VERIFICATION — not restoring. Take a fresh backup.", file=sys.stderr)
+            return 1
+        r = restore(backup_dir, Path(args.target))
+        print("restored:", json.dumps(r))
+        if args.verify_outputs:
+            o = verify_outputs(backup_dir, Path(args.verify_outputs))
+            print("outputs:", json.dumps(o))
+            return 0 if o["ok"] else 1
+        return 0
+    finally:
+        if unpacked is not None:
+            cleanup_unpacked(unpacked)          # no decrypted plaintext lingers beside the archive
 
 
 if __name__ == "__main__":

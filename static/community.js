@@ -62,6 +62,10 @@ addEventListener("hashchange", route);
 /* ---------- account ---------- */
 $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
 function renderAccount() {
+  /* Real auth (passkeys/email) renders the modern account dialog when mounted; the
+     legacy cookie UI below is the fallback for when it is not. handles() is synchronous
+     so a Promise can never hide the fallback. */
+  if (window.ZeimAccount && window.ZeimAccount.handles(ME)) { window.ZeimAccount.render(ME); return; }
   if (!ME.signed_up) {
     $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. Anyone can build and learn in the ${esc(CFG.sections.learn)} without an account, and families can print designs together with an adult account holder.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>

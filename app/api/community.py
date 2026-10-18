@@ -35,9 +35,27 @@ def get_config():
 
 
 # ---------------- identity ----------------
+def _auth_caps(request: Request, actor: Actor) -> dict:
+    """What the SIGN-IN UI may honestly offer, derived from what is actually mounted —
+    never from whether a request succeeded. No tokens or internals are exposed."""
+    svc = getattr(request.app.state, "auth_service", None)
+    if svc is None or not getattr(request.app.state, "auth_mounted", False):
+        return {"available": False}
+    from ..auth.mailer import NullMailer
+    return {"available": True,
+            "email_codes": not isinstance(svc.mailer, NullMailer),   # SMTP or the dev console
+            "session": actor.auth_session is not None}               # signed in via passkey/email
+
+
+def me(request: Request, actor: Actor = Depends(get_actor)):
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor),
+            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
+
+
 @router.get("/me")
 def me(request: Request, actor: Actor = Depends(get_actor)):
-    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor), "hide_mature": catalog.hides_mature(actor)}
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor),
+            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
 
 
 def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
@@ -303,6 +321,11 @@ def showcase_item(iid: str, actor: Actor = Depends(get_actor)):
 
 @router.post("/showcase")
 def publish(body: dict, actor: Actor = Depends(get_actor)):
+    build_id = str(body.get("build_id", ""))[:40]
+    if build_id:
+        from ..services import quarantine
+        if quarantine.is_quarantined(build_id):
+            raise HTTPException(409, "That project is pending its malware scan and can't be shared yet.")
     try:
         title = text_in(body.get("title"), 80, "Title")
         desc = text_in(body.get("description"), 500, "Description")
@@ -541,11 +564,13 @@ def delete_everything_i_made(actor: Actor = Depends(get_actor)):
     from ..community.store import LISTINGS as _L
     from ..community import ownership
     builds = ownership.purge_builds(actor.sid)
+    from ..services import quarantine as _q
+    pending = _q.purge_for(actor.sid)            # parked uploads (scanner-down) are the user's too
     mine = [i["id"] for i in _L.read() if i.get("owner_sid") == actor.sid]
     for pid in mine:
         _sh.rmtree(catalog.LDIR / pid, ignore_errors=True)
     _L.update(lambda l: l.__setitem__(slice(None), [i for i in l if i.get("owner_sid") != actor.sid]))
-    return {"ok": True, "builds": builds, "shared": len(mine)}
+    return {"ok": True, "builds": builds, "shared": len(mine), "pending_uploads": pending}
 
 
 @router.put("/me/mature")
@@ -662,6 +687,25 @@ def mod_audit(request: Request, x_admin_token: str = Header("")):
     return {"entries": moderation.audit_trail()}
 
 
+@router.get("/admin/metrics")
+def admin_metrics(request: Request, x_admin_token: str = Header("")):
+    """Operational metrics for monitoring, behind the admin token (/healthz stays liveness-only).
+    Slicing is synchronous by design (each request slices inline, capped by RLIMIT_AS + timeout) —
+    there is no queue, so there is no queue depth; slice failures appear in the app logs."""
+    _admin(x_admin_token, request)
+    from .. import config
+    from ..services import quarantine, retention, slicestats
+    from ..services.history import store
+    q = moderation.queue()
+    return {
+        "moderation": {"open_reports": len(q), "oldest_open_age_s": moderation.oldest_open_age_s()},
+        "quarantined_builds": sum(1 for m in store.list() if m.get("quarantined")),
+        "storage": {"mode": config.STORAGE_MODE},
+        "slicing": slicestats.snapshot(),               # synchronous design: totals + failures, no queue
+        "disk_free_mb": round(retention.free_bytes() / (1024 * 1024)),
+    }
+
+
 @router.post("/moderation/report/{report_id}/preserve")
 def mod_preserve(report_id: str, request: Request, x_admin_token: str = Header("")):
     """Securely preserve the reported content + context for possible law-enforcement reporting
@@ -671,6 +715,26 @@ def mod_preserve(report_id: str, request: Request, x_admin_token: str = Header("
         return moderation.preserve(report_id)
     except KeyError:
         raise HTTPException(404, "unknown report")
+
+
+@router.get("/moderation/pending-uploads")
+def mod_pending_list(request: Request, x_admin_token: str = Header("")):
+    """Pending uploads (scanner was down at upload time): parked originals awaiting a scan.
+    Admin only — no bytes, no sids beyond a count-safe view."""
+    _admin(x_admin_token, request)
+    from ..services import quarantine
+    return {"pending": quarantine.list_pending()}
+
+
+@router.delete("/moderation/pending-uploads/{pid}")
+def mod_pending_discard(pid: str, request: Request, x_admin_token: str = Header("")):
+    """Discard a pending upload by decision (audited). The validated path is the owner's
+    resume (clean re-scan -> full pipeline); this is the safety valve for infected files."""
+    _admin(x_admin_token, request)
+    from ..services import quarantine
+    if not quarantine.discard_pending(pid, "admin discard"):
+        raise HTTPException(404, "unknown pending upload")
+    return {"ok": True, "id": pid}
 
 
 @router.post("/moderation/report/{report_id}/escalate-ncmec")

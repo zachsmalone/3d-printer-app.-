@@ -66,21 +66,27 @@ def _allowed(sid: str, now: float) -> bool:
     return ratelimit.hit(f"upload:{sid}", limit=config.UPLOADS_PER_HOUR, window_s=_HOUR)
 
 
-def _clamav_clean(data: bytes) -> tuple[bool, str]:
-    """Scan via a local clamd (INSTREAM). Returns (clean, signature). Unreachable clamd = clean."""
+def scan_bytes(data: bytes) -> tuple[bool, str, str]:
+    """Scan via a local clamd (INSTREAM). -> (clean, signature, state) where state is
+    'off' (scanning not enabled) | 'clean' | 'infected' | 'unscanned' (scanner on but unreachable).
+    An unreachable clamd is NOT silently clean — the upload flow marks the build quarantined
+    (services/quarantine.py) instead of trusting an unscanned file."""
     if not config.CLAMAV:
-        return True, ""
+        return True, "", "off"
     import socket
+    import struct
     try:
         s = socket.socket(socket.AF_UNIX)
         s.settimeout(30)
         s.connect(config.CLAMAV_SOCKET)
         try:
             s.sendall(b"zINSTREAM\0")
+            # clamd INSTREAM framing: each chunk is <4-byte network-order length><data>,
+            # terminated by a zero-length chunk (4 zero bytes) — NOT hex text.
             for i in range(0, len(data), 32768):
                 chunk = data[i:i + 32768]
-                s.sendall(f"{len(chunk):x}".encode() + b"\0" + chunk)
-            s.sendall(b"0\0")
+                s.sendall(struct.pack("!I", len(chunk)) + chunk)
+            s.sendall(struct.pack("!I", 0))
             s.shutdown(socket.SHUT_WR)
             reply = b""
             while True:
@@ -90,15 +96,24 @@ def _clamav_clean(data: bytes) -> tuple[bool, str]:
                 reply += part
         finally:
             s.close()
-        verdict = reply.decode("utf-8", "replace").strip()
-        if verdict.upper().startswith("OK"):
-            return True, ""
-        if "FOUND" in verdict.upper():
-            return False, verdict.split("FOUND")[0].strip()
-        return True, verdict      # unknown reply: do not block on a confused scanner
+        # clamd INSTREAM replies end with a NUL terminator: "stream: OK\0" or
+        # "stream: <SIGNATURE> FOUND\0". Errors arrive as "ERROR: <text>\0" or are cut off.
+        # Verdict grammar is STRICT: an unterminated reply or anything that is not exactly
+        # a clean or infected verdict is NOT a verdict — the upload is held, never trusted.
+        if not reply.endswith(b"\0"):
+            log.warning("clamd reply missing its NUL terminator (%r) — upload held", reply[:120])
+            return True, "", "unscanned"
+        body = reply[:-1].decode("utf-8", "replace").strip()
+        if body.endswith(" FOUND"):
+            return False, body[:-len(" FOUND")].strip(), "infected"
+        if body in ("OK", "stream: OK"):                     # EXACTLY the supported success replies
+            return True, "", "clean"
+        # empty / malformed / ERROR replies are NOT a clean verdict: hold the upload
+        log.warning("clamd gave an unusable verdict (%r) — upload quarantined pending scan", body[:120])
+        return True, "", "unscanned"
     except Exception as e:
-        log.warning("PHOTO3D_CLAMAV=1 but clamd unreachable (%s) — upload allowed, miss logged", e)
-        return True, ""
+        log.warning("PHOTO3D_CLAMAV=1 but clamd unreachable (%s) — upload quarantined pending scan", e)
+        return True, "", "unscanned"
 
 
 def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Checked:
@@ -121,11 +136,14 @@ def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Ch
             # so this is a genuine oversized image: same 400 + message imagesafe gives
             raise GateError(400, TOO_BIG)
         raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
-    clean, signature = _clamav_clean(data)
+    clean, signature, scan_state = scan_bytes(data)
+    checked.scan_state = scan_state
     if not clean:
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"malware:{signature}"})
         log.warning("upload refused by malware scan (sid hidden in audit log)")
         raise GateError(415, "That file can't be uploaded. Nothing about it was stored.")
+    if scan_state == "unscanned":
+        _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "quarantined:scanner_unreachable"})
     _audit({"sid": actor_sid, "src": source, "kind": checked.kind, "format": checked.format,
             "size": checked.size_bytes, "verdict": "ok"})
     return checked
