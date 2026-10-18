@@ -67,9 +67,10 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
     min_wall = ps.line_width(n) if n else 0.4      # resin: 0.4 mm is a common minimum wall
     thin = thin_walls(mesh, min_wall)
     checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message}}
-    tiny = bool(size) and min(size) < 2 * min_wall            # B11: thinner overall than two lines
+    # B11: a part thinner than one line, or a speck only a few lines across, won't really print
+    tiny = bool(size) and (min(size) < min_wall or max(size) < 5 * min_wall)
     if tiny:
-        thin = {**thin, "ok": False, "note": f"The whole part is under {2 * min_wall:g} mm thick."}
+        thin = {**thin, "ok": False, "note": f"The whole part is tiny for a {min_wall:g} mm line."}
         checks["thin_wall"] = thin
     states = [fit["ok"], thin["ok"] if not thin.get("skipped") else True, slices_ok]
     if fit["ok"] is False or slices_ok is False:
