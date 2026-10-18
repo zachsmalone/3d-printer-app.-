@@ -100,6 +100,8 @@ def purge_expired(bs: BuildStore = _store, now: float | None = None) -> dict:
                 out["kept_starred"] += 1
             elif _age_days(meta, now) > days:
                 bs.delete(d.name); out["expired"] += 1
+                from ..services import filestore
+                filestore.delete_build(d.name)      # object-storage copy too (best-effort)
     if out["expired"] or out["unfinished"]:
         log.info("retention: removed %d expired and %d unfinished builds (%d starred kept)", out["expired"], out["unfinished"], out["kept_starred"])
     return out

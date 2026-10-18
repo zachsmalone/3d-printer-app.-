@@ -221,3 +221,27 @@ def test_filestore_is_a_noop_when_unconfigured(monkeypatch):
     filestore.put_build("b1", "model.stl", b"data")        # must not raise or touch the network
     assert filestore.signed_url("builds/b1/model.stl") is None
     filestore.delete_build("b1")                            # best-effort no-op
+
+
+def test_download_route_redirects_to_presigned_and_delete_cleans_up(s3):
+    from tests.b1 import client
+    """Route-level: generate → download redirects to a VERIFIED presigned URL; delete removes the bucket copy."""
+    import httpx
+    c = client()
+    r = c.post("/api/generate", files={"file": ("photo.png", _png_bytes(), "image/png")}, data={"mode": "relief"})
+    assert r.status_code == 200, r.text
+    bid = r.json()["id"]
+    d = c.get(f"/api/download/{bid}/stl", follow_redirects=False)
+    assert d.status_code == 303 and "X-Amz-Signature=" in d.headers["location"]
+    got = httpx.get(d.headers["location"], timeout=10)          # the fake S3 verifies the signature
+    assert got.status_code == 200 and len(got.content) > 0
+    assert c.delete(f"/api/builds/{bid}").status_code == 200
+    assert httpx.get(d.headers["location"], timeout=10).status_code == 404
+
+
+def _png_bytes() -> bytes:
+    import io
+    from PIL import Image
+    b = io.BytesIO()
+    Image.new("RGB", (60, 40), (10, 120, 200)).save(b, "PNG")
+    return b.getvalue()

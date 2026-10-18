@@ -176,6 +176,8 @@ def delete_oldest(actor: Actor = Depends(get_actor)):
         if not items:
             return {"ok": True, "deleted": None}
         store.delete(items[0]["id"])
+        from ..services import filestore
+        filestore.delete_build(items[0]["id"])       # object-storage copy too (best-effort)
         return {"ok": True, "deleted": items[0]["id"]}
 
 
@@ -320,7 +322,7 @@ def generate(
         # local disk stays the slicer's/editor's working surface
         from ..services import filestore
         if filestore.enabled():
-            filestore.put_build(bid, src, data)
+            filestore.put_build(bid, "source", data)      # stable key; ext does not matter to the bucket
             for ext in exporters.WRITERS:
                 filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
             filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
@@ -405,6 +407,12 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
         for e, fn in exporters.WRITERS.items():
             (d / f"model.{e}").write_bytes(fn(model))
         Image.fromarray(model.thumb).save(d / "thumb.png")
+        from ..services import filestore
+        if filestore.enabled():
+            filestore.put_build(bid, "source", clean)
+            for e in exporters.WRITERS:
+                filestore.put_build(bid, f"model.{e}", (d / f"model.{e}").read_bytes())
+            filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
         stats = mesh_stats(model)
         model.info = {**model.info, "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), "creality_k1")}
         meta = {"id": bid, "mode": "trace2d", "beginner": False, "preset": None,
@@ -446,11 +454,13 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     meta_for(bid, actor)
     from ..services import editproj, filestore
     editproj.ensure_exports(bid)
-    # object storage (when configured): presigned URL with a TTL instead of proxying bytes
-    url = filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900)
-    if url:
-        return RedirectResponse(url, status_code=303)
     p = store.dir(bid) / f"model.{ext}"
     if not p.exists():
         raise HTTPException(404, "unknown build")
+    # object storage (when configured): refresh the bucket copy (idempotent — also heals builds
+    # created before S3 was switched on), then redirect to a presigned URL with a TTL
+    if filestore.enabled():
+        filestore.put_build(bid, f"model.{ext}", p.read_bytes())
+        return RedirectResponse(filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900),
+                                status_code=303)
     return FileResponse(p, filename=f"photo3d_{bid}.{ext}", headers=NO_STORE)

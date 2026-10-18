@@ -10,7 +10,7 @@ Every alert must have a runbook entry below — an alert without a runbook is no
 | Uptime | UptimeRobot (5-min checks) on `https://<domain>/healthz` | any 2 consecutive failures |
 | Error rate | Sentry (self-hosted or SaaS free tier) via `loguru`/logging integration, or plain log scan | new CRITICAL log entries: `zeim.audit`, `zeim.uploads`, unhandled exceptions |
 | Disk | `df` on the host via cron | disk under 10% free |
-| Slicing queue | `/api/moderation/queue` (admin token) exposes `oldest_open_age_s`; poll it with a small cron script | SLA breach when the oldest open moderation report exceeds 24h |
+| Moderation SLA | `/api/moderation/queue` (admin token) exposes `oldest_open_age_s`; poll it with a small cron script | breach when the oldest open report exceeds 24h (slicer queue-depth monitoring itself is still outstanding — /healthz does not expose it today) |
 | Backups | `scripts/backup.py` exit code + monthly restore drill | non-zero exit, failed drill |
 
 Cron sketch (the host, not the container):

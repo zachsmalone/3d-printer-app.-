@@ -70,8 +70,17 @@ def conn() -> sqlite3.Connection:
         if c is None:
             path.parent.mkdir(parents=True, exist_ok=True)
             c = sqlite3.connect(key, timeout=30, check_same_thread=False)
-            c.execute("PRAGMA journal_mode=WAL")
             c.execute("PRAGMA busy_timeout=30000")
+            # journal_mode=WAL ignores the busy handler and fails with SQLITE_BUSY while another
+            # process holds a lock (multi-worker startup) — check-then-set with backoff instead
+            for attempt in range(50):
+                if (c.execute("PRAGMA journal_mode").fetchone() or [""])[0].lower() == "wal":
+                    break
+                try:
+                    c.execute("PRAGMA journal_mode=WAL")
+                    break
+                except sqlite3.OperationalError:
+                    time.sleep(0.1 * (attempt + 1))
             c.execute("PRAGMA synchronous=NORMAL")
             c.executescript(_SCHEMA)
             c.commit()
@@ -248,3 +257,22 @@ def upload_events_count(sid: str, since: float) -> int:
 def upload_events_add(sid: str, ts: float) -> None:
     conn().execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, ts))
     conn().commit()
+
+
+def upload_events_hit(sid: str, now: float, window_s: float, limit: int) -> bool:
+    """Atomic count-and-insert for the upload gate: BEGIN IMMEDIATE takes the write lock
+    BEFORE the count, so two workers admitting the same account cannot both pass the limit."""
+    c = conn()
+    c.execute("BEGIN IMMEDIATE")
+    try:
+        n = c.execute("SELECT COUNT(*) FROM upload_events WHERE sid=? AND ts >= ?",
+                      (sid, now - window_s)).fetchone()[0]
+        if n >= limit:
+            c.commit()                                   # nothing inserted; refusal is final
+            return False
+        c.execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, now))
+        c.commit()
+        return True
+    except Exception:
+        c.rollback()
+        raise

@@ -26,7 +26,7 @@ from pathlib import Path
 
 from .. import config
 from ..config import DATA
-from ..core.imagesafe import UNREADABLE
+from ..core.imagesafe import TOO_BIG, UNREADABLE
 from . import uploadsafe
 
 log = logging.getLogger("zeim.uploads")
@@ -59,11 +59,8 @@ def _allowed(sid: str, now: float) -> bool:
         return True
     if config.STORAGE_MODE == "db":
         from .. import db
-        db.upload_events_prune(now, _HOUR)
-        if db.upload_events_count(sid, now - _HOUR) >= config.UPLOADS_PER_HOUR:
-            return False
-        db.upload_events_add(sid, now)
-        return True
+        db.upload_events_prune(now, _HOUR)                # best-effort housekeeping
+        return db.upload_events_hit(sid, now, _HOUR, config.UPLOADS_PER_HOUR)
     # json mode: in-process limiter (documented limitation for multi-worker json deployments)
     from ..core import ratelimit
     return ratelimit.hit(f"upload:{sid}", limit=config.UPLOADS_PER_HOUR, window_s=_HOUR)
@@ -113,24 +110,17 @@ def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Ch
     try:
         checked = uploadsafe.check(data)
     except uploadsafe.Rejected as e:
-        if e.reason == "image_too_many_pixels" and source == "generate":
-            # photo flow only: defer the pixel cap to the decoder. imagesafe (which runs next, in
-            # the same request) enforces its own cap AFTER decoding — the sniff only fires on a
-            # structurally valid header (IHDR is validated first), so this is a genuine oversized
-            # image, and imagesafe's own "very large" refusal still protects the worker. Logged.
-            _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "deferred:image_too_many_pixels"})
-            sniffed = uploadsafe._sniff_image(data)
-            checked = uploadsafe.Checked("image", sniffed[0], len(data),
-                                         image={"width": sniffed[1], "height": sniffed[2],
-                                                "pixels": sniffed[1] * sniffed[2]})
-        else:
-            _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"rejected:{e.reason}"})
-            if e.reason == "too_big":
-                raise GateError(413, "That file is too big to upload.")
-            if e.reason in ("unknown_type", "image_bad_header"):
-                # the photo flow's existing friendly contract (imagesafe's message, 400)
-                raise GateError(400, UNREADABLE)
-            raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
+        _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"rejected:{e.reason}"})
+        if e.reason == "too_big":
+            raise GateError(413, "That file is too big to upload.")
+        if e.reason in ("unknown_type", "image_bad_header"):
+            # the photo flow's existing friendly contract (imagesafe's message, 400)
+            raise GateError(400, UNREADABLE)
+        if e.reason == "image_too_many_pixels":
+            # the sniff only fires on a structurally valid header (IHDR is validated first),
+            # so this is a genuine oversized image: same 400 + message imagesafe gives
+            raise GateError(400, TOO_BIG)
+        raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
     clean, signature = _clamav_clean(data)
     if not clean:
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"malware:{signature}"})

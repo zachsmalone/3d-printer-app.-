@@ -269,3 +269,49 @@ def test_two_processes_see_the_same_data_and_dont_corrupt_it(db_mode, tmp_path):
     for i in range(2):
         assert db.doc_read(f"child{i}", {}) == {"n": i}
     assert db.doc_read("parent", {}) == {"n": 1}
+
+
+def test_concurrent_same_document_updates_lose_nothing(db_mode, tmp_path):
+    """Two processes hammering doc_update on the SAME document: every increment survives."""
+    import os, subprocess, sys
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    script = tmp_path / "hammer.py"
+    script.write_text(
+        "import sys; sys.path.insert(0, sys.argv[1])\n"
+        "from app import db\n"
+        "for _ in range(10):\n"
+        "    db.doc_update('ctr', {}, lambda d: d.update(n=d.get('n', 0) + 1))\n"
+        "print('ok')\n"
+    )
+    env = {**os.environ, "PHOTO3D_DATA": str(db_mode)}
+    procs = [subprocess.Popen([sys.executable, str(script), repo], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, env=env) for _ in range(2)]
+    for p in procs:
+        out, err = p.communicate(timeout=120)
+        assert p.returncode == 0, err.decode()[-400:]
+    assert db.doc_read("ctr", {})["n"] == 20                    # 2 processes x 10 updates, none lost
+
+
+def test_concurrent_upload_limit_admits_at_most_the_limit(db_mode, tmp_path):
+    """The count-and-insert is one transaction: parallel workers cannot over-admit one account."""
+    import os, subprocess, sys
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    script = tmp_path / "hit.py"
+    script.write_text(
+        "import sys, time; sys.path.insert(0, sys.argv[1])\n"
+        "from app import db\n"
+        "admitted = 0\n"
+        "for _ in range(5):\n"
+        "    if db.upload_events_hit('acct', time.time(), 3600, 3):\n"
+        "        admitted += 1\n"
+        "print(admitted)\n"
+    )
+    env = {**os.environ, "PHOTO3D_DATA": str(db_mode)}
+    procs = [subprocess.Popen([sys.executable, str(script), repo], stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, env=env) for _ in range(4)]
+    total = 0
+    for p in procs:
+        out, err = p.communicate(timeout=120)
+        assert p.returncode == 0, err.decode()[-400:]
+        total += int(out.strip())
+    assert total == 3                                            # limit is 3: never more, exactly the limit
