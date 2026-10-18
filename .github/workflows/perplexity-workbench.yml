@@ -1,0 +1,34 @@
+name: Perplexity workbench
+on:
+  push:
+    branches: [Perplexity]
+  pull_request:
+    paths:
+      - "workbench/perplexity/**"
+      - "static/perplexity-workbench/**"
+      - "app/main.py"
+      - "tests/test_perplexity_workbench.py"
+      - ".github/workflows/perplexity-workbench.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  workbench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: workbench/perplexity/package-lock.json
+      - run: npm ci && npm test && npm run build
+        working-directory: workbench/perplexity
+      - name: Verify committed bundle is reproducible
+        run: git diff --exit-code -- static/perplexity-workbench
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt -c constraints.txt pytest
+      - run: python -m pytest tests/test_perplexity_workbench.py tests/test_b2_static.py -q

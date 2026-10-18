@@ -1,0 +1,37 @@
+{
+  "browser": {"mode": "launch", "executable_path": "/usr/bin/chromium", "headless": true},
+  "start_url": {"url": "http://127.0.0.1:8766/workbench/", "query": []},
+  "environment": {
+    "viewport": {"width": 1440, "height": 1000, "device_scale_factor": 1},
+    "locale": "en-US", "timezone": "America/Chicago", "color_scheme": "light",
+    "reduced_motion": "reduce", "service_workers": "block"
+  },
+  "actions": [
+    {"step_id": "ready", "action": "wait_for", "locator": {"kind": "test_id", "value": "preset-Workshop"}, "state": "attached"},
+    {"step_id": "appearance", "action": "click", "locator": {"kind": "css", "selector": "[data-view=appearance]"}},
+    {"step_id": "blueprint", "action": "click", "locator": {"kind": "test_id", "value": "preset-Blueprint"}},
+    {"step_id": "dark-on", "action": "check", "locator": {"kind": "css", "selector": "#mod-dark"}},
+    {"step_id": "dark-off", "action": "uncheck", "locator": {"kind": "css", "selector": "#mod-dark"}},
+    {"step_id": "grid-off", "action": "check", "locator": {"kind": "css", "selector": "#mod-grid"}},
+    {"step_id": "left-inspector", "action": "check", "locator": {"kind": "css", "selector": "#mod-left"}},
+    {"step_id": "studio", "action": "click", "locator": {"kind": "css", "selector": "[data-view=studio]"}},
+    {"step_id": "wireframe", "action": "click", "locator": {"kind": "css", "selector": "#wire-button"}},
+    {"step_id": "solid", "action": "click", "locator": {"kind": "css", "selector": "#solid-button"}},
+    {"step_id": "appearance-again", "action": "click", "locator": {"kind": "css", "selector": "[data-view=appearance]"}},
+    {"step_id": "reset", "action": "click", "locator": {"kind": "css", "selector": "#reset-theme"}},
+    {"step_id": "lithophane", "action": "click", "locator": {"kind": "css", "selector": "[data-view=litho]"}},
+    {"step_id": "panel-width", "action": "fill", "locator": {"kind": "css", "selector": "#litho-width"}, "value": {"source": "literal", "value": "150"}},
+    {"step_id": "invalid-thickness", "action": "fill", "locator": {"kind": "css", "selector": "#litho-min"}, "value": {"source": "literal", "value": "3.5"}},
+    {"step_id": "generation-blocked", "action": "wait_for", "locator": {"kind": "css", "selector": "#export-litho[disabled]"}, "state": "attached"},
+    {"step_id": "valid-thickness", "action": "fill", "locator": {"kind": "css", "selector": "#litho-min"}, "value": {"source": "literal", "value": "0.8"}},
+    {"step_id": "thickness-view", "action": "click", "locator": {"kind": "css", "selector": "[data-lit-view=thickness]"}},
+    {"step_id": "source-view", "action": "click", "locator": {"kind": "css", "selector": "[data-lit-view=source]"}},
+    {"step_id": "backlit-view", "action": "click", "locator": {"kind": "css", "selector": "[data-lit-view=backlit]"}}
+  ],
+  "capture": {
+    "after_each_step": ["screenshot", "accessibility"],
+    "at_end": ["screenshot", "url", "dom"],
+    "events": [],
+    "network": {"request_body": false, "response_body": false, "header_values": false}
+  }
+}
