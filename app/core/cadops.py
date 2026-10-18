@@ -339,6 +339,7 @@ def op_round_edges(m, p):
         raise OpError(f"Rounding failed on this shape: {e}")
     if opened.is_empty():
         raise OpError("The radius removes the whole body.")
+    opened_raw = opened
     opened = opened ^ A                       # never grow past the original faces
     edges = p.get("edges") or []
     if edges:
@@ -351,8 +352,13 @@ def op_round_edges(m, p):
         if caps is not None:
             opened = A - ((A - opened) ^ caps)
     out = None
-    for tol in (1e-3, 5e-3, 2e-2, 5e-2, 0):           # merge the near-coincident sliver vertices Minkowski leaves behind
-        out = _solid_or_none(opened.simplify(tol), len(bodies(sel)))
+    nb = len(bodies(sel))
+    cands = [opened] + ([opened_raw] if not edges else [])   # the ^A clip can leave coplanar slivers; the raw opening is already inside A up to facets
+    for cand in cands:
+        for tol in (1e-3, 5e-3, 2e-2, 5e-2, 0):       # merge the near-coincident sliver vertices Minkowski leaves behind
+            out = _solid_or_none(cand.simplify(tol), nb)
+            if out is not None:
+                break
         if out is not None:
             break
     if out is None:                           # QA B3: never hand back a non-manifold mesh
