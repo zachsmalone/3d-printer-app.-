@@ -238,9 +238,9 @@ def test_recipe_reopens_after_a_cold_restart():
     # the RUNNING app's actual dirs — NOT os.environ: earlier test modules may have
     # rewritten PHOTO3D_DATA after the app was imported, and the app would still be
     # using its import-time value (the child must look where THIS app actually wrote).
+    # DATA = users/settings, OUT = the builds themselves — pass each to its own variable.
     from app import config
-    from app.services.history import store
-    data_dir = str(store.root)
+    data_dir = str(config.DATA)
     out_dir = str(config.OUT)
     repo = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -264,6 +264,21 @@ steps = p.json()["ops"]
 assert steps and steps[0]["op"] == "parts", steps
 r2 = c.get("/api/download/{bid}/stl", follow_redirects=False)
 assert r2.status_code in (200, 303), r2.status_code
+# the saved-project picker must list it after the restart too
+pp = c.get("/api/parts/projects")
+assert pp.status_code == 200
+ids = [x["id"] for x in pp.json()["projects"]]
+assert "{bid}" in ids, ids
+# and a real RECOMPOSITION in the fresh process: change the recipe, the mesh must follow
+r3 = c.put("/api/parts/{bid}/recipe", json={{"recipe": {{"parts": [
+    {{"kind": "box", "dims": {{"size": [30.0, 30.0, 20.0]}}, "position": [0, 0, 0], "role": "solid"}}]}}}})
+assert r3.status_code == 200, "recipe PUT %s: %s" % (r3.status_code, r3.text[:200])
+import io, trimesh as tm3
+stl = c.get("/api/download/{bid}/stl", follow_redirects=True).content
+mesh = tm3.load(io.BytesIO(stl), file_type="stl", process=False)
+z = mesh.bounds[:, 2]
+# the recipe box is centred at z=0: 30x30x20 -> z in [-10, 10] (NOT the old [-4, 4])
+assert abs(float(z.max()) - 10.0) < 0.5 and abs(float(z.min()) + 10.0) < 0.5, mesh.bounds.tolist()
 print("COLD-REOPEN-OK")
 """
     res = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=300)

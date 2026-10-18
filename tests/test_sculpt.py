@@ -25,9 +25,10 @@ def _bumpy(radius=10.0):
 
 # ---------------------------------------------------------------- the basics
 
-def test_zero_strength_is_an_exact_no_op():
+@pytest.mark.parametrize("brush", ["smooth", "flatten", "inflate"])
+def test_zero_strength_is_an_exact_no_op(brush):
     m = _bumpy()
-    out, rep = sculpt.op_sculpt(m, {"brush": "smooth", "center": [0, 0, 10], "radius": 4,
+    out, rep = sculpt.op_sculpt(m, {"brush": brush, "center": [0, 0, 10], "radius": 4,
                                    "strength": 0.0, "iterations": 3})
     assert np.array_equal(out.vertices, m.vertices)
     assert rep["vertices_moved"] > 0                    # the brush selected, but moved nothing
@@ -77,7 +78,6 @@ def test_flatten_moves_vertices_toward_the_stored_plane():
     before = np.abs((m.vertices - q) @ n)
     after = np.abs((out.vertices - q) @ n)
     assert after.mean() < before.mean()                # distances to the plane shrank
-    assert rep["plane"] in (rep["plane"],)             # the plane is reported (pinnable)
 
 
 def test_flatten_with_a_pinned_plane_never_recomputes_it():
@@ -91,26 +91,75 @@ def test_flatten_with_a_pinned_plane_never_recomputes_it():
 
 # ---------------------------------------------------------------- inflate
 
+def _flat_grid(size=20.0, step=2.5):
+    """A flat grid on z=0: every vertex normal is EXACTLY (0,0,1) — displacement is
+    analytically known without calling any of the op's internals."""
+    xs = np.round(np.arange(-size, size + 1e-9, step), 6)
+    n = len(xs)
+    xg, yg = np.meshgrid(xs, xs)
+    v = np.column_stack([xg.ravel(), yg.ravel(), np.zeros(xg.size)])
+    def vid(i, j): return j * n + i          # meshgrid ravel is row-major: row j, col i
+    f = []
+    for i in range(n - 1):
+        for j in range(n - 1):
+            a, b, c, d = vid(i, j), vid(i + 1, j), vid(i, j + 1), vid(i + 1, j + 1)
+            f += [[a, b, c], [b, d, c]]
+    return trimesh.Trimesh(v, np.array(f), process=False)
+
+
 def test_inflate_displaces_vertices_by_the_documented_amount():
-    m = _bumpy()
-    radius, strength = 3.0, 0.5
-    center = np.array([0, 0, 10.0])
-    out, rep = sculpt.op_sculpt(m, {"brush": "inflate", "center": center.tolist(), "radius": radius,
-                                   "strength": strength, "iterations": 1})
+    m = _flat_grid()
+    radius, strength = 5.0, 0.5
+    center = np.array([0.0, 0.0, 0.0])
+    out, _ = sculpt.op_sculpt(m, {"brush": "inflate", "center": center.tolist(), "radius": radius,
+                                 "strength": strength, "iterations": 1})
+    # analytical expectation: a flat grid's normals are all +z, so the displacement is
+    # pure +z: w(d) * strength * radius * INFLATE_FRACTION — computed HERE, independently.
     d = np.linalg.norm(m.vertices - center, axis=1)
     w = np.clip(1.0 - (d / radius) ** 2, 0.0, 1.0) ** 2
-    # the op's own normals: recompute them the same way to predict displacement
-    from app.core.sculpt import _vertex_normals
-    vn = _vertex_normals(m, len(m.vertices))
-    expected = m.vertices + (strength * w)[:, None] * vn * (strength * radius * sculpt.INFLATE_FRACTION)
-    assert np.allclose(out.vertices, expected, atol=1e-9)   # the formula is the contract
+    expected_z = w * strength * radius * sculpt.INFLATE_FRACTION
+    assert np.allclose(out.vertices[:, 0], m.vertices[:, 0], atol=1e-9)   # x untouched
+    assert np.allclose(out.vertices[:, 1], m.vertices[:, 1], atol=1e-9)   # y untouched
+    assert np.allclose(out.vertices[:, 2], expected_z, atol=1e-9)         # z = the formula
+    # and strength appears ONCE (not squared): the center vertex moves exactly
+    # strength * radius * INFLATE_FRACTION — if it were applied twice, this would be
+    # strength**2 * radius * INFLATE_FRACTION = half the value at strength 0.5.
+    assert abs(expected_z.max() - strength * radius * sculpt.INFLATE_FRACTION) < 1e-12
 
 
-def test_inflate_reports_no_inverted_or_degenerate_faces_at_normal_strengths():
-    m = _bumpy()
-    out, rep = sculpt.op_sculpt(m, {"brush": "inflate", "center": [0, 0, 10], "radius": 4,
-                                   "strength": 0.5, "iterations": 3})
-    assert rep["inverted_faces"] == 0
+def test_a_folding_stroke_is_refused_and_the_input_preserved():
+    """Adversarial: a stroke whose result contains folded/degenerate faces must be
+    REFUSED (not warned about), and the input mesh left untouched — exactly the case
+    watertightness checks miss. The brush math (falloff-capped displacement) makes a
+    healthy mesh very hard to fold, so the adversarial input carries a degenerate
+    (zero-area) face INSIDE the brush area: the stroke refuses rather than carry that
+    damage silently into the result. Pre-existing damage OUTSIDE the brush must NOT
+    block the stroke (only touched faces count)."""
+    m = _flat_grid()
+    c = int(np.argmin(np.linalg.norm(m.vertices - [0, 0, 0], axis=1)))   # the centre vertex
+    f = m.faces.copy()
+    f[0] = [c, c, c + 1]                               # a zero-area face AT the centre (in the brush)
+    damaged = trimesh.Trimesh(m.vertices, f, process=False)
+    before = damaged.vertices.copy()
+    with pytest.raises(meshedit.OpError, match="folded"):
+        sculpt.op_sculpt(damaged, {"brush": "inflate", "center": [0, 0, 0], "radius": 5,
+                                   "strength": 0.5, "iterations": 1})
+    assert np.array_equal(damaged.vertices, before)     # the input mesh is untouched
+    # ...but the SAME damage far from the brush does not block the stroke
+    f2 = m.faces.copy()
+    f2[-1] = [f2[-1][0], f2[-1][0], f2[-1][1]]          # degenerate face at the rim, outside
+    far = trimesh.Trimesh(m.vertices, f2, process=False)
+    out, _ = sculpt.op_sculpt(far, {"brush": "inflate", "center": [0, 0, 0], "radius": 5,
+                                    "strength": 0.5, "iterations": 1})
+    assert out.is_watertight or len(out.faces) > 0       # accepted: untouched by the stroke
+
+
+def test_reasonable_strokes_produce_no_folded_faces():
+    for brush, params in [("inflate", {"center": [0, 0, 10], "radius": 4, "strength": 0.5, "iterations": 3}),
+                          ("smooth", {"center": [0, 0, 10], "radius": 4, "strength": 0.5, "iterations": 3}),
+                          ("flatten", {"center": [0, 0, 10], "radius": 4, "strength": 0.5, "iterations": 3})]:
+        m = _bumpy()
+        out, _ = sculpt.op_sculpt(m, {"brush": brush, **params})   # no OpError => no folds
 
 
 # ---------------------------------------------------------------- selection policy
@@ -161,6 +210,26 @@ def test_undo_restores_geometry_through_the_real_api():
     assert stl_restored == stl_before                 # byte-identical restore
 
 
+def test_flatten_plane_is_persisted_into_the_saved_step_params():
+    """The advisor's persistence requirement: the auto-derived plane must be SAVED with
+    the step (ops[...]["params"]), not just returned in the report — so a replay after
+    an earlier step changed reuses the SAME plane instead of deriving a different one."""
+    c = client()
+    r = c.post("/api/parts/new", json={"recipe": {"parts": [
+        {"kind": "sphere", "dims": {"diameter": 40}, "position": [0, 0, 0], "role": "solid"}]}})
+    assert r.status_code == 200, r.text
+    bid = r.json()["id"]
+    mv = c.post(f"/api/edit/{bid}/op", json={"op": "sculpt", "params": {
+        "brush": "flatten", "center": [0, 0, 20], "radius": 8, "strength": 0.5, "iterations": 2}})
+    assert mv.status_code == 200, mv.text
+    p = c.get(f"/api/edit/{bid}")
+    step = p.json()["ops"][-1]
+    assert step["op"] == "sculpt"
+    assert "plane" in step["params"]                     # PERSISTED, not just reported
+    pl = step["params"]["plane"]
+    assert len(pl["point"]) == 3 and len(pl["normal"]) == 3
+
+
 def test_cold_replay_through_a_fresh_process_reproduces_the_stroke():
     """Deterministic REPLAY, cold: a brand-new process must reproduce the same sculpted
     mesh from the same input (no hidden state, no randomness, no warm caches)."""
@@ -207,6 +276,9 @@ def test_invalid_parameters_are_rejected_before_any_work():
         {"strength": 1.5}, {"strength": -0.1}, {"strength": float("nan")},  # bad strength
         {"iterations": 0}, {"iterations": 11}, {"iterations": 1.5}, {"iterations": "2"},  # bad iters
         {"brush": "flatten", "plane": {"point": [0, 0, 0], "normal": [0, 0, 0]}},  # zero normal
+        {"center": [0, 0, 0, 0]},                        # FOUR coordinates: no truncation
+        {"center": [[0, 0], [0, 0]]},                   # ragged shape
+        {"brush": "flatten", "plane": {"point": [0, 0, 0, 0], "normal": [0, 0, 1]}},  # 4-coord plane
     ]:
         with pytest.raises(meshedit.OpError):
             sculpt.op_sculpt(m, {**base, **bad})

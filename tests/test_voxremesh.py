@@ -114,16 +114,27 @@ def test_voxremesh_fills_a_genuine_sealed_cavity_and_says_so():
     assert out.is_watertight
     full = 4 / 3 * np.pi * 10 ** 3
     assert out.volume > 0.9 * full                       # the sealed cavity was filled
-    assert "sealed internal cavity was filled" in rep["message"]   # disclosed, not silent
+    # disclosed, not silent — with the honest ambiguity (growth may also be padding/pitch)
+    assert "filled sealed cavity" in rep["message"]
 
 
 def test_voxremesh_refuses_a_thin_walled_hollow_model():
     """Thin wall (inner radius 9 of 10): filling the cavity would more than double the volume.
-    The guard refuses — and the error says WHY (sealed cavity), not the misleading
-    'pitch too coarse' it used to give."""
+    The guard refuses — and the error no longer OVERCLAIMS that it proved a cavity (growth
+    may also be coarse pitch/padding): it says a cavity MAY have been filled."""
     hollow = _hollow_sphere(r_out=10.0, r_in=9.0)
-    with pytest.raises(meshedit.OpError, match="sealed internal cavity"):
+    with pytest.raises(meshedit.OpError, match="sealed internal cavity may have"):
         op_voxremesh(hollow, {"pitch": 0.5})
+
+
+def test_voxremesh_a_solid_at_coarse_pitch_is_not_falsely_called_a_cavity_fill():
+    """Volume growth alone does not PROVE a sealed cavity: a SOLID sphere at a coarse
+    pitch also grows (voxel padding). It must be accepted (no cavity to destroy), and
+    the disclosure must carry the ambiguity, not assert a cavity was filled."""
+    solid = trimesh.creation.icosphere(radius=10.0, subdivisions=3)
+    out, rep = op_voxremesh(solid, {"pitch": 2.0})       # coarse: 5 cells across the radius
+    assert out.is_watertight
+    assert "voxel padding, coarse pitch, or a filled sealed cavity" in rep["message"]
 
 
 def test_voxremesh_refuses_grids_over_the_memory_budget():

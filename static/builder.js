@@ -108,11 +108,6 @@ let viewer = null;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
 $("#vReset").onclick = () => viewer?.controls.reset();
 $("#vWire").onclick = () => { if (viewer) { viewer.wire = !viewer.wire; viewer.load(lastPreview, "edit", { flat: true }); } };
-/* The page is up and every button works — tell the boot.js watchdog so it does not
-   raise a false "didn't start" banner (this page loads neither community.js nor edit.js,
-   the two scripts that normally set these flags). */
-window.__zeimStarted = true;
-window.__zeimEditStarted = true;
 let lastPreview = null;
 function show(p) {
   lastPreview = p.preview;
@@ -162,6 +157,13 @@ $("#btnUpdate").onclick = () => run(async () => {
   show(out);
   $("#status").textContent = "Updated.";
 });
+
+/* ---------- startup complete — tell the boot.js watchdog so it does not raise a false
+   "didn't start" banner (this page loads neither community.js nor edit.js, the two
+   scripts that normally set these flags). Set LAST, after every handler above is wired:
+   by this point the page really is fully interactive. ---------- */
+window.__zeimStarted = true;
+window.__zeimEditStarted = true;
 
 /* ---------- reopening a saved recipe (builder.html?bid=...) — runs ONCE at startup ---------- */
 /* Saved-project picker: the reachable 'edit recipe' path for existing builds. */
