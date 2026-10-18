@@ -113,13 +113,16 @@ def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Ch
     try:
         checked = uploadsafe.check(data)
     except uploadsafe.Rejected as e:
-        if e.reason == "image_too_many_pixels":
-            # the photo flow defers the pixel cap to the decoder: imagesafe (which runs next,
-            # in the same request) enforces its own cap AFTER decoding, so a real bomb still gets
-            # refused — but a fake header claiming giant dims gets the honest "unreadable" message
-            # instead of a wrong "too large" one. Logged, not rejected.
+        if e.reason == "image_too_many_pixels" and source == "generate":
+            # photo flow only: defer the pixel cap to the decoder. imagesafe (which runs next, in
+            # the same request) enforces its own cap AFTER decoding — the sniff only fires on a
+            # structurally valid header (IHDR is validated first), so this is a genuine oversized
+            # image, and imagesafe's own "very large" refusal still protects the worker. Logged.
             _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "deferred:image_too_many_pixels"})
-            checked = uploadsafe.Checked("image", "png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "jpeg", len(data))
+            sniffed = uploadsafe._sniff_image(data)
+            checked = uploadsafe.Checked("image", sniffed[0], len(data),
+                                         image={"width": sniffed[1], "height": sniffed[2],
+                                                "pixels": sniffed[1] * sniffed[2]})
         else:
             _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"rejected:{e.reason}"})
             if e.reason == "too_big":

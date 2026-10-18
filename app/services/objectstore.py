@@ -116,28 +116,32 @@ def delete(key: str) -> None:
 
 
 def signed_url(key: str, ttl_s: int = 900) -> str:
-    """Presigned GET URL (query-string signature, expires after ttl_s). Object mode only."""
+    """Presigned GET URL (query-string signature, expires after ttl_s). Object mode only.
+
+    Canonical form follows the S3 presigning spec: the canonical query string carries every
+    X-Amz-* param except the signature itself, strictly percent-encoded and sorted."""
     cfg = _cfg()
     url = _object_url(key, cfg)
     now = datetime.datetime.now(datetime.timezone.utc)
     amz = now.strftime("%Y%m%dT%H%M%SZ")
     datestamp = now.strftime("%Y%m%d")
-    expiry = int(now.timestamp()) + int(ttl_s)
-    # unsigned headers only: host (from the URL)
     host = httpx.URL(url).host
     if httpx.URL(url).port not in (None, 80, 443):
         host = f"{host}:{httpx.URL(url).port}"
-    headers = {"host": host}
-    signed_headers = "host"
-    canonical_headers = f"host:{host}\n"
-    canonical = "\n".join(["GET", quote(httpx.URL(url).path or "/", safe="/"), "", canonical_headers, signed_headers,
-                           "UNSIGNED-PAYLOAD"])
+    params = {
+        "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+        "X-Amz-Credential": f"{cfg['key']}/{datestamp}/{cfg['region']}/{_SERVICE}/aws4_request",
+        "X-Amz-Date": amz,
+        "X-Amz-Expires": str(int(ttl_s)),
+        "X-Amz-SignedHeaders": "host",
+    }
+    canonical_query = "&".join(f"{quote(k, safe='-_.~')}={quote(v, safe='-_.~')}" for k, v in sorted(params.items()))
+    canonical = "\n".join(["GET", quote(httpx.URL(url).path or "/", safe="/"), canonical_query,
+                           f"host:{host}\n", "host", "UNSIGNED-PAYLOAD"])
     scope = f"{datestamp}/{cfg['region']}/{_SERVICE}/aws4_request"
     to_sign = "\n".join(["AWS4-HMAC-SHA256", amz, scope, hashlib.sha256(canonical.encode()).hexdigest()])
     k = _h(("AWS4" + cfg["secret"]).encode(), datestamp)
     for part in (cfg["region"], _SERVICE, "aws4_request"):
         k = _h(k, part)
     signature = hmac.new(k, to_sign.encode(), hashlib.sha256).hexdigest()
-    return (f"{url}?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential={quote(cfg['key'] + '/' + scope)}"
-            f"&X-Amz-Date={amz}&X-Amz-Expires={ttl_s}&X-Amz-SignedHeaders=host"
-            f"&X-Amz-Signature={signature}&Expires={expiry}")
+    return f"{url}?{canonical_query}&X-Amz-Signature={signature}"

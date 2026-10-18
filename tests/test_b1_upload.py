@@ -53,6 +53,13 @@ def test_heic_from_an_iphone_is_converted_not_rejected():
     f, raw = stored(e.json()["id"]); assert f.suffix == ".jpg"; clean(raw)
 
 
+def test_malformed_heic_gets_the_friendly_unreadable_message():
+    # a file with an HEIC-looking header but a broken body must not pass the gate as "heic"
+    garbage_heic = b"\x00\x00\x00\x18ftypheic" + b"garbage" * 20
+    r = gen(client(), name="IMG_1234.HEIC", data=garbage_heic, ctype="image/heic")
+    assert r.status_code == 400 and r.json()["detail"] == UNREADABLE, r.text
+
+
 def test_without_the_heif_plugin_the_message_is_friendly(monkeypatch):
     monkeypatch.setattr(imagesafe, "ALLOWED", imagesafe.ALLOWED - {"HEIF"})
     r = gen(client(), name="IMG.HEIC", data=heic(), ctype="image/heic")

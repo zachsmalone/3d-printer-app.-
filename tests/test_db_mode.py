@@ -244,3 +244,28 @@ def test_migrated_builds_usable_by_buildstore(db_mode):
     bs = BuildStore(root=out)
     assert [m["id"] for m in bs.list("sid1")] == ["b1", "b2"]
     assert bs.get("b1")["mode"] == "relief"
+
+
+def test_two_processes_see_the_same_data_and_dont_corrupt_it(db_mode, tmp_path):
+    """_TX_LOCK guards threads; WAL + busy_timeout must guard separate processes (multiple workers)."""
+    import os, subprocess, sys
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    script = tmp_path / "writer.py"
+    script.write_text(
+        "import sys; sys.path.insert(0, sys.argv[3]); import json\n"
+        "from app import db\n"
+        "db.doc_write(sys.argv[1], json.loads(sys.argv[2]))\n"
+        "print('ok')"
+    )
+    # parent process: write concurrently with two child writers on the same DATA dir
+    db.doc_write("parent", {"n": 1})
+    env = {**os.environ, "PHOTO3D_DATA": str(db_mode)}
+    procs = [subprocess.Popen([sys.executable, str(script), f"child{i}", json.dumps({"n": i}), str(repo)],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+             for i in range(2)]
+    for p in procs:
+        out, err = p.communicate(timeout=60)
+        assert p.returncode == 0, err.decode()[-400:]
+    for i in range(2):
+        assert db.doc_read(f"child{i}", {}) == {"n": i}
+    assert db.doc_read("parent", {}) == {"n": 1}

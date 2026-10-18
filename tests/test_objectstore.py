@@ -21,21 +21,73 @@ class _FakeS3(ThreadingHTTPServer):
 
 
 class _Handler(BaseHTTPRequestHandler):
+    """S3-shaped server that VERIFIES SigV4 (both header auth and presigned query auth) —
+    an independent re-derivation of the signature from the received request, so a wrongly-
+    canonicalized client gets 403, not a pass."""
+
+    SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
     def _clean_path(self):
         return self.path.split("?")[0]
+
+    def _sigv4_ok(self) -> bool:
+        import hashlib
+        import hmac as _hmac
+        from urllib.parse import parse_qsl, quote, urlsplit
+
+        u = urlsplit(self.path)
+        q = dict(parse_qsl(u.query))
+        if "X-Amz-Signature" in q:                      # presigned GET (query auth)
+            params = {k: v for k, v in q.items() if k != "X-Amz-Signature"}
+            cq = "&".join(f"{quote(k, safe='-_.~')}={quote(v, safe='-_.~')}" for k, v in sorted(params.items()))
+            host = self.headers.get("Host", "")
+            canonical = "\n".join(["GET", quote(u.path, safe="/"), cq, f"host:{host}\n", "host", "UNSIGNED-PAYLOAD"])
+            amz, cred = q["X-Amz-Date"], q["X-Amz-Credential"]
+            given = q["X-Amz-Signature"]
+        else:                                           # header auth
+            auth = self.headers.get("Authorization", "")
+            if not auth.startswith("AWS4-HMAC-SHA256 "):
+                return False
+            parts = dict(p.strip().split("=", 1) for p in auth[len("AWS4-HMAC-SHA256 "):].split(", "))
+            signed = parts["SignedHeaders"].split(";")
+            cred, given = parts["Credential"], parts["Signature"]
+            values = {h.lower(): self.headers.get(h, "").strip() for h in signed}
+            canonical_headers = "".join(f"{h}:{values[h]}\n" for h in signed)
+            canonical = "\n".join([self.command, quote(u.path, safe="/"), "", canonical_headers,
+                                   parts["SignedHeaders"], self.headers.get("x-amz-content-sha256", "")])
+            amz = self.headers.get("x-amz-date", "")
+        _key, datestamp, region, service, _tail = cred.split("/")
+        scope = f"{datestamp}/{region}/{service}/aws4_request"
+        to_sign = "\n".join(["AWS4-HMAC-SHA256", amz, scope, hashlib.sha256(canonical.encode()).hexdigest()])
+        k = _hmac.new(("AWS4" + self.SECRET).encode(), datestamp.encode(), hashlib.sha256).digest()
+        for part in (region, service, "aws4_request"):
+            k = _hmac.new(k, part.encode(), hashlib.sha256).digest()
+        return _hmac.new(k, to_sign.encode(), hashlib.sha256).hexdigest() == given
 
     def _auth(self):
         _FakeS3.auth_headers.append(self.headers.get("Authorization", ""))
 
+    def _reject_if_bad_sig(self):
+        if not self._sigv4_ok():
+            self.send_response(403)
+            self.end_headers()
+            return True
+        return False
+
     def do_PUT(self):
         self._auth()
         n = int(self.headers.get("Content-Length", 0))
-        _FakeS3.objects[self._clean_path()] = self.rfile.read(n)
+        body = self.rfile.read(n)
+        if self._reject_if_bad_sig():
+            return
+        _FakeS3.objects[self._clean_path()] = body
         self.send_response(200)
         self.end_headers()
 
     def do_GET(self):
         self._auth()
+        if self._reject_if_bad_sig():
+            return
         if self._clean_path() in _FakeS3.objects:
             body = _FakeS3.objects[self._clean_path()]
             self.send_response(200)
@@ -48,6 +100,8 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         self._auth()
+        if self._reject_if_bad_sig():
+            return
         _FakeS3.objects.pop(self._clean_path(), None)
         self.send_response(204)
         self.end_headers()
@@ -127,3 +181,43 @@ def test_sigv4_is_deterministic_for_a_fixed_time(monkeypatch):
     # a different payload changes the signature
     h3 = objectstore._sign_request("PUT", "https://s3.example.org/b/x", {"content-type": "text/plain"}, b"tampered", cfg, amz_date=t)
     assert h3["Authorization"] != h1["Authorization"]
+
+
+def test_the_server_actually_verifies_signatures(s3):
+    """A request with a broken signature must be refused — proves the double verifies, not just accepts."""
+    import httpx
+    url = f"{objectstore._cfg()['endpoint']}/{objectstore._cfg()['bucket']}/tamper"
+    r = httpx.put(url, content=b"x", headers={"Authorization": "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20261017/us-east-1/s3/aws4_request, "
+                                               "SignedHeaders=host, Signature=deadbeef"})
+    assert r.status_code == 403
+    # and a tampered presigned URL is refused too
+    objectstore.put("k/t.png", b"PNG")
+    u = objectstore.signed_url("k/t.png", ttl_s=60)
+    assert u.endswith("deadbeef") or True
+    bad = u[: u.rfind("=") + 1] + "0" * 64
+    assert httpx.get(bad, timeout=10).status_code == 403
+
+
+def test_filestore_lifecycle_put_sign_delete(s3):
+    """The app's storage facade: artifacts go to the bucket, downloads are presigned, deletes clean up."""
+    from app.services import filestore
+    assert filestore.enabled() is True
+    filestore.put_build("b1", "model.stl", b"solid x")
+    assert _FakeS3.objects["/zeim-test/builds/b1/model.stl"] == b"solid x"
+    url = filestore.signed_url(filestore.artifact_key("b1", "model.stl"), ttl_s=300)
+    assert url and "X-Amz-Expires=300" in url
+    import httpx
+    assert httpx.get(url, timeout=10).content == b"solid x"
+    filestore.delete_build("b1")
+    assert httpx.get(url, timeout=10).status_code == 404
+
+
+def test_filestore_is_a_noop_when_unconfigured(monkeypatch):
+    """No S3 env: put/delete do nothing, signed_url is None — the local-disk path serves files."""
+    from app.services import filestore
+    for k in ("PHOTO3D_S3_ENDPOINT", "PHOTO3D_S3_BUCKET", "PHOTO3D_S3_KEY", "PHOTO3D_S3_SECRET"):
+        monkeypatch.delenv(k, raising=False)
+    assert filestore.enabled() is False
+    filestore.put_build("b1", "model.stl", b"data")        # must not raise or touch the network
+    assert filestore.signed_url("builds/b1/model.stl") is None
+    filestore.delete_build("b1")                            # best-effort no-op

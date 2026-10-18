@@ -9,8 +9,8 @@ Every alert must have a runbook entry below — an alert without a runbook is no
 |---|---|---|
 | Uptime | UptimeRobot (5-min checks) on `https://<domain>/healthz` | any 2 consecutive failures |
 | Error rate | Sentry (self-hosted or SaaS free tier) via `loguru`/logging integration, or plain log scan | new CRITICAL log entries: `zeim.audit`, `zeim.uploads`, unhandled exceptions |
-| Disk | the backup script reports free space; cron alerts when under `PHOTO3D_DISK_MIN_FREE_MB` | disk under 10% free |
-| Slicing queue | `/healthz` reports it; alert when the oldest open moderation report exceeds 24h (`oldest_open_age_s` from `/api/moderation/queue`) | SLA breach |
+| Disk | `df` on the host via cron | disk under 10% free |
+| Slicing queue | `/api/moderation/queue` (admin token) exposes `oldest_open_age_s`; poll it with a small cron script | SLA breach when the oldest open moderation report exceeds 24h |
 | Backups | `scripts/backup.py` exit code + monthly restore drill | non-zero exit, failed drill |
 
 Cron sketch (the host, not the container):
@@ -29,7 +29,7 @@ Cron sketch (the host, not the container):
 
 **Error spike**
 1. Sentry (or `docker compose logs app --tail 500 | grep -i error`).
-2. Common causes: upload gate rejections (429/415 in `data/uploads.log.jsonl` — expected under attack), slicer OOM (RLIMIT_AS kills show as slice failures — lower `PHOTO3D_SLICE_MEM_MB` or ask the user to simplify).
+2. Common causes: upload gate rejections (429/415 in `data/uploads.log.jsonl` — expected under attack), slicer OOM (RLIMIT_AS kills show as slice failures — the cap is worker protection, not a fix; if legitimate jobs hit it, raise `PHOTO3D_SLICE_MEM_MB` on a host with more RAM).
 3. If abuse: the upload gate and report rate limits are the first brake; PHOTO3D_UPLOADS_PER_HOUR can be lowered live in env.
 
 **Moderation SLA breach (oldest open report > 24h)**
@@ -46,4 +46,5 @@ Cron sketch (the host, not the container):
 
 No log aggregation service (ELK/Datadog) — one person cannot justify the cost or the noise.
 Container stdout + `docker compose logs` + the audit log cover launch needs. Revisit at
-~1,000 weekly users.
+~1,000 weekly users. The UptimeRobot/Sentry/cron entries above are the PROPOSED launch
+setup — none of it is configured until a real host exists.

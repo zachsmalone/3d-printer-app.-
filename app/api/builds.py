@@ -8,7 +8,7 @@ import uuid
 import numpy as np
 import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from PIL import Image
 
 from .. import config
@@ -164,6 +164,8 @@ def get_build(bid: str, actor: Actor = Depends(get_actor)):
 def delete_build(bid: str, actor: Actor = Depends(get_actor)):
     meta_for(bid, actor, owner_only=True)
     store.delete(bid)
+    from ..services import filestore
+    filestore.delete_build(bid)               # object-storage copy too (best-effort)
     return {"ok": True}
 
 
@@ -314,6 +316,14 @@ def generate(
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(model))
         Image.fromarray(model.thumb).save(d / "thumb.png")
+        # object storage (when configured): the bucket is the durable copy of the artifacts;
+        # local disk stays the slicer's/editor's working surface
+        from ..services import filestore
+        if filestore.enabled():
+            filestore.put_build(bid, src, data)
+            for ext in exporters.WRITERS:
+                filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
+            filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
         stats = mesh_stats(model)
         if mode == "lithophane" and params.get("shape", "rect") != "rect":
             from ..services import willprint            # same bed-fit check the Will-it-print box uses (default printer)
@@ -434,8 +444,12 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     if ext not in exporters.WRITERS or not bid.isalnum():
         raise HTTPException(404)
     meta_for(bid, actor)
-    from ..services import editproj
+    from ..services import editproj, filestore
     editproj.ensure_exports(bid)
+    # object storage (when configured): presigned URL with a TTL instead of proxying bytes
+    url = filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900)
+    if url:
+        return RedirectResponse(url, status_code=303)
     p = store.dir(bid) / f"model.{ext}"
     if not p.exists():
         raise HTTPException(404, "unknown build")

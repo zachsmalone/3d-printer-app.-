@@ -87,7 +87,7 @@ class Checked:
 def _sniff_image(data: bytes) -> tuple[str, int, int] | None:
     """(format, width, height) from the header, or None when not a known image."""
     if data[:8] == b"\x89PNG\r\n\x1a\n":                       # PNG: IHDR is the first chunk
-        if len(data) < 24:
+        if len(data) < 24 or data[12:16] != b"IHDR":   # validate the chunk before trusting its dims
             raise Rejected("image_bad_header")
         w, h = struct.unpack(">II", data[16:24])
         return "png", w, h
