@@ -91,10 +91,39 @@ def test_voxremesh_keeps_through_holes_but_fills_sealed_cavities():
     annulus = np.pi * (10 ** 2 - 6 ** 2) * 20
     assert out.volume < 0.85 * solid_cyl                             # the bore is still open
     assert out.volume > 0.9 * annulus                                # ...and the walls survive
-    shell = trimesh.creation.uv_sphere(radius=10, count=[32, 24])
-    shell = trimesh.Trimesh(shell.vertices, shell.faces, process=False)
-    out2, _ = op_voxremesh(shell, {"pitch": 0.5})
-    assert out2.volume > 0.9 * (4 / 3 * np.pi * 10 ** 3)             # sealed cavity filled
+
+
+def _hollow_sphere(r_out: float, r_in: float) -> trimesh.Trimesh:
+    """A GENUINE hollow object: an outer shell plus an oppositely-oriented inner shell —
+    watertight, with a real sealed cavity between them (not a solid sphere mislabeled
+    as hollow, and not a broken mesh)."""
+    outer = trimesh.creation.icosphere(radius=r_out, subdivisions=3)
+    inner = trimesh.creation.icosphere(radius=r_in, subdivisions=3)
+    inner.invert()                       # flip winding: the solid is the region between shells
+    hollow = trimesh.util.concatenate([outer, inner])
+    assert hollow.is_watertight
+    return hollow
+
+
+def test_voxremesh_fills_a_genuine_sealed_cavity_and_says_so():
+    """A real hollow sphere (outer + inverted inner shell), thick wall: the cavity IS filled
+    (the disclosed limit), the result is watertight and nearly the full solid — and the
+    report TELLS the user the cavity was filled rather than staying silent about a +14% volume."""
+    hollow = _hollow_sphere(r_out=10.0, r_in=5.0)
+    out, rep = op_voxremesh(hollow, {"pitch": 0.5})
+    assert out.is_watertight
+    full = 4 / 3 * np.pi * 10 ** 3
+    assert out.volume > 0.9 * full                       # the sealed cavity was filled
+    assert "sealed internal cavity was filled" in rep["message"]   # disclosed, not silent
+
+
+def test_voxremesh_refuses_a_thin_walled_hollow_model():
+    """Thin wall (inner radius 9 of 10): filling the cavity would more than double the volume.
+    The guard refuses — and the error says WHY (sealed cavity), not the misleading
+    'pitch too coarse' it used to give."""
+    hollow = _hollow_sphere(r_out=10.0, r_in=9.0)
+    with pytest.raises(meshedit.OpError, match="sealed internal cavity"):
+        op_voxremesh(hollow, {"pitch": 0.5})
 
 
 def test_voxremesh_refuses_grids_over_the_memory_budget():
@@ -106,3 +135,19 @@ def test_voxremesh_refuses_grids_over_the_memory_budget():
     with pytest.raises(meshedit.OpError, match="million cells"):
         op_voxremesh(big, {"pitch": 0.05})
     assert time.time() - t0 < 2.0                                    # refused, not attempted
+
+
+def test_voxremesh_budget_counts_the_real_padded_grid():
+    """The voxelizer PADS the grid: a 100 mm axis at pitch 1 is 101 cells, not 100. A model
+    whose RAW ratio fits the budget but whose PADDED, rounded grid does not must be refused —
+    a 199 mm cube at pitch 1 is 199³ = 7.88 M raw (fits 8 M) but (199+2)³ = 8.12 M padded."""
+    import time
+    sneaky = trimesh.creation.box((199, 199, 199))
+    t0 = time.time()
+    with pytest.raises(meshedit.OpError, match="million cells"):
+        op_voxremesh(sneaky, {"pitch": 1.0})
+    assert time.time() - t0 < 2.0                                    # refused before voxelizing
+    # ...and a model that fits even padded is accepted
+    fits = trimesh.creation.box((195, 195, 195))
+    out, _ = op_voxremesh(fits, {"pitch": 1.0})
+    assert out.is_watertight

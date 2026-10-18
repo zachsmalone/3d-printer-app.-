@@ -220,3 +220,75 @@ def test_the_builder_page_is_served():
     assert "/static/builder.js" in r.text                          # its script is wired
     main = c.get("/")
     assert "parts builder" in main.text.lower()                    # reachable from the main page
+
+
+def test_recipe_reopens_after_a_cold_restart():
+    """A GENUINE cold-cache reopen: create a parts build here, then load it in a FRESH
+    process — a brand-new app import with empty in-memory caches, pointed at the same
+    on-disk data dir, replaying the same session cookie. The recipe must load from disk
+    and the model recompose. (A second GET inside this process proves nothing: the
+    project and mesh are already warm.)"""
+    import os, subprocess, sys
+
+    c = client()
+    r = c.post("/api/parts/new", json={"recipe": _recipe(_box((30, 30, 8)))})
+    assert r.status_code == 200, r.text
+    bid = r.json()["id"]
+    sid = next(ck.value for ck in c.cookies.jar if ck.name == "p3d_sid")
+    # the RUNNING app's actual dirs — NOT os.environ: earlier test modules may have
+    # rewritten PHOTO3D_DATA after the app was imported, and the app would still be
+    # using its import-time value (the child must look where THIS app actually wrote).
+    from app import config
+    from app.services.history import store
+    data_dir = str(store.root)
+    out_dir = str(config.OUT)
+    repo = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    child = f"""
+import os, sys
+os.environ["PHOTO3D_DATA"] = {data_dir!r}
+os.environ["PHOTO3D_OUT"] = {out_dir!r}
+os.environ["PHOTO3D_COOKIE_SECURE"] = "false"
+sys.path.insert(0, {repo!r})
+from fastapi.testclient import TestClient
+from app.main import app
+c = TestClient(app)
+c.cookies.set("p3d_sid", {sid!r})
+r = c.get("/api/parts/{bid}/recipe")
+assert r.status_code == 200, "recipe GET %s: %s" % (r.status_code, r.text[:200])
+rec = r.json()["recipe"]
+assert rec["parts"][0]["dims"]["size"] == [30.0, 30.0, 8.0], rec
+p = c.get("/api/edit/{bid}")
+assert p.status_code == 200, "edit GET %s" % p.status_code
+steps = p.json()["ops"]
+assert steps and steps[0]["op"] == "parts", steps
+r2 = c.get("/api/download/{bid}/stl", follow_redirects=False)
+assert r2.status_code in (200, 303), r2.status_code
+print("COLD-REOPEN-OK")
+"""
+    res = subprocess.run([sys.executable, "-c", child], capture_output=True, text=True, timeout=300)
+    assert res.returncode == 0, f"cold reopen failed:\n{res.stdout}\n{res.stderr}"
+    assert "COLD-REOPEN-OK" in res.stdout
+
+
+def test_saved_project_picker_lists_only_the_actors_parts_builds():
+    """The builder's saved-project picker: the actor's parts builds, newest first — and
+    ONLY those (a photo build must not appear), and only for the owner."""
+    from tests.b1 import photo_build
+    c = client()
+    r1 = c.post("/api/parts/new", json={"recipe": _recipe(_box((30, 30, 8)))})
+    b1 = r1.json()["id"]
+    r2 = c.post("/api/parts/new", json={"recipe": _recipe(_box((20, 20, 6)))})
+    b2 = r2.json()["id"]
+    photo_build(c)                                     # a NON-parts build: must not appear
+    g = c.get("/api/parts/projects")
+    assert g.status_code == 200, g.text
+    ids = [p["id"] for p in g.json()["projects"]]
+    assert b1 in ids and b2 in ids
+    assert len([p for p in g.json()["projects"]]) == 2  # the photo build is excluded
+    assert ids.index(b2) < ids.index(b1)               # newest first
+    # another user's picker: owner-scoped, sees none of these
+    c2 = client()
+    g2 = c2.get("/api/parts/projects")
+    assert g2.status_code == 200
+    assert g2.json()["projects"] == []

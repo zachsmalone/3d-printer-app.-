@@ -78,6 +78,22 @@ def new_parts_project(body: dict, actor: Actor = Depends(get_actor)):
             "history": [summary(m) for m in store.list(actor.sid)]}
 
 
+@router.get("/projects")
+def my_parts_projects(actor: Actor = Depends(get_actor)):
+    """The actor's parts builds, newest first — the saved-project picker on the builder
+    page (a reachable 'edit recipe' path for existing projects; owner-scoped)."""
+    out = []
+    for meta in store.list(actor.sid):
+        ops = meta.get("ops") or []
+        if not ops or ops[0].get("op") != "parts":
+            continue
+        out.append({"id": meta["id"], "title": (meta.get("title") or "Untitled")[:60],
+                    "created": meta.get("created"),
+                    "triangles": (meta.get("stats") or {}).get("triangles")})
+    out.sort(key=lambda p: p["created"] or "", reverse=True)
+    return {"projects": out}
+
+
 @router.get("/{bid}/recipe")
 def get_recipe(bid: str, actor: Actor = Depends(get_actor)):
     _, recipe = _recipe_of(bid, actor)

@@ -38,11 +38,14 @@ def _pitch(m: trimesh.Trimesh, p: dict) -> float:
 
 
 def _budget(m: trimesh.Trimesh, pitch: float) -> None:
-    """The grid is extents/pitch per axis. A pitch RANGE is not a resource bound: 100 mm at
-    0.05 mm is ~8 billion cells. Refuse before voxelization ever runs."""
+    """The grid is extents/pitch per axis — but the voxelizer PADS: the real grid is up to
+    ceil(ext/pitch) + 2 cells per axis (measured on trimesh 5.1.1: a 100 mm axis at
+    pitch 1 is 101 cells; at pitch 3.7, 29). Budget the padded, rounded dims, not the raw
+    ratio — a pitch RANGE is not a resource bound: 100 mm at 0.05 mm is ~8 billion cells.
+    Refuse before voxelization ever runs."""
     from .meshedit import OpError
     ext = np.asarray(m.extents, dtype=float)
-    cells = float(np.prod(np.maximum(ext / pitch, 1.0)))
+    cells = float(np.prod(np.ceil(ext / pitch) + 2))
     if cells > MAX_CELLS:
         raise OpError(
             f"voxel remesh needs ~{cells / 1e6:.0f} million cells at that pitch (budget "
@@ -84,10 +87,21 @@ def op_voxremesh(m: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
     after = float(abs(out.volume))
     drift = abs(after - before) / before if solid_in and before > 0 else None
     if drift is not None and drift > 0.5:
+        if after > before:
+            # the volume GREW: an enclosed internal cavity was filled (the disclosed limit —
+            # a hollow model becomes solid). Refuse rather than silently change the geometry,
+            # and say WHY — it is not a pitch problem.
+            raise OpError(
+                f"the model has a sealed internal cavity: the voxel remesh fills it, changing "
+                f"the volume by +{drift:.0%} — refused rather than silently fill it. "
+                f"(Through-holes survive; sealed cavities do not.)")
         raise OpError(f"the voxel remesh changed the volume by {drift:.0%} — the pitch is too coarse for this model.")
+    note = ""
+    if drift is not None and after > before * 1.10:
+        note = f" (a sealed internal cavity was filled: volume +{drift:.0%})"
     rep = {"pitch_mm": pitch, "triangles_before": int(len(m.faces)), "triangles_after": int(len(out.faces)),
            "volume_drift": drift, "watertight": True,
            "holes_closed": bool(not m.is_watertight and work.is_watertight),
            "shell_risk": not solid_in,      # input stayed open: the result may be a hollow shell
-           "message": f"Voxel remesh at {pitch:.2f} mm ({len(out.faces)} triangles, watertight)"}
+           "message": f"Voxel remesh at {pitch:.2f} mm ({len(out.faces)} triangles, watertight){note}"}
     return _check(out), rep

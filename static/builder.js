@@ -32,7 +32,7 @@ let parts = [{ kind: "box", role: "solid", dims: { size: [40, 40, 10] }, positio
 let bid = new URLSearchParams(location.search).get("bid");   // reopen a saved recipe
 let busy = false;
 
-/* ---------- rendering ---------- */
+/* ---------- rendering (pure: never touches the network) ---------- */
 function partCard(p, i) {
   const k = KINDS[p.kind];
   const el = document.createElement("div");
@@ -100,27 +100,7 @@ $$("[data-add]").forEach(b => b.onclick = () => {
   const dims = {};
   for (const [name, n, def] of KINDS[kind].dims) dims[name] = n === 1 ? def[0] : [...def];
   parts.push({ kind, role: "solid", dims, position: [0, 0, 0], rotation: [0, 0, 0] });
-  /* ---------- reopening a saved recipe (builder.html?bid=...) ---------- */
-async function openSaved() {
-  if (!bid) { render(); return; }        // fresh page: the default starter part
-  try {
-    const rec = await api(`/api/parts/${bid}/recipe`);
-    if (rec?.recipe?.parts?.length) parts = rec.recipe.parts;
-    $("#title").value = rec.recipe.title || $("#title").value;
-    const p = await api(`/api/edit/${bid}`);
-    show(p);
-    $("#status").textContent = "Reopened your recipe — change any number and press Update.";
-    $("#handoff").hidden = false;
-    $("#handoff").innerHTML = `Saved. Come back any time: <a href="/builder.html?bid=${bid}">bookmark this recipe</a>. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
-  } catch (e) {
-    $("#status").textContent = e.status === 409
-      ? "That project wasn't made in the parts builder."
-      : (e.message || "Could not reopen that project.");
-    bid = null;
-  }
   render();
-}
-openSaved();          // async: renders itself once the recipe (or the error) is in
 });
 
 /* ---------- viewer (reused, not modified) ---------- */
@@ -128,6 +108,11 @@ let viewer = null;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
 $("#vReset").onclick = () => viewer?.controls.reset();
 $("#vWire").onclick = () => { if (viewer) { viewer.wire = !viewer.wire; viewer.load(lastPreview, "edit", { flat: true }); } };
+/* The page is up and every button works — tell the boot.js watchdog so it does not
+   raise a false "didn't start" banner (this page loads neither community.js nor edit.js,
+   the two scripts that normally set these flags). */
+window.__zeimStarted = true;
+window.__zeimEditStarted = true;
 let lastPreview = null;
 function show(p) {
   lastPreview = p.preview;
@@ -159,31 +144,12 @@ $("#btnCreate").onclick = () => run(async () => {
     body: JSON.stringify({ title: $("#title").value.trim() || "My parts build", recipe: { parts } }),
   });
   bid = out.id;
+  history.replaceState(null, "", `/builder.html?bid=${bid}`);        // the reopen link IS the address bar now
   show(out);
   $("#status").textContent = "Built. Every number above stays editable — change one and press Update.";
   $("#handoff").hidden = false;
-  $("#handoff").innerHTML = `Saved. Come back any time: <a href="/builder.html?bid=${bid}">bookmark this recipe</a>. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
-  /* ---------- reopening a saved recipe (builder.html?bid=...) ---------- */
-async function openSaved() {
-  if (!bid) { render(); return; }        // fresh page: the default starter part
-  try {
-    const rec = await api(`/api/parts/${bid}/recipe`);
-    if (rec?.recipe?.parts?.length) parts = rec.recipe.parts;
-    $("#title").value = rec.recipe.title || $("#title").value;
-    const p = await api(`/api/edit/${bid}`);
-    show(p);
-    $("#status").textContent = "Reopened your recipe — change any number and press Update.";
-    $("#handoff").hidden = false;
-    $("#handoff").innerHTML = `Saved. Come back any time: <a href="/builder.html?bid=${bid}">bookmark this recipe</a>. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
-  } catch (e) {
-    $("#status").textContent = e.status === 409
-      ? "That project wasn't made in the parts builder."
-      : (e.message || "Could not reopen that project.");
-    bid = null;
-  }
+  $("#handoff").innerHTML = `Saved — this page is your recipe's home, so bookmark it. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
   render();
-}
-openSaved();          // async: renders itself once the recipe (or the error) is in
 });
 
 $("#btnUpdate").onclick = () => run(async () => {
@@ -197,18 +163,37 @@ $("#btnUpdate").onclick = () => run(async () => {
   $("#status").textContent = "Updated.";
 });
 
-/* ---------- reopening a saved recipe (builder.html?bid=...) ---------- */
-async function openSaved() {
-  if (!bid) { render(); return; }        // fresh page: the default starter part
+/* ---------- reopening a saved recipe (builder.html?bid=...) — runs ONCE at startup ---------- */
+/* Saved-project picker: the reachable 'edit recipe' path for existing builds. */
+(async function loadSavedList() {
+  try {
+    const r = await fetch("/api/parts/projects");
+    if (!r.ok) return;
+    const projects = (await r.json()).projects || [];
+    if (!projects.length) return;
+    const ul = $("#savedList");
+    for (const p of projects.slice(0, 8)) {
+      const li = document.createElement("li");
+      const a = document.createElement("a");
+      a.href = "builder.html?bid=" + encodeURIComponent(p.id);
+      a.textContent = p.title + (p.triangles ? ` (${p.triangles.toLocaleString()} triangles)` : "");
+      li.appendChild(a);
+      ul.appendChild(li);
+    }
+    $("#savedProjects").hidden = false;
+  } catch (e) { /* the picker is optional: never block the builder */ }
+})();
+
+(async function openSaved() {
+  if (!bid) { render(); return; }          // fresh page: the default starter part
   try {
     const rec = await api(`/api/parts/${bid}/recipe`);
     if (rec?.recipe?.parts?.length) parts = rec.recipe.parts;
-    $("#title").value = rec.recipe.title || $("#title").value;
     const p = await api(`/api/edit/${bid}`);
     show(p);
     $("#status").textContent = "Reopened your recipe — change any number and press Update.";
     $("#handoff").hidden = false;
-    $("#handoff").innerHTML = `Saved. Come back any time: <a href="/builder.html?bid=${bid}">bookmark this recipe</a>. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
+    $("#handoff").innerHTML = `Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
   } catch (e) {
     $("#status").textContent = e.status === 409
       ? "That project wasn't made in the parts builder."
@@ -216,5 +201,4 @@ async function openSaved() {
     bid = null;
   }
   render();
-}
-openSaved();          // async: renders itself once the recipe (or the error) is in
+})();
