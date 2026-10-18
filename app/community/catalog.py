@@ -14,6 +14,7 @@ from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor
 from . import originals_qa, privacy
 from ..services.credits import credit_line
+from ..services.history import store as _bstore
 from .store import ENGAGEMENT, LISTINGS, MODERATION, USERS
 
 LDIR = DATA / "projects"
@@ -338,9 +339,11 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
     title = (title or "").strip()[:80]
     if not title:
         raise Denied(422, "title required")
-    if not build_id.isalnum() or not (OUT / build_id / "meta.json").exists():
+    try:
+        bmeta = _bstore.get(build_id)
+    except KeyError:
         raise Denied(422, "unknown build")
-    if json.loads((OUT / build_id / "meta.json").read_text()).get("owner_sid") != actor.sid:
+    if bmeta.get("owner_sid") != actor.sid:
         raise Denied(422, "unknown build")      # you can only publish your own builds
     try:
         visibility = privacy.check_level(actor, visibility or privacy.default_level(actor))
@@ -370,7 +373,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
         files.append({"name": f"{slug}.{ext}", "size_kb": round((d / f"{slug}.{ext}").stat().st_size / 1024)})
     if (OUT / build_id / "thumb.png").exists():
         shutil.copy(OUT / build_id / "thumb.png", d / "thumb.png")
-    mode = json.loads((OUT / build_id / "meta.json").read_text())["mode"]
+    mode = bmeta["mode"]
     item = {"id": pid, "title": title, "creator": actor.user["display_name"], "creator_id": actor.user["id"], "creator_username": actor.user.get("username"),
             "example": False, "tags": [t.strip().lower() for t in tags if t.strip()][:8], "mode": mode,
             "downloads": 0, "description": (description or "")[:500],

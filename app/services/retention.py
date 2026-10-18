@@ -5,7 +5,7 @@ Rules (all configurable by environment variable, see app/config.py):
     / deleting the account, removes it.
   * a build that was SAVED on purpose (shared to the Showcase or sent to a class) is kept 30 days (PHOTO3D_KEEP_SAVED_DAYS);
   * any other build is kept 7 days (PHOTO3D_KEEP_UNSAVED_DAYS).
-  * a folder with no meta.json (a build that never finished) is removed after one day.
+  * a folder with no build metadata at all (a build that never finished) is removed after one day.
 Cleanup only ever looks at the direct sub-folders of the per-build data folder (OUT). It refuses to run if that folder is, or sits inside,
 library/, static/ or the code. Logs say HOW MANY were removed, never which files or whose.
 """
@@ -75,21 +75,26 @@ def expires_at(meta: dict) -> str | None:
 
 
 def purge_expired(bs: BuildStore = _store, now: float | None = None) -> dict:
-    """Remove builds older than their keep time. Starred builds are skipped. Returns counts only."""
+    """Remove builds older than their keep time. Starred builds are skipped. Returns counts only.
+    Metadata is read through BuildStore, so this works in json and db storage modes alike."""
     now = time.time() if now is None else now
     out = {"expired": 0, "unfinished": 0, "kept_starred": 0}
     with bs.lock:
         for d in list(build_dirs(bs.root)):
-            mp = d / "meta.json"
-            if not mp.exists():
-                if now - d.stat().st_mtime > 86400:
-                    shutil.rmtree(d, ignore_errors=True); out["unfinished"] += 1
-                continue
             try:
-                import json
-                meta = json.loads(mp.read_text())
-            except Exception:
-                continue
+                meta = bs.get(d.name)            # db mode: the row is authoritative; json mode: meta.json
+            except KeyError:
+                meta = None
+                mp = d / "meta.json"
+                if not mp.exists():
+                    if now - d.stat().st_mtime > 86400:
+                        shutil.rmtree(d, ignore_errors=True); out["unfinished"] += 1
+                    continue
+                try:
+                    import json
+                    meta = json.loads(mp.read_text())   # json-era folder the store does not know: still readable
+                except Exception:
+                    continue
             days = keep_days(meta)
             if days is None:
                 out["kept_starred"] += 1

@@ -50,13 +50,13 @@ def test_cr5_studio_build_from_an_uploaded_photo_needs_the_box_and_records_it(ac
     r = gen(c, ack=False, data=other_png()); assert r.status_code == 400 and "permission" in r.json()["detail"] and "photo" in r.json()["detail"].lower()
     assert store.list(sid_of(c)) == []                                   # nothing was built, no history slot used
     r = gen(c, ack=True, data=other_png()); assert r.status_code == 200, r.text
-    assert json.loads((store.dir(r.json()["id"]) / "meta.json").read_text())["photo_ack"] is True
+    assert store.get(r.json()["id"])["photo_ack"] is True          # store.get works in json and db modes
 
 
 def test_cr5_built_in_sample_needs_no_box_and_is_recorded_as_sample(ack_on):
     c = client()
     r = gen(c, ack=False, name="sample.png", data=open(SAMPLE_PNG, "rb").read()); assert r.status_code == 200, r.text
-    assert json.loads((store.dir(r.json()["id"]) / "meta.json").read_text())["photo_ack"] == "sample"
+    assert store.get(r.json()["id"])["photo_ack"] == "sample"
     # the exemption is the exact file, not the file name
     r = gen(c, ack=False, name="sample.png", data=other_png()); assert r.status_code == 400
 
