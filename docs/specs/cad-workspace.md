@@ -7,6 +7,14 @@ A CAD design is an ordinary **edit project**. Every solid feature is one history
 
 Steps store their full inputs, e.g. an extrude stores its sketch (entities + constraints), plane, picked regions, distance, direction and mode. Editing a step re-solves its sketch and replays every later step (all-or-nothing).
 
+## Editing your own files
+- **Open ▾ → Import STL, OBJ or 3MF** (or drag a file onto the view) uses the existing upload gate (`POST /api/edit/new`: size cap, content sniffing, units). The uploaded file is kept byte-for-byte and is shown in History as **Import 01 (kept as-is)**; tapping it rolls back to the file.
+- **Open ▾ → From my builds** opens editable projects directly and makes an editable copy of other builds (the original is unchanged). Showcase items: remix/download into your builds first (no direct Showcase picker yet).
+- Editor: after any upload, **✏️ Open in CAD** opens the same project in the workspace; the parts builder hand-off links there too.
+- Every tool works on the imported mesh: tap a face to select body + face, sketch on that face, extrude join/cut, boolean, fillet/chamfer (approx.), face offset (planar), move/rotate/scale/mirror/pattern/align. Meshes that are not closed solids get a clear message; **Fix mesh** (Y) runs the existing repair step.
+- **Export ▾ → Save as a new version** copies the current state into a new project; **Open in Slicer & plate editor** opens it in the Slicer.
+- **STEP is not supported**: no permissive STEP importer is installed (the usual ones depend on OpenCascade, LGPL with a large native build). Convert to STL/3MF first.
+
 ## Ops (history steps)
 | op | what | notes |
 |---|---|---|
