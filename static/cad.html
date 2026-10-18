@@ -18,10 +18,20 @@
   <button class="cw-btn" id="cwUndo" aria-label="Undo (Ctrl+Z)" title="Undo · Ctrl/⌘+Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
   <button class="cw-btn" id="cwRedo" aria-label="Redo (Ctrl+Shift+Z)" title="Redo · Ctrl/⌘+Shift+Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
   <div class="cw-menu">
+    <button class="cw-btn wide" id="cwOpen" aria-haspopup="menu" aria-expanded="false">Open ▾</button>
+    <div class="cw-pop" id="cwOpenMenu" role="menu" hidden>
+      <a role="menuitem" href="#" id="cwImport">Import STL, OBJ or 3MF…</a>
+      <a role="menuitem" href="#" id="cwFromBuild">From my builds…</a>
+      <a role="menuitem" href="/static/cad.html">New blank design</a>
+    </div>
+    <input type="file" id="cwFile" class="sr-only" accept=".stl,.obj,.3mf,model/stl,model/3mf" tabindex="-1" aria-hidden="true" hidden>
+  </div>
+  <div class="cw-menu">
     <button class="cw-btn wide" id="cwExport" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
     <div class="cw-pop" id="cwExportMenu" role="menu" hidden>
       <a role="menuitem" id="cwDlStl" href="#">Download STL</a>
       <a role="menuitem" id="cwDl3mf" href="#">Download 3MF</a>
+      <a role="menuitem" id="cwSaveCopy" href="#">Save as a new version (copy)</a>
       <a role="menuitem" id="cwToSlicer" href="#">Open in Slicer &amp; plate editor</a>
     </div>
   </div>
@@ -64,6 +74,7 @@
   </aside>
 </main>
 
+<dialog class="cw-search" id="cwBuildsDlg" aria-label="Open one of my builds"><b>Open one of my builds</b><p class="help" style="font-size:12px">Showcase items: remix one into your builds first, then open it here.</p><ul id="cwBuildsList"></ul><button class="cw-btn wide" id="cwBuildsClose">Close</button></dialog>
 <dialog class="cw-search" id="cwSearchDlg" aria-label="Search tools">
   <input id="cwSearchIn" placeholder="Search tools…" aria-label="Search tools">
   <ul id="cwSearchList" role="listbox"></ul>

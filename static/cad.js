@@ -212,6 +212,7 @@ const MODEL_TOOLS = [
   { id: "pattern", key: "P", label: "Pattern", sub: "linear · circular", tip: "Repeat a body in a row or around a centre." },
   { id: "align", key: "A", label: "Align", sub: "to value or body", tip: "Line up a body's side or centre with a value or another body." },
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
+  { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
   { id: "visualize", key: "V", label: "Visualize", sub: "colour + finish", tip: "Pick body colours and finishes (display only; prints stay one colour)." },
 ];
 const SKETCH_TOOLS = [
@@ -270,6 +271,7 @@ function panel(title, html, onApply, applyLabel = "Apply") {
   $("#tApply").onclick = onApply; $("#tCancel").onclick = () => setTool(null);
 }
 const HINTS = {
+  repair: ["Fix mesh", "Repair an imported mesh."],
   null: ["Select", "Tap a body to select it, or pick a tool on the left."],
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
   revolve: ["Revolve", "Choose the axis and angle, then Apply."], boolean: ["Boolean", "Choose the target and tool bodies."],
@@ -349,6 +351,7 @@ const TOOL_PANELS = {
       ${v3("tPv:Through", [0, 0, 0])}<label class="cw-toggle"><span>Keep the original</span><input type="checkbox" id="tKeep" checked></label>`,
       () => addOp("body_transform", { body: +$("#tBody").value, mirror: segVal("tAx"), pivot: vec("tPv"), copy: $("#tKeep").checked }));
   },
+  repair() { panel("Fix mesh", `<p class="help">Repairs holes, flipped and duplicate faces. Imported files that aren't closed solids need this before Boolean, Fillet or Extrude join/cut.</p>`, () => addOp("repair", {})); },
   visualize() {
     const bs = S.scene?.bodies || [];
     panel("Visualize", bs.map(b => { const a = S.appearance[b.index] || {}; return `<div class="f"><label for="vc${b.index}">${esc(b.name)}</label><span style="display:flex;gap:4px"><input type="color" id="vc${b.index}" value="${a.color || PALETTE[b.index % PALETTE.length]}" style="width:48px">
@@ -417,8 +420,10 @@ function paramField(k, v, i) {
 }
 function renderHist() {
   const ol = $("#cwHist"), ops = S.scene?.ops || [], head = S.scene?.head ?? 0;
-  if (!ops.length) { ol.innerHTML = `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No steps yet. Your sketch and solid steps will be listed here.</span></div></li>`; return; }
-  ol.innerHTML = ops.map(o => {
+  const base = S.scene?.base, imp = base && base.type !== "cad" ? `<li class="${head < 0 ? "future" : ""}"><div class="hrow" role="button" tabindex="0" data-act="goto" data-i="0" title="Roll back to the imported file"><span class="ic">${IC.step}</span><span class="nm">Import 01 · ${esc(base.type === "upload" ? (base.format || "").toUpperCase() + " file" : base.type === "build" ? "from a build" : base.type)} (kept as-is)</span></div></li>` : "";
+  if (!ops.length) { ol.innerHTML = imp || `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No steps yet. Your sketch and solid steps will be listed here.</span></div></li>`; return; }
+  if (false) { ol.innerHTML = `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No steps yet. Your sketch and solid steps will be listed here.</span></div></li>`; return; }
+  ol.innerHTML = imp + ops.map(o => {
     const open = S.openStep === o.i, future = o.i > head, p = o.params || {};
     const nm = o.name || o.label;
     let body = "";
@@ -440,7 +445,7 @@ $("#cwHist").addEventListener("click", async e => {
   const o = e.target.closest("[data-open]");
   if (o && !e.target.closest(".hbody")) { const i = +o.dataset.open; S.openStep = S.openStep === i ? 0 : i; renderHist(); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
-  const i = +b.dataset.i, step = S.scene.ops[i - 1], act = b.dataset.act;
+  const i = +b.dataset.i, step = S.scene.ops[i - 1] || {}, act = b.dataset.act;
   if (act === "goto") return histAction(() => api(`/api/edit/${S.bid}/goto`, { method: "POST", json: { head: i } }));
   if (act === "delete") { if (!confirm(`Delete step ${i}? Later steps are replayed without it.`)) return; S.openStep = 0; return histAction(() => api(`/api/edit/${S.bid}/step/${i}`, { method: "DELETE" })); }
   if (act === "rename") { const n = prompt("Step name (empty = automatic):", step.name || step.label); if (n === null) return; return histAction(() => api(`/api/cad/${S.bid}/step/${i}/name`, { method: "PUT", json: { name: n.slice(0, 40) } })); }
@@ -537,6 +542,7 @@ function startSketch(plane, sketch = null, editStep = 0) {
 function exitSketch() {
   S.mode = "model"; S.sk = null; sketchG.clear(); controls.enableRotate = true; helpers.visible = true;
   $("#cwMode").textContent = "Modeling"; renderRail(); hint(...HINTS.null); $("#cwLabels").innerHTML = ""; buildWorld(true);
+  camera.up.set(0, 0, 1); viewAlong(new THREE.Vector3(0.9, -1.3, 1)); if (world.children.length) fit();
 }
 const SK_HINTS = { line: "Tap points. Tap the first point to close. Esc or double-tap ends the chain. A = arc.", rect: "Tap one corner, then the opposite corner.",
   circle: "Tap the centre, then the edge.", ellipse: "Tap the centre, then a corner.", polygon: "Tap the centre, then a corner.", spline: "Tap through-points; double-tap or Enter to finish.",
@@ -987,6 +993,42 @@ document.addEventListener("keydown", e => {
   const t = MODEL_TOOLS.find(t => t.key.toLowerCase() === k); if (t) setTool(t.id);
 });
 $("#cwTitle").addEventListener("change", () => { /* the name is used when the project is first saved */ });
+
+/* ---------------------------------------------------------------- open / import a user's own file or build */
+function openProject(id) { S.bid = id; S.openStep = 0; S.hidden.clear(); history.replaceState(null, "", `?bid=${id}`); return load(); }
+$("#cwOpen").onclick = () => { const m = $("#cwOpenMenu"), open = m.hidden; m.hidden = !open; $("#cwOpen").setAttribute("aria-expanded", open); };
+document.addEventListener("click", e => { if (!e.target.closest(".cw-menu")) $("#cwOpenMenu").hidden = true; });
+$("#cwImport").onclick = e => { e.preventDefault(); $("#cwFile").click(); };
+async function importFile(f) {
+  await run(async () => {
+    const fd = new FormData(); fd.append("file", f); fd.append("title", ($("#cwTitle").value || "Imported model").slice(0, 60));
+    const j = await api("/api/edit/new", { method: "POST", body: fd });
+    const id = j.id || j.project?.id; if (!id) throw new Error("Your recent builds are full. Delete one on the main page, then try again.");
+    await openProject(id);
+  }, "Imported. It's Import 01 in History; edit it with any tool.");
+}
+$("#cwFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); };
+stage.addEventListener("dragover", e => e.preventDefault());
+stage.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) importFile(f); });
+$("#cwSaveCopy").onclick = async e => {
+  e.preventDefault(); if (!S.bid) return msg("Nothing to save yet.");
+  await run(async () => { const fd = new FormData(); fd.append("from_build", S.bid); fd.append("title", (($("#cwTitle").value || "My design") + " v2").slice(0, 60));
+    const r = await api("/api/edit/new", { method: "POST", body: fd }); const id = r.id || r.project?.id; if (!id) throw new Error("Your recent builds are full.");
+    await openProject(id); }, "Saved as a new version. The previous one is unchanged in your builds.");
+};
+$("#cwBuildsClose").onclick = () => $("#cwBuildsDlg").close();
+$("#cwFromBuild").onclick = async e => {
+  e.preventDefault(); $("#cwOpenMenu").hidden = true;
+  try {
+    const j = await api("/api/builds"), list = $("#cwBuildsList");
+    list.innerHTML = (j.builds || []).map(b => `<li role="option" data-id="${esc(b.id)}" data-kind="${esc(b.kind || "")}"><span>${esc(b.title || "Untitled")}</span><small>${esc(b.kind === "edit" ? "editable" : b.mode || "")}</small></li>`).join("") || "<li>No builds yet.</li>";
+    list.onclick = async ev => { const li = ev.target.closest("[data-id]"); if (!li) return; $("#cwBuildsDlg").close();
+      if (li.dataset.kind === "edit") return run(() => openProject(li.dataset.id));
+      await run(async () => { const fd = new FormData(); fd.append("from_build", li.dataset.id); const r = await api("/api/edit/new", { method: "POST", body: fd });
+        const id = r.id || r.project?.id; if (!id) throw new Error("Your recent builds are full."); await openProject(id); }, "Opened as an editable copy (the original build is unchanged)."); };
+    $("#cwBuildsDlg").showModal();
+  } catch (er) { msg(er.message); }
+};
 
 /* ---------------------------------------------------------------- start */
 renderRail(); hint(...HINTS.null); loop();

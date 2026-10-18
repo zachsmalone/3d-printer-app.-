@@ -132,6 +132,7 @@ document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
 /* ---------- applying a project payload ---------- */
 function loadProject(p, keepCamera = false) {
+  { const oc = $("#editOpenCad"); if (oc) oc.href = "/static/cad.html?bid=" + encodeURIComponent(p.id); }
   E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearFaceMark(); clearMeasure(); clearGhost();
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });

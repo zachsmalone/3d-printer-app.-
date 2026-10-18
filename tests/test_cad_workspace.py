@@ -162,3 +162,24 @@ def test_scene_endpoint_and_static_page():
     assert "cad.js" in page and "cwRail" in page and "<script>try{" in page
     js = c.get("/static/cad.js").text
     assert "/api/cad/sketch/solve" in js and "Shapr3D" not in js
+
+
+def test_imported_stl_is_editable_with_cad_tools():
+    import io
+    stl = trimesh.creation.box((30, 30, 10)).export(file_type="stl")       # centred box: z -5..5
+    j = c.post("/api/edit/new", files={"file": ("mine.stl", io.BytesIO(stl), "model/stl")}).json()
+    bid = j.get("id") or j["project"]["id"]
+    s = c.get(f"/api/cad/{bid}/scene").json()
+    assert s["base"]["type"] == "upload" and s["base"]["format"] == "stl" and len(s["bodies"]) == 1
+    top = {"origin": [0, 0, 5], "normal": [0, 0, 1], "xdir": [1, 0, 0]}                 # sketch on the picked top face
+    boss = {"sketch": {"entities": [{"id": "k", "type": "circle", "c": [0, 0], "r": 5}]}, "plane": top, "distance": 8, "mode": "join"}
+    r = c.post(f"/api/edit/{bid}/op", json={"op": "sketch_extrude", "params": boss}); assert r.status_code == 200, r.text
+    assert r.json()["analysis"]["size_mm"][2] == pytest.approx(18, abs=1e-3)
+    hole = {"sketch": {"entities": [{"id": "h", "type": "circle", "c": [10, 10], "r": 2}]}, "plane": top, "direction": "down", "distance": 10, "mode": "cut"}
+    assert c.post(f"/api/edit/{bid}/op", json={"op": "sketch_extrude", "params": hole}).status_code == 200
+    for op, p in (("round_edges", {"radius": 1, "style": "chamfer"}), ("face_offset", {"point": [0, 0, -5], "normal": [0, 0, -1], "distance": 2}), ("body_transform", {"scale": [2, 2, 2]})):
+        r = c.post(f"/api/edit/{bid}/op", json={"op": op, "params": p}); assert r.status_code == 200, (op, r.text)
+    p = c.get(f"/api/edit/{bid}").json()
+    assert [o["op"] for o in p["ops"]] == ["sketch_extrude", "sketch_extrude", "round_edges", "face_offset", "body_transform"] and p["analysis"]["watertight"]
+    # the uploaded file is untouched and editing step 1 replays the rest
+    assert c.put(f"/api/edit/{bid}/step/1", json={"params": {**boss, "distance": 4}}).status_code == 200

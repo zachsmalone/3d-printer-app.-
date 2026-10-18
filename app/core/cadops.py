@@ -307,6 +307,7 @@ def op_round_edges(m, p):
             raise OpError("edges must be [[x,y,z],[x,y,z]] pairs.")
         if caps is not None:
             opened = (A - caps) + (opened ^ caps)
+    opened = opened.simplify(1e-3)            # merge the near-coincident sliver vertices Minkowski leaves behind
     return _join(_from_manifold(opened), rest), {"message": f"{style.title()} {r:g} mm (approximate, convex edges)."}
 
 

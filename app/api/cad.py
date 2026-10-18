@@ -199,4 +199,4 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
     p = editproj.payload(bid)
     return {"id": bid, "title": meta.get("title"), "bodies": out, "appearance": meta.get("appearance") or {},
             "ops": p["ops"], "head": p["head"], "can_undo": p["can_undo"], "can_redo": p["can_redo"],
-            "analysis": p["analysis"], "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")}}
+            "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode")}, "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")}}

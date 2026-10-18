@@ -143,7 +143,7 @@ $("#btnCreate").onclick = () => run(async () => {
   show(out);
   $("#status").textContent = "Built. Every number above stays editable — change one and press Update.";
   $("#handoff").hidden = false;
-  $("#handoff").innerHTML = `Saved — this page is your recipe's home, so bookmark it. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
+  $("#handoff").innerHTML = `Saved — this page is your recipe's home, so bookmark it. Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>, or <a href="/static/cad.html?bid=${bid}">open it in the CAD workspace</a>.`;
   render();
 });
 
@@ -195,7 +195,7 @@ window.__zeimEditStarted = true;
     show(p);
     $("#status").textContent = "Reopened your recipe — change any number and press Update.";
     $("#handoff").hidden = false;
-    $("#handoff").innerHTML = `Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>.`;
+    $("#handoff").innerHTML = `Next steps: slice & print it from the <a href="/#slicer">main page</a> — your model is in Recent builds, or <a href="/api/download/${bid}/stl">download the STL</a>, or <a href="/static/cad.html?bid=${bid}">open it in the CAD workspace</a>.`;
   } catch (e) {
     $("#status").textContent = e.status === 409
       ? "That project wasn't made in the parts builder."
