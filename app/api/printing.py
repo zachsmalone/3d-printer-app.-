@@ -23,9 +23,10 @@ FILE_NAMES = ("model.stl", "model.obj", "model.3mf", "thumb.png", "model.gcode")
 
 
 def _send_file(bid: str, name: str):
-    from ..services import editproj
+    from ..services import editproj, quarantine
     if name not in FILE_NAMES or not bid.isalnum():
         raise HTTPException(404)
+    quarantine.guard(bid)                        # quarantined builds are not served
     if name.startswith("model.") and name != "model.gcode":
         editproj.ensure_exports(bid)
     p = store.dir(bid) / name
@@ -119,6 +120,10 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
                     upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0)):
     guards.require_send(request, actor)
     meta_for(bid, actor, owner_only=True)
+    if not printers.direct_control_enabled():
+        raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
+    from ..services import quarantine
+    quarantine.guard(bid)                        # quarantined builds are not printed either
     pr = settings.get_printer(printer_id)
     if not pr:
         raise HTTPException(404, "unknown printer")
@@ -136,6 +141,8 @@ def test_printer(printer_id: str, request: Request, actor: Actor = Depends(get_a
     """Connection test: read-only GET requests to the printer, NEVER a print or upload command. Same guard as /api/send, plus on a
     shared server only the owner/admin (the server connects to whatever address was saved: keep that to the person who saved it)."""
     guards.require_send(request, actor)
+    if not printers.direct_control_enabled():
+        raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
     if not guards.can_see_printer_urls(request, actor):
         raise HTTPException(403, "Only the person who manages this server can test printers.")
     pr = settings.get_printer(printer_id)

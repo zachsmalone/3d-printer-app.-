@@ -121,3 +121,28 @@ error messages.
   their own geometry representations are counted as whatever triangles they
   declare in the core model part, or refused if unresolvable.
 - It does not detect malware or scanning-probe payloads; it is a resource guard.
+
+## Handoff contract: wiring the gate into /api/edit/new (and /api/edit/new-multi)
+
+`app/api/edit.py` (and the `static/edit.js` flow that calls it) belongs to the Copilot
+workstream and is deliberately not modified here. This is the exact integration once that
+file is next touched — it is three lines at the top of each upload-reading handler
+(`new_project`, `new_multi`), right where the UploadFile is read and BEFORE any parsing:
+
+```python
+from ..services import uploadgate          # module level
+
+data = await file.read() if file else b""  # existing read; cap it as today (MAX_UPLOAD)
+try:
+    uploadgate.gate(data, actor.sid, source="edit")
+except uploadgate.GateError as e:
+    raise HTTPException(e.status, e.message)
+```
+
+What this buys (all already implemented + tested in `app/services/uploadgate.py`):
+  * per-account hourly rate limit (shared with photo uploads, db-backed in db mode);
+  * the uploadsafe content checks (mesh bombs, archive caps, masquerading files);
+  * the audit log entry (never file bytes) in DATA/uploads.log.jsonl;
+  * ClamAV verdicts: infected -> refused + never stored; scanner-down -> quarantine.
+
+Acceptance test: `tests/test_edit_new_gate.py` (marked xfail until the wiring lands).

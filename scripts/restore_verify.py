@@ -20,6 +20,31 @@ import sys
 from pathlib import Path
 
 
+def unpack_archive(archive: Path, identity: Path) -> Path:
+    """Decrypt+untar a .tar.age backup into a sibling directory, and return that directory.
+    Raises on any failure (wrong identity, corrupt archive, missing age binary)."""
+    import subprocess
+    if not shutil.which("age"):
+        raise RuntimeError("age binary not found — install age (e.g. apt install age)")
+    dest = archive.parent / archive.name.replace(".tar.age", "")
+    if dest.exists():
+        raise RuntimeError(f"{dest} already exists — remove it first")
+    with open(archive, "rb") as src:
+        dec = subprocess.Popen(["age", "-d", "-i", str(identity)], stdin=src,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        untar = subprocess.Popen(["tar", "-xf", "-", "-C", str(archive.parent)],
+                                stdin=dec.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        dec.stdout.close()
+        _, dec_err = dec.communicate()
+        untar.wait()
+    if dec.returncode != 0 or untar.returncode != 0:
+        shutil.rmtree(dest, ignore_errors=True)
+        raise RuntimeError(f"decrypt/untar failed: {dec_err.decode(errors='replace')[:400]}")
+    if not dest.is_dir():
+        raise RuntimeError("archive did not contain a backup directory")
+    return dest
+
+
 def verify_backup(backup_dir: Path) -> dict:
     """Check a backup's internal consistency (checksums + DB integrity) without restoring."""
     result = {"checksums": "ok", "databases": {}, "ok": True}
@@ -89,12 +114,23 @@ def verify_outputs(backup_dir: Path, out_dir: Path) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="Restore + verify a ZEIM backup")
-    ap.add_argument("--backup", required=True, help="backup directory (zeim-YYYYMMDD-HHMMSS)")
+    ap.add_argument("--backup", required=True, help="backup directory or .tar.age archive")
     ap.add_argument("--target", required=True, help="data directory to restore INTO (overwritten!)")
+    ap.add_argument("--identity", default=None,
+                    help="age identity file (private key) when --backup is a .tar.age archive")
     ap.add_argument("--verify-outputs", default=None, help="also check an outputs tree against the manifest")
     args = ap.parse_args(argv)
 
     backup_dir = Path(args.backup)
+    if backup_dir.name.endswith(".tar.age"):
+        if not args.identity:
+            print("--identity (the age private key) is required for a .tar.age backup", file=sys.stderr)
+            return 1
+        try:
+            backup_dir = unpack_archive(backup_dir, Path(args.identity))
+        except RuntimeError as e:
+            print(json.dumps({"ok": False, "error": str(e)}), file=sys.stderr)
+            return 1
     v = verify_backup(backup_dir)
     print("verify:", json.dumps(v))
     if not v["ok"]:

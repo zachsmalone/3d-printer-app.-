@@ -66,10 +66,13 @@ def _allowed(sid: str, now: float) -> bool:
     return ratelimit.hit(f"upload:{sid}", limit=config.UPLOADS_PER_HOUR, window_s=_HOUR)
 
 
-def _clamav_clean(data: bytes) -> tuple[bool, str]:
-    """Scan via a local clamd (INSTREAM). Returns (clean, signature). Unreachable clamd = clean."""
+def scan_bytes(data: bytes) -> tuple[bool, str, str]:
+    """Scan via a local clamd (INSTREAM). -> (clean, signature, state) where state is
+    'off' (scanning not enabled) | 'clean' | 'infected' | 'unscanned' (scanner on but unreachable).
+    An unreachable clamd is NOT silently clean — the upload flow marks the build quarantined
+    (services/quarantine.py) instead of trusting an unscanned file."""
     if not config.CLAMAV:
-        return True, ""
+        return True, "", "off"
     import socket
     try:
         s = socket.socket(socket.AF_UNIX)
@@ -91,14 +94,14 @@ def _clamav_clean(data: bytes) -> tuple[bool, str]:
         finally:
             s.close()
         verdict = reply.decode("utf-8", "replace").strip()
-        if verdict.upper().startswith("OK"):
-            return True, ""
         if "FOUND" in verdict.upper():
-            return False, verdict.split("FOUND")[0].strip()
-        return True, verdict      # unknown reply: do not block on a confused scanner
+            return False, verdict.split("FOUND")[0].strip(), "infected"
+        if "OK" in verdict.upper():
+            return True, "", "clean"
+        return True, verdict, "clean"      # unknown reply: do not block on a confused scanner
     except Exception as e:
-        log.warning("PHOTO3D_CLAMAV=1 but clamd unreachable (%s) — upload allowed, miss logged", e)
-        return True, ""
+        log.warning("PHOTO3D_CLAMAV=1 but clamd unreachable (%s) — upload quarantined pending scan", e)
+        return True, "", "unscanned"
 
 
 def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Checked:
@@ -121,11 +124,14 @@ def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Ch
             # so this is a genuine oversized image: same 400 + message imagesafe gives
             raise GateError(400, TOO_BIG)
         raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
-    clean, signature = _clamav_clean(data)
+    clean, signature, scan_state = scan_bytes(data)
+    checked.scan_state = scan_state
     if not clean:
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"malware:{signature}"})
         log.warning("upload refused by malware scan (sid hidden in audit log)")
         raise GateError(415, "That file can't be uploaded. Nothing about it was stored.")
+    if scan_state == "unscanned":
+        _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "quarantined:scanner_unreachable"})
     _audit({"sid": actor_sid, "src": source, "kind": checked.kind, "format": checked.format,
             "size": checked.size_bytes, "verdict": "ok"})
     return checked

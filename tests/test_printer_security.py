@@ -16,7 +16,7 @@ import pytest
 
 from app import config
 from app.services import settings
-from tests.b1 import client
+from tests.b1 import client, photo_build
 
 
 @pytest.fixture
@@ -70,3 +70,35 @@ def test_print_never_starts_without_an_explicit_start(adult):
     # the send path passes `start` through to the printer client; the stub path shows the contract
     out = printers.send({"type": "not-a-real-type", "url": "", "api_key": "K"}, None, "x.gcode", start=False)
     assert out["ok"] is False            # refusing, and never starting anything
+
+
+# --- launch checklist Task 10: file handoff replaces direct control in production ---
+
+def test_production_disables_direct_printer_control(monkeypatch):
+    """ZEIM_ENV=production without ZEIM_PRINTER_DIRECT: no arbitrary printer URLs (the SSRF
+    vector), no server-side send/test — the file-handoff path (download .gcode) is the way."""
+    monkeypatch.setenv("ZEIM_ENV", "production")
+    monkeypatch.delenv("ZEIM_PRINTER_DIRECT", raising=False)
+    c = client()
+    r = c.put("/api/settings", json={"printers": [{"id": "p1", "type": "octoprint", "url": "https://printer.example.org", "api_key": "k"}]})
+    assert r.status_code == 400 and "file handoff" in r.json()["detail"]
+    assert c.post("/api/printers/p1/test").status_code == 410
+    bid = photo_build(c)
+    assert c.post(f"/api/send/{bid}", data={"printer_id": "p1", "start": "false"}).status_code == 410
+    # the handoff path still works: the gcode/model download is untouched by the gate
+    assert c.get(f"/api/download/{bid}/stl", follow_redirects=False).status_code in (200, 303)
+
+
+def test_printer_direct_opt_in_restores_control(monkeypatch):
+    monkeypatch.setenv("ZEIM_ENV", "production")
+    monkeypatch.setenv("ZEIM_PRINTER_DIRECT", "1")
+    c = client()
+    r = c.put("/api/settings", json={"printers": [{"id": "p1", "type": "octoprint", "url": "https://printer.example.org", "api_key": "k"}]})
+    assert r.status_code == 200
+
+
+def test_dev_default_keeps_direct_control(monkeypatch):
+    monkeypatch.delenv("ZEIM_ENV", raising=False)
+    monkeypatch.delenv("ZEIM_PRINTER_DIRECT", raising=False)
+    from app.services import printers
+    assert printers.direct_control_enabled() is True

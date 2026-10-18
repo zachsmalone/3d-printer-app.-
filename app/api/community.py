@@ -303,6 +303,11 @@ def showcase_item(iid: str, actor: Actor = Depends(get_actor)):
 
 @router.post("/showcase")
 def publish(body: dict, actor: Actor = Depends(get_actor)):
+    build_id = str(body.get("build_id", ""))[:40]
+    if build_id:
+        from ..services import quarantine
+        if quarantine.is_quarantined(build_id):
+            raise HTTPException(409, "That project is pending its malware scan and can't be shared yet.")
     try:
         title = text_in(body.get("title"), 80, "Title")
         desc = text_in(body.get("description"), 500, "Description")
@@ -662,6 +667,24 @@ def mod_audit(request: Request, x_admin_token: str = Header("")):
     return {"entries": moderation.audit_trail()}
 
 
+@router.get("/admin/metrics")
+def admin_metrics(request: Request, x_admin_token: str = Header("")):
+    """Operational metrics for monitoring, behind the admin token (/healthz stays liveness-only).
+    Slicing is synchronous by design (each request slices inline, capped by RLIMIT_AS + timeout) —
+    there is no queue, so there is no queue depth; slice failures appear in the app logs."""
+    _admin(x_admin_token, request)
+    from .. import config
+    from ..services import quarantine, retention
+    from ..services.history import store
+    q = moderation.queue()
+    return {
+        "moderation": {"open_reports": len(q), "oldest_open_age_s": moderation.oldest_open_age_s()},
+        "quarantined_builds": sum(1 for m in store.list() if m.get("quarantined")),
+        "storage": {"mode": config.STORAGE_MODE},
+        "disk_free_mb": round(retention.free_bytes() / (1024 * 1024)),
+    }
+
+
 @router.post("/moderation/report/{report_id}/preserve")
 def mod_preserve(report_id: str, request: Request, x_admin_token: str = Header("")):
     """Securely preserve the reported content + context for possible law-enforcement reporting
@@ -671,6 +694,18 @@ def mod_preserve(report_id: str, request: Request, x_admin_token: str = Header("
         return moderation.preserve(report_id)
     except KeyError:
         raise HTTPException(404, "unknown report")
+
+
+@router.post("/moderation/release-quarantine/{bid}")
+def mod_release_quarantine(bid: str, request: Request, x_admin_token: str = Header("")):
+    """Lift an upload-quarantine hold by decision (audited). Admin only — the automatic path
+    (scanner back + clean re-scan) needs no one."""
+    _admin(x_admin_token, request)
+    from ..services import quarantine
+    try:
+        return quarantine.release(bid)
+    except KeyError:
+        raise HTTPException(404, "build is not quarantined")
 
 
 @router.post("/moderation/report/{report_id}/escalate-ncmec")

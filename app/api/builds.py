@@ -242,11 +242,12 @@ def generate(
     if len(data) > MAX_UPLOAD:
         raise HTTPException(413, "image too large (max 25 MB)")
     try:
-        uploadgate.gate(data, actor.sid, source="generate")
+        checked = uploadgate.gate(data, actor.sid, source="generate")
     except uploadgate.GateError as e:
         raise HTTPException(e.status, e.message)
     if mode == "trace2d":
-        return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest)
+        return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest,
+                               unscanned=getattr(checked, "scan_state", "off") == "unscanned")
     try:
         ack = imagesafe.check_ack(data, photo_ack)        # CR-5: "this is my photo / I have permission" (built-in sample exempt)
         data, src_ext, _ = imagesafe.sanitize(data)       # HEIC -> JPEG, rotation applied, EXIF/GPS dropped, extension from content
@@ -336,6 +337,9 @@ def generate(
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
+        if getattr(checked, "scan_state", "off") == "unscanned":
+            from ..services import quarantine
+            quarantine.mark(bid)                     # scanner was down: hold the files until a scan clears them
     return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
             "history": [summary(m) for m in store.list(actor.sid)]}
@@ -384,7 +388,7 @@ def _trace_notes(info: dict) -> list:
     return rows
 
 
-def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest):
+def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest, unscanned=False):
     from ..core import trace2d
     from ..services import willprint
     clean, ext, im, params, ack = trace_input(data, photo_ack, trace_json, width_mm)
@@ -421,6 +425,9 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
+        if unscanned:
+            from ..services import quarantine
+            quarantine.mark(bid)                     # scanner was down: hold the files until a scan clears them
     return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(model),
             "history": [summary(m) for m in store.list(actor.sid)]}
@@ -452,6 +459,8 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     if ext not in exporters.WRITERS or not bid.isalnum():
         raise HTTPException(404)
     meta_for(bid, actor)
+    from ..services import quarantine
+    quarantine.guard(bid)                        # quarantined builds are not served
     from ..services import editproj, filestore
     editproj.ensure_exports(bid)
     p = store.dir(bid) / f"model.{ext}"

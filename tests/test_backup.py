@@ -90,3 +90,97 @@ def test_retention_keeps_daily_and_weekly(tmp_path):
     # the newest backup always survives
     newest = max(remaining, key=lambda p: p.name)
     assert (newest / "backup.json").exists()
+
+
+# --- encryption at rest (age) ---
+
+import shutil
+import time
+from pathlib import Path
+
+import pytest
+
+
+def _age_keypair(tmp_path):
+    """A real age keypair via age-keygen (the same binary an operator would use)."""
+    import subprocess
+    key = tmp_path / "age.key"
+    r = subprocess.run(["age-keygen", "-o", str(key)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    recipient = [l for l in key.read_text().splitlines() if "public key" in l][0].split(": ")[1]
+    return recipient, key
+
+
+def test_encrypted_backup_roundtrip_no_plaintext_left(tmp_path):
+    import subprocess
+    if not shutil.which("age"):
+        pytest.skip("age binary not installed")
+    from scripts import backup as B, restore_verify as RV
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text('{"a": 1}')
+    recipient, key = _age_keypair(tmp_path)
+    report = B.create_backup(data, tmp_path / "out", tmp_path / "bk", encrypt_to=recipient)
+    assert report["encrypted"] is True
+    archive = Path(report["archive"])
+    assert archive.name.endswith(".tar.age") and archive.stat().st_size > 0
+    # the plaintext backup directory is gone — only the encrypted archive exists
+    assert not archive.parent.joinpath(archive.name.replace(".tar.age", "")).exists()
+    # decrypt with the right identity -> the backup verifies (checksums + DB integrity)
+    unpacked = RV.unpack_archive(archive, key)
+    v = RV.verify_backup(unpacked)
+    assert v["ok"] is True
+
+
+def test_wrong_identity_cannot_decrypt(tmp_path):
+    import subprocess
+    if not shutil.which("age"):
+        pytest.skip("age binary not installed")
+    from scripts import backup as B, restore_verify as RV
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text('{"a": 1}')
+    recipient, _key = _age_keypair(tmp_path)
+    (tmp_path / "sub").mkdir(exist_ok=True)
+    _r2, other_key = _age_keypair(tmp_path / "sub")
+    report = B.create_backup(data, tmp_path / "out", tmp_path / "bk", encrypt_to=recipient)
+    with pytest.raises(RuntimeError):
+        RV.unpack_archive(Path(report["archive"]), other_key)
+
+
+def test_corrupt_ciphertext_fails_loudly(tmp_path):
+    if not shutil.which("age"):
+        pytest.skip("age binary not installed")
+    from scripts import backup as B, restore_verify as RV
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text('{"a": 1}')
+    recipient, key = _age_keypair(tmp_path)
+    report = B.create_backup(data, tmp_path / "out", tmp_path / "bk", encrypt_to=recipient)
+    archive = Path(report["archive"])
+    raw = bytearray(archive.read_bytes()); raw[len(raw) // 2] ^= 0xFF
+    archive.write_bytes(bytes(raw))
+    with pytest.raises(RuntimeError):
+        RV.unpack_archive(archive, key)
+
+
+def test_missing_age_binary_never_falls_back_to_plaintext(tmp_path, monkeypatch):
+    from scripts import backup as B
+    data = tmp_path / "data"; data.mkdir()
+    (data / "users.json").write_text('{"a": 1}')
+    monkeypatch.setattr(B.shutil, "which", lambda _n: None)
+    with pytest.raises(RuntimeError, match="age binary not found"):
+        B.create_backup(data, tmp_path / "out", tmp_path / "bk", encrypt_to="age1fake")
+
+
+def test_retention_prunes_tar_age_archives_too(tmp_path):
+    if not shutil.which("age"):
+        pytest.skip("age binary not installed")
+    from scripts import backup as B
+    data = tmp_path / "data"; data.mkdir()
+    recipient, _ = _age_keypair(tmp_path)
+    bk = tmp_path / "bk"
+    # 16 daily archives: only the newest 14 survive
+    for i in range(16):
+        B.create_backup(data, tmp_path / "out", bk, now=time.time() - (16 - i) * 3600, encrypt_to=recipient)
+    out = B.enforce_retention(bk, now=time.time() + 60)
+    assert out["kept"] == 14 and out["removed"] == 2
+    assert len(list(bk.glob("*.tar.age"))) == 14
+    assert all(p.is_file() for p in bk.glob("zeim-*"))          # no plaintext dirs remain

@@ -315,3 +315,25 @@ def test_concurrent_upload_limit_admits_at_most_the_limit(db_mode, tmp_path):
         assert p.returncode == 0, err.decode()[-400:]
         total += int(out.strip())
     assert total == 3                                            # limit is 3: never more, exactly the limit
+
+
+def test_multithreaded_admission_never_exceeds_the_limit(db_mode, tmp_path):
+    """Same-process threads hammering the count-and-insert: admitted total == the limit, exactly."""
+    import threading
+    import time as _t
+    limit = 5
+    admitted = []
+    lock = threading.Lock()
+
+    def hammer():
+        for _ in range(10):
+            if db.upload_events_hit("acct-mt", _t.time(), 3600, limit):
+                with lock:
+                    admitted.append(1)
+
+    threads = [threading.Thread(target=hammer) for _ in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(admitted) == limit           # never more than the limit; exactly the limit

@@ -72,15 +72,27 @@ def conn() -> sqlite3.Connection:
             c = sqlite3.connect(key, timeout=30, check_same_thread=False)
             c.execute("PRAGMA busy_timeout=30000")
             # journal_mode=WAL ignores the busy handler and fails with SQLITE_BUSY while another
-            # process holds a lock (multi-worker startup) — check-then-set with backoff instead
-            for attempt in range(50):
-                if (c.execute("PRAGMA journal_mode").fetchone() or [""])[0].lower() == "wal":
+            # process holds a lock (multi-worker startup) — check-then-set with a bounded backoff.
+            # Only lock contention is retried; anything else is a real error and raises.
+            deadline = time.monotonic() + 15.0
+            while True:
+                mode = (c.execute("PRAGMA journal_mode").fetchone() or [""])[0]
+                if mode and mode.lower() == "wal":
                     break
+                if time.monotonic() >= deadline:
+                    c.close()
+                    raise RuntimeError("could not enable WAL journal mode (database is locked)")
                 try:
                     c.execute("PRAGMA journal_mode=WAL")
-                    break
-                except sqlite3.OperationalError:
-                    time.sleep(0.1 * (attempt + 1))
+                except sqlite3.OperationalError as e:
+                    if "database is locked" not in str(e).lower():
+                        c.close()
+                        raise
+                    time.sleep(0.1)
+            mode = (c.execute("PRAGMA journal_mode").fetchone() or [""])[0].lower()
+            if mode != "wal":
+                c.close()
+                raise RuntimeError("WAL journal mode not active")
             c.execute("PRAGMA synchronous=NORMAL")
             c.executescript(_SCHEMA)
             c.commit()
@@ -110,12 +122,13 @@ def doc_read(name: str, default):
 
 def doc_write(name: str, data) -> None:
     c = conn()
-    c.execute(
-        "INSERT INTO documents(name, doc, updated_at) VALUES(?,?,?) "
-        "ON CONFLICT(name) DO UPDATE SET doc=excluded.doc, updated_at=excluded.updated_at",
-        (name, json.dumps(data, default=str), time.time()),
-    )
-    c.commit()
+    with _TX_LOCK:                                  # a bare commit must not land mid-transaction
+        c.execute(
+            "INSERT INTO documents(name, doc, updated_at) VALUES(?,?,?) "
+            "ON CONFLICT(name) DO UPDATE SET doc=excluded.doc, updated_at=excluded.updated_at",
+            (name, json.dumps(data, default=str), time.time()),
+        )
+        c.commit()
 
 
 def doc_update(name: str, default, fn):
@@ -246,8 +259,9 @@ def build_claim_unowned(sid: str) -> int:
 # --- per-account upload counter (backs app/services/uploadgate.py; shared by all workers) ---
 
 def upload_events_prune(now: float, window_s: float) -> None:
-    conn().execute("DELETE FROM upload_events WHERE ts < ?", (now - window_s,))
-    conn().commit()
+    with _TX_LOCK:
+        conn().execute("DELETE FROM upload_events WHERE ts < ?", (now - window_s,))
+        conn().commit()
 
 
 def upload_events_count(sid: str, since: float) -> int:
@@ -255,24 +269,27 @@ def upload_events_count(sid: str, since: float) -> int:
 
 
 def upload_events_add(sid: str, ts: float) -> None:
-    conn().execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, ts))
-    conn().commit()
+    with _TX_LOCK:
+        conn().execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, ts))
+        conn().commit()
 
 
 def upload_events_hit(sid: str, now: float, window_s: float, limit: int) -> bool:
-    """Atomic count-and-insert for the upload gate: BEGIN IMMEDIATE takes the write lock
-    BEFORE the count, so two workers admitting the same account cannot both pass the limit."""
+    """Atomic count-and-insert for the upload gate: the lock + BEGIN IMMEDIATE take the
+    write lock BEFORE the count, so neither threads in this process nor other workers
+    admitting the same account can both pass the limit."""
     c = conn()
-    c.execute("BEGIN IMMEDIATE")
-    try:
-        n = c.execute("SELECT COUNT(*) FROM upload_events WHERE sid=? AND ts >= ?",
-                      (sid, now - window_s)).fetchone()[0]
-        if n >= limit:
-            c.commit()                                   # nothing inserted; refusal is final
-            return False
-        c.execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, now))
-        c.commit()
-        return True
-    except Exception:
-        c.rollback()
-        raise
+    with _TX_LOCK:
+        c.execute("BEGIN IMMEDIATE")
+        try:
+            n = c.execute("SELECT COUNT(*) FROM upload_events WHERE sid=? AND ts >= ?",
+                          (sid, now - window_s)).fetchone()[0]
+            if n >= limit:
+                c.commit()                               # nothing inserted; refusal is final
+                return False
+            c.execute("INSERT INTO upload_events(sid, ts) VALUES(?,?)", (sid, now))
+            c.commit()
+            return True
+        except Exception:
+            c.rollback()
+            raise

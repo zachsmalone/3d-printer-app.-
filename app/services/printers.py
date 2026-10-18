@@ -41,6 +41,23 @@ TYPES = [
 IMPLEMENTED = {t["type"] for t in TYPES if t["implemented"]}
 
 
+def direct_control_enabled() -> bool:
+    """Launch checklist Task 10: letting the server talk to arbitrary printer URLs is an SSRF
+    vector, so on PRODUCTION deployments direct printer control is off unless explicitly
+    re-enabled with ZEIM_PRINTER_DIRECT=1. The supported path there is file handoff: download
+    the .gcode and upload it in the printer's own app (or the future paired local connector).
+    Dev/localhost keeps direct control so real-printer testing works. Read at call time."""
+    import os
+    if (os.environ.get("ZEIM_PRINTER_DIRECT") or "").lower() in ("1", "true", "yes"):
+        return True
+    return (os.environ.get("ZEIM_ENV") or "").lower() != "production"
+
+
+DIRECT_OFF_MESSAGE = ("This deployment uses file handoff instead of direct printer control: "
+                      "download the .gcode and upload it in your printer's own app. "
+                      "(Server-side printer control is disabled in production unless ZEIM_PRINTER_DIRECT=1.)")
+
+
 def check_url(url: str) -> None:
     """Refuse printer addresses that could turn the server into a proxy (SSRF). Always blocked: credentials in the URL,
     link-local (incl. cloud metadata 169.254.169.254), unspecified and multicast addresses. With PHOTO3D_BLOCK_PRIVATE_PRINTERS=1

@@ -67,6 +67,8 @@ def download_export(
     actor: Actor = Depends(get_actor),
 ):
     """Download universal export sized and named for the printer (3MF with STL fallback)."""
+    from ..services import quarantine
+    quarantine.guard(bid)                        # quarantined builds are not served
     pref_pid = printer_id
     if not pref_pid and actor.user and actor.user.get("printer", {}).get("printer_id"):
         pref_pid = actor.user["printer"]["printer_id"]

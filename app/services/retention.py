@@ -58,10 +58,11 @@ def _age_days(meta: dict, now: float) -> float:
 
 
 def keep_days(meta: dict) -> float | None:
-    """None = kept until the person deletes it (starred)."""
-    if meta.get("favorite"):
+    """None = kept until the person deletes it. Launch-checklist policy: ordinary builds
+    expire after 30 days; starred AND saved (shared to Showcase) builds are exempt."""
+    if meta.get("favorite") or meta.get("saved"):
         return None
-    return float(config.KEEP_SAVED_DAYS if meta.get("saved") else config.KEEP_UNSAVED_DAYS)
+    return float(config.KEEP_UNSAVED_DAYS)
 
 
 def expires_at(meta: dict) -> str | None:
@@ -125,6 +126,8 @@ def sweep_for_space(bs: BuildStore = _store, now: float | None = None) -> dict:
             if free_bytes(bs.root) >= target:
                 break
             bs.delete(m["id"]); out["swept"] += 1
+            from ..services import filestore
+            filestore.delete_build(m["id"])       # object-storage copy too (best-effort)
     if out["swept"]:
         log.warning("disk low: removed %d oldest unstarred builds to make room", out["swept"])
     return out

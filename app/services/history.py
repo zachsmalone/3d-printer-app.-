@@ -85,6 +85,8 @@ class BuildStore:
                 oldest = loose[0]
                 db.build_delete(oldest["id"])
                 self._purge_cached(oldest["id"])
+                from ..services import filestore
+                filestore.delete_build(oldest["id"])        # object-storage copy too (best-effort)
                 items = [m for m in items if m["id"] != oldest["id"]]
             return
         items = self.list(owner)
@@ -92,7 +94,10 @@ class BuildStore:
             loose = [m for m in items if not m.get("favorite")]       # starred builds are never rolled off
             if not loose:
                 raise HistoryFull()
-            self.delete(loose[0]["id"])                                 # oldest un-starred build rolls off
+            victim = loose[0]["id"]                                    # oldest un-starred build rolls off
+            self.delete(victim)
+            from ..services import filestore
+            filestore.delete_build(victim)                             # object-storage copy too (best-effort)
             items = self.list(owner)
 
     def set_saved(self, bid: str):
