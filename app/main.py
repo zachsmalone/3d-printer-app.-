@@ -129,7 +129,7 @@ def _inline_script_hashes() -> str:
     """CSP hashes of the few inline <script> blocks our own pages have (the importmap, the share-test page) so no 'unsafe-inline' is needed for scripts."""
     import base64, hashlib, re
     out = []
-    for f in ("index.html", "sharetest.html"):
+    for f in ("index.html", "sharetest.html", "builder.html"):
         try:
             html = (STATIC / f).read_text(encoding="utf-8")
         except OSError:

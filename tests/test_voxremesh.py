@@ -4,6 +4,7 @@ preserve volume (within the inherent half-voxel inflation), and refuse nonsense 
 from __future__ import annotations
 
 import pytest
+import numpy as np
 import trimesh
 
 from app.core import meshedit
@@ -22,7 +23,8 @@ def test_voxremesh_repairs_a_broken_mesh():
     out, rep = op_voxremesh(m, {})
     assert out.is_watertight                       # the point: a fresh watertight mesh
     assert rep["watertight"] and rep["triangles_after"] > 0
-    assert rep["volume_drift"] is None             # broken input has no meaningful volume: no false alarm
+    assert rep["holes_closed"] is True             # the repair pass closed the holes first
+    assert rep["volume_drift"] is None or rep["volume_drift"] < 0.5   # no false alarm either way
     # and it survives the ordinary apply() checks (what every editor op goes through)
     out2, _ = meshedit.apply(_broken_box(), "voxremesh", {})
     assert out2.is_watertight
@@ -66,3 +68,41 @@ def test_voxremesh_through_the_real_api():
     # undo works on it like any step
     u = c.post(f"/api/edit/{bid}/undo")
     assert u.status_code == 200 and u.json()["head"] == len(steps) - 1
+
+
+def test_voxremesh_result_is_a_repaired_solid_not_a_closed_shell():
+    """Geometry, not just watertightness: the repaired open box must be a SOLID of the right
+    size (a closed thin shell would also be watertight — and useless to print)."""
+    out, rep = op_voxremesh(_broken_box(), {"pitch": 0.5})
+    lo, hi = out.bounds
+    assert abs(hi[0] - 10.25) < 0.01 and abs(lo[0] + 10.25) < 0.01     # box +/- half a voxel
+    assert out.volume == pytest.approx(20.5 ** 3, rel=0.05)           # solid, not a shell
+    assert rep["holes_closed"] and rep["shell_risk"] is False
+
+
+def test_voxremesh_keeps_through_holes_but_fills_sealed_cavities():
+    """A tube's bore is open at both ends and must SURVIVE; a sealed cavity is filled (that
+    destructive behaviour is disclosed in the module docstring — asserted here so it can't
+    silently change)."""
+    tube = trimesh.creation.annulus(r_min=6, r_max=10, height=20, sections=48)
+    out, _ = op_voxremesh(tube, {"pitch": 0.5})
+    assert out.is_watertight
+    solid_cyl = np.pi * 10 ** 2 * 20
+    annulus = np.pi * (10 ** 2 - 6 ** 2) * 20
+    assert out.volume < 0.85 * solid_cyl                             # the bore is still open
+    assert out.volume > 0.9 * annulus                                # ...and the walls survive
+    shell = trimesh.creation.uv_sphere(radius=10, count=[32, 24])
+    shell = trimesh.Trimesh(shell.vertices, shell.faces, process=False)
+    out2, _ = op_voxremesh(shell, {"pitch": 0.5})
+    assert out2.volume > 0.9 * (4 / 3 * np.pi * 10 ** 3)             # sealed cavity filled
+
+
+def test_voxremesh_refuses_grids_over_the_memory_budget():
+    """A pitch RANGE is not a resource bound: 0.05 mm on a 200 mm model is ~64 billion cells.
+    The budget is checked BEFORE voxelization (the refusal is instant)."""
+    import time
+    big = trimesh.creation.box((200, 200, 200))
+    t0 = time.time()
+    with pytest.raises(meshedit.OpError, match="million cells"):
+        op_voxremesh(big, {"pitch": 0.05})
+    assert time.time() - t0 < 2.0                                    # refused, not attempted

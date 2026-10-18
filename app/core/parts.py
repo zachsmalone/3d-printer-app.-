@@ -8,8 +8,9 @@ tube/torus) with explicit dimensions, a position and a rotation, and a ROLE:
   * "hole"  — subtracted from the running shape.
 Order matters, exactly like a boolean history. The recipe is stored as step 1 of the project's
 ops list, so every downstream mechanism works unchanged: editing the recipe re-replays the
-step (parametric recomposition that PRESERVES any manual ops added after it), undo/redo,
-named dimensions ($name in any numeric field), the safety checks, exports, slicing, sharing.
+step (parametric recomposition that PRESERVES any manual ops added after it), undo/redo, the
+safety checks, exports, slicing, sharing. Recipe numbers are literals (no $name substitution
+in v1 — the pre-validation here runs before dimension resolution).
 """
 from __future__ import annotations
 
@@ -93,8 +94,11 @@ def _dims(kind: str, d: dict, where: str) -> dict:
     if kind == "torus":
         out = {"outer": _num(d.get("outer", 30), f"{where} outer diameter"),
                "tube": _num(d.get("tube", 6), f"{where} tube diameter")}
-        if out["tube"] >= out["outer"]:
-            raise RecipeError(f"{where}: torus tube diameter must be smaller than outer.")
+        # a non-self-intersecting ring needs major_radius >= minor_radius:
+        # (outer - tube)/2 >= tube/2  =>  outer >= 2*tube. Just "tube < outer" would allow
+        # spindle configurations that intersect themselves.
+        if 2 * out["tube"] >= out["outer"]:
+            raise RecipeError(f"{where}: torus outer diameter must be more than twice the tube diameter.")
         return out
     raise RecipeError(f"{where}: unknown kind")      # unreachable
 

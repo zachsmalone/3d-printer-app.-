@@ -27,6 +27,19 @@ def _cyl(d=20, h=20, position=(0, 0, 0), role="solid"):
 
 # ---------------------------------------------------------------- validation
 
+def test_torus_spindle_configurations_are_rejected():
+    """A ring only exists while major_radius >= minor_radius: outer >= 2*tube. Just
+    'tube < outer' would allow self-intersecting spindles."""
+    with pytest.raises(parts.RecipeError):
+        parts.check_recipe({"parts": [
+            _box((60, 60, 5)),
+            {"kind": "torus", "dims": {"outer": 20, "tube": 12}}]})   # 2*tube > outer: spindle
+    ok = parts.check_recipe({"parts": [
+        _box((60, 60, 5)),
+        {"kind": "torus", "dims": {"outer": 26, "tube": 12}}]})      # comfortably > 2x: a real ring
+    assert ok["parts"][1]["dims"] == {"outer": 26.0, "tube": 12.0}
+
+
 def test_recipe_validation_rejects_bad_input():
     with pytest.raises(parts.RecipeError):
         parts.check_recipe({"parts": []})                       # empty
@@ -128,14 +141,18 @@ def test_recompose_preserves_manual_steps_added_after_the_recipe():
                                              "params": {"dx": 0, "dy": 0, "dz": 5}})
     assert mv.status_code == 200, mv.text
     assert len(mv.json()["ops"]) == 2
-    # recompose the recipe: the translate step must survive and still apply
+    # recompose the recipe: the translate step must survive and STILL APPLY
     r2 = c.put(f"/api/parts/{bid}/recipe", json={"recipe": _recipe(_box((60, 60, 10)))})
     assert r2.status_code == 200, r2.text
     steps = r2.json()["ops"]
     assert len(steps) == 2 and steps[0]["op"] == "parts" and steps[1]["op"] == "translate"
-    # the model is the new composition, moved: bbox z should reflect BOTH
-    m = c.get(f"/api/edit/{bid}")
-    assert m.status_code == 200
+    # geometry, not just step names: the recomposed 60x60x10 box, translated +5 in z
+    # (a box centred at the origin spans z -5..+5; +5 => z 0..10)
+    import trimesh as _tm
+    from app.services import editproj as _ep
+    mesh = _ep.mesh_at(bid)
+    assert mesh.bounds[0][0] == pytest.approx(-30, abs=0.5)      # the NEW width really applied
+    assert mesh.bounds[1][2] == pytest.approx(10, abs=0.5)       # ...and the translate still moved it
 
 
 def test_undo_and_redo_work_on_the_parts_step():
