@@ -15,8 +15,10 @@ admin token and audited like every other moderation action.
 """
 from __future__ import annotations
 
+import json
 import logging
 import shutil
+import time
 import uuid
 from pathlib import Path
 
@@ -25,6 +27,10 @@ from ..community import moderation
 from ..services.history import store
 
 log = logging.getLogger("zeim.quarantine")
+
+PENDING_MSG = ("The malware scanner is temporarily unavailable, so your upload is parked — not lost. "
+               "It was NOT built or shared. Try again in a little while (or hit resume) and it "
+               "will go through the moment the scanner is back.")
 
 QUARANTINE_MSG = ("This file is pending its malware scan, so it can't be downloaded or shared yet. "
                   "It will unlock automatically once the scanner is back — nothing was lost.")
@@ -45,13 +51,86 @@ def _root() -> Path:
     return p
 
 
-def hold_bytes(raw: bytes) -> Path:
-    """Park the ORIGINAL upload bytes (pre-sanitize) in the restricted hold area. Returns the
-    hold dir; quarantine.mark(bid, hold) claims it once the build id exists."""
-    d = _root() / f".hold-{uuid.uuid4().hex[:12]}"
+def _pending_root() -> Path:
+    """DATA/pending_uploads — 0700. A pending upload is NOT a build: no artifacts, no metadata,
+    nothing served. It holds the original bytes + the request context until a scan (or the
+    owner's retry via /api/uploads/resume) runs the normal pipeline."""
+    p = Path(config.DATA) / "pending_uploads"
+    p.mkdir(parents=True, exist_ok=True)
+    p.chmod(0o700)
+    return p
+
+
+def stage_pending(sid: str, raw: bytes, ctx: dict, filename: str = "upload") -> str:
+    """Accept an upload INTO PENDING while the malware scanner is down: the original bytes plus
+    the request context (every form field) land in restricted storage. Returns the pending id.
+    Nothing is built, published or served until resume_pending() runs the normal pipeline."""
+    pid = uuid.uuid4().hex[:12]
+    d = _pending_root() / pid
     d.mkdir()
+    d.chmod(0o700)
     (d / "original.bin").write_bytes(raw)
-    return d
+    (d / "context.json").write_text(json.dumps({
+        "sid": sid, "filename": filename, "ts": time.time(), "form": ctx,
+    }, default=str))
+    moderation._log("pending_upload", item=pid, reason="scanner unavailable at upload")
+    log.warning("upload parked as pending %s: scanner unreachable", pid)
+    return pid
+
+
+def pending_context(pid: str) -> dict | None:
+    p = _pending_root() / pid
+    try:
+        return json.loads((p / "context.json").read_text())
+    except Exception:
+        return None
+
+
+def pending_bytes(pid: str) -> bytes | None:
+    p = _pending_root() / pid / "original.bin"
+    try:
+        return p.read_bytes()
+    except Exception:
+        return None
+
+
+def scan_pending(pid: str) -> str:
+    """Scan a pending upload's original bytes: 'clean' | 'infected' | 'held'."""
+    from . import uploadgate
+    data = pending_bytes(pid)
+    if data is None:
+        return "held"
+    clean, signature, state = uploadgate.scan_bytes(data)
+    if state == "infected":
+        moderation._log("pending_scan", item=pid, verdict="infected", signature=signature)
+        return "infected"
+    if state == "clean":
+        return "clean"
+    return "held"
+
+
+def discard_pending(pid: str, why: str) -> bool:
+    """Remove a pending upload (infected, admin decision, or consumed by a successful resume)."""
+    p = _pending_root() / pid
+    if not p.exists():
+        return False
+    shutil.rmtree(p, ignore_errors=True)
+    moderation._log("pending_discard", item=pid, reason=why)
+    return True
+
+
+def list_pending() -> list[dict]:
+    out = []
+    for d in sorted(_pending_root().iterdir()):
+        if not d.is_dir():
+            continue
+        try:
+            ctx = json.loads((d / "context.json").read_text())
+            out.append({"id": d.name, "sid": ctx.get("sid"), "filename": ctx.get("filename"),
+                        "ts": ctx.get("ts"), "size": (d / "original.bin").stat().st_size})
+        except Exception:
+            out.append({"id": d.name, "corrupt": True})
+    return out
 
 
 def mark(bid: str, hold: Path | None = None) -> None:

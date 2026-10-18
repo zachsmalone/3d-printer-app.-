@@ -697,16 +697,24 @@ def mod_preserve(report_id: str, request: Request, x_admin_token: str = Header("
         raise HTTPException(404, "unknown report")
 
 
-@router.post("/moderation/release-quarantine/{bid}")
-def mod_release_quarantine(bid: str, request: Request, x_admin_token: str = Header("")):
-    """Lift an upload-quarantine hold by decision (audited). Admin only — the automatic path
-    (scanner back + clean re-scan) needs no one."""
+@router.get("/moderation/pending-uploads")
+def mod_pending_list(request: Request, x_admin_token: str = Header("")):
+    """Pending uploads (scanner was down at upload time): parked originals awaiting a scan.
+    Admin only — no bytes, no sids beyond a count-safe view."""
     _admin(x_admin_token, request)
     from ..services import quarantine
-    try:
-        return quarantine.release(bid)
-    except KeyError:
-        raise HTTPException(404, "build is not quarantined")
+    return {"pending": quarantine.list_pending()}
+
+
+@router.delete("/moderation/pending-uploads/{pid}")
+def mod_pending_discard(pid: str, request: Request, x_admin_token: str = Header("")):
+    """Discard a pending upload by decision (audited). The validated path is the owner's
+    resume (clean re-scan -> full pipeline); this is the safety valve for infected files."""
+    _admin(x_admin_token, request)
+    from ..services import quarantine
+    if not quarantine.discard_pending(pid, "admin discard"):
+        raise HTTPException(404, "unknown pending upload")
+    return {"ok": True, "id": pid}
 
 
 @router.post("/moderation/report/{report_id}/escalate-ncmec")

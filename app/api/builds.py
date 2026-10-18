@@ -102,6 +102,10 @@ def meta_for(bid: str, actor: Actor, owner_only: bool = False) -> dict:
 
 DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded file name (camera / school file names can hold a child's name)
 
+# every form field of /api/generate — captured verbatim into a pending upload's context so
+# /api/uploads/resume can replay the exact request once the malware scan clears
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+
 
 def disk_guard():
     """Refuse a new heavy build, kindly, when the disk is nearly full and nothing but starred builds could be removed."""
@@ -167,6 +171,40 @@ def delete_build(bid: str, actor: Actor = Depends(get_actor)):
     from ..services import filestore
     filestore.delete_build(bid)               # object-storage copy too (best-effort)
     return {"ok": True}
+
+
+@router.post("/uploads/resume/{pid}")
+def resume_pending(pid: str, actor: Actor = Depends(get_actor)):
+    """Resume a pending upload (created when the malware scanner was down): re-scan the HELD
+    original bytes; a clean scan re-runs the full generate pipeline (every check re-runs);
+    an infected verdict discards it; a scanner still down keeps it pending. Owner only."""
+    from ..services import quarantine
+    if not pid.isalnum() or len(pid) != 12:
+        raise HTTPException(404)
+    ctx = quarantine.pending_context(pid)
+    if ctx is None:
+        raise HTTPException(404, "unknown pending upload")
+    if ctx.get("sid") != actor.sid:
+        raise HTTPException(404)                      # not yours: indistinguishable from missing
+    verdict = quarantine.scan_pending(pid)
+    if verdict == "infected":
+        quarantine.discard_pending(pid, "infected on scan")
+        raise HTTPException(422, "That file was flagged by the malware scanner. Nothing of it was kept.")
+    if verdict != "clean":
+        return JSONResponse(status_code=202, content={
+            "status": "pending_scan", "pending_id": pid, "detail": quarantine.PENDING_MSG})
+    # clean: replay the exact original request through the normal pipeline (the gate re-runs)
+    raw = quarantine.pending_bytes(pid)
+    import io
+    from fastapi import UploadFile as _Up
+    from starlette.datastructures import UploadFile as _SU
+    up = _SU(file=io.BytesIO(raw), filename=ctx.get("filename") or "upload")
+    form = ctx.get("form") or {}
+    try:
+        out = generate(actor=actor, file=up, **form)
+    finally:
+        quarantine.discard_pending(pid, "resumed into a build")
+    return out
 
 
 @router.post("/builds/delete-oldest")
@@ -246,13 +284,20 @@ def generate(
         checked = uploadgate.gate(data, actor.sid, source="generate")
     except uploadgate.GateError as e:
         raise HTTPException(e.status, e.message)
-    hold = None
     if getattr(checked, "scan_state", "off") == "unscanned":
+        # Scanner explicitly on but unreachable: the upload is NOT built — no artifacts, no
+        # metadata, nothing cached or served. The original bytes + request context are parked
+        # in restricted pending storage; resume (/api/uploads/resume/<pid>) runs the normal
+        # pipeline once a scan clears them.
         from ..services import quarantine
-        hold = quarantine.hold_bytes(data)              # the ORIGINAL bytes, pre-sanitize, 0700
+        ctx = {k: locals()[k] for k in _GENERATE_FORM_FIELDS if k in locals()}
+        pid = quarantine.stage_pending(actor.sid, data, ctx, file.filename or "upload")
+        return JSONResponse(status_code=202, content={
+            "status": "pending_scan", "pending_id": pid,
+            "detail": quarantine.PENDING_MSG,
+        })
     if mode == "trace2d":
-        return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest,
-                               unscanned=hold is not None, hold=hold)
+        return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest)
     try:
         ack = imagesafe.check_ack(data, photo_ack)        # CR-5: "this is my photo / I have permission" (built-in sample exempt)
         data, src_ext, _ = imagesafe.sanitize(data)       # HEIC -> JPEG, rotation applied, EXIF/GPS dropped, extension from content
@@ -327,7 +372,7 @@ def generate(
         # object storage (when configured): the bucket is the durable copy of the artifacts;
         # local disk stays the slicer's/editor's working surface
         from ..services import filestore
-        if filestore.enabled() and hold is None:         # quarantined builds are NOT published to the bucket
+        if filestore.enabled():
             filestore.put_build(bid, "source", data)      # stable key; ext does not matter to the bucket
             for ext in exporters.WRITERS:
                 filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
@@ -342,14 +387,6 @@ def generate(
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
-        if hold is not None:
-            from ..services import quarantine
-            quarantine.mark(bid, hold)               # scanner was down: hold the original until a scan clears it
-    if hold is not None:
-        # pending its malware scan: status metadata only — no preview, nothing served
-        return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
-                "seconds": round(time.time() - t0, 2), "quarantined": True,
-                "history": [summary(m) for m in store.list(actor.sid)]}
     return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
             "history": [summary(m) for m in store.list(actor.sid)]}
@@ -398,8 +435,7 @@ def _trace_notes(info: dict) -> list:
     return rows
 
 
-def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest,
-                    unscanned=False, hold=None):
+def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_title, auto_delete_oldest):
     from ..core import trace2d
     from ..services import willprint
     clean, ext, im, params, ack = trace_input(data, photo_ack, trace_json, width_mm)
@@ -423,7 +459,7 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
             (d / f"model.{e}").write_bytes(fn(model))
         Image.fromarray(model.thumb).save(d / "thumb.png")
         from ..services import filestore
-        if filestore.enabled() and hold is None:         # quarantined builds are NOT published to the bucket
+        if filestore.enabled():
             filestore.put_build(bid, "source", clean)
             for e in exporters.WRITERS:
                 filestore.put_build(bid, f"model.{e}", (d / f"model.{e}").read_bytes())
@@ -436,14 +472,6 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
-        if hold is not None:
-            from ..services import quarantine
-            quarantine.mark(bid, hold)               # scanner was down: hold the original until a scan clears it
-    if hold is not None:
-        # pending its malware scan: status metadata only — no preview, nothing served
-        return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
-                "seconds": round(time.time() - t0, 2), "quarantined": True,
-                "history": [summary(m) for m in store.list(actor.sid)]}
     return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(model),
             "history": [summary(m) for m in store.list(actor.sid)]}

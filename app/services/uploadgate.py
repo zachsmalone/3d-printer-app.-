@@ -96,13 +96,20 @@ def scan_bytes(data: bytes) -> tuple[bool, str, str]:
                 reply += part
         finally:
             s.close()
-        verdict = reply.decode("utf-8", "replace").strip().strip("\0").strip()
-        if "FOUND" in verdict.upper():
-            return False, verdict.split("FOUND")[0].strip(), "infected"
-        if verdict.upper().endswith("OK") and len(verdict) >= 2:      # explicit successful scan only
+        # clamd INSTREAM replies end with a NUL terminator: "stream: OK\0" or
+        # "stream: <SIGNATURE> FOUND\0". Errors arrive as "ERROR: <text>\0" or are cut off.
+        # Verdict grammar is STRICT: an unterminated reply or anything that is not exactly
+        # a clean or infected verdict is NOT a verdict — the upload is held, never trusted.
+        if not reply.endswith(b"\0"):
+            log.warning("clamd reply missing its NUL terminator (%r) — upload held", reply[:120])
+            return True, "", "unscanned"
+        body = reply[:-1].decode("utf-8", "replace").strip()
+        if body.endswith(" FOUND"):
+            return False, body[:-len(" FOUND")].strip(), "infected"
+        if body == "OK" or body.endswith(": OK"):                    # exactly a clean verdict
             return True, "", "clean"
-        # empty / malformed / error replies are NOT a clean verdict: hold the upload
-        log.warning("clamd gave an unusable verdict (%r) — upload quarantined pending scan", verdict[:120])
+        # empty / malformed / ERROR replies are NOT a clean verdict: hold the upload
+        log.warning("clamd gave an unusable verdict (%r) — upload quarantined pending scan", body[:120])
         return True, "", "unscanned"
     except Exception as e:
         log.warning("PHOTO3D_CLAMAV=1 but clamd unreachable (%s) — upload quarantined pending scan", e)
