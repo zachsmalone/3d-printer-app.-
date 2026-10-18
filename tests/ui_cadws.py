@@ -52,7 +52,7 @@ def run(tag, vw, vh, touch=False):
         click_local(pg, -20, -15); click_local(pg, 20, 15)
         pg.click(".cw-tool[data-tool=circle]")
         click_local(pg, 0, 0); click_local(pg, 6, 0)
-        pg.click(".cw-tool[data-tool=rect]")    # toggle off -> select
+        pg.click(".cw-tool[data-tool=circle]")    # toggle off -> select
         n = pg.evaluate("window.__cad.S.sk.entities.length")
         ok(f"{tag}: rectangle + circle drawn", n == 5, n)
         # type a dimension: first line length -> 50

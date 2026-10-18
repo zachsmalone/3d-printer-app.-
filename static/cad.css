@@ -86,7 +86,7 @@ body.cadws{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hi
 .cw-dim.locked{border-color:var(--accink);color:var(--accink)}
 .cw-dim svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
 .cw-dim input{width:70px;min-height:24px;border:0;background:transparent;color:inherit;font:inherit;padding:0}
-.cw-con{position:absolute;transform:translate(-50%,-50%);pointer-events:auto;background:var(--warmtint);color:var(--warm);border:1px solid var(--warm);border-radius:6px;padding:1px 5px;font:700 11px var(--font);cursor:pointer;min-width:18px;text-align:center}
+.cw-con{min-height:0!important;min-width:0;height:20px;line-height:16px;position:absolute;transform:translate(-50%,-50%);pointer-events:auto;background:var(--warmtint);color:var(--warm);border:1px solid var(--warm);border-radius:6px;padding:1px 5px;font:700 11px var(--font);cursor:pointer;min-width:18px;text-align:center}
 .cw-con:hover{background:var(--badbg);color:var(--bad);border-color:var(--bad)}
 .cw-meas{position:absolute;transform:translate(-50%,-130%);background:var(--acc);color:var(--on-acc);border-radius:8px;padding:3px 8px;font:700 12px var(--font);white-space:nowrap}
 .cw-busy{position:absolute;inset:0;display:flex;gap:10px;align-items:center;justify-content:center;background:rgba(0,0,0,.25);z-index:20;color:#fff}
