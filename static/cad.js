@@ -625,6 +625,7 @@ function snapPt(ev, skipId) {
   let best = null, bd = ev.pointerType === "touch" ? 22 : 12;
   for (const e of S.sk.entities) { if (e.id === skipId) continue; for (const [ref, p] of keyPoints(e)) { const [x, y] = scr2(p); const d = Math.hypot(x - mx, y - my); if (d < bd) { bd = d; best = { ref, p: [...p] }; } } }
   if (S.sk.draft?.pts) S.sk.draft.pts.forEach((p, k) => { const [x, y] = scr2(p); const d = Math.hypot(x - mx, y - my); if (d < bd && k === 0) { bd = d; best = { ref: "draft0", p: [...p] }; } });
+  if (!best) { const [x, y] = scr2([0, 0]); const d = Math.hypot(x - mx, y - my); if (d < bd) best = { ref: null, p: [0, 0], origin: true }; }   // sketch origin
   if (best) return best;
   const p = local(ev); if (!p) return null;
   const g = S.snap ? S.grid / 10 : 0;
@@ -908,7 +909,7 @@ function extrudePanel(kind) {
   const lines = pd.sketch.entities.filter(e => e.type === "line");
   const common = `${seg("tMode", modes, "new")}<p class="help">Tap regions on the sketch to use only those (none picked = all closed shapes; a shape inside another is a hole).</p>
     <p class="help" id="tPicks">${pd.picks?.length ? pd.picks.length + " region(s) picked." : "All regions."}</p>`;
-  const go = (op, extra) => addOp(op, { sketch: pd.sketch, plane: pd.plane, picks: pd.picks || [], mode: segVal("tMode"), ...extra }).then(() => { if (S.tool === null) { S.pending = null; sketchG.clear(); } });
+  const go = (op, extra) => addOp(op, { sketch: pd.sketch, plane: pd.plane, picks: pd.picks || [], mode: segVal("tMode"), ...extra }).then(() => { if (S.tool === null) { S.pending = null; sketchG.clear(); } if (hasBody) modePop(); });
   if (kind === "extrude")
     panel("Extrude", `<div class="f"><label for="tDist">Distance (mm)</label>${num("tDist", 10)}</div>${seg("tDir", [["up", "Up"], ["down", "Down"], ["both", "Both (symmetric)"]], "up")}
       <div class="f"><label for="tTaper">Taper angle°</label>${num("tTaper", 0)}</div>${common}`,
@@ -919,6 +920,21 @@ function extrudePanel(kind) {
       () => { const a = $("#tAxis").value, L = lines.find(l => l.id === a);
         const axis = a === "y" ? { p: [0, 0], d: [0, 1] } : a === "x" ? { p: [0, 0], d: [1, 0] } : { p: L.p0, d: [L.p1[0] - L.p0[0], L.p1[1] - L.p0[1]] };
         go("revolve", { axis, angle: val("tAng") }); });
+}
+/* Right after an extrude/revolve onto existing bodies: a big, obvious "what should this do?" pop-up.
+   Changing it re-runs the step with the new mode (history edit), so a wrong default costs one tap. */
+function modePop() {
+  const ops = S.scene?.ops || [], last = ops[ops.length - 1]; if (!last || !last.params?.sketch) return;
+  document.getElementById("cwModePop")?.remove();
+  const box = document.createElement("div"); box.id = "cwModePop"; box.className = "cw-modepop"; box.setAttribute("role", "dialog"); box.setAttribute("aria-label", "Combine the new shape");
+  const lab = document.createElement("span"); lab.textContent = "New shape:"; box.append(lab);
+  for (const [m, t] of [["join", "Union"], ["cut", "Subtract"], ["new", "New body"], ["intersect", "Intersect"]]) {
+    const b = document.createElement("button"); b.textContent = t; b.dataset.mode = m; b.setAttribute("aria-pressed", String(last.params.mode === m));
+    b.onclick = () => { box.remove(); if (last.params.mode !== m) histAction(() => api(`/api/edit/${S.bid}/step/${last.i}`, { method: "PUT", json: { params: { ...last.params, mode: m } } })); };
+    box.append(b);
+  }
+  const x = document.createElement("button"); x.textContent = "✕"; x.setAttribute("aria-label", "Keep as is"); x.onclick = () => box.remove(); box.append(x);
+  stage.append(box); setTimeout(() => box.remove(), 12000);
 }
 function pickRegion(ev) {
   const pd = S.pending; if (!pd?.faces) return false;
