@@ -296,3 +296,106 @@ def test_oversized_meshes_are_refused_before_building_adjacency():
 def test_sculpt_is_registered_in_the_op_table():
     assert meshedit.OPS["sculpt"] is sculpt.op_sculpt
     assert "Sculpt" in meshedit.label("sculpt", {"brush": "smooth", "radius": 5})
+
+
+def _single_triangle():
+    """A=(0,0,0), B=(1,0,0), C=(0,1,0): normal +z. Analytically predictable."""
+    v = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+    f = np.array([[0, 1, 2]])
+    return trimesh.Trimesh(v, f, process=False)
+
+
+def test_a_flatten_stroke_that_flips_the_face_is_refused():
+    """The reviewer's analytical fixture. Flatten at A with radius 0.5 (only A inside),
+    strength 1, one iteration, plane point (2,0,0) normal (1,0,0): A moves to (2,0,0)
+    and the triangle's normal REVERSES (+z -> -z). The stroke must be refused and the
+    input preserved."""
+    m = _single_triangle()
+    with pytest.raises(meshedit.OpError, match="folded"):
+        sculpt.op_sculpt(m, {"brush": "flatten", "center": [0, 0, 0], "radius": 0.5,
+                             "strength": 1.0, "iterations": 1,
+                             "plane": {"point": [2, 0, 0], "normal": [1, 0, 0]}})
+    assert np.array_equal(m.vertices, np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0]]))  # untouched
+
+
+def test_a_flatten_stroke_that_collapses_the_face_is_refused():
+    """Same fixture with plane point (1,0,0): A collapses exactly onto B — a zero-area
+    (degenerate) face. Refused, input preserved."""
+    m = _single_triangle()
+    with pytest.raises(meshedit.OpError, match="folded"):
+        sculpt.op_sculpt(m, {"brush": "flatten", "center": [0, 0, 0], "radius": 0.5,
+                             "strength": 1.0, "iterations": 1,
+                             "plane": {"point": [1, 0, 0], "normal": [1, 0, 0]}})
+    assert np.array_equal(m.vertices, np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0]]))
+
+
+def test_a_folding_stroke_through_the_history_path_changes_nothing():
+    """The refusal must hold through the real op endpoint: the step is NOT added, the
+    saved ops and the exported STL are byte-identical to before."""
+    c = client()
+    r = c.post("/api/parts/new", json={"recipe": {"parts": [
+        {"kind": "sphere", "dims": {"diameter": 40}, "position": [0, 0, 0], "role": "solid"}]}})
+    assert r.status_code == 200, r.text
+    bid = r.json()["id"]
+    stl_before = c.get(f"/api/download/{bid}/stl", follow_redirects=True).content
+    ops_before = c.get(f"/api/edit/{bid}").json()["ops"]
+    # the analytical flip, transplanted onto the sphere's top vertex region
+    mv = c.post(f"/api/edit/{bid}/op", json={"op": "sculpt", "params": {
+        "brush": "flatten", "center": [0, 0, 20], "radius": 0.5, "strength": 1.0,
+        "iterations": 1, "plane": {"point": [22, 0, 20], "normal": [1, 0, 0]}}})
+    assert mv.status_code in (400, 422), mv.text                # refused by the service
+    ops_after = c.get(f"/api/edit/{bid}").json()["ops"]
+    assert ops_after == ops_before                              # history untouched
+    stl_after = c.get(f"/api/download/{bid}/stl", follow_redirects=True).content
+    assert stl_after == stl_before                              # exports untouched
+
+
+def test_editing_a_flatten_step_keeps_its_stored_plane():
+    """edit_step must not lose a persisted plane when the caller edits other params —
+    and an EARLIER recipe change must not move it either (replay reuses the stored
+    plane instead of deriving a new one from the changed mesh)."""
+    from app.services import editproj
+    c = client()
+    r = c.post("/api/parts/new", json={"recipe": {"parts": [
+        {"kind": "sphere", "dims": {"diameter": 40}, "position": [0, 0, 0], "role": "solid"}]}})
+    bid = r.json()["id"]
+    mv = c.post(f"/api/edit/{bid}/op", json={"op": "sculpt", "params": {
+        "brush": "flatten", "center": [0, 0, 20], "radius": 6, "strength": 0.5, "iterations": 1}})
+    assert mv.status_code == 200, mv.text
+    steps = c.get(f"/api/edit/{bid}").json()["ops"]
+    stored_plane = steps[1]["params"]["plane"]
+    assert stored_plane
+    # edit the flatten step (strength only, no plane): the stored plane survives
+    editproj.edit_step(bid, 2, {"brush": "flatten", "center": [0, 0, 20], "radius": 6,
+                                 "strength": 0.3, "iterations": 1})
+    steps2 = c.get(f"/api/edit/{bid}").json()["ops"]
+    assert steps2[1]["params"]["plane"] == stored_plane        # NOT re-derived
+    # and an EARLIER step change (bigger sphere) must not move the stored plane either
+    c.put(f"/api/parts/{bid}/recipe", json={"recipe": {"parts": [
+        {"kind": "sphere", "dims": {"diameter": 44}, "position": [0, 0, 0], "role": "solid"}]}})
+    steps3 = c.get(f"/api/edit/{bid}").json()["ops"]
+    assert steps3[1]["params"]["plane"] == stored_plane        # replay reuses it
+
+
+def test_strict_vector_shapes_are_rejected():
+    m = _bumpy()
+    for bad in [
+        {"center": [[1, 2, 3]]},              # (1,3): not a 3-vector
+        {"center": [[1], [2], [3]]},           # (3,1): not a 3-vector
+        {"brush": "flatten", "plane": {"point": [[0, 0, 0]], "normal": [0, 0, 1]}},  # (1,3)
+        {"brush": "flatten", "plane": {"point": [[0], [0], [0]], "normal": [0, 0, 1]}},  # (3,1)
+    ]:
+        with pytest.raises(meshedit.OpError):
+            sculpt.op_sculpt(m, {**{"center": [0, 0, 10], "radius": 4, "strength": 0.5}, **bad})
+
+
+def test_zero_strength_flatten_needs_no_derivable_plane():
+    """A zero-strength flatten on a selection whose normals cancel (a stroke that moves
+    nothing) must be a clean no-op — not an error about an unusable normal."""
+    # two facing triangles: averaged selection normals cancel out
+    v = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 0.5], [1, 0, 0.5], [0, 1, 0.5]])
+    f = np.array([[0, 1, 2], [3, 5, 4]])                     # opposite windings
+    m = trimesh.Trimesh(v, f, process=False)
+    out, rep = sculpt.op_sculpt(m, {"brush": "flatten", "center": [0.2, 0.2, 0.25],
+                                    "radius": 2, "strength": 0.0, "iterations": 3})
+    assert np.array_equal(out.vertices, m.vertices)

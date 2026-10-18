@@ -99,12 +99,15 @@ def op_voxremesh(m: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
         raise OpError(f"the voxel remesh changed the volume by {drift:.0%} — the pitch is too coarse for this model.")
     note = ""
     if drift is not None and after > before * 1.02:
-        # ANY meaningful growth is disclosed, with the honest ambiguity: it may be padding,
-        # coarse pitch, or a filled sealed cavity (sealed cavities are ALWAYS filled).
+        # meaningful growth is disclosed with the honest ambiguity (padding, coarse
+        # pitch, or a filled cavity) — separate from the standing disclosure below.
         note = f" (volume +{drift:.0%}: voxel padding, coarse pitch, or a filled sealed cavity)"
     rep = {"pitch_mm": pitch, "triangles_before": int(len(m.faces)), "triangles_after": int(len(out.faces)),
            "volume_drift": drift, "watertight": True,
            "holes_closed": bool(not m.is_watertight and work.is_watertight),
            "shell_risk": not solid_in,      # input stayed open: the result may be a hollow shell
-           "message": f"Voxel remesh at {pitch:.2f} mm ({len(out.faces)} triangles, watertight){note}"}
+           # the destructive limit is disclosed on EVERY successful remesh, unconditionally —
+           # never only when the volume drift happens to be large enough to notice.
+           "message": f"Voxel remesh at {pitch:.2f} mm ({len(out.faces)} triangles, watertight). "
+                      f"Sealed internal cavities can be filled; through-holes survive.{note}"}
     return _check(out), rep

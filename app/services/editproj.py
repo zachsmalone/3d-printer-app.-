@@ -295,6 +295,13 @@ def edit_step(bid: str, i: int, params: dict) -> dict:
         raise meshedit.OpError("no such step")
     o = meta["ops"][i - 1]
     params = check_op_text(o["op"], params)
+    # a step may carry values resolved once and persisted with it (sculpt's flatten
+    # plane). If the caller edits the step WITHOUT re-supplying them, the STORED ones
+    # survive — re-deriving them after an earlier step changed would silently move the
+    # target. (The _rewrite below replays with the merged params, so validation holds.)
+    stored = o.get("params") or {}
+    if o["op"] == "sculpt" and "plane" in stored and "plane" not in params:
+        params = {**params, "plane": stored["plane"]}
     _apply(meta, mesh_at(bid, meta, head=i - 1), {"op": o["op"], "params": params})      # validate this step alone first (clear error)
     return _rewrite(bid, i, {"op": o["op"], "params": params, "label": meshedit.label(o["op"], params)})
 

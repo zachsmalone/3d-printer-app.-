@@ -158,10 +158,10 @@ $("#btnUpdate").onclick = () => run(async () => {
   $("#status").textContent = "Updated.";
 });
 
-/* ---------- startup complete — tell the boot.js watchdog so it does not raise a false
-   "didn't start" banner (this page loads neither community.js nor edit.js, the two
-   scripts that normally set these flags). Set LAST, after every handler above is wired:
-   by this point the page really is fully interactive. ---------- */
+/* ---------- initial render, THEN startup-complete flags. The form must be on screen
+   before the watchdog is told the page started: a rendering failure can then still
+   raise the banner (it cannot happen after a successful render). ---------- */
+render();
 window.__zeimStarted = true;
 window.__zeimEditStarted = true;
 
@@ -187,7 +187,7 @@ window.__zeimEditStarted = true;
 })();
 
 (async function openSaved() {
-  if (!bid) { render(); return; }          // fresh page: the default starter part
+  if (!bid) return;                        // fresh page: already rendered above
   try {
     const rec = await api(`/api/parts/${bid}/recipe`);
     if (rec?.recipe?.parts?.length) parts = rec.recipe.parts;

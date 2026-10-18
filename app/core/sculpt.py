@@ -29,13 +29,14 @@ INFLATE_FRACTION = 0.1     # full-strength inflate moves vertices 0.1 * radius (
 
 
 def _vec3(x, what: str) -> np.ndarray:
-    """EXACTLY three finite coordinates — no truncating extras, no ragged shapes."""
+    """EXACTLY a 3-vector of finite numbers — no reshaping, so [[1,2,3]], [[1],[2],[3]]
+    and 4-coordinate extras are all rejected instead of silently flattened."""
     from .meshedit import OpError
     try:
-        a = np.asarray(x, dtype=float).reshape(-1)
+        a = np.asarray(x, dtype=float)
     except (TypeError, ValueError):
         raise OpError(f"{what} must be exactly three finite numbers.")
-    if a.size != 3 or not np.isfinite(a).all():
+    if a.shape != (3,) or not np.isfinite(a).all():
         raise OpError(f"{what} must be exactly three finite numbers.")
     return a
 
@@ -132,8 +133,11 @@ def op_sculpt(m: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
     vn = _vertex_normals(m, n)
 
     # ---- the flatten plane: pinned in params, or derived ONCE and persisted ----
+    # (only when the stroke can actually move something: a zero-strength stroke is a
+    # no-op and must not fail on a selection whose normals cancel — there is nothing
+    # to flatten, so no plane is needed)
     persist = {}
-    if brush == "flatten" and plane is None:
+    if brush == "flatten" and plane is None and strength > 0:
         q = m.vertices[inside].mean(axis=0)
         nv = vn[inside].sum(axis=0)
         ln = float(np.linalg.norm(nv))
@@ -164,11 +168,14 @@ def op_sculpt(m: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
                 v = (1.0 - lam) * v + lam * avg
                 v[~inside] = m.vertices[~inside]        # anchors: untouched vertices never move
         elif brush == "flatten":
-            q, nrm = plane
-            for _ in range(iters):
-                off = (v - q) @ nrm                      # signed distance to the plane
-                v = v - (strength * w)[:, None] * off[:, None] * nrm
-                v[~inside] = m.vertices[~inside]
+            if plane is None:
+                pass                                     # zero-strength: nothing to move, no plane needed
+            else:
+                q, nrm = plane
+                for _ in range(iters):
+                    off = (v - q) @ nrm                  # signed distance to the plane
+                    v = v - (strength * w)[:, None] * off[:, None] * nrm
+                    v[~inside] = m.vertices[~inside]
         else:  # inflate: displacement = falloff * strength * radius * INFLATE_FRACTION
             amount = strength * radius * INFLATE_FRACTION
             for _ in range(iters):
