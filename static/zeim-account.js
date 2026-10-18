@@ -56,8 +56,9 @@
         <button class="btn small" id="au_code_go">Verify my code</button>
         <p class="mini">Codes sign you in to an existing account — they do not create one.</p>
       </details>` : ""}
-      <p class="mini" style="margin-top:12px">Signed out before and have a recovery code? Scroll the page to the account view's
-        recovery section — recovery works the same as ever.</p>`;
+      <details class="recover" style="margin-top:10px"><summary>Signed out before? Get your account back with a recovery code</summary>
+        <div class="field"><label for="rc_code">Recovery code</label><input id="rc_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+        <button class="btn" id="rc_go">Get my account back</button></details>`;
     $("#au_go").onclick = async () => {
       const name = $("#au_name").value.trim();
       const dob = $("#au_dob").value;
@@ -81,6 +82,17 @@
         if (calm(e)) return;
         say(e.message || "Passkey sign-in did not work.", true);
       }
+    };
+    $("#rc_go").onclick = async () => {
+      try {
+        const r = await fetch("/api/me/recover", { method: "POST",
+          headers: { "Content-Type": "application/json", "X-Requested-With": "zeim" },
+          body: JSON.stringify({ code: $("#rc_code").value }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error((j.detail && j.detail.message) || j.message || "That recovery code did not work.");
+        body.innerHTML = `<div class="calm" role="status" tabindex="-1"><p>Welcome back, <b>@${esc(j.username || "")}</b>.</p><p>Your new recovery code is <b class="code">${esc(j.recovery_code)}</b>. The old one no longer works. Write this one down and keep it like a password.</p><button class="btn primary" id="rc_done">Done</button></div>`;
+        $("#rc_done").onclick = () => afterIdentityChange();
+      } catch (e) { say(e.message || "That recovery code did not work.", true); }
     };
     if (emailOk) {
       $("#au_em_go").onclick = async () => {
@@ -125,7 +137,7 @@
   }
 
   /* ---------- state 3: signed in with a real auth session ---------- */
-  async function renderSignedIn(me) {
+  function renderSignedIn(me) {
     const body = $("#accBody");
     body.innerHTML = `
       <div class="calm" role="status">
@@ -134,7 +146,10 @@
       <div id="accMsg" class="help" style="min-height:1.2em"></div>
       <div id="accSecurity"></div>
       <button class="btn" id="au_out" style="margin-top:10px">Sign out</button>`;
-    root.ZeimAuth.mountSecurityPanel($("#accSecurity"), { onSignedOut: afterIdentityChange });
+    root.ZeimAuth.mountSecurityPanel($("#accSecurity"), {
+      onSignedOut: afterIdentityChange,
+      emailAvailable: !!(me.auth && me.auth.email_codes),   /* do not offer email adding when the server cannot send codes */
+    });
     $("#au_out").onclick = async () => {
       try {
         await root.ZeimAuth.signOut();
@@ -143,19 +158,30 @@
     };
   }
 
-  /* ---------- entry: community.js delegates here ---------- */
+  /* ---------- entry points ---------- */
+  function handles(me) {
+    /* Synchronous on purpose: community.js must not await this decision, or a Promise
+       (always truthy) would hide the legacy UI. Only confirmed unavailability falls back. */
+    return !!(root.ZeimAuth && me && me.auth && me.auth.available);
+  }
+
   async function render(me) {
-    if (!root.ZeimAuth || !me || !me.auth || !me.auth.available) return false;   // legacy UI
+    if (!handles(me)) return false;
     try {
-      if (me.auth.session) await renderSignedIn(me);
-      else if (me.signed_up) renderLegacy(me);      // cookie account: offer the upgrade
+      if (me.auth.session) renderSignedIn(me);
+      else if (me.signed_up) renderLegacy(me);       // cookie account: offer the upgrade
       else renderGuest(me, !!me.auth.email_codes);
       return true;
     } catch (e) {
-      return false;                                  /* fall back to the legacy UI rather
-                                                         than break the account dialog */
+      /* Auth is available but rendering failed: show the failure — never silently
+         downgrade to the legacy cookie signup as if passkeys did not exist. */
+      try {
+        $("#accBody").innerHTML = `<div class="calm" role="alert"><p>The account panel could not load.</p>
+          <p class="help">Refresh the page and try again. You can keep building either way.</p></div>`;
+      } catch (_) { /* nothing more we can do */ }
+      return true;
     }
   }
 
-  root.ZeimAccount = { render };
+  root.ZeimAccount = { handles, render };
 })(window);

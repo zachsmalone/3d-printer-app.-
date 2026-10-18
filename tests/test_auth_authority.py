@@ -186,3 +186,51 @@ def test_pages_reference_the_auth_client(zapp):
     for f in ("zeim-auth.js", "zeim-auth.css", "zeim-account.js"):
         r = a.get(f"/static/{f}")
         assert r.status_code == 200, (f, r.status_code)
+
+
+def test_a_retained_copy_of_the_legacy_cookie_cannot_restore_upgraded_authority(zapp):
+    """Response-side cookie retirement only reaches THIS browser. A copy of the old
+    p3d_sid held by another browser must not silently sign the upgraded account back in
+    after a sign-out or a revoked session — so an upgraded legacy cookie is retired
+    authority server-side, not just deleted from one response."""
+    app, svc, sample = zapp
+    a = browser(app)
+
+    # a registered legacy account, whose cookie a second browser has kept a copy of
+    legacy_signup(a, "Retained Rita")
+    old_sid = a.cookies.get("p3d_sid")
+    bid = a.post("/api/parts/new", json={"title": "Rita's private build", "recipe": {
+        "parts": [{"kind": "box", "dims": {"size": [20, 20, 20]}, "position": [0, 0, 0], "role": "solid"}]}}).json()["id"]
+
+    # client 1 upgrades the account with a passkey and signs in (ephemeral -> real session)
+    key, _ = upgrade_with_passkey(a)
+    signin = a.post("/api/auth/signin/begin", headers=H)
+    cred = key.assertion(signin.json()["options"])
+    a.post("/api/auth/signin/finish", json={"ceremony_id": signin.json()["ceremony_id"], "credential": cred}, headers=H)
+
+    # client 2 signs in with the same passkey: a second, distinct session
+    b = browser(app)
+    s2 = b.post("/api/auth/signin/begin", headers=H)
+    cred2 = key.assertion(s2.json()["options"])
+    r = b.post("/api/auth/signin/finish", json={"ceremony_id": s2.json()["ceremony_id"], "credential": cred2}, headers=H)
+    assert r.status_code == 200, r.text
+    sid2 = b.cookies.get(svc.cfg.cookie_name)
+
+    # client 1 revokes CLIENT 2's session — its real session id from the device list
+    # (the auth cookie is only a lookup token, not the session id)
+    d2 = next(d["id"] for d in b.get("/api/auth/account", headers=H).json()["devices"] if d["current"])
+    assert a.delete(f"/api/auth/sessions/{d2}", headers=H).status_code == 200
+
+    # client 2 comes back with its REVOKED auth token AND the retained legacy cookie:
+    # no authority may survive — not the dead session, not the upgraded legacy cookie
+    me = b.get("/api/me", cookies={svc.cfg.cookie_name: sid2, "p3d_sid": old_sid}).json()
+    assert me["signed_up"] is False, "a revoked session must not keep authority"
+    assert me["auth"]["session"] is False
+    assert b.get(f"/api/parts/{bid}/recipe", cookies={svc.cfg.cookie_name: sid2, "p3d_sid": old_sid}).status_code == 404
+
+    # and the account itself is still reachable with the passkey: nothing was destroyed
+    s3 = b.post("/api/auth/signin/begin", headers=H)
+    r = b.post("/api/auth/signin/finish", json={"ceremony_id": s3.json()["ceremony_id"],
+                "credential": key.assertion(s3.json()["options"])}, headers=H)
+    assert r.status_code == 200
+    assert b.get(f"/api/parts/{bid}/recipe").status_code == 200
