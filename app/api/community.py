@@ -35,9 +35,27 @@ def get_config():
 
 
 # ---------------- identity ----------------
+def _auth_caps(request: Request, actor: Actor) -> dict:
+    """What the SIGN-IN UI may honestly offer, derived from what is actually mounted —
+    never from whether a request succeeded. No tokens or internals are exposed."""
+    svc = getattr(request.app.state, "auth_service", None)
+    if svc is None or not getattr(request.app.state, "auth_mounted", False):
+        return {"available": False}
+    from ..auth.mailer import NullMailer
+    return {"available": True,
+            "email_codes": not isinstance(svc.mailer, NullMailer),   # SMTP or the dev console
+            "session": actor.auth_session is not None}               # signed in via passkey/email
+
+
+def me(request: Request, actor: Actor = Depends(get_actor)):
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor),
+            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
+
+
 @router.get("/me")
 def me(request: Request, actor: Actor = Depends(get_actor)):
-    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor), "hide_mature": catalog.hides_mature(actor)}
+    return {**idn.public_profile(actor), "send": guards.send_caps(request, actor),
+            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
 
 
 def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
