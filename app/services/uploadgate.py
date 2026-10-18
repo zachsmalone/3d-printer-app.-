@@ -53,17 +53,20 @@ def _audit(entry: dict) -> None:
         log.exception("upload audit log write failed")
 
 
-def _allowed(sid: str, now: float) -> bool:
-    """Per-account hourly limit. db mode: SQLite counter (shared by all workers); json mode: in-process."""
-    if config.UPLOADS_PER_HOUR <= 0:
+def _allowed(sid: str, now: float, source: str = "generate") -> bool:
+    """Per-account hourly limit. db mode: SQLite counter (shared by all workers); json mode: in-process.
+    Mesh edit/CAD imports have their own (larger) budget: opening your own files is cheap and frequent."""
+    limit = config.EDIT_UPLOADS_PER_HOUR if source == "edit" else config.UPLOADS_PER_HOUR
+    if limit <= 0:
         return True
+    key = sid if source != "edit" else f"edit:{sid}"
     if config.STORAGE_MODE == "db":
         from .. import db
         db.upload_events_prune(now, _HOUR)                # best-effort housekeeping
-        return db.upload_events_hit(sid, now, _HOUR, config.UPLOADS_PER_HOUR)
+        return db.upload_events_hit(key, now, _HOUR, limit)
     # json mode: in-process limiter (documented limitation for multi-worker json deployments)
     from ..core import ratelimit
-    return ratelimit.hit(f"upload:{sid}", limit=config.UPLOADS_PER_HOUR, window_s=_HOUR)
+    return ratelimit.hit(f"upload:{key}", limit=limit, window_s=_HOUR)
 
 
 def scan_bytes(data: bytes) -> tuple[bool, str, str]:
@@ -116,14 +119,15 @@ def scan_bytes(data: bytes) -> tuple[bool, str, str]:
         return True, "", "unscanned"
 
 
-def gate(data: bytes, actor_sid: str, source: str = "generate") -> uploadsafe.Checked:
-    """Check one upload before anything parses it. Raises GateError; returns uploadsafe's Checked."""
+def gate(data: bytes, actor_sid: str, source: str = "generate", **limits) -> uploadsafe.Checked:
+    """Check one upload before anything parses it. Raises GateError; returns uploadsafe's Checked.
+    `limits` are passed to uploadsafe.check (e.g. max_bytes for the 50 MB editor upload)."""
     now = time.time()
-    if not _allowed(actor_sid, now):
+    if not _allowed(actor_sid, now, source):
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "rate_limited"})
         raise GateError(429, f"You have reached this hour's upload limit ({config.UPLOADS_PER_HOUR}). Try again later.")
     try:
-        checked = uploadsafe.check(data)
+        checked = uploadsafe.check(data, **limits)
     except uploadsafe.Rejected as e:
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": f"rejected:{e.reason}"})
         if e.reason == "too_big":

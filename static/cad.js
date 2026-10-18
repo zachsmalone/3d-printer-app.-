@@ -424,6 +424,11 @@ $("#cwUndo").onclick = () => S.bid && histAction(() => api(`/api/edit/${S.bid}/u
 $("#cwRedo").onclick = () => S.bid && histAction(() => api(`/api/edit/${S.bid}/redo`, { method: "POST" }));
 
 /* ---------------------------------------------------------------- History panel */
+/* Every user-influenced string in History/Items goes in via textContent: templates only hold
+   placeholders (<span data-tx=N>) that fill() populates after the static markup is set. */
+let TX = [];
+const T = v => { TX.push(String(v ?? "")); return `<span data-tx="${TX.length - 1}"></span>`; };
+function fillTx(root) { root.querySelectorAll("[data-tx]").forEach(el => { el.textContent = TX[+el.dataset.tx]; el.removeAttribute("data-tx"); }); TX = []; }
 const PARAM_SKIP = new Set(["sketch", "plane", "picks", "replace", "edges", "layout", "axis", "solve"]);
 function paramField(k, v, i) {
   const id = `hp${i}_${k}`;
@@ -432,7 +437,7 @@ function paramField(k, v, i) {
   if (typeof v === "string") {
     const choices = { direction: ["up", "down", "both"], mode: ["new", "join", "cut", "intersect"], kind: ["union", "subtract", "intersect", "linear", "circular"], style: ["fillet", "chamfer"], axis: ["x", "y", "z"], side: ["min", "center", "max"], mirror: ["x", "y", "z"] }[k];
     if (choices && choices.includes(v)) return `<label class="kv" for="${id}"><span>${esc(k)}</span><select id="${id}" data-k="${esc(k)}" data-t="s">${choices.map(c => `<option ${c === v ? "selected" : ""}>${c}</option>`).join("")}</select></label>`;
-    return `<div class="kv"><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
+    return `<div class="kv"><span>${T(k)}</span><b>${T(v)}</b></div>`;
   }
   if (Array.isArray(v) && v.length === 3 && v.every(x => typeof x === "number"))
     return `<div class="kv"><span>${esc(k)}</span><span style="display:flex;gap:3px">${v.map((x, j) => `<input data-k="${esc(k)}" data-t="v${j}" type="number" step="any" value="${x}" aria-label="${esc(k)} ${"XYZ"[j]}">`).join("")}</span></div>`;
@@ -440,9 +445,8 @@ function paramField(k, v, i) {
 }
 function renderHist() {
   const ol = $("#cwHist"), ops = S.scene?.ops || [], head = S.scene?.head ?? 0;
-  const base = S.scene?.base, imp = base && base.type !== "cad" ? `<li class="${head < 0 ? "future" : ""}"><div class="hrow" role="button" tabindex="0" data-act="goto" data-i="0" title="Roll back to the imported file"><span class="ic">${IC.step}</span><span class="nm">Import 01 · ${esc(base.type === "upload" ? (base.format || "").toUpperCase() + " file" : base.type === "build" ? "from a build" : base.type)} (kept as-is)</span></div></li>` : "";
-  if (!ops.length) { ol.innerHTML = imp || `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No steps yet. Your sketch and solid steps will be listed here.</span></div></li>`; return; }
-  if (false) { ol.innerHTML = `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No steps yet. Your sketch and solid steps will be listed here.</span></div></li>`; return; }
+  const base = S.scene?.base, imp = base && base.type !== "cad" ? `<li class="${head < 0 ? "future" : ""}"><div class="hrow" role="button" tabindex="0" data-act="goto" data-i="0" title="Roll back to the imported file"><span class="ic">${IC.step}</span><span class="nm">Import 01 · ${T(base.type === "upload" ? (base.format || "").toUpperCase() + " file" : base.type === "build" ? "from a build" : base.type)} (kept as-is)</span></div></li>` : "";
+  if (!ops.length) { ol.innerHTML = imp || `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No steps yet. Your sketch and solid steps will be listed here.</span></div></li>`; fillTx(ol); return; }
   ol.innerHTML = imp + ops.map(o => {
     const open = S.openStep === o.i, future = o.i > head, p = o.params || {};
     const nm = o.name || o.label;
@@ -450,7 +454,7 @@ function renderHist() {
     if (open) {
       const fields = Object.entries(p).filter(([k]) => !PARAM_SKIP.has(k)).map(([k, v]) => paramField(k, v, o.i)).join("");
       const sk = p.sketch ? `<div class="kv"><span>Profile</span><b>${(p.sketch.entities || []).length} curves${p.picks?.length ? ` · ${p.picks.length} picked region(s)` : ""}</b></div>
-        <div class="kv"><span>Plane</span><b>${typeof p.plane === "string" ? p.plane : "face"}</b></div>` : "";
+        <div class="kv"><span>Plane</span><b>${T(typeof p.plane === "string" ? p.plane : "face")}</b></div>` : "";
       body = `<div class="hbody">${sk}${fields || (o.editable ? "" : `<p class="help">This step can't be edited here.</p>`)}
         <div class="hbtns">${o.editable ? `<button class="primary" data-act="save" data-i="${o.i}">Update</button>` : ""}
         ${p.sketch && o.editable ? `<button data-act="sketch" data-i="${o.i}">Edit sketch</button>` : ""}
@@ -458,8 +462,10 @@ function renderHist() {
         <button data-act="rename" data-i="${o.i}">Rename</button><button data-act="delete" data-i="${o.i}">Delete</button></div></div>`;
     }
     return `<li class="${open ? "open" : ""} ${future ? "future" : ""}"><div class="hrow" role="button" tabindex="0" aria-expanded="${open}" data-open="${o.i}">
-      <span class="ic">${IC[OP_ICON[o.op]] || IC.step}</span><span class="nm" title="${esc(o.label)}">${o.i}. ${esc(nm)}</span>${open ? "▾" : "›"}</div>${body}</li>`;
+      <span class="ic">${IC[OP_ICON[o.op]] || IC.step}</span><span class="nm" data-title="${o.i}">${o.i}. ${T(nm)}</span>${open ? "▾" : "›"}</div>${body}</li>`;
   }).join("") + (head < ops.length ? `<li><div class="hrow" data-act="goto" data-i="${ops.length}" role="button" tabindex="0"><span class="nm" style="color:var(--accink)">Roll forward to the end</span></div></li>` : "");
+  fillTx(ol);
+  ol.querySelectorAll("[data-title]").forEach(el => { el.title = (ops[+el.dataset.title - 1] || {}).label || ""; });
 }
 $("#cwHist").addEventListener("click", async e => {
   const o = e.target.closest("[data-open]");
@@ -487,13 +493,14 @@ $("#cwHist").addEventListener("dblclick", e => { const o = e.target.closest("[da
 function renderItems() {
   const box = $("#cwItems"), bs = S.scene?.bodies || [];
   const eye = (on, lbl, attr) => `<button class="cw-eye" ${attr} aria-pressed="${on}" aria-label="${on ? "Hide" : "Show"} ${esc(lbl)}">${on ? IC.eye : IC.eyeoff}</button>`;
-  const sketches = (S.scene?.ops || []).filter(o => o.params?.sketch).map(o => `<div class="cw-item"><span class="nm">Sketch of step ${o.i}<br><small>${typeof o.params.plane === "string" ? o.params.plane + " plane" : "on a face"} · ${(o.params.sketch.entities || []).length} curves</small></span><button class="cw-eye" data-skedit="${o.i}" aria-label="Edit the sketch of step ${o.i}">✎</button></div>`).join("");
+  const sketches = (S.scene?.ops || []).filter(o => o.params?.sketch).map(o => `<div class="cw-item"><span class="nm">Sketch of step ${o.i}<br><small>${T(typeof o.params.plane === "string" ? o.params.plane + " plane" : "on a face")} · ${(o.params.sketch.entities || []).length} curves</small></span><button class="cw-eye" data-skedit="${o.i}" aria-label="Edit the sketch of step ${o.i}">✎</button></div>`).join("");
   box.innerHTML = `<h3>Bodies</h3>${bs.length ? bs.map(b => `<div class="cw-item ${b.index === S.selBody ? "sel" : ""}" data-body="${b.index}"><span class="sw" style="background:${(S.appearance[b.index] || {}).color || PALETTE[b.index % PALETTE.length]}"></span>
-      <span class="nm">${esc(b.name)}<br><small>${b.size.map(fmt).join(" × ")} mm</small></span>${eye(!S.hidden.has(b.index), b.name, `data-eye="${b.index}"`)}</div>`).join("") : `<p class="help">None yet.</p>`}
+      <span class="nm">${T(b.name)}<br><small>${b.size.map(fmt).join(" × ")} mm</small></span>${eye(!S.hidden.has(b.index), b.name, `data-eye="${b.index}"`)}</div>`).join("") : `<p class="help">None yet.</p>`}
     <h3>Sketches</h3>${sketches || `<p class="help">None yet.</p>`}
     <h3>Planes &amp; axes</h3>
     <div class="cw-item"><span class="nm">Grid (XY plane)</span>${eye(gridObj.visible, "grid", 'data-h="grid"')}</div>
     <div class="cw-item"><span class="nm">Axes (X red · Y green · Z blue)</span>${eye(axes.visible, "axes", 'data-h="axes"')}</div>`;
+  fillTx(box);
 }
 $("#cwItems").addEventListener("click", e => {
   const ey = e.target.closest("[data-eye]"); if (ey) { const i = +ey.dataset.eye; S.hidden.has(i) ? S.hidden.delete(i) : S.hidden.add(i); world.children.forEach(g => g.visible = !S.hidden.has(g.userData.body)); return renderItems(); }

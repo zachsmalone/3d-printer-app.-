@@ -121,6 +121,7 @@ COOKIE_SECURE = (os.environ.get("PHOTO3D_COOKIE_SECURE") or "auto").strip().lowe
 # Per-account upload limit per hour (0 = off). Enforced at /api/generate; the counter is
 # SQLite-backed in db mode (shared by all workers) and in-process in json mode.
 UPLOADS_PER_HOUR = _int("PHOTO3D_UPLOADS_PER_HOUR", 10)
+EDIT_UPLOADS_PER_HOUR = _int("PHOTO3D_EDIT_UPLOADS_PER_HOUR", 120)   # editor / CAD mesh imports (own budget)
 # Optional local malware scan of uploads via clamd (INSTREAM). Nothing is ever sent anywhere
 # else; if clamd is unreachable, uploads are allowed and the miss is logged.
 CLAMAV = _flag("PHOTO3D_CLAMAV", False)

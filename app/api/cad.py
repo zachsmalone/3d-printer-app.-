@@ -23,7 +23,7 @@ from ..core import sketch as sk
 from ..services import editproj
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, disk_guard, meta_for, summary
-from .textcap import text_in
+from .textcap import plain_text, text_in
 
 router = APIRouter(prefix="/api/cad", tags=["cad"])
 FIRST_OPS = ("sketch_extrude", "revolve")
@@ -78,8 +78,10 @@ def trim(body: dict):
 def new_project(body: dict, actor: Actor = Depends(get_actor)):
     """Start a CAD project from its first solid feature (Extrude or Revolve of a sketch)."""
     try:
-        title = _safe_title(body.get("title") or "My design")
+        title = plain_text(text_in(body.get("title") or "My design", 60, "Title"), "Title") or "My design"
         safety.filter_only(title, "Title")
+    except safety.ChatBlocked as e:
+        return JSONResponse(status_code=e.status, content=e.payload)
     except ValueError as e:
         raise HTTPException(400, str(e))
     op = body.get("op")
@@ -131,7 +133,7 @@ def bodies(bid: str, actor: Actor = Depends(get_actor)):
 def rename(bid: str, i: int, body: dict, actor: Actor = Depends(get_actor)):
     _edit(bid, actor, owner_only=True)
     try:
-        name = text_in(body.get("name") or "", 40, "Name")
+        name = plain_text(text_in(body.get("name") or "", 40, "Name"), "Name")
         if name:
             safety.filter_only(name, "Name")
         editproj.rename_step(bid, i, name)

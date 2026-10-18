@@ -25,3 +25,10 @@ def text_in(value, max_len: int, label: str = "Text") -> str:
 def ip(request: Request) -> str:
     """Client address as the server sees it (behind a proxy run uvicorn with --proxy-headers)."""
     return request.client.host if request.client else "unknown"
+
+
+def plain_text(value: str, label: str = "Text") -> str:
+    """Display strings (titles, step names) are plain text: refuse markup characters outright."""
+    if value and ("<" in value or ">" in value):
+        raise ValueError(f"{label} can't contain < or >.")
+    return value

@@ -16,9 +16,18 @@ from ..core import thickness as thickness_mod
 from ..services import editproj
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
-from .textcap import text_in
+from .textcap import plain_text, text_in
 
 router = APIRouter(prefix="/api/edit")
+
+
+def _gate(data: bytes, actor: Actor):
+    """The shared upload gate (rate limit + content check + audit + optional malware scan), same as photo uploads."""
+    from ..services import uploadgate
+    try:
+        uploadgate.gate(data, actor.sid, source="edit", max_bytes=editproj.MAX_UPLOAD_EDIT)
+    except uploadgate.GateError as e:
+        raise HTTPException(e.status, e.message)
 
 
 def _edit_meta(bid: str, actor: Actor, owner_only=False) -> dict:
@@ -63,6 +72,7 @@ def new_project(
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
         title = text_in(title, 80, "Title")
+        plain_text(title, "Title")
         if title:
             safety.filter_only(title, "Title")
     except ValueError as e:
@@ -99,6 +109,7 @@ def new_project(
             bad = meshedit.sniff(data, ext)
             if bad:
                 raise HTTPException(415, bad)
+            _gate(data, actor)
             try:
                 mesh, w = meshedit.load_mesh(data, ext)
             except meshedit.OpError as e:
@@ -318,6 +329,7 @@ def new_multi(
         bad = meshedit.sniff(data, ext)
         if bad:
             raise HTTPException(415, f"File {n}: {bad}")
+        _gate(data, actor)
         try:
             mesh, w = meshedit.load_mesh(data, ext)
         except meshedit.OpError as e:

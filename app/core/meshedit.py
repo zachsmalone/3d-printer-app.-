@@ -942,8 +942,14 @@ def sniff(data: bytes, ext: str) -> str:
             names = z.namelist()
             if not any(n.lower().endswith(".model") for n in names):
                 return "3MF has no 3D model part."
-            if sum(i.file_size for i in z.infolist()) > 600 * 1024 * 1024:
+            infos = z.infolist()
+            total = sum(i.file_size for i in infos)
+            packed = sum(i.compress_size for i in infos) or 1
+            extra = sum(i.file_size for i in infos if not i.filename.lower().endswith(".model"))
+            if total > 128 * 1024 * 1024 or len(infos) > 200:
                 return "3MF expands to an unreasonable size (possible zip bomb)."
+            if extra > 16 * 1024 * 1024 or (total > 8 * 1024 * 1024 and total / packed > 200):
+                return "3MF has a suspiciously large packed member (possible zip bomb). Re-export it from your slicer."
         except zipfile.BadZipFile:
             return "Corrupt 3MF (bad zip)."
         return ""

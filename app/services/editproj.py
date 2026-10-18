@@ -165,10 +165,41 @@ def _commit(bid: str, meta: dict, head: int):
 TEXT_MAX = 60       # characters for the emboss/deboss text (same as meshedit.op_text)
 
 
+MAX_PARAM_STRINGS = 6000
+
+
+def _scan_strings(v, safety, depth=0, seen=None):
+    """Every free-text value anywhere in a step's params is plain text and passes the language /
+    contact filter (stored params are shown in History and shared with public projects)."""
+    seen = seen if seen is not None else [0]
+    if depth > 8:
+        raise ValueError("Step settings are nested too deeply.")
+    if isinstance(v, str):
+        seen[0] += 1
+        if seen[0] > MAX_PARAM_STRINGS:
+            raise ValueError("Too many text values in the step settings.")
+        if "<" in v or ">" in v:
+            raise ValueError("Step settings can't contain < or >.")
+        if len(v) > 200:
+            raise ValueError("A text value in the step settings is too long.")
+        if v:
+            safety.filter_only(v, "Text")
+    elif isinstance(v, dict):
+        for k, x in v.items():
+            _scan_strings(str(k), safety, depth + 1, seen)
+            _scan_strings(x, safety, depth + 1, seen)
+    elif isinstance(v, list):
+        for x in v:
+            _scan_strings(x, safety, depth + 1, seen)
+
+
 def check_op_text(op: str, params: dict) -> dict:
     """Free text that ends up in a model is gated like any other text others can read: length cap first, then the
     language + personal-info filter. Raises safety.ChatBlocked (nothing is stored). Returns the params with text trimmed."""
     from ..community import safety
+    from ..core import cadops
+    params = cadops.clean_params(op, params)
+    _scan_strings(params, safety)
     out = dict(params)
     for k, v in params.items():
         if isinstance(v, str) and len(v) > 200:

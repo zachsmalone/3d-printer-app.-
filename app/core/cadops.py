@@ -20,6 +20,8 @@ from . import sketch as sk
 from .meshedit import OpError, _check, _new
 
 MAX_PATTERN = 64
+MAX_PATTERN_FACES = 600_000      # refuse BEFORE fusing: input faces x count (memory grows with it)
+MAX_ROUND_FACES = 60_000         # Minkowski fillet/chamfer cost explodes on dense meshes
 LIM = 5000.0
 
 
@@ -280,6 +282,8 @@ def op_round_edges(m, p):
     if style not in ("fillet", "chamfer"):
         raise OpError("style must be fillet | chamfer")
     sel, rest = _pick(m, p)
+    if len(sel.faces) > MAX_ROUND_FACES:
+        raise OpError(f"Fillet/chamfer works on bodies up to {MAX_ROUND_FACES:,} triangles (this one has {len(sel.faces):,}). Simplify first.")
     if max(sel.extents) / r > 400:
         raise OpError("The radius is tiny compared with the body; use at least 1/400 of its size.")
     if 2 * r >= min(sel.extents):
@@ -385,6 +389,10 @@ def op_pattern(m, p):
     kind = p.get("kind", "linear")
     count = int(_num(p, "count", 3, 2, MAX_PATTERN))
     sel, rest = _pick(m, p)
+    est = len(sel.faces) * count
+    if est > MAX_PATTERN_FACES:
+        raise OpError(f"That pattern would make about {est:,} triangles (limit {MAX_PATTERN_FACES:,}). "
+                      "Use fewer copies or simplify / remesh coarser first.")
     copies = []
     if kind == "linear":
         step = _vec(p, "step", (20, 0, 0))
@@ -442,6 +450,43 @@ def op_align(m, p):
 OPS = {"sketch_extrude": op_sketch_extrude, "revolve": op_revolve, "body_boolean": op_body_boolean,
        "round_edges": op_round_edges, "face_offset": op_face_offset, "body_transform": op_body_transform,
        "pattern": op_pattern, "align": op_align}
+
+# Keys each CAD op reads. Anything else in a step's params is dropped before it is stored
+# (stored params are shown in History and shared with public projects).
+PARAM_KEYS = {
+    "sketch_extrude": {"sketch", "plane", "picks", "distance", "direction", "mode", "taper", "replace", "solve"},
+    "revolve": {"sketch", "plane", "picks", "axis", "angle", "mode", "replace", "solve"},
+    "body_boolean": {"kind", "target", "tool"},
+    "round_edges": {"radius", "style", "body", "edges"},
+    "face_offset": {"point", "normal", "distance"},
+    "body_transform": {"body", "move", "rotate", "scale", "mirror", "pivot", "copy"},
+    "pattern": {"kind", "count", "step", "axis", "angle", "center", "body", "fuse"},
+    "align": {"body", "axis", "side", "to_body", "value"},
+    "sculpt_stroke": {"brush", "radius", "strength", "points", "normal", "delta", "symmetry_x"},
+    "remesh": {"edge"},
+}
+
+
+def clean_params(op: str, p: dict) -> dict:
+    """Drop unknown keys and validate the plane (named plane or a numeric frame only)."""
+    keys = PARAM_KEYS.get(op)
+    if keys is None:
+        return p
+    out = {k: v for k, v in p.items() if k in keys}
+    if "plane" in out:
+        try:
+            o, xd, yd, n = sk.plane(out["plane"])
+        except (sk.SketchError, TypeError, ValueError, AttributeError) as e:
+            raise OpError(str(e) or "Bad plane.")
+        if not isinstance(out["plane"], str):
+            r = lambda v: [round(float(x), 6) for x in v]
+            out["plane"] = {"origin": r(o), "normal": r(n), "xdir": r(xd)}
+    if "sketch" in out:
+        try:
+            out["sketch"] = sk.check(out["sketch"])
+        except sk.SketchError as e:
+            raise OpError(str(e))
+    return out
 
 from . import sculptws as _sculptws   # noqa: E402  (workspace sculpt strokes + remesh)
 OPS.update(_sculptws.OPS)

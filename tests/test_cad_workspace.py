@@ -211,3 +211,53 @@ def test_sculpt_strokes_and_remesh():
     r = c.post(f"/api/edit/{bid}/op", json={"op": "sculpt_stroke", "params": {"brush": "draw", "points": [[10, 10, 10]], "normal": [0, 0, 1], "radius": 4}})
     assert r.status_code == 200 and r.json()["ops"][-1]["label"].startswith("Sculpt Draw")
     assert c.post(f"/api/edit/{bid}/undo").json()["head"] == 2
+
+
+# ---------------------------------------------------------------- red-team regressions (CADRT-1..7)
+def test_cadrt1_pattern_and_fillet_refuse_before_running():
+    big = trimesh.creation.icosphere(subdivisions=6, radius=10)          # 81 920 faces
+    with pytest.raises(Exception, match="triangles"):
+        cadops.op_pattern(big, {"kind": "linear", "count": 12, "step": [30, 0, 0], "fuse": True})
+    with pytest.raises(Exception, match="triangles"):
+        cadops.op_round_edges(big, {"radius": 1})
+
+
+def test_cadrt2_3_params_are_cleaned_and_filtered():
+    bid = _new()["id"]
+    r = c.post(f"/api/edit/{bid}/op", json={"op": "align", "params": {"axis": "z", "side": "min", "value": 0, "caption": "hi",
+                                                                     "plane": "<img src=x onerror=alert(1)>"}})
+    assert r.status_code == 200 and "caption" not in r.json()["ops"][-1]["params"] and "plane" not in r.json()["ops"][-1]["params"]
+    bad_plane = {"sketch": SQUARE, "distance": 5, "plane": "<img src=x>"}
+    assert c.post(f"/api/edit/{bid}/op", json={"op": "sketch_extrude", "params": bad_plane}).status_code in (400, 422)
+    contact = {"sketch": {"entities": SQUARE["entities"], "constraints": [{"type": "length", "a": "a", "value": 20, "id": "name at gmail dot com"}]}, "distance": 5}
+    assert c.post(f"/api/edit/{bid}/op", json={"op": "sketch_extrude", "params": contact}).status_code in (400, 422)
+    assert c.post(f"/api/edit/{bid}/op", json={"op": "translate", "params": {"dx": 1, "note": "<b>x</b>"}}).status_code == 400
+    js = c.get("/static/cad.js").text
+    assert "${typeof p.plane === \"string\" ? p.plane" not in js
+
+
+def test_cadrt4_5_zip_bomb_3mf_refused_and_gate_used(monkeypatch):
+    import io, zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("3D/3dmodel.model", trimesh.exchange.threemf.export_3MF(trimesh.creation.box((5, 5, 5)))[:0] or b"<model/>")
+        z.writestr("Metadata/pad.bin", b"\0" * (40 * 1024 * 1024))
+    r = c.post("/api/edit/new", files={"file": ("bomb.3mf", io.BytesIO(buf.getvalue()), "model/3mf")})
+    assert r.status_code == 415, r.text
+    from app.services import uploadgate
+    seen = []
+    real = uploadgate.gate
+    monkeypatch.setattr(uploadgate, "gate", lambda d, sid, source="generate", **k: seen.append(source) or real(d, sid, source, **k))
+    stl = trimesh.creation.box((5, 5, 5)).export(file_type="stl")
+    assert c.post("/api/edit/new", files={"file": ("b.stl", io.BytesIO(stl), "model/stl")}).status_code == 200 and seen == ["edit"]
+
+
+def test_cadrt6_7_titles_and_names_are_plain_and_filtered():
+    r = c.post("/api/cad/new", json={"op": "sketch_extrude", "params": {"sketch": SQUARE, "distance": 5}, "title": "name at gmail dot com"})
+    assert r.status_code == 422
+    assert c.post("/api/cad/new", json={"op": "sketch_extrude", "params": {"sketch": SQUARE}, "title": "<img src=x>"}).status_code == 400
+    bid = _new()["id"]
+    assert c.put(f"/api/cad/{bid}/step/1/name", json={"name": "<b>x</b>"}).status_code == 400
+    import io
+    stl = trimesh.creation.box((5, 5, 5)).export(file_type="stl")
+    assert c.post("/api/edit/new", files={"file": ("b.stl", io.BytesIO(stl), "model/stl")}, data={"title": "<i>t</i>"}).status_code == 400
