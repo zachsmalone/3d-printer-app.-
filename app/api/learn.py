@@ -133,9 +133,18 @@ def credits_page():
     t = d["tools"]
 
     def rows(items):
+        def cell(i):
+            name = escape(i['name'])
+            url = i.get('url') or ''
+            if url.startswith('https://'):
+                return '<a href="' + escape(url) + '" rel="noopener noreferrer" target=_blank>' + name + '</a>'
+            return name
         return "".join(
-            f"<tr><td>{('<a href=\'' + escape(i['url']) + '\' rel=\'noopener noreferrer\' target=_blank>' + escape(i['name']) + '</a>') if i.get('url', '').startswith('https://') else escape(i['name'])}</td>"
-            f"<td>{escape(i.get('version') or '')}</td><td>{escape(i['licence'])}</td><td>{escape(i['what'])}</td></tr>" for i in items)
+            '<tr><td>' + cell(i) + '</td>'
+            '<td>' + escape(i.get('version') or '') + '</td>'
+            '<td>' + escape(i['licence']) + '</td>'
+            '<td>' + escape(i['what']) + '</td></tr>'
+            for i in items)
 
     def table(items):
         return ("<div class=tablewrap><table class=credits><thead><tr><th scope=col>Name</th><th scope=col>Version</th><th scope=col>Licence</th><th scope=col>What it does for ZEIM</th></tr></thead>"
