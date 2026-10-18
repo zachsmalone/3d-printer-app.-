@@ -140,18 +140,21 @@ try:
     checked = uploadgate.gate(data, actor.sid, source="edit")
 except uploadgate.GateError as e:
     raise HTTPException(e.status, e.message)
-# checked.scan_state == "unscanned" -> the upload is quarantined (services/quarantine.py):
-# hold the bytes BEFORE parsing, do not publish artifacts, and return status metadata only —
-# see app/api/builds.py's generate flow for the exact pattern (hold_bytes -> mark(bid, hold)).
+# checked.scan_state == "unscanned" (scanner on but unreachable) -> the upload is NOT built:
+# park it (services/quarantine.py stage_pending: original bytes + request context, 0700) and
+# return 202 {"status": "pending_scan", "pending_id": ...} — see app/api/builds.py's generate
+# flow + /api/uploads/resume for the exact pattern (resume re-runs the whole pipeline).
 ```
 
 The gate must run BEFORE any parsing of the bytes, and the returned scan state must be honored
-(a quarantined upload is never served, shared, or mirrored to object storage).
+(a pending upload is never parsed, built, served, shared, or mirrored to object storage; only
+a clean scan — via resume — ever builds it, and an infected verdict discards it).
 
 What this buys (all already implemented + tested in `app/services/uploadgate.py`):
   * per-account hourly rate limit (shared with photo uploads, db-backed in db mode);
   * the uploadsafe content checks (mesh bombs, archive caps, masquerading files);
   * the audit log entry (never file bytes) in DATA/uploads.log.jsonl;
-  * ClamAV verdicts: infected -> refused + never stored; scanner-down -> quarantine.
+  * ClamAV verdicts: infected -> refused + never stored; scanner-down -> parked as a pending
+    upload (never built) until a clean scan via /api/uploads/resume builds it.
 
 Acceptance test: `tests/test_edit_new_gate.py` (marked xfail until the wiring lands).

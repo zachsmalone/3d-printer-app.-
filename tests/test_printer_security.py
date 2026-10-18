@@ -106,15 +106,19 @@ def test_dev_default_keeps_direct_control(monkeypatch):
 
 def test_file_handoff_path_works_in_production(monkeypatch):
     """The launch posture: slice -> DOWNLOAD THE G-CODE -> print from the printer's own app.
-    The full file-handoff path must work while direct control is off."""
+    The full file-handoff path must work while direct control is off. This test REQUIRES a
+    working slicer (it asserts a nonempty gcode download); it skips explicitly if the slicer
+    is unavailable rather than reporting handoff success without producing G-code."""
+    from app.services import slicer
+    if not slicer.status()["available"]:
+        pytest.skip("PrusaSlicer unavailable in this environment — gcode handoff not testable here")
     monkeypatch.setenv("ZEIM_ENV", "production")
     monkeypatch.delenv("ZEIM_PRINTER_DIRECT", raising=False)
     c = client()
     bid = photo_build(c)
     r = c.post(f"/api/slice/{bid}", data={"layer_height": 0.2, "fill_density": 15})
     assert r.status_code == 200, r.text
-    if r.json().get("ok") or "download" in r.json():                    # slicer present: gcode exists
-        g = c.get(f"/files/{bid}/model.gcode")
-        assert g.status_code == 200 and len(g.content) > 0             # the handoff artifact itself
-    # and the gcode download is not blocked by the direct-control gate
-    assert c.get(f"/files/{bid}/model.gcode").status_code in (200, 404)
+    assert r.json().get("ok") or "download" in r.json(), r.text        # the slice really succeeded
+    g = c.get(f"/files/{bid}/model.gcode")
+    assert g.status_code == 200, g.text
+    assert len(g.content) > 0                                          # a real, nonempty handoff artifact

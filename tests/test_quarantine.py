@@ -19,6 +19,7 @@ import pytest
 
 from app import config
 from app.services import quarantine, uploadgate
+from app.services.history import store
 from tests.b1 import client, photo_build
 from tests.test_objectstore import _FakeS3, s3  # noqa: F401 — the s3 fixture registers on import
 
@@ -172,9 +173,10 @@ def test_error_or_malformed_clamd_replies_hold_the_upload(scan_on):
 
 
 def test_not_ok_error_reply_and_unterminated_reply_are_not_clean(scan_on):
-    # "ERROR: NOT OK" must NOT be accepted as success, and a reply missing its NUL terminator
-    # (cut off mid-verdict) is not a verdict at all
-    for bad in (b"ERROR: NOT OK\0", b"stream: OK"):
+    # "ERROR: NOT OK" must NOT be accepted as success, a reply missing its NUL terminator
+    # (cut off mid-verdict) is not a verdict at all, and "ERROR: OK"/"garbage: OK" are not
+    # whitelisted success replies
+    for bad in (b"ERROR: NOT OK\0", b"stream: OK", b"ERROR: OK\0", b"garbage: OK\0"):
         clamd = FakeClamd(scan_on, bad)
         c = client()
         r = _gen(c)
@@ -243,16 +245,83 @@ def test_slicing_stats_record_success_and_failure():
     assert after["last_error"] == "boom"
 
 
-def test_slicing_metrics_update_through_the_real_api():
-    """POST /api/slice really moves the counters (success and failure both counted)."""
-    from app.services import slicestats
+def test_slicing_metrics_count_success_and_failure_through_the_real_api(monkeypatch):
+    """One REAL successful slice and one REAL failure through POST /api/slice — both outcomes
+    asserted, no conditionals."""
+    from app.services import slicestats, slicer
+    from app.api import printing
+    if not slicer.status()["available"]:
+        pytest.skip("PrusaSlicer unavailable in this environment")
     c = client()
     bid = photo_build(c)
     before = slicestats.snapshot()
     r = c.post(f"/api/slice/{bid}", data={"layer_height": 0.2, "fill_density": 15})
+    assert r.status_code == 200 and (r.json().get("ok") or "download" in r.json()), r.text
+    mid = slicestats.snapshot()
+    assert mid["total"] == before["total"] + 1                        # the success is counted
+    assert mid["failures"] == before["failures"]
+
+    def boom(*a, **k):
+        raise RuntimeError("slicer exploded")
+    monkeypatch.setattr(printing, "_slice_inner", boom)               # inject a slice failure
+    with pytest.raises(RuntimeError):
+        c.post(f"/api/slice/{bid}", data={"layer_height": 0.2, "fill_density": 15})
     after = slicestats.snapshot()
-    assert after["total"] == before["total"] + 1                     # one slice attempt, counted
-    if r.status_code == 200 and (r.json().get("ok") or "gcode" in r.json()):
-        assert after["failures"] == before["failures"]               # success: no new failure
-    else:
-        assert after["failures"] == before["failures"] + 1           # refused/failed: counted as failure
+    assert after["total"] == mid["total"] + 1                         # the failure is counted
+    assert after["failures"] == mid["failures"] + 1
+
+
+def test_invalid_pending_ids_cannot_reach_the_filesystem(scan_on):
+    """Pending ids are validated at every service boundary: path tricks never reach a path
+    join or rmtree."""
+    c = client()
+    r = _gen(c)
+    pid = r.json()["pending_id"]
+    for bad in ("..", "../evil", "a" * 13, "x" * 11, "abc/def", "PASSWD"):
+        assert quarantine.discard_pending(bad, "test") is False
+        assert quarantine.pending_context(bad) is None
+        assert quarantine.pending_bytes(bad) is None
+        assert c.post(f"/api/uploads/resume/{bad}").status_code == 404
+        assert c.delete(f"/api/moderation/pending-uploads/{bad}",
+                        headers={"x-admin-token": "t0k"}).status_code == 404
+    # the real pending upload is untouched by all of those attempts
+    assert quarantine.pending_bytes(pid) == _png()
+
+
+def test_resume_failure_retains_the_pending_upload(monkeypatch, scan_on):
+    """If generation fails after a clean scan (history full, storage error), the pending upload
+    is RETAINED — the user can retry. It is consumed only on success or a validated rejection."""
+    c = client()
+    r = _gen(c, title="Retry me")          # scanner DOWN at upload: parked
+    pid = r.json()["pending_id"]
+    clamd = FakeClamd(scan_on, b"stream: OK\0")          # scanner is back, clean
+    # force every generate to fail: history full (limit 0 => nothing can be reserved)
+    monkeypatch.setattr(store, "limit", 0)
+    refused = c.post(f"/api/uploads/resume/{pid}")
+    assert refused.status_code == 409                                 # the pipeline refused to build
+    assert quarantine.pending_bytes(pid) == _png()                   # retained, not consumed
+    monkeypatch.setattr(store, "limit", 20)
+    out = c.post(f"/api/uploads/resume/{pid}")                       # retry: now it works
+    assert out.status_code == 200 and out.json()["title"] == "Retry me"
+    assert c.post(f"/api/uploads/resume/{pid}").status_code == 404   # consumed by the success
+    clamd.stop()
+
+
+def test_staged_context_replays_nondefault_fields(scan_on):
+    """The stored request context replays the EXACT original request: numeric, boolean and
+    mode-specific fields, not just the title."""
+    c = client()
+    r = _gen(c, title="Ctx test", width_mm=123.5, resolution=150, invert=True,
+             base_mm=4.5, relief_mm=2.5)    # scanner DOWN at upload: parked
+    assert r.status_code == 202
+    pid = r.json()["pending_id"]
+    clamd = FakeClamd(scan_on, b"stream: OK\0")          # scanner is back, clean
+    out = c.post(f"/api/uploads/resume/{pid}")
+    assert out.status_code == 200, out.text
+    params = out.json()["params"]
+    assert params["width_mm"] == 123.5
+    assert params["resolution"] == 150
+    assert params["invert"] is True
+    assert params["base_mm"] == 4.5
+    assert params["relief_mm"] == 2.5
+    clamd.stop()

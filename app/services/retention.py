@@ -106,9 +106,9 @@ def purge_expired(bs: BuildStore = _store, now: float | None = None) -> dict:
             if days is None:
                 out["kept_starred"] += 1
             elif _age_days(meta, now) > days:
-                bs.delete(d.name); out["expired"] += 1
                 from ..services import filestore
-                filestore.delete_build(d.name)      # object-storage copy too (best-effort)
+                filestore.delete_build(d.name)      # remote FIRST, durably recorded — raises => local survives
+                bs.delete(d.name); out["expired"] += 1
     if out["expired"] or out["unfinished"]:
         log.info("retention: removed %d expired and %d unfinished builds (%d starred kept)", out["expired"], out["unfinished"], out["kept_starred"])
     return out
@@ -131,9 +131,9 @@ def sweep_for_space(bs: BuildStore = _store, now: float | None = None) -> dict:
         for m in sorted(metas, key=lambda m: m["created"]):
             if free_bytes(bs.root) >= target:
                 break
-            bs.delete(m["id"]); out["swept"] += 1
             from ..services import filestore
-            filestore.delete_build(m["id"])       # object-storage copy too (best-effort)
+            filestore.delete_build(m["id"])        # remote FIRST, durably recorded — raises => local survives
+            bs.delete(m["id"]); out["swept"] += 1
     if out["swept"]:
         log.warning("disk low: removed %d oldest unstarred builds to make room", out["swept"])
     return out

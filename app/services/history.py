@@ -88,10 +88,12 @@ class BuildStore:
                 if not loose:
                     raise HistoryFull()
                 oldest = loose[0]
+                from ..services import filestore
+                # remote deletion FIRST and durably recorded — if the queue cannot be persisted
+                # this raises and the local row survives (never orphan remote copies)
+                filestore.delete_build(oldest["id"])
                 db.build_delete(oldest["id"])
                 self._purge_cached(oldest["id"])
-                from ..services import filestore
-                filestore.delete_build(oldest["id"])        # object-storage copy too (best-effort)
                 items = [m for m in items if m["id"] != oldest["id"]]
             return
         items = self.list(owner)
@@ -100,9 +102,9 @@ class BuildStore:
             if not loose:
                 raise HistoryFull()
             victim = loose[0]["id"]                                    # oldest un-starred build rolls off
-            self.delete(victim)
             from ..services import filestore
-            filestore.delete_build(victim)                             # object-storage copy too (best-effort)
+            filestore.delete_build(victim)                            # remote FIRST: raises => local survives
+            self.delete(victim)
             items = self.list(owner)
 
     def set_saved(self, bid: str):

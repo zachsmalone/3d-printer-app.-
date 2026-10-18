@@ -88,27 +88,38 @@ def _artifact_names() -> tuple[str, ...]:
 def delete_build(bid: str) -> None:
     """Remove a build's artifacts from object storage, DURABLY: the keys are recorded in
     DATA/pending_deletions.json BEFORE any local metadata is gone, and retried until they
-    succeed — a provider outage never silently orphans remote copies (local deletion is the
-    caller's job; this never raises)."""
+    succeed — a provider outage never silently orphans remote copies. Callers must remove
+    local state only AFTER this returns: it RAISES if the queue cannot be persisted (so a
+    crash between record and local removal can never orphan remote copies)."""
     if not enabled():
         return
     keys = [artifact_key(bid, n) for n in _artifact_names()]
-    try:
-        pending = _load_pending()
-    except RuntimeError as e:
-        # the safety record is corrupt: preserve it for manual recovery (never overwrite
-        # silently) — the new deletion is still recorded, or the outage would orphan it too
-        log.error("%s; preserved as pending_deletions.corrupt-*.json", e)
-        import time as _time
-        try:
-            _pending_path().rename(_pending_path().with_name(
-                f"pending_deletions.corrupt-{int(_time.time())}.json"))
-        except Exception:
-            pass
-        pending = {}
+    # the WHOLE load/modify/save sequence (including corruption handling) is inside the lock —
+    # a load outside it loses concurrent enqueues. Single-process deployment: the app runs one
+    # uvicorn worker (JSON-file storage is single-process by design); a module-level lock is
+    # therefore sufficient — if multi-worker is ever configured, this needs a file lock.
     with _PENDING_LOCK:
+        try:
+            pending = _load_pending()
+        except RuntimeError as e:
+            # the safety record is corrupt: preserve it for manual recovery. If preservation
+            # fails, REFUSE — overwriting would destroy the only recovery record.
+            log.error("%s; preserving as pending_deletions.corrupt-*.json", e)
+            import time as _time
+            try:
+                _pending_path().rename(_pending_path().with_name(
+                    f"pending_deletions.corrupt-{int(_time.time())}.json"))
+            except Exception as keep_err:
+                raise RuntimeError(
+                    f"pending_deletions.json corrupt AND unpreservable ({keep_err}) — "
+                    "refusing to record a deletion over the recovery record")
+            pending = {}
         pending[bid] = keys                   # recorded before we try
-        _save_pending(pending)
+        try:
+            _save_pending(pending)
+        except Exception as e:
+            raise RuntimeError(f"could not persist the pending-deletion record ({e}) — "
+                              "refusing to delete locally: remote copies would be orphaned")
     retry_pending(bids=[bid])
 
 
@@ -118,8 +129,8 @@ def retry_pending(bids: list[str] | None = None) -> int:
     A corrupt record RAISES (loudly) rather than reading as 'nothing pending'."""
     if not enabled():
         return 0
-    pending = _load_pending()
-    with _PENDING_LOCK:                         # serialize the whole load/modify/save sequence
+    with _PENDING_LOCK:                         # the whole load/modify/save sequence
+        pending = _load_pending()
         for bid in list(pending):
             if bids is not None and bid not in bids:
                 continue

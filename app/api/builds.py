@@ -167,9 +167,9 @@ def get_build(bid: str, actor: Actor = Depends(get_actor)):
 @router.delete("/builds/{bid}")
 def delete_build(bid: str, actor: Actor = Depends(get_actor)):
     meta_for(bid, actor, owner_only=True)
-    store.delete(bid)
     from ..services import filestore
-    filestore.delete_build(bid)               # object-storage copy too (best-effort)
+    filestore.delete_build(bid)               # remote FIRST, durably recorded — raises => local survives
+    store.delete(bid)
     return {"ok": True}
 
 
@@ -193,16 +193,18 @@ def resume_pending(pid: str, actor: Actor = Depends(get_actor)):
     if verdict != "clean":
         return JSONResponse(status_code=202, content={
             "status": "pending_scan", "pending_id": pid, "detail": quarantine.PENDING_MSG})
-    # clean: replay the exact original request through the normal pipeline (the gate re-runs)
+    # clean: replay the exact original request through the normal pipeline (the gate re-runs).
+    # The pending record is consumed ONLY on success or a validated rejection — if generation
+    # fails (history full, storage error), the upload is RETAINED and the user can retry.
     raw = quarantine.pending_bytes(pid)
     import io
-    from fastapi import UploadFile as _Up
     from starlette.datastructures import UploadFile as _SU
     up = _SU(file=io.BytesIO(raw), filename=ctx.get("filename") or "upload")
     form = ctx.get("form") or {}
-    try:
-        out = generate(actor=actor, file=up, **form)
-    finally:
+    out = generate(actor=actor, file=up, **form)
+    # consume the pending record ONLY when a build was really created — a 409 history-full
+    # (or any non-build response, or an exception) RETAINS the upload so the user can retry
+    if isinstance(out, dict) and out.get("id"):
         quarantine.discard_pending(pid, "resumed into a build")
     return out
 
@@ -214,9 +216,9 @@ def delete_oldest(actor: Actor = Depends(get_actor)):
                  if not (m.get("favorite") or m.get("saved"))]          # never a starred/saved build
         if not items:
             return {"ok": True, "deleted": None}
-        store.delete(items[0]["id"])
         from ..services import filestore
-        filestore.delete_build(items[0]["id"])       # object-storage copy too (best-effort)
+        filestore.delete_build(items[0]["id"])       # remote FIRST, durably recorded — raises => local survives
+        store.delete(items[0]["id"])
         return {"ok": True, "deleted": items[0]["id"]}
 
 
@@ -290,7 +292,8 @@ def generate(
         # in restricted pending storage; resume (/api/uploads/resume/<pid>) runs the normal
         # pipeline once a scan clears them.
         from ..services import quarantine
-        ctx = {k: locals()[k] for k in _GENERATE_FORM_FIELDS if k in locals()}
+        frame = dict(locals())          # snapshot BEFORE the comprehension (version-safe)
+        ctx = {k: frame[k] for k in _GENERATE_FORM_FIELDS if k in frame}
         pid = quarantine.stage_pending(actor.sid, data, ctx, file.filename or "upload")
         return JSONResponse(status_code=202, content={
             "status": "pending_scan", "pending_id": pid,

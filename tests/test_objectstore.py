@@ -295,3 +295,41 @@ def test_corrupt_pending_deletion_record_is_never_read_as_empty(s3, tmp_path, mo
     # and the corrupt original was preserved for manual recovery, not overwritten silently
     leftovers = list(p.parent.glob("pending_deletions.corrupt-*.json"))
     assert leftovers and b"this is not json" in leftovers[0].read_bytes()
+
+
+def test_concurrent_enqueues_all_survive_an_outage(s3, monkeypatch):
+    """Many threads enqueue deletions while the provider is down: every queued build must be
+    in the durable record afterwards (no lost updates from load/modify/save races)."""
+    import threading
+    from app.services import filestore, objectstore
+    def down(key):
+        raise RuntimeError("provider down")
+    monkeypatch.setattr(objectstore, "delete", down)
+    errs = []
+    def enqueue(i):
+        try:
+            filestore.delete_build(f"bid-{i}")
+        except Exception as e:
+            errs.append(e)
+    ts = [threading.Thread(target=enqueue, args=(i,)) for i in range(12)]
+    [t.start() for t in ts]; [t.join() for t in ts]
+    assert not errs, errs
+    rec = json.loads(filestore._pending_path().read_text())
+    assert {f"bid-{i}" for i in range(12)} <= set(rec)             # every enqueue survived
+
+
+def test_persist_failure_prevents_local_removal(s3, monkeypatch):
+    """If the pending-deletion queue cannot be persisted, the local build SURVIVES — the
+    failure propagates instead of orphaning remote copies."""
+    from app.services import filestore
+    from tests.b1 import client, photo_build
+    c = client()
+    bid = photo_build(c)
+    def no_save(d):
+        raise RuntimeError("disk full")
+    monkeypatch.setattr(filestore, "_save_pending", no_save)
+    with pytest.raises(RuntimeError):
+        c.delete(f"/api/builds/{bid}")
+    # the build is still there locally — the refusal worked
+    from app.services.history import store
+    assert store.get(bid) is not None

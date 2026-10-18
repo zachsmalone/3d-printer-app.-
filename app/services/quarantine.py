@@ -78,7 +78,15 @@ def stage_pending(sid: str, raw: bytes, ctx: dict, filename: str = "upload") -> 
     return pid
 
 
+def _valid_pid(pid: str) -> bool:
+    """Canonical pending-id check, applied at every service boundary: 12 hex/alnum chars.
+    Anything else (paths, '..', injections) is rejected before it reaches a path join."""
+    return isinstance(pid, str) and len(pid) == 12 and pid.isalnum()
+
+
 def pending_context(pid: str) -> dict | None:
+    if not _valid_pid(pid):
+        return None
     p = _pending_root() / pid
     try:
         return json.loads((p / "context.json").read_text())
@@ -87,6 +95,8 @@ def pending_context(pid: str) -> dict | None:
 
 
 def pending_bytes(pid: str) -> bytes | None:
+    if not _valid_pid(pid):
+        return None
     p = _pending_root() / pid / "original.bin"
     try:
         return p.read_bytes()
@@ -110,7 +120,11 @@ def scan_pending(pid: str) -> str:
 
 
 def discard_pending(pid: str, why: str) -> bool:
-    """Remove a pending upload (infected, admin decision, or consumed by a successful resume)."""
+    """Remove a pending upload (infected, admin decision, or consumed by a successful resume).
+    The id is validated FIRST: a bad id can never reach a path join or rmtree."""
+    if not _valid_pid(pid):
+        log.warning("refused to discard pending upload with invalid id %r", pid[:40])
+        return False
     p = _pending_root() / pid
     if not p.exists():
         return False

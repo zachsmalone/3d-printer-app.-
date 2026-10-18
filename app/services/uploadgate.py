@@ -106,7 +106,7 @@ def scan_bytes(data: bytes) -> tuple[bool, str, str]:
         body = reply[:-1].decode("utf-8", "replace").strip()
         if body.endswith(" FOUND"):
             return False, body[:-len(" FOUND")].strip(), "infected"
-        if body == "OK" or body.endswith(": OK"):                    # exactly a clean verdict
+        if body in ("OK", "stream: OK"):                     # EXACTLY the supported success replies
             return True, "", "clean"
         # empty / malformed / ERROR replies are NOT a clean verdict: hold the upload
         log.warning("clamd gave an unusable verdict (%r) — upload quarantined pending scan", body[:120])
