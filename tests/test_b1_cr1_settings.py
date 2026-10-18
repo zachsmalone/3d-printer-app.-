@@ -27,7 +27,7 @@ def test_default_mode_is_shared_without_env():
 
 def test_cr1_shared_mode_settings_and_send_locked(shared):
     anon, adult = client(), client(ADULT)
-    body = {"public_base_url": "https://evil.example", "printers": [{"name": "P", "type": "octoprint", "url": "http://10.0.0.5", "api_key": "k"}]}
+    body = {"public_base_url": "https://evil.example", "printers": [{"name": "P", "type": "octoprint", "url": "http://203.0.113.5", "api_key": "k"}]}   # public-looking: private ranges are refused in shared mode (SSRF guard)
     assert anon.put("/api/settings", json=body).status_code == 403          # (b) brand-new anonymous session
     assert adult.put("/api/settings", json=body).status_code == 403         # accounts cannot rewrite server-wide settings either
     assert anon.put("/api/settings", json=body, headers={"X-Admin-Token": "wrong"}).status_code == 403
@@ -35,7 +35,7 @@ def test_cr1_shared_mode_settings_and_send_locked(shared):
     # printer URLs are not shown to anonymous visitors, but are to admin
     pr = anon.get("/api/settings").json()["printers"][0]
     assert "url" not in pr and "api_key" not in pr
-    assert anon.get("/api/settings", headers=ADMIN).json()["printers"][0]["url"] == "http://10.0.0.5"
+    assert anon.get("/api/settings", headers=ADMIN).json()["printers"][0]["url"] == "http://203.0.113.5"
     pid = anon.get("/api/settings", headers=ADMIN).json()["printers"][0]["id"]
     # anonymous visitor cannot send either (no adult account / admin token)
     abid = photo_build(anon)

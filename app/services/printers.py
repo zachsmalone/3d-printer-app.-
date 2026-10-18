@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 import httpx
 
 from .. import config
+from . import netguard
 
 PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
 DEFAULT_BED = (250.0, 210.0)       # the generic bed used when no printer is chosen; ONE place, used by /api/slice and /api/send alike
@@ -79,6 +80,16 @@ def check_url(url: str) -> None:
             raise ValueError("This server does not allow printers on private or local networks. Use the slicer hand-off or download the G-code.")
 
 
+def shared_mode_denial(url: str) -> str | None:
+    """Shared mode only (ported from perplexity/ssrf-printer-guard): refuse printer addresses that resolve to the server's
+    own machine, cloud metadata or private LAN ranges (PHOTO3D_LAN_PRINTERS=1 re-allows the LAN ranges for self-hosters on
+    the printer's network; loopback and link-local stay blocked). Local mode is never restricted here. Checked when saving
+    AND before every request. Complements check_url(), which applies in every mode."""
+    if config.MODE != "shared":
+        return None
+    return netguard.shared_mode_denial(url, lan_ok=config.LAN_PRINTERS)
+
+
 def _client(p):
     return httpx.Client(base_url=p["url"].rstrip("/"), timeout=60,
                         headers={"X-Api-Key": p["api_key"]} if p.get("api_key") else {})
@@ -92,6 +103,9 @@ def send(printer: dict, gcode: "Path | None", name: str, start: bool) -> dict:
                            "Use 'Open in slicer' or download the G-code and send it manually."}
     if not printer.get("url"):
         return {"ok": False, "message": "printer URL is not configured"}
+    denial = shared_mode_denial(printer["url"])
+    if denial:
+        return {"ok": False, "message": denial}
     try:
         check_url(printer["url"])
     except ValueError as e:
@@ -138,6 +152,9 @@ def test(printer: dict) -> dict:
         return {"ok": False, "message": f"'{t}' is not implemented yet, so it cannot be tested.", "detail": {}}
     if not printer.get("url"):
         return {"ok": False, "message": "Add the printer's address first.", "detail": {}}
+    denial = shared_mode_denial(printer["url"])
+    if denial:
+        return {"ok": False, "message": denial, "detail": {}}
     try:
         check_url(printer["url"])
     except ValueError as e:

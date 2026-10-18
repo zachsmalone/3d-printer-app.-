@@ -9,7 +9,7 @@ import threading
 import uuid
 
 from .. import config
-from . import printers as printers_mod
+from . import netguard, printers as printers_mod
 from ..config import DATA
 
 FILE = DATA / "settings.json"
@@ -168,11 +168,13 @@ def save_from_client(incoming: dict) -> dict:
         q["id"] = pid
         if not q.get("api_key"):  # blank = keep stored key
             q["api_key"] = old.get(pid, {}).get("api_key", "")
-        if q.get("url") and q.get("type") in printers_mod.IMPLEMENTED and not str(q["url"]).lower().startswith(("http://", "https://")):
-            raise ValueError("Printer address must start with http:// or https://")
         if q.get("url") and q.get("type") in printers_mod.IMPLEMENTED:
+            q["url"] = netguard.parse_printer_url(q["url"])          # http(s) only, no credentials, valid port, sane length (every mode)
             if not printers_mod.direct_control_enabled():
                 raise ValueError(printers_mod.DIRECT_OFF_MESSAGE)
+            denial = printers_mod.shared_mode_denial(q["url"])        # shared mode: no loopback / metadata / private LAN (SSRF)
+            if denial:
+                raise ValueError(denial)
             printers_mod.check_url(q["url"])
         q["profile"] = q.get("profile") or ""
         if q["profile"] and q["profile"] not in printers_mod.PROFILES:

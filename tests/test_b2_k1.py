@@ -86,8 +86,12 @@ def test_test_route_refuses_suspended_visitors_and_unknown_ids(local):
 def test_shared_server_only_admin_can_test(monkeypatch):
     monkeypatch.setattr(config, "MODE", "shared")
     a = client(ADULT)
-    assert a.put("/api/settings", json={"printers": [{"name": "K1", "type": "moonraker", "url": "http://127.0.0.1:1"}]}, headers={"X-Admin-Token": "t0k"}).status_code == 200
+    # 127.0.0.1 is now refused in shared mode (SSRF guard); a public-looking address stands in, and the
+    # connection test is stubbed so this stays a permissions test, not a network test.
+    assert a.put("/api/settings", json={"printers": [{"name": "K1", "type": "moonraker", "url": "http://127.0.0.1:1"}]}, headers={"X-Admin-Token": "t0k"}).status_code == 400
+    assert a.put("/api/settings", json={"printers": [{"name": "K1", "type": "moonraker", "url": "http://203.0.113.5:1"}]}, headers={"X-Admin-Token": "t0k"}).status_code == 200
     pid = settings.load()["printers"][0]["id"]
+    monkeypatch.setattr(printers, "test", lambda pr: {"ok": False, "message": "stubbed", "detail": {}})
     assert a.post(f"/api/printers/{pid}/test").status_code == 403                       # an ordinary adult on a shared server may not make the server dial out
     assert a.post(f"/api/printers/{pid}/test", headers={"X-Admin-Token": "t0k"}).status_code == 200
     a.put("/api/settings", json={"printers": []}, headers={"X-Admin-Token": "t0k"})
