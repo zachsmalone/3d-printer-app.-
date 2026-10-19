@@ -35,3 +35,9 @@ def test_n2_fix_mesh_clears_stale_not_watertight_warning_and_it_comes_back_on_un
     p = c.post(f"/api/edit/{bid}/undo").json()                           # back to the open mesh: the warning is back, once
     p = c.get(f"/api/edit/{bid}").json()
     assert not p["analysis"]["watertight"] and len(_gate(p)) == 1 and "not watertight" in _gate(p)[0]
+
+
+def test_b13_edge_tap_shows_length_and_announces_it_in_a_real_browser():
+    from test_b4_ui import _run
+    out = _run("ui_cadws_edge_len.py")
+    assert "ALL PASS" in out

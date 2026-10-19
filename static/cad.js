@@ -532,6 +532,10 @@ function toggleMeasure(on = !S.measure) {
 $("#cwMeasure").onclick = () => toggleMeasure();
 let measLabel = null;
 function setMeasLabel(text, at) { measLabel = text ? { text, at } : null; }
+const onEdge = (e, h) => e && (!h || e.a.distanceTo(h.point) + e.b.distanceTo(h.point) - e.a.distanceTo(e.b) < 2);   // the tap is on this edge, not just near it on a face
+function showEdgeLen(e) {   // B13: a picked edge shows its length on the model and in the polite live hint
+  const t = `${fmt(e.a.distanceTo(e.b))} mm`; setMeasLabel(t, e.a.clone().add(e.b).multiplyScalar(0.5)); renderSkLabels(); return t;
+}
 
 /* ---------------------------------------------------------------- Sketch mode */
 const NAMED = { XY: [[0, 0, 0], [0, 0, 1], [1, 0, 0]], XZ: [[0, 0, 0], [0, -1, 0], [1, 0, 0]], YZ: [[0, 0, 0], [1, 0, 0], [0, 1, 0]] };
@@ -1033,7 +1037,7 @@ function showCtx(kind, at) {
   }
   bar.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if (b) ctxRun(b.dataset.c); });
   bar.querySelector("#ctxD").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") ctxRun(kind === "face" ? "pp" : "fi"); });
-  hint(kind === "face" ? "Face" : "Edge", kind === "face" ? "Drag the arrow or type a distance to push/pull; or sketch on it." : "Type a radius, then Fillet or Chamfer this edge (approximate).");
+  hint(kind === "face" ? "Face" : "Edge", kind === "face" ? "Drag the arrow or type a distance to push/pull; or sketch on it." : `${showEdgeLen(S.selEdges[0])} long. Type a radius, then Fillet or Chamfer this edge (approximate).`);
 }
 function facePreviewStart() {   // remember positions on the picked face's plane for a live preview
   const out = [], { point, normal } = S.selFace, tol = 1e-3 * Math.max(1, new THREE.Box3().setFromObject(world).getSize(new THREE.Vector3()).length());
@@ -1057,7 +1061,7 @@ async function ctxRun(c) {
   if (c === "fa") { S.selEdges = []; return setTool("fillet"); }
   if (c === "sc") return setTool("sculpt");
   if (c === "fi" || c === "ch") return addOp("round_edges", { style: c === "fi" ? "fillet" : "chamfer", radius: v || 1, body: e.body, edges: [[e.a.toArray(), e.b.toArray()]] });
-  if (c === "ms") { S.measPts = [e.a, e.b]; setMeasLabel(`${fmt(e.a.distanceTo(e.b))} mm`, e.a.clone().add(e.b).multiplyScalar(0.5)); drawSelection(); renderSkLabels(); }
+  if (c === "ms") { S.measPts = [e.a, e.b]; hint("Edge length", showEdgeLen(e)); drawSelection(); }
 }
 
 /* ---------------------------------------------------------------- stage pointer routing */
@@ -1078,18 +1082,18 @@ function modelTap(ev) {
   if (S.tool === "sculpt") return;
   if (!S.tool && !S.measure) {               // direct modelling: tap an edge or a face -> floating actions
     const e = pickEdge(ev), h = pickBody(ev);
-    if (e && (!h || e.a.distanceTo(h.point) + e.b.distanceTo(h.point) - e.a.distanceTo(e.b) < 2)) {
-      S.selEdges = [e]; S.selFace = null; S.selBody = e.body; drawSelection(); showCtx("edge", e.a.clone().add(e.b).multiplyScalar(0.5)); return;
+    if (onEdge(e, h)) {
+      S.selEdges = [e]; S.selFace = null; S.selBody = e.body; S.measPts = []; drawSelection(); showCtx("edge", e.a.clone().add(e.b).multiplyScalar(0.5)); return;
     }
-    if (h) { S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal }; S.selEdges = []; drawSelection(); showCtx("face", h.point); return; }
+    if (h) { S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal }; S.selEdges = []; setMeasLabel(null); renderSkLabels(); drawSelection(); showCtx("face", h.point); return; }
     hideCtx(); deselect(); return;
   }
   if (S.measure) {
     const e = pickEdge(ev), h = pickBody(ev);
-    if (h) { if (S.measPts.length >= 2) S.measPts = []; S.measPts.push(h.point); }
-    else if (e) { S.measPts = [e.a, e.b]; }
+    if (onEdge(e, h)) { S.measPts = [e.a, e.b]; }
+    else if (h) { if (S.measPts.length >= 2) S.measPts = []; S.measPts.push(h.point); }
     if (S.measPts.length === 2) { const [a, b] = S.measPts, d = a.distanceTo(b), dv = b.clone().sub(a);
-      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})`, a.clone().add(b).multiplyScalar(0.5)); }
+      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})`, a.clone().add(b).multiplyScalar(0.5)); hint("Measure", measLabel.text); }
     else setMeasLabel(null);
     drawSelection(); renderSkLabels(); return;
   }
