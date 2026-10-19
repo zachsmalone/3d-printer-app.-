@@ -184,7 +184,7 @@ def slice_model(
     from app.services import slicer as _sl, willprint
     stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
     try:
-        badge = willprint.check_file(work / "model.stl", prof.id, prof.nozzle, slices_ok=True)
+        badge = willprint.check_file(work / "model.stl", prof.id, prof.nozzle, slices_ok=True, filament_g=res.filament_grams)
     except Exception:
         badge = None
 

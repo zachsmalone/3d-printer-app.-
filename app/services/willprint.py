@@ -12,6 +12,8 @@ from app.services import print_setup as ps
 FIT_TOLERANCE_MM = 0.05
 THIN_SAMPLES = 1500
 THIN_FAIL_FRACTION = 0.05       # more than 5 % of the surface (by sample) thinner than one line width -> warning
+THIN_MIN_SPOTS = 2              # ... or this many sampled spots thinner than one line (same rule as /printcheck; QA B11)
+MIN_FILAMENT_G = 0.01           # a slice that uses less filament than this printed (almost) nothing
 
 
 def bed_fit(size, printer_id) -> dict:
@@ -54,29 +56,36 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     if len(ray_idx) == 0:
         return {"ok": True, "thin_fraction": 0.0, "min_mm": min_mm}
     d = np.linalg.norm(locs - origins[ray_idx], axis=1)
-    frac = float(np.count_nonzero(d < min_mm)) / n
-    return {"ok": frac <= THIN_FAIL_FRACTION, "thin_fraction": round(frac, 3), "min_mm": min_mm,
-            "thinnest_mm": round(float(d.min()), 2)}
+    thin_n = int(np.count_nonzero(d < min_mm))
+    frac = float(thin_n) / n
+    # QA B11: a few spots far below one line (0.06 mm on a 0.42 mm line) used to pass the 5 % rule while /printcheck
+    # flagged them; any couple of sampled spots under one line now counts, like printcheck's "some thin spots".
+    return {"ok": frac <= THIN_FAIL_FRACTION and thin_n < THIN_MIN_SPOTS, "thin_fraction": round(frac, 3), "thin_count": thin_n,
+            "min_mm": min_mm, "thinnest_mm": round(float(d.min()), 3)}
 
 
-def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, slice_message="") -> dict:
+def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, slice_message="", filament_g=None) -> dict:
     pid, n = ps.resolve(printer_id, nozzle)
     p = ps.printer_public(pid)
     size = tuple(float(v) for v in mesh.extents) if len(mesh.vertices) else (0.0, 0.0, 0.0)
     fit = bed_fit(size, pid)
     min_wall = ps.line_width(n) if n else 0.4      # resin: 0.4 mm is a common minimum wall
     thin = thin_walls(mesh, min_wall)
-    checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message}}
+    checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message, "filament_g": filament_g}}
     # B11: a part thinner than one line, or a speck only a few lines across, won't really print
     tiny = bool(size) and (min(size) < min_wall or max(size) < 5 * min_wall)
     if tiny:
         thin = {**thin, "ok": False, "note": f"The whole part is tiny for a {min_wall:g} mm line."}
         checks["thin_wall"] = thin
     states = [fit["ok"], thin["ok"] if not thin.get("skipped") else True, slices_ok]
+    # B11: a slice that used ~0 g of filament printed nothing, whatever the geometry checks say
+    empty = slices_ok is True and filament_g is not None and float(filament_g) < MIN_FILAMENT_G
     if fit["ok"] is False or slices_ok is False:
         verdict, label = "no", "Won't print as is"
     elif thin["ok"] is False:
         verdict, label = "maybe", "Might print: thin walls"
+    elif empty:
+        verdict, label = "maybe", "Might print: almost no filament"
     elif all(s is True for s in states):
         verdict, label = "yes", "Will print" + (" (thin-wall check skipped)" if thin.get("skipped") else "")
     else:
@@ -86,7 +95,12 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
         tips.append(f"It won't fit your bed. Scale it to about {fit['fit_scale_pct']}% to fit the {p['name']} "
                     f"({' x '.join(f'{b:g}' for b in fit['bed_mm'])} mm), use shrink-to-fit (\"Scale down to fit this printer\") when you slice, or cut it into pieces with Edit → Split.")
     if thin["ok"] is False:
-        tips.append(f"Some walls are thinner than one {min_wall:g} mm line. Try a smaller nozzle or thicken them.")
+        tips.append(f"Some walls are thinner than one {min_wall:g} mm line"
+                    + (f" (thinnest about {thin['thinnest_mm']:g} mm)" if (thin.get("thinnest_mm") or min_wall) < min_wall else "")
+                    + ". Try a smaller nozzle or thicken them.")
+    if empty:
+        tips.append(f"The slicer used almost no filament ({float(filament_g):.2f} g), so little or nothing would print. "
+                    f"The part may be too small or too thin for a {min_wall:g} mm line.")
     if slices_ok is False:
         tips.append(slice_message or "The slicer couldn't process it. Try Smart Fix first.")
     return {"verdict": verdict, "label": label, "printer_id": pid, "printer": p["name"], "nozzle": n, "checks": checks, "tips": tips}

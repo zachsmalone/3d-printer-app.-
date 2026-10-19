@@ -80,7 +80,7 @@ export function badgeHTML(r, { detail = false } = {}) {
   return `<div class="willbox"><p><b>Will it print?</b> ${pill} <span class="help">${esc(r.printer)}${r.nozzle ? ` · ${r.nozzle} mm nozzle` : ""}</span></p><ul class="checks">
     ${row(c.bed_fit.ok, c.bed_fit.ok ? `Fits the bed (${c.bed_fit.size_mm.join(" × ")} mm)` : `Won't fit your bed: ${c.bed_fit.size_mm.join(" × ")} mm on a ${c.bed_fit.bed_mm.join(" × ")} mm printer`)}
     ${row(c.slices.ok, c.slices.ok ? "Slices OK" : c.slices.ok === false ? "Slicing failed" : "Not sliced yet (press Slice)")}
-    ${row(c.thin_wall.ok, c.thin_wall.ok === false ? `Thin walls under ${c.thin_wall.min_mm} mm (${Math.round(c.thin_wall.thin_fraction * 100)}% of the surface)` : c.thin_wall.ok ? `No walls thinner than one ${c.thin_wall.min_mm} mm line` : "Wall check not available")}</ul>
+    ${row(c.thin_wall.ok, c.thin_wall.ok === false ? `Thin walls under ${c.thin_wall.min_mm} mm (${c.thin_wall.thinnest_mm < c.thin_wall.min_mm ? `thinnest ${c.thin_wall.thinnest_mm} mm, ` : ""}${Math.round(c.thin_wall.thin_fraction * 100)}% of the surface)` : c.thin_wall.ok ? `No walls thinner than one ${c.thin_wall.min_mm} mm line` : "Wall check not available")}</ul>
     ${(r.tips || []).map(t => `<p class="help">${esc(t)}</p>`).join("")}</div>`;
 }
 const q = (pref = P.pref) => `printer_id=${encodeURIComponent(pref.printer_id)}&nozzle=${pref.nozzle ?? ""}`;
