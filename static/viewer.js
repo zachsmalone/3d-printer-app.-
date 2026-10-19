@@ -66,11 +66,12 @@ export class Viewer {
     this.scene.background = on ? new THREE.Color(0x0b0d12) : null;
     for (const m of this.group.children) {
       if (!m.userData.lit) m.userData.lit = m.material;
-      if (!on) { m.material = m.userData.lit; continue; }
+      if (m.material !== m.userData.lit) m.material.dispose();          // drop the previous backlit material (colour change / off)
+      if (!on) { m.material = m.userData.lit; m.material.wireframe = this.wire; continue; }
       const pos = m.geometry.getAttribute("position");
       m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, light), 3));
       m.material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, wireframe: this.wire });
     }
   }
-  toggleWire() { this.wire = !this.wire; this.group.children.forEach(m => m.material.wireframe = this.wire); }
+  toggleWire() { this.wire = !this.wire; this.group.children.forEach(m => { m.material.wireframe = this.wire; if (m.userData.lit) m.userData.lit.wireframe = this.wire; }); }
 }

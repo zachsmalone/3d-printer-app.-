@@ -20,8 +20,19 @@ def _analyse(im: Image.Image):
     return dict(contrast=float(p99 - p1), noise=noise, colors=ncol)
 
 
-def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standard"):
+# Lithophane starting points per printer type, indexed by preset (thin, standard, thick).
+# Resin cures in ~0.05 mm layers with a fine XY pixel, so walls can be thinner and detail finer.
+# These are starting suggestions only: real light transmission varies a lot by filament / resin brand and colour.
+LITHO_MATERIALS = {
+    "filament": dict(thick=[(0.6, 2.4), (0.8, 3.2), (1.0, 4.0)], pitch=0.35, nozzle="matched to a 0.4 mm nozzle"),
+    "resin": dict(thick=[(0.5, 2.5), (0.5, 2.8), (0.6, 3.0)], pitch=0.2, nozzle="resin printers resolve finer detail"),
+}
+
+
+def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standard", material: str = "filament"):
     preset = preset if preset in PRESETS else "standard"
+    material = material if material in LITHO_MATERIALS else "filament"
+    mat = LITHO_MATERIALS[material]
     k = PRESETS.index(preset)
     a = _analyse(im)
     notes, P = [], {"width_mm": float(width_mm)}
@@ -30,13 +41,13 @@ def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standar
         notes.append({"label": label, "value": str(value), "why": why})
 
     note("Size", f"{width_mm:g} mm wide", "from your size choice")
-    pitch_target = {"lithophane": 0.35, "relief": 0.5, "popart": 0.8}[mode]
+    pitch_target = {"lithophane": mat["pitch"], "relief": 0.5, "popart": 0.8}[mode]
     res = int(np.clip(round(width_mm / pitch_target), 100, 500))
     if res > im.width:
         res = max(100, im.width)
         why = "limited by your photo's pixel width (no point upsampling)"
     else:
-        why = f"~{pitch_target} mm per pixel, matched to a 0.4 mm nozzle"
+        why = f"~{pitch_target} mm per pixel, " + (mat["nozzle"] if mode == "lithophane" else "matched to a 0.4 mm nozzle")
     P["resolution"] = res
     note("Detail", f"{res} px across", why)
 
@@ -52,7 +63,9 @@ def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standar
     P["invert"] = False
 
     if mode == "lithophane":
-        tmin, tmax = [(0.6, 2.4), (0.8, 3.2), (1.0, 4.0)][k]
+        tmin, tmax = mat["thick"][k]
+        if material == "resin":
+            note("Printer type", "Resin", "thinner walls and finer detail; a starting suggestion, test-print a strip first")
         P.update(min_thickness=tmin, max_thickness=tmax, border_mm=3.0 if width_mm >= 60 else 2.0)
         note("Thickness", f"{tmin}-{tmax} mm", f"'{preset}' preset: {tmin} mm lets the most light through, "
              f"{tmax} mm is the darkest shade")

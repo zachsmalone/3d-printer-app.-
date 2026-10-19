@@ -104,7 +104,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
 
 
 def disk_guard():
@@ -247,6 +247,7 @@ def generate(
     min_thickness: float = Form(0.8),
     max_thickness: float = Form(3.0),
     border_mm: float = Form(3.0),
+    material: str = Form("filament"),       # lithophane printer type: filament | resin (beginner defaults only)
     shape: str = Form("rect"),               # lithophane outline: rect | heart | circle | star | square | hexagon | diamond | globe | nightlight | cup
     diameter_mm: float = Form(40.0),         # curved shapes: globe diameter / light diameter the night-light slips over
     height_mm: float = Form(60.0),           # curved shapes: height
@@ -318,6 +319,8 @@ def generate(
 
     from ..core import litho_shapes
     if mode == "lithophane":
+        if material not in autotune.LITHO_MATERIALS:
+            raise HTTPException(400, "material must be filament or resin")
         if shape not in litho_shapes.SHAPES:
             raise HTTPException(400, "shape must be one of " + " | ".join(litho_shapes.SHAPES))
         if shape in litho_shapes.CURVED_SHAPES and not (10 <= diameter_mm <= 200 and 10 <= height_mm <= 240):
@@ -339,7 +342,7 @@ def generate(
             return full_response(actor)
         auto_notes = []
         if beginner:
-            params, auto_notes = autotune.autotune(im, mode, width_mm, preset)
+            params, auto_notes = autotune.autotune(im, mode, width_mm, preset, material if mode == "lithophane" else "filament")
         else:
             params = dict(width_mm=width_mm, resolution=int(np.clip(resolution, 16, geometry.MAX_RES)),
                           smooth=smooth, gamma=gamma, auto_contrast=auto_contrast, invert=invert)

@@ -64,3 +64,31 @@ def test_light_toggle_is_labelled_and_accessible():
     assert "Preview estimate" in html and 'for="vLightColor"' in html
     for c in ("warm", "cool", "white"):
         assert f'value="{c}"' in html
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_js_curved_shapes_and_light_colours():
+    js = (ROOT / "static" / "lithlight.js").as_uri()
+    code = (f"import {{ wallThickness, backlitColors, LIGHTS }} from '{js}';"
+            "const P = []; for (const r of [20, 22.5]) for (const z of [0, 10, 20, 30]) for (let a = 0; a < 36; a++)"
+            " P.push(r * Math.cos(a / 36 * 2 * Math.PI), r * Math.sin(a / 36 * 2 * Math.PI), z);"
+            "const pos = new Float32Array(P), t = Array.from(wallThickness(pos, 'cup')), n = Array.from(wallThickness(pos, 'nightlight'));"
+            "const c = {}; for (const l of ['warm', 'cool', 'white', 'bogus']) c[l] = Array.from(backlitColors(pos, 'cup', l).slice(0, 3));"
+            "console.log(JSON.stringify({t, n, c, L: LIGHTS}));")
+    out = json.loads(subprocess.run(["node", "--input-type=module", "-e", code], capture_output=True, text=True, check=True).stdout)
+    assert max(out["t"][:144]) == pytest.approx(0, abs=1e-5) and out["t"][144:] == pytest.approx([2.5] * 144, abs=1e-4)
+    assert out["n"] == pytest.approx(out["t"], abs=1e-6)
+    assert out["c"]["warm"] == pytest.approx(out["L"]["warm"]) and out["c"]["cool"] == pytest.approx(out["L"]["cool"])
+    assert out["c"]["bogus"] == pytest.approx([1, 1, 1])                       # unknown colour falls back to white
+    assert all(0 <= x <= 1 for v in out["c"].values() for x in v)
+
+
+def test_viewer_backlight_restores_material_and_keeps_wireframe_in_step():
+    v = (ROOT / "static" / "viewer.js").read_text()
+    body = v[v.index("setBacklight(on"):v.index("toggleWire()")]
+    assert "m.userData.lit" in body and ".dispose()" in body and "this.wire" in body
+    tw = v[v.index("toggleWire()"):]
+    assert "userData.lit.wireframe" in tw[:300]
+    app = (ROOT / "static" / "app.js").read_text()
+    assert "S.lightOn = false; syncLight();" in app                            # new build starts with light off
+    assert 'S.current?.mode === "lithophane"' in app and "litShapeOf(S.current)" in app

@@ -152,6 +152,9 @@
           <p class="help" id="traceStatus" aria-live="polite"></p></div>
       </div>
 
+      <div class="field" id="lithMatBox"><label for="lithMaterial">Printer type</label>
+        <select id="lithMaterial"><option value="filament">Filament (FDM)</option><option value="resin">Resin (SLA / MSLA)</option></select>
+        <p class="help" id="lithMatHelp">Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first.</p></div>
       <div id="beginnerOpts">
         <fieldset class="field seg wide" id="presetSeg"><legend>Thickness</legend>
           <label data-preset="thin"><input type="radio" name="preset" value="thin">Thin</label><label data-preset="standard"><input type="radio" name="preset" value="standard" checked>Standard</label><label data-preset="thick"><input type="radio" name="preset" value="thick">Thick</label>
@@ -206,7 +209,7 @@
         <button class="btn small ghost" id="vWire">▦ Wireframe</button>
         <span id="litLightBox" hidden><button class="btn small" id="vLight" type="button" aria-pressed="false" title="Show it as if a light is behind it">💡 Light on</button>
         <label for="vLightColor" class="sr-only">Light colour</label><select id="vLightColor" class="small"><option value="warm">Warm light</option><option value="cool">Cool light</option><option value="white">White light</option></select>
-        <span class="pill" id="vLightNote" hidden title="Brightness from wall thickness: thin glows, thick stays dark. Real filament varies.">Preview estimate</span></span>
+        <span class="pill" id="vLightNote" hidden title="Brightness from wall thickness: thin glows, thick stays dark. Real filament and resin vary.">Preview estimate</span></span>
     </div>
 
     <p class="touch-hint" id="touchHint">Drag the model to turn it. To scroll the page, swipe on the thin edge strips beside it.</p>

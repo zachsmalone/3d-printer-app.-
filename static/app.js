@@ -92,6 +92,7 @@ function applyMode() {
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   applyShape();
+  $("#lithMatBox").hidden = S.mode !== "lithophane";
   const tr = S.mode === "trace2d";               // 'Logo & Drawing to 3D' has its own settings panel at both levels
   $("#traceOpts").hidden = !tr;
   $("#beginnerOpts").hidden = tr || isExpert(); $("#expertOpts").hidden = tr || !isExpert();
@@ -186,6 +187,7 @@ function formData(autoDelete) {
   fd.append("beginner", !isExpert()); fd.append("preset", S.preset);
   fd.append("width_mm", $("#width_mm").value);
   if (S.mode === "lithophane") {
+    fd.append("material", $("#lithMaterial").value);
     fd.append("shape", litShape());
     if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
     if (!$("#hangOpts").hidden) {
@@ -290,6 +292,16 @@ $("#vReset").onclick = () => viewer?.reset();
 $("#vLeft").onclick = () => viewer?.turn(-30);
 $("#vRight").onclick = () => viewer?.turn(30);
 $("#vWire").onclick = () => viewer?.toggleWire();
+/* Lithophane printer type: Resin = thinner walls + finer detail. Starting suggestions (keep in step with app/core/autotune.py LITHO_MATERIALS, standard preset). */
+const LITH_MAT = {
+  filament: { min_thickness: 0.8, max_thickness: 3.0, resolution: 200, help: "Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first." },
+  resin: { min_thickness: 0.5, max_thickness: 2.8, resolution: 400, help: "Resin: thinner 0.5–2.8 mm walls and finer detail. Starting suggestions; resins vary, so test a small strip first." },
+};
+$("#lithMaterial").onchange = e => {
+  const d = LITH_MAT[e.target.value] || LITH_MAT.filament;
+  $("#lithMatHelp").textContent = d.help;
+  for (const k of ["min_thickness", "max_thickness", "resolution"]) { const el = $(`#expertOpts [name="${k}"]`); if (el) el.value = d[k]; }
+};
 /* "Light on": backlit lithophane preview estimate (thin = bright, thick = dark) */
 const litShapeOf = r => r?.info?.shape || r?.params?.shape || "rect";
 function syncLight() {
