@@ -552,8 +552,21 @@ NAMED_PLANES = {"XY": ([0, 0, 0], [0, 0, 1], [1, 0, 0]), "XZ": ([0, 0, 0], [0, -
                 "YZ": ([0, 0, 0], [1, 0, 0], [0, 1, 0])}
 
 
-def plane(p) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """(origin, xdir, ydir, normal) from "XY"/"XZ"/"YZ" or {origin, normal, xdir?}."""
+def plane(p, _depth: int = 0) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """(origin, xdir, ydir, normal) from "XY"/"XZ"/"YZ", {origin, normal, xdir?}, or a construction plane:
+    {"offset": {"base": <plane>, "distance": d}} or {"mid": [<plane>, <plane>]} (the two must be parallel)."""
+    if isinstance(p, dict) and ("offset" in p or "mid" in p):
+        if _depth >= 3:
+            raise SketchError("Construction planes nest too deep.")
+        if "offset" in p:
+            spec = p["offset"]
+            if not isinstance(spec, dict):
+                raise SketchError("offset plane needs {base, distance}.")
+            return offset_plane(spec.get("base", "XY"), spec.get("distance", 0), _depth + 1)
+        pair = p["mid"]
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            raise SketchError("midplane needs two planes.")
+        return mid_plane(pair[0], pair[1], _depth + 1)
     if isinstance(p, str):
         if p not in NAMED_PLANES:
             raise SketchError("plane must be XY, XZ, YZ or {origin, normal}.")
@@ -576,3 +589,20 @@ def plane(p) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     xd = np.array(xd, float); xd = xd - n * (xd @ n); xd /= np.linalg.norm(xd)
     yd = np.cross(n, xd)
     return o, xd, yd, n
+
+
+def offset_plane(base, distance, _depth: int = 0):
+    """The base plane moved `distance` mm along its normal (same in-plane axes)."""
+    d = _f(distance, "offset distance")
+    o, xd, yd, n = plane(base, _depth)
+    return o + n * d, xd, yd, n
+
+
+def mid_plane(a, b, _depth: int = 0):
+    """The plane halfway between two parallel planes; keeps a's normal and axes."""
+    oa, xa, ya, na = plane(a, _depth)
+    ob, _, _, nb = plane(b, _depth)
+    if abs(float(na @ nb)) < 0.999:
+        raise SketchError("Midplane needs two parallel planes or faces.")
+    gap = float((ob - oa) @ na)
+    return oa + na * (gap / 2), xa, ya, na

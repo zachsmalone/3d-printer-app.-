@@ -534,7 +534,12 @@ def clean_params(op: str, p: dict) -> dict:
             raise OpError(str(e) or "Bad plane.")
         if not isinstance(out["plane"], str):
             r = lambda v: [round(float(x), 6) for x in v]
+            kind = "offset" if "offset" in out["plane"] else "midplane" if "mid" in out["plane"] else None
+            if kind is None and out["plane"].get("construct") in ("offset", "midplane"):
+                kind = out["plane"]["construct"]
             out["plane"] = {"origin": r(o), "normal": r(n), "xdir": r(xd)}
+            if kind:
+                out["plane"]["construct"] = kind   # label only (fixed strings), shown in History
     if "sketch" in out:
         try:
             out["sketch"] = sk.check(out["sketch"])

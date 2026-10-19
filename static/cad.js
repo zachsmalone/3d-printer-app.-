@@ -3,6 +3,7 @@
    solver (app/core/sketch.py). Icons are ZEIM's own inline SVG. */
 import * as THREE from "three";
 import { OrbitControls } from "/static/vendor/OrbitControls.js";
+import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/cad-planes.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -59,7 +60,15 @@ const S = {
 };
 const msg = (t, ok) => { const m = $("#cwMsg"); m.textContent = t || ""; m.style.color = ok ? "var(--ok)" : ""; };
 const busy = on => { $("#cwBusy").hidden = !on; };
-const hint = (t, s) => { $("#cwHintT").textContent = t; $("#cwHintS").textContent = s; };
+/* Coach hints: one compact pill (tap to expand). "Hints off" (toolbar chip, remembered per browser) hides every hint overlay. */
+const LS = (() => { try { return localStorage; } catch { return null; } })();
+let HINTS_ON = hintsOn(LS);
+const hint = (t, s) => { $("#cwHintT").textContent = t; $("#cwHintS").textContent = s; $("#cwHint").classList.remove("open"); };
+function emptyHint() { $("#cwEmpty").hidden = !HINTS_ON || !!(S.scene?.bodies?.length) || S.mode === "sketch"; }
+function applyHints() {
+  $("#cwHint").hidden = !HINTS_ON; emptyHint();
+  const b = $("#cwHints"); b.setAttribute("aria-pressed", HINTS_ON); b.textContent = HINTS_ON ? "Hints on" : "Hints off";
+}
 
 /* ---------------------------------------------------------------- three.js stage */
 const stage = $("#cwStage");
@@ -121,7 +130,7 @@ function buildWorld(keepCam) {
     const grp = new THREE.Group(); grp.add(mesh, lines); grp.userData.body = b.index; grp.visible = !S.hidden.has(b.index);
     world.add(grp);
   }
-  $("#cwEmpty").hidden = !!(S.scene?.bodies?.length) || S.mode === "sketch";
+  emptyHint();
   if (!keepCam) fit();
   drawSelection();
 }
@@ -297,10 +306,28 @@ function setTool(id) {
 }
 const TOOL_PANELS = {
   sketch() {
-    const face = S.selFace;
+    const face = S.selFace, prev = S.prevFace;
+    const pick = v => v === "face" ? planeFromFace(face) : v === "face2" ? planeFromFace(prev) : v;
+    const bases = [...(face ? [["face", "Picked face"]] : []), ["XY", "XY (top)"], ["XZ", "XZ (front)"], ["YZ", "YZ (side)"]];
+    const others = [...(prev ? [["face2", "Previous face"]] : []), ...bases];
     panel("New sketch", `<p class="help">${face ? "Sketch on the face you tapped, or choose a main plane:" : "Choose a plane (or Cancel, tap a flat face, then Sketch again):"}</p>
-      ${seg("tPlane", [...(face ? [["face", "Picked face"]] : []), ["XY", "XY (top)"], ["XZ", "XZ (front)"], ["YZ", "YZ (side)"]], face ? "face" : "XY")}`,
-      () => { const v = segVal("tPlane"); startSketch(v === "face" ? planeFromFace(face) : v); }, "Start sketch");
+      ${seg("tPlane", bases, face ? "face" : "XY")}
+      <div class="f"><label>Construction plane</label>${seg("tCons", [["none", "None"], ["offset", "Offset"], ["mid", "Midplane"]], "none")}</div>
+      <div class="f" id="tOffRow" hidden><label for="tOff">Offset distance (mm, − = other side)</label>${num("tOff", 10)}</div>
+      <div class="f" id="tMidRow" hidden><label>Midway to (must be parallel)</label>${seg("tPlane2", others, prev ? "face2" : face ? "XY" : "XY")}</div>`,
+      () => {
+        const base = pick(segVal("tPlane")), c = segVal("tCons");
+        try {
+          if (c === "offset") return startSketch(offsetPlane(base, val("tOff")));
+          if (c === "mid") {
+            const other = pick(segVal("tPlane2"));
+            if (!parallel(base, other)) return msg("Midplane needs two parallel planes or faces (e.g. the two sides of a block).");
+            return startSketch(midPlane(base, other));
+          }
+        } catch (e) { return msg(e.message); }
+        startSketch(base);
+      }, "Start sketch");
+    $("#tCons").addEventListener("change", () => { const c = segVal("tCons"); $("#tOffRow").hidden = c !== "offset"; $("#tMidRow").hidden = c !== "mid"; });
   },
   extrude() { extrudePanel("extrude"); }, revolve() { extrudePanel("revolve"); },
   boolean() {
@@ -454,7 +481,7 @@ function renderHist() {
     if (open) {
       const fields = Object.entries(p).filter(([k]) => !PARAM_SKIP.has(k)).map(([k, v]) => paramField(k, v, o.i)).join("");
       const sk = p.sketch ? `<div class="kv"><span>Profile</span><b>${(p.sketch.entities || []).length} curves${p.picks?.length ? ` · ${p.picks.length} picked region(s)` : ""}</b></div>
-        <div class="kv"><span>Plane</span><b>${T(typeof p.plane === "string" ? p.plane : "face")}</b></div>` : "";
+        <div class="kv"><span>Plane</span><b>${T(typeof p.plane === "string" ? p.plane : p.plane?.construct === "midplane" ? "midplane" : p.plane?.construct === "offset" ? "offset plane" : "face")}</b></div>` : "";
       body = `<div class="hbody">${sk}${fields || (o.editable ? "" : `<p class="help">This step can't be edited here.</p>`)}
         <div class="hbtns">${o.editable ? `<button class="primary" data-act="save" data-i="${o.i}">Update</button>` : ""}
         ${p.sketch && o.editable ? `<button data-act="sketch" data-i="${o.i}">Edit sketch</button>` : ""}
@@ -493,7 +520,7 @@ $("#cwHist").addEventListener("dblclick", e => { const o = e.target.closest("[da
 function renderItems() {
   const box = $("#cwItems"), bs = S.scene?.bodies || [];
   const eye = (on, lbl, attr) => `<button class="cw-eye" ${attr} aria-pressed="${on}" aria-label="${on ? "Hide" : "Show"} ${esc(lbl)}">${on ? IC.eye : IC.eyeoff}</button>`;
-  const sketches = (S.scene?.ops || []).filter(o => o.params?.sketch).map(o => `<div class="cw-item"><span class="nm">Sketch of step ${o.i}<br><small>${T(typeof o.params.plane === "string" ? o.params.plane + " plane" : "on a face")} · ${(o.params.sketch.entities || []).length} curves</small></span><button class="cw-eye" data-skedit="${o.i}" aria-label="Edit the sketch of step ${o.i}">✎</button></div>`).join("");
+  const sketches = (S.scene?.ops || []).filter(o => o.params?.sketch).map(o => `<div class="cw-item"><span class="nm">Sketch of step ${o.i}<br><small>${T(typeof o.params.plane === "string" ? o.params.plane + " plane" : o.params.plane?.construct === "midplane" ? "on a midplane" : o.params.plane?.construct === "offset" ? "on an offset plane" : "on a face")} · ${(o.params.sketch.entities || []).length} curves</small></span><button class="cw-eye" data-skedit="${o.i}" aria-label="Edit the sketch of step ${o.i}">✎</button></div>`).join("");
   box.innerHTML = `<h3>Bodies</h3>${bs.length ? bs.map(b => `<div class="cw-item ${b.index === S.selBody ? "sel" : ""}" data-body="${b.index}"><span class="sw" style="background:${(S.appearance[b.index] || {}).color || PALETTE[b.index % PALETTE.length]}"></span>
       <span class="nm">${T(b.name)}<br><small>${b.size.map(fmt).join(" × ")} mm</small></span>${eye(!S.hidden.has(b.index), b.name, `data-eye="${b.index}"`)}</div>`).join("") : `<p class="help">None yet.</p>`}
     <h3>Sketches</h3>${sketches || `<p class="help">None yet.</p>`}
@@ -1101,6 +1128,7 @@ function modelTap(ev) {
   if (S.tool === "fillet") { const e = pickEdge(ev); if (e) { const k = S.selEdges.findIndex(x => x.a.equals(e.a) && x.b.equals(e.b)); k >= 0 ? S.selEdges.splice(k, 1) : S.selEdges.push(e); const el = $("#tEdges"); if (el) el.firstChild.textContent = `${S.selEdges.length || "No"} edge(s) picked. `; drawSelection(); return; } }
   const h = pickBody(ev);
   if (!h) { if (!S.tool) deselect(); return; }
+  if (S.selFace && !S.selFace.point.equals(h.point)) S.prevFace = S.selFace;
   S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal };
   hint("Selected", `Body ${h.body + 1} and a face. Sketch (K) draws on this face; Face offset (O) moves it.`);
   drawSelection();
@@ -1212,7 +1240,9 @@ $("#cwFromBuild").onclick = async e => {
 };
 
 /* ---------------------------------------------------------------- start */
-renderRail(); hint(...HINTS.null); loop();
+$("#cwHints").onclick = () => { HINTS_ON = setHintsOn(LS, !HINTS_ON); applyHints(); };
+$("#cwHint").onclick = () => $("#cwHint").classList.toggle("open");
+renderRail(); hint(...HINTS.null); applyHints(); loop();
 /* Never silently drop a project (QA B4): if it exists but can't be shown here (e.g. too detailed),
    keep it and offer Undo / the editor instead of an empty workspace. */
 load().catch(e => {
