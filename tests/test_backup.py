@@ -244,7 +244,11 @@ def test_age_invocation_failure_leaves_nothing(tmp_path, monkeypatch):
     from scripts import backup as B
     data = tmp_path / "data"; data.mkdir()
     (data / "users.json").write_text("{}")
-    recipient, _ = _age_keypair(tmp_path)
+    # Popen is replaced below, so no real age is needed: use a real key when age-keygen exists, else a placeholder
+    # recipient, and report age as present so the Popen failure path (not the "age missing" path) is what runs.
+    import shutil as _sh
+    recipient = _age_keypair(tmp_path)[0] if _sh.which("age-keygen") else "age1placeholderrecipientforafailedinvocationtest"
+    monkeypatch.setattr(B.shutil, "which", lambda n: "/usr/bin/" + n)
 
     def boom(*a, **k):
         raise OSError("cannot start process")
