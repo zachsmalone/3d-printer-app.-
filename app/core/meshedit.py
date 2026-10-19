@@ -133,16 +133,15 @@ def analyze(m: trimesh.Trimesh) -> dict:
             "components": comps, "internal_voids": voids}
 
 
-def fill_boundary_loops(m: trimesh.Trimesh, max_loop=20000) -> int:
-    """Close open boundary loops with a centroid fan (trimesh.fill_holes only handles tiny holes).
-    Returns the number of loops closed. Good for flat/gently curved holes; very concave holes may look rough."""
+def _boundary_cycles(m: trimesh.Trimesh) -> list:
+    """Directed open-boundary loops (vertex index lists, in the winding of the faces next to them)."""
     f = m.faces
     de = np.vstack([f[:, [0, 1]], f[:, [1, 2]], f[:, [2, 0]]])
     key = np.sort(de, axis=1)
     _, inv, cnt = np.unique(key, axis=0, return_inverse=True, return_counts=True)
     bnd = de[cnt[inv.reshape(-1)] == 1]
     if len(bnd) == 0:
-        return 0
+        return []
     rem: dict = {}
     for a_, b_ in bnd:
         rem.setdefault(int(a_), []).append(int(b_))
@@ -168,9 +167,15 @@ def fill_boundary_loops(m: trimesh.Trimesh, max_loop=20000) -> int:
             if not outs:
                 break
             cur = outs.pop()
+    return cycles
+
+
+def fill_boundary_loops(m: trimesh.Trimesh, max_loop=20000) -> int:
+    """Close open boundary loops with a centroid fan (trimesh.fill_holes only handles tiny holes).
+    Returns the number of loops closed. Good for flat/gently curved holes; very concave holes may look rough."""
     new_faces, new_verts, loops = [], [], 0
     base = len(m.vertices)
-    for loop in cycles:
+    for loop in _boundary_cycles(m):
         if len(loop) > max_loop:
             continue
         c = m.vertices[loop].mean(0)
@@ -183,6 +188,69 @@ def fill_boundary_loops(m: trimesh.Trimesh, max_loop=20000) -> int:
         m.vertices = np.vstack([m.vertices, np.array(new_verts)])
         m.faces = np.vstack([m.faces, np.array(new_faces, dtype=np.int64)])
     return loops
+
+
+MAX_PATCH_LOOP = 150
+
+
+def _min_area_patch(v, loop):
+    """Triangulate one boundary loop with the smallest total area (dynamic programming over the loop, O(n³)).
+    On a bent hole (e.g. across a cube edge) this follows the surface instead of cutting a corner off."""
+    n = len(loop)
+    P = v[loop]
+    W = np.zeros((n, n)); K = np.zeros((n, n), dtype=np.int64)
+    for gap in range(2, n):
+        for i in range(n - gap):
+            j = i + gap
+            k = np.arange(i + 1, j)
+            a = 0.5 * np.linalg.norm(np.cross(P[k] - P[i], P[j] - P[i]), axis=1)
+            c = W[i, k] + W[k, j] + a
+            b = int(np.argmin(c)); W[i, j] = c[b]; K[i, j] = k[b]
+    tris, todo = [], [(0, n - 1)]
+    while todo:
+        i, j = todo.pop()
+        if j - i < 2:
+            continue
+        k = K[i, j]
+        tris.append([loop[j], loop[k], loop[i]])         # reversed: matches the faces around the hole
+        todo += [(i, k), (k, j)]
+    return tris
+
+
+def _tet_volume(v, faces) -> float:
+    t = v[np.asarray(faces)]
+    return float(np.einsum("ij,ij->i", t[:, 0], np.cross(t[:, 1], t[:, 2])).sum() / 6.0)
+
+
+def fill_nonplanar_loops(m: trimesh.Trimesh) -> tuple[int, int, float]:
+    """QA B7: close the non-flat boundary loops with a minimum-area patch (trimesh's fill_holes picks an arbitrary
+    diagonal and can cut a wedge out). Returns (non-flat loops, loops filled here, volume spread) where the spread
+    is how much the volume would differ with a centroid-fan patch instead, i.e. how ambiguous the fill is."""
+    tol = 1e-3 * float(max(m.extents.max(), 1e-9)) if len(m.vertices) else 0.0
+    v = np.asarray(m.vertices, float)
+    found, done, spread, new_faces, edges = 0, 0, 0.0, [], None
+    for loop in _boundary_cycles(m):
+        pts = v[loop]
+        if len(loop) < 4:
+            continue
+        c = pts - pts.mean(axis=0)
+        if np.abs(c @ np.linalg.svd(c, full_matrices=False)[2][-1]).max() <= tol:
+            continue
+        found += 1
+        if len(loop) > MAX_PATCH_LOOP:
+            continue
+        tris = _min_area_patch(v, loop)
+        if edges is None:
+            edges = {tuple(e) for e in m.edges_sorted.tolist()}
+        if any(tuple(sorted(e)) in edges for t in tris for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0]))
+               if abs(loop.index(e[0]) - loop.index(e[1])) not in (1, len(loop) - 1)):
+            continue                                      # a diagonal is already an edge: leave it to the old fill
+        fan = [[loop[(i + 1) % len(loop)], a_, len(v)] for i, a_ in enumerate(loop)]
+        spread += abs(_tet_volume(v, tris) - _tet_volume(np.vstack([v, pts.mean(axis=0)]), fan))
+        new_faces += tris; done += 1
+    if new_faces:
+        m.faces = np.vstack([m.faces, np.array(new_faces, dtype=np.int64)])
+    return found, done, spread
 
 
 # ------------------------------------------------------------------ transforms
@@ -259,11 +327,14 @@ def op_repair(m, p):
         trimesh.repair.fix_inversion(m)
         trimesh.repair.fix_normals(m, multibody=True)
         steps.append("made face directions consistent / outward")
-    nonflat = 0
+    nonflat = patched = 0; spread = 0.0
     if p.get("fill_holes", True):
         was = m.is_watertight
         if not was:
-            nonflat = _nonplanar_holes(m)
+            try:
+                nonflat, patched, spread = fill_nonplanar_loops(m)
+            except Exception:                             # never let the better patch break a repair
+                nonflat = 1
         trimesh.repair.fill_holes(m)
         if not m.is_watertight:
             fill_boundary_loops(m)
@@ -278,36 +349,15 @@ def op_repair(m, p):
                       "Still not watertight — it may have complex holes or self-intersections; the slicer may still cope, "
                       "or try Simplify/Hollow-free workflow in another tool.")
     if nonflat and after["watertight"]:
-        # QA B7: a non-flat hole has no single right patch; the fill can cut a wedge out of the shape.
-        rep["warning"] = (f"{nonflat} filled hole(s) weren't flat, so the patch there is a guess and the volume may be off "
-                          f"(now {abs(float(m.volume)):,.1f} mm³). Check those areas before printing.")
+        # QA B7: a non-flat hole has no single right patch. Non-flat loops now get the smallest-area patch, which
+        # follows a bent hole (e.g. across a cube edge) instead of cutting a wedge out; still say how big the doubt is.
+        vol = abs(float(m.volume))
+        doubt = (f"; another patch would change it by up to {spread:,.1f} mm³ ({100 * spread / max(vol, 1e-9):.1f} %)"
+                 if patched == nonflat else "")
+        rep["warning"] = (f"{nonflat} filled hole(s) weren't flat. They were closed with the smallest patch that follows the "
+                          f"hole's edge (now {vol:,.1f} mm³{doubt}). Check those areas before printing.")
         rep["message"] += " · check filled areas"
     return m, rep
-
-
-def _nonplanar_holes(m) -> int:
-    """Count boundary loops that are not (nearly) planar."""
-    try:
-        mm = m.copy(); mm.merge_vertices()
-        edges = mm.edges_sorted
-        uniq, cnt = np.unique(edges, axis=0, return_counts=True)
-        bnd = uniq[cnt == 1]
-        if not len(bnd) or len(bnd) > 20000:
-            return 0
-        import networkx as nx
-        g = nx.Graph(); g.add_edges_from(bnd.tolist())
-        tol = 1e-3 * float(max(mm.extents.max(), 1e-9))
-        bad = 0
-        for comp in nx.connected_components(g):
-            pts = mm.vertices[list(comp)]
-            if len(pts) < 4:
-                continue
-            c = pts - pts.mean(axis=0)
-            dev = np.abs(c @ np.linalg.svd(c, full_matrices=False)[2][-1]).max()
-            bad += int(dev > tol)
-        return bad
-    except Exception:
-        return 0
 
 
 def op_simplify(m, p):
