@@ -50,7 +50,8 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     normals = mesh.face_normals[idx]
     origins = mesh.triangles_center[idx] - normals * 1e-4
     try:
-        locs, ray_idx, _ = mesh.ray.intersects_location(origins, -normals, multiple_hits=False)
+        from ..core.thickness import first_hits
+        locs, ray_idx = first_hits(mesh, origins, -normals)          # batched: small child memory (N3)
     except Exception:
         return {"ok": None, "thin_fraction": None, "min_mm": min_mm}
     if len(ray_idx) == 0:
@@ -77,7 +78,7 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
     if tiny:
         thin = {**thin, "ok": False, "note": f"The whole part is tiny for a {min_wall:g} mm line."}
         checks["thin_wall"] = thin
-    states = [fit["ok"], thin["ok"] if not thin.get("skipped") else True, slices_ok]
+    states = [fit["ok"], thin["ok"], slices_ok]
     # B11: a slice that used ~0 g of filament printed nothing, whatever the geometry checks say
     empty = slices_ok is True and filament_g is not None and float(filament_g) < MIN_FILAMENT_G
     if fit["ok"] is False or slices_ok is False:
@@ -86,14 +87,18 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
         verdict, label = "maybe", "Might print: thin walls"
     elif empty:
         verdict, label = "maybe", "Might print: almost no filament"
+    elif thin["ok"] is None:              # skipped / timed out / unmeasurable: never claim "Will print" (N3)
+        verdict, label = "unchecked", ("Sliced OK; couldn't check thin walls" if slices_ok else "Fits; couldn't check thin walls")
     elif all(s is True for s in states):
-        verdict, label = "yes", "Will print" + (" (thin-wall check skipped)" if thin.get("skipped") else "")
+        verdict, label = "yes", "Will print"
     else:
         verdict, label = "likely", "Fits: not sliced yet"
     tips = []
     if not fit["ok"]:
         tips.append(f"It won't fit your bed. Scale it to about {fit['fit_scale_pct']}% to fit the {p['name']} "
                     f"({' x '.join(f'{b:g}' for b in fit['bed_mm'])} mm), use shrink-to-fit (\"Scale down to fit this printer\") when you slice, or cut it into pieces with Edit → Split.")
+    if thin["ok"] is None and fit["ok"] is not False and slices_ok is not False:
+        tips.append((thin.get("note") or "The thin-wall check could not run.") + " Check thin parts in the slicer preview, or Simplify and check again.")
     if thin["ok"] is False:
         tips.append(f"Some walls are thinner than one {min_wall:g} mm line"
                     + (f" (thinnest about {thin['thinnest_mm']:g} mm)" if (thin.get("thinnest_mm") or min_wall) < min_wall else "")

@@ -134,5 +134,5 @@ async def willprint_showcase(iid: str, printer_id: str = "", nozzle: str = "", s
     if not paths:
         return {"verdict": "unknown", "label": "No model file to check", "checks": {}, "tips": []}
     plates = [await _ck(p, printer_id or None, nozzle or None, slice) for p in paths[:6]]
-    worst = min(plates, key=lambda r: ["no", "maybe", "likely", "yes"].index(r["verdict"]))
+    worst = min(plates, key=lambda r: ["no", "maybe", "unchecked", "likely", "yes"].index(r["verdict"]))
     return {**worst, "plates": len(plates)}

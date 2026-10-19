@@ -40,6 +40,6 @@ def test_already_fixed_cases_keep_working():
         big = willprint.check(s, "creality_k1", 0.4, slices_ok=True, filament_g=5.0)
     finally:
         willprint.THIN_MAX_FACES = old
-    assert big["label"] == "Will print (thin-wall check skipped)"
+    assert big["verdict"] == "unchecked" and big["label"] == "Sliced OK; couldn't check thin walls"   # N3: never "Will print"
     ok = willprint.check(trimesh.creation.box((20, 20, 20)), "creality_k1", 0.4, slices_ok=True)
     assert ok["label"] == "Will print"
