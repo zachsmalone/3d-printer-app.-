@@ -14,6 +14,21 @@ MAX_FACES = 150_000
 SAMPLES_MAX = 5000
 
 
+RAY_CHUNK = 250     # rays per batch: trimesh's pure-numpy ray engine needs ~1.3 GB for 2000 rays at once on a
+                    # 20k-face mesh, ~0.27 GB in batches of 250 (same hits, same speed). Keeps guarded children small (N3).
+
+
+def first_hits(m: trimesh.Trimesh, origins: np.ndarray, directions: np.ndarray, chunk: int = RAY_CHUNK):
+    """m.ray.intersects_location(..., multiple_hits=False) in batches. Returns (locations, ray_index)."""
+    locs, idx = [], []
+    for s in range(0, len(origins), chunk):
+        loc, ir, _ = m.ray.intersects_location(origins[s:s + chunk], directions[s:s + chunk], multiple_hits=False)
+        locs.append(np.asarray(loc, float).reshape(-1, 3)); idx.append(np.asarray(ir, int) + s)
+    if not locs:
+        return np.zeros((0, 3)), np.zeros(0, int)
+    return np.concatenate(locs), np.concatenate(idx)
+
+
 def analyze(m: trimesh.Trimesh, min_wall: float = 0.8, samples: int = 2000) -> dict:
     min_wall = float(min_wall)
     if not (0.05 <= min_wall <= 50):
@@ -21,14 +36,18 @@ def analyze(m: trimesh.Trimesh, min_wall: float = 0.8, samples: int = 2000) -> d
     samples = int(max(100, min(samples, SAMPLES_MAX)))
     base = {"min_wall_mm": min_wall, "approximate": True,
             "note": "Sampled estimate of straight-through thickness; thin spots between samples can be missed."}
-    if len(m.faces) == 0 or len(m.faces) > MAX_FACES:
-        return {**base, "ok": False, "reason": "No triangles, or too many to analyse; simplify first."}
+    if len(m.faces) == 0:
+        return {**base, "ok": False, "reason": "The model has no triangles to analyse."}
+    if len(m.faces) > MAX_FACES:
+        return {**base, "ok": False, "skipped": "too_detailed",
+                "reason": f"The model is too large to analyse fully ({len(m.faces):,} triangles; the thickness check "
+                          f"handles up to {MAX_FACES:,}). Simplify a copy first for a full check."}
     if not m.is_watertight:
         return {**base, "ok": False, "reason": "The model has holes; run Fix first so thickness can be measured."}
     pts, fi = trimesh.sample.sample_surface(m, samples, seed=1)
     nn = m.face_normals[fi]
     org = pts - nn * 1e-3                                    # nudge inside so the ray does not hit its own start face
-    loc, ir, _ = m.ray.intersects_location(org, -nn, multiple_hits=False)
+    loc, ir = first_hits(m, org, -nn)
     if not len(ir):
         return {**base, "ok": False, "reason": "Could not measure thickness on this model."}
     d = np.linalg.norm(loc - org[ir], axis=1)
