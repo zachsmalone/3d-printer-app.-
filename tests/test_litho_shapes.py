@@ -131,6 +131,11 @@ def test_flat_outline_is_smooth_vector_curve(shape):
     if shape == "square":
         assert axis.all()                                                 # straight sides, no steps either
     else:
+        if shape == "hexagon":                                            # pointy-top hexagon: its two flat sides ARE vertical,
+            mid = (pts + np.roll(pts, -1, axis=0)) / 2                    # so axis-aligned segments may only lie on those sides
+            on_side = np.abs(np.abs(mid[:, 0]) - np.cos(np.pi / 6) * half) < 1e-6 * half + 1e-6
+            assert (axis <= on_side).all() and on_side.any()
+            axis = axis & ~on_side
         assert axis.mean() < 0.02                                         # no axis-aligned stair steps
         # and no zig-zag: the direction changes gently between neighbours (corners of the star excepted)
         d = np.arctan2(seg[:, 1], seg[:, 0]); turn = np.abs((np.diff(np.append(d, d[0])) + np.pi) % (2 * np.pi) - np.pi)
@@ -139,7 +144,7 @@ def test_flat_outline_is_smooth_vector_curve(shape):
 
 def test_unknown_shape_and_color_mode_are_refused():
     with pytest.raises(ValueError):
-        make("hexagon")
+        make("octagon")                    # hexagon is a real shape since eec555d; octagon is not
     with pytest.raises(ValueError):
         make("heart", color_mode="cmyk")
 
