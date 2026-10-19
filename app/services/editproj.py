@@ -153,6 +153,46 @@ def create(owner_sid: str, visibility: str, *, title: str, base: dict, original:
     return store.get(bid)
 
 
+def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner: bool) -> dict:
+    """'Save as a new version' of an edit project WITH its history (QA B12): the untouched original file, every step
+    up to the current head (the redo tail is dropped, like a new step would), named dimensions, plate layouts and
+    the display appearance are copied, so v2's earlier steps stay editable. The source project is not changed.
+    Caller must already hold `store.lock`, have reserved a history slot and checked that the caller owns `src_bid`."""
+    import copy
+    import shutil
+    src = store.get(src_bid)
+    sd = store.dir(src_bid)
+    head = int(src.get("head", 0))
+    bid = uuid.uuid4().hex[:12]
+    d = store.dir(bid)
+    d.mkdir(parents=True)
+    try:
+        for f in list(sd.glob("original.*")) + list(sd.glob("source.*")):
+            shutil.copyfile(f, d / f.name)
+        layouts = {k: v for k, v in (src.get("plate_layouts") or {}).items() if str(k).lstrip("-").isdigit() and int(k) <= head}
+        meta = {"id": bid, "kind": "edit", "mode": "edit", "beginner": beginner, "title": title[:60] or "Untitled",
+                "base": copy.deepcopy(src.get("base") or {}), "ops": copy.deepcopy(src.get("ops", [])[:head]), "head": head,
+                "warnings": [], "source": "", "params": {}, "auto_notes": [], "info": {},
+                "owner_sid": owner_sid, "visibility": visibility, "version_of": src_bid}
+        for k in ("dims", "appearance", "photo_ack"):
+            if src.get(k):
+                meta[k] = copy.deepcopy(src[k])
+        if layouts:
+            meta["plate_layouts"] = copy.deepcopy(layouts)
+        with _lock:                                          # reuse the source's parsed base + current state: no replay
+            _BASES[bid] = _base(src_bid, src).copy()
+            cur = mesh_at(src_bid, src).copy()
+            _STATES[bid] = OrderedDict([(head, cur)])
+        meta["stats"] = _stats(cur, meta["title"])
+    except Exception:
+        _BASES.pop(bid, None); _STATES.pop(bid, None)
+        shutil.rmtree(d, ignore_errors=True)
+        raise
+    store.save(meta)
+    ensure_exports(bid)
+    return store.get(bid)
+
+
 # ---------------------------------------------------------------- editing
 def _commit(bid: str, meta: dict, head: int):
     meta["head"] = head

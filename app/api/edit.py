@@ -68,6 +68,7 @@ def new_project(
     photo_mode: str = Form("lithophane"),
     width_mm: float = Form(100.0),
     photo_ack: bool = Form(False),
+    keep_history: bool = Form(True),
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -85,14 +86,29 @@ def new_project(
     scale, base = 1.0, {}
     if from_build:                                              # ---- bring a ZEIM build into the editor
         meta = meta_for(from_build, actor, owner_only=True)
+        title = title or meta["title"]
+        if meta.get("kind") == "edit" and keep_history:         # 'Save as a new version': keep every step editable (B12)
+            from .builds import disk_guard
+            disk_guard()
+            with store.lock:
+                try:
+                    store.reserve(actor.sid, auto_delete_oldest)
+                except HistoryFull:
+                    return _full(actor)
+                try:
+                    new = editproj.clone(actor.sid, privacy.default_level(actor), from_build, title=title.strip(), beginner=beginner)
+                except meshedit.OpError as e:
+                    raise HTTPException(422, str(e))
+            return {**editproj.payload(new["id"]), "history": [summary(m) for m in store.list(actor.sid)]}
         if meta.get("kind") == "edit":
             editproj.ensure_exports(from_build)
-        v, f = load_model(from_build).solid()
+        mdl = load_model(from_build)
+        v, f = mdl.solid()
         mesh = trimesh.Trimesh(v, f, process=False)
-        original, ext = exporters.to_stl(load_model(from_build)), "stl"
+        original, ext = exporters.to_stl(mdl), "stl"
         base = {"type": "build", "from_build": from_build, "from_mode": meta.get("mode")}
-        title = title or meta["title"]
-        warnings.append("Colours / separate colour bodies of the original build are merged into one mesh in the editor.")
+        if len({(b.color or "").lower() for b in mdl.bodies}) > 1:          # only when colours are really lost (B12)
+            warnings.append("Colours / separate colour bodies of the original build are merged into one mesh in the editor.")
     elif file is not None and file.filename:                    # ---- upload
         name = file.filename
         ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
