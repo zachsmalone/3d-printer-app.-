@@ -14,7 +14,7 @@ import resource
 import threading
 import traceback
 
-MEM_MB = int(os.environ.get("PHOTO3D_HEAVY_MEM_MB", "1500"))     # extra address space on top of the parent's
+MEM_MB = int(os.environ.get("PHOTO3D_HEAVY_MEM_MB", "1500"))     # per-child budget on top of what it inherits at fork (N3)
 TIMEOUT_S = float(os.environ.get("PHOTO3D_HEAVY_TIMEOUT_S", "120"))
 ENABLED = os.environ.get("PHOTO3D_HEAVY_GUARD", "1") != "0"
 MAX_CHILDREN = max(1, int(os.environ.get("PHOTO3D_HEAVY_CHILDREN", "2")))   # per process (CADRT-9)
@@ -42,15 +42,27 @@ def _vm_bytes() -> int:
     return 0
 
 
+def _hard_cap() -> int | None:
+    """The inherited HARD RLIMIT_AS, or None when there is none. No unprivileged process can raise it (CADRT-8)."""
+    _soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    return None if hard in (resource.RLIM_INFINITY, -1) else hard
+
+
 def _clamp(want: int) -> int | None:
-    """Never try to RAISE an existing RLIMIT_AS (CADRT-8): use min(want, soft, hard).
-    Returns the limit to set, 0 for 'keep the inherited limit as is', or None if there is no usable headroom."""
-    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-    caps = [x for x in (soft, hard) if x not in (resource.RLIM_INFINITY, -1)]
-    limit = min([want] + caps)
+    """The child's address-space limit for `want` bytes (= what it inherits at fork + its budget), never above the
+    inherited HARD limit, so setrlimit can never fail with "not allowed to raise maximum limit" (CADRT-8).
+    Returns the limit, or None when the hard limit leaves no usable headroom (refuse kindly, no fork).
+
+    N3: the budget no longer depends on what is left under the server's SOFT limit. A long-running server's
+    VmSize grows with reserved-but-untouched address space (malloc arenas, thread stacks, freed-but-mapped
+    pools) that it never gives back, so "soft cap minus parent VmSize" shrank until even a 20k-face print check
+    could not run. RLIMIT_AS is per process: setting the child's soft limit (up to hard, which the kernel always
+    allows) gives the server process itself no extra room, and the child can still add at most its budget."""
+    hard = _hard_cap()
+    limit = want if hard is None else min(want, hard)
     if limit - _vm_bytes() < MIN_HEADROOM:
         return None
-    return 0 if caps and limit == min(caps) else limit
+    return limit
 
 
 def _child(conn, fn, args, kwargs, limit):
@@ -60,7 +72,7 @@ def _child(conn, fn, args, kwargs, limit):
                 soft, hard = resource.getrlimit(resource.RLIMIT_AS)
                 resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
             except (ValueError, OSError):
-                pass                                   # keep the inherited (tighter) limit
+                pass                                   # keep the inherited limit
         os.environ["OMP_NUM_THREADS"] = "1"
         res = ("ok", fn(*args, **kwargs))
     except MemoryError:
