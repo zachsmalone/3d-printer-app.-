@@ -63,7 +63,9 @@ const busy = on => { $("#cwBusy").hidden = !on; };
 /* Coach hints: one compact pill (tap to expand). "Hints off" (toolbar chip, remembered per browser) hides every hint overlay. */
 const LS = (() => { try { return localStorage; } catch { return null; } })();
 let HINTS_ON = hintsOn(LS);
-const hint = (t, s) => { $("#cwHintT").textContent = t; $("#cwHintS").textContent = s; $("#cwHint").classList.remove("open"); };
+/* hint(): coach/tutorial text, hidden when Hints are off. status(): solver results, readouts and errors, always shown. */
+const hint = (t, s, always = false) => { const h = $("#cwHint"); $("#cwHintT").textContent = t; $("#cwHintS").textContent = s; h.classList.remove("open"); h.hidden = !HINTS_ON && !always; };
+const status = (t, s) => hint(t, s, true);
 function emptyHint() { $("#cwEmpty").hidden = !HINTS_ON || !!(S.scene?.bodies?.length) || S.mode === "sketch"; }
 function applyHints() {
   $("#cwHint").hidden = !HINTS_ON; emptyHint();
@@ -757,14 +759,14 @@ async function solveSketch() {
   try {
     const r = await api("/api/cad/sketch/solve", { method: "POST", json: { sketch: { entities: S.sk.entities, constraints: S.sk.constraints } } });
     S.sk.entities = r.sketch.entities;
-    hint(r.ok ? "Solved" : "Over-constrained", r.ok ? `${r.dof_estimate} degree(s) of freedom left.` : r.message);
+    status(r.ok ? "Solved" : "Over-constrained", r.ok ? `${r.dof_estimate} degree(s) of freedom left.` : r.message);
   } catch (e) { msg(e.message); }
   drawSketch();
 }
 function addConstraint(type) {
   const sel = [...S.sk.sel].map(id => S.sk.entities.find(e => e.id === id)).filter(Boolean);
   const need2 = ["parallel", "perpendicular", "equal", "tangent", "concentric", "coincident"].includes(type);
-  if (!sel.length || (need2 && sel.length !== 2)) return hint("Constraints", need2 ? "Select exactly two curves first." : "Select curves first.");
+  if (!sel.length || (need2 && sel.length !== 2)) return status("Constraints", need2 ? "Select exactly two curves first." : "Select curves first.");
   pushUndo();
   if (type === "horizontal") sel.filter(e => e.type === "line").forEach(e => S.sk.constraints.push({ type: Math.abs(e.p1[0] - e.p0[0]) >= Math.abs(e.p1[1] - e.p0[1]) ? "horizontal" : "vertical", a: e.id }));
   else if (type === "lock") sel.forEach(e => keyPoints(e).forEach(([ref]) => S.sk.constraints.push({ type: "lock", a: ref })));
@@ -845,7 +847,7 @@ function skDown(ev) {
       dr.lastRef = e.id + (A.swapped ? ".s" : ".e");
       if (!dr.firstRef) dr.firstRef = e.id + (A.swapped ? ".e" : ".s");
       dr.pts.push(endP);
-      if (wasClosing) { sk.draft = null; hint("Closed", "Shape closed. Finish the sketch to extrude it."); }
+      if (wasClosing) { sk.draft = null; status("Closed", "Shape closed. Finish the sketch to extrude it."); }
       return drawSketch();
     }
     e = { id: newId(), type: "line", p0: [...prev], p1: closing ? [...dr.firstP] : [...p] };
@@ -853,7 +855,7 @@ function skDown(ev) {
     autoCons(e, prevRef, closing ? dr.firstRef : sp.ref);
     if (!dr.firstRef) dr.firstRef = e.id + ".p0";
     dr.lastRef = e.id + ".p1"; dr.pts.push(e.p1);
-    if (closing) { sk.draft = null; hint("Closed", "Shape closed. Finish the sketch (Enter) to extrude it."); }
+    if (closing) { sk.draft = null; status("Closed", "Shape closed. Finish the sketch (Enter) to extrude it."); }
     return drawSketch();
   }
   if (t === "spline") { if (!dr) sk.draft = { pts: [p] }; else dr.pts.push(p); return drawSketch(); }
@@ -1088,7 +1090,7 @@ async function ctxRun(c) {
   if (c === "fa") { S.selEdges = []; return setTool("fillet"); }
   if (c === "sc") return setTool("sculpt");
   if (c === "fi" || c === "ch") return addOp("round_edges", { style: c === "fi" ? "fillet" : "chamfer", radius: v || 1, body: e.body, edges: [[e.a.toArray(), e.b.toArray()]] });
-  if (c === "ms") { S.measPts = [e.a, e.b]; hint("Edge length", showEdgeLen(e)); drawSelection(); }
+  if (c === "ms") { S.measPts = [e.a, e.b]; status("Edge length", showEdgeLen(e)); drawSelection(); }
 }
 
 /* ---------------------------------------------------------------- stage pointer routing */
@@ -1120,7 +1122,7 @@ function modelTap(ev) {
     if (onEdge(e, h)) { S.measPts = [e.a, e.b]; }
     else if (h) { if (S.measPts.length >= 2) S.measPts = []; S.measPts.push(h.point); }
     if (S.measPts.length === 2) { const [a, b] = S.measPts, d = a.distanceTo(b), dv = b.clone().sub(a);
-      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})`, a.clone().add(b).multiplyScalar(0.5)); hint("Measure", measLabel.text); }
+      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})`, a.clone().add(b).multiplyScalar(0.5)); status("Measure", measLabel.text); }
     else setMeasLabel(null);
     drawSelection(); renderSkLabels(); return;
   }

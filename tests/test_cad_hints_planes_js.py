@@ -37,3 +37,11 @@ def test_cad_page_serves_planes_module():
     from app.main import app
     r = TestClient(app).get("/static/cad-planes.js")
     assert r.status_code == 200 and "export function midPlane" in r.text
+
+
+def test_status_messages_show_even_with_hints_off():
+    js = (ROOT / "static/cad.js").read_text()
+    assert "h.hidden = !HINTS_ON && !always" in js and "const status = (t, s) => hint(t, s, true)" in js
+    for m in ('status(r.ok ? "Solved" : "Over-constrained"', 'return status("Constraints"', 'status("Measure", measLabel.text)'):
+        assert m in js, m
+    assert 'hint(r.ok ? "Solved"' not in js
