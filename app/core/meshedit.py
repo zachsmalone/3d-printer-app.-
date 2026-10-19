@@ -1044,8 +1044,20 @@ def _3mf_unit_scale(data: bytes) -> float:
         return 1.0
 
 
-def load_mesh(data: bytes, ext: str) -> tuple[trimesh.Trimesh, list[str]]:
-    """Parse STL/OBJ/3MF into ONE mesh (mm). Multiple objects are merged (colours/materials are dropped)."""
+def size_warnings(size_mm: float) -> list[str]:
+    """The 'is that the right unit?' hint for a model whose largest side is `size_mm` (already in mm)."""
+    if size_mm < 2:
+        return [f"The model is only {size_mm:.3g} mm across — if it should be bigger, re-import with units set to inch/cm/m."]
+    if size_mm > 1500:
+        return [f"The model is {size_mm:.0f} mm across — if that's wrong, re-import with units set to mm/in correctly."]
+    return []
+
+
+def load_mesh(data: bytes, ext: str, units_scale: float = 1.0) -> tuple[trimesh.Trimesh, list[str]]:
+    """Parse STL/OBJ/3MF into ONE mesh (mm). Multiple objects are merged (colours/materials are dropped).
+    `units_scale` is the factor the caller will apply for the user's chosen units (e.g. 25.4 for inches; ignored
+    for 3MF, which declares its own). The mesh is returned unscaled, but the size warning is judged on the
+    converted size, so a 1 in cube imported as inches is not called "only 1 mm across" (QA B9)."""
     warnings = []
     ft = ext.lower()
     try:
@@ -1076,9 +1088,6 @@ def load_mesh(data: bytes, ext: str) -> tuple[trimesh.Trimesh, list[str]]:
         if k != 1.0:
             mesh = _new(mesh.vertices * k, mesh.faces)
             warnings.append(f"3MF declared units; converted to mm (×{k:g}).")
-    size = float(mesh.extents.max())
-    if size < 2:
-        warnings.append(f"The model is only {size:.3g} mm across — if it should be bigger, re-import with units set to inch/cm/m.")
-    elif size > 1500:
-        warnings.append(f"The model is {size:.0f} mm across — if that's wrong, re-import with units set to mm/in correctly.")
+    size = float(mesh.extents.max()) * (1.0 if ft == "3mf" else float(units_scale or 1.0))
+    warnings += size_warnings(size)
     return mesh, warnings

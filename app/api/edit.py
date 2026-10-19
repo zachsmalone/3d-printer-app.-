@@ -111,7 +111,7 @@ def new_project(
                 raise HTTPException(415, bad)
             _gate(data, actor)
             try:
-                mesh, w = meshedit.load_mesh(data, ext)
+                mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])     # warn on the converted size (B9)
             except meshedit.OpError as e:
                 raise HTTPException(422, str(e))
             warnings += w
@@ -331,7 +331,7 @@ def new_multi(
             raise HTTPException(415, f"File {n}: {bad}")
         _gate(data, actor)
         try:
-            mesh, w = meshedit.load_mesh(data, ext)
+            mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])       # warn on the converted size (B9)
         except meshedit.OpError as e:
             raise HTTPException(422, f"File {n}: {e}")
         scale = meshedit.UNIT_MM[units] if ext != "3mf" else 1.0
