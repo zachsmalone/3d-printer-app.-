@@ -233,13 +233,23 @@ def workbench():
 
 
 # ---------------- legal pages (Phase 1 Task 5: public routes; DMCA contact comes from app/credits.json) ----------------
+def _terms_with_takedown_contact() -> str:
+    """terms.html with the DMCA contact from app/credits.json (takedown.contact) when one is configured.
+    The page ships with a default address in <strong data-takedown-contact>…</strong>; a configured contact
+    replaces it (and the older [COPYRIGHT CONTACT TO BE ADDED] placeholder). HTML-escaped."""
+    import html as _html
+    page = (STATIC / "terms.html").read_text()
+    contact = ((_credits.data().get("takedown", {}) or {}).get("contact") or "").strip()
+    if contact:
+        safe = _html.escape(contact)
+        page = page.replace("[COPYRIGHT CONTACT TO BE ADDED]", safe)
+        page = _re.sub(r"(<strong data-takedown-contact>)[^<]*(</strong>)", lambda m: m.group(1) + safe + m.group(2), page)
+    return page
+
+
 @app.get("/legal/terms", include_in_schema=False)
 def legal_terms():
-    html = (STATIC / "terms.html").read_text()
-    contact = (_credits.data().get("takedown", {}) or {}).get("contact") or ""
-    if contact:
-        html = html.replace("[COPYRIGHT CONTACT TO BE ADDED]", contact)
-    return HTMLResponse(html)
+    return HTMLResponse(_terms_with_takedown_contact())
 
 
 @app.get("/legal/privacy", include_in_schema=False)
@@ -255,11 +265,7 @@ def legal_guidelines():
 @app.get("/legal/takedown", include_in_schema=False)
 def legal_takedown():
     """DMCA section of the terms (with the real contact when configured) — notices also come in via POST /api/report/takedown."""
-    html = (STATIC / "terms.html").read_text()
-    contact = (_credits.data().get("takedown", {}) or {}).get("contact") or ""
-    if contact:
-        html = html.replace("[COPYRIGHT CONTACT TO BE ADDED]", contact)
-    return HTMLResponse(html)
+    return HTMLResponse(_terms_with_takedown_contact())
 
 
 @app.get("/favicon.ico")
