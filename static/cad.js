@@ -1162,13 +1162,27 @@ function openProject(id) { S.bid = id; S.openStep = 0; S.hidden.clear(); history
 $("#cwOpen").onclick = () => { const m = $("#cwOpenMenu"), open = m.hidden; m.hidden = !open; $("#cwOpen").setAttribute("aria-expanded", open); };
 document.addEventListener("click", e => { if (!e.target.closest(".cw-menu")) $("#cwOpenMenu").hidden = true; });
 $("#cwImport").onclick = e => { e.preventDefault(); $("#cwFile").click(); };
+/* File units (QA B8): what an STL/OBJ was drawn in; the server adds a "Units: in → mm" step. Remembered per browser. */
+const UNITS = ["mm", "cm", "in", "m"];
+try { const u = localStorage.getItem("zeim.cad.units"); if (UNITS.includes(u)) $("#cwUnits").value = u; } catch { }
+$("#cwUnits").onchange = () => { try { localStorage.setItem("zeim.cad.units", $("#cwUnits").value); } catch { } };
+/* The import's title (QA B12): the name the user typed for a still-empty design, otherwise "Imported model".
+   Never the file's name (file names can hold a person's name) and never the open design's "My design". */
+function importTitle() {
+  const t = ($("#cwTitle").value || "").trim();
+  return (!S.bid && t && t !== "My design" ? t : "Imported model").slice(0, 60);
+}
 async function importFile(f) {
-  await run(async () => {
-    const fd = new FormData(); fd.append("file", f); fd.append("title", ($("#cwTitle").value || "Imported model").slice(0, 60));
+  let warn = []; $("#cwOpenMenu").hidden = true; $("#cwOpen").setAttribute("aria-expanded", false);
+  const ok = await run(async () => {
+    const fd = new FormData(); fd.append("file", f); fd.append("title", importTitle());
+    fd.append("units", UNITS.includes($("#cwUnits").value) ? $("#cwUnits").value : "mm");
     const j = await api("/api/edit/new", { method: "POST", body: fd });
     const id = j.id || j.project?.id; if (!id) throw new Error("Your recent builds are full. Delete one on the main page, then try again.");
+    warn = j.warnings || j.project?.warnings || [];
     await openProject(id);
   }, "Imported. It's Import 01 in History; edit it with any tool.");
+  if (ok && warn.length) msg("Imported. " + warn.join(" "));
 }
 $("#cwFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); };
 stage.addEventListener("dragover", e => e.preventDefault());
@@ -1177,7 +1191,7 @@ $("#cwSaveCopy").onclick = async e => {
   e.preventDefault(); if (!S.bid) return msg("Nothing to save yet.");
   await run(async () => { const fd = new FormData(); fd.append("from_build", S.bid); fd.append("title", (() => { const t = ($("#cwTitle").value || "My design").trim(), mm = t.match(/^(.*?) v(\d+)$/); return (mm ? `${mm[1]} v${+mm[2] + 1}` : `${t} v2`).slice(0, 60); })());
     const r = await api("/api/edit/new", { method: "POST", body: fd }); const id = r.id || r.project?.id; if (!id) throw new Error("Your recent builds are full.");
-    await openProject(id); }, "Saved as a new version. The previous one is unchanged in your builds.");
+    await openProject(id); }, "Saved as a new version with its full History. The previous one is unchanged in your builds.");
 };
 $("#cwBuildsClose").onclick = () => $("#cwBuildsDlg").close();
 $("#cwFromBuild").onclick = async e => {

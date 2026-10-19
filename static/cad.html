@@ -20,6 +20,15 @@
   <div class="cw-menu">
     <button class="cw-btn wide" id="cwOpen" aria-haspopup="menu" aria-expanded="false">Open ▾</button>
     <div class="cw-pop" id="cwOpenMenu" role="menu" hidden>
+      <label class="cw-units" for="cwUnits">File units
+        <select id="cwUnits" aria-describedby="cwUnitsHelp">
+          <option value="mm">mm</option>
+          <option value="cm">cm</option>
+          <option value="in">inches</option>
+          <option value="m">metres</option>
+        </select>
+      </label>
+      <small class="cw-units-help" id="cwUnitsHelp">What the STL/OBJ was drawn in. 3MF files say their own units.</small>
       <a role="menuitem" href="#" id="cwImport">Import STL, OBJ or 3MF…</a>
       <a role="menuitem" href="#" id="cwFromBuild">From my builds…</a>
       <a role="menuitem" href="/static/cad.html">New blank design</a>
