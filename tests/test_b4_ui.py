@@ -1,6 +1,6 @@
 """Batch B UI tests (home redesign, Mode dropdown, nozzle). Each script runs against its own TEMP-data server in Chrome and WebKit."""
 import os, subprocess, sys
-from test_b1_ui import _spawn, ROOT
+from test_b1_ui import _spawn, ROOT, LEGACY_LOGIN
 
 
 def _run(script, mode="local", extra=None):
@@ -43,7 +43,7 @@ def test_send_sheet_labels_untested_rows_and_never_claims_they_work():
 
 
 def test_nozzle_it_buttons_states_keyboard_sync_rollback_and_axe_in_chrome_and_webkit():
-    out = _run("ui_nozzle.py")
+    out = _run("ui_nozzle.py", extra=LEGACY_LOGIN)
     assert "PASS webkit" in out or "SKIP webkit" in out
 
 

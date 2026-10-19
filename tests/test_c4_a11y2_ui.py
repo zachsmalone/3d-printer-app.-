@@ -1,7 +1,8 @@
 """Accessibility round 2 top-10 in Chrome + WebKit (tests/ui_a11y2.py)."""
 from test_b4_ui import _run
+from test_b1_ui import LEGACY_LOGIN   # legacy cookie-account dialog (see test_b1_ui.LEGACY_LOGIN)
 
 
 def test_a11y_round2_labels_keyboard_errors_focus_skip_link_dialogs_targets_in_chrome_and_webkit():
-    out = _run("ui_a11y2.py")
+    out = _run("ui_a11y2.py", extra=LEGACY_LOGIN)
     assert "PASS webkit" in out or "SKIP webkit" in out

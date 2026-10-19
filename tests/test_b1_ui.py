@@ -66,6 +66,13 @@ def test_ios2_touch_targets_16px_inputs_safe_area_and_viewer_does_not_trap_scrol
     assert code == 0, out
 
 
+# These UI scripts drive the legacy cookie-account dialog (#su_name, #su_dob, username, recovery code). Since the
+# passkey login (e4b2283) auto-mounts on localhost, a loopback test server shows the passkey dialog instead. This env
+# value is not "dev" or "production", so passkey login stays unconfigured and the documented fallback (the old cookie
+# login, app/api/auth.py try_mount_auth) is what renders, exactly as on a deployment without ZEIM_RP_ID etc.
+LEGACY_LOGIN = {"ZEIM_ENV": "legacy-login-test"}
+
+
 def _spawn(mode, extra=None):
     import socket as _s, tempfile as _t
     s = _s.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
@@ -160,7 +167,7 @@ def test_credits_page_and_showcase_credit_at_phone_width_in_chrome_and_webkit():
 
 
 def test_refusals_are_inline_persistent_and_keep_typed_text_in_chrome_and_webkit():
-    p, u = _spawn("local")
+    p, u = _spawn("local", LEGACY_LOGIN)
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_inline.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
@@ -178,7 +185,7 @@ def test_report_is_a_dialog_with_choices_at_phone_width_in_chrome_and_webkit():
 
 
 def test_settings_sheet_fields_are_dark_and_readable_on_a_phone_in_chrome_and_webkit():
-    p, u = _spawn("local")
+    p, u = _spawn("local", LEGACY_LOGIN)
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_settings.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
@@ -196,7 +203,7 @@ def test_star_keeps_a_build_at_phone_width_in_chrome_and_webkit():
 
 
 def test_username_is_chosen_changed_once_and_locked_in_the_account_dialog_in_chrome_and_webkit():
-    p, u = _spawn("local")
+    p, u = _spawn("local", LEGACY_LOGIN)
     try:
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_username.py"), u], cwd=ROOT, capture_output=True, text=True, timeout=400)
         assert r.returncode == 0 and "FAIL" not in r.stdout and "PASS chrome" in r.stdout, r.stdout + r.stderr
