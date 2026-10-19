@@ -41,3 +41,9 @@ def test_b13_edge_tap_shows_length_and_announces_it_in_a_real_browser():
     from test_b4_ui import _run
     out = _run("ui_cadws_edge_len.py")
     assert "ALL PASS" in out
+
+
+def test_shtabs_fit_or_wrap_320_to_1280_every_tab_reachable_in_a_real_browser():
+    from test_b4_ui import _run
+    out = _run("ui_shtabs.py")
+    assert "ALL PASS" in out and "PASS chrome 320px: all 4 tabs" in out

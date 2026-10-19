@@ -554,6 +554,7 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 @media (max-width:768px){.topbar .nav button{font-size:11px;min-width:0;flex:1 1 0;letter-spacing:-.01em}.topbar .nav button span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .topbar .nav button.on .i{width:44px;padding:2px 10px}}
 .feedbar{gap:var(--s2);align-items:center;flex-wrap:wrap;margin:var(--s2) 0}
+#shTabs{flex-wrap:wrap;max-width:100%}#shTabs button{flex:1 1 auto;white-space:nowrap}   /* 320px: the 4 list tabs wrap instead of cutting off "Following" */
 .feedbar .createcta{margin-left:auto;text-decoration:none;display:inline-flex;align-items:center;gap:var(--s2)}
 .feedbar a.btn.ghost{text-decoration:none;display:inline-flex;align-items:center;gap:var(--s2);color:var(--txt)}
 #viewShowcase .pagehead form{flex:1 1 360px}
