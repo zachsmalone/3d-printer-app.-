@@ -429,9 +429,9 @@ def op_body_transform(m, p):
     piv = p.get("pivot", "center")
     center = sel.bounds.mean(axis=0) if piv == "center" else np.zeros(3) if piv == "origin" else _vec(p, "pivot")
     T = _xform_matrix(p, center)
+    # trimesh's apply_transform already flips the winding for a mirror (det < 0); inverting again
+    # made mirrored bodies inside-out (-volume). QA N1.
     moved = sel.copy(); moved.apply_transform(T)
-    if np.linalg.det(T[:3, :3]) < 0:
-        moved.invert()
     out = _join_sep(_join(rest, sel) if p.get("copy") else rest, moved, "Move it slightly, or Union the bodies.")
     return out, {"message": "Transformed."}
 
