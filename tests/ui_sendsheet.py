@@ -73,9 +73,12 @@ with sync_playwright() as p:
     st = pg.inner_text("#printerList")
     ok("K1 preset: Experimental text + 220x220 + type Moonraker (no new type)", "Experimental" in st and pg.input_value("#printerList [data-f=bed_x]") == "220" and pg.input_value("#printerList [data-f=bed_y]") == "220" and pg.input_value("#printerList [data-f=type]") == "moonraker" and "Creality" not in pg.inner_text("#printerList [data-f=type]"))
     ok("K1 preset: honest 'pretend printer only' + Test disabled before saving", "Tested with a pretend printer only" in st and pg.is_disabled("#printerList [data-test]"))
-    pg.fill("#printerList [data-f=url]", "http://127.0.0.1:1"); pg.click("#btnSaveSettings"); pg.wait_for_timeout(600)
+    # Since e4b2283 the Settings sheet has no printer URL field (arbitrary printer URLs were an SSRF risk); the row says so.
+    ok("no printer URL field; the row says direct control is off and why", pg.locator("#printerList [data-f=url]").count() == 0 and "Direct control is off" in st and "SSRF" in st)
+    pg.click("#btnSaveSettings"); pg.wait_for_timeout(600)
     pg.evaluate("location.hash='account'"); pg.click("#btnSettings"); pg.wait_for_selector("#dlgSettings[open]"); pg.click("#printerList [data-test]"); pg.wait_for_timeout(1500)
-    ok("Test connection answers in plain words", "✖" in pg.inner_text("#printerList [data-testout]") and "Nothing answers" in pg.inner_text("#printerList [data-testout]") or "Could not reach" in pg.inner_text("#printerList [data-testout]"), pg.inner_text("#printerList [data-testout]"))
+    to = pg.inner_text("#printerList [data-testout]")
+    ok("Test connection answers in plain words (no address saved, nothing contacted)", "✖" in to and "address" in to.lower(), to)
     pg.keyboard.press("Escape")
     # offline copy
     ctx.set_offline(True); pg.evaluate("window.dispatchEvent(new Event('offline'))")
