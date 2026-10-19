@@ -115,6 +115,12 @@ def test_n3_showcase_worst_plate_order_knows_unchecked():
     assert '["no", "maybe", "unchecked", "likely", "yes"]' in inspect.getsource(printsetup)
 
 
+def test_n3_printer_js_badge_maps_unchecked_to_warn():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "static" / "printer.js").read_text()
+    assert 'unchecked: ["warn", "!"]' in src
+
+
 def test_n3_big_model_message_says_too_large_not_no_triangles():
     big = trimesh.creation.icosphere(subdivisions=7, radius=20)        # 327 680 faces
     r = thickness.analyze(big, 0.8)

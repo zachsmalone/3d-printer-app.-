@@ -70,7 +70,7 @@ export async function savePref(pref) {
 export const prefLabel = (pref = P.pref) => { const p = printerOf(pref.printer_id); return p ? p.name + (pref.nozzle ? ` · ${pref.nozzle} mm` : "") : ""; };
 
 /* ---------- "Will it print?" badge ---------- */
-const VERDICT = { yes: ["ok", "✔"], likely: ["ok", "✔"], maybe: ["warn", "!"], no: ["bad", "✖"], unknown: ["", "?"] };
+const VERDICT = { yes: ["ok", "✔"], likely: ["ok", "✔"], maybe: ["warn", "!"], unchecked: ["warn", "!"], no: ["bad", "✖"], unknown: ["", "?"] };
 export function badgeHTML(r, { detail = false } = {}) {
   if (!r) return "";
   const [cls, ico] = VERDICT[r.verdict] || VERDICT.unknown;
