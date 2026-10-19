@@ -137,7 +137,7 @@ def credits_page():
             name = escape(i['name'])
             url = i.get('url') or ''
             if url.startswith('https://'):
-                return '<a href="' + escape(url) + '" rel="noopener noreferrer" target=_blank>' + name + '</a>'
+                return "<a href='" + escape(url) + "' rel='noopener noreferrer' target=_blank>" + name + "</a>"   # one link style (escape() quotes ')
             return name
         return "".join(
             '<tr><td>' + cell(i) + '</td>'
