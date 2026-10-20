@@ -227,3 +227,24 @@ def test_hollow_output_is_one_watertight_solid_after_export(hollow):
     for ft in ("stl", "3mf"):
         e = _exported(out, ft)
         assert e.is_watertight and len(e.split(only_watertight=False)) == 1, ft
+
+
+def _overlap():
+    a = trimesh.creation.box(extents=[20, 20, 20])
+    b = trimesh.creation.box(extents=[20, 20, 20]); b.apply_translation([10, 0, 0])   # 10 mm overlap
+    return trimesh.util.concatenate([a, b])
+
+
+def test_overlapping_bodies_are_unioned_before_hollowing():
+    out, rep = resin.prepare(_overlap(), resin.settings())
+    assert rep["input_union"]["bodies_in"] == 2 and rep["input_union"]["bodies_out"] == 1
+    assert rep["hollow"]["thinnest_wall_mm"] > 1.0 and rep["hollow"]["cavities"] == 1
+    assert not rep["layer_check"]["islands"]
+    for ft in ("stl", "3mf"):
+        e = _exported(out, ft)
+        assert e.is_watertight and len(e.split(only_watertight=False)) == 1, ft
+
+
+def test_overlapping_bodies_resin_counted_once():
+    _, rep = resin.prepare(_overlap(), resin.settings({"hollow": "false", "supports": "false", "tilt_deg": 0}))
+    assert rep["estimate"]["resin_ml"] == pytest.approx(12.0, abs=0.1)        # 2 x 8 ml minus the 4 ml shared

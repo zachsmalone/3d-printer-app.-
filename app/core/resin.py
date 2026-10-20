@@ -335,6 +335,17 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
     Warnings never block: they are notes; the files are always made."""
     rep = {"program": NAME, "settings": s, "notes": [], "safety": SAFETY, "test_note": TEST_NOTE}
     work = orient(m, s["tilt_deg"])
+    shells = work.split(only_watertight=False)
+    if len(shells) > 1:
+        # overlapping bodies: join them FIRST, so hollowing sees one solid (not shells inside shells) and the shared
+        # volume is counted once
+        u = union_all(shells)
+        if u is not None:
+            rep["input_union"] = {"bodies_in": len(shells), "bodies_out": bodies(u)}
+            work = u
+        else:
+            rep["notes"].append(f"The model has {len(shells)} separate or overlapping bodies that could not be joined into "
+                                "one solid; overlapping parts may hollow badly and their resin may be counted twice.")
     envelope = None
     if s["hollow"] and s["wall_mm"] > 0:
         try:
