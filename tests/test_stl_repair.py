@@ -24,8 +24,8 @@ def _post(c, name, data):
     return c.post("/api/repair", files={"file": (name, io.BytesIO(data), "application/octet-stream")})
 
 
-@pytest.fixture(scope="module")
-def c():
+@pytest.fixture
+def c():   # function scope: runs after conftest resets rate limits (module scope hit the signup limit in the full suite)
     return client(ADULT)
 
 
