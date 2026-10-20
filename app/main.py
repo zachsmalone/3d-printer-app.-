@@ -60,10 +60,11 @@ def _start_retention():
     retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
 from .api import parts as parts_api
 from .api import cad as cad_api
+from .api import repair as repair_api
 for r in (builds.router, edit.router, parts_api.router, cad_api.router, printing.router, printing.files_router, settings_api.router,
           showcase_extras.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
-          export_api.router, calibration_api.router, doctor_api.router):
+          export_api.router, calibration_api.router, doctor_api.router, repair_api.router):
     app.include_router(r)
 
 # Passkey + email-code login (docs/auth.md). Localhost / ZEIM_ENV=dev get safe defaults.
