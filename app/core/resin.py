@@ -316,6 +316,11 @@ def bodies(m: trimesh.Trimesh) -> int:
     return len(q.split(only_watertight=False))
 
 
+def thin_wall_note(thin: float, asked: float) -> str:
+    return (f"Thin wall: the thinnest wall came out {thin:.2f} mm, thinner than the {asked:g} mm you asked for. "
+            "Thin spots can crack or leak resin; try a thicker wall if this part must be strong.")
+
+
 def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
     layers = max(1, math.ceil(height_mm / s["layer_mm"] - 1e-9))
     bottom = min(layers, s["bottom_layers"])
@@ -357,11 +362,9 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
             rep["hollow"]["cavities"] = len(made); rep["hollow"]["holes"] = made
             thin = hr.get("wall_min_probe_mm", hr.get("thinnest_wall_mm"))
             if thin is not None and thin < s["wall_mm"] - 0.05:
+                # one wording for every thin-wall case (meshedit's own note says the same thing differently: not used)
                 rep["hollow"]["thin_wall"] = True
-                rep["notes"].append(f"Thin wall: the thinnest wall came out {thin:.2f} mm, thinner than the {s['wall_mm']:g} mm you asked for. "
-                                    "Thin spots can crack or leak resin; try a thicker wall if this part must be strong.")
-            elif hr.get("note"):
-                rep["notes"].append(hr["note"])
+                rep["notes"].append(thin_wall_note(thin, s["wall_mm"]))
             short = sum(1 for n in made if n < 2)
             if short:
                 rep["notes"].append(f"{short} hollow space(s) have fewer than 2 holes. Resin needs a drain hole and an air vent "

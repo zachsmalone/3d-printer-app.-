@@ -248,3 +248,11 @@ def test_overlapping_bodies_are_unioned_before_hollowing():
 def test_overlapping_bodies_resin_counted_once():
     _, rep = resin.prepare(_overlap(), resin.settings({"hollow": "false", "supports": "false", "tilt_deg": 0}))
     assert rep["estimate"]["resin_ml"] == pytest.approx(12.0, abs=0.1)        # 2 x 8 ml minus the 4 ml shared
+
+
+def test_thin_wall_has_one_wording():
+    for m in (_overlap(), trimesh.creation.box(extents=[20, 15, 10]), trimesh.creation.icosphere(subdivisions=3, radius=8)):
+        _, rep = resin.prepare(m, resin.settings({"supports": "false"}))
+        thin = [n for n in rep["notes"] if "wall" in n.lower() and "thin" in n.lower()]
+        assert len(thin) <= 1 and all(n.startswith("Thin wall: the thinnest wall came out") for n in thin)
+        assert not any("The thinnest wall is about" in n or "Some walls are thinner" in n for n in rep["notes"])
