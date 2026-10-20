@@ -10,10 +10,13 @@ export function lightRGB(light) {
 }
 export const brightness = (t, k = K_PER_MM) => Math.exp(-k * Math.max(0, t));
 
-export function wallThickness(pos, shape = "rect") {          // pos: flat Float32Array x,y,z,...
+export function wallThickness(pos, shape = "rect", box = null) {   // pos: flat Float32Array x,y,z,...; box {lo,hi}: whole-model bounds
   const n = pos.length / 3, lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], t = new Float32Array(n);
   for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) { const x = pos[3 * i + a]; if (x < lo[a]) lo[a] = x; if (x > hi[a]) hi[a] = x; }
-  if (shape === "nightlight" || shape === "cup") {
+  if (shape === "memorybox") {                                   // square box, flat backs outward: depth in from the nearest side
+    const L = box ? box.lo : lo, H = box ? box.hi : hi;
+    for (let i = 0; i < n; i++) { const x = pos[3 * i], y = pos[3 * i + 1]; t[i] = Math.max(0, Math.min(x - L[0], H[0] - x, y - L[1], H[1] - y)); }
+  } else if (shape === "nightlight" || shape === "cup") {
     const cx = (lo[0] + hi[0]) / 2, cy = (lo[1] + hi[1]) / 2, h = hi[2] - lo[2]; let rin = Infinity, rall = Infinity;
     const r = i => Math.hypot(pos[3 * i] - cx, pos[3 * i + 1] - cy);
     for (let i = 0; i < n; i++) { const z = pos[3 * i + 2], ri = r(i); rall = Math.min(rall, ri); if (z > lo[2] + 0.2 * h && z < lo[2] + 0.8 * h) rin = Math.min(rin, ri); }
@@ -30,8 +33,8 @@ export function wallThickness(pos, shape = "rect") {          // pos: flat Float
 }
 
 /* per-vertex RGB (Float32Array) for a light colour; shade is relative to the thinnest wall, gamma-lifted */
-export function backlitColors(pos, shape, light = "warm", k = K_PER_MM, gamma = 0.6) {
-  const t = wallThickness(pos, shape), L = lightRGB(light), out = new Float32Array(t.length * 3);
+export function backlitColors(pos, shape, light = "warm", k = K_PER_MM, gamma = 0.6, box = null) {
+  const t = wallThickness(pos, shape, box), L = lightRGB(light), out = new Float32Array(t.length * 3);
   let tmin = Infinity; for (const x of t) tmin = Math.min(tmin, x);
   const top = brightness(tmin, k) || 1;
   for (let i = 0; i < t.length; i++) { const s = Math.min(1, brightness(t[i], k) / top) ** gamma; out[3 * i] = L[0] * s; out[3 * i + 1] = L[1] * s; out[3 * i + 2] = L[2] * s; }

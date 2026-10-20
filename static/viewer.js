@@ -65,12 +65,14 @@ export class Viewer {
   setBacklight(on, shape = "rect", light = "warm") {
     this.backlit = on;
     this.scene.background = on ? new THREE.Color(0x0b0d12) : null;
+    let box = null;
+    if (on && shape === "memorybox") { const b = new THREE.Box3().setFromObject(this.group); box = { lo: b.min.toArray(), hi: b.max.toArray() }; }
     for (const m of this.group.children) {
       if (!m.userData.lit) m.userData.lit = m.material;
       if (m.material !== m.userData.lit) m.material.dispose();          // drop the previous backlit material (colour change / off)
       if (!on || SOLID_PART.test(m.userData.name || "")) { m.material = m.userData.lit; m.material.wireframe = this.wire; continue; }   // stands / bases / lids stay opaque
       const pos = m.geometry.getAttribute("position");
-      m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, "white"), 3));   // shade once
+      m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, "white", undefined, undefined, box), 3));   // shade once
       m.material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, wireframe: this.wire });
       m.material.color.setRGB(...lightRGB(light));                                   // light colour = material tint (effects change it in place)
     }

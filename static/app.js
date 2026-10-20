@@ -93,7 +93,7 @@ function applyMode() {
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   applyShape();
-  $("#lithMatBox").hidden = S.mode !== "lithophane"; $("#lithThk").hidden = !isExpert();
+  $("#lithMatBox").hidden = S.mode !== "lithophane"; $("#mboxBox").hidden = S.mode !== "lithophane"; $("#lithThk").hidden = !isExpert();
   const tr = S.mode === "trace2d";               // 'Logo & Drawing to 3D' has its own settings panel at both levels
   $("#traceOpts").hidden = !tr;
   $("#beginnerOpts").hidden = tr || isExpert(); $("#expertOpts").hidden = tr || !isExpert();
@@ -306,6 +306,40 @@ function fillLithMat() {
   set("min_thickness", mn); set("max_thickness", mx); set("resolution", d.resolution);
 }
 $("#lithMaterial").onchange = fillLithMat; $("#lithThk").onchange = fillLithMat;
+/* Memory box: 4 photos round a light (stateless API; preview is the assembled cube, downloads are the print parts) */
+$("#lithMaterial").addEventListener("change", () => { $("#mbClear").value = $("#lithMaterial").value === "resin" ? 0.1 : 0.2; });
+$("#mbHole").onchange = () => { $("#mbCustom").hidden = $("#mbHole").value !== "custom"; };
+function mbForm(fmt) {
+  const fs = [...$("#mbFiles").files];
+  if (fs.length !== 4) throw new Error("Choose exactly 4 photos, one per side.");
+  const fd = new FormData();
+  fs.forEach(f => fd.append("files", f));
+  const kv = { fmt, style: $("#mbStyle").value, panel_mm: $("#mbSize").value, material: $("#lithMaterial").value, clearance_mm: $("#mbClear").value,
+    hole_preset: $("#mbHole").value, hole_shape: $("#mbHoleShape").value, hole_w: $("#mbHoleW").value, hole_d: $("#mbHoleD").value,
+    notch_mm: $("#mbNotch").value, lid: $("#mbLid").checked, photo_ack: $("#mbAck").checked };
+  for (const [k, v] of Object.entries(kv)) fd.append(k, v);
+  return fd;
+}
+async function mbRun(fmt) {
+  const st = $("#mbStatus");
+  try {
+    const fd = mbForm(fmt); st.textContent = "Making your memory box…";
+    const r = await fetch("/api/memorybox", { method: "POST", body: fd });
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch (_) {} throw new Error(m); }
+    if (fmt !== "preview") {
+      const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob());
+      a.download = fmt === "3mf" ? "memory-box.3mf" : "memory-box-stls.zip"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      st.textContent = "Downloaded. Every part is its own object."; return;
+    }
+    const j = await r.json();
+    S.current = { mode: "lithophane", info: j.info, params: { shape: "memorybox" }, preview: j.preview, stats: j.stats };
+    $("#viewerEmpty").hidden = true; $("#vtools").hidden = false;
+    viewer?.load(j.preview, "lithophane"); S.lightOn = false; syncLight();
+    const w = j.info.warnings || [];
+    st.textContent = `Parts: ${j.info.parts.join(", ")}.` + (w.length ? " ⚠ " + w.join(" ") : "") + " Tap 💡 Light on to see it lit.";
+  } catch (e) { st.textContent = "Couldn't make the box: " + (e.message || "something went wrong"); }
+}
+$("#mbPreview").onclick = () => mbRun("preview"); $("#mb3mf").onclick = () => mbRun("3mf"); $("#mbZip").onclick = () => mbRun("zip");
 /* "Light on": backlit lithophane preview estimate (thin = bright, thick = dark) */
 const litShapeOf = r => r?.info?.shape || r?.params?.shape || "rect";
 function syncLight() {

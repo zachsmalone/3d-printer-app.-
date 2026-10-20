@@ -33,6 +33,8 @@ def display(t, k: float = K_PER_MM, gamma: float = 0.6):
 def wall_thickness(v, shape: str = "rect"):
     v = np.asarray(v, float)
     lo, hi = v.min(0), v.max(0)
+    if shape == "memorybox":                    # square box, flat backs outward (twin of lithlight.js)
+        return np.maximum(0, np.minimum.reduce([v[:, 0] - lo[0], hi[0] - v[:, 0], v[:, 1] - lo[1], hi[1] - v[:, 1]]))
     if shape in ("nightlight", "cup"):
         c = (lo + hi) / 2
         r = np.hypot(v[:, 0] - c[0], v[:, 1] - c[1])

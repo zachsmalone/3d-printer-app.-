@@ -523,3 +523,57 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
         return RedirectResponse(filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900),
                                 status_code=303)
     return FileResponse(p, filename=f"photo3d_{bid}.{ext}", headers=NO_STORE)
+
+
+@router.post("/memorybox")
+def memorybox_build(actor: Actor = Depends(get_actor), files: list[UploadFile] = File(...), photo_ack: bool = Form(False),
+                    fmt: str = Form("preview"), style: str = Form("frame"), panel_mm: float = Form(80.0),
+                    material: str = Form("filament"), clearance_mm: str = Form(""), hole_shape: str = Form("round"),
+                    hole_preset: str = Form("tealight"), hole_w: str = Form(""), hole_d: str = Form(""),
+                    notch_mm: str = Form(""), lid: bool = Form(True)):
+    """Memory box (4 lithophane sides round a light). Stateless like the trace preview: nothing is stored.
+    fmt=preview -> assembled preview + part list; fmt=3mf -> one 3MF with every part as its own object; fmt=zip -> STLs."""
+    from fastapi.responses import Response
+    from ..core import memorybox
+    if fmt not in ("preview", "3mf", "zip"):
+        raise HTTPException(400, "fmt must be preview, 3mf or zip")
+    if len(files) != 4:
+        raise HTTPException(400, "A memory box needs exactly 4 photos, one per side.")
+    params = dict(style=style, panel_mm=panel_mm, material=material, clearance_mm=clearance_mm, hole_shape=hole_shape,
+                  hole_preset=hole_preset, hole_w=hole_w, hole_d=hole_d, notch_mm=notch_mm, lid=lid)
+    try:
+        memorybox.check_params(params)              # refuse bad options before any upload is read or rate-counted
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    ims = []
+    for up in files:
+        data = up.file.read(MAX_UPLOAD + 1)
+        if len(data) > MAX_UPLOAD:
+            raise HTTPException(413, "image too large (max 25 MB)")
+        try:
+            checked = uploadgate.gate(data, actor.sid, source="memorybox")
+        except uploadgate.GateError as e:
+            raise HTTPException(e.status, e.message)
+        if getattr(checked, "scan_state", "off") == "unscanned":
+            raise HTTPException(503, "The photo safety check is unavailable right now. Nothing was saved; please try again soon.")
+        try:
+            imagesafe.check_ack(data, photo_ack)
+            ims.append(imagesafe.sanitize(data)[2])
+        except imagesafe.ImageRefused as e:
+            raise HTTPException(400, str(e))
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, imagesafe.UNREADABLE)
+    try:
+        pm, view = memorybox.build(ims, params)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if fmt == "3mf":
+        return Response(exporters.to_3mf(pm, "memory-box"), media_type="model/3mf",
+                        headers={"Content-Disposition": 'attachment; filename="memory-box.3mf"'})
+    if fmt == "zip":
+        return Response(memorybox.stl_zip(pm), media_type="application/zip",
+                        headers={"Content-Disposition": 'attachment; filename="memory-box-stls.zip"'})
+    return {"mode": "lithophane", "info": {**view.info, "shape": "memorybox"}, "preview": preview_payload(view),
+            "stats": mesh_stats(pm)}
