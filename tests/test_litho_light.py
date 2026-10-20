@@ -173,3 +173,24 @@ def test_effect_selector_speed_warning_and_loop_hygiene():
     assert '"visibilitychange", syncFx' in app
     v = (ROOT / "static" / "viewer.js").read_text()
     assert "setTint(rgb)" in v and "color.setRGB(" in v
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_material_colour_multiplies_the_light():
+    o = _node("console.log(JSON.stringify({w: L.transmit([1, 0.5, 0.2], L.materialRGB('white')),"
+              " r: L.transmit([1, 1, 1], L.materialRGB('red')), c: L.materialRGB('#808000'), bad: L.materialRGB('nope'),"
+              " m: L.transmit(L.lightRGB('#ff0000'), L.materialRGB('blue'))}))")
+    assert o["w"] == [1, 0.5, 0.2] and o["r"] == [1.0, 0.35, 0.3] and o["bad"] == [1, 1, 1]
+    assert o["c"] == pytest.approx([128 / 255, 128 / 255, 0]) and o["m"] == pytest.approx([0.4, 0, 0])
+
+
+def test_material_picker_stand_solid_and_expert_resin_presets_wired():
+    html = (ROOT / "static" / "index.html").read_text()
+    assert 'id="vMatColor"' in html and 'for="vMatColor"' in html and 'type="color" id="vMatRGB"' in html and 'id="lithThk"' in html
+    app = (ROOT / "static" / "app.js").read_text()
+    assert "localStorage.lithMat" in app and "transmit(effectRGB(" in app and "transmit(fxColour(), matColour())" in app
+    assert "THK_IX" in app and '$("#lithThk").onchange = fillLithMat' in app
+    v = (ROOT / "static" / "viewer.js").read_text()
+    assert "SOLID_PART = /^(stand|base|lid|frame|post|rail)/" in v and "SOLID_PART.test(m.userData.name" in v
+    assert "mesh.userData.name = b.name" in v
+    assert "stand" in __import__("inspect").getsource(__import__("app.core.geometry", fromlist=["x"]).litho_stand_body)

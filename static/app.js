@@ -1,4 +1,4 @@
-import { effectRGB, defaultEffect, lightRGB as fxBase } from "/static/lithlight.js";
+import { effectRGB, defaultEffect, lightRGB as fxBase, materialRGB, transmit } from "/static/lithlight.js";
 import { Viewer } from "/static/viewer.js";
 
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -79,7 +79,7 @@ function applyLevel(announce = false) {
   $("#modeSel").value = S.level; $("#modeIco").textContent = LEVEL_ICO[S.level]; $("#modeLine").textContent = LEVEL_LINE[S.level];
   document.dispatchEvent(new CustomEvent("zeim:level"));
   $("#beginnerOpts").hidden = isExpert() || S.mode === "trace2d";
-  $("#expertOpts").hidden = !isExpert() || S.mode === "trace2d";
+  $("#expertOpts").hidden = !isExpert() || S.mode === "trace2d"; $("#lithThk").hidden = !isExpert();
   if (announce) say(LEVEL_SAY[S.level]);
 }
 $("#modeSel").onchange = e => {
@@ -93,7 +93,7 @@ function applyMode() {
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   applyShape();
-  $("#lithMatBox").hidden = S.mode !== "lithophane";
+  $("#lithMatBox").hidden = S.mode !== "lithophane"; $("#lithThk").hidden = !isExpert();
   const tr = S.mode === "trace2d";               // 'Logo & Drawing to 3D' has its own settings panel at both levels
   $("#traceOpts").hidden = !tr;
   $("#beginnerOpts").hidden = tr || isExpert(); $("#expertOpts").hidden = tr || !isExpert();
@@ -294,15 +294,18 @@ $("#vLeft").onclick = () => viewer?.turn(-30);
 $("#vRight").onclick = () => viewer?.turn(30);
 $("#vWire").onclick = () => viewer?.toggleWire();
 /* Lithophane printer type: Resin = thinner walls + finer detail. Starting suggestions (keep in step with app/core/autotune.py LITHO_MATERIALS, standard preset). */
-const LITH_MAT = {
-  filament: { min_thickness: 0.8, max_thickness: 3.0, resolution: 200, help: "Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first." },
-  resin: { min_thickness: 0.5, max_thickness: 2.8, resolution: 400, help: "Resin: thinner 0.5–2.8 mm walls and finer detail. Starting suggestions; resins vary, so test a small strip first." },
+const LITH_MAT = {   // [thin, standard, thick] min/max thickness; starting suggestions
+  filament: { thk: [[0.6, 2.4], [0.8, 3.0], [1.0, 4.0]], resolution: 200, help: "Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first." },
+  resin: { thk: [[0.5, 2.5], [0.5, 2.8], [0.6, 3.0]], resolution: 400, help: "Resin: thinner 0.5–2.8 mm walls and finer detail. Starting suggestions; resins vary, so test a small strip first." },
 };
-$("#lithMaterial").onchange = e => {
-  const d = LITH_MAT[e.target.value] || LITH_MAT.filament;
+const THK_IX = { thin: 0, standard: 1, thick: 2 };
+function fillLithMat() {
+  const d = LITH_MAT[$("#lithMaterial").value] || LITH_MAT.filament, [mn, mx] = d.thk[THK_IX[$("#lithThk").value] ?? 1];
   $("#lithMatHelp").textContent = d.help;
-  for (const k of ["min_thickness", "max_thickness", "resolution"]) { const el = $(`#expertOpts [name="${k}"]`); if (el) el.value = d[k]; }
-};
+  const set = (k, v) => { const el = $(`#expertOpts [name="${k}"]`); if (el) el.value = v; };
+  set("min_thickness", mn); set("max_thickness", mx); set("resolution", d.resolution);
+}
+$("#lithMaterial").onchange = fillLithMat; $("#lithThk").onchange = fillLithMat;
 /* "Light on": backlit lithophane preview estimate (thin = bright, thick = dark) */
 const litShapeOf = r => r?.info?.shape || r?.params?.shape || "rect";
 function syncLight() {
@@ -334,10 +337,20 @@ try {
 } catch (_) {}
 let fxRaf = 0, fxT0 = 0;
 const fxColour = () => { const lc = $("#vLightColor").value; return fxBase(lc === "custom" ? $("#vLightRGB").value : lc); };
+const matColour = () => { const m = $("#vMatColor").value; return materialRGB(m === "custom" ? $("#vMatRGB").value : m); };
+try {
+  const mc = localStorage.lithMat, mr = localStorage.lithMatRGB;
+  if (mc && [...$("#vMatColor").options].some(o => o.value === mc)) $("#vMatColor").value = mc;
+  if (/^#[0-9a-f]{6}$/i.test(mr || "")) $("#vMatRGB").value = mr;
+} catch (_) {}
+$("#vMatRGB").hidden = $("#vMatColor").value !== "custom";
+const saveMat = () => { try { localStorage.lithMat = $("#vMatColor").value; localStorage.lithMatRGB = $("#vMatRGB").value; } catch (_) {} };
+$("#vMatColor").onchange = () => { $("#vMatRGB").hidden = $("#vMatColor").value !== "custom"; saveMat(); syncFx(); };
+$("#vMatRGB").oninput = () => { saveMat(); syncFx(); };
 function fxTick(now) {
   fxRaf = 0;
   if (!S.lightOn || document.hidden || !viewer || $("#vLightFx").value === "steady") return;
-  viewer.setTint(effectRGB($("#vLightFx").value, fxColour(), (now - fxT0) / 1000, +$("#vLightSpeed").value));
+  viewer.setTint(transmit(effectRGB($("#vLightFx").value, fxColour(), (now - fxT0) / 1000, +$("#vLightSpeed").value), matColour()));
   fxRaf = requestAnimationFrame(fxTick);
 }
 function syncFx() {
@@ -346,7 +359,7 @@ function syncFx() {
   if (fx !== "strobe") $("#vStrobeWarn").hidden = true;
   if (fxRaf) { cancelAnimationFrame(fxRaf); fxRaf = 0; }
   if (S.lightOn && viewer && !document.hidden && fx !== "steady") { fxT0 = performance.now(); fxRaf = requestAnimationFrame(fxTick); }
-  else if (S.lightOn && viewer) viewer.setTint(fxColour());
+  else if (S.lightOn && viewer) viewer.setTint(transmit(fxColour(), matColour()));
 }
 $("#vLightFx").onchange = e => {
   const fx = e.target.value;

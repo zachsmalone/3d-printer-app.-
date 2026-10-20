@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "/static/vendor/OrbitControls.js";
 import { backlitColors, lightRGB } from "/static/lithlight.js";
+const SOLID_PART = /^(stand|base|lid|frame|post|rail)/;   // non-lithophane parts: shown solid, never glowing
 
 const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
 
@@ -41,7 +42,7 @@ export class Viewer {
       gg.computeVertexNormals();
       const color = b.color || (mode === "lithophane" ? "#f2ead8" : "#8fb0e0");
       const m = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05, flatShading: false, wireframe: this.wire });
-      const mesh = new THREE.Mesh(gg, m); mesh.userData.object = b.object ?? null; this.group.add(mesh);
+      const mesh = new THREE.Mesh(gg, m); mesh.userData.object = b.object ?? null; mesh.userData.name = b.name || ""; this.group.add(mesh);
     }
     this.backlit = false; this.scene.background = null;
     if (!opts.keepCamera) this.reset();
@@ -67,7 +68,7 @@ export class Viewer {
     for (const m of this.group.children) {
       if (!m.userData.lit) m.userData.lit = m.material;
       if (m.material !== m.userData.lit) m.material.dispose();          // drop the previous backlit material (colour change / off)
-      if (!on) { m.material = m.userData.lit; m.material.wireframe = this.wire; continue; }
+      if (!on || SOLID_PART.test(m.userData.name || "")) { m.material = m.userData.lit; m.material.wireframe = this.wire; continue; }   // stands / bases / lids stay opaque
       const pos = m.geometry.getAttribute("position");
       m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, "white"), 3));   // shade once
       m.material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, wireframe: this.wire });

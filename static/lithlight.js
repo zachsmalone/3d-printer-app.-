@@ -69,3 +69,8 @@ export function defaultEffect(saved, reduce, optedIn = false) {
   const e = EFFECTS.includes(saved) ? saved : "steady";
   return reduce && !optedIn ? "steady" : e;
 }
+
+/* filament / resin colour: transmitted light = light colour x material colour (per channel) */
+export const MATERIALS = { white: [1, 1, 1], natural: [1.0, 0.94, 0.82], ivory: [1.0, 0.97, 0.88], grey: [0.62, 0.62, 0.62], red: [1.0, 0.35, 0.3], blue: [0.4, 0.6, 1.0] };
+export const materialRGB = m => (MATERIALS[m] || (/^#?[0-9a-f]{6}$/i.test(String(m || "")) ? lightRGB(m) : MATERIALS.white));
+export const transmit = (light, mat) => light.map((x, i) => x * mat[i]);
