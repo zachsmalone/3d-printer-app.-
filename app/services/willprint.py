@@ -69,7 +69,7 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
 
 PIP_CLEARANCE_FDM = 0.3      # safe print-in-place gap between separate parts (hinge knuckles, pins, joints, chain links)
 PIP_CLEARANCE_RESIN = 0.15
-GAP_MAX_FACES = 200_000
+GAP_MAX_FACES = 150_000
 
 
 def part_gaps(mesh: trimesh.Trimesh, safe_mm: float) -> dict:
@@ -79,10 +79,12 @@ def part_gaps(mesh: trimesh.Trimesh, safe_mm: float) -> dict:
     if len(mesh.faces) == 0 or len(mesh.faces) > GAP_MAX_FACES:
         return out
     try:
-        parts = mesh.split(only_watertight=False)
+        m = mesh.copy(); m.merge_vertices()                           # STLs load with unshared vertices: without this every
+        comps = trimesh.graph.connected_components(m.face_adjacency, nodes=np.arange(len(m.faces)))   # triangle is its own "part" (16 s on a lithophane)
+        if len(comps) < 2 or len(comps) > 60:
+            return out
+        parts = [m.submesh([c], append=True) for c in comps]
     except Exception:
-        return out
-    if len(parts) < 2 or len(parts) > 60:
         return out
     from scipy.spatial import cKDTree
     pts = []

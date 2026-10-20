@@ -27,3 +27,13 @@ def test_safe_gap_single_body_and_far_parts_are_quiet():
 def test_badge_has_slice_anyway_dismiss():
     js = open(os.path.join(ROOT, "static/printer.js")).read()
     assert "Got it, slice anyway" in js and "sessionStorage" in js and "data-gapok" in js
+
+
+def test_gap_check_is_fast_on_an_unmerged_stl():
+    """STLs load with unshared vertices; the gap check used to treat every triangle as a part (16 s on a lithophane,
+    which also kept the test server from shutting down)."""
+    import time
+    m = trimesh.creation.icosphere(subdivisions=6, radius=20)            # 81k faces
+    m = trimesh.Trimesh(m.triangles.reshape(-1, 3), __import__("numpy").arange(len(m.faces) * 3).reshape(-1, 3), process=False)
+    t = time.time(); g = willprint.part_gaps(m, 0.3)
+    assert time.time() - t < 5 and g["ok"] is True
