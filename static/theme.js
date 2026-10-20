@@ -7,12 +7,23 @@
   var MOON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
   function isDark() { return root.getAttribute("data-theme") === "dark"; }
   function apply(dark) { if (dark) root.setAttribute("data-theme", "dark"); else root.removeAttribute("data-theme"); }
+  var FORCED_MSG = "Your Windows contrast theme is on, so it's controlling ZEIM's colours. Turn it off in Windows Settings > Accessibility > Contrast themes to use ZEIM's themes.";
+  function forced() { try { return matchMedia("(forced-colors: active)").matches; } catch (e) { return false; } }
   function paint(b) {
     var d = isDark();
     b.setAttribute("aria-pressed", String(d));
     b.setAttribute("aria-label", "Dark mode");
-    b.title = d ? "Switch to light mode" : "Switch to dark mode";
+    b.title = forced() ? FORCED_MSG : (d ? "Switch to light mode" : "Switch to dark mode");
     b.innerHTML = d ? SUN : MOON;
+  }
+  // Windows contrast themes (forced-colors) override every page colour, so the toggle seems to do nothing. Say so once (never blocks).
+  function forcedNote(b) {
+    if (!forced()) return;
+    try { if (sessionStorage.getItem("zeim_forced_note")) return; sessionStorage.setItem("zeim_forced_note", "1"); } catch (e) { }
+    var n = document.getElementById("forcedNote");
+    if (!n) { n = document.createElement("div"); n.id = "forcedNote"; n.setAttribute("role", "status"); n.className = "forcednote"; document.body.appendChild(n); }
+    n.innerHTML = ""; var t = document.createElement("span"); t.textContent = FORCED_MSG; n.appendChild(t);
+    var x = document.createElement("button"); x.type = "button"; x.className = "btn small"; x.textContent = "OK"; x.onclick = function () { n.remove(); if (b) b.focus(); }; n.appendChild(x);
   }
   function setup() {
     var b = document.getElementById("themeToggle");
@@ -31,7 +42,7 @@
         var t = e.target && e.target.closest && e.target.closest("#themeToggle"); if (!t) return;
         var d = !isDark(); apply(d);
         try { localStorage.theme = d ? "dark" : "light"; } catch (er) { }
-        paint(t);
+        paint(t); forcedNote(t);
         document.dispatchEvent(new CustomEvent("zeim:theme", { detail: { dark: d } }));
       });
       addEventListener("storage", function (e) { if (e.key === "theme") { apply(e.newValue === "dark"); var x = document.getElementById("themeToggle"); if (x) paint(x); } });

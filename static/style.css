@@ -753,3 +753,7 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 
 /* brand logo: light and dark variants swap with the theme */
 .logo-dark{display:none!important}html[data-theme=dark] .logo-light{display:none!important}html[data-theme=dark] .logo-dark{display:block!important}
+
+/* Windows contrast themes (forced-colors): the system picks the colours; keep the logo as drawn and say why the toggle has no effect */
+.forcednote{position:fixed;right:12px;top:64px;z-index:60;max-width:420px;display:flex;gap:8px;align-items:flex-start;padding:10px 12px;border:2px solid CanvasText;background:Canvas;color:CanvasText;border-radius:10px}
+@media (forced-colors:active){.logoimg{forced-color-adjust:none;background:#fff;padding:2px 6px;border-radius:6px}html[data-theme=dark] .logo-light{display:block!important}html[data-theme=dark] .logo-dark{display:none!important}}
