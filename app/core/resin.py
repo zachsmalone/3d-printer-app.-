@@ -100,36 +100,46 @@ def orient(m: trimesh.Trimesh, tilt_deg: float) -> trimesh.Trimesh:
     return m
 
 
-def support_points(m: trimesh.Trimesh, spacing: float, max_angle_deg: float = 45.0) -> np.ndarray:
+def support_points(m: trimesh.Trimesh, spacing: float, max_angle_deg: float = 45.0, envelope=None) -> np.ndarray:
     """Points on downward-facing surfaces (steeper than max_angle_deg from vertical-down counts as overhang),
-    thinned to one per `spacing` mm cell, plus every local lowest vertex (islands that would start mid-air)."""
+    thinned to one per `spacing` mm cell, plus every local lowest vertex (islands that would start mid-air).
+    `envelope` (the solid before hollowing, same placement): a point whose outward side lies inside it is the inner
+    ceiling of a cavity or a hole wall, which resin prints don't support, so it is left out."""
     down = m.face_normals[:, 2] < -math.cos(math.radians(max_angle_deg))
-    pts = []
+    pts, nrm = [], []
     if down.any():
         area = m.area_faces[down].sum()
         n = int(min(20000, max(50, area / (spacing * spacing) * 4)))
-        sub = m.submesh([np.nonzero(down)[0]], append=True)
-        p, _ = trimesh.sample.sample_surface_even(sub, n, radius=spacing * 0.5, seed=3) if len(sub.faces) else (np.zeros((0, 3)), None)
-        pts.append(p)
-    # local minima: vertices lower than all their neighbours
+        idx = np.nonzero(down)[0]
+        sub = m.submesh([idx], append=True)
+        if len(sub.faces):
+            p, fi = trimesh.sample.sample_surface_even(sub, n, radius=spacing * 0.5, seed=3)
+            pts.append(p); nrm.append(sub.face_normals[fi])
     v = m.vertices; nb = m.vertex_neighbors
     mins = [i for i in range(len(v)) if nb[i] and all(v[i, 2] < v[j, 2] - 1e-9 for j in nb[i])]
     if mins:
-        pts.append(v[mins])
+        pts.append(v[mins]); nrm.append(np.tile([0, 0, -1.0], (len(mins), 1)))
     if not pts:
         return np.zeros((0, 3))
-    p = np.vstack(pts)
+    p, nn = np.vstack(pts), np.vstack(nrm)
+    if envelope is not None and len(p):
+        inner = envelope.contains(p + nn * 0.3)
+        p = p[~inner]
+    if not len(p):
+        return np.zeros((0, 3))
     keys = np.floor(p[:, :2] / spacing).astype(np.int64)
     order = np.lexsort((p[:, 2], keys[:, 1], keys[:, 0]))        # lowest point per cell wins
     _, first = np.unique(keys[order], axis=0, return_index=True)
     return p[order[first]]
 
 
-def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0):
+def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None):
     """Model raised by base_lift; a cone tip + cylinder pillar to a raft under each support point.
     Points whose straight path down hits the model itself are skipped (counted) instead of piercing it."""
     m = m.copy(); m.apply_translation([0, 0, base_lift + raft_mm])
-    pts = support_points(m, spacing)
+    if envelope is not None:
+        envelope = envelope.copy(); envelope.apply_translation([0, 0, base_lift + raft_mm])
+    pts = support_points(m, spacing, envelope=envelope)
     parts, skipped = [], 0
     if len(pts):
         org = pts - [0, 0, 0.05]
@@ -283,10 +293,12 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
     Warnings never block: they are notes; the files are always made."""
     rep = {"program": NAME, "settings": s, "notes": [], "safety": SAFETY, "test_note": TEST_NOTE}
     work = orient(m, s["tilt_deg"])
+    envelope = None
     if s["hollow"] and s["wall_mm"] > 0:
         try:
             hollowed, hr = meshedit.op_hollow(work, {"wall": s["wall_mm"], "drain_diameter": 0})
             hollowed, made = add_holes(hollowed, s["drain_mm"])
+            envelope = work if work.is_watertight else None
             work = hollowed
             rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
             rep["hollow"]["cavities"] = len(made); rep["hollow"]["holes"] = made
@@ -300,7 +312,7 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
             rep["notes"].append(f"Printed solid (not hollowed): {e}")
     vol = float(abs(work.volume))
     if s["supports"]:
-        work, sr = build_supports(work, s["support_spacing_mm"], s["base_lift_mm"])
+        work, sr = build_supports(work, s["support_spacing_mm"], s["base_lift_mm"], envelope=envelope)
         rep["support"] = sr
         vol += sr.pop("_volume")
         if sr["skipped_inside"]:

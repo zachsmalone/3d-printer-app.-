@@ -192,3 +192,11 @@ def test_hollow_gets_drain_and_vent_and_warns_without_holes():
 def test_warnings_have_dismiss_in_ui():
     js = (ROOT / "static" / "torchc0.js").read_text()
     assert "rzDismiss" in js and "Dismiss" in js
+
+
+def test_hollow_inner_ceiling_is_not_an_unsupported_overhang():
+    out, rep = resin.prepare(trimesh.creation.box(extents=[20, 15, 10]), resin.settings())
+    assert rep["hollow"]["cavities"] == 1
+    assert rep["support"]["skipped_inside"] == 0 and not any("overhang spot" in n for n in rep["notes"])
+    _, solid = resin.prepare(trimesh.creation.box(extents=[20, 15, 10]), resin.settings({"hollow": "false"}))
+    assert rep["support"]["supports"] <= solid["support"]["supports"] * 1.25   # no extra supports for the cavity
