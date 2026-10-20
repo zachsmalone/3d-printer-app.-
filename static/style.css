@@ -1,6 +1,6 @@
-/* Warm light is the default look; Dark is a choice (html[data-theme=dark], stored in localStorage.theme). Tokens and contrast: reports/design/home-redesign-spec.md section 5 (tests/test_b3_theme.py recomputes the ratios). */
-:root{--bg:#FFF8EE;--panel:#FFFFFF;--panel2:#FFF1DC;--sunk:#FBF3E6;--line:#E6D5BD;--ctl:#7F6F5D;--txt:#2B2118;--mut:#5E4F40;--acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#4F34C7;--acc2:#4F34C7;--tint:#EDE7FF;--warm:#B4410C;--warmtint:#FFE3CC;--focus:#1D4ED8;--ok:#166534;--okbg:#E3F5E8;--bad:#B91C1C;--badbg:#FDE8E8;--warn:#8A5300;--r:12px;--stage1:#2c3547;--stage2:#0b0e14;color-scheme:light}
-html[data-theme=dark]{--bg:#0E1117;--panel:#161B24;--panel2:#1C2330;--sunk:#121722;--line:#2A3344;--ctl:#7B88A6;--txt:#E6EAF2;--mut:#A9B4C9;--acc:#5B3FD6;--on-acc:#FFFFFF;--accink:#B8A9FF;--acc2:#B8A9FF;--tint:#2A2457;--warm:#FFB26B;--warmtint:#3A2A1A;--focus:#8DB8FF;--ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;color-scheme:dark}
+/* Neutral light (ZEIM brand: black, blue, grey) is the default look; Dark is a choice (html[data-theme=dark], stored in localStorage.theme). Tokens and contrast: reports/design/home-redesign-spec.md section 5 (tests/test_b3_theme.py recomputes the ratios). */
+:root{--bg:#F7F7F8;--panel:#FFFFFF;--panel2:#F1F2F4;--sunk:#F4F5F7;--line:#D9DBDF;--ctl:#8A8A8A;--txt:#0A0A0A;--mut:#555555;--acc:#0066FF;--on-acc:#FFFFFF;--accink:#0052CC;--acc2:#0052CC;--tint:#E6F0FF;--warm:#B4410C;--warmtint:#FFE3CC;--focus:#0066FF;--ok:#166534;--okbg:#E3F5E8;--bad:#B91C1C;--badbg:#FDE8E8;--warn:#8A5300;--r:12px;--stage1:#2c3547;--stage2:#0b0e14;color-scheme:light}   /* ZEIM brand: black #0A0A0A, blue #0066FF (primary, accents, focus), grey #8A8A8A (borders/controls only: it fails AA for small text, so body/help text uses #555) */
+html[data-theme=dark]{--bg:#0A0A0A;--panel:#141414;--panel2:#1B1B1B;--sunk:#101010;--line:#2E2E2E;--ctl:#8A8A8A;--txt:#F2F2F2;--mut:#B8B8B8;--acc:#0066FF;--on-acc:#FFFFFF;--accink:#6AA6FF;--acc2:#6AA6FF;--tint:#0B1F40;--warm:#FFB26B;--warmtint:#3A2A1A;--focus:#6AA6FF;--ok:#4ADE80;--okbg:#12301F;--bad:#FF9A9A;--badbg:#3A1A1E;--warn:#FBBF24;color-scheme:dark}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 *{box-sizing:border-box}html{height:100%}body{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
@@ -83,7 +83,7 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
 .toast{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--acc);padding:10px 14px;border-radius:9px;max-width:360px;box-shadow:0 8px 30px #0008}
 .toast.err{border-left-color:var(--bad)}.toast.ok{border-left-color:var(--ok)}
 /* ---- nav / pages / community ---- */
-.logoimg{height:36px;display:block;background:#fff;border-radius:8px;padding:3px 8px}
+.logoimg{height:36px;width:auto;display:block;background:none;border-radius:0;padding:0}
 .brand{display:flex;align-items:center;text-decoration:none}
 .nav{display:flex;gap:4px}.nav button{background:none;border:0;color:var(--mut);padding:7px 14px;border-radius:9px;cursor:pointer;font:inherit;font-weight:600}
 .nav button.on{background:var(--panel2);color:var(--txt);box-shadow:0 -2px 0 var(--acc2) inset}
@@ -540,7 +540,7 @@ h1,h2,h3,h4{letter-spacing:-.022em}
 .themetoggle.floating{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:30}
 .topbar .themetoggle{margin-left:auto}.topbar .spacer+.themetoggle,.topbar .btn+.themetoggle{margin-left:var(--s1)}
 html[data-theme=dark] dialog::backdrop{background:rgba(0,0,0,.6)}
-html[data-theme=dark] .logoimg{background:#fff}
+html[data-theme=dark] .logoimg{background:none}
 html[data-theme=dark] input,html[data-theme=dark] select,html[data-theme=dark] textarea{color-scheme:dark}
 input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,textarea){color-scheme:dark}
 @media (max-width:768px){.topbar{background:var(--panel);backdrop-filter:none;-webkit-backdrop-filter:none}/* a filter here would trap the fixed bottom tab bar */
@@ -750,3 +750,6 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 .lookbtn{width:44px;height:44px;min-width:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer;order:98}
 .lookbtn .i{width:20px;height:20px}
 #dlgLook .lookgrid{display:grid;gap:12px}#dlgLook label{display:grid;gap:4px}
+
+/* brand logo: light and dark variants swap with the theme */
+.logo-dark{display:none!important}html[data-theme=dark] .logo-light{display:none!important}html[data-theme=dark] .logo-dark{display:block!important}

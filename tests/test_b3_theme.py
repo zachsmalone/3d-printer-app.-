@@ -48,8 +48,19 @@ def test_control_borders_and_focus_ring_are_at_least_3_to_1(theme, t):
 
 
 def test_light_is_the_default_and_the_violet_gradient_and_old_brand_violet_are_gone():
-    assert LIGHT["bg"].lower() == "#fff8ee" and "color-scheme:light" in CSS[CSS.index(":root{"):].split("}")[0]
+    assert LIGHT["bg"].lower() == "#f7f7f8" and LIGHT["acc"].lower() == "#0066ff" and "color-scheme:light" in CSS[CSS.index(":root{"):].split("}")[0]
     assert "prefers-color-scheme:dark" not in CSS.replace(" ", "")          # dark only when the person chose it
     assert "#7c5cff" not in CSS.lower() and "linear-gradient(135deg,var(--acc)" not in CSS
     idx = (Path(__file__).parent.parent / "static" / "index.html").read_text()
     assert 't==="dark"' in idx[:idx.index("</head>")]          # saved choice wins; OS preference only when nothing is saved (inline head snippet)
+
+
+def test_brand_logo_variants_icons_and_palette():
+    root = Path(__file__).parent.parent / "static"
+    idx = (root / "index.html").read_text()
+    assert "/static/zeim-logo.png" in idx and "/static/zeim-logo-dark.png" in idx and "apple-touch-icon" in idx
+    for f in ("zeim-logo.png", "zeim-logo-dark.png", "favicon.png", "favicon.ico", "apple-touch-icon.png"):
+        assert (root / f).stat().st_size > 1000, f
+    css = (root / "style.css").read_text()
+    assert "html[data-theme=dark] .logo-dark{display:block" in css
+    assert LIGHT["txt"].lower() == "#0a0a0a" and LIGHT["ctl"].lower() == "#8a8a8a" and LIGHT["mut"].lower() != "#8a8a8a"   # grey only for borders
