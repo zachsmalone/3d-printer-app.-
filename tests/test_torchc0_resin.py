@@ -200,3 +200,10 @@ def test_hollow_inner_ceiling_is_not_an_unsupported_overhang():
     assert rep["support"]["skipped_inside"] == 0 and not any("overhang spot" in n for n in rep["notes"])
     _, solid = resin.prepare(trimesh.creation.box(extents=[20, 15, 10]), resin.settings({"hollow": "false"}))
     assert rep["support"]["supports"] <= solid["support"]["supports"] * 1.25   # no extra supports for the cavity
+
+
+def test_thin_wall_is_told_plainly():
+    _, rep = resin.prepare(trimesh.creation.box(extents=[20, 15, 10]), resin.settings({"supports": "false"}))
+    thin = rep["hollow"]["thinnest_wall_mm"]
+    assert thin < 2.0 and rep["hollow"]["thin_wall"]
+    assert sum("Thin wall" in n for n in rep["notes"]) == 1 and "you asked for" in next(n for n in rep["notes"] if "Thin wall" in n)

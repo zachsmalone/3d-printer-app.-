@@ -302,7 +302,12 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
             work = hollowed
             rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
             rep["hollow"]["cavities"] = len(made); rep["hollow"]["holes"] = made
-            if hr.get("note"):
+            thin = hr.get("wall_min_probe_mm", hr.get("thinnest_wall_mm"))
+            if thin is not None and thin < s["wall_mm"] - 0.05:
+                rep["hollow"]["thin_wall"] = True
+                rep["notes"].append(f"Thin wall: the thinnest wall came out {thin:.2f} mm, thinner than the {s['wall_mm']:g} mm you asked for. "
+                                    "Thin spots can crack or leak resin; try a thicker wall if this part must be strong.")
+            elif hr.get("note"):
                 rep["notes"].append(hr["note"])
             short = sum(1 for n in made if n < 2)
             if short:
