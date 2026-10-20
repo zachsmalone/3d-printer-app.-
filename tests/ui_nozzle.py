@@ -16,6 +16,8 @@ def axe(pg, label):
     # Wait until secondary dialog buttons have opaque text+bg (avoids one-frame flake on #nzAcctLater).
     _ready = r"""() => {
       const el = document.querySelector('#nzAcctLater') || document.querySelector('.dlg .df .btn:not(.primary)');
+      // a CSS transition still running (button colours under a busy full-suite run) reads as a mid-blend colour to axe
+      if (document.getAnimations().some(a => a.playState === 'running' && !(a.effect && a.effect.getComputedTiming().iterations === Infinity))) return false;
       if (!el) return true;
       const s = getComputedStyle(el);
       const parse = (c) => { const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/); return m ? [+m[1],+m[2],+m[3], m[4]==null?1:+m[4]] : null; };

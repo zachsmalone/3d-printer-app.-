@@ -99,9 +99,9 @@ def run(name, launch, with_axe):
     # keyboard order of the first controls
     ctx, pg = page()
     order = []
-    for _ in range(11):
+    for _ in range(12):
         pg.keyboard.press("Tab"); order.append(pg.evaluate("document.activeElement.id || document.activeElement.textContent.trim().slice(0,12)"))
-    ok(f"{name}: keyboard reaches the six tabs, Mode, then the Dark mode toggle", all(t in order for t in ("Showcase", "Slicer", "CAD", "Lithophane", "Smart Fix", "Account", "modeSel", "themeToggle")) and order.index("modeSel") < order.index("themeToggle"), order)
+    ok(f"{name}: keyboard reaches the seven tabs, Mode, then the Dark mode toggle", all(t in order for t in ("Showcase", "FDM Slicer", "TorchC0", "CAD", "Lithophane", "Smart Fix", "Account", "modeSel", "themeToggle")) and order.index("modeSel") < order.index("themeToggle"), order)
     ok(f"{name}: no page errors", not errs, errs)
     ctx.close(); b.close()
 

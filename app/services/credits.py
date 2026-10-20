@@ -85,13 +85,71 @@ def _debian_licence(pkg: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+def _real_binary(path: str) -> str:
+    """Follow a small shell wrapper (e.g. ~/.local/bin/prusa-slicer -> exec $D/.../prusa-slicer "$@") to the program."""
+    try:
+        p = Path(path).resolve()
+        if p.stat().st_size > 16384 or not p.read_bytes()[:2] == b"#!":
+            return str(p)
+        env = {}
+        for line in p.read_text(errors="replace").splitlines():
+            line = line.strip()
+            sub = lambda x: re.sub(r"\$\{?(\w+)\}?", lambda m: env.get(m.group(1), ""), x)
+            m = re.fullmatch(r"(?:export\s+)?(\w+)=(\S+)", line)
+            if m:
+                env[m.group(1)] = sub(m.group(2).strip("\"'"))
+            elif line.startswith("exec "):
+                cand = sub(line.split()[1].strip("\"'"))
+                if Path(cand).is_file():
+                    return str(Path(cand).resolve())
+        return str(p)
+    except OSError:
+        return path
+
+
+@lru_cache(maxsize=8)
+def _cli_version(path: str) -> str:
+    """Version from the program's own banner (PrusaSlicer 2.8 has no --version; --help prints 'PrusaSlicer-2.8.1+...')."""
+    for flag in ("--version", "--help"):
+        try:
+            r = subprocess.run([path, flag], capture_output=True, text=True, timeout=15)
+        except Exception:
+            continue
+        m = re.search(r"\b[A-Za-z][\w-]*?[- ]v?(\d+\.\d+(?:\.\d+)?)", (r.stdout or "") + "\n" + (r.stderr or ""))
+        if m:
+            return m.group(1)
+    return ""
+
+
+_LICENCE_MARKERS = ((b"GNU Affero General Public License, version 3", "AGPL-3.0"),
+                    (b"GNU Affero General Public License", "AGPL"))
+
+
+@lru_cache(maxsize=8)
+def _binary_licence(path: str) -> str:
+    """The licence the program states about itself (its About text), read from the binary when no package says it."""
+    try:
+        with open(_real_binary(path), "rb") as f:
+            tail = b""
+            while chunk := f.read(1 << 22):
+                buf = tail + chunk
+                for marker, name in _LICENCE_MARKERS:
+                    if marker in buf:
+                        return name
+                tail = buf[-64:]
+    except OSError:
+        pass
+    return ""
+
+
 def system_tools() -> list[dict]:
     import shutil
     out = []
     for t in data()["tools"]["system"]:
-        found = bool(shutil.which(t["command"]))
-        ver = _dpkg_version(t["dpkg"]) if found else ""
-        lic = _debian_licence(t["dpkg"]) if found else ""
+        where = shutil.which(t["command"])
+        found = bool(where)
+        ver = (_dpkg_version(t["dpkg"]) or _cli_version(where)) if found else ""
+        lic = (_debian_licence(t["dpkg"]) or _binary_licence(where)) if found else ""
         out.append({"name": t["name"], "version": ver, "licence": lic or UNKNOWN_LICENCE, "url": t["url"], "what": t["what"], "installed": found})
     return out
 
