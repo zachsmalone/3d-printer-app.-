@@ -215,10 +215,46 @@ def public(i: dict, actor: Actor) -> dict:
             "creator_username": i.get("creator_username"), "credit": credit_line(i),
             "favorited": bool(actor.user) and _social().is_fav(actor.sid, i["id"]), "can_favorite": bool(actor.user),
             "license_id": i.get("license_id") or "",
+            **remix_status(i),
             "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
                        "url": f"/api/showcase/{i['id']}/files/{f['name']}"} for f in i["files"]]}
+
+
+def allows_remixes(i: dict) -> bool:
+    """The maker's 'Allow remixes' switch. Defaults to Yes: projects posted before the switch existed keep allowing them."""
+    return i.get("allow_remixes", True) is not False
+
+
+REMIX_OFF_MSG = "The maker turned off remixes for this project, so it can't be credited as the source of a new one."
+
+
+def remix_status(i: dict) -> dict:
+    """What the Remix button shows: allowed only when the maker's switch is on AND the licence permits adaptations."""
+    from . import licensing
+    on = allows_remixes(i)
+    lic = licensing.may_remix(i.get("license_id"))
+    why = "" if (on and lic) else (REMIX_OFF_MSG if not on else
+                                   "This project's licence doesn't allow publishing remixes of it.")
+    return {"allow_remixes": on, "can_remix": on and lic, "remix_off_reason": why}
+
+
+def set_allow_remixes(actor: Actor, item_id: str, allow) -> dict:
+    """Owner only. Turning remixes off never removes credit from remixes that already exist."""
+    if not isinstance(allow, bool):
+        raise Denied(400, "allow_remixes must be true or false")
+    found = {}
+
+    def f(l):
+        for i in l:
+            if i["id"] == item_id and i.get("owner_sid") == actor.sid:
+                i["allow_remixes"] = allow
+                found.update(i)
+    LISTINGS.update(f)
+    if not found:
+        raise Denied(404, "not found")
+    return get(item_id, actor)
 
 
 def _social():
@@ -324,7 +360,8 @@ def set_visibility(actor: Actor, item_id: str, level: str) -> dict:
     return found
 
 
-def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None, license_id: str | None = None) -> dict:
+def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None, license_id: str | None = None,
+                   allow_remixes: bool = True) -> dict:
     from . import licensing
     try:
         lid = licensing.check(license_id)              # new projects always carry one (default: private use)
@@ -359,6 +396,8 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             src = get(remix_of, actor)                                # you can only credit a project you can see
         except Denied:
             raise Denied(422, "We couldn't find the project you remixed. Paste its Showcase link.")
+        if not allows_remixes(src):
+            raise Denied(403, REMIX_OFF_MSG)
         if not licensing.may_remix(src.get("license_id")):
             raise Denied(422, "That project's licence doesn't allow publishing remixes of it. "
                                 "Pick a project marked as remixable, or ask its maker to change the licence.")
@@ -380,7 +419,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
-            "nsfw": bool(nsfw), "license_id": lid}
+            "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False}
     if remix_of:
         item["remix_of"] = remix_of
     LISTINGS.update(lambda l: l.append(item))

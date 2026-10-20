@@ -341,7 +341,7 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
                                    tags=body.get("tags") or [], build_id=str(body.get("build_id", ""))[:40],
                                    accept_guidelines=bool(body.get("accept_guidelines")),
                                    visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw,
-                                   license_id=body.get("license_id"))
+                                   license_id=body.get("license_id"), allow_remixes=_yes_no(body.get("allow_remixes"), True, "allow_remixes"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:
@@ -356,6 +356,31 @@ def item_visibility(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Owner only; takes effect on the very next request by anyone."""
     try:
         return catalog.public(catalog.set_visibility(actor, iid, body.get("visibility", "")), actor)
+    except catalog.Denied as e:
+        raise D(e)
+
+
+def _yes_no(v, default: bool, name: str) -> bool:
+    """A Yes/No form answer: missing -> default; true/false or "yes"/"no" accepted; anything else is a 400."""
+    if v is None or v == "":
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str) and v.strip().lower() in ("yes", "true", "no", "false"):
+        return v.strip().lower() in ("yes", "true")
+    raise ValueError(f"{name} must be Yes or No")
+
+
+@router.put("/showcase/{iid}/remixes")
+def item_remixes(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Owner only: the 'Allow remixes: Yes/No' switch. Existing remix credit chains are kept either way."""
+    try:
+        allow = _yes_no(body.get("allow_remixes"), None, "allow_remixes")
+        if allow is None:
+            raise ValueError("allow_remixes must be Yes or No")
+        return catalog.public(catalog.set_allow_remixes(actor, iid, allow), actor)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     except catalog.Denied as e:
         raise D(e)
 
