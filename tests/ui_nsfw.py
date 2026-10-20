@@ -1,4 +1,4 @@
-"""Mild NSFW in a real browser (Chrome + WebKit): a tagged project shows in Showcase search as a blurred card with a
+"""Mild NSFW in a real browser (Chrome + WebKit): hidden by default; after opting in, a tagged project shows in Showcase search as a blurred card with a
 "Mature content" label (not hidden), opening it asks "Are you sure?" once per visit (focus on Go back, Esc = Go back),
 then it opens unblurred; "Hide mature content entirely" removes it from the feed; Publish needs the NSFW answer.
 python tests/ui_nsfw.py URL"""
@@ -42,7 +42,11 @@ def run(name, launch, title):
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(URL + "/"); pg.request.post(URL + "/api/me/signup", data={"display_name": "Viewer", "dob": "1990-01-01"})
     search(pg, title.split()[0])
-    ok(f"{name}: shown in search as a card with a Mature content label (not hidden)", wait(pg, "document.querySelector('#shGrid .pcard .mature-label')"))
+    ok(f"{name}: hidden by default (no opt-in yet)", pg.locator("#shGrid .pcard .mature-label").count() == 0)
+    s0 = pg.request.put(URL + "/api/me/mature", data={"hide_mature": False})
+    ok(f"{name}: opting in saves", s0.ok, s0.text())
+    search(pg, title.split()[0])
+    ok(f"{name}: after opting in, shown in search as a card with a Mature content label (not hidden)", wait(pg, "document.querySelector('#shGrid .pcard .mature-label')"))
     flt = pg.evaluate("(() => { const e = document.querySelector('#shGrid .ph.nsfw img'); return e ? getComputedStyle(e).filter : '' })()")
     ok(f"{name}: card picture is blurred", "blur" in flt, flt)
     card = pg.locator("#shGrid .pcard:has(.mature-label)").first

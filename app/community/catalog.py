@@ -262,8 +262,9 @@ def categories(actor: Actor) -> list[str]:
 
 
 def hides_mature(actor: Actor) -> bool:
-    """Account setting 'Hide mature content entirely' (default off: NSFW items are listed as blurred cards)."""
-    return bool(actor.user and actor.user.get("hide_mature"))
+    """Mature (artistic-nudity) content is HIDDEN by default, for signed-out visitors too. Only an account that opted in
+    (setting 'hide_mature' explicitly False) sees it, and then as a blurred 'Mature content' card with confirm-before-unblur."""
+    return not (actor.user and actor.user.get("hide_mature") is False)
 
 
 def mature_ok(i: dict, actor: Actor) -> bool:

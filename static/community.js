@@ -407,11 +407,11 @@ $("#btnDoPublish").onclick = async () => {
 /* What ZEIM knows about you (Kenji S-07): live view, download metadata, delete everything I made */
 $("#btnMyData").onclick = openData;
 $("#hideMature").onchange = async e => {
-  if (!ME?.signed_up) { e.target.checked = false; return toast("Make a free account to change this setting.", "err"); }
+  if (!ME?.signed_up) { e.target.checked = true; return toast("Make a free account to change this setting.", "err"); }
   try { await api("/api/me/mature", J("PUT", { hide_mature: e.target.checked })); ME.hide_mature = e.target.checked; loadShowcase(); } catch (er) { toast(er.message, "err"); }
 };
 async function openData() {
-  $("#hideMature").checked = !!ME?.hide_mature;
+  $("#hideMature").checked = ME?.hide_mature !== false;
   const d = await api("/api/me/data");
   const ints = Object.entries(d.interests || {}).sort((a, b) => b[1] - a[1]);
   const acct = d.account;

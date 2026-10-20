@@ -12,7 +12,7 @@ Made by **Nightmare Ops Studios**. Groups in the app are called **Build Plates**
 
 - **Core is free forever:** CAD, sculpt, slicing, lithophanes, plate editor, community and downloads.
 - **Optional supporter plans (after the pilot):** **Semi Pro $3.50/mo** and **Pro $5.50/mo** for perks like priority slicing, more storage and early access. Plans help cover hosting (about $400/mo) and never lock core features. Perks may change.
-- **Safe by design:** Mild NSFW means **artistic nudity only, nothing lewd**. The maker must tag it, it shows as a blurred "Mature content" card, asks "Are you sure?" before opening, and can be hidden entirely in settings. Lewd or suggestive figures (anime included) and explicit content are banned. All "I printed this" photos are moderator-reviewed. No school features.
+- **Safe by design:** Mild NSFW means **artistic nudity only, nothing lewd**. The maker must tag it, it is hidden by default; only people who turn it on in settings see it, as a blurred "Mature content" card that asks "Are you sure?" before opening. Lewd or suggestive figures (anime included) and explicit content are banned. All "I printed this" photos are moderator-reviewed. No school features.
 - **Inclusive:** FDM and resin printers, plus accessibility options.
 - **Honest:** we say what is done and what is not, and badge our own designs **Simulated** or **Test-printed**.
 

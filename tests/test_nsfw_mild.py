@@ -41,13 +41,15 @@ def test_filter_allows_mild_words_only_when_tagged_and_explicit_always_blocked()
         safety.parse_nsfw("maybe")
 
 
-def test_listed_blurred_by_default_and_hide_setting():
+def test_hidden_by_default_opt_in_shows_blurred():
     a = U("Nc"); it = pub(a, "Venus sculpt", True).json()
     v = U("Nv")
+    assert it["id"] not in ids(v, q="venus")                              # hidden by default
+    assert it["id"] not in ids(client(), q="venus")                       # signed-out visitors never see it
+    assert v.get("/api/me").json()["hide_mature"] is True
+    assert v.put("/api/me/mature", json={"hide_mature": False}).json() == {"hide_mature": False}   # opt in
     got = ids(v, q="venus")
-    assert it["id"] in got and got[it["id"]]["nsfw"] is True              # shown (client blurs it), not hidden
-    assert it["id"] in ids(client(), q="venus")                           # signed-out visitors too
-    assert v.get("/api/me").json()["hide_mature"] is False
+    assert it["id"] in got and got[it["id"]]["nsfw"] is True              # now listed, flagged so the client blurs it
     assert v.put("/api/me/mature", json={"hide_mature": True}).json() == {"hide_mature": True}
     assert it["id"] not in ids(v, q="venus")
     assert it["id"] in ids(a, q="venus")                                  # the owner always sees their own
@@ -97,7 +99,7 @@ def test_moderator_flips_tag_and_report_reason():
 def test_ui_and_docs():
     js = open(os.path.join(ROOT, "static/community.js")).read(); html = open(os.path.join(ROOT, "static/index.html")).read()
     assert "Are you sure? This may contain nudity." in html and "Mature content" in js and "sessionStorage" in js
-    assert 'name="pub_nsfw"' in html and "Hide mature content entirely" in (html + js) and "should_be_nsfw" in html
+    assert 'name="pub_nsfw"' in html and "Hide mature content" in (html + js) and "on by default" in html and "should_be_nsfw" in html
     readme = open(os.path.join(ROOT, "README.md")).read()
     assert "No NSFW" not in readme and "Mild NSFW" in readme
     for f in ("static/COMMUNITY_GUIDELINES.md", "static/COMMUNITY_GUIDELINES.html", "static/terms.html"):

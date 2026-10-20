@@ -1,6 +1,6 @@
 # Community Guidelines
 
-ZEIM accounts are for **adults 18 and over only**. **Mild NSFW** (artistic nudity, figure sculpts, mature art) is allowed **only when tagged NSFW** when you share it: it is shown blurred with a "Mature content" label, opens only after an "Are you sure?" check, and anyone can hide it entirely in settings. Untagged content must be clean and safe for all. Families can print designs together with an adult account holder.
+ZEIM accounts are for **adults 18 and over only**. **Mild NSFW** (artistic nudity, figure sculpts, mature art) is allowed **only when tagged NSFW** when you share it: it is hidden by default and shown (blurred, with a "Mature content" label) only to people who opt in, opens only after an "Are you sure?" check, and anyone can hide it entirely in settings. Untagged content must be clean and safe for all. Families can print designs together with an adult account holder.
 
 **Allowed:** original or properly licensed 3D-print projects, lithophanes, reliefs and pop-art made from photos you have the right to use; friendly, constructive feedback.
 
