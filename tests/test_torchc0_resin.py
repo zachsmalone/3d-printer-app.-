@@ -214,3 +214,16 @@ def test_supports_are_unioned_into_one_solid_and_ml_not_double_counted():
     out, rep = resin.prepare(m, resin.settings({"hollow": "false"}))
     assert rep["support"]["merged"] and out.is_watertight and len(out.split(only_watertight=False)) == 1
     assert rep["estimate"]["resin_ml"] == pytest.approx(abs(out.volume) / 1000, abs=0.05)
+
+
+def _exported(out, ft):
+    return trimesh.load(io.BytesIO(out.export(file_type=ft)), file_type=ft, force="mesh")
+
+
+@pytest.mark.parametrize("hollow", ["true", "false"])
+def test_hollow_output_is_one_watertight_solid_after_export(hollow):
+    out, rep = resin.prepare(trimesh.creation.box(extents=[20, 15, 10]), resin.settings({"hollow": hollow}))
+    assert rep["support"]["merged"] is True and rep["support"]["bodies"] == 1
+    for ft in ("stl", "3mf"):
+        e = _exported(out, ft)
+        assert e.is_watertight and len(e.split(only_watertight=False)) == 1, ft

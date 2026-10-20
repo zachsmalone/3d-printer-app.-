@@ -151,10 +151,11 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
             top = p[2]; bot = raft_mm * 0.5
             if top - tip_len <= bot + 0.2:
                 continue
+            # taper: wide end on the pillar, point up into the contact tip (the old cone pointed down and met the
+            # pillar at a single vertex, which is not a solid joint and fell apart into pieces after export)
             cone = trimesh.creation.cone(radius=shaft_d / 2, height=tip_len, sections=10)
-            cone.apply_transform(trimesh.transformations.rotation_matrix(math.pi, [1, 0, 0]))   # point up
-            cone.apply_translation([p[0], p[1], top])
-            # tip: truncate visually by a thin contact cylinder
+            cone.apply_translation([p[0], p[1], top - tip_len])
+            # contact tip: a thin cylinder reaching 0.3 mm into the model so the joint is a real overlap
             tipc = trimesh.creation.cylinder(radius=tip_d / 2, height=0.4, sections=8)
             tipc.apply_translation([p[0], p[1], top + 0.1])
             h_shaft = top - tip_len - bot
@@ -174,7 +175,7 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
         out, extra, merged = u, float(abs(u.volume)) - float(abs(m.volume)), True
     else:
         out, extra, merged = trimesh.util.concatenate([m, raft, *parts]), float(raft.volume + sum(abs(q.volume) for q in parts)), False
-    return out, {"_volume": extra, "merged": merged, "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
+    return out, {"_volume": extra, "merged": merged, "bodies": bodies(out), "watertight": bool(merged or _weld_check(out)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
 
 
 def _cavities(m: trimesh.Trimesh):
@@ -278,22 +279,41 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -
     return {"islands": islands[:50], "suction": suction[:50], "step_mm": round(step, 3)}
 
 
-def union_all(meshes):
-    """One solid from overlapping bodies (model + raft + supports) with manifold3d. None if it can't be done."""
+def _weld_check(r: trimesh.Trimesh) -> bool:
+    """True if the mesh survives an STL round trip (float32, vertices welded by position) as a watertight solid."""
+    q = trimesh.Trimesh(vertices=np.asarray(r.vertices, dtype=np.float32).astype(np.float64), faces=r.faces, process=True)
+    return bool(len(q.faces)) and q.is_watertight and q.is_winding_consistent
+
+
+def union_all(meshes, tol: float = 1e-3):
+    """One solid from overlapping bodies (model + raft + supports, or the overlapping shells of an input file) with a
+    real manifold3d boolean union. Slivers and near-duplicate vertices below `tol` mm are simplified away so the result
+    stays watertight after STL/3MF export (float32, welded vertices). None if it can't be done."""
     try:
         import manifold3d as mf
         ms = []
         for q in meshes:
             if len(q.faces) == 0:
                 continue
-            ms.append(mf.Manifold(mf.Mesh(vert_properties=np.asarray(q.vertices, dtype=np.float32),
-                                          tri_verts=np.asarray(q.faces, dtype=np.uint32))))
-        u = mf.Manifold.batch_boolean(ms, mf.OpType.Add)
-        out = u.to_mesh()
-        r = trimesh.Trimesh(vertices=np.asarray(out.vert_properties)[:, :3], faces=np.asarray(out.tri_verts), process=False)
-        return r if len(r.faces) and r.is_watertight else None
+            ms.append(mf.Manifold(mf.Mesh64(vert_properties=np.asarray(q.vertices, dtype=np.float64),
+                                            tri_verts=np.asarray(q.faces, dtype=np.uint64))))
+        if not ms:
+            return None
+        u = mf.Manifold.batch_boolean(ms, mf.OpType.Add) if len(ms) > 1 else ms[0]
+        u = u.simplify(tol)
+        if u.is_empty():
+            return None
+        out = u.to_mesh64()
+        r = trimesh.Trimesh(vertices=np.asarray(out.vert_properties)[:, :3], faces=np.asarray(out.tri_verts, dtype=np.int64), process=True)
+        return r if len(r.faces) and r.is_watertight and _weld_check(r) else None
     except Exception:
         return None
+
+
+def bodies(m: trimesh.Trimesh) -> int:
+    """Separate pieces as a slicer sees them after export (vertices welded by position)."""
+    q = trimesh.Trimesh(vertices=np.asarray(m.vertices, dtype=np.float32).astype(np.float64), faces=m.faces, process=True)
+    return len(q.split(only_watertight=False))
 
 
 def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
@@ -342,6 +362,9 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
         work, sr = build_supports(work, s["support_spacing_mm"], s["base_lift_mm"], envelope=envelope)
         rep["support"] = sr
         vol += sr.pop("_volume")
+        if not sr["merged"]:
+            rep["notes"].append("Supports could not be joined to the model into one solid; the file has separate overlapping "
+                                "pieces. Most resin slicers still print it, but check it there.")
         if sr["skipped_inside"]:
             rep["notes"].append(f"{sr['skipped_inside']} overhang spot(s) sit above other parts of the model and got no support; "
                                 "check them in your slicer and add supports there if needed.")
