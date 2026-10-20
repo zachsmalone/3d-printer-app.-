@@ -1,3 +1,4 @@
+import { effectRGB, defaultEffect, lightRGB as fxBase } from "/static/lithlight.js";
 import { Viewer } from "/static/viewer.js";
 
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -312,6 +313,7 @@ function syncLight() {
   $("#vLightNote").hidden = !S.lightOn;
   const lc = $("#vLightColor").value; $("#vLightRGB").hidden = lc !== "custom";
   viewer?.setBacklight(!!S.lightOn, litShapeOf(S.current), lc === "custom" ? $("#vLightRGB").value : lc);
+  syncFx();
 }
 $("#vLight").onclick = () => { S.lightOn = !S.lightOn; syncLight(); };
 /* remember the last light (named preset or custom #rrggbb bulb) */
@@ -324,6 +326,39 @@ try {
 const saveLight = () => { try { localStorage.lithLight = $("#vLightColor").value; localStorage.lithLightRGB = $("#vLightRGB").value; } catch (_) {} };
 $("#vLightColor").onchange = () => { saveLight(); syncLight(); };
 $("#vLightRGB").oninput = () => { saveLight(); if (S.lightOn) syncLight(); };
+/* LED-strip effects: one rAF loop that only runs while the light is on, the tab is visible and a viewer exists; it retints in place */
+const reduceMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+try {
+  $("#vLightFx").value = defaultEffect(localStorage.lithFx, reduceMotion(), localStorage.lithFxOptIn === "1");
+  const sp = +localStorage.lithFxSpeed; if (sp >= 1 && sp <= 10) $("#vLightSpeed").value = sp;
+} catch (_) {}
+let fxRaf = 0, fxT0 = 0;
+const fxColour = () => { const lc = $("#vLightColor").value; return fxBase(lc === "custom" ? $("#vLightRGB").value : lc); };
+function fxTick(now) {
+  fxRaf = 0;
+  if (!S.lightOn || document.hidden || !viewer || $("#vLightFx").value === "steady") return;
+  viewer.setTint(effectRGB($("#vLightFx").value, fxColour(), (now - fxT0) / 1000, +$("#vLightSpeed").value));
+  fxRaf = requestAnimationFrame(fxTick);
+}
+function syncFx() {
+  const fx = $("#vLightFx").value;
+  $("#vLightSpeedBox").hidden = fx === "steady";
+  if (fx !== "strobe") $("#vStrobeWarn").hidden = true;
+  if (fxRaf) { cancelAnimationFrame(fxRaf); fxRaf = 0; }
+  if (S.lightOn && viewer && !document.hidden && fx !== "steady") { fxT0 = performance.now(); fxRaf = requestAnimationFrame(fxTick); }
+  else if (S.lightOn && viewer) viewer.setTint(fxColour());
+}
+$("#vLightFx").onchange = e => {
+  const fx = e.target.value;
+  try {
+    localStorage.lithFx = fx; if (reduceMotion()) localStorage.lithFxOptIn = fx === "steady" ? "0" : "1";
+    if (fx === "strobe" && localStorage.lithStrobeWarned !== "1") { $("#vStrobeWarn").hidden = false; localStorage.lithStrobeWarned = "1"; }
+  } catch (_) { if (fx === "strobe") $("#vStrobeWarn").hidden = false; }
+  syncFx();
+};
+$("#vLightSpeed").oninput = e => { try { localStorage.lithFxSpeed = e.target.value; } catch (_) {} };
+document.addEventListener("visibilitychange", syncFx);
+$("#vLightSpeedBox").hidden = $("#vLightFx").value === "steady";
 
 /* ---------- history ---------- */
 function renderHistory() {

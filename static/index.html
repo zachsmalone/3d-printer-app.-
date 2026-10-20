@@ -210,6 +210,9 @@
         <span id="litLightBox" hidden><button class="btn small" id="vLight" type="button" aria-pressed="false" title="Show it as if a light is behind it">💡 Light on</button>
         <label for="vLightColor" class="sr-only">Light colour</label><select id="vLightColor" class="small"><option value="warm">Warm light</option><option value="cool">Cool light</option><option value="white">White light</option><option value="sunlight">Sunlight (daylight)</option><option value="custom">Custom colour (RGB)</option></select>
         <label for="vLightRGB" class="sr-only">Custom bulb colour</label><input type="color" id="vLightRGB" value="#ff4fa3" hidden title="Pick a bulb colour">
+        <label for="vLightFx" class="sr-only">Light effect</label><select id="vLightFx" class="small"><option value="steady">Steady</option><option value="fade">Fade</option><option value="rainbow">Rainbow</option><option value="breathe">Breathe</option><option value="strobe">Strobe</option></select>
+        <label class="fxspeed" id="vLightSpeedBox" hidden>Speed <input type="range" id="vLightSpeed" min="1" max="10" step="1" value="5" aria-label="Effect speed, slow to fast"></label>
+        <span class="pill bad" id="vStrobeWarn" role="alert" hidden>⚠ Flashing light (max 3 flashes a second). Choose Steady if flashing bothers you.</span>
         <span class="pill" id="vLightNote" hidden title="Brightness from wall thickness: thin glows, thick stays dark. Real filament and resin vary.">Preview estimate</span></span>
     </div>
 

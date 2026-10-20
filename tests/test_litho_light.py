@@ -119,3 +119,57 @@ def test_custom_and_sunlight_ui_is_tap_friendly_and_remembered():
     assert "#vLightRGB { min-width: 44px; min-height: 44px;" in css and "flex-wrap: wrap" in css
     app = (ROOT / "static" / "app.js").read_text()
     assert "localStorage.lithLight" in app and "localStorage.lithLightRGB" in app and '"#vLightRGB").oninput' in app
+
+
+def _node(code):
+    js = (ROOT / "static" / "lithlight.js").as_uri()
+    return json.loads(subprocess.run(["node", "--input-type=module", "-e", f"import * as L from '{js}';" + code],
+                                     capture_output=True, text=True, check=True).stdout)
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_led_effects_hue_breathe_and_steady_maths():
+    o = _node("const b = [1, 0.5, 0.25];"
+              "console.log(JSON.stringify({h: [0, 1/3, 2/3, 1].map(h => L.hsv(h)), st: L.effectRGB('steady', b, 7, 5),"
+              " br: Array.from({length: 200}, (_, i) => L.effectRGB('breathe', b, i * 0.05, 5)),"
+              " rb: Array.from({length: 50}, (_, i) => L.effectRGB('rainbow', b, i * 0.2, 5)),"
+              " fd: Array.from({length: 300}, (_, i) => L.effectRGB('fade', b, i * 0.05, 5)), E: L.EFFECTS}))")
+    assert o["h"][0] == pytest.approx([1, 0, 0]) and o["h"][1] == pytest.approx([0, 1, 0], abs=1e-9)
+    assert o["h"][2] == pytest.approx([0, 0, 1], abs=1e-9) and o["h"][3] == pytest.approx([1, 0, 0])
+    assert o["st"] == [1, 0.5, 0.25]
+    v = [c[0] for c in o["br"]]
+    assert min(v) >= 0.15 - 1e-9 and max(v) == pytest.approx(1, abs=0.01)
+    assert all(c[1] == pytest.approx(c[0] * 0.5) for c in o["br"])                # breathe keeps the colour, changes brightness
+    assert len({tuple(round(x, 2) for x in c) for c in o["rb"]}) > 20               # rainbow keeps moving
+    steps = [max(abs(a - b) for a, b in zip(o["fd"][i], o["fd"][i + 1])) for i in range(299)]
+    assert max(steps) < 0.1                                                         # fade is smooth (no jumps)
+    assert o["E"] == ["steady", "fade", "rainbow", "breathe", "strobe"]
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_strobe_never_exceeds_3_flashes_per_second_and_reduced_motion_defaults_steady():
+    o = _node("const n = []; for (const s of [1, 5, 10, 99]) { let f = 0, prev = 0;"
+              " for (let i = 0; i < 10000; i++) { const on = L.effectRGB('strobe', [1, 1, 1], i / 1000, s)[0] > 0 ? 1 : 0; if (on && !prev) f++; prev = on; } n.push(f); }"
+              "console.log(JSON.stringify({n, hz: [1, 10, 1e9, -5].map(L.strobeHz), max: L.STROBE_MAX_HZ,"
+              " d: [L.defaultEffect('rainbow', true), L.defaultEffect('rainbow', true, true), L.defaultEffect('rainbow', false),"
+              "     L.defaultEffect('nope', false), L.defaultEffect(undefined, true)]}))")
+    assert o["max"] == 3 and max(o["hz"]) <= 3 and min(o["hz"]) > 0
+    assert all(f <= 30 for f in o["n"]) and o["n"][0] < o["n"][2]                  # <= 3 Hz over 10 s, speed still matters
+    assert o["d"] == ["steady", "rainbow", "rainbow", "steady", "steady"]
+
+
+def test_effect_selector_speed_warning_and_loop_hygiene():
+    html = (ROOT / "static" / "index.html").read_text()
+    for v in ("steady", "fade", "rainbow", "breathe", "strobe"):
+        assert f'<option value="{v}">' in html
+    assert 'for="vLightFx"' in html and 'type="range" id="vLightSpeed"' in html and "Flashing light" in html
+    css = (ROOT / "static" / "style.css").read_text()
+    assert "#vLightSpeed { min-height: 44px;" in css and ".fxspeed { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;" in css
+    app = (ROOT / "static" / "app.js").read_text()
+    tick = app[app.index("function fxTick"):app.index("function syncFx")]
+    assert "requestAnimationFrame(fxTick)" in tick and "document.hidden" in tick and "!S.lightOn" in tick and "!viewer" in tick
+    assert "new THREE" not in tick and "setBacklight" not in tick                   # no material churn per frame
+    assert "prefers-reduced-motion: reduce" in app and "lithStrobeWarned" in app and "localStorage.lithFxSpeed" in app
+    assert '"visibilitychange", syncFx' in app
+    v = (ROOT / "static" / "viewer.js").read_text()
+    assert "setTint(rgb)" in v and "color.setRGB(" in v

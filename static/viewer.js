@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "/static/vendor/OrbitControls.js";
-import { backlitColors } from "/static/lithlight.js";
+import { backlitColors, lightRGB } from "/static/lithlight.js";
 
 const b64 = (s, T) => { const bin = atob(s), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new T(u.buffer); };
 
@@ -69,9 +69,12 @@ export class Viewer {
       if (m.material !== m.userData.lit) m.material.dispose();          // drop the previous backlit material (colour change / off)
       if (!on) { m.material = m.userData.lit; m.material.wireframe = this.wire; continue; }
       const pos = m.geometry.getAttribute("position");
-      m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, light), 3));
+      m.geometry.setAttribute("color", new THREE.BufferAttribute(backlitColors(pos.array, shape, "white"), 3));   // shade once
       m.material = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, wireframe: this.wire });
+      m.material.color.setRGB(...lightRGB(light));                                   // light colour = material tint (effects change it in place)
     }
   }
+  /* LED effects: retint the backlit materials in place each frame (no new materials, no geometry upload) */
+  setTint(rgb) { if (!this.backlit) return; for (const m of this.group.children) if (m.material !== m.userData.lit) m.material.color.setRGB(rgb[0], rgb[1], rgb[2]); }
   toggleWire() { this.wire = !this.wire; this.group.children.forEach(m => { m.material.wireframe = this.wire; if (m.userData.lit) m.userData.lit.wireframe = this.wire; }); }
 }

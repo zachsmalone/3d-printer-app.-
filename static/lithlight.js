@@ -37,3 +37,35 @@ export function backlitColors(pos, shape, light = "warm", k = K_PER_MM, gamma = 
   for (let i = 0; i < t.length; i++) { const s = Math.min(1, brightness(t[i], k) / top) ** gamma; out[3 * i] = L[0] * s; out[3 * i + 1] = L[1] * s; out[3 * i + 2] = L[2] * s; }
   return out;
 }
+
+/* LED-strip style effects. effectRGB(effect, base, tSec, speed) -> [r,g,b] 0..1 tint for this frame.
+   speed 1 (slow) .. 10 (fast). Strobe is hard-capped at STROBE_MAX_HZ flashes/second (WCAG 2.3.1: no more than 3). */
+export const EFFECTS = ["steady", "fade", "rainbow", "breathe", "strobe"];
+export const STROBE_MAX_HZ = 3;
+const sp = s => Math.min(10, Math.max(1, Number(s) || 5));
+export function hsv(h, s = 1, v = 1) {                         // h in turns (0..1)
+  h = ((h % 1) + 1) % 1; const f = k => { const x = (k + h * 6) % 6; return v - v * s * Math.max(0, Math.min(x, 4 - x, 1)); };
+  return [f(5), f(3), f(1)];
+}
+export const strobeHz = speed => Math.min(STROBE_MAX_HZ, 0.5 + (sp(speed) - 1) * (2.5 / 9));
+const FADE = [[1, 0, 0], [1, 0.5, 0], [0, 1, 0], [0, 0.6, 1], [0.6, 0, 1]];
+export function effectRGB(effect, base, t, speed = 5) {
+  const k = sp(speed);
+  if (effect === "rainbow") return hsv(t / (22 - 2 * k));                         // one hue lap: 20 s (slow) .. 2 s (fast)
+  if (effect === "fade") {                                                          // smooth cross-fade through a palette
+    const p = t / (16 - 1.4 * k), i = Math.floor(p), w = 0.5 - 0.5 * Math.cos(Math.PI * (p - i));
+    const a = FADE[((i % 5) + 5) % 5], b = FADE[(((i + 1) % 5) + 5) % 5];
+    return a.map((x, j) => x + (b[j] - x) * w);
+  }
+  if (effect === "breathe") {                                                       // 6 s .. 1.5 s per breath, never fully dark
+    const w = 0.5 - 0.5 * Math.cos(2 * Math.PI * t / (6.5 - 0.5 * k)), v = 0.15 + 0.85 * w;
+    return base.map(x => x * v);
+  }
+  if (effect === "strobe") return ((t * strobeHz(k)) % 1) < 0.5 ? base.slice() : [0, 0, 0];
+  return base.slice();
+}
+/* start-up effect: the remembered one, but Steady under prefers-reduced-motion unless the user opted in while it was set */
+export function defaultEffect(saved, reduce, optedIn = false) {
+  const e = EFFECTS.includes(saved) ? saved : "steady";
+  return reduce && !optedIn ? "steady" : e;
+}
