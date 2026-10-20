@@ -35,11 +35,11 @@ def test_css_has_toggle_target_and_dark_viewer():
     assert "--stage1:#1b2232" in css
 
 
-def test_nav_has_the_six_tabs_in_order_and_showcase_is_default():
+def test_nav_has_the_seven_tabs_in_order_and_showcase_is_default():
     import re
     h = (S / "index.html").read_text()
     nav = h[h.index('id="mainNav"'):h.index("</nav>")]
-    assert re.findall(r'data-view="(\w+)"', nav) == ["showcase", "slicer", "cad", "lithophane", "smartfix", "account"]
+    assert re.findall(r'data-view="(\w+)"', nav) == ["showcase", "slicer", "torchc0", "cad", "lithophane", "smartfix", "account"]   # FDM Slicer + TorchC0 are separate tabs (Zach)
     assert '<main class="page" id="viewShowcase">' in h and 'id="viewCreate" hidden' in h
     acc = h[h.index('id="viewAccount"'):]
     acc = acc[:acc.index("</main>")]
