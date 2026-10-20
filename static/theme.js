@@ -22,6 +22,7 @@
       if (bar) bar.appendChild(b); else { b.classList.add("floating"); document.body.appendChild(b); }
     }
     paint(b);
+    setupLook();
     // One delegated handler on the document (not on the button): the toggle keeps working if a page re-draws its header,
     // and pages that put the button somewhere else (CAD workspace) are covered too.
     if (!window.__zeimThemeWired) {
@@ -35,6 +36,52 @@
       });
       addEventListener("storage", function (e) { if (e.key === "theme") { apply(e.newValue === "dark"); var x = document.getElementById("themeToggle"); if (x) paint(x); } });
     }
+  }
+  /* ---------- Colours & accessibility: theme (light/dark/system), accent, high contrast, colour-vision-safe palettes ---------- */
+  var LOOK_KEY = "zeim_look";
+  function look() { try { return JSON.parse(localStorage.getItem(LOOK_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  function applyLook(l) {
+    ["accent", "contrast", "cb"].forEach(function (k) { if (l[k] && l[k] !== "default") root.setAttribute("data-" + k, l[k]); else root.removeAttribute("data-" + k); });
+  }
+  function themePref() { try { return localStorage.theme === "dark" ? "dark" : (localStorage.theme === "light" || localStorage.theme === "warm") ? "light" : "system"; } catch (e) { return "system"; } }
+  function setTheme(v) {
+    try { if (v === "system") localStorage.removeItem("theme"); else localStorage.theme = v; } catch (e) { }
+    apply(v === "dark" || (v === "system" && matchMedia("(prefers-color-scheme: dark)").matches));
+    var x = document.getElementById("themeToggle"); if (x) paint(x);
+  }
+  applyLook(look());
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (themePref() === "system") setTheme("system"); }); } catch (e) { }
+  var PAL = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.7 1.5-1.5 0-1-.8-1.4-.8-2.3 0-.8.7-1.2 1.6-1.2H16a5 5 0 0 0 5-5c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="14.5" cy="7.5" r="1"/></svg>';
+  function opt(v, t, cur) { return '<option value="' + v + '"' + (v === cur ? " selected" : "") + ">" + t + "</option>"; }
+  function openLook() {
+    var d = document.getElementById("dlgLook");
+    if (!d) { d = document.createElement("dialog"); d.id = "dlgLook"; d.setAttribute("aria-labelledby", "lookTitle"); document.body.appendChild(d); }
+    var l = look(), t = themePref();
+    d.innerHTML = '<div class="dlg"><div class="dh"><h3 id="lookTitle">Colours &amp; accessibility</h3><button type="button" class="x" data-lookclose aria-label="Close">✕</button></div>' +
+      '<div class="body lookgrid">' +
+      '<label>Theme<select id="lookTheme">' + opt("light", "Light", t) + opt("dark", "Dark", t) + opt("system", "Same as my device", t) + "</select></label>" +
+      '<label>Accent colour<select id="lookAccent">' + opt("default", "Purple (ZEIM)", l.accent || "default") + opt("blue", "Blue", l.accent) + opt("teal", "Teal", l.accent) + opt("orange", "Orange", l.accent) + "</select></label>" +
+      '<label class="inl"><input type="checkbox" id="lookContrast"' + (l.contrast === "high" ? " checked" : "") + "> High contrast</label>" +
+      '<label>Colour vision<select id="lookCb">' + opt("default", "Standard colours", l.cb || "default") + opt("redgreen", "Red-green safe (deuteranopia / protanopia)", l.cb) + opt("blueyellow", "Blue-yellow safe (tritanopia)", l.cb) + "</select></label>" +
+      '<p class="help">Saved on this device. Warnings and problems always show a symbol and words, not just a colour.</p>' +
+      '<div class="row"><button type="button" class="btn" id="lookReset">Reset to default</button><button type="button" class="btn primary" data-lookclose>Done</button></div></div></div>';
+    var save = function () {
+      var n = { accent: d.querySelector("#lookAccent").value, contrast: d.querySelector("#lookContrast").checked ? "high" : "default", cb: d.querySelector("#lookCb").value };
+      try { localStorage.setItem(LOOK_KEY, JSON.stringify(n)); } catch (e) { }
+      applyLook(n); setTheme(d.querySelector("#lookTheme").value);
+    };
+    d.querySelectorAll("select,input").forEach(function (x) { x.addEventListener("change", save); });
+    d.querySelector("#lookReset").onclick = function () { try { localStorage.removeItem(LOOK_KEY); } catch (e) { } applyLook({}); setTheme("system"); openLook(); };
+    d.querySelectorAll("[data-lookclose]").forEach(function (x) { x.onclick = function () { d.close(); var b = document.getElementById("lookBtn"); if (b) b.focus(); }; });
+    if (!d.open) d.showModal ? d.showModal() : d.setAttribute("open", "");
+  }
+  window.zeimOpenLook = openLook;
+  function setupLook() {
+    var t = document.getElementById("themeToggle"); if (!t || document.getElementById("lookBtn")) return;
+    var b = document.createElement("button"); b.type = "button"; b.id = "lookBtn"; b.className = "lookbtn" + (t.classList.contains("cw-btn") ? " cw-btn" : "");
+    b.setAttribute("aria-label", "Colours and accessibility"); b.title = "Colours & accessibility"; b.innerHTML = PAL;
+    b.addEventListener("click", openLook);
+    t.parentNode.insertBefore(b, t);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
 })();

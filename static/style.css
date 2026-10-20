@@ -727,3 +727,26 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 /* Repair page (static/repair.html): one column, big targets, fits 320 px */
 .rp-main{max-width:640px;margin:0 auto;padding:16px}.rp-pick,.rp-go,.rp-dl{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:8px 0;box-sizing:border-box;text-align:center}
 .rp-t{width:100%;border-collapse:collapse;margin:12px 0;font-size:15px}.rp-t th,.rp-t td{padding:8px 6px;border-bottom:1px solid var(--line,#ccc);text-align:left;overflow-wrap:anywhere}.rp-fx{padding-left:20px;line-height:1.7}
+
+/* ---------- Colour preferences (theme.js "Colours & accessibility"): accent, high contrast, colour-vision-safe status colours.
+   Stored on this device (localStorage.zeim_look); status is never shown by colour alone (icons/text below). ---------- */
+html[data-accent=blue]{--acc:#1D4ED8;--accink:#1D4ED8;--acc2:#1D4ED8;--tint:#DBEAFE}
+html[data-accent=teal]{--acc:#0F766E;--accink:#0F766E;--acc2:#0F766E;--tint:#CCFBF1}
+html[data-accent=orange]{--acc:#B4410C;--accink:#9A3412;--acc2:#9A3412;--tint:#FFEDD5}
+html[data-theme=dark][data-accent=blue]{--acc:#2563EB;--accink:#93C5FD;--acc2:#93C5FD;--tint:#172554}
+html[data-theme=dark][data-accent=teal]{--acc:#0F766E;--accink:#5EEAD4;--acc2:#5EEAD4;--tint:#042F2E}
+html[data-theme=dark][data-accent=orange]{--acc:#C2410C;--accink:#FDBA74;--acc2:#FDBA74;--tint:#431407}
+html[data-contrast=high]{--txt:#000;--mut:#1F1A14;--line:#000;--ctl:#000;--panel:#fff;--bg:#fff;--sunk:#fff;--focus:#0000EE}
+html[data-theme=dark][data-contrast=high]{--txt:#fff;--mut:#F1F1F1;--line:#fff;--ctl:#fff;--panel:#000;--bg:#000;--sunk:#000;--focus:#FFD400}
+/* red/green colour blindness (deuteranopia / protanopia): blue = good, vermillion = problem (Okabe-Ito based) */
+html[data-cb=redgreen]{--ok:#005A9C;--okbg:#DCEBFA;--bad:#A13D00;--badbg:#FCE6D9;--warn:#6B4E00}
+html[data-theme=dark][data-cb=redgreen]{--ok:#7CC4FF;--okbg:#0B2740;--bad:#FFA066;--badbg:#3A1C0A;--warn:#F0D060}
+/* blue/yellow colour blindness (tritanopia): teal = good, red = problem, magenta = warning */
+html[data-cb=blueyellow]{--ok:#0B6E4F;--okbg:#DDF3EA;--bad:#B3001B;--badbg:#FBE3E6;--warn:#9D174D}
+html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8A99;--badbg:#3A0E15;--warn:#F9A8D4}
+/* never colour alone: warning / problem pills carry a symbol too (the Will-it-print pill has its own icon) */
+.pill.warn:not(.willprint)::before{content:"⚠\FE0E  ";speak:never}
+.pill.bad:not(.willprint)::before{content:"✖\FE0E  ";speak:never}
+.lookbtn{width:44px;height:44px;min-width:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--txt);cursor:pointer;order:98}
+.lookbtn .i{width:20px;height:20px}
+#dlgLook .lookgrid{display:grid;gap:12px}#dlgLook label{display:grid;gap:4px}

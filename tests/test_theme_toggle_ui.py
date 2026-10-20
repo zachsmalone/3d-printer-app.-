@@ -22,7 +22,8 @@ def test_theme_toggle_switches_and_persists():
                 socket.create_connection(("127.0.0.1", port), timeout=0.3).close(); break
             except OSError:
                 time.sleep(0.25)
-        r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_theme_toggle.py"), f"http://127.0.0.1:{port}"], cwd=ROOT, capture_output=True, text=True, timeout=200)
-        assert r.returncode == 0, r.stdout + r.stderr
+        for script in ("ui_theme_toggle.py", "ui_look_prefs.py"):     # sun/moon toggle; Colours & accessibility (theme/accent/contrast/colour vision)
+            r = subprocess.run([sys.executable, os.path.join(ROOT, "tests", script), f"http://127.0.0.1:{port}"], cwd=ROOT, capture_output=True, text=True, timeout=200)
+            assert r.returncode == 0, script + ": " + r.stdout + r.stderr
     finally:
         p.terminate(); p.wait(20)
