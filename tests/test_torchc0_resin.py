@@ -146,3 +146,49 @@ def test_api_reports_cost(c):
                files={"file": ("cube.stl", _stl(trimesh.creation.box(extents=[10, 10, 10])), "model/stl")})
     assert r.status_code == 200 and r.json()["estimate"]["cost"] == 0.05
     assert c.get("/api/resin/catalog").json()["default_price"] == resin.DEFAULT_PRICE
+
+
+def _box(ext, at):
+    return trimesh.creation.box(extents=ext).apply_translation(at)
+
+
+FLAT = {"hollow": "false", "supports": "false", "tilt_deg": 0}
+
+
+def test_island_detected_and_warned_not_blocking():
+    fl = trimesh.util.concatenate([_box([10, 10, 10], [0, 0, 5]), _box([5, 5, 2], [20, 0, 6])])
+    out, rep = resin.prepare(fl, resin.settings(FLAT))
+    assert len(rep["layer_check"]["islands"]) == 1 and rep["layer_check"]["islands"][0]["z_mm"] == pytest.approx(5, abs=0.3)
+    assert any("island" in n for n in rep["notes"]) and len(out.faces)       # warned, file still made
+    _, ok = resin.prepare(_box([10, 10, 10], [0, 0, 5]), resin.settings(FLAT))
+    assert ok["layer_check"]["islands"] == [] and ok["layer_check"]["suction"] == []
+
+
+@pytest.mark.parametrize("pocket_z", [3.9, 6.1])     # cup open toward the plate / open away from it, sealed on the other side
+def test_suction_cup_detected(pocket_z):
+    cup = trimesh.boolean.difference([_box([20, 20, 10], [0, 0, 5]), _box([14, 14, 8], [0, 0, pocket_z])], engine="manifold")
+    _, rep = resin.prepare(cup, resin.settings(FLAT))
+    assert rep["layer_check"]["suction"] and any("suction" in n for n in rep["notes"])
+
+
+def test_through_hole_is_not_suction_once_lifted_on_supports():
+    tube = trimesh.boolean.difference([_box([20, 20, 10], [0, 0, 5]), _box([8, 8, 14], [0, 0, 5])], engine="manifold")
+    _, flat = resin.prepare(tube, resin.settings(FLAT))
+    assert flat["layer_check"]["suction"]                 # straight on the plate the plate is its floor: a cup
+    _, rep = resin.prepare(tube, resin.settings({"hollow": "false", "tilt_deg": 0}))
+    assert rep["layer_check"]["suction"] == []
+
+
+def test_hollow_gets_drain_and_vent_and_warns_without_holes():
+    sph = trimesh.creation.icosphere(subdivisions=3, radius=15)
+    _, rep = resin.prepare(sph, resin.settings({"supports": "false"}))
+    assert rep["hollow"]["holes"] == [2] and rep["layer_check"]["suction"] == []
+    assert not any("fewer than 2 holes" in n for n in rep["notes"])
+    _, rep = resin.prepare(sph, resin.settings({"supports": "false", "drain_mm": 0}))
+    assert rep["hollow"]["holes"] == [0] and any("fewer than 2 holes" in n for n in rep["notes"])
+    assert rep["layer_check"]["suction"]                                  # sealed cavity = suction risk too
+
+
+def test_warnings_have_dismiss_in_ui():
+    js = (ROOT / "static" / "torchc0.js").read_text()
+    assert "rzDismiss" in js and "Dismiss" in js

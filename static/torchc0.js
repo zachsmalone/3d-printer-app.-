@@ -51,9 +51,10 @@ function wire() {
       const r = await api("/api/resin/prepare", { method: "POST", body: fd }), e = r.estimate;
       out.innerHTML = `<p class="slicestats"><span class="pill">⏱ about ${esc(e.print_time_human)}</span><span class="pill">🧪 about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">💰 about ${esc(money(e.cost, $("#rzCur").value))}</span><span class="pill">${e.layers} layers</span>${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
         ${r.hollow ? `<p class="help">${esc(r.hollow.message)}</p>` : ""}
-        ${r.notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
+        ${r.notes.map(n => `<p class="help warn rzWarn">${esc(n)} <button type="button" class="btn small rzDismiss" aria-label="Dismiss this warning">Dismiss</button></p>`).join("")}
         <p class="help">${esc(e.resin_note)} Cost estimate: ${esc(e.cost_note)}</p>
         <div class="row"><a class="btn primary" href="${r.downloads.stl}" download>⬇ STL</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a></div>`;
+      out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { $("#rzGo").disabled = false; }
   };

@@ -64,7 +64,7 @@ def _num(o, key, default, cast=float):
 
 
 def settings(opts: dict | None = None) -> dict:
-    """Preset first, then explicit values. Defaults: 30° tilt, 2 mm hollow wall, two 3 mm drain holes, supports on."""
+    """Preset first, then explicit values. Defaults: 30° tilt, 2 mm hollow wall, 3 mm drain + vent holes, supports on."""
     o = dict(opts or {})
     preset = o.get("preset") or DEFAULT_PRESET
     if preset not in PRESETS:
@@ -163,6 +163,107 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
     return out, {"_volume": float(raft.volume + sum(abs(q.volume) for q in parts)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
 
 
+def _cavities(m: trimesh.Trimesh):
+    """Inside-out shells of a hollowed solid = the cavities (negative volume)."""
+    return [c for c in m.split(only_watertight=False) if c.is_watertight and c.volume < 0]
+
+
+def add_holes(m: trimesh.Trimesh, diameter: float, per_cavity: int = 2):
+    """Drain + vent: per sealed cavity, one hole at its plate-side end (lowest z) and one at the far end (highest z),
+    each drilled straight through the nearest outer wall. Returns (mesh, holes made per cavity)."""
+    cavs = _cavities(m)
+    if not cavs or diameter <= 0:
+        return m, [0] * len(cavs)
+    outer = max(m.split(only_watertight=False), key=lambda c: c.volume)
+    made = []
+    for cav in cavs:
+        v = cav.vertices
+        targets = [v[np.argmin(v[:, 2])], v[np.argmax(v[:, 2])]][:per_cavity]
+        n = 0
+        for t in targets:
+            cp, dist, _ = trimesh.proximity.closest_point(outer, [t])
+            d = cp[0] - t
+            L = float(np.linalg.norm(d))
+            if L < 1e-6:
+                continue
+            axis = d / L
+            h = L + 2 * diameter + 1.0
+            cyl = trimesh.creation.cylinder(radius=diameter / 2, height=h, sections=32)
+            T = trimesh.geometry.align_vectors([0, 0, 1], axis)
+            T[:3, 3] = t + axis * (L / 2)
+            cyl.apply_transform(T)
+            try:
+                m = meshedit._boolean(m, cyl, "difference"); n += 1
+            except meshedit.OpError:
+                pass
+        made.append(n)
+    return m, made
+
+
+def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -> dict:
+    """Slice the print every `step` mm (z=0 is the build plate) and look for:
+    islands: a region with no overlap with the layer before it (starts in mid-air, nothing to hang from);
+    suction cups: a hole in the layers that is closed on its plate side (sealed by material or the plate) so every
+    peel pulls a vacuum. A hole that reaches open space on the plate side is vented."""
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+    z0, z1 = float(m.bounds[0][2]), float(m.bounds[1][2])
+    if z1 - z0 < step * 2:
+        return {"islands": [], "suction": []}
+    step = max(step, (z1 - z0) / max_layers)
+    zs = np.arange(z0 + step / 2, z1, step)
+    secs = m.section_multiplane([0, 0, 0], [0, 0, 1], zs)
+    layers = []
+    for sec in secs:
+        polys = []
+        if sec is not None:
+            try:
+                polys = [p.buffer(0) for p in sec.polygons_full if p.area > 1e-4]
+            except Exception:
+                polys = []
+        layers.append(polys)
+    islands, holes, parent = [], [], {}
+    prev_mat = prev_fill = None
+    for i, polys in enumerate(layers):
+        mat = unary_union(polys) if polys else None
+        fill = unary_union([Polygon(p.exterior) for p in polys]) if polys else None
+        for p in polys:
+            if i > 0 and (prev_mat is None or not p.intersects(prev_mat)) and p.area > 0.05:
+                islands.append({"z_mm": round(float(zs[i]), 2), "area_mm2": round(p.area, 2),
+                                "xy": [round(c, 1) for c in p.representative_point().coords[0]]})
+            for r in p.interiors:
+                h = Polygon(r)
+                if h.area < 1.0:
+                    continue
+                # vented on the plate side if, in the layer below, part of this hole is outside every outline (open vat)
+                below_open = i > 0 and (prev_fill is None or h.difference(prev_fill).area > 0.2)
+                holes.append({"i": i, "poly": h, "open": below_open})
+        prev_mat, prev_fill = mat, fill
+    # chain holes across layers by overlap (union-find); a chain is vented if any member opens below
+    def find(a):
+        while parent.get(a, a) != a:
+            a = parent[a]
+        return a
+    by_layer = {}
+    for k, h in enumerate(holes):
+        by_layer.setdefault(h["i"], []).append(k)
+    for k, h in enumerate(holes):
+        for j in by_layer.get(h["i"] - 1, []):
+            if holes[j]["poly"].intersects(h["poly"]):
+                parent[find(k)] = find(j)
+    groups = {}
+    for k in range(len(holes)):
+        groups.setdefault(find(k), []).append(k)
+    suction = []
+    for g in groups.values():
+        if len(g) < 2 or any(holes[k]["open"] for k in g):
+            continue
+        first = min(g, key=lambda k: holes[k]["i"])
+        suction.append({"z_mm": round(float(zs[holes[first]["i"]]), 2), "layers": len({holes[k]["i"] for k in g}),
+                        "area_mm2": round(max(holes[k]["poly"].area for k in g), 1)})
+    return {"islands": islands[:50], "suction": suction[:50], "step_mm": round(step, 3)}
+
+
 def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
     layers = max(1, math.ceil(height_mm / s["layer_mm"] - 1e-9))
     bottom = min(layers, s["bottom_layers"])
@@ -178,21 +279,25 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
 
 
 def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, dict]:
-    """The TorchC0 pipeline: hollow (+drain holes) -> tilt -> supports + raft. Returns (print mesh, report)."""
+    """The TorchC0 pipeline: tilt -> hollow -> drain + vent holes -> supports + raft -> layer check (islands, suction cups).
+    Warnings never block: they are notes; the files are always made."""
     rep = {"program": NAME, "settings": s, "notes": [], "safety": SAFETY, "test_note": TEST_NOTE}
-    work = m
+    work = orient(m, s["tilt_deg"])
     if s["hollow"] and s["wall_mm"] > 0:
         try:
-            work, hr = meshedit.op_hollow(m, {"wall": s["wall_mm"], "drain_diameter": s["drain_mm"]})
+            hollowed, hr = meshedit.op_hollow(work, {"wall": s["wall_mm"], "drain_diameter": 0})
+            hollowed, made = add_holes(hollowed, s["drain_mm"])
+            work = hollowed
             rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
+            rep["hollow"]["cavities"] = len(made); rep["hollow"]["holes"] = made
             if hr.get("note"):
                 rep["notes"].append(hr["note"])
-            if not s["drain_mm"]:
-                rep["notes"].append("Hollow without a drain hole traps liquid resin inside. Add a drain hole of 2.5 mm or more.")
+            short = sum(1 for n in made if n < 2)
+            if short:
+                rep["notes"].append(f"{short} hollow space(s) have fewer than 2 holes. Resin needs a drain hole and an air vent "
+                                    "to flow out, or it gets trapped and can crack the print. Set the hole size to 2.5 mm or more.")
         except meshedit.OpError as e:
-            work = m
             rep["notes"].append(f"Printed solid (not hollowed): {e}")
-    work = orient(work, s["tilt_deg"])
     vol = float(abs(work.volume))
     if s["supports"]:
         work, sr = build_supports(work, s["support_spacing_mm"], s["base_lift_mm"])
@@ -203,6 +308,17 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
                                 "check them in your slicer and add supports there if needed.")
     else:
         rep["notes"].append("Supports are off: only flat-bottomed models print without them. Add supports in your slicer otherwise.")
+    try:
+        lc = layer_check(work)
+    except Exception:
+        lc = {"islands": [], "suction": []}
+    rep["layer_check"] = lc
+    if lc["islands"]:
+        rep["notes"].append(f"{len(lc['islands'])} island(s): parts that start in mid-air with nothing under them (first at "
+                            f"{lc['islands'][0]['z_mm']} mm). They will fail or float in the vat; add supports under them.")
+    if lc["suction"]:
+        rep["notes"].append(f"{len(lc['suction'])} suction cup(s): a hollow or cup shape sealed on the plate side (first at "
+                            f"{lc['suction'][0]['z_mm']} mm). Each peel pulls a vacuum that can rip the print off; add a vent hole or tilt it.")
     ext = work.extents
     rep["size_mm"] = [round(float(x), 1) for x in ext]
     rep["estimate"] = estimate(float(ext[2]), vol, s)
