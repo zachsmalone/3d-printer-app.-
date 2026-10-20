@@ -22,13 +22,19 @@
       if (bar) bar.appendChild(b); else { b.classList.add("floating"); document.body.appendChild(b); }
     }
     paint(b);
-    b.addEventListener("click", function () {
-      var d = !isDark(); apply(d);
-      try { localStorage.theme = d ? "dark" : "light"; } catch (e) { }
-      paint(b);
-      document.dispatchEvent(new CustomEvent("zeim:theme", { detail: { dark: d } }));
-    });
-    addEventListener("storage", function (e) { if (e.key === "theme") { apply(e.newValue === "dark"); paint(b); } });
+    // One delegated handler on the document (not on the button): the toggle keeps working if a page re-draws its header,
+    // and pages that put the button somewhere else (CAD workspace) are covered too.
+    if (!window.__zeimThemeWired) {
+      window.__zeimThemeWired = true;
+      document.addEventListener("click", function (e) {
+        var t = e.target && e.target.closest && e.target.closest("#themeToggle"); if (!t) return;
+        var d = !isDark(); apply(d);
+        try { localStorage.theme = d ? "dark" : "light"; } catch (er) { }
+        paint(t);
+        document.dispatchEvent(new CustomEvent("zeim:theme", { detail: { dark: d } }));
+      });
+      addEventListener("storage", function (e) { if (e.key === "theme") { apply(e.newValue === "dark"); var x = document.getElementById("themeToggle"); if (x) paint(x); } });
+    }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setup); else setup();
 })();

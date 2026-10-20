@@ -7,6 +7,7 @@
 <script>try{var t=localStorage.theme;if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
 <link rel="stylesheet" href="/static/style.css">
 <link rel="stylesheet" href="/static/cad.css">
+<script src="/static/theme.js" defer></script>
 <script type="importmap">{"imports":{"three":"/static/vendor/three.module.min.js"}}</script>
 </head>
 <body class="cadws">
@@ -15,6 +16,7 @@
   <input id="cwTitle" class="cw-title" value="My design" aria-label="Design name" maxlength="60">
   <span class="cw-mode" id="cwMode" aria-live="polite">Modeling</span>
   <span class="cw-sp"></span>
+  <button type="button" class="cw-btn themetoggle" id="themeToggle" aria-pressed="false" aria-label="Dark mode" title="Switch to dark mode"></button>
   <button class="cw-btn" id="cwUndo" aria-label="Undo (Ctrl+Z)" title="Undo · Ctrl/⌘+Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
   <button class="cw-btn" id="cwRedo" aria-label="Redo (Ctrl+Shift+Z)" title="Redo · Ctrl/⌘+Shift+Z"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
   <div class="cw-menu">
