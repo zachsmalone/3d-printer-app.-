@@ -338,14 +338,17 @@ async function openItem(id) {
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
     ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · ⬇ ${i.downloads}` : ""}</p>
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
+    ${i.first_posted && !i.example ? `<p class="help first-posted">First posted on ${esc(new Date(i.first_posted + "T12:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</p>` : ""}
+    ${i.owned && !i.original ? `<div class="field"><label for="itViewOnly">Downloads</label><select id="itViewOnly"><option value="no" ${i.view_only ? "" : "selected"}>Anyone who can see it may download it</option><option value="yes" ${i.view_only ? "selected" : ""}>View only, no download</option></select></div>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itRemixSw">Allow remixes</label><select id="itRemixSw"><option value="yes" ${i.allow_remixes ? "selected" : ""}>Yes</option><option value="no" ${i.allow_remixes ? "" : "selected"}>No</option></select><small class="help">Remixes already posted keep their credit either way.</small></div>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "🔒 Private — only me", followers: "👥 Followers only", public: "🌐 Public" }[v]}</option>`).join("")}</select></div>` : ""}
-    <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
+    <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download>⬇ ${esc(f.name)}</a>`).join("")}
       ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       ${i.example || i.owned ? "" : `<button class="btn ghost" id="itRemix" ${i.can_remix ? "" : 'disabled aria-describedby="itRemixWhy"'}>🔁 Remix</button>`}
       <button class="btn ghost" id="itShare">🔗 Copy link</button>
-      ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}</div>
+      ${i.example ? "" : '<button class="btn ghost danger" id="itReport">⚑ Report</button>'}
+      ${i.example || i.owned || i.original ? "" : '<button class="btn ghost danger" id="itStolen">Report as stolen</button>'}</div>
     ${!i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
@@ -374,6 +377,14 @@ async function openItem(id) {
     const put = r => { const w = $("#itWill"); if (!w) return; w.innerHTML = badgeHTML(r, { detail: true }) + (r.checks?.slices?.ok == null ? `<button type="button" class="btn" id="itSliceCheck">Test-slice it for my printer</button>` : "");
       const b = $("#itSliceCheck"); if (b) b.onclick = async () => { b.disabled = true; b.textContent = "Slicing…"; try { put(await checkShowcase(id, true)); } catch (e) { b.textContent = e.message; } }; };
     put(await checkShowcase(id)); }).catch(() => { });
+  if ($("#itViewOnly")) $("#itViewOnly").onchange = async e => { try { await api(`/api/showcase/${id}/download`, J("PUT", { view_only: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Now view only: nobody else can download it" : "Downloads turned on", "ok"); } catch (er) { toast(er.message, "err"); openItem(id); } };
+  if ($("#itStolen")) $("#itStolen").onclick = async () => {
+    const b = $("#itStolen"); b.disabled = true;
+    try { const r = await api(`/api/showcase/${id}/report-stolen`, J("POST", {}));
+      b.textContent = "Reported"; toast(r.message, "ok");
+      b.insertAdjacentHTML("afterend", `<p class="help">Sent to the moderators${r.original_url ? `, with a link to <a href="${esc(r.original_url)}">the original</a>` : ""}. Rights holders can also send a <a href="${esc(r.dmca_url)}" target="_blank" rel="noopener">formal takedown notice</a>.</p>`);
+    } catch (e) { b.disabled = false; toast(e.message, "err"); }
+  };
   if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => { sessionStorage.setItem("zeim_remix_of", location.origin + i.share_url); toast("Make your version in the Studio, then Share it: this project will be credited as the original.", "ok"); };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
@@ -398,7 +409,7 @@ async function openItem(id) {
 $("#btnPublish").onclick = () => {
   if (!ME.signed_up) { toast("Create an account first to share projects.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
   $("#pub_title").value = S.current.title; $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $$("[name=pub_nsfw]").forEach(r => r.checked = false);
-  $("#pub_allow_remix").value = "yes"; if (!$("#pub_remix").value && sessionStorage.getItem("zeim_remix_of")) $("#pub_remix").value = sessionStorage.getItem("zeim_remix_of");
+  $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no"; if (!$("#pub_remix").value && sessionStorage.getItem("zeim_remix_of")) $("#pub_remix").value = sessionStorage.getItem("zeim_remix_of");
   $("#dlgPublish").showModal();
 };
 $("#btnDoPublish").onclick = async () => {
@@ -407,9 +418,12 @@ $("#btnDoPublish").onclick = async () => {
   try {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
       tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim(), nsfw: nsfw === "yes",
-      allow_remixes: $("#pub_allow_remix").value === "yes" }));
+      allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes" }));
     if ($("#pub_remix").value.trim()) sessionStorage.removeItem("zeim_remix_of");
-    clearInline($("#btnDoPublish")); $("#dlgPublish").close(); toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
+    clearInline($("#btnDoPublish")); $("#dlgPublish").close();
+    (i.warnings || []).forEach(w => toast(w, "ok"));
+    if (i.held_for_review) return toast(i.hold_message, "ok");
+    toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
   } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
 };
 

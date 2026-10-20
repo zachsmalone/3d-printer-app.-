@@ -216,10 +216,38 @@ def public(i: dict, actor: Actor) -> dict:
             "favorited": bool(actor.user) and _social().is_fav(actor.sid, i["id"]), "can_favorite": bool(actor.user),
             "license_id": i.get("license_id") or "",
             **remix_status(i),
+            "first_posted": str(i.get("created", ""))[:10],
+            "view_only": bool(i.get("view_only")),
+            "download_blocked": _dl_blocked(i, actor),
+            "held_for_review": bool(i.get("owner_sid") == actor.sid and i.get("hidden") and i.get("held")),
             "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],
             "thumb": f"/api/showcase/{i['id']}/thumb" if i.get("has_thumb") else None,
             "files": [{"name": f["name"], "size_kb": f["size_kb"],
-                       "url": f"/api/showcase/{i['id']}/files/{f['name']}"} for f in i["files"]]}
+                       "url": None if _dl_blocked(i, actor) else f"/api/showcase/{i['id']}/files/{f['name']}"} for f in i["files"]]}
+
+
+VIEW_ONLY_MSG = "The maker made this project view only: you can look at it, but it can't be downloaded."
+
+
+def _dl_blocked(i: dict, actor) -> bool:
+    """'View only, no download': everyone but the owner is refused the files (enforced again in the file route)."""
+    return bool(i.get("view_only")) and not (actor is not None and i.get("owner_sid") and i["owner_sid"] == actor.sid)
+
+
+def set_view_only(actor: Actor, item_id: str, on) -> dict:
+    if not isinstance(on, bool):
+        raise Denied(400, "view_only must be true or false")
+    found = {}
+
+    def f(l):
+        for i in l:
+            if i["id"] == item_id and i.get("owner_sid") == actor.sid:
+                i["view_only"] = on
+                found.update(i)
+    LISTINGS.update(f)
+    if not found:
+        raise Denied(404, "not found")
+    return get(item_id, actor)
 
 
 def allows_remixes(i: dict) -> bool:
@@ -361,7 +389,7 @@ def set_visibility(actor: Actor, item_id: str, level: str) -> dict:
 
 
 def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None, license_id: str | None = None,
-                   allow_remixes: bool = True) -> dict:
+                   allow_remixes: bool = True, view_only: bool = False) -> dict:
     from . import licensing
     try:
         lid = licensing.check(license_id)              # new projects always carry one (default: private use)
@@ -419,10 +447,25 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
-            "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False}
+            "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False,
+            "view_only": bool(view_only)}
     if remix_of:
         item["remix_of"] = remix_of
+    # theft protection: fingerprint the geometry; a near-match to ANOTHER maker's model is held for a moderator
+    from . import fingerprint, protect
+    fpr = fingerprint.safe_compute(d / f"{slug}.stl")
+    match = protect.find_match(fpr, actor.user["id"], remix_of) if config.DUPLICATE_CHECK else None
+    warnings = []
+    mine_hit = protect.own_match(fpr, actor.user["id"]) if fpr else None
+    if mine_hit:
+        warnings.append(f"This looks like your project \"{mine_hit['title'][:60]}\". It was posted anyway.")
     LISTINGS.update(lambda l: l.append(item))
+    protect.remember(pid, fpr)
+    if match:
+        held = protect.hold(item, match, actor.user["id"])
+        LISTINGS.update(lambda l: [x.update(held=held) for x in l if x["id"] == pid])
+        item["held"], item["hidden"] = held, True
+    item["_warnings"] = warnings
     from ..services.history import store as _bs
     _bs.set_saved(build_id)
     return item
