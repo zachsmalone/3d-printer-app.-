@@ -169,8 +169,12 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
         lo, hi = m.bounds[0][:2] - 2, m.bounds[1][:2] + 2
     raft = trimesh.creation.box(extents=[hi[0] - lo[0], hi[1] - lo[1], raft_mm])
     raft.apply_translation([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, raft_mm / 2])
-    out = trimesh.util.concatenate([m, raft, *parts])
-    return out, {"_volume": float(raft.volume + sum(abs(q.volume) for q in parts)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
+    u = union_all([m, raft, *parts])
+    if u is not None:                       # one solid: no overlapping shells, and the ml is the real union
+        out, extra, merged = u, float(abs(u.volume)) - float(abs(m.volume)), True
+    else:
+        out, extra, merged = trimesh.util.concatenate([m, raft, *parts]), float(raft.volume + sum(abs(q.volume) for q in parts)), False
+    return out, {"_volume": extra, "merged": merged, "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
 
 
 def _cavities(m: trimesh.Trimesh):
@@ -272,6 +276,24 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -
         suction.append({"z_mm": round(float(zs[holes[first]["i"]]), 2), "layers": len({holes[k]["i"] for k in g}),
                         "area_mm2": round(max(holes[k]["poly"].area for k in g), 1)})
     return {"islands": islands[:50], "suction": suction[:50], "step_mm": round(step, 3)}
+
+
+def union_all(meshes):
+    """One solid from overlapping bodies (model + raft + supports) with manifold3d. None if it can't be done."""
+    try:
+        import manifold3d as mf
+        ms = []
+        for q in meshes:
+            if len(q.faces) == 0:
+                continue
+            ms.append(mf.Manifold(mf.Mesh(vert_properties=np.asarray(q.vertices, dtype=np.float32),
+                                          tri_verts=np.asarray(q.faces, dtype=np.uint32))))
+        u = mf.Manifold.batch_boolean(ms, mf.OpType.Add)
+        out = u.to_mesh()
+        r = trimesh.Trimesh(vertices=np.asarray(out.vert_properties)[:, :3], faces=np.asarray(out.tri_verts), process=False)
+        return r if len(r.faces) and r.is_watertight else None
+    except Exception:
+        return None
 
 
 def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:

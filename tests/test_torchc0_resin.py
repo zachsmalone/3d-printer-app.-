@@ -207,3 +207,10 @@ def test_thin_wall_is_told_plainly():
     thin = rep["hollow"]["thinnest_wall_mm"]
     assert thin < 2.0 and rep["hollow"]["thin_wall"]
     assert sum("Thin wall" in n for n in rep["notes"]) == 1 and "you asked for" in next(n for n in rep["notes"] if "Thin wall" in n)
+
+
+def test_supports_are_unioned_into_one_solid_and_ml_not_double_counted():
+    m = trimesh.creation.box(extents=[20, 15, 10])
+    out, rep = resin.prepare(m, resin.settings({"hollow": "false"}))
+    assert rep["support"]["merged"] and out.is_watertight and len(out.split(only_watertight=False)) == 1
+    assert rep["estimate"]["resin_ml"] == pytest.approx(abs(out.volume) / 1000, abs=0.05)
