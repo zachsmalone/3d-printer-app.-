@@ -713,3 +713,5 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 /* Paint-on supports (Slicer panel) */
 .spPaint{margin:.6rem 0;padding:.4rem .6rem;border:1px solid var(--line,#333);border-radius:8px}
 .spPaint canvas{display:block;width:min(100%,280px);height:auto;touch-action:none;border-radius:6px;margin-top:.4rem;cursor:crosshair}
+#vLightRGB { min-width: 44px; min-height: 44px; padding: 2px; border-radius: 8px; cursor: pointer; }
+#vLightRGB[hidden] { display: none; }

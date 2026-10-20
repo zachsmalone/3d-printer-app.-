@@ -14,7 +14,8 @@ from __future__ import annotations
 import numpy as np
 
 K_PER_MM = 0.9
-LIGHTS = {"warm": (1.0, 0.72, 0.42), "cool": (0.74, 0.85, 1.0), "white": (1.0, 1.0, 1.0)}
+LIGHTS = {"warm": (1.0, 0.72, 0.42), "cool": (0.74, 0.85, 1.0), "white": (1.0, 1.0, 1.0),
+          "sunlight": (0.97, 0.98, 1.0)}  # ~6000 K daylight: bright, faintly blue-white
 
 
 def brightness(t, k: float = K_PER_MM):

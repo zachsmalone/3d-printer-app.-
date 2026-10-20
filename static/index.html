@@ -208,7 +208,8 @@
         <button class="btn small ghost" id="vReset">⟲ Reset view</button>
         <button class="btn small ghost" id="vWire">▦ Wireframe</button>
         <span id="litLightBox" hidden><button class="btn small" id="vLight" type="button" aria-pressed="false" title="Show it as if a light is behind it">💡 Light on</button>
-        <label for="vLightColor" class="sr-only">Light colour</label><select id="vLightColor" class="small"><option value="warm">Warm light</option><option value="cool">Cool light</option><option value="white">White light</option></select>
+        <label for="vLightColor" class="sr-only">Light colour</label><select id="vLightColor" class="small"><option value="warm">Warm light</option><option value="cool">Cool light</option><option value="white">White light</option><option value="sunlight">Sunlight (daylight)</option><option value="custom">Custom colour (RGB)</option></select>
+        <label for="vLightRGB" class="sr-only">Custom bulb colour</label><input type="color" id="vLightRGB" value="#ff4fa3" hidden title="Pick a bulb colour">
         <span class="pill" id="vLightNote" hidden title="Brightness from wall thickness: thin glows, thick stays dark. Real filament and resin vary.">Preview estimate</span></span>
     </div>
 

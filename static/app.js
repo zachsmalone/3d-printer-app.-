@@ -310,10 +310,20 @@ function syncLight() {
   if (!lit) S.lightOn = false;
   $("#vLight").setAttribute("aria-pressed", S.lightOn ? "true" : "false");
   $("#vLightNote").hidden = !S.lightOn;
-  viewer?.setBacklight(!!S.lightOn, litShapeOf(S.current), $("#vLightColor").value);
+  const lc = $("#vLightColor").value; $("#vLightRGB").hidden = lc !== "custom";
+  viewer?.setBacklight(!!S.lightOn, litShapeOf(S.current), lc === "custom" ? $("#vLightRGB").value : lc);
 }
 $("#vLight").onclick = () => { S.lightOn = !S.lightOn; syncLight(); };
-$("#vLightColor").onchange = () => { if (S.lightOn) syncLight(); };
+/* remember the last light (named preset or custom #rrggbb bulb) */
+try {
+  const sv = localStorage.lithLight, rgb = localStorage.lithLightRGB;
+  if (sv && [...$("#vLightColor").options].some(o => o.value === sv)) $("#vLightColor").value = sv;
+  if (/^#[0-9a-f]{6}$/i.test(rgb || "")) $("#vLightRGB").value = rgb;
+  $("#vLightRGB").hidden = $("#vLightColor").value !== "custom";
+} catch (_) { /* private mode: no storage */ }
+const saveLight = () => { try { localStorage.lithLight = $("#vLightColor").value; localStorage.lithLightRGB = $("#vLightRGB").value; } catch (_) {} };
+$("#vLightColor").onchange = () => { saveLight(); syncLight(); };
+$("#vLightRGB").oninput = () => { saveLight(); if (S.lightOn) syncLight(); };
 
 /* ---------- history ---------- */
 function renderHistory() {

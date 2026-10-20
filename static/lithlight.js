@@ -1,7 +1,13 @@
 /* Backlit lithophane "Light on" preview — browser twin of app/core/litho_light.py (keep in step).
    Preview estimate: I = exp(-k * t), t = wall thickness in mm (thin = bright, thick = dark). No three.js here, so node can test it. */
 export const K_PER_MM = 0.9;
-export const LIGHTS = { warm: [1.0, 0.72, 0.42], cool: [0.74, 0.85, 1.0], white: [1.0, 1.0, 1.0] };
+export const LIGHTS = { warm: [1.0, 0.72, 0.42], cool: [0.74, 0.85, 1.0], white: [1.0, 1.0, 1.0], sunlight: [0.97, 0.98, 1.0] };  // sunlight ~6000 K daylight
+/* a named light, or a custom "#rrggbb" bulb colour -> [r,g,b] 0..1 (unknown -> white) */
+export function lightRGB(light) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(light || ""));
+  if (m) { const n = parseInt(m[1], 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
+  return LIGHTS[light] || LIGHTS.white;
+}
 export const brightness = (t, k = K_PER_MM) => Math.exp(-k * Math.max(0, t));
 
 export function wallThickness(pos, shape = "rect") {          // pos: flat Float32Array x,y,z,...
@@ -25,7 +31,7 @@ export function wallThickness(pos, shape = "rect") {          // pos: flat Float
 
 /* per-vertex RGB (Float32Array) for a light colour; shade is relative to the thinnest wall, gamma-lifted */
 export function backlitColors(pos, shape, light = "warm", k = K_PER_MM, gamma = 0.6) {
-  const t = wallThickness(pos, shape), L = LIGHTS[light] || LIGHTS.white, out = new Float32Array(t.length * 3);
+  const t = wallThickness(pos, shape), L = lightRGB(light), out = new Float32Array(t.length * 3);
   let tmin = Infinity; for (const x of t) tmin = Math.min(tmin, x);
   const top = brightness(tmin, k) || 1;
   for (let i = 0; i < t.length; i++) { const s = Math.min(1, brightness(t[i], k) / top) ** gamma; out[3 * i] = L[0] * s; out[3 * i + 1] = L[1] * s; out[3 * i + 2] = L[2] * s; }

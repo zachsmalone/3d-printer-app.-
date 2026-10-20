@@ -92,3 +92,30 @@ def test_viewer_backlight_restores_material_and_keeps_wireframe_in_step():
     app = (ROOT / "static" / "app.js").read_text()
     assert "S.lightOn = false; syncLight();" in app                            # new build starts with light off
     assert 'S.current?.mode === "lithophane"' in app and "litShapeOf(S.current)" in app
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
+def test_js_custom_rgb_and_sunlight():
+    js = (ROOT / "static" / "lithlight.js").as_uri()
+    pts = [0, 0, 0, 1, 0, 0.8, 2, 0, 3.2]
+    code = (f"import {{ lightRGB, backlitColors, LIGHTS }} from '{js}';"
+            f"const c = Array.from(backlitColors(new Float32Array({pts}), 'rect', '#ff8000'));"
+            "console.log(JSON.stringify({c, red: lightRGB('#FF0000'), bad: lightRGB('#zz'), sun: lightRGB('sunlight'), L: LIGHTS}));")
+    out = json.loads(subprocess.run(["node", "--input-type=module", "-e", code], capture_output=True, text=True, check=True).stdout)
+    assert out["red"] == [1, 0, 0] and out["bad"] == [1, 1, 1]
+    assert out["c"][:3] == pytest.approx([1, 128 / 255, 0], abs=1e-6)          # thinnest glows the bulb colour
+    assert out["c"][5] == 0 and out["c"][6] < out["c"][3] < out["c"][0]          # tint kept, thicker darker
+    sun = out["sun"]
+    assert sun == pytest.approx(list(ll.LIGHTS["sunlight"]))                      # python twin in step
+    assert min(sun) > 0.9 and sun[2] > sun[0]                                     # bright, slightly blue-white
+    assert all(sun != out["L"][k] for k in ("warm", "cool", "white"))
+
+
+def test_custom_and_sunlight_ui_is_tap_friendly_and_remembered():
+    html = (ROOT / "static" / "index.html").read_text()
+    assert 'value="sunlight"' in html and 'value="custom"' in html
+    assert 'type="color" id="vLightRGB"' in html and 'for="vLightRGB"' in html
+    css = (ROOT / "static" / "style.css").read_text()
+    assert "#vLightRGB { min-width: 44px; min-height: 44px;" in css and "flex-wrap: wrap" in css
+    app = (ROOT / "static" / "app.js").read_text()
+    assert "localStorage.lithLight" in app and "localStorage.lithLightRGB" in app and '"#vLightRGB").oninput' in app
