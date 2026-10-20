@@ -20,6 +20,8 @@ ADMIN = {"X-Admin-Token": "t0k"}
 def _fresh(monkeypatch):
     monkeypatch.setattr(config, "DUPLICATE_CHECK", True)
     snap = {s: s.read() for s in (LISTINGS, ENGAGEMENT, PREFS, MODERATION, protect.FINGERPRINTS)}
+    LISTINGS.write([])                 # other files leave projects made from the same sample photo behind
+    protect.FINGERPRINTS.write({})
     yield
     for s, was in snap.items():
         s.write(was)
