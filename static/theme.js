@@ -60,7 +60,7 @@
     d.innerHTML = '<div class="dlg"><div class="dh"><h3 id="lookTitle">Colours &amp; accessibility</h3><button type="button" class="x" data-lookclose aria-label="Close">✕</button></div>' +
       '<div class="body lookgrid">' +
       '<label>Theme<select id="lookTheme">' + opt("light", "Light", t) + opt("dark", "Dark", t) + opt("system", "Same as my device", t) + "</select></label>" +
-      '<label>Accent colour<select id="lookAccent">' + opt("default", "Purple (ZEIM)", l.accent || "default") + opt("blue", "Blue", l.accent) + opt("teal", "Teal", l.accent) + opt("orange", "Orange", l.accent) + "</select></label>" +
+      '<label>Accent colour<select id="lookAccent">' + opt("default", "Blue (ZEIM)", l.accent || "default") + opt("teal", "Teal", l.accent) + opt("orange", "Orange", l.accent) + "</select></label>" +
       '<label class="inl"><input type="checkbox" id="lookContrast"' + (l.contrast === "high" ? " checked" : "") + "> High contrast</label>" +
       '<label>Colour vision<select id="lookCb">' + opt("default", "Standard colours", l.cb || "default") + opt("redgreen", "Red-green safe (deuteranopia / protanopia)", l.cb) + opt("blueyellow", "Blue-yellow safe (tritanopia)", l.cb) + "</select></label>" +
       '<p class="help">Saved on this device. Warnings and problems always show a symbol and words, not just a colour.</p>' +
