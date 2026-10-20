@@ -67,6 +67,51 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
             "min_mm": min_mm, "thinnest_mm": round(float(d.min()), 3)}
 
 
+PIP_CLEARANCE_FDM = 0.3      # safe print-in-place gap between separate parts (hinge knuckles, pins, joints, chain links)
+PIP_CLEARANCE_RESIN = 0.15
+GAP_MAX_FACES = 200_000
+
+
+def part_gaps(mesh: trimesh.Trimesh, safe_mm: float) -> dict:
+    """Smallest gap between separate bodies that are close together (print-in-place parts). Non-blocking warning only.
+    Bodies that touch or overlap (gap ~0) are treated as joined, not as a print-in-place gap."""
+    out = {"ok": True, "safe_mm": safe_mm, "min_gap_mm": None, "warning": None}
+    if len(mesh.faces) == 0 or len(mesh.faces) > GAP_MAX_FACES:
+        return out
+    try:
+        parts = mesh.split(only_watertight=False)
+    except Exception:
+        return out
+    if len(parts) < 2 or len(parts) > 60:
+        return out
+    from scipy.spatial import cKDTree
+    pts = []
+    for p in parts:
+        n = min(3000, max(200, len(p.faces) * 2))
+        v, _ = trimesh.sample.sample_surface(p, n, seed=0)
+        pts.append(np.vstack([v, p.vertices]))
+    trees = [cKDTree(x) for x in pts]
+    best = None
+    for i in range(len(parts)):
+        for j in range(i + 1, len(parts)):
+            lo, hi = parts[i].bounds, parts[j].bounds                 # skip pairs far apart
+            if np.any(lo[0] - hi[1] > safe_mm * 2) or np.any(hi[0] - lo[1] > safe_mm * 2):
+                continue
+            d, _ = trees[j].query(pts[i], k=1)
+            g = float(d.min())
+            if g < 0.02:                                              # touching / fused: not a gap
+                continue
+            best = g if best is None else min(best, g)
+    if best is None:
+        return out
+    out["min_gap_mm"] = round(best, 2)
+    if best < safe_mm:
+        out["ok"] = False
+        out["warning"] = (f"These parts are {best:.2f} mm apart and may fuse together. Aim for at least {safe_mm:g} mm. "
+                          "You can still slice it.")
+    return out
+
+
 def _inside_out(mesh: trimesh.Trimesh) -> bool:
     """A closed mesh whose signed volume is negative has every face pointing inward."""
     try:
@@ -83,8 +128,9 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
     min_wall = ps.line_width(n) if n else 0.4      # resin: 0.4 mm is a common minimum wall
     thin = thin_walls(mesh, min_wall)
     inside_out = _inside_out(mesh)
+    gaps = part_gaps(mesh, PIP_CLEARANCE_FDM if n else PIP_CLEARANCE_RESIN)
     checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message, "filament_g": filament_g},
-              "inside_out": {"ok": not inside_out}}
+              "inside_out": {"ok": not inside_out}, "gaps": gaps}
     # B11: a part thinner than one line, or a speck only a few lines across, won't really print
     tiny = bool(size) and (min(size) < min_wall or max(size) < 5 * min_wall)
     if tiny:
@@ -117,6 +163,8 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
         tips.append(f"Some walls are thinner than one {min_wall:g} mm line"
                     + (f" (thinnest about {thin['thinnest_mm']:g} mm)" if (thin.get("thinnest_mm") or min_wall) < min_wall else "")
                     + ". Try a smaller nozzle or thicken them.")
+    if gaps["ok"] is False:
+        tips.append(gaps["warning"])                                  # warning only: never changes the verdict or blocks slicing
     if inside_out:
         tips.append("The model is inside out (its surfaces face inward), so slicers may print it wrongly or not at all. Run Smart Fix to turn it the right way out.")
     if empty:
@@ -124,7 +172,8 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
                     f"The part may be too small or too thin for a {min_wall:g} mm line.")
     if slices_ok is False:
         tips.append(slice_message or "The slicer couldn't process it. Try Smart Fix first.")
-    return {"verdict": verdict, "label": label, "printer_id": pid, "printer": p["name"], "nozzle": n, "checks": checks, "tips": tips}
+    warnings = [gaps["warning"]] if gaps["ok"] is False else []
+    return {"verdict": verdict, "label": label, "warnings": warnings, "printer_id": pid, "printer": p["name"], "nozzle": n, "checks": checks, "tips": tips}
 
 
 def check_file(path, printer_id=None, nozzle=None, **kw) -> dict:

@@ -81,8 +81,21 @@ export function badgeHTML(r, { detail = false } = {}) {
     ${row(c.bed_fit.ok, c.bed_fit.ok ? `Fits the bed (${c.bed_fit.size_mm.join(" × ")} mm)` : `Won't fit your bed: ${c.bed_fit.size_mm.join(" × ")} mm on a ${c.bed_fit.bed_mm.join(" × ")} mm printer`)}
     ${row(c.slices.ok, c.slices.ok ? "Slices OK" : c.slices.ok === false ? "Slicing failed" : "Not sliced yet (press Slice)")}
     ${row(c.thin_wall.ok, c.thin_wall.ok === false ? `Thin walls under ${c.thin_wall.min_mm} mm (${c.thin_wall.thinnest_mm < c.thin_wall.min_mm ? `thinnest ${c.thin_wall.thinnest_mm} mm, ` : ""}${Math.round(c.thin_wall.thin_fraction * 100)}% of the surface)` : c.thin_wall.ok ? `No walls thinner than one ${c.thin_wall.min_mm} mm line` : "Wall check not available")}</ul>
-    ${(r.tips || []).map(t => `<p class="help">${esc(t)}</p>`).join("")}</div>`;
+    ${gapRow(c.gaps)}
+    ${(r.tips || []).filter(t => !(c.gaps?.warning && t === c.gaps.warning)).map(t => `<p class="help">${esc(t)}</p>`).join("")}</div>`;
 }
+/* Print-in-place gap check: a warning only, never blocks slicing. "Got it, slice anyway" hides it for this visit. */
+const GAP_KEY = "zeim_gap_ok";
+const gapDismissed = w => { try { return JSON.parse(sessionStorage.getItem(GAP_KEY) || "[]").includes(w); } catch { return false; } };
+function gapRow(g) {
+  if (!g || g.ok !== false || !g.warning || gapDismissed(g.warning)) return "";
+  return `<p class="help gapwarn" role="status">⚠ ${esc(g.warning)} <button type="button" class="btn small" data-gapok="${esc(g.warning)}">Got it, slice anyway</button></p>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest?.("[data-gapok]"); if (!b) return;
+  try { const l = JSON.parse(sessionStorage.getItem(GAP_KEY) || "[]"); l.push(b.dataset.gapok); sessionStorage.setItem(GAP_KEY, JSON.stringify(l.slice(-50))); } catch { }
+  b.closest(".gapwarn")?.remove();
+});
 const q = (pref = P.pref) => `printer_id=${encodeURIComponent(pref.printer_id)}&nozzle=${pref.nozzle ?? ""}`;
 export const checkBuild = (id, slice = false) => api(`/api/willprint/build/${id}?${q()}${slice ? "&slice=true" : ""}`);
 export const checkShowcase = (id, slice = false) => api(`/api/showcase/${id}/willprint?${q()}${slice ? "&slice=true" : ""}`);
