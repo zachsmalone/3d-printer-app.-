@@ -256,3 +256,9 @@ def test_thin_wall_has_one_wording():
         thin = [n for n in rep["notes"] if "wall" in n.lower() and "thin" in n.lower()]
         assert len(thin) <= 1 and all(n.startswith("Thin wall: the thinnest wall came out") for n in thin)
         assert not any("The thinnest wall is about" in n or "Some walls are thinner" in n for n in rep["notes"])
+
+
+def test_costs_are_shown_to_two_decimals():
+    js = (ROOT / "static" / "cost.js").read_text()
+    assert "toFixed(3)" not in js.split("export function money")[1].split("\n}")[0]
+    assert resin.estimate(10.0, 12345, resin.settings())["cost"] == round(resin.estimate(10.0, 12345, resin.settings())["cost"], 2)

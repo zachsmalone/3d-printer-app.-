@@ -14,8 +14,9 @@ export function costOf(grams, perKg) {
 }
 export function money(v, cur) {
   if (v == null) return "";
-  const s = v < 0.1 ? v.toFixed(3) : v.toFixed(2);
-  return /^[a-z]/i.test(cur) ? `${s} ${cur}` : `${cur}${s}`;
+  const tiny = v > 0 && v < 0.005, s = (tiny ? 0.01 : v).toFixed(2);     // money always to 2 decimals
+  const t = /^[a-z]/i.test(cur) ? `${s} ${cur}` : `${cur}${s}`;
+  return tiny ? `under ${t}` : t;
 }
 function hm(sec) {
   if (sec == null) return "";
