@@ -21,7 +21,9 @@ function panelHTML() {
     <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div>
     <div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
       ${num("rzBL", "Bottom layers", 5, 1, 15, 1, "")}${num("rzLift", "Lift distance", 6, 1, 15, 0.5, "mm")}${num("rzLiftS", "Lift speed", 65, 10, 300, 5, "mm/min")}
-      ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 1, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div>
+      ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div>
+    <p class="help warn rzWarn" id="rzWallWarn" hidden>Walls under 1 mm crack easily in resin. Use 1 mm or more, or prepare anyway.
+      <button type="button" class="btn small" id="rzWallAnyway">Prepare anyway</button> <button type="button" class="btn small" id="rzWallDismiss" aria-label="Dismiss this warning">Dismiss</button></p>
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
       ${num("rzCost", "Resin price", loadP().price ?? cat.default_price, 0, 10000, 0.5, "")}
       <div class="field"><label for="rzCostU">Price per</label><select id="rzCostU"><option value="l" ${(loadP().unit || cat.default_price_unit) === "l" ? "selected" : ""}>litre</option><option value="kg" ${loadP().unit === "kg" ? "selected" : ""}>kg</option></select></div></div>
@@ -36,6 +38,12 @@ function wire() {
   const pr = $("#rzPreset"), info = () => { const p = cat.printers.find(x => x.id === $("#rzPrinter").value); $("#rzInfo").textContent = p ? `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. Make the layer file in ${p.official_slicer || "the printer's own resin slicer"}.` : ""; };
   $("#rzPrinter").onchange = info; info();
   pr.onchange = () => { const [l, e, b, bl] = RZ_PRESETS[pr.value]; $("#rzLayer").value = l; $("#rzExp").value = e; $("#rzBExp").value = b; $("#rzBL").value = bl; };
+  // thin hollow wall: a dismissable warning, never a block (Prepare stays enabled; "Prepare anyway" just runs it)
+  let wallOk = false;
+  const wallWarn = () => { $("#rzWallWarn").hidden = wallOk || !($("#rzHollow").checked && +$("#rzWall").value > 0 && +$("#rzWall").value < 1); };
+  $("#rzWall").addEventListener("input", () => { wallOk = false; wallWarn(); }); $("#rzHollow").addEventListener("change", wallWarn);
+  $("#rzWallDismiss").onclick = () => { wallOk = true; wallWarn(); };
+  $("#rzWallAnyway").onclick = () => { wallOk = true; wallWarn(); $("#rzGo").click(); };
   $("#rzGo").onclick = async () => {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
     if (!f) { out.innerHTML = `<p class="help warn" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }

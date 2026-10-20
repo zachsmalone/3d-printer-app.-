@@ -85,8 +85,6 @@ def settings(opts: dict | None = None) -> dict:
         raise ResinError("Price unit must be per litre (l) or per kg.")
     s["hollow"] = str(o.get("hollow", "true")).lower() in ("1", "true", "on", "yes")
     s["supports"] = str(o.get("supports", "true")).lower() in ("1", "true", "on", "yes")
-    if s["hollow"] and 0 < s["wall_mm"] < 1.0:
-        raise ResinError("Hollow walls under 1 mm crack easily in resin. Use 1 mm or more, or turn hollowing off.")
     return s
 
 
@@ -316,6 +314,10 @@ def bodies(m: trimesh.Trimesh) -> int:
     return len(q.split(only_watertight=False))
 
 
+THIN_ASK_NOTE = ("Hollow wall under 1 mm: walls this thin crack easily in resin. Prepared anyway as you asked; "
+                 "use 1 mm or more, or turn hollowing off, if the part must be strong.")
+
+
 def thin_wall_note(thin: float, asked: float) -> str:
     return (f"Thin wall: the thinnest wall came out {thin:.2f} mm, thinner than the {asked:g} mm you asked for. "
             "Thin spots can crack or leak resin; try a thicker wall if this part must be strong.")
@@ -352,6 +354,8 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
             rep["notes"].append(f"The model has {len(shells)} separate or overlapping bodies that could not be joined into "
                                 "one solid; overlapping parts may hollow badly and their resin may be counted twice.")
     envelope = None
+    if s["hollow"] and 0 < s["wall_mm"] < 1.0:
+        rep["notes"].append(THIN_ASK_NOTE)          # a warning, never a refusal (warnings never block)
     if s["hollow"] and s["wall_mm"] > 0:
         try:
             hollowed, hr = meshedit.op_hollow(work, {"wall": s["wall_mm"], "drain_diameter": 0})
@@ -370,7 +374,9 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
                 rep["notes"].append(f"{short} hollow space(s) have fewer than 2 holes. Resin needs a drain hole and an air vent "
                                     "to flow out, or it gets trapped and can crack the print. Set the hole size to 2.5 mm or more.")
         except meshedit.OpError as e:
-            rep["notes"].append(f"Printed solid (not hollowed): {e}")
+            # meshedit's text ends "Try a thinner wall." for its own tool; here it would contradict the 1 mm advice
+            why = str(e).replace(" Try a thinner wall.", "").replace(" Try a different wall thickness.", "")
+            rep["notes"].append(f"Printed solid (not hollowed): {why} A part this small or thin prints fine solid.")
     vol = float(abs(work.volume))
     if s["supports"]:
         work, sr = build_supports(work, s["support_spacing_mm"], s["base_lift_mm"], envelope=envelope)

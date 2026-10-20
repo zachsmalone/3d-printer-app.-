@@ -28,7 +28,7 @@ def test_settings_presets_and_limits():
     assert s["preset"] == "standard" and s["layer_mm"] == 0.05 and s["hollow"] and s["supports"] and s["drain_mm"] > 0
     assert resin.settings({"preset": "detail"})["layer_mm"] == 0.03
     assert resin.settings({"layer_mm": "0.04", "hollow": "false"})["layer_mm"] == 0.04
-    for bad in ({"preset": "x"}, {"layer_mm": 1}, {"exposure_s": "abc"}, {"wall_mm": 0.5}, {"tilt_deg": 90}):
+    for bad in ({"preset": "x"}, {"layer_mm": 1}, {"exposure_s": "abc"}, {"tilt_deg": 90}):
         with pytest.raises(resin.ResinError):
             resin.settings(bad)
 
@@ -262,3 +262,16 @@ def test_costs_are_shown_to_two_decimals():
     js = (ROOT / "static" / "cost.js").read_text()
     assert "toFixed(3)" not in js.split("export function money")[1].split("\n}")[0]
     assert resin.estimate(10.0, 12345, resin.settings())["cost"] == round(resin.estimate(10.0, 12345, resin.settings())["cost"], 2)
+
+
+def test_thin_hollow_wall_is_a_warning_not_a_refusal():
+    s = resin.settings({"wall_mm": 0.5})            # accepted (was a refusal)
+    out, rep = resin.prepare(trimesh.creation.box(extents=[20, 15, 10]), s)
+    assert len(out.faces) and resin.THIN_ASK_NOTE in rep["notes"]
+    js = (ROOT / "static" / "torchc0.js").read_text()
+    assert "Prepare anyway" in js and "rzWallDismiss" in js
+
+
+def test_no_try_a_thinner_wall_message():
+    _, rep = resin.prepare(trimesh.creation.box(extents=[4, 4, 4]), resin.settings({"wall_mm": 3, "supports": "false"}))
+    assert not any("thinner wall" in n.lower() for n in rep["notes"])
