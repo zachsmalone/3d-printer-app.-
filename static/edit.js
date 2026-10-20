@@ -41,7 +41,7 @@ async function create(fd, retry) {
     S.history = r.history; renderHistory(); loadProject(r);
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
     else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) editPick.msg(e.message);       // photo problems stay under the photo buttons (QA-3)
     else toast(e.message, "err");
   } finally { busy(false); }
@@ -60,6 +60,8 @@ function fromFile(file) {
   if (!file) return;
   E.photoTry = /^image\//.test(file.type) || PHOTO_RE.test(file.name || "");
   if (!E.photoTry && !isModel(file)) return modelMsg("That doesn't look like a 3D model. Choose an .stl, .obj or .3mf file, or start from a photo below.");
+  if (!E.photoTry && file.size > 50 * 1024 * 1024) return modelMsg("That file is over 50 MB. Try a smaller one, or simplify it first.");
+  if (!E.photoTry && !file.size) return modelMsg("That file is empty. Choose another .stl, .obj or .3mf file.");
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
@@ -69,26 +71,41 @@ function fromFile(file) {
 const drop = $("#editDrop");
 $("#btnHave3d")?.addEventListener("click", () => { location.hash = "slicer"; $("#editFile").click(); });     // Studio → Edit (same tap, so iOS opens the picker)
 $("#editChooseModel").onclick = () => $("#editFile").click();
-$("#editFile").onchange = e => { fromFiles([...e.target.files]); e.target.value = ""; };
-drop.addEventListener("click", () => $("#editFile").click());
 $("#editPhoto").innerHTML = photoBlock("e", { sample: true });
-const editPick = mountPhoto("e", f => fromFile(f));
+const editPick = mountPhoto("e", f => fromFile(f));   // defined BEFORE the file handlers below: fromFile() uses it (an early pick hit a TDZ error and the file silently never loaded)
+// Import bug fix: a picked/dropped file must ALWAYS either load or say why. Any unexpected error is shown, never swallowed.
+function takeFiles(list) {
+  const files = [...(list || [])];
+  try { fromFiles(files); }
+  catch (e) { console.error(e); busy(false); modelMsg("We couldn't open that file. Please try again, or choose an .stl, .obj or .3mf file."); }
+}
+$("#editFile").onchange = e => { const l = [...e.target.files]; e.target.value = ""; takeFiles(l); };
+drop.addEventListener("click", () => $("#editFile").click());
 $("#eSample").onclick = async () => {
   try { const b = await (await fetch("/static/sample.png")).blob(); fromFile(new File([b], "sample.png", { type: "image/png" })); }
   catch { editPick.msg("We couldn't load the sample image. Please try again."); }
 };
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => fromFiles([...e.dataTransfer.files]));
+drop.addEventListener("drop", e => { e.stopPropagation(); takeFiles(e.dataTransfer.files); });
+// Dropping a model anywhere on the Slicer page (outside the small drop box, or onto the viewer while a model is open) used to make
+// the browser open/download the file instead, so it never appeared in ZEIM. The whole page now accepts the drop.
+const viewEl = $("#viewEdit");
+["dragenter", "dragover"].forEach(ev => viewEl.addEventListener(ev, e => { if (e.dataTransfer?.types?.includes("Files")) e.preventDefault(); }));
+viewEl.addEventListener("drop", e => { if (!e.dataTransfer?.files?.length) return; e.preventDefault(); takeFiles(e.dataTransfer.files); });
 
 /* ---------- several files at once: 'Parts of one print' (one plate) or 'Separate prints' ---------- */
 let multiFiles = [];
+const MULTI_MAX_BYTES = 50 * 2 ** 20, MULTI_TOTAL_BYTES = 55 * 2 ** 20;   // server: 50 MB per file, 56 MB per request
 function fromFiles(files) {
   files = files.filter(Boolean);
   if (files.length <= 1) return fromFile(files[0]);
   const bad = files.filter(f => !isModel(f));
   if (bad.length) return modelMsg("When you pick several files, they all need to be 3D models (.stl, .obj or .3mf).");
   if (files.length > 12) return modelMsg("Up to 12 files at a time.");
+  const big = files.find(f => f.size > MULTI_MAX_BYTES);
+  if (big) return modelMsg(`${big.name} is over 50 MB. Try a smaller file.`);
+  if (files.reduce((t, f) => t + f.size, 0) > MULTI_TOTAL_BYTES) return modelMsg("Those files are over 55 MB together. Pick fewer files at a time.");
   modelMsg(""); multiFiles = files;
   $("#multiWhich").textContent = `${files.length} files: ${files.map(f => f.name).join(", ")}`;
   $("#multiMsg").textContent = "";
@@ -109,7 +126,7 @@ async function sendMulti(mode, auto = false) {
     if (r.mode === "plate") toast(r.plate.fits ? `All ${r.plate.parts} parts fit on the bed (${r.plate.footprint_mm[0]} × ${r.plate.footprint_mm[1]} mm).` : `These parts don't fit on one ${r.plate.bed_mm[0]} × ${r.plate.bed_mm[1]} mm bed together. Try Separate prints or scale them down.`, r.plate.fits ? "ok" : "err");
     else toast(`Made ${r.projects.length} separate projects. Find them under Pick up where you left off.`, "ok");
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { $("#dlgMulti").close(); S.history = e.body.builds; renderHistory(); S.pending = a => sendMulti(mode, a); openFull(); }
+    if (e.status === 409 && e.body?.code === "history_full") { $("#dlgMulti").close(); S.history = e.body.builds; renderHistory(); S.pending = a => { S.pending = null; return sendMulti(mode, a); }; openFull(); }
     else $("#multiMsg").textContent = e.message;
   } finally { busy(false); }
 }
