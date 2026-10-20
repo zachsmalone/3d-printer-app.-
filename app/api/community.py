@@ -103,7 +103,7 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
 
 @router.put("/me/username")
 def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)):
-    """Change my username. Server-enforced: 3-20 chars, unique ignoring case, passes the chat filter, no email/phone-like text."""
+    """Change my username. Server-enforced: 3-18 chars, unique ignoring case, passes the chat filter, no email/phone-like text."""
     if not actor.user:
         raise HTTPException(401, "Create an account first.")
     if not ratelimit.hit("username:" + actor.sid, 20, 3600) or not ratelimit.hit("usernameip:" + _ip(request), 200, 3600):

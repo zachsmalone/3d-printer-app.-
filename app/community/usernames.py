@@ -1,6 +1,6 @@
 """Unique usernames (the name a model is credited to).
 
-* 3-20 characters: letters, digits and underscore, starting with a letter. Unique ignoring case.
+* 3-18 characters (18 = "NightmareOpsStudio"): letters, digits and underscore, starting with a letter. Unique ignoring case.
 * No email-like or phone-like strings, nothing the chat filter blocks, no reserved words (staff, admin, zeim ...).
 * Sign-up may supply a username (it must pass every check); otherwise a friendly generated nickname is given. Changes must pass all of the above.
 * A username is separate from the display name; neither is ever an email address, and email is never part of any public response.
@@ -16,7 +16,7 @@ from .. import config
 from . import safety
 from .store import USERS
 
-NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{2,19}$")
+NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{2,17}$")
 RESERVED = {"admin", "administrator", "moderator", "mod", "staff", "support", "system", "zeim", "teacher", "official", "root", "owner", "help",
             "anonymous", "null", "undefined", "nasa", "creality", "prusa", "bambu"}
 ADJ = ["Sunny", "Bright", "Happy", "Brave", "Calm", "Clever", "Cosmic", "Gentle", "Jolly", "Kind", "Lucky", "Merry", "Nimble", "Quick", "Quiet", "Shiny",
@@ -43,7 +43,7 @@ def check_shape(name: str) -> str:
     if "@" in n or "." in n or "://" in n:
         raise UsernameError("Please don't use an email address or a link as a username.")
     if not NAME_RE.match(n):
-        raise UsernameError("Use 3 to 20 letters, numbers or underscores, starting with a letter.")
+        raise UsernameError("Use 3 to 18 letters, numbers or underscores, starting with a letter.")
     if sum(ch.isdigit() for ch in n) >= 7:
         raise UsernameError("Please don't use a phone number as a username.")
     if n.lower() in RESERVED or any(n.lower().startswith(r) and r in ("admin", "zeim", "staff", "moderator") for r in RESERVED):
@@ -156,7 +156,7 @@ def migrate() -> int:
             if u.get("username"):
                 continue
             adult = not idn.underage(u)
-            cand = re.sub(r"[^A-Za-z0-9_]", "", (u.get("display_name") or "").replace(" ", "_"))[:20]
+            cand = re.sub(r"[^A-Za-z0-9_]", "", (u.get("display_name") or "").replace(" ", "_"))[:18]
             ok = None
             if adult:
                 try:

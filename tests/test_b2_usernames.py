@@ -18,7 +18,7 @@ def test_adult_can_choose_a_valid_free_name_or_gets_a_generated_one():
     assert r.status_code == 400 and "taken" in r.json()["detail"] and c.get("/api/me").json()["signed_up"] is False
 
 
-@pytest.mark.parametrize("bad", ["ab", "a" * 21, "1abc", "has space", "da-sh", "me@example.com", "ada.smith", "http://x", "a1234567b", "Zeim_team", "admin", "Teacher", "fuck_you", "<script>"])
+@pytest.mark.parametrize("bad", ["ab", "a" * 19, "NightmareOpsStudio1", "1abc", "has space", "da-sh", "me@example.com", "ada.smith", "http://x", "a1234567b", "Zeim_team", "admin", "Teacher", "fuck_you", "<script>"])
 def test_change_refuses_bad_names_with_a_kind_message(bad):
     a = client(ADULT); before = me(a)["username"]
     r = a.put("/api/me/username", json={"username": bad})
@@ -150,10 +150,10 @@ def test_username_with_a_bad_word_in_any_disguise_is_refused():
     w = _bad()
     for v in (w, w.upper(), w[:2] + "_" + w[2:], w[0] + "1" + w[2:], w + "_fan", "the_" + w):
         try:
-            usernames.check_shape(v[:20])
+            usernames.check_shape(v[:18])
         except usernames.UsernameError:
             continue
-        assert usernames.safety.scan(v[:20]) is None, v
+        assert usernames.safety.scan(v[:18]) is None, v
 
 
 def test_a_refused_username_is_refused_over_the_api_too():
@@ -165,3 +165,14 @@ def test_a_refused_username_is_refused_over_the_api_too():
     assert r.status_code == 400
 
 
+
+
+def test_max_18_chars_zachs_name_fits_and_case_duplicate_refused():
+    a = client(); r = a.post("/api/me/signup", json={**ADULT, "username": "NightmareOpsStudio"})
+    assert r.status_code == 200 and r.json()["username"] == "NightmareOpsStudio"
+    b = client(); r = b.post("/api/me/signup", json={**ADULT, "username": "nightmareopsstudio"})
+    assert r.status_code == 400 and "taken" in r.json()["detail"]
+    c = client(); r = c.post("/api/me/signup", json={**ADULT, "username": "NightmareOpsStudios"})      # 19
+    assert r.status_code == 400 and "3 to 18" in r.json()["detail"]
+    d = client(ADULT); r = d.put("/api/me/username", json={"username": "NIGHTMAREOPSSTUDIO"}); assert r.status_code == 409
+    r = d.put("/api/me/username", json={"username": "x" + "a" * 18}); assert r.status_code == 400 and "3 to 18" in r.json()["detail"]

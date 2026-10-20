@@ -69,8 +69,8 @@ function renderAccount() {
   if (!ME.signed_up) {
     $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. Anyone can build and learn in the ${esc(CFG.sections.learn)} without an account, and families can print designs together with an adult account holder.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
-      <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false">
-        <small class="help">3 to 20 letters, numbers or underscores. Leave it empty and ZEIM makes you a friendly nickname you can change later. Not your real name, email or phone number.</small></div>
+      <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <small class="help">3 to 18 letters, numbers or underscores. Leave it empty and ZEIM makes you a friendly nickname you can change later. Not your real name, email or phone number.</small></div>
       <div class="field"><label for="su_dob">Date of birth <em>used only to confirm you are 18 or over; not kept if you are not</em></label><input id="su_dob" type="date"></div>
       <details class="su-printer"><summary>Your printer <em>optional</em></summary><div id="su_printer"><p class="help">Loading printers…</p></div></details>
       <button class="btn primary" id="su_go">Create account</button>
@@ -102,8 +102,8 @@ function renderAccount() {
     $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> ${ME.suspended ? '<span class="pill">suspended</span>' : ""}</p>
       <h4>Your username</h4>
       <p>Credit for what you share goes to <b id="un_now">@${esc(ME.username || "")}</b>. Your email is never shown to anyone.</p>
-      <div class="field"><label for="un_new">New username</label><input id="un_new" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" ${nextUn ? "disabled" : ""}>
-        <small class="help" id="un_help">${nextUn ? "You can change your username again on " + esc(nextUn) + "." : "3 to 20 letters, numbers or underscores. You can change it once every 90 days. The old name stays saved for you, so nobody else can take it. Please don't use your real name."}</small></div>
+      <div class="field"><label for="un_new">New username</label><input id="un_new" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false" ${nextUn ? "disabled" : ""}>
+        <small class="help" id="un_help">${nextUn ? "You can change your username again on " + esc(nextUn) + "." : "3 to 18 letters, numbers or underscores. You can change it once every 90 days. The old name stays saved for you, so nobody else can take it. Please don't use your real name."}</small></div>
       <div class="row"><button class="btn small" id="un_save" ${nextUn ? "disabled" : ""}>Change username</button><button class="btn small ghost" id="un_suggest" ${nextUn ? "disabled" : ""}>Suggest names</button></div>
       <div class="row" id="un_sugg"></div>
       <p class="help">Public page: <a href="/u/${ME.id}" target="_blank">/u/${ME.id}</a> (only if your profile is visible to the viewer)</p>
