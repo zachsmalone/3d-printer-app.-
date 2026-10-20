@@ -19,7 +19,8 @@
   <a class="brand" href="/" title="Home"><img src="/static/logo-header.png" alt="ZEIM" class="logoimg" id="logoImg"></a>
   <nav class="nav" id="mainNav" aria-label="Main">
     <button data-view="showcase" class="on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>Showcase</span></button>
-    <button data-view="slicer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M8 4v6M16 9v6M11 14v6"/></svg><span>Slicer</span></button>
+    <button data-view="slicer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M8 4v6M16 9v6M11 14v6"/></svg><span>FDM Slicer</span></button>
+    <button data-view="torchc0"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 15h10"/></svg><span>TorchC0</span></button>
     <button data-view="cad"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span>CAD</span></button>
     <button data-view="lithophane"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span>Lithophane</span></button>
     <button data-view="smartfix"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span>Smart Fix</span></button>
@@ -153,7 +154,7 @@
       </div>
 
       <div class="field" id="lithMatBox"><label for="lithMaterial">Printer type</label>
-        <select id="lithMaterial"><option value="filament">Filament (FDM)</option><option value="resin">Resin (SLA / MSLA)</option></select>
+        <select id="lithMaterial"><option value="filament">Filament (FDM)</option><option value="resin">TorchC0 resin (SLA / MSLA)</option></select>
         <label for="lithThk" class="sr-only">Thickness preset</label><select id="lithThk" class="exp-only"><option value="thin">Thin</option><option value="standard" selected>Standard</option><option value="thick">Thick</option></select>
         <p class="help" id="lithMatHelp">Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first.</p></div>
       <details class="field" id="mboxBox"><summary>📦 Memory box (4 photos round a light)</summary>
@@ -424,6 +425,12 @@
   </ul>
 </main>
 
+<main class="page" id="viewTorch" hidden>
+  <div class="pagehead"><div><h1>TorchC0</h1><p class="help">ZEIM's resin program. Hollow your model with a drain hole, tilt it, add supports and a raft, then open the STL or 3MF in your resin printer's own slicer to make the layer file.</p></div></div>
+  <section class="card" id="torchPanel" aria-label="TorchC0 resin settings"><p class="help">Loading resin printers…</p></section>
+  <div id="torchOut" aria-live="polite"></div>
+</main>
+
 <main class="page" id="viewFix" hidden>
   <div class="pagehead"><div><h1>Smart Fix</h1><p class="help">Open a model in the editor, then repair, hollow or simplify it. ZEIM checks for holes, flipped faces and hidden voids.</p></div></div>
   <ul class="grid toolgrid">
@@ -570,6 +577,7 @@
 <script type="module" src="/static/community.js"></script>
 <script type="module" src="/static/edit.js"></script>
 <script type="module" src="/static/printer.js"></script>
+<script type="module" src="/static/torchc0.js"></script>
 <script type="module" src="/static/trace2d.js"></script>
 <script type="module" src="/static/calibrate.js"></script>
 <script type="module" src="/static/doctor.js"></script>

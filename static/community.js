@@ -25,14 +25,15 @@ async function refreshMe() {
 }
 
 /* ---------- views ---------- */
-const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", account: "#viewAccount", learn: "#viewLearn" };
-const ALIAS = { "": "showcase", edit: "slicer", create: "lithophane", studio: "lithophane" };
+const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", account: "#viewAccount", learn: "#viewLearn" };
+const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", studio: "lithophane" };
 function show(view) {
   const tab = view === "learn" ? "account" : view;
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === tab); if (b.dataset.view === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
   document.body.dataset.view = view;
   if (view === "slicer") document.dispatchEvent(new CustomEvent("zeim:edit-shown"));
+  if (view === "torchc0") document.dispatchEvent(new CustomEvent("zeim:torchc0-shown"));
   if (view === "showcase") loadShowcase();
   if (view === "learn") loadLearn();
 }
