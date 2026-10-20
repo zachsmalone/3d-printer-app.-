@@ -42,7 +42,7 @@ def test_b1_willprint_big_mesh_skipped_cleanly():
     before = _rss_mb()
     r = willprint.check(big, slices_ok=True)
     assert r["checks"]["thin_wall"]["skipped"] == "too_detailed" and r["verdict"] == "unchecked"      # N3: never "Will print"
-    assert "Will print" not in r["label"] and "couldn't check" in r["label"]
+    assert "Will print" not in r["label"] and "thin-wall check skipped" in r["label"]
     assert _rss_mb() - before < 300
     assert willprint.check(trimesh.creation.box((0.5, 0.5, 0.5)), slices_ok=True)["verdict"] != "yes"   # B11 size floor
 

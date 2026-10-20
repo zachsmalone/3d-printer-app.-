@@ -35,7 +35,7 @@ def thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     from ..core import guard
     try:
         return guard.run(_thin_walls, mesh, min_mm, mem_mb=1200, timeout=60)
-    except (guard.Tripped, guard.Busy):
+    except (guard.Tripped, guard.Busy, MemoryError, OSError):     # QA B1/B11: a MemoryError used to escape and the badge fell back to "Fits: not sliced yet"
         return {"ok": None, "skipped": "limit", "thin_fraction": None, "min_mm": min_mm,
                 "note": "Thin-wall check skipped: it needed more memory or time than allowed."}
 
@@ -50,19 +50,29 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     normals = mesh.face_normals[idx]
     origins = mesh.triangles_center[idx] - normals * 1e-4
     try:
-        from ..core.thickness import first_hits
-        locs, ray_idx = first_hits(mesh, origins, -normals)          # batched: small child memory (N3)
+        from ..core.thickness import first_hits_faces, real_thin
+        locs, ray_idx, hit = first_hits_faces(mesh, origins, -normals)   # batched: small child memory (N3)
     except Exception:
         return {"ok": None, "thin_fraction": None, "min_mm": min_mm}
     if len(ray_idx) == 0:
         return {"ok": True, "thin_fraction": 0.0, "min_mm": min_mm}
     d = np.linalg.norm(locs - origins[ray_idx], axis=1)
-    thin_n = int(np.count_nonzero(d < min_mm))
+    thin = real_thin(mesh, idx[ray_idx], hit, d, min_mm)             # same shell + nearly parallel opposite face (same rule as /printcheck)
+    d = np.where(thin | (d >= min_mm), d, min_mm)
+    thin_n = int(np.count_nonzero(thin))
     frac = float(thin_n) / n
     # QA B11: a few spots far below one line (0.06 mm on a 0.42 mm line) used to pass the 5 % rule while /printcheck
     # flagged them; any couple of sampled spots under one line now counts, like printcheck's "some thin spots".
     return {"ok": frac <= THIN_FAIL_FRACTION and thin_n < THIN_MIN_SPOTS, "thin_fraction": round(frac, 3), "thin_count": thin_n,
             "min_mm": min_mm, "thinnest_mm": round(float(d.min()), 3)}
+
+
+def _inside_out(mesh: trimesh.Trimesh) -> bool:
+    """A closed mesh whose signed volume is negative has every face pointing inward."""
+    try:
+        return bool(len(mesh.faces) and mesh.is_watertight and float(mesh.volume) < 0)
+    except Exception:
+        return False
 
 
 def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, slice_message="", filament_g=None) -> dict:
@@ -72,7 +82,9 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
     fit = bed_fit(size, pid)
     min_wall = ps.line_width(n) if n else 0.4      # resin: 0.4 mm is a common minimum wall
     thin = thin_walls(mesh, min_wall)
-    checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message, "filament_g": filament_g}}
+    inside_out = _inside_out(mesh)
+    checks = {"bed_fit": fit, "thin_wall": thin, "slices": {"ok": slices_ok, "message": slice_message, "filament_g": filament_g},
+              "inside_out": {"ok": not inside_out}}
     # B11: a part thinner than one line, or a speck only a few lines across, won't really print
     tiny = bool(size) and (min(size) < min_wall or max(size) < 5 * min_wall)
     if tiny:
@@ -83,12 +95,14 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
     empty = slices_ok is True and filament_g is not None and float(filament_g) < MIN_FILAMENT_G
     if fit["ok"] is False or slices_ok is False:
         verdict, label = "no", "Won't print as is"
+    elif inside_out:                      # QA: an inside-out (inverted) cube used to get "Will print"
+        verdict, label = "maybe", "Might print: model is inside out"
     elif thin["ok"] is False:
         verdict, label = "maybe", "Might print: thin walls"
     elif empty:
         verdict, label = "maybe", "Might print: almost no filament"
     elif thin["ok"] is None:              # skipped / timed out / unmeasurable: never claim "Will print" (N3)
-        verdict, label = "unchecked", ("Sliced OK; couldn't check thin walls" if slices_ok else "Fits; couldn't check thin walls")
+        verdict, label = "unchecked", ("Sliced OK; thin-wall check skipped" if slices_ok else "Fits; thin-wall check skipped")
     elif all(s is True for s in states):
         verdict, label = "yes", "Will print"
     else:
@@ -103,6 +117,8 @@ def check(mesh: trimesh.Trimesh, printer_id=None, nozzle=None, slices_ok=None, s
         tips.append(f"Some walls are thinner than one {min_wall:g} mm line"
                     + (f" (thinnest about {thin['thinnest_mm']:g} mm)" if (thin.get("thinnest_mm") or min_wall) < min_wall else "")
                     + ". Try a smaller nozzle or thicken them.")
+    if inside_out:
+        tips.append("The model is inside out (its surfaces face inward), so slicers may print it wrongly or not at all. Run Smart Fix to turn it the right way out.")
     if empty:
         tips.append(f"The slicer used almost no filament ({float(filament_g):.2f} g), so little or nothing would print. "
                     f"The part may be too small or too thin for a {min_wall:g} mm line.")

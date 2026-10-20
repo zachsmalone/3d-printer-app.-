@@ -97,7 +97,7 @@ def test_n3_badge_never_says_will_print_when_thin_wall_check_did_not_run(monkeyp
     cube = trimesh.creation.box((20, 20, 20))
     r = willprint.check(cube, slices_ok=True)
     assert r["checks"]["thin_wall"]["skipped"] == "limit"
-    assert r["verdict"] == "unchecked" and "Will print" not in r["label"] and "couldn't check" in r["label"]
+    assert r["verdict"] == "unchecked" and "Will print" not in r["label"] and "thin-wall check skipped" in r["label"]
     assert any("thin" in t.lower() for t in r["tips"])
     r = willprint.check(cube, slices_ok=None)
     assert r["verdict"] == "unchecked" and "Will print" not in r["label"]
