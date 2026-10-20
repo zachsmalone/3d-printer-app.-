@@ -117,3 +117,15 @@ def test_fdm_slicer_and_torchc0_are_separate_main_tabs():
     for rz in ("rzGo", "/api/resin", "exposure_s", "bottom_exposure"):
         assert rz not in pjs
     assert 'href="#torchc0"' in pjs
+
+
+def test_torchc0_panel_inputs_are_not_hidden_by_radio_card_css():
+    css = (ROOT / "static" / "style.css").read_text()
+    assert "label.card input,.seg input{position:absolute" in css and "\n.card input," not in css
+    assert 'class="card" id="torchPanel"' not in (ROOT / "static" / "index.html").read_text()
+
+
+def test_torchc0_in_a_real_browser():
+    from test_b4_ui import _run
+    out = _run("ui_torchc0.py")
+    assert "PASS webkit" in out, out

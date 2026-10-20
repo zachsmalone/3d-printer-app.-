@@ -293,7 +293,7 @@ body[data-level=expert] .hero{padding:8px 14px;background:none;border:0}
 .pathnav .help{margin:6px 2px 0}
 fieldset.cards{border:0;padding:0;margin:0;min-width:0}fieldset.cards legend{padding:0;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:8px;font-weight:700}
 fieldset.cards legend i{font-style:normal;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--acc);color:var(--on-acc);font-size:11px;margin-right:6px}
-.card input,.seg input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+label.card input,.seg input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
 .card{position:relative}
 .card:has(input:focus-visible),.seg label:has(input:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
 fieldset.seg{margin:0;min-width:0}fieldset.seg legend{font-size:13px;color:var(--mut);padding:0 0 4px;float:left;width:100%}
