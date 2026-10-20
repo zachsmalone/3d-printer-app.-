@@ -33,11 +33,15 @@ PRESETS = {
 DEFAULT_PRESET = "standard"
 LIMITS = {"layer_mm": (0.01, 0.2), "exposure_s": (0.5, 30.0), "bottom_exposure_s": (5.0, 120.0), "bottom_layers": (1, 15),
           "lift_mm": (1.0, 15.0), "lift_speed_mm_min": (10.0, 300.0), "tilt_deg": (0.0, 60.0), "wall_mm": (0.0, 6.0),
-          "drain_mm": (0.0, 10.0), "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0)}
+          "drain_mm": (0.0, 10.0), "price": (0.0, 10000.0), "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0)}
 SAFETY = ["Wear nitrile gloves and eye protection; uncured resin irritates skin and eyes.",
           "Print and wash in a ventilated room; keep resin away from children, pets and food areas.",
           "Wash prints in IPA (or the resin maker's wash), then cure under UV. Cure used IPA and resin waste in sunlight before disposal; never pour it down a drain.",
           "Hollow prints need drain holes, or trapped liquid resin can crack the print later."]
+# Typical standard-resin street price (~30 per litre in USD/EUR, 2026) and density (~1.1 g/ml, standard resins 1.05-1.25).
+DEFAULT_PRICE = 30.0
+DEFAULT_PRICE_UNIT = "l"
+RESIN_DENSITY_G_ML = 1.1
 TEST_NOTE = "Starting values only. Run an exposure test with your resin (most resin makers publish one) and adjust in your slicer."
 
 
@@ -75,6 +79,10 @@ def settings(opts: dict | None = None) -> dict:
     s["drain_mm"] = _num(o, "drain_mm", 3.0)
     s["support_spacing_mm"] = _num(o, "support_spacing_mm", 4.0)
     s["base_lift_mm"] = _num(o, "base_lift_mm", 5.0)
+    s["price"] = _num(o, "price", DEFAULT_PRICE)
+    s["price_unit"] = o.get("price_unit") or DEFAULT_PRICE_UNIT
+    if s["price_unit"] not in ("l", "kg"):
+        raise ResinError("Price unit must be per litre (l) or per kg.")
     s["hollow"] = str(o.get("hollow", "true")).lower() in ("1", "true", "on", "yes")
     s["supports"] = str(o.get("supports", "true")).lower() in ("1", "true", "on", "yes")
     if s["hollow"] and 0 < s["wall_mm"] < 1.0:
@@ -161,7 +169,11 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
     move = 2 * s["lift_mm"] / s["lift_speed_mm_min"] * 60 + 0.5          # up + down + settle
     secs = bottom * s["bottom_exposure_s"] + (layers - bottom) * s["exposure_s"] + layers * move
     ml = volume_mm3 / 1000.0
-    return {"layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
+    price, unit = s.get("price", DEFAULT_PRICE), s.get("price_unit", DEFAULT_PRICE_UNIT)
+    cost = ml / 1000.0 * price if unit == "l" else ml * RESIN_DENSITY_G_ML / 1000.0 * price
+    return {"cost": round(cost, 2), "cost_note": f"Resin only, at {price:g} per {'litre' if unit == 'l' else 'kg'}"
+            + (f" (density {RESIN_DENSITY_G_ML:g} g/ml)" if unit == "kg" else "") + "; leaves out spills, IPA, gloves and failed prints.",
+            "layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
             "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film."}
 
 

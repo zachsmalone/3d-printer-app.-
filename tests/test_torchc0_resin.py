@@ -129,3 +129,20 @@ def test_torchc0_in_a_real_browser():
     from test_b4_ui import _run
     out = _run("ui_torchc0.py")
     assert "PASS webkit" in out, out
+
+
+def test_resin_cost_estimate_per_litre_and_kg():
+    e = resin.estimate(10.0, 100000, resin.settings({"price": 40, "price_unit": "l"}))   # 100 ml at 40/l
+    assert e["cost"] == 4.0 and "40 per litre" in e["cost_note"]
+    k = resin.estimate(10.0, 100000, resin.settings({"price": 40, "price_unit": "kg"}))  # 110 g at 40/kg
+    assert k["cost"] == 4.4
+    assert resin.estimate(10.0, 100000, resin.settings())["cost"] == round(0.1 * resin.DEFAULT_PRICE, 2)
+    with pytest.raises(resin.ResinError):
+        resin.settings({"price_unit": "gal"})
+
+
+def test_api_reports_cost(c):
+    r = c.post("/api/resin/prepare", data={"hollow": "false", "supports": "false", "price": "50"},
+               files={"file": ("cube.stl", _stl(trimesh.creation.box(extents=[10, 10, 10])), "model/stl")})
+    assert r.status_code == 200 and r.json()["estimate"]["cost"] == 0.05
+    assert c.get("/api/resin/catalog").json()["default_price"] == resin.DEFAULT_PRICE

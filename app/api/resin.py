@@ -38,7 +38,7 @@ def catalog():
     printers = [p for p in ps.public()["printers"] if p["technology"] == "Resin"]
     return {"program": resin.NAME, "printers": printers, "default_preset": resin.DEFAULT_PRESET,
             "presets": [{"id": k, **v} for k, v in resin.PRESETS.items()], "limits": resin.LIMITS,
-            "safety": resin.SAFETY, "test_note": resin.TEST_NOTE,
+            "safety": resin.SAFETY, "default_price": resin.DEFAULT_PRICE, "default_price_unit": resin.DEFAULT_PRICE_UNIT, "test_note": resin.TEST_NOTE,
             "formats_note": "TorchC0 exports STL and 3MF for your printer's own resin slicer (CHITUBOX, Lychee, Photon Workshop, "
                             "VoxelDance Tango, PrusaSlicer, PreForm), which makes the layer file."}
 
@@ -54,11 +54,11 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = 
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
             lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
-            base_lift_mm: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
             "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg",
-            "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm")})
+            "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "price", "price_unit")})
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
     bed = None
