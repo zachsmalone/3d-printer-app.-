@@ -38,7 +38,7 @@ export function mfrHTML(pid, n) {
 
 /* Picker markup. `uid` keeps ids unique when the picker appears twice on a page (sign-up + Account). */
 export function pickerHTML(uid, pref = P.pref, { optional = false } = {}) {
-  const opts = (optional ? `<option value="">Not now</option>` : "") + [...new Set(P.cat.printers.map(p => p.brand))].map(b => `<optgroup label="${esc(b)}">` + P.cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}" ${p.id === pref.printer_id && !optional ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (resin)" : ""}</option>`).join("") + `</optgroup>`).join("");  // grouped by brand
+  const opts = (optional ? `<option value="">Not now</option>` : "") + [...new Set(P.cat.printers.map(p => p.brand))].map(b => `<optgroup label="${esc(b)}">` + P.cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}" ${p.id === pref.printer_id && !optional ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (TorchC0 resin)" : ""}</option>`).join("") + `</optgroup>`).join("");  // grouped by brand
   const pid = optional ? P.cat.default.printer_id : pref.printer_id;
   return `<div class="grid2 printerpick" data-uid="${uid}">
     <div class="field"><label for="${uid}_pr">Printer${optional ? " <em>optional</em>" : ""}</label><select id="${uid}_pr">${opts}</select></div>
@@ -50,7 +50,7 @@ export function wirePicker(uid, onChange) {
   const info = () => {
     const p = printerOf(pr.value);
     $(`#${uid}_nzf`).hidden = !p || p.technology === "Resin";
-    $(`#${uid}_info`).innerHTML = !p ? "" : `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. ` + (p.technology === "Resin" ? "Resin printer: no nozzle. Slice it in " + esc(p.official_slicer || "its own slicer") + "." : mfrHTML(p.id, +nz.value));
+    $(`#${uid}_info`).innerHTML = !p ? "" : `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. ` + (p.technology === "Resin" ? "Resin printer: no nozzle. Prepare it in the TorchC0 tab, then make the layer file in " + esc(p.official_slicer || "its own resin slicer") + "." : mfrHTML(p.id, +nz.value));
   };
   pr.onchange = () => { const p = printerOf(pr.value); if (p) nz.innerHTML = nozOptions(p.id, pickNozzle(p.id, +nz.value)); info(); onChange?.(readPicker(uid)); };
   nz.onchange = () => { info(); onChange?.(readPicker(uid)); };
@@ -119,7 +119,7 @@ export function panelHTML(hintMode) {
   const num = (id, label, v, min, max, step, unit) => `<div class="field"><label for="${id}">${label} <em>${unit}</em></label><input type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" inputmode="decimal"></div>`;
   return `<h3>Slice for your printer</h3>
     <p class="help">Printer: <b id="spPrinter">${esc(prefLabel())}</b> · <a href="#account" id="spChange">Change printer</a></p>
-    ${p?.technology === "Resin" ? `<p class="help warn">The ${esc(p.name)} is a resin printer. ZEIM's slicer makes G-code for filament printers only. Download the STL or 3MF below and open it in ${esc(p.official_slicer || "your resin slicer")}.</p>` : `
+    ${p?.technology === "Resin" ? `<p class="help warn">The ${esc(p.name)} is a resin printer. The FDM Slicer is for filament printers only. Open the <a href="#torchc0">TorchC0</a> tab to get this model ready for resin.</p>` : `
     <p class="help nozzlespec">${mfrHTML(pref.printer_id, n)}</p>
     <div class="segmented" role="group" aria-label="Settings level"><button type="button" id="spBeginner" aria-pressed="${beginner}">Beginner</button><button type="button" id="spAdvanced" aria-pressed="${!beginner}">Advanced</button></div>
     <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === wantPreset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>

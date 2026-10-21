@@ -1,0 +1,125 @@
+"""TorchC0 (ZEIM's resin program) API.
+GET  /api/resin/catalog   resin printers, presets, safety notes.
+POST /api/resin/prepare   model_id (your build) or an uploaded STL/3MF/OBJ -> hollowed, tilted, supported STL + 3MF + report.
+Heavy geometry runs in core/guard.py's memory-capped child. Files are kept for an hour."""
+from __future__ import annotations
+
+import json
+import time
+import uuid
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+
+from .. import config
+from ..community.identity import Actor, get_actor
+from ..core import guard, meshedit, resin
+from ..services import editproj
+from ..services import print_setup as ps
+
+router = APIRouter(prefix="/api/resin", tags=["resin"])
+KEEP_S = 3600
+
+
+def _dir():
+    d = config.DATA / "resin"; d.mkdir(parents=True, exist_ok=True)
+    now = time.time()
+    for f in d.iterdir():
+        try:
+            if now - f.stat().st_mtime > KEEP_S:
+                f.unlink()
+        except OSError:
+            pass
+    return d
+
+
+@router.get("/catalog")
+def catalog():
+    printers = [p for p in ps.public()["printers"] if p["technology"] == "Resin"]
+    return {"program": resin.NAME, "printers": printers, "default_preset": resin.DEFAULT_PRESET,
+            "presets": [{"id": k, **v} for k, v in resin.PRESETS.items()], "limits": resin.LIMITS,
+            "safety": resin.SAFETY, "default_price": resin.DEFAULT_PRICE, "default_price_unit": resin.DEFAULT_PRICE_UNIT, "test_note": resin.TEST_NOTE,
+            "formats_note": "TorchC0 exports STL and 3MF for your printer's own resin slicer (CHITUBOX, Lychee, Photon Workshop, "
+                            "VoxelDance Tango, PrusaSlicer, PreForm), which makes the layer file."}
+
+
+def _work(data, ext, s, bed):
+    m, _ = meshedit.load_mesh(data, ext)
+    out, rep = resin.prepare(m, s, bed)
+    return out.export(file_type="stl"), out.export(file_type="3mf"), rep
+
+
+@router.post("/prepare")
+def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = Form(""), layer_mm: str = Form(""),
+            exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
+            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), hollow: str = Form("true"),
+            wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
+            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+    try:
+        s = resin.settings({k: v for k, v in locals().items() if k in (
+            "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg",
+            "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "price", "price_unit")})
+    except resin.ResinError as e:
+        raise HTTPException(400, str(e))
+    bed = None
+    if printer_id:
+        try:
+            pid, _ = ps.resolve(printer_id, None)
+        except ps.SetupError as e:
+            raise HTTPException(400, str(e))
+        p = ps.printer_public(pid)
+        if p["technology"] != "Resin":
+            raise HTTPException(400, f"The {p['name']} is a filament printer. Use the Slicer for it; TorchC0 is for resin printers.")
+        bed = p["bed_mm"]
+    if file is not None and file.filename:
+        limit = editproj.MAX_UPLOAD_EDIT
+        data = file.file.read(limit + 1)
+        if len(data) > limit:
+            raise HTTPException(413, f"File too large (max {limit // 2**20} MB).")
+        if not data:
+            raise HTTPException(400, "The file is empty.")
+        ext = meshedit.guess_model_ext(file.filename, data, getattr(file, "content_type", "") or "")
+        if ext not in meshedit.ALLOWED:
+            raise HTTPException(415, "TorchC0 takes .stl, .3mf or .obj files.")
+        bad = meshedit.sniff(data, ext)
+        if bad:
+            raise HTTPException(415, bad)
+        from ..services import uploadgate
+        try:
+            uploadgate.gate(data, actor.sid, source="edit", max_bytes=limit)
+        except uploadgate.GateError as e:
+            raise HTTPException(e.status, e.message)
+    elif model_id:
+        from .slice import resolve_model
+        data, ext = resolve_model(model_id, actor).read_bytes(), "stl"
+    else:
+        raise HTTPException(400, "Choose a model or upload an STL, 3MF or OBJ file.")
+    try:
+        stl, tmf, rep = guard.run(_work, data, ext, s, bed, timeout=240)
+    except meshedit.OpError as e:
+        raise HTTPException(422, str(e))
+    except guard.Busy:
+        raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
+    except guard.Tripped:
+        raise HTTPException(422, "This model is too big or complex for TorchC0 here. Simplify it, or turn hollowing off.")
+    rid = uuid.uuid4().hex
+    d = _dir()
+    (d / f"{rid}.stl").write_bytes(stl); (d / f"{rid}.3mf").write_bytes(tmf)
+    (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid}))
+    rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
+    return rep
+
+
+@router.get("/{rid}/torchc0.{fmt}")
+def download(rid: str, fmt: str, actor: Actor = Depends(get_actor)):
+    if fmt not in ("stl", "3mf") or len(rid) != 32 or any(c not in "0123456789abcdef" for c in rid):
+        raise HTTPException(404, "Not found")
+    d = config.DATA / "resin"
+    try:
+        owner = json.loads((d / f"{rid}.json").read_text())["sid"]
+    except (OSError, ValueError, KeyError):
+        raise HTTPException(404, "That file has expired. Prepare it again.")
+    if owner != actor.sid or not (d / f"{rid}.{fmt}").is_file():
+        raise HTTPException(404, "That file has expired. Prepare it again.")
+    mt = "model/stl" if fmt == "stl" else "model/3mf"
+    return FileResponse(d / f"{rid}.{fmt}", media_type=mt, filename=f"torchc0.{fmt}")

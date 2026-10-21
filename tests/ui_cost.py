@@ -32,7 +32,8 @@ def run(name, launch, stl):
     ok(f"{name}: grams + time from the G-code, labelled an estimate", f"{grams:g} g" in t and "min" in t and "Estimate" in t, t)
     ok(f"{name}: asks for a price first", "Type your price per kg" in pg.inner_text("#costOut"))
     pg.fill("#costKg", "25"); pg.wait_for_timeout(200)
-    want = f"${grams / 1000 * 25:.2f}" if grams / 1000 * 25 >= 0.1 else f"${grams / 1000 * 25:.3f}"
+    c = grams / 1000 * 25
+    want = f"${c:.2f}" if c >= 0.005 else "under $0.01"                    # money is always 2 decimals
     out = pg.inner_text("#costOut")
     ok(f"{name}: cost = grams x price", f"About {want} of filament" in out and "Estimate only" in out, (want, out))
     pg.select_option("#costCur", "€"); pg.wait_for_timeout(200)
