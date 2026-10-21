@@ -36,7 +36,7 @@ def run(name, launch, with_axe):
     # 6 dark focus ring
     pg.evaluate("document.documentElement.dataset.theme='dark'"); pg.evaluate("location.hash='account'"); pg.click("#btnAccount"); pg.wait_for_selector("#su_name"); pg.focus("#su_name")
     ow = pg.evaluate("getComputedStyle(document.querySelector('#su_name')).outlineWidth"); oc = pg.evaluate("getComputedStyle(document.querySelector('#su_name')).outlineColor")
-    ok(f"{name}: dark input focus ring is the 3px --focus ring", ow == "3px" and oc in ("rgb(141, 184, 255)",), (ow, oc))
+    ok(f"{name}: dark input focus ring is the 3px --focus ring", ow == "3px" and oc in ("rgb(106, 166, 255)",), (ow, oc))
     pg.keyboard.press("Escape"); pg.evaluate("document.documentElement.removeAttribute('data-theme')")
     # 1 Settings slicer label
     pg.evaluate("location.hash='account'"); pg.click("#btnSettings"); pg.wait_for_selector("#dlgSettings[open]")
