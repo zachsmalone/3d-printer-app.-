@@ -64,7 +64,18 @@ def real_thin(m: trimesh.Trimesh, src_faces: np.ndarray, hit_faces: np.ndarray, 
         shells = shell_ids(m)
     n0, n1 = m.face_normals[src_faces], m.face_normals[hit_faces]
     opposite = np.einsum("ij,ij->i", n0, n1) <= -np.cos(np.radians(OPPOSITE_MAX_DEG))
-    return (d < min_mm) & (shells[src_faces] == shells[hit_faces]) & opposite
+    # Tuning (solid-part false alarms): a ray that lands on a face sharing a vertex with its start face is a crease /
+    # sliver / numerical self-hit at a corner, not a wall; real walls have their opposite face on separate triangles.
+    f = np.asarray(m.faces)
+    touching = (f[src_faces][:, :, None] == f[hit_faces][:, None, :]).any(axis=(1, 2))
+    return (d < min_mm) & (shells[src_faces] == shells[hit_faces]) & opposite & ~touching
+
+
+THIN_MIN_FRACTION = 0.005   # and at least 0.5 % of measured samples, so a couple of stray readings on a big solid part are not "thin"
+
+
+def min_spots(measured: int) -> int:
+    return max(MIN_THIN_SPOTS, int(np.ceil(THIN_MIN_FRACTION * measured)))
 
 
 def analyze(m: trimesh.Trimesh, min_wall: float = 0.8, samples: int = 2000) -> dict:
@@ -90,7 +101,7 @@ def analyze(m: trimesh.Trimesh, min_wall: float = 0.8, samples: int = 2000) -> d
         return {**base, "ok": False, "reason": "Could not measure thickness on this model."}
     d = np.linalg.norm(loc - org[ir], axis=1)
     thin = real_thin(m, fi[ir], hit, d, min_wall)
-    if thin.sum() < MIN_THIN_SPOTS:
+    if thin.sum() < min_spots(len(d)):
         thin[:] = False
     d = np.where(thin | (d >= min_wall), d, min_wall)        # filtered-out readings are not reported as the thinnest
     worst = np.argsort(d)[:10]

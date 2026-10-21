@@ -61,3 +61,9 @@ def test_print_check_warns_on_inside_out_cube():
     c = trimesh.creation.box((20, 20, 20)); c.invert()
     assert any("inside out" in i for i in printcheck.run(c, (220, 220, 250))["issues"])
     assert not any("inside out" in i for i in printcheck.run(trimesh.creation.box((20, 20, 20)), (220, 220, 250))["issues"])
+
+
+def test_solid_parts_not_thin_but_real_walls_still_are():
+    for m in (trimesh.creation.cylinder(10, 30, sections=256), trimesh.creation.box((20, 20, 20)).subdivide().subdivide()):
+        assert thickness.analyze(m, 0.42)["verdict"] == "ok" and badge(m)["label"] == "Will print"
+    assert thickness.analyze(wall(0.3), 0.42)["verdict"] != "ok"

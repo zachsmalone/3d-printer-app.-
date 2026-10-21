@@ -50,7 +50,7 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
     normals = mesh.face_normals[idx]
     origins = mesh.triangles_center[idx] - normals * 1e-4
     try:
-        from ..core.thickness import first_hits_faces, real_thin
+        from ..core.thickness import first_hits_faces, real_thin, min_spots
         locs, ray_idx, hit = first_hits_faces(mesh, origins, -normals)   # batched: small child memory (N3)
     except Exception:
         return {"ok": None, "thin_fraction": None, "min_mm": min_mm}
@@ -58,8 +58,10 @@ def _thin_walls(mesh: trimesh.Trimesh, min_mm: float) -> dict:
         return {"ok": True, "thin_fraction": 0.0, "min_mm": min_mm}
     d = np.linalg.norm(locs - origins[ray_idx], axis=1)
     thin = real_thin(mesh, idx[ray_idx], hit, d, min_mm)             # same shell + nearly parallel opposite face (same rule as /printcheck)
-    d = np.where(thin | (d >= min_mm), d, min_mm)
     thin_n = int(np.count_nonzero(thin))
+    if thin_n < min_spots(len(d)):                                   # stray readings on a solid part are not thin walls
+        thin[:] = False; thin_n = 0
+    d = np.where(thin | (d >= min_mm), d, min_mm)
     frac = float(thin_n) / n
     # QA B11: a few spots far below one line (0.06 mm on a 0.42 mm line) used to pass the 5 % rule while /printcheck
     # flagged them; any couple of sampled spots under one line now counts, like printcheck's "some thin spots".
