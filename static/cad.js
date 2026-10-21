@@ -592,7 +592,13 @@ function toggleMeasure(on = !S.measure) {
 $("#cwMeasure").onclick = () => toggleMeasure();
 let measLabel = null;
 function setMeasLabel(text, at) { measLabel = text ? { text, at } : null; }
-const onEdge = (e, h) => e && (!h || e.a.distanceTo(h.point) + e.b.distanceTo(h.point) - e.a.distanceTo(e.b) < 2);   // the tap is on this edge, not just near it on a face
+const SNAP_PX = 10;   // measure/edge snap: a constant on-screen distance, so it scales with camera zoom (was a fixed 2 mm)
+function onEdge(e, h) {   // the tap is on this edge, not just near it on a face
+  if (!e) return false; if (!h) return true;
+  const [ax, ay] = toScreen(e.a), [bx, by] = toScreen(e.b), [px, py] = toScreen(h.point);
+  const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L));
+  return Math.hypot(ax + dx * t - px, ay + dy * t - py) < SNAP_PX;
+}
 function showEdgeLen(e) {   // B13: a picked edge shows its length on the model and in the polite live hint
   const t = `${fmt(e.a.distanceTo(e.b))} mm`; setMeasLabel(t, e.a.clone().add(e.b).multiplyScalar(0.5)); renderSkLabels(); return t;
 }
