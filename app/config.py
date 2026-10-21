@@ -71,6 +71,8 @@ MODE = (os.environ.get("PHOTO3D_MODE") or "shared").strip().lower()
 if MODE not in ("shared", "local"):
     MODE = "shared"
 # The URL put in join QR codes and slicer links. If set here, nobody can change it from the UI.
+# Theft protection: hold a Showcase upload for a moderator when its geometry matches another maker's model (on by default)
+DUPLICATE_CHECK = os.environ.get("PHOTO3D_DUPLICATE_CHECK", "1").strip().lower() not in ("0", "false", "no", "off")
 PUBLIC_BASE_URL = (os.environ.get("PHOTO3D_PUBLIC_BASE_URL") or "").strip().rstrip("/")
 
 # ---- Education CR-10 / Yami's decisions (2026-10-04) - reversible flags ----

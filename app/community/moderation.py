@@ -23,7 +23,7 @@ from .store import MODERATION
 
 _audit = logging.getLogger("zeim.audit")
 _who = lambda sid: hashlib.sha256(("rep:" + (sid or "")).encode()).hexdigest()[:8]       # a stable short tag; never the session id itself
-REASONS = ["minor_safety", "underage_user", "not_family_friendly", "copyright", "harassment", "personal_info", "should_be_nsfw", "other"]
+REASONS = ["minor_safety", "underage_user", "not_family_friendly", "copyright", "harassment", "personal_info", "should_be_nsfw", "other", "stolen", "duplicate_hold"]
 # mark_nsfw / unmark_nsfw flip the item's mature tag; remove = take explicit content down (same as hide, logged as removal)
 ACTIONS = ("hide", "restore", "dismiss", "suspend", "mark_nsfw", "unmark_nsfw", "remove")
 
