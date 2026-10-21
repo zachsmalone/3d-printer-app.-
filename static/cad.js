@@ -149,6 +149,13 @@ function viewAlong(dir, up = new THREE.Vector3(0, 0, 1)) {
   camera.position.copy(controls.target).addScaledVector(dir.clone().normalize(), d); camera.lookAt(controls.target); controls.update();
 }
 
+/* ---------------------------------------------------------------- back button */
+$("#cwBack")?.addEventListener("click", ev => {
+  ev.preventDefault(); ev.stopPropagation();
+  let same = false; try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch {}
+  if (same && history.length > 1) history.back(); else location.href = "/";
+});
+
 /* ---------------------------------------------------------------- view cube (CSS 3D, own design) */
 const CUBE = [["Top", [0, 0, 1], "rotateX(0deg)", "translateZ(30px)"], ["Bottom", [0, 0, -1], "rotateX(180deg) rotateZ(180deg)", "translateZ(30px)"],
   ["Front", [0, -1, 0], "rotateX(-90deg)", "translateZ(30px)"], ["Back", [0, 1, 0], "rotateX(90deg) rotateZ(180deg)", "translateZ(30px)"],
@@ -157,8 +164,32 @@ const cubeEl = $("#cwCube");
 for (const [name, dir, rot, tz] of CUBE) {
   const b = document.createElement("button"); b.textContent = name; b.style.transform = `${rot} ${tz}`;
   b.setAttribute("aria-label", `View from ${name.toLowerCase()}`);
-  b.onclick = () => viewAlong(new THREE.Vector3(...dir));
+  // own pointer handling so the canvas/orbit listeners never swallow the tap (mouse + touch)
+  b.addEventListener("pointerdown", ev => { ev.stopPropagation(); b._down = [ev.clientX, ev.clientY]; });
+  b.addEventListener("pointerup", ev => {
+    ev.stopPropagation(); const d = b._down; b._down = null;
+    if (d && Math.hypot(ev.clientX - d[0], ev.clientY - d[1]) < 10) { ev.preventDefault(); tweenView(new THREE.Vector3(...dir)); }
+  });
+  b.addEventListener("click", ev => { ev.stopPropagation(); if (ev.detail === 0) tweenView(new THREE.Vector3(...dir)); });   // keyboard
   cubeEl.append(b);
+}
+cubeEl.parentElement.style.touchAction = "none";
+let viewTween = 0;
+function tweenView(dir, ms = 300) {   // rotate around the kept orbit target to look along dir
+  dir = dir.clone().normalize();
+  const t = controls.target.clone(), d = t.distanceTo(camera.position) || 150;
+  const from = camera.position.clone().sub(t).normalize(), upFrom = camera.up.clone();
+  const upTo = Math.abs(dir.z) > 0.99 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+  const q = new THREE.Quaternion().setFromUnitVectors(from, dir), id = ++viewTween, t0 = performance.now();
+  const step = now => {
+    if (id !== viewTween) return;
+    const k = Math.min(1, (now - t0) / ms), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    const qi = new THREE.Quaternion().slerp(q, e);
+    camera.position.copy(t).addScaledVector(from.clone().applyQuaternion(qi), d);
+    camera.up.copy(upFrom).lerp(upTo, e).normalize(); camera.lookAt(t); controls.update();
+    if (k < 1) requestAnimationFrame(step); else viewAlong(dir);
+  };
+  requestAnimationFrame(step);
 }
 function syncCube() {
   const m = new THREE.Matrix4().copy(camera.matrixWorldInverse); m.setPosition(0, 0, 0); if (window.__cubeT) m.transpose();
