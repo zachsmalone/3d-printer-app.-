@@ -341,14 +341,34 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
                                    tags=body.get("tags") or [], build_id=str(body.get("build_id", ""))[:40],
                                    accept_guidelines=bool(body.get("accept_guidelines")),
                                    visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw,
-                                   license_id=body.get("license_id"))
+                                   license_id=body.get("license_id"), allow_remixes=_yes_no(body.get("allow_remixes"), True, "allow_remixes"),
+                                   view_only=_yes_no(body.get("view_only"), False, "view_only"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:
         return JSONResponse(status_code=e.status, content=e.payload)
     except catalog.Denied as e:
         raise D(e)
-    return catalog.public(i, actor)
+    out = catalog.public(i, actor)
+    out["warnings"] = i.get("_warnings", [])            # non-blocking notes
+    if i.get("held"):
+        from ..community import protect
+        out.update(held_for_review=True, hold_message=protect.HOLD_MESSAGE)
+    return out
+
+
+@router.put("/showcase/{iid}/download")
+def item_view_only(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Owner only: 'View only, no download'. Enforced in the file route for everyone but the owner."""
+    try:
+        v = _yes_no(body.get("view_only"), None, "view_only")
+        if v is None:
+            raise ValueError("view_only must be Yes or No")
+        return catalog.public(catalog.set_view_only(actor, iid, v), actor)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except catalog.Denied as e:
+        raise D(e)
 
 
 @router.put("/showcase/{iid}/visibility")
@@ -356,6 +376,31 @@ def item_visibility(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Owner only; takes effect on the very next request by anyone."""
     try:
         return catalog.public(catalog.set_visibility(actor, iid, body.get("visibility", "")), actor)
+    except catalog.Denied as e:
+        raise D(e)
+
+
+def _yes_no(v, default: bool, name: str) -> bool:
+    """A Yes/No form answer: missing -> default; true/false or "yes"/"no" accepted; anything else is a 400."""
+    if v is None or v == "":
+        return default
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str) and v.strip().lower() in ("yes", "true", "no", "false"):
+        return v.strip().lower() in ("yes", "true")
+    raise ValueError(f"{name} must be Yes or No")
+
+
+@router.put("/showcase/{iid}/remixes")
+def item_remixes(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Owner only: the 'Allow remixes: Yes/No' switch. Existing remix credit chains are kept either way."""
+    try:
+        allow = _yes_no(body.get("allow_remixes"), None, "allow_remixes")
+        if allow is None:
+            raise ValueError("allow_remixes must be Yes or No")
+        return catalog.public(catalog.set_allow_remixes(actor, iid, allow), actor)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     except catalog.Denied as e:
         raise D(e)
 
@@ -395,11 +440,17 @@ def item_file(iid: str, name: str, actor: Actor = Depends(get_actor)):
         i = catalog.get(iid, actor)
     except catalog.Denied as e:
         raise D(e)
+    if catalog._dl_blocked(i, actor):
+        raise HTTPException(403, catalog.VIEW_ONLY_MSG)
     p = catalog.file_path(i, name)
     if not p:
         raise HTTPException(404, "No model yet.")
     catalog.count_download(i, actor)
     personalization.record_view(actor.sid, i["tags"], 2.0)
+    if name.lower().endswith(".3mf"):
+        from ..community import protect
+        data = protect.tag_3mf(p.read_bytes(), protect.owner_meta(catalog.resolve(i)))
+        return Response(data, media_type="model/3mf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
     return FileResponse(p, filename=name)
 
 
@@ -423,6 +474,39 @@ def report(iid: str, request: Request, body: dict, actor: Actor = Depends(get_ac
         raise D(e)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/showcase/{iid}/report-stolen")
+def report_stolen(iid: str, request: Request, body: dict | None = None, actor: Actor = Depends(get_actor)):
+    """One tap: 'Report as stolen'. Lands in the moderation queue with a link to the original when known (the link the
+    reporter pasted, else the earliest other-maker project with matching geometry). Never auto-hides anything."""
+    report_limit(request, actor)
+    guards.showcase_gate(actor)
+    from ..community import protect
+    body = body or {}
+    try:
+        i = catalog.get(iid, actor)
+        orig = None
+        ref = str(body.get("original_url") or "").strip()[:200]
+        if ref:
+            oid = ref.rsplit("/p/", 1)[-1].strip("/ ").split("?")[0]
+            orig = next((x for x in catalog._all() if x["id"] == oid and x["id"] != iid), None)
+        orig = orig or protect.likely_original(i)
+        note = text_in(body.get("details"), 1000, "Details")
+        link = f"/p/{orig['id']}" if orig else (ref if ref.startswith(("http://", "https://")) else "")
+        details = ("Reported as stolen." + (f" Original: {link}" if link else " Original not known.") + (f" Note: {note}" if note else ""))
+        owner = USERS.read().get(i.get("owner_sid") or "") or {}
+        rep = moderation.report(iid, actor.sid, "stolen", details, owner.get("id"),
+                                ip=request.client.host if request.client else "", user_agent=request.headers.get("user-agent", ""))
+        if link:
+            moderation.MODERATION.update(lambda m: [r.update(original_url=link, original_id=(orig or {}).get("id"))
+                                                    for r in m["reports"] if r["id"] == rep["id"]])
+    except catalog.Denied as e:
+        raise D(e)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {**rep, "original_url": link or None, "dmca_url": protect.DMCA_URL,
+            "message": "Thanks. A moderator will compare it with the original. If you own the rights, you can also send a formal notice."}
 
 
 @router.post("/users/{uid}/report")
