@@ -55,3 +55,9 @@ def test_out_of_memory_thin_check_says_skipped_after_a_good_slice(monkeypatch):
     assert r["label"] == "Sliced OK; thin-wall check skipped" and r["checks"]["thin_wall"]["skipped"] == "limit"
     pc = printcheck.run(trimesh.creation.box((20, 20, 20)), (220, 220, 250))      # was a 500 MemoryError
     assert any("skipped" in i.lower() for i in pc["issues"])
+
+
+def test_print_check_warns_on_inside_out_cube():
+    c = trimesh.creation.box((20, 20, 20)); c.invert()
+    assert any("inside out" in i for i in printcheck.run(c, (220, 220, 250))["issues"])
+    assert not any("inside out" in i for i in printcheck.run(trimesh.creation.box((20, 20, 20)), (220, 220, 250))["issues"])

@@ -71,6 +71,8 @@ def run(m: trimesh.Trimesh, bed, process: str = "fdm", min_wall: float | None = 
         issues.append(f"Thin walls: {th['thin_count']} sampled spot(s) under {wall:g} mm (thinnest {th['min_found_mm']:g} mm).")
     if not th.get("ok"):
         issues.append(th.get("reason", "Thickness could not be checked."))
+    if len(m.faces) and m.is_watertight and float(m.volume) < 0:      # inverted / flipped normals: a warning, never a block
+        issues.append("The model looks inside out (normals flipped); slicers may print it wrong. Run Fix to flip it, or dismiss and continue.")
     if ov and ov["overhang_mm2"] > 0:
         issues.append(f"{ov['overhang_mm2']:.0f} mm² of steep overhang (past 45°) will probably need supports.")
     return {"process": process, "approximate": True, "ok": not issues, "issues": issues,
