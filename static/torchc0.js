@@ -16,7 +16,8 @@ function panelHTML() {
   const brands = [...new Set(cat.printers.map(p => p.brand))];
   return `<h2>Resin print settings</h2>
     <div class="grid2"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
-    <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><input type="file" id="rzFile" accept=".stl,.3mf,.obj"></div></div>
+    <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" accept=".stl,.3mf,.obj"><span>or drop an STL, 3MF or OBJ file here</span></div>
+      <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p></div></div>
     <p class="help" id="rzInfo"></p>
     <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div>
     <div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
@@ -44,8 +45,22 @@ function wire() {
   $("#rzWall").addEventListener("input", () => { wallOk = false; wallWarn(); }); $("#rzHollow").addEventListener("change", wallWarn);
   $("#rzWallDismiss").onclick = () => { wallOk = true; wallWarn(); };
   $("#rzWallAnyway").onclick = () => { wallOk = true; wallWarn(); $("#rzGo").click(); };
+  // file pick / drop: show name + size right away; wrong types get a friendly note (never blocks anything else)
+  const st = $("#rzFileStatus"), inp = $("#rzFile"), drop = $("#rzDrop");
+  const kb = n => n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`;
+  const okType = f => /\.(stl|3mf|obj)$/i.test(f.name);
+  const show = () => { const f = inp.files[0]; st.classList.remove("warn");
+    if (!f) { st.textContent = ""; return; }
+    if (!okType(f)) { st.classList.add("warn"); st.textContent = `${f.name} isn't an STL, 3MF or OBJ file. Choose one of those to prepare it for resin.`; return; }
+    st.textContent = `${f.name}, ${kb(f.size)}, ready. Press Prepare for resin.`; };
+  inp.addEventListener("change", show);
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const fs = e.dataTransfer?.files; if (!fs?.length) return;
+    const dt = new DataTransfer(); dt.items.add(fs[0]); inp.files = dt.files; show(); });
   $("#rzGo").onclick = async () => {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
+    if (f && !okType(f)) { show(); return; }
     if (!f) { out.innerHTML = `<p class="help warn" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
     const fd = new FormData();
     const v = { printer_id: $("#rzPrinter").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
@@ -54,7 +69,8 @@ function wire() {
       price: $("#rzCost").value, price_unit: $("#rzCostU").value };
     saveP({ price: +$("#rzCost").value, unit: $("#rzCostU").value, currency: $("#rzCur").value });
     Object.entries(v).forEach(([k, x]) => fd.append(k, x)); fd.append("file", f);
-    out.innerHTML = `<p class="help">TorchC0 is preparing your model…</p>`; $("#rzGo").disabled = true;
+    out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
+    const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
       const r = await api("/api/resin/prepare", { method: "POST", body: fd }), e = r.estimate;
       out.innerHTML = `<p class="slicestats"><span class="pill">⏱ about ${esc(e.print_time_human)}</span><span class="pill">🧪 about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">💰 about ${esc(money(e.cost, $("#rzCur").value))}</span><span class="pill">${e.layers} layers</span>${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
@@ -64,7 +80,7 @@ function wire() {
         <div class="row"><a class="btn primary" href="${r.downloads.stl}" download>⬇ STL</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a></div>`;
       out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
-    finally { $("#rzGo").disabled = false; }
+    finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }
   };
 }
 
