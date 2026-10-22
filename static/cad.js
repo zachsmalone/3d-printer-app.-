@@ -73,9 +73,26 @@ function applyHints() {
 }
 
 /* ---------------------------------------------------------------- three.js stage */
+/* render on demand: frames are scheduled only by invalidate() (camera/controls change, input, scene edits) */
+let rafId = 0, dirtyN = 0, inFrame = false, lastPos, lastQuat;
+window.__cadFrames = 0;
+function invalidate(n = 2) { dirtyN = Math.max(dirtyN, n); if (!rafId) rafId = requestAnimationFrame(frame); }
+window.__cadInvalidate = invalidate;
+function frame() {
+  rafId = 0; inFrame = true;
+  controls.update(); inFrame = false;        // damping: keep going only while the camera actually still moves
+  const tol = 2e-4 * camera.position.distanceTo(controls.target);   // stop once the damping tail is sub-pixel
+  const moving = camera.position.distanceToSquared(lastPos) > tol * tol || 1 - Math.abs(camera.quaternion.dot(lastQuat)) > 1e-8;
+  lastPos.copy(camera.position); lastQuat.copy(camera.quaternion);
+  renderer.render(scene, camera); syncCube(); placeLabels(); placeCtx(); window.__cadFrames++;
+  if (--dirtyN > 0 || moving) invalidate(Math.max(dirtyN, 1));
+}
 const stage = $("#cwStage");
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// touch devices: skip MSAA and cap DPR at 1.5 (fill-rate is the phone bottleneck); desktop unchanged
+const TOUCH = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0 && matchMedia("(hover: none)").matches;
+const renderer = new THREE.WebGLRenderer({ antialias: !TOUCH, alpha: true, preserveDrawingBuffer: true, powerPreference: TOUCH ? "low-power" : "default" });
+renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
+renderer.shadowMap.enabled = false;
 renderer.localClippingEnabled = true;
 stage.prepend(renderer.domElement);
 const scene = new THREE.Scene();
@@ -83,6 +100,8 @@ const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 20000);
 camera.up.set(0, 0, 1); camera.position.set(80, -120, 90);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+controls.addEventListener("change", () => { if (!inFrame) invalidate(); });
+lastPos = camera.position.clone(); lastQuat = camera.quaternion.clone();
 scene.add(new THREE.HemisphereLight(0xffffff, 0x3a4256, 1.2));
 const dl = new THREE.DirectionalLight(0xffffff, 1.8); dl.position.set(-1, -1.5, 2); scene.add(dl);
 const dl2 = new THREE.DirectionalLight(0xb8c8ff, 0.5); dl2.position.set(2, 1, 1); scene.add(dl2);
@@ -103,10 +122,24 @@ makeGrid();
 const axes = new THREE.AxesHelper(20); helpers.add(axes);
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return;
-  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); invalidate();
 }
 new ResizeObserver(resize).observe(stage); resize();
-function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); syncCube(); placeLabels(); placeCtx(); }
+function loop() { invalidate(); }
+// any user input may change what is drawn: one cheap passive listener covers UI-driven edits
+for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel", "wheel", "keydown", "keyup", "input", "change", "click"])
+  addEventListener(t, () => invalidate(), { capture: true, passive: true });
+// async results (fetch -> buildWorld/drawSketch) mutate DOM too; ignore our own per-frame label/cube/ctx moves
+new MutationObserver(recs => { if (recs.some(r => !r.target.closest?.(".cw-labels,.cw-cubewrap,.cw-ctx"))) invalidate(); })
+  .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "aria-pressed"] });
+/* coalesce heavy pointermove work (raycasts, snapping, highlight) to once per frame; flush before up/down */
+function perFrame(fn) {
+  let ev = null, id = 0;
+  const run = () => { id = 0; const e = ev; ev = null; if (e) fn(e); };
+  const w = e => { ev = e; if (!id) id = requestAnimationFrame(run); };
+  w.flush = () => { if (id) cancelAnimationFrame(id); run(); };
+  return w;
+}
 
 const FIN = { matte: [0.9, 0], satin: [0.55, 0.05], gloss: [0.2, 0.05], metal: [0.3, 0.9], glass: [0.05, 0] };
 const PALETTE = ["#8fb0e0", "#e0a47a", "#9ad1a5", "#d6a3e0", "#e6d27a", "#7ad6d6", "#e08f9a"];
@@ -119,7 +152,7 @@ function bodyMaterial(i) {
   return m;
 }
 function buildWorld(keepCam) {
-  world.clear();
+  world.clear(); invalidate();
   for (const b of S.scene?.bodies || []) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(b64(b.positions, Float32Array), 3));
@@ -146,7 +179,7 @@ function fit() {
 function viewAlong(dir, up = new THREE.Vector3(0, 0, 1)) {
   const d = controls.target.distanceTo(camera.position) || 150;
   camera.up.copy(Math.abs(dir.dot(up)) > 0.99 ? new THREE.Vector3(0, 1, 0) : up);
-  camera.position.copy(controls.target).addScaledVector(dir.clone().normalize(), d); camera.lookAt(controls.target); controls.update();
+  camera.position.copy(controls.target).addScaledVector(dir.clone().normalize(), d); camera.lookAt(controls.target); controls.update(); invalidate();
 }
 
 /* ---------------------------------------------------------------- back button */
@@ -186,7 +219,7 @@ function tweenView(dir, ms = 300) {   // rotate around the kept orbit target to 
     const k = Math.min(1, (now - t0) / ms), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
     const qi = new THREE.Quaternion().slerp(q, e);
     camera.position.copy(t).addScaledVector(from.clone().applyQuaternion(qi), d);
-    camera.up.copy(upFrom).lerp(upTo, e).normalize(); camera.lookAt(t); controls.update();
+    camera.up.copy(upFrom).lerp(upTo, e).normalize(); camera.lookAt(t); controls.update(); invalidate();
     if (k < 1) requestAnimationFrame(step); else viewAlong(dir);
   };
   requestAnimationFrame(step);
@@ -225,6 +258,7 @@ function pickEdge(ev) {
 }
 const selG = new THREE.Group(); scene.add(selG);
 function drawSelection() {
+  invalidate();
   selG.clear();
   for (const e of S.selEdges) {
     const g = new THREE.BufferGeometry().setFromPoints([e.a, e.b]);
@@ -711,7 +745,7 @@ function hitEntity(ev) {
 
 /* drawing */
 function drawSketch() {
-  sketchG.clear();
+  sketchG.clear(); invalidate();
   if (!S.sk) return;
   const lineMat = (sel, cons) => new THREE.LineBasicMaterial({ color: sel ? 0x29b6ff : cons ? 0x8a93a8 : 0xf2f5ff, depthTest: false, transparent: true });
   const fill = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x2b63ff, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide }));
@@ -957,7 +991,7 @@ async function finishSketch() {
 
 /* ---------------------------------------------------------------- Extrude / Revolve from the pending sketch */
 async function drawPending() {
-  sketchG.clear();
+  sketchG.clear(); invalidate();
   const pd = S.pending; if (!pd) return;
   sketchG.matrixAutoUpdate = false; sketchG.matrix.copy(pd.F.m);
   try {
@@ -1043,8 +1077,9 @@ stage.addEventListener("pointerdown", ev => {
   stroke = { pts: [h.point.clone()], n: h.normal.clone(), start: h.point.clone(), plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), h.point), last: h.point.clone() };
   if (!["grab", "smooth", "pinch", "flatten"].includes(S.brush.brush)) previewDab(h.point, h.normal);
 }, true);
-stage.addEventListener("pointermove", ev => {
-  if (S.tool !== "sculpt") { ring.visible = false; return; }
+const sculptMove = perFrame(ev => {
+  if (S.tool !== "sculpt") { if (ring.visible) { ring.visible = false; invalidate(); } return; }
+  invalidate();
   const h = stroke && S.brush.brush === "grab" ? null : pickBody(ev);
   if (h) { ring.visible = true; ring.position.copy(h.point); ring.scale.setScalar(S.brush.radius); ring.lookAt(h.point.clone().add(h.normal)); } else if (!stroke) ring.visible = false;
   if (!stroke) return;
@@ -1055,8 +1090,10 @@ stage.addEventListener("pointermove", ev => {
   if (h && h.point.distanceTo(stroke.pts[stroke.pts.length - 1]) > S.brush.radius / 3 && stroke.pts.length < 400) {
     stroke.pts.push(h.point.clone()); if (!["smooth", "pinch", "flatten"].includes(S.brush.brush)) previewDab(h.point, stroke.n);
   }
-}, true);
+});
+stage.addEventListener("pointermove", sculptMove, { capture: true, passive: true });
 async function endStroke(ev) {
+  sculptMove.flush();
   pointers.delete(ev.pointerId);
   if (!stroke) return;
   const st = stroke, B = S.brush; stroke = null; controls.enabled = true;
@@ -1134,11 +1171,14 @@ async function ctxRun(c) {
 let downAt = null;
 renderer.domElement.addEventListener("pointerdown", ev => {
   if (ev.button > 0) return;
+  skMoveF.flush();
   downAt = { x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId };
   if (S.mode === "sketch" && (ev.pointerType !== "touch" || ev.isPrimary)) { renderer.domElement.setPointerCapture(ev.pointerId); skDown(ev); }
 });
-renderer.domElement.addEventListener("pointermove", ev => { if (S.mode === "sketch") skMove(ev); });
+const skMoveF = perFrame(ev => { if (S.mode === "sketch") { skMove(ev); invalidate(); } });
+renderer.domElement.addEventListener("pointermove", skMoveF, { passive: true });
 renderer.domElement.addEventListener("pointerup", ev => {
+  skMoveF.flush();
   if (S.mode === "sketch") { if (drag) { const moved = drag.moved; drag = null; if (moved) solveSketch(); } return; }
   if (!downAt || Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 6) return;   // it was an orbit drag
   modelTap(ev);

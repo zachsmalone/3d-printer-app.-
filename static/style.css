@@ -760,3 +760,10 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 .rzDrop{min-height:96px;gap:6px}.rzDrop .i{width:24px;height:24px;color:var(--accink)}#rzFileStatus:empty{display:none}
 #rzFileStatus{overflow-wrap:anywhere;word-break:break-word;min-width:0}.rzRow>.field{min-width:0}.rzDrop{max-width:100%;box-sizing:border-box}.rzDrop input[type=file]{max-width:100%}
 @media (max-width:480px){.rzRow{grid-template-columns:1fr}.rzRow #rzPrinter{width:100%}}
+
+/* phone tap targets (QA 2026-10-22) */
+@media (max-width:768px){.topbar .nav{overflow-x:auto;scrollbar-width:none}.topbar .nav button{flex:1 0 44px;min-width:44px}}
+#spChange{display:inline-flex;align-items:center;min-height:44px;padding:0 4px}
+#rzPrinter{min-width:44px;width:100%;min-height:44px;box-sizing:border-box}
+#rzFile{min-height:44px;box-sizing:border-box}
+.rzDrop{cursor:pointer}

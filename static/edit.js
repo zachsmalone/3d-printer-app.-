@@ -143,13 +143,19 @@ function fillBuildSelect() {
   $("#editFromBuild").innerHTML = S.history.length ? S.history.slice().reverse().map(b => `<option value="${b.id}">${esc(b.title)} (${b.kind === "edit" ? "edited" : b.mode})</option>`).join("") : `<option value="">No builds yet — make one in the Studio</option>`;
   $("#editFromBuildGo").disabled = !S.history.length;
 }
-document.addEventListener("zeim:edit-shown", async () => { try { await loadHistory(); } catch { } fillBuildSelect(); ensureViewer(); setTimeout(() => viewer?.resize(), 50); });
+document.addEventListener("zeim:edit-shown", async () => {
+  try { await loadHistory(); } catch { } fillBuildSelect(); ensureViewer(); setTimeout(() => viewer?.resize(), 50);
+  // returning from CAD (Back) reloads the page: reopen the model that was loaded (CAD edits are saved server-side on the same project)
+  let last = null; try { last = sessionStorage.getItem("zeim.edit.last"); } catch { }
+  if (!E.p && last) { try { loadProject(await api("/api/edit/" + encodeURIComponent(last))); } catch { try { sessionStorage.removeItem("zeim.edit.last"); } catch { } } }
+});
 document.addEventListener("zeim:open-edit", async e => { try { loadProject(await api("/api/edit/" + e.detail)); } catch (er) { toast(er.message, "err"); } });
 document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
 /* ---------- applying a project payload ---------- */
 function loadProject(p, keepCamera = false) {
   { const oc = $("#editOpenCad"); if (oc) oc.href = "/static/cad.html?bid=" + encodeURIComponent(p.id); }
+  try { sessionStorage.setItem("zeim.edit.last", p.id); } catch { }   // so Back from CAD (full page load) can restore it
   E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearFaceMark(); clearMeasure(); clearGhost();
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });

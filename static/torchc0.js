@@ -58,6 +58,8 @@ function wire() {
     if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, but you can still press Prepare for resin and TorchC0 will check the file itself.`; return; }
     st.textContent = `${nm}, ${kb(f.size)}, ready. Press Prepare for resin.`; };
   inp.addEventListener("change", show);
+  // tapping anywhere on the drop zone opens the picker (phones can't drop); the input itself already does
+  drop.addEventListener("click", e => { if (e.target !== inp && !e.target.closest("a,button,label")) inp.click(); });
   ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
   drop.addEventListener("drop", e => { const fs = e.dataTransfer?.files; if (!fs?.length) return;
