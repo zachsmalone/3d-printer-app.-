@@ -15,7 +15,7 @@ const num = (id, label, v, min, max, step, unit) => `<div class="field"><label f
 function panelHTML() {
   const brands = [...new Set(cat.printers.map(p => p.brand))];
   return `<h2>Resin print settings</h2>
-    <div class="grid2"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
+    <div class="grid2 rzRow"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
     <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" accept=".stl,.3mf,.obj"><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p></div></div>
     <p class="help" id="rzInfo"></p>
@@ -48,11 +48,15 @@ function wire() {
   // file pick / drop: show name + size right away; wrong types get a friendly note (never blocks anything else)
   const st = $("#rzFileStatus"), inp = $("#rzFile"), drop = $("#rzDrop");
   const kb = n => n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`;
-  const okType = f => /\.(stl|3mf|obj)$/i.test(f.name);
+  // soft hint only: the server checks the content and decides (it accepts e.g. no extension or iPhone ".3mf.zip")
+  const okType = f => /\.(stl|3mf|obj)(\.zip)?$/i.test(f.name);
+  // displayed name only: drop bidi overrides/isolates, zero-width and control chars so the name can't be misread
+  const shownName = n => n.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, "");
   const show = () => { const f = inp.files[0]; st.classList.remove("warn");
     if (!f) { st.textContent = ""; return; }
-    if (!okType(f)) { st.classList.add("warn"); st.textContent = `${f.name} isn't an STL, 3MF or OBJ file. Choose one of those to prepare it for resin.`; return; }
-    st.textContent = `${f.name}, ${kb(f.size)}, ready. Press Prepare for resin.`; };
+    const nm = shownName(f.name) || "(unnamed file)";
+    if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, but you can still press Prepare for resin and TorchC0 will check the file itself.`; return; }
+    st.textContent = `${nm}, ${kb(f.size)}, ready. Press Prepare for resin.`; };
   inp.addEventListener("change", show);
   ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
@@ -60,7 +64,6 @@ function wire() {
     const dt = new DataTransfer(); dt.items.add(fs[0]); inp.files = dt.files; show(); });
   $("#rzGo").onclick = async () => {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
-    if (f && !okType(f)) { show(); return; }
     if (!f) { out.innerHTML = `<p class="help warn" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
     const fd = new FormData();
     const v = { printer_id: $("#rzPrinter").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
