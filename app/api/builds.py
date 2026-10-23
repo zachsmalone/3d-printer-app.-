@@ -104,7 +104,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
 
 
 def disk_guard():
@@ -270,6 +270,7 @@ def generate(
     palette: str = Form(""),
     photo_ack: bool = Form(False),
     trace: str = Form(""),                   # mode=trace2d ('Logo & Drawing to 3D'): JSON of the trace2d options
+    select: str = Form(""),                  # Select mode: JSON of the traced selection (app/core/selectmask.py); "" = whole photo
 ):
     if mode not in ("lithophane", "relief", "popart", "trace2d"):
         raise HTTPException(400, f"unknown mode {mode}")
@@ -300,6 +301,11 @@ def generate(
             "status": "pending_scan", "pending_id": pid,
             "detail": quarantine.PENDING_MSG,
         })
+    from ..core import selectmask
+    try:
+        sel = selectmask.parse(select) if mode != "trace2d" else None
+    except selectmask.SelectError as e:
+        raise HTTPException(400, str(e))
     if mode == "trace2d":
         return _generate_trace(actor, data, photo_ack, trace, width_mm, title, sample_title, auto_delete_oldest)
     try:
@@ -352,6 +358,8 @@ def generate(
                 "popart": dict(base_mm=base_mm, levels=levels, layer_mm=layer_mm, style=style,
                                halftone_cell=halftone_cell, multi_body=multi_body, palette=palette or None),
             }[mode])
+        if sel:
+            params["select"] = sel                 # kept in the saved build: every rebuild / re-open / Send-to applies it
         if mode == "lithophane":
             params.update(shape=shape)
             if shape in litho_shapes.CURVED_SHAPES:

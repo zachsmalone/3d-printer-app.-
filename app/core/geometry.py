@@ -121,6 +121,41 @@ def heightfield_solid(top: np.ndarray, pitch: float, bottom: float = 0.0):
     return verts, faces
 
 
+def masked_heightfield_solid(top: np.ndarray, pitch: float, cells: np.ndarray, bottom: float = 0.0):
+    """Like heightfield_solid but only over the grid cells where `cells` (ny-1, nx-1) is True (Select mode).
+    The cell mask is de-checkered first so the walls stay 2-manifold; unused vertices are dropped."""
+    cells = fix_checkers(cells)
+    ny, nx = top.shape
+    n = ny * nx
+    jj, ii = np.meshgrid(np.arange(nx), np.arange(ny))
+    x = jj * pitch
+    y = (ny - 1 - ii) * pitch
+    vt = np.stack([x, y, top], -1).reshape(-1, 3)
+    vb = np.stack([x, y, np.full_like(top, bottom)], -1).reshape(-1, 3)
+    idx = np.arange(n).reshape(ny, nx)
+    a, b = idx[:-1, :-1][cells], idx[:-1, 1:][cells]
+    d, c = idx[1:, :-1][cells], idx[1:, 1:][cells]
+    top_f = np.vstack([np.stack([d, c, b], -1), np.stack([d, b, a], -1)])
+    bot_f = (top_f + n)[:, ::-1]
+    e = np.vstack([top_f[:, [0, 1]], top_f[:, [1, 2]], top_f[:, [2, 0]]])
+    key = e[:, 0].astype(np.int64) * n + e[:, 1]
+    rkey = e[:, 1].astype(np.int64) * n + e[:, 0]
+    bnd = e[~np.isin(key, rkey)]
+    u, v = bnd[:, 0], bnd[:, 1]
+    faces = np.vstack([top_f, bot_f, np.stack([v, u, u + n], -1), np.stack([v, u + n, v + n], -1)]).astype(np.int64)
+    verts = np.vstack([vt, vb]).astype(np.float64)
+    used = np.unique(faces)
+    remap = np.full(len(verts), -1, np.int64); remap[used] = np.arange(len(used))
+    return verts[used], remap[faces]
+
+
+def _cells_from_alpha(alpha, nx, ny):
+    from .selectmask import node_alpha
+    na = node_alpha(alpha, nx, ny)
+    keep = na >= 0.5
+    return na, keep[:-1, :-1] & keep[1:, :-1] & keep[:-1, 1:] & keep[1:, 1:]
+
+
 def fix_checkers(mask: np.ndarray) -> np.ndarray:
     """Fill diagonal-only contacts so the extruded mask is 2-manifold.
 
@@ -287,19 +322,35 @@ def litho_stand_body(width_mm: float, max_thickness: float, y_offset: float = 0.
 
 
 def relief(im: Image.Image, width_mm=100.0, base_mm=2.0, relief_mm=6.0, resolution=200,
-           smooth=1.0, gamma=1.0, auto_contrast=True, invert=False, **_) -> Model:
+           smooth=1.0, gamma=1.0, auto_contrast=True, invert=False, _alpha=None, **_) -> Model:
     small = _resize(im, resolution)
     g = _tone(_luma(np.asarray(small, np.float64)), auto_contrast, gamma, smooth)
     if invert:
         g = 1 - g
+    ny, nx = g.shape
+    cells = None
+    if _alpha is not None:                       # Select mode: soft edge eases the relief down to the base, outside is cut away
+        na, cells = _cells_from_alpha(_alpha, nx, ny)
+        g = g * np.clip((na - 0.5) * 2.0, 0, 1) ** 0.5 if na.min() < 1 else g
     h = max(base_mm, 0.2) + relief_mm * g  # bright -> high
-    ny, nx = h.shape
     pitch = width_mm / (nx - 1)
-    v, f = heightfield_solid(h, pitch)
+    v, f = heightfield_solid(h, pitch) if cells is None or cells.all() else masked_heightfield_solid(h, pitch, cells)
     m = Model([Body("relief", v, f)], "relief")
     m.info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4))
     m.thumb = thumbnail.relief_shaded(h, pitch)
+    if cells is not None:
+        m.thumb = _cut_thumb(m.thumb, cells)
     return m
+
+
+def _cut_thumb(thumb, cells):
+    """Grey out the removed part of the preview picture."""
+    t = np.asarray(thumb).copy()
+    if t.ndim != 3:
+        return thumb
+    k = np.asarray(Image.fromarray(cells.astype(np.uint8) * 255).resize((t.shape[1], t.shape[0]), Image.NEAREST)) > 0
+    t[~k] = 235
+    return t
 
 
 def _hex(c):
@@ -357,17 +408,23 @@ def pop_labels(im: Image.Image, levels=4, resolution=160, style="posterize",
 
 def popart(im: Image.Image, width_mm=100.0, levels=4, base_mm=2.0, layer_mm=1.0,
            resolution=160, style="posterize", halftone_cell=6.0, multi_body=True,
-           smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, palette=None, **_) -> Model:
+           smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, palette=None, _alpha=None, **_) -> Model:
     lab, pal = pop_labels(im, levels, resolution, style, halftone_cell, smooth, gamma,
                           auto_contrast, invert, palette)
     levels = len(pal)
     H, W = lab.shape
     info = dict(pixels=[W, H], levels=levels, palette=[_hex(c) for c in pal],
                 total_height_mm=round(base_mm + (levels - 1) * layer_mm, 3))
+    sel_nodes = sel_cells = None
+    if _alpha is not None:                       # Select mode: only the traced part is kept
+        _, sel_nodes = _cells_from_alpha(_alpha, W + 1, H + 1)        # one cell per label pixel
+        _, sel_cells = _cells_from_alpha(_alpha, W, H)                # cells of the node-grid single mesh
+    def _hf(h, pitch):
+        return heightfield_solid(h, pitch) if sel_cells is None else masked_heightfield_solid(h, pitch, sel_cells)
     if not multi_body:
         pitch = width_mm / (W - 1)
         h = base_mm + lab * layer_mm
-        v, f = heightfield_solid(h.astype(np.float64), pitch)
+        v, f = _hf(h.astype(np.float64), pitch)
         m = Model([Body("popart", v, f, _hex(pal[0]))], "popart")
         info["note"] = "single mesh: risers are one pixel wide (sloped)"
         m.info = info
@@ -375,6 +432,8 @@ def popart(im: Image.Image, width_mm=100.0, levels=4, base_mm=2.0, layer_mm=1.0,
         return m
     pitch = width_mm / W
     masks = [lab >= k for k in range(levels)]
+    if sel_nodes is not None:
+        masks = [mk & sel_nodes for mk in masks]
     for k in range(levels - 2, -1, -1):  # keep nested, then de-checker
         masks[k] = masks[k] | masks[k + 1]
     for k in range(levels - 1, 0, -1):
@@ -394,7 +453,7 @@ def popart(im: Image.Image, width_mm=100.0, levels=4, base_mm=2.0, layer_mm=1.0,
     m.info = info
     # STL/slicer variant: one merged watertight mesh (risers are 1 px sloped) - touching coplanar
     # bodies would not survive vertex-welding STL readers as a clean manifold.
-    m.single = heightfield_solid((base_mm + lab * layer_mm).astype(np.float64), width_mm / (W - 1))
+    m.single = _hf((base_mm + lab * layer_mm).astype(np.float64), width_mm / (W - 1))
     m.thumb = thumbnail.popart_shaded(lab, pal, layer_mm, pitch)
     return m
 
@@ -403,8 +462,20 @@ def build(im: Image.Image, mode: str, params: dict) -> Model:
     fn = {"lithophane": lithophane, "relief": relief, "popart": popart}.get(mode)
     if fn is None:
         raise ValueError(f"unknown mode {mode!r}")
+    params = dict(params)
+    sel = params.pop("select", None)
+    alpha, sel_warn = None, []
+    if sel:
+        from . import selectmask
+        sel = selectmask.parse(sel)
+        if sel and mode == "lithophane" and params.get("invert"):
+            sel = {**sel, "_invert_tone": True}
+        im, alpha, sel_warn = selectmask.apply(im, mode, sel)
     params, warnings = check_params(im, mode, params)
-    m = fn(im, **params)
+    warnings = sel_warn + warnings
+    m = fn(im, **params, **({"_alpha": alpha} if alpha is not None else {}))
+    if sel:
+        m.info = {**(m.info or {}), "select": selectmask.summary(sel)}
     if warnings:
         m.info = {**(m.info or {}), "warnings": warnings}
     return m

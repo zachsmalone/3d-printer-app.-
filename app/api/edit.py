@@ -69,6 +69,7 @@ def new_project(
     width_mm: float = Form(100.0),
     photo_ack: bool = Form(False),
     keep_history: bool = Form(True),
+    select: str = Form(""),                     # Select mode: traced selection for a photo base (app/core/selectmask.py)
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -152,6 +153,13 @@ def new_project(
                 raise HTTPException(415, imagesafe.UNREADABLE)
             params, _ = autotune.autotune(im, photo_mode, width_mm, "standard")
             params["resolution"] = min(params.get("resolution", 200), 220)
+            from ..core import selectmask
+            try:
+                sel = selectmask.parse(select)
+            except selectmask.SelectError as e:
+                raise HTTPException(400, str(e))
+            if sel:
+                params["select"] = sel
             mdl = geometry.build(im, photo_mode, params)
             v, f = mdl.solid()
             mesh = trimesh.Trimesh(v, f, process=False)

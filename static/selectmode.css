@@ -1,0 +1,24 @@
+/* Select mode (selectmode.js): phone-first, 44px targets, no page scroll while drawing. */
+.selm{margin:10px 0 0}
+.selm-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.selm-open{min-height:44px}
+.selm-state{font-size:.9rem;opacity:.85}
+.selm-panel{margin-top:10px;border:1px solid var(--line,#ccc);border-radius:12px;padding:10px;background:var(--card,transparent)}
+.selm-say{margin:0 0 8px}
+.selm-tools{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.selm-t{min-height:44px;min-width:44px;padding:0 12px;border-radius:10px;border:1px solid var(--line,#bbb);background:var(--bg,#fff);color:inherit;font:inherit;cursor:pointer}
+.selm-t[aria-pressed=true]{background:var(--accent,#2b6cb0);color:#fff;border-color:transparent}
+.selm-t:disabled{opacity:.45;cursor:default}
+.selm-stage{position:relative;overflow:hidden;border-radius:10px;background:#222;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.selm-zoom{transform-origin:0 0;will-change:transform}
+.selm-stage canvas{display:block;touch-action:none;cursor:crosshair}
+.selm-fit{position:absolute;right:6px;top:6px;background:rgba(255,255,255,.92);color:#111}
+.selm-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0;min-height:44px}
+.selm-row input[type=range]{flex:1;min-width:140px;min-height:44px}
+.selm-row input[type=checkbox],.selm-row input[type=radio]{width:22px;height:22px}
+.selm-row label.inl{display:inline-flex;align-items:center;gap:6px;min-height:44px}
+.selm-out{border:0;padding:0}
+.selm-out legend{font-weight:600;padding:0;margin-bottom:2px}
+.selm-warn{color:var(--warn,#9a5b00)}
+.selm-go{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.selm-go .btn{min-height:44px}
