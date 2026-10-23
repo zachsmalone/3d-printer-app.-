@@ -131,7 +131,8 @@ def printer_public(pid: str) -> dict:
             "nozzle_options": nozzle_options(pid), "nozzle_family": family_of(pid),
             "max_nozzle_c": _v(p, "max_nozzle_temperature_c"), "max_bed_c": _v(p, "max_bed_temperature_c"),
             "official_slicer": _v(p, "official_slicer_name"), "official_slicer_url": _v(p, "official_slicer_download_url"),
-            "native_formats": _v(p, "native_file_formats") or []}
+            "native_formats": _v(p, "native_file_formats") or [], "firmware": _v(p, "firmware", "unknown"),
+            "xy_resolution_um": _v(p, "xy_resolution_um"), "layer_range_mm": _v(p, "layer_height_range_mm")}
 
 
 def public() -> dict:

@@ -598,7 +598,8 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 /* ---- printer picker, slicer panel, Will it print? ---- */
 .slicepanel{margin-top:var(--s4,16px);padding:var(--s4,16px);border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
 .slicepanel h3{margin:0 0 6px}
-.slicepanel select,.slicepanel input[type=number],.printerpick select{min-height:44px;width:100%}
+.slicepanel select,.slicepanel input[type=number],.printerpick select,.printerpick input[type=search]{min-height:44px;width:100%;box-sizing:border-box;max-width:100%}
+.printerpick{min-width:0}.printerpick .field{min-width:0}@media (max-width:480px){.printerpick.grid2{grid-template-columns:1fr}.printerpick .field{grid-column:1/-1}}
 .segmented{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:8px 0}
 .segmented button{min-height:44px;min-width:44px;padding:0 16px;border:0;background:var(--panel);color:var(--txt);font:inherit;cursor:pointer}
 .segmented button[aria-pressed=true]{background:var(--acc);color:var(--on-acc)}

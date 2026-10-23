@@ -23,24 +23,48 @@ _KLIPPER = ("creality_k1", "creality_k2", "creality_hi", "creality_ender3_v3_ke"
 _MARLIN = ("creality_ender3_v3_se", "creality_ender5_s1", "sovol_sv06", "ankermake_m5", "snapmaker_")
 
 
-def firmware_for(printer_id: str | None) -> dict:
-    """Best guess from the printer id. 'unknown' means the maker must pick the command."""
-    pid = (printer_id or "").lower()
+FIRMWARE_COMMAND = {"klipper": "PAUSE", "prusa": "M601", "bambu": "M400 U1", "marlin": "M600"}
+
+
+def _guess(pid: str) -> str:
     if pid == "creality_ender3_v3":
         pid = "creality_ender3_v3_ke"           # the CoreXZ V3 runs Klipper like the KE; the SE runs Marlin (exact match first)
     if pid.startswith(_KLIPPER) and not pid.startswith("creality_ender3_v3_se"):
-        fw, cmd = "klipper", "PAUSE"
-    elif pid.startswith("prusa_"):
-        fw, cmd = "prusa", "M601"
-    elif pid.startswith("bambu_"):
-        fw, cmd = "bambu", "M400 U1"
-    elif pid.startswith(_MARLIN):
-        fw, cmd = "marlin", "M600"
+        return "klipper"
+    if pid.startswith("prusa_"):
+        return "prusa"
+    if pid.startswith("bambu_"):
+        return "bambu"
+    if pid.startswith(_MARLIN):
+        return "marlin"
+    return "unknown"
+
+
+def _profile_firmware(pid: str):
+    try:
+        from app import printers
+        return printers.load_printer(pid)["settings"]["firmware"]["value"]
+    except Exception:
+        return None
+
+
+def firmware_for(printer_id: str | None) -> dict:
+    """Firmware from the printer's sourced profile ('firmware' field); if that says 'unknown', a best guess from the id.
+    'unknown' after both means the maker must pick the command. Resin printers get no G-code pause."""
+    pid = (printer_id or "").lower()
+    prof = _profile_firmware(pid) if pid else None
+    if prof == "resin":
+        return {"firmware": "resin", "command": None, "commands": COMMANDS, "source": "profile",
+                "note": "Resin printers don't use G-code. Pauses are set in your resin slicer."}
+    if prof in FIRMWARE_COMMAND:
+        fw, source = prof, "profile"
     else:
-        fw, cmd = "unknown", None
-    return {"firmware": fw, "command": cmd, "commands": COMMANDS,
-            "note": ("We couldn't tell which firmware this printer runs. Pick the pause command it understands." if cmd is None else
-                     "Best guess from the printer model. Check your printer's manual if the pause doesn't trigger.")}
+        fw = _guess(pid); source = "guess" if fw != "unknown" else "none"
+    cmd = FIRMWARE_COMMAND.get(fw)
+    note = {"profile": "From this printer's profile. Check your printer's manual if the pause doesn't trigger.",
+            "guess": "Best guess from the printer model. Check your printer's manual if the pause doesn't trigger.",
+            "none": "We couldn't tell which firmware this printer runs. Pick the pause command it understands."}[source]
+    return {"firmware": fw, "command": cmd, "commands": COMMANDS, "source": source, "note": note}
 
 
 _NUM = re.compile(r"([A-Za-z])\s*([-+]?(?:\d+\.?\d*|\.\d+))")

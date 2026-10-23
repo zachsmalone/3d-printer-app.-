@@ -16,7 +16,10 @@ PRINTER_FIELDS = {
     "technology": ("enum", "technology"), "multi_color_system": ("system", "list"),
     "native_file_formats": ("format", "formats"), "official_slicer_name": ("text", "text"),
     "official_slicer_download_url": ("url", "url"),
+    "firmware": ("enum", "firmware"), "xy_resolution_um": ("um", "pair"), "layer_height_range_mm": ("mm", 2),
 }
+# Firmware family -> decides the pause command (app/services/gcode_pause.py). "unknown" = the maker picks; "resin" = no G-code.
+FIRMWARES = ("klipper", "marlin", "prusa", "bambu", "unknown", "resin")
 MATERIAL_FIELDS = {
     "first_layer_nozzle_temperature_c": ("C", 0), "nozzle_temperature_c": ("C", 0),
     "first_layer_bed_temperature_c": ("C", 0), "bed_temperature_c": ("C", 0),
@@ -61,7 +64,10 @@ def validate_profile(profile, *, material=False):
         if entry["unit"] != unit:
             raise ProfileValidationError(f"{key}: incorrect unit")
         value = entry["value"]
-        if kind in ("text", "technology", "url"):
+        if kind == "firmware":
+            if value not in FIRMWARES:
+                raise ProfileValidationError("Unknown firmware family")
+        elif kind in ("text", "technology", "url"):
             if not isinstance(value, str) or not value.strip():
                 raise ProfileValidationError(f"{key}: expected text")
             if kind == "technology" and value not in ("FDM", "Resin"):
@@ -76,12 +82,18 @@ def validate_profile(profile, *, material=False):
             if kind == "formats" and any(not re.fullmatch(r"[a-z0-9]+(?:\.[a-z0-9]+)*", v) for v in value):
                 raise ProfileValidationError("Formats use lowercase suffixes without leading dots")
         else:
-            if kind and (not isinstance(value, list) or len(value) != kind):
+            if kind == "pair":
+                kind = 2 if isinstance(value, list) and len(value) == 2 else -1
+                if kind < 0:
+                    raise ProfileValidationError(f"{key}: expected X/Y pair")
+                values = value
+            elif kind and (not isinstance(value, list) or len(value) != kind):
                 raise ProfileValidationError(f"{key}: invalid dimensions/range")
-            values = value if kind else [value]
+            else:
+                values = value if kind else [value]
             if any(type(n) not in (int, float) or not math.isfinite(n) or n <= 0 for n in values):
                 raise ProfileValidationError(f"{key}: expected finite positive numbers")
-            if kind == 2 and value[0] > value[1]:
+            if kind == 2 and key != "xy_resolution_um" and value[0] > value[1]:
                 raise ProfileValidationError("Reversed range")
     if material:
         if not ({"nozzle_temperature_c", "nozzle_temperature_range_c"} & set(settings)) or not ({"bed_temperature_c", "bed_temperature_range_c"} & set(settings)):
@@ -91,8 +103,15 @@ def validate_profile(profile, *, material=False):
         if identity & set(settings):
             if not identity | {"bed_size_mm"} <= set(settings):
                 raise ProfileValidationError("Incomplete catalog identity or volume")
-            if settings["technology"]["value"] == "Resin" and {"nozzle_diameter_mm", "max_nozzle_temperature_c", "max_bed_temperature_c"} & set(settings):
+            resin = settings["technology"]["value"] == "Resin"
+            if resin and {"nozzle_diameter_mm", "max_nozzle_temperature_c", "max_bed_temperature_c"} & set(settings):
                 raise ProfileValidationError("Resin profile cannot contain FDM nozzle/heatbed fields")
+            if "firmware" not in settings:
+                raise ProfileValidationError("Catalog printer needs a firmware field (use 'unknown' when unsourced)")
+            if (settings["firmware"]["value"] == "resin") != resin:
+                raise ProfileValidationError("Firmware 'resin' is for resin printers only")
+            if not resin and "xy_resolution_um" in settings:
+                raise ProfileValidationError("XY resolution is a resin field")
         elif not {"bed_size_mm", "nozzle_diameter_mm"} <= set(settings):
             raise ProfileValidationError("Missing legacy bed/nozzle")
     return profile

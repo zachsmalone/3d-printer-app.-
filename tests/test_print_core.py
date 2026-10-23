@@ -36,7 +36,7 @@ def ini_dict(text):
 # ---- 1) picker ------------------------------------------------------------------------------------------------------
 def test_catalog_has_18_printers_nozzles_and_k1_default():
     j = client().get("/api/printers/catalog").json()
-    assert len(j["printers"]) == 67 and j["nozzles"] == [0.2, 0.4, 0.6, 0.8, 1.0]
+    assert len(j["printers"]) == 75 and j["nozzles"] == [0.2, 0.4, 0.6, 0.8, 1.0]
     assert j["default"] == {"printer_id": "creality_k1", "nozzle": 0.4}
     resin = [p for p in j["printers"] if p["technology"] == "Resin"]
     assert resin and all(p["nozzles"] == [] and p["stock_nozzle_mm"] is None for p in resin)
@@ -211,7 +211,7 @@ def test_exports_are_sized_for_the_printer(fake_engine):
 def test_open_in_uses_no_undocumented_schemes_and_no_accounts():
     j = client().get("/api/printers/catalog").json()
     labels = {o["label"] for o in j["open_in"]}
-    assert {"Creality Print", "Bambu Studio", "PrusaSlicer", "ELEGOO slicer", "Anycubic slicer"} == labels
+    assert {"Creality Print", "Bambu Studio", "PrusaSlicer", "ELEGOO slicer", "Anycubic slicer", "another slicer (3MF)", "any slicer (STL)"} == labels
     assert all(o["scheme"] is None and o["steps"] and o["format"] in ("3mf", "stl") for o in j["open_in"])
     js = (ROOT / "static/printer.js").read_text()
     assert "download=" in js and "://open" not in js and "oauth" not in js.lower()

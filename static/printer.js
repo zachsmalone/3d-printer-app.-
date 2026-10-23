@@ -39,11 +39,19 @@ export function mfrHTML(pid, n) {
     (o.advanced ? ` <b class="warn">${esc(P.cat.advanced_note)}.</b>` : "");
 }
 
+const prHit = q => { const words = q.toLowerCase().split(/\s+/).filter(Boolean); return p => words.every(w => `${p.name} ${p.technology}`.toLowerCase().includes(w)); };
+const prOptions = (sel, optional, q = "") => {
+  const hit = prHit(q);
+  const list = P.cat.printers.filter(p => hit(p) || p.id === sel);   // the chosen printer always stays visible
+  return (optional ? `<option value="">Not now</option>` : "") + [...new Set(list.map(p => p.brand))].sort((a, b) => a.localeCompare(b)).map(b => `<optgroup label="${esc(b)}">` + list.filter(p => p.brand === b).map(p => `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (TorchC0 resin)" : ""}</option>`).join("") + `</optgroup>`).join("");  // grouped by brand
+};
 /* Picker markup. `uid` keeps ids unique when the picker appears twice on a page (sign-up + Account). */
 export function pickerHTML(uid, pref = P.pref, { optional = false } = {}) {
-  const opts = (optional ? `<option value="">Not now</option>` : "") + [...new Set(P.cat.printers.map(p => p.brand))].map(b => `<optgroup label="${esc(b)}">` + P.cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}" ${p.id === pref.printer_id && !optional ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (TorchC0 resin)" : ""}</option>`).join("") + `</optgroup>`).join("");  // grouped by brand
+  const opts = prOptions(optional ? "" : pref.printer_id, optional);
   const pid = optional ? P.cat.default.printer_id : pref.printer_id;
-  return `<div class="grid2 printerpick" data-uid="${uid}">
+  const nb = new Set(P.cat.printers.map(p => p.brand)).size;
+  return `<div class="grid2 printerpick" data-uid="${uid}" data-optional="${optional ? 1 : ""}">
+    <div class="field prsearch" style="grid-column:1/-1"><label for="${uid}_q">Find your printer</label><input id="${uid}_q" type="search" autocomplete="off" enterkeyhint="search" placeholder="Brand or model, e.g. Longer LK5" aria-describedby="${uid}_qn"><span class="help" id="${uid}_qn" aria-live="polite">${P.cat.printers.length} printers from ${nb} brands</span></div>
     <div class="field"><label for="${uid}_pr">Printer${optional ? " <em>optional</em>" : ""}</label><select id="${uid}_pr">${opts}</select></div>
     <div class="field" id="${uid}_nzf"><label for="${uid}_nz">Nozzle size</label><select id="${uid}_nz">${nozOptions(pid, pickNozzle(pid, pref.nozzle))}</select></div>
     <p class="help" id="${uid}_info" aria-live="polite" style="grid-column:1/-1"></p></div>`;
@@ -57,6 +65,15 @@ export function wirePicker(uid, onChange) {
   };
   pr.onchange = () => { const p = printerOf(pr.value); if (p) nz.innerHTML = nozOptions(p.id, pickNozzle(p.id, +nz.value)); info(); onChange?.(readPicker(uid)); };
   nz.onchange = () => { info(); onChange?.(readPicker(uid)); };
+  const q = $(`#${uid}_q`);
+  if (q) q.oninput = () => {
+    const before = pr.value, optional = !!pr.closest(".printerpick")?.dataset.optional;
+    pr.innerHTML = prOptions(before, optional, q.value);
+    const matches = P.cat.printers.filter(prHit(q.value)), n = matches.length;
+    $(`#${uid}_qn`).textContent = q.value.trim() ? (n ? `${n} match${n === 1 ? "" : "es"}. Pick one below.` : "No printer matches. Try the brand name, or pick a similar printer.") : `${P.cat.printers.length} printers`;
+    // one match: select it straight away (saves a tap on phones)
+    if (q.value.trim() && n === 1 && matches[0].id !== before) { pr.innerHTML = prOptions(matches[0].id, optional, q.value); pr.value = matches[0].id; pr.onchange(); }
+  };
   info();
 }
 export function readPicker(uid) {

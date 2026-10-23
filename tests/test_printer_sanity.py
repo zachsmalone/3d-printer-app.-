@@ -17,8 +17,8 @@ def _s(pid):
 
 
 def test_catalog_is_the_full_expansion():
-    assert len(IDS) == 67
-    assert len({_s(p)["brand"]["value"] for p in IDS}) == 15
+    assert len(IDS) == 75
+    assert len({_s(p)["brand"]["value"] for p in IDS}) == 22
 
 
 @pytest.mark.parametrize("pid", IDS)

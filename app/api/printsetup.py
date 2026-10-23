@@ -28,6 +28,11 @@ OPEN_IN = [
      "steps": "FDM (Neptune): open ElegooSlicer, File > Import. Resin (Mars/Saturn): open CHITUBOX or VoxelDance Tango and drag the STL in."},
     {"id": "anycubic", "label": "Anycubic slicer", "format": "stl", "scheme": None,
      "steps": "FDM (Kobra): open Anycubic Slicer Next, File > Import. Resin (Photon): open Anycubic Photon Workshop and open the STL."},
+    # Every other brand (Longer, Raise3D, UltiMaker, Flashforge, Qidi, Sovol, Voron, Two Trees, Kingroon, Tronxy, BIQU, ...)
+    {"id": "other3mf", "label": "another slicer (3MF)", "format": "3mf", "scheme": None,
+     "steps": "OrcaSlicer, UltiMaker Cura, ideaMaker, QIDI Studio, Flashforge Orca and most current slicers: File > Import/Open, pick your printer, then Slice."},
+    {"id": "otherstl", "label": "any slicer (STL)", "format": "stl", "scheme": None,
+     "steps": "Older or resin slicers (Longerware, CHITUBOX, Lychee, Photon Workshop, Simplify3D): open or drag in the STL, pick your printer, then slice."},
 ]
 
 
