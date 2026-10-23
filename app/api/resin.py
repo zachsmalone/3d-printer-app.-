@@ -1,6 +1,8 @@
 """TorchC0 (ZEIM's resin program) API.
 GET  /api/resin/catalog   resin printers, presets, safety notes.
 POST /api/resin/prepare   model_id (your build) or an uploaded STL/3MF/OBJ -> hollowed, tilted, supported STL + 3MF + report.
+                          Optional island_supports / drains: JSON [[x,y,z],...] from a report's layer_check "at" values
+                          (one-click "Add supports to islands" / "Add drain hole"). price empty = no cost (never guessed).
 Heavy geometry runs in core/guard.py's memory-capped child. Files are kept for an hour."""
 from __future__ import annotations
 
@@ -43,9 +45,23 @@ def catalog():
                             "VoxelDance Tango, PrusaSlicer, PreForm), which makes the layer file."}
 
 
-def _work(data, ext, s, bed):
+def _points(raw: str, what: str):
+    """JSON list of [x, y, z] points sent back from a report's "at" values; [] if empty."""
+    if not raw:
+        return []
+    try:
+        v = json.loads(raw)
+        pts = [[float(a), float(b), float(c)] for a, b, c in v]
+    except (ValueError, TypeError):
+        raise HTTPException(400, f"{what} must be a list of [x, y, z] points.")
+    if len(pts) > 200 or any(abs(x) > 1e5 or x != x for p in pts for x in p):
+        raise HTTPException(400, f"Too many or bad {what}.")
+    return pts
+
+
+def _work(data, ext, s, bed, isl=None, drains=None):
     m, _ = meshedit.load_mesh(data, ext)
-    out, rep = resin.prepare(m, s, bed)
+    out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains)
     return out.export(file_type="stl"), out.export(file_type="3mf"), rep
 
 
@@ -54,13 +70,14 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = 
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
             lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
-            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
             "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg",
             "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "price", "price_unit")})
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
+    isl, drn = _points(island_supports, "Island supports"), _points(drains, "Drain holes")
     bed = None
     if printer_id:
         try:
@@ -95,7 +112,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = 
     else:
         raise HTTPException(400, "Choose a model or upload an STL, 3MF or OBJ file.")
     try:
-        stl, tmf, rep = guard.run(_work, data, ext, s, bed, timeout=240)
+        stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, timeout=240)
     except meshedit.OpError as e:
         raise HTTPException(422, str(e))
     except guard.Busy:

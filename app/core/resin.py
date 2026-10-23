@@ -38,8 +38,25 @@ SAFETY = ["Wear nitrile gloves and eye protection; uncured resin irritates skin 
           "Print and wash in a ventilated room; keep resin away from children, pets and food areas.",
           "Wash prints in IPA (or the resin maker's wash), then cure under UV. Cure used IPA and resin waste in sunlight before disposal; never pour it down a drain.",
           "Hollow prints need drain holes, or trapped liquid resin can crack the print later."]
-# Typical standard-resin street price (~30 per litre in USD/EUR, 2026) and density (~1.1 g/ml, standard resins 1.05-1.25).
-DEFAULT_PRICE = 30.0
+def _data_price():
+    """Price per litre from data/resin/resin.json if a resin profile there carries one ("resins"/"profiles" entries with
+    price_per_l). None otherwise: TorchC0 never makes up a price; the user types their own."""
+    import json
+    from pathlib import Path
+    try:
+        d = json.loads((Path(__file__).resolve().parents[2] / "data" / "resin" / "resin.json").read_text())
+    except (OSError, ValueError):
+        return None
+    for key in ("resins", "profiles", "resin_profiles"):
+        for r in d.get(key) or []:
+            v = r.get("price_per_l") if isinstance(r, dict) else None
+            if isinstance(v, (int, float)) and v > 0:
+                return float(v)
+    return None
+
+
+# Density of standard resins is ~1.1 g/ml (1.05-1.25), used only to turn a per-kg price into a per-ml cost.
+DEFAULT_PRICE = _data_price()
 DEFAULT_PRICE_UNIT = "l"
 RESIN_DENSITY_G_ML = 1.1
 TEST_NOTE = "Starting values only. Run an exposure test with your resin (most resin makers publish one) and adjust in your slicer."
@@ -79,7 +96,7 @@ def settings(opts: dict | None = None) -> dict:
     s["drain_mm"] = _num(o, "drain_mm", 3.0)
     s["support_spacing_mm"] = _num(o, "support_spacing_mm", 4.0)
     s["base_lift_mm"] = _num(o, "base_lift_mm", 5.0)
-    s["price"] = _num(o, "price", DEFAULT_PRICE)
+    s["price"] = None if o.get("price") in (None, "") and DEFAULT_PRICE is None else _num(o, "price", DEFAULT_PRICE)
     s["price_unit"] = o.get("price_unit") or DEFAULT_PRICE_UNIT
     if s["price_unit"] not in ("l", "kg"):
         raise ResinError("Price unit must be per litre (l) or per kg.")
@@ -131,13 +148,17 @@ def support_points(m: trimesh.Trimesh, spacing: float, max_angle_deg: float = 45
     return p[order[first]]
 
 
-def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None):
+def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None,
+                   extra=None, auto=True):
     """Model raised by base_lift; a cone tip + cylinder pillar to a raft under each support point.
     Points whose straight path down hits the model itself are skipped (counted) instead of piercing it."""
     m = m.copy(); m.apply_translation([0, 0, base_lift + raft_mm])
     if envelope is not None:
         envelope = envelope.copy(); envelope.apply_translation([0, 0, base_lift + raft_mm])
-    pts = support_points(m, spacing, envelope=envelope)
+    pts = support_points(m, spacing, envelope=envelope) if auto else np.zeros((0, 3))
+    if extra is not None and len(extra):          # user-asked points (islands), given before the lift
+        ex = _surface_below(m, np.asarray(extra, dtype=float) + [0, 0, base_lift + raft_mm])
+        pts = np.vstack([pts, ex]) if len(pts) else ex
     parts, skipped = [], 0
     if len(pts):
         org = pts - [0, 0, 0.05]
@@ -158,7 +179,7 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
             tipc.apply_translation([p[0], p[1], top + 0.1])
             h_shaft = top - tip_len - bot
             shaft = trimesh.creation.cylinder(radius=shaft_d / 2, height=h_shaft + 0.1, sections=10)
-            shaft.apply_translation([p[0], p[1], bot + h_shaft / 2])
+            shaft.apply_translation([p[0], p[1], bot + h_shaft / 2 + 0.05])   # bottom flush with the raft / plate, 0.1 mm into the cone
             parts += [cone, tipc, shaft]
     used = len(parts) // 3
     if used:
@@ -166,14 +187,61 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
         lo, hi = xy.min(0) - 3, xy.max(0) + 3
     else:
         lo, hi = m.bounds[0][:2] - 2, m.bounds[1][:2] + 2
-    raft = trimesh.creation.box(extents=[hi[0] - lo[0], hi[1] - lo[1], raft_mm])
-    raft.apply_translation([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, raft_mm / 2])
-    u = union_all([m, raft, *parts])
+    rafts = []
+    if raft_mm > 0:
+        raft = trimesh.creation.box(extents=[hi[0] - lo[0], hi[1] - lo[1], raft_mm])
+        raft.apply_translation([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, raft_mm / 2])
+        rafts = [raft]
+    u = union_all([m, *rafts, *parts])
     if u is not None:                       # one solid: no overlapping shells, and the ml is the real union
         out, extra, merged = u, float(abs(u.volume)) - float(abs(m.volume)), True
     else:
-        out, extra, merged = trimesh.util.concatenate([m, raft, *parts]), float(raft.volume + sum(abs(q.volume) for q in parts)), False
+        out, extra, merged = trimesh.util.concatenate([m, *rafts, *parts]), float(sum(r.volume for r in rafts) + sum(abs(q.volume) for q in parts)), False
     return out, {"_volume": extra, "merged": merged, "bodies": bodies(out), "watertight": bool(merged or _weld_check(out)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
+
+
+def _surface_below(m, pts, reach=2.0):
+    """Snap each point to the model's underside straight below/above it (the island's bottom face), so a tip lands on it."""
+    out = []
+    for p in pts:
+        org = p + [0, 0, reach]
+        loc, _, _ = m.ray.intersects_location([org], [[0, 0, -1.0]])
+        loc = [q for q in loc if q[2] >= p[2] - reach]
+        out.append(min(loc, key=lambda q: q[2]) if loc else p)
+    return np.array(out).reshape(-1, 3)
+
+
+def drill_vent(m: trimesh.Trimesh, at, diameter: float):
+    """One vent/drain hole from a point inside an open pocket (a suction cup) out to the open vat or air: try straight
+    down (the plate side, where it is sealed) then the four sideways directions, and drill the shortest way that
+    passes through one wall and comes out on the outside above the plate. Returns (mesh, made?)."""
+    p = np.asarray(at, dtype=float)
+    best = None
+    for d in ([0, 0, -1.0], [1.0, 0, 0], [-1.0, 0, 0], [0, 1.0, 0], [0, -1.0, 0]):
+        loc, _, _ = m.ray.intersects_location([p], [d])
+        if len(loc) < 2:
+            continue
+        t = sorted(float(np.dot(q - p, d)) for q in loc)
+        t = [x for x in t if x > 1e-6]
+        if len(t) < 2:
+            continue
+        exit_pt = p + np.asarray(d) * t[1]
+        if exit_pt[2] < m.bounds[0][2] + 1e-3:       # comes out on the plate: no way to drain there
+            continue
+        if best is None or t[1] < best[1]:
+            best = (np.asarray(d), t[1])
+    if best is None or diameter <= 0:
+        return m, False
+    d, L = best
+    h = L + 2.0
+    cyl = trimesh.creation.cylinder(radius=diameter / 2, height=h, sections=24)
+    T = trimesh.geometry.align_vectors([0, 0, 1], d)
+    T[:3, 3] = p + d * (L / 2)
+    cyl.apply_transform(T)
+    try:
+        return meshedit._boolean(m, cyl, "difference"), True
+    except meshedit.OpError:
+        return m, False
 
 
 def _cavities(m: trimesh.Trimesh):
@@ -242,15 +310,16 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -
         fill = unary_union([Polygon(p.exterior) for p in polys]) if polys else None
         for p in polys:
             if i > 0 and (prev_mat is None or not p.intersects(prev_mat)) and p.area > 0.05:
+                c = p.representative_point().coords[0]
                 islands.append({"z_mm": round(float(zs[i]), 2), "area_mm2": round(p.area, 2),
-                                "xy": [round(c, 1) for c in p.representative_point().coords[0]]})
+                                "xy": [round(c[0], 1), round(c[1], 1)], "xyz": [round(c[0], 2), round(c[1], 2), round(float(zs[i]), 2)]})
             for r in p.interiors:
                 h = Polygon(r)
                 if h.area < 1.0:
                     continue
                 # vented on the plate side if, in the layer below, part of this hole is outside every outline (open vat)
                 below_open = i > 0 and (prev_fill is None or h.difference(prev_fill).area > 0.2)
-                holes.append({"i": i, "poly": h, "open": below_open})
+                holes.append({"i": i, "poly": h, "open": below_open, "xy": h.representative_point().coords[0]})
         prev_mat, prev_fill = mat, fill
     # chain holes across layers by overlap (union-find); a chain is vented if any member opens below
     def find(a):
@@ -272,8 +341,10 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -
         if len(g) < 2 or any(holes[k]["open"] for k in g):
             continue
         first = min(g, key=lambda k: holes[k]["i"])
-        suction.append({"z_mm": round(float(zs[holes[first]["i"]]), 2), "layers": len({holes[k]["i"] for k in g}),
-                        "area_mm2": round(max(holes[k]["poly"].area for k in g), 1)})
+        h0 = holes[first]
+        suction.append({"z_mm": round(float(zs[h0["i"]]), 2), "layers": len({holes[k]["i"] for k in g}),
+                        "area_mm2": round(max(holes[k]["poly"].area for k in g), 1),
+                        "xyz": [round(float(h0["xy"][0]), 2), round(float(h0["xy"][1]), 2), round(float(zs[h0["i"]]), 2)]})
     return {"islands": islands[:50], "suction": suction[:50], "step_mm": round(step, 3)}
 
 
@@ -308,6 +379,31 @@ def union_all(meshes, tol: float = 1e-3):
         return None
 
 
+def bridge_touching(m: trimesh.Trimesh, gap: float = 0.3, r: float = 0.8):
+    """Parts that only touch (a head resting on a body at one point) stay separate after a union and print as loose
+    pieces. Join each part lying within `gap` mm of a bigger one with a small ball at the touching point.
+    Returns (mesh, bridges made)."""
+    parts = sorted(m.split(only_watertight=False), key=lambda q: -abs(q.volume))
+    if len(parts) < 2:
+        return m, 0
+    balls = []
+    for small in parts[1:]:
+        best = None
+        for big in parts:
+            if big is small:
+                continue
+            cp, dist, _ = trimesh.proximity.closest_point(big, small.vertices)
+            k = int(np.argmin(dist))
+            if best is None or dist[k] < best[0]:
+                best = (float(dist[k]), (cp[k] + small.vertices[k]) / 2)
+        if best and best[0] <= gap:
+            balls.append(trimesh.creation.icosphere(subdivisions=2, radius=r).apply_translation(best[1]))
+    if not balls:
+        return m, 0
+    u = union_all([m, *balls])
+    return (u, len(balls)) if u is not None else (m, 0)
+
+
 def bodies(m: trimesh.Trimesh) -> int:
     """Separate pieces as a slicer sees them after export (vertices welded by position)."""
     q = trimesh.Trimesh(vertices=np.asarray(m.vertices, dtype=np.float32).astype(np.float64), faces=m.faces, process=True)
@@ -323,21 +419,27 @@ def thin_wall_note(thin: float, asked: float) -> str:
             "Thin spots can crack or leak resin; try a thicker wall if this part must be strong.")
 
 
+def cost_of(ml: float, price, unit: str = "l") -> dict:
+    """Resin cost estimate for `ml` millilitres at the user's price per litre (or per kg). No price -> no cost."""
+    if price is None:
+        return {"cost": None, "cost_note": "Enter your resin's price (per litre or kg) to see a cost estimate."}
+    cost = ml / 1000.0 * price if unit == "l" else ml * RESIN_DENSITY_G_ML / 1000.0 * price
+    return {"cost": round(cost, 2), "cost_note": f"Estimate: resin only, at {price:g} per {'litre' if unit == 'l' else 'kg'}"
+            + (f" (density {RESIN_DENSITY_G_ML:g} g/ml)" if unit == "kg" else "") + "; leaves out spills, IPA, gloves and failed prints."}
+
+
 def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
     layers = max(1, math.ceil(height_mm / s["layer_mm"] - 1e-9))
     bottom = min(layers, s["bottom_layers"])
     move = 2 * s["lift_mm"] / s["lift_speed_mm_min"] * 60 + 0.5          # up + down + settle
     secs = bottom * s["bottom_exposure_s"] + (layers - bottom) * s["exposure_s"] + layers * move
     ml = volume_mm3 / 1000.0
-    price, unit = s.get("price", DEFAULT_PRICE), s.get("price_unit", DEFAULT_PRICE_UNIT)
-    cost = ml / 1000.0 * price if unit == "l" else ml * RESIN_DENSITY_G_ML / 1000.0 * price
-    return {"cost": round(cost, 2), "cost_note": f"Resin only, at {price:g} per {'litre' if unit == 'l' else 'kg'}"
-            + (f" (density {RESIN_DENSITY_G_ML:g} g/ml)" if unit == "kg" else "") + "; leaves out spills, IPA, gloves and failed prints.",
+    return {**cost_of(ml, s.get("price", DEFAULT_PRICE), s.get("price_unit", DEFAULT_PRICE_UNIT)),
             "layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
             "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film."}
 
 
-def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, dict]:
+def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None) -> tuple[trimesh.Trimesh, dict]:
     """The TorchC0 pipeline: tilt -> hollow -> drain + vent holes -> supports + raft -> layer check (islands, suction cups).
     Warnings never block: they are notes; the files are always made."""
     rep = {"program": NAME, "settings": s, "notes": [], "safety": SAFETY, "test_note": TEST_NOTE}
@@ -347,6 +449,10 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
         # overlapping bodies: join them FIRST, so hollowing sees one solid (not shells inside shells) and the shared
         # volume is counted once
         u = union_all(shells)
+        if u is not None and bodies(u) > 1:
+            u, nb = bridge_touching(u)
+            if nb:
+                rep["bridged"] = nb
         if u is not None:
             rep["input_union"] = {"bodies_in": len(shells), "bodies_out": bodies(u)}
             work = u
@@ -363,6 +469,9 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
             envelope = work if work.is_watertight else None
             work = hollowed
             rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
+            # one number everywhere: the note and the report both show the probe's thinnest spot (was 0.02 mm apart)
+            if hr.get("wall_min_probe_mm") is not None:
+                rep["hollow"]["thinnest_wall_mm"] = hr["wall_min_probe_mm"]
             rep["hollow"]["cavities"] = len(made); rep["hollow"]["holes"] = made
             thin = hr.get("wall_min_probe_mm", hr.get("thinnest_wall_mm"))
             if thin is not None and thin < s["wall_mm"] - 0.05:
@@ -377,9 +486,25 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
             # meshedit's text ends "Try a thinner wall." for its own tool; here it would contradict the 1 mm advice
             why = str(e).replace(" Try a thinner wall.", "").replace(" Try a different wall thickness.", "")
             rep["notes"].append(f"Printed solid (not hollowed): {why} A part this small or thin prints fine solid.")
+    if drains:                                   # one-click "Add drain hole" for suction cups (points in the model frame)
+        made = 0
+        for at in drains[:20]:
+            work, ok = drill_vent(work, at, s["drain_mm"] or 2.0)
+            made += ok
+        rep["drains_added"] = made
+        if made < len(drains[:20]):
+            rep["notes"].append(f"{len(drains[:20]) - made} drain hole(s) could not be drilled (no wall to the outside "
+                                "above the plate there); tilt the model or turn supports on so the cup lifts off the plate.")
+    lift = 0.0
     vol = float(abs(work.volume))
-    if s["supports"]:
-        work, sr = build_supports(work, s["support_spacing_mm"], s["base_lift_mm"], envelope=envelope)
+    if s["supports"] or island_supports:
+        # supports off + island pillars only: the model stays on the plate (no lift, no raft); pillars stand on the plate
+        bl, raft = (s["base_lift_mm"], 1.0) if s["supports"] else (0.0, 0.0)
+        lift = bl + raft
+        work, sr = build_supports(work, s["support_spacing_mm"], bl, raft_mm=raft, envelope=envelope,
+                                  extra=island_supports[:200] if island_supports else None, auto=s["supports"])
+        if island_supports:
+            sr["island_supports"] = len(island_supports[:200])
         rep["support"] = sr
         vol += sr.pop("_volume")
         if not sr["merged"]:
@@ -388,12 +513,18 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None) -> tuple[trimesh.Trimesh, 
         if sr["skipped_inside"]:
             rep["notes"].append(f"{sr['skipped_inside']} overhang spot(s) sit above other parts of the model and got no support; "
                                 "check them in your slicer and add supports there if needed.")
-    else:
+    if not s["supports"] and not island_supports:
         rep["notes"].append("Supports are off: only flat-bottomed models print without them. Add supports in your slicer otherwise.")
     try:
-        lc = layer_check(work)
+        lc = layer_check(work, step=s["layer_mm"])      # sliced at the chosen layer height (capped at 400 slices)
     except Exception:
         lc = {"islands": [], "suction": []}
+    # markers for the 3D view are in the output frame; "at" is the same point in the model frame (before the support
+    # lift) so the UI can send it back for "Add supports to islands" / "Add drain hole"
+    for it in lc["islands"] + lc["suction"]:
+        if "xyz" in it:
+            it["at"] = [it["xyz"][0], it["xyz"][1], round(it["xyz"][2] - lift, 2)]
+    lc["lift_mm"] = lift
     rep["layer_check"] = lc
     if lc["islands"]:
         rep["notes"].append(f"{len(lc['islands'])} island(s): parts that start in mid-air with nothing under them (first at "

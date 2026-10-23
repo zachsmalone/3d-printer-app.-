@@ -136,7 +136,8 @@ def test_resin_cost_estimate_per_litre_and_kg():
     assert e["cost"] == 4.0 and "40 per litre" in e["cost_note"]
     k = resin.estimate(10.0, 100000, resin.settings({"price": 40, "price_unit": "kg"}))  # 110 g at 40/kg
     assert k["cost"] == 4.4
-    assert resin.estimate(10.0, 100000, resin.settings())["cost"] == round(0.1 * resin.DEFAULT_PRICE, 2)
+    if resin.DEFAULT_PRICE is None:     # no price in data/resin/resin.json: no cost until the user types one (never guessed)
+        assert resin.estimate(10.0, 100000, resin.settings())["cost"] is None
     with pytest.raises(resin.ResinError):
         resin.settings({"price_unit": "gal"})
 
@@ -261,7 +262,8 @@ def test_thin_wall_has_one_wording():
 def test_costs_are_shown_to_two_decimals():
     js = (ROOT / "static" / "cost.js").read_text()
     assert "toFixed(3)" not in js.split("export function money")[1].split("\n}")[0]
-    assert resin.estimate(10.0, 12345, resin.settings())["cost"] == round(resin.estimate(10.0, 12345, resin.settings())["cost"], 2)
+    c = resin.estimate(10.0, 12345, resin.settings({"price": 33.33}))["cost"]
+    assert c == round(c, 2)
 
 
 def test_thin_hollow_wall_is_a_warning_not_a_refusal():
@@ -275,3 +277,77 @@ def test_thin_hollow_wall_is_a_warning_not_a_refusal():
 def test_no_try_a_thinner_wall_message():
     _, rep = resin.prepare(trimesh.creation.box(extents=[4, 4, 4]), resin.settings({"wall_mm": 3, "supports": "false"}))
     assert not any("thinner wall" in n.lower() for n in rep["notes"])
+
+
+# ---- islands / suction cups / one-click fixes / cost (resin-islands-cost) ----
+
+def test_cost_math_estimate_label_and_no_invented_price():
+    assert resin.cost_of(250, 40)["cost"] == 10.0 and "Estimate" in resin.cost_of(250, 40)["cost_note"]
+    assert resin.cost_of(1000, 20, "kg")["cost"] == 22.0
+    assert resin.cost_of(250, None)["cost"] is None
+    import json
+    d = json.loads((ROOT / "data" / "resin" / "resin.json").read_text())
+    has = any(isinstance(x, dict) and x.get("price_per_l") for k in ("resins", "profiles", "resin_profiles") for x in d.get(k) or [])
+    assert (resin.DEFAULT_PRICE is not None) == has
+    assert "30.0" not in (ROOT / "app" / "core" / "resin.py").read_text().split("DEFAULT_PRICE =")[1].split("\n")[0]
+
+
+def test_floating_island_marker_and_add_supports():
+    fl = trimesh.util.concatenate([_box([10, 10, 10], [0, 0, 5]), _box([5, 5, 2], [20, 0, 6])])
+    _, rep = resin.prepare(fl, resin.settings(FLAT))
+    isl = rep["layer_check"]["islands"]
+    assert len(isl) == 1 and isl[0]["xyz"][0] == pytest.approx(20, abs=1) and isl[0]["at"]
+    out, fixed = resin.prepare(fl, resin.settings(FLAT), island_supports=[i["at"] for i in isl])
+    assert fixed["layer_check"]["islands"] == [] and fixed["support"]["island_supports"] == 1
+    assert out.bounds[0][2] == pytest.approx(0, abs=1e-6)          # model still on the plate (no lift with supports off)
+
+
+def test_cup_open_to_plate_gets_drain_hole():
+    cup = trimesh.boolean.difference([_box([20, 20, 10], [0, 0, 5]), _box([14, 14, 8], [0, 0, 3.9])], engine="manifold")
+    _, rep = resin.prepare(cup, resin.settings(FLAT))
+    su = rep["layer_check"]["suction"]
+    assert len(su) == 1 and len(su[0]["xyz"]) == 3
+    out, fixed = resin.prepare(cup, resin.settings(FLAT), drains=[x["at"] for x in su])
+    assert fixed["drains_added"] == 1 and fixed["layer_check"]["suction"] == [] and abs(out.volume) < abs(cup.volume)
+
+
+def test_solid_cube_has_no_islands_or_cups():
+    _, rep = resin.prepare(_box([15, 15, 15], [0, 0, 0]), resin.settings({"hollow": "false"}))
+    assert rep["layer_check"]["islands"] == [] and rep["layer_check"]["suction"] == []
+
+
+def test_hollow_with_drain_has_no_suction():
+    _, rep = resin.prepare(trimesh.creation.icosphere(subdivisions=3, radius=12), resin.settings())
+    assert rep["hollow"]["holes"] == [2] and rep["layer_check"]["suction"] == []
+
+
+def test_thinnest_wall_one_value_everywhere():
+    _, rep = resin.prepare(trimesh.creation.box(extents=[40, 30, 25]), resin.settings({"supports": "false"}))
+    note = next(n for n in rep["notes"] if n.startswith("Thin wall"))
+    assert f"{rep['hollow']['thinnest_wall_mm']:.2f} mm" in note
+
+
+def test_touching_parts_are_one_body():
+    fig = trimesh.boolean.union([trimesh.creation.cylinder(4, 14).apply_translation([0, 0, 7]),
+                                 trimesh.creation.icosphere(3, 3.5).apply_translation([0, 0, 17.5])], engine="manifold")
+    out, rep = resin.prepare(fig, resin.settings())
+    assert rep["support"]["bodies"] == 1 and resin.bodies(out) == 1
+
+
+def test_api_fix_points_and_no_price(c):
+    fl = trimesh.util.concatenate([_box([10, 10, 10], [0, 0, 5]), _box([5, 5, 2], [20, 0, 6])])
+    data = {**{k: str(v).lower() for k, v in FLAT.items()}}
+    r = c.post("/api/resin/prepare", data=data, files={"file": ("f.stl", _stl(fl), "model/stl")}).json()
+    assert r["estimate"]["cost"] is None and len(r["layer_check"]["islands"]) == 1
+    import json
+    r2 = c.post("/api/resin/prepare", data={**data, "island_supports": json.dumps([r["layer_check"]["islands"][0]["at"]])},
+                files={"file": ("f.stl", _stl(fl), "model/stl")}).json()
+    assert r2["layer_check"]["islands"] == []
+    bad = c.post("/api/resin/prepare", data={**data, "drains": "nope"}, files={"file": ("f.stl", _stl(fl), "model/stl")})
+    assert bad.status_code == 400
+
+
+def test_torchc0_islands_cups_cost_in_chromium():
+    from test_b4_ui import _run
+    out = _run("ui_torchc0_islands.py")
+    assert "FAIL" not in out and "PASS chrome" in out, out

@@ -21,6 +21,7 @@ def run(name, launch, stl):
     pg.click("#rzHollow"); ok(f"{name}: hollow checkbox clickable", not pg.is_checked("#rzHollow"))
     pg.fill("#rzLayer", "0.05"); ok(f"{name}: layer field editable", pg.input_value("#rzLayer") == "0.05")
     pg.set_input_files("#rzFile", stl)
+    pg.fill("#rzCost", "40")          # no built-in price (never guessed): the user types theirs
     pg.click("#rzGo")
     pg.wait_for_selector("#torchOut a[href$='torchc0.stl']", timeout=200000)
     txt = pg.inner_text("#torchOut")

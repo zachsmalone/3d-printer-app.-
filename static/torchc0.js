@@ -2,6 +2,29 @@
    Upload a model -> POST /api/resin/prepare (hollow + drain hole, tilt, supports + raft) -> STL / 3MF for the resin slicer. */
 import { api, esc, $ } from "/static/app.js";
 import { money } from "/static/cost.js";
+import * as THREE from "three";
+
+/* 3D result view: the prepared STL with island (red) and suction-cup (orange) markers. Lazy: only made after a result. */
+let viewer = null;
+async function show3D(el, url, lc) {
+  try {
+    const { Viewer } = await import("/static/viewer.js");
+    if (!viewer || !el.contains(viewer.el)) viewer = new Viewer(el);
+    const buf = await (await fetch(url)).arrayBuffer(), dv = new DataView(buf), n = dv.getUint32(80, true);
+    if (84 + n * 50 > buf.byteLength) throw new Error("not a binary STL");
+    const pos = new Float32Array(n * 9);
+    for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(84 + i * 50 + 12 + k * 4, true);
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.computeVertexNormals();
+    viewer.group.clear();
+    viewer.group.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: "#8fb0e0", roughness: 0.6, transparent: true, opacity: 0.85 })));
+    g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
+    const mark = (p, color) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color, depthTest: false }));
+      m.position.set(...p); m.renderOrder = 2; viewer.group.add(m); };
+    (lc.islands || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
+    (lc.suction || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
+    viewer.reset(); el.dataset.markers = String(viewer.group.children.length - 1);
+  } catch (e) { el.innerHTML = `<p class="help">3D preview unavailable here (${esc(e.message)}). The files below are still ready.</p>`; }
+}
 
 const PKEY = "zeim.resinPrice";   // remembered in this browser only: {price, unit, currency}
 const CURS = ["$", "€", "£", "¥", "₹", "R$", "kr"];
@@ -26,7 +49,7 @@ function panelHTML() {
     <p class="help warn rzWarn" id="rzWallWarn" hidden>Walls under 1 mm crack easily in resin. Use 1 mm or more, or prepare anyway.
       <button type="button" class="btn small" id="rzWallAnyway">Prepare anyway</button> <button type="button" class="btn small" id="rzWallDismiss" aria-label="Dismiss this warning">Dismiss</button></p>
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
-      ${num("rzCost", "Resin price", loadP().price ?? cat.default_price, 0, 10000, 0.5, "")}
+      ${num("rzCost", "Resin price", loadP().price ?? cat.default_price ?? "", 0, 10000, 0.5, "")}
       <div class="field"><label for="rzCostU">Price per</label><select id="rzCostU"><option value="l" ${(loadP().unit || cat.default_price_unit) === "l" ? "selected" : ""}>litre</option><option value="kg" ${loadP().unit === "kg" ? "selected" : ""}>kg</option></select></div></div>
     <label class="inl chk"><input type="checkbox" id="rzHollow" checked> Hollow (saves resin; needs a drain hole)</label>
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
@@ -72,21 +95,46 @@ function wire() {
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,
       tilt_deg: $("#rzTilt").value, wall_mm: $("#rzWall").value, drain_mm: $("#rzDrain").value, hollow: $("#rzHollow").checked, supports: $("#rzSup").checked,
       price: $("#rzCost").value, price_unit: $("#rzCostU").value };
-    saveP({ price: +$("#rzCost").value, unit: $("#rzCostU").value, currency: $("#rzCur").value });
+    last = { v, f, isl: [], drains: [] };
+    await run();
+  };
+  let last = null;
+  $("#torchOut").addEventListener("click", async e => {      // one-click fixes re-run the same job with the extra points
+    const b = e.target.closest("#rzFixIsl,#rzFixCup"); if (!b || !last || !last.rep) return;
+    const lc = last.rep.layer_check;
+    if (b.id === "rzFixIsl") last.isl = last.isl.concat(lc.islands.map(i => i.at).filter(Boolean));
+    else last.drains = last.drains.concat(lc.suction.map(i => i.at).filter(Boolean));
+    await run();
+  });
+  async function run() {
+    const out = $("#torchOut"), { v, f } = last, fd = new FormData();
+    saveP({ price: $("#rzCost").value === "" ? null : +$("#rzCost").value, unit: $("#rzCostU").value, currency: $("#rzCur").value });
     Object.entries(v).forEach(([k, x]) => fd.append(k, x)); fd.append("file", f);
+    if (last.isl.length) fd.append("island_supports", JSON.stringify(last.isl));
+    if (last.drains.length) fd.append("drains", JSON.stringify(last.drains));
     out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
       const r = await api("/api/resin/prepare", { method: "POST", body: fd }), e = r.estimate;
-      out.innerHTML = `<p class="slicestats"><span class="pill">⏱ about ${esc(e.print_time_human)}</span><span class="pill">🧪 about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">💰 about ${esc(money(e.cost, $("#rzCur").value))}</span><span class="pill">${e.layers} layers</span>${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
+      last.rep = r;
+      const lc = r.layer_check || { islands: [], suction: [] }, nI = lc.islands.length, nS = lc.suction.length;
+      const costTxt = e.cost == null ? "💰 enter a price for a cost estimate" : `💰 about ${money(e.cost, $("#rzCur").value)} (estimate)`;
+      out.innerHTML = `<div id="rzView" class="rzView" role="img" aria-label="3D view of the prepared model: red dots are islands, orange dots are suction cups" style="position:relative;width:100%;height:min(60vw,360px);min-height:220px;border-radius:8px;overflow:hidden"></div>
+        <div class="rzChecks" id="rzChecks">
+        <p class="help ${nI ? "warn rzWarn" : ""}" id="rzIslands"><span class="pill">🔴 ${nI} island${nI === 1 ? "" : "s"}</span> ${nI ? "Parts that start in mid-air (red dots)." : "No unsupported islands found."}
+          ${nI ? `<button type="button" class="btn small" id="rzFixIsl" style="min-height:44px">Add supports to islands</button> <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss the island warning">Dismiss</button>` : ""}</p>
+        <p class="help ${nS ? "warn rzWarn" : ""}" id="rzCups"><span class="pill">🟠 ${nS} suction cup${nS === 1 ? "" : "s"}</span> ${nS ? "Hollows sealed on the plate side trap resin and pull a vacuum (orange dots)." : "No suction cups found."}
+          ${nS ? `<button type="button" class="btn small" id="rzFixCup" style="min-height:44px">Add drain hole${nS === 1 ? "" : "s"}</button> <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss the suction cup warning">Dismiss</button>` : ""}</p></div>
+        <p class="slicestats"><span class="pill">⏱ about ${esc(e.print_time_human)}</span><span class="pill">🧪 about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${esc(costTxt)}</span><span class="pill">${e.layers} layers</span>${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
         ${r.hollow ? `<p class="help">${esc(r.hollow.message)}</p>` : ""}
-        ${r.notes.map(n => `<p class="help warn rzWarn">${esc(n)} <button type="button" class="btn small rzDismiss" aria-label="Dismiss this warning">Dismiss</button></p>`).join("")}
-        <p class="help">${esc(e.resin_note)} Cost estimate: ${esc(e.cost_note)}</p>
+        ${r.notes.filter(n => !/ island\(s\)| suction cup\(s\)/.test(n)).map(n => `<p class="help warn rzWarn">${esc(n)} <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss this warning">Dismiss</button></p>`).join("")}
+        <p class="help">${esc(e.resin_note)} ${esc(e.cost_note)}</p>
         <div class="row"><a class="btn primary" href="${r.downloads.stl}" download>⬇ STL</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a></div>`;
       out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
+      show3D($("#rzView"), r.downloads.stl, lc);
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }
-  };
+  }
 }
 
 async function load() {
