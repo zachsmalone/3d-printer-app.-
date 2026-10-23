@@ -49,7 +49,7 @@ async function preview() {
     const line = `${r.pieces} ${r.pieces > 1 ? "pieces" : "piece"}${holes}, ${r.size_mm[0]} × ${r.size_mm[1]} mm` +
       (r.threshold != null && $("#t_auto").checked ? `. Cut-off picked: ${r.threshold}` : "");
     box.setAttribute("aria-label", "Traced outline: " + line.replace(" × ", " by "));
-    st.textContent = line + "." + (r.warnings.length ? " ⚠ " + r.warnings.join(" ") : "") + (r.notes.length ? " " + r.notes.join(" ") : "") +
+    st.textContent = line + "." + (r.warnings.length ? " " + r.warnings.join(" ") : "") + (r.notes.length ? " " + r.notes.join(" ") : "") +
       (r.thin && !$("#t_thicken").checked ? " Thin bits are shown in red." : "");
     if (r.threshold != null && $("#t_auto").checked) { $("#t_threshold").value = r.threshold; }
   } catch (e) {

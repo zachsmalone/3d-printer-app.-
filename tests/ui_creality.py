@@ -25,7 +25,7 @@ def run(name, launch):
     ctx, pg, errs = open_print(b, U2, True)
     first = pg.evaluate("document.querySelector('#slicerBtns').firstElementChild.className")
     ok(f"{name} phone: the Creality Cloud block is the first thing under 'Open in your slicer'", "cre" in first, first)
-    ok(f"{name} phone: starred 'Download 3MF' is the primary button", "★" in pg.inner_text("#crDl") and pg.get_attribute("#crDl", "download") == "ZEIM-build.3mf")
+    ok(f"{name} phone: starred 'Download 3MF' is the primary button", pg.locator("#crDl use[href='#i-star']").count() == 1 and "default" in pg.inner_text("#crDl") and pg.get_attribute("#crDl", "download") == "ZEIM-build.3mf")
     href = pg.get_attribute("#crDl", "href"); bid = href.split("/")[2]
     ok(f"{name} phone: it is the authenticated download (/files/<id>/model.3mf), not a link", href.startswith("/files/") and href.endswith("/model.3mf") and "token" not in href, href)
     hrefs = pg.eval_on_selector_all(".cre a", "els=>els.map(e=>e.getAttribute('href'))")

@@ -43,15 +43,15 @@ function render() {
   const fileLine = !adult ? "" : !isExpert()
     ? `<div class="help">File: 3D print file (3MF)<details class="inl"><summary>Different file type?</summary>${chooser}</details></div>` : chooser;
   const save = [], other = [], print = [];
-  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "⬇ Save to this device" : "⬇ Download my model"}</b>
+  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Save to this device" : "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download my model"}</b>
     <small>${adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
-  if (b.original) save.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b>⬇ Your original file</b><small>The file you opened, unchanged.</small></a>`);
+  if (b.original) save.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Your original file</b><small>The file you opened, unchanged.</small></a>`);
   if (adult && shareAllowed()) {
-    other.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b>📤 Share… <span class="untested">untested</span></b><small>Opens the ${shareLabel()} share sheet, where you pick the app (Files, Mail and more). Not tried on a real iPhone or iPad yet.</small></button>`);
-    other.push(`<button type="button" class="btn sheet-row" id="ssEmail" disabled><b>✉ Email it to myself <span class="untested">untested</span></b><small>Your Mail app sends it. ZEIM doesn't. Not tried on a real iPhone or iPad yet.</small></button>`);
-    other.push(`<button type="button" class="btn sheet-row" id="ssShapr" disabled><b>🧊 Share as STL for Shapr3D… <span class="untested">untested</span></b><small>Opens as a reference shape, not editable. When Shapr3D asks, choose <b>millimetres</b>. Pick Shapr3D on the next screen. Not tried with the real app yet.</small></button>`);
+    other.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-upload></use></svg> Share… <span class="untested">untested</span></b><small>Opens the ${shareLabel()} share sheet, where you pick the app (Files, Mail and more). Not tried on a real iPhone or iPad yet.</small></button>`);
+    other.push(`<button type="button" class="btn sheet-row" id="ssEmail" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-mail></use></svg> Email it to myself <span class="untested">untested</span></b><small>Your Mail app sends it. ZEIM doesn't. Not tried on a real iPhone or iPad yet.</small></button>`);
+    other.push(`<button type="button" class="btn sheet-row" id="ssShapr" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg> Share as STL for Shapr3D… <span class="untested">untested</span></b><small>Opens as a reference shape, not editable. When Shapr3D asks, choose <b>millimetres</b>. Pick Shapr3D on the next screen. Not tried with the real app yet.</small></button>`);
   }
-  if (caps.printer_ui) print.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b>🖨 Send to my printer</b><small>Opens the printer step in Print. Tested with a pretend printer only.</small></button>`);
+  if (caps.printer_ui) print.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Send to my printer</b><small>Opens the printer step in Print. Tested with a pretend printer only.</small></button>`);
   const group = (title, items, id) => items.length ? `<h3 class="group" id="${id}">${title}</h3><ul class="rows" aria-labelledby="${id}">${items.map(h => `<li>${h}</li>`).join("")}</ul>` : "";
   const notes = [];
   if (caps.role !== "adult") notes.push("Sending to other apps isn't available for your account. You can download your build.");

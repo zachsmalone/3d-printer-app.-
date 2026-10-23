@@ -53,12 +53,12 @@ function panelHTML() {
     const grp = pl.objects.filter(x => x.group === o.group).length > 1 ? ` <span class="pill">Group ${o.group + 1}</span>` : "";
     return `<li class="pobj ${on ? "on" : ""} ${o.hidden ? "hid" : ""}">
       <button type="button" class="pselect" data-psel="${o.i}" aria-pressed="${on}"><b>${esc(o.name)}</b>${grp}<small>${o.size.map(r1).join(" × ")} mm · ${w}</small></button>
-      <button type="button" class="picon" data-peye="${o.i}" aria-pressed="${!o.hidden}" aria-label="${o.hidden ? "Show" : "Hide"} ${esc(o.name)}" title="${o.hidden ? "Hidden, won't print. Show it" : "Hide (won't print)"}">${o.hidden ? "🙈" : "👁"}</button>
+      <button type="button" class="picon" data-peye="${o.i}" aria-pressed="${!o.hidden}" aria-label="${o.hidden ? "Show" : "Hide"} ${esc(o.name)}" title="${o.hidden ? "Hidden, won't print. Show it" : "Hide (won't print)"}">${o.hidden ? "<svg class=i aria-hidden=true focusable=false><use href=#i-eyeoff></use></svg>" : "<svg class=i aria-hidden=true focusable=false><use href=#i-eye></use></svg>"}</button>
       <button type="button" class="picon" data-pdup="${o.i}" aria-label="Duplicate ${esc(o.name)}" title="Duplicate">⧉</button>
-      <button type="button" class="picon" data-pdel="${o.i}" aria-label="Delete ${esc(o.name)}" title="Delete (Undo brings it back)" ${n < 2 ? "disabled" : ""}>🗑</button></li>`;
+      <button type="button" class="picon" data-pdel="${o.i}" aria-label="Delete ${esc(o.name)}" title="Delete (Undo brings it back)" ${n < 2 ? "disabled" : ""}><svg class=i aria-hidden=true focusable=false><use href=#i-trash></use></svg></button></li>`;
   }).join("");
   const sz = box ? box.size : [0, 0, 0];
-  return `<details class="tool plate" open id="plateTool"><summary>🧩 Plate (${n} object${n > 1 ? "s" : ""}${pl.visible < n ? `, ${n - pl.visible} hidden` : ""})</summary>
+  return `<details class="tool plate" open id="plateTool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-grid></use></svg> Plate (${n} object${n > 1 ? "s" : ""}${pl.visible < n ? `, ${n - pl.visible} hidden` : ""})</summary>
     <p class="help">Click or tap an object to select it. Shift-click to select more. Drag a selected object to move it on the bed.</p>
     ${pl.all_hidden ? `<p class="warn" role="alert">Every object is hidden. Show at least one to print.</p>` : ""}
     <ul class="plist" aria-label="Objects on the plate">${list}</ul>
@@ -97,9 +97,9 @@ function panelHTML() {
       </form>
       <div class="tool-row" role="group" aria-label="Selected objects">
         <button type="button" class="btn small" data-pact="duplicate">⧉ Duplicate</button>
-        <button type="button" class="btn small" data-pact="${allHidden ? "show" : "hide"}">${allHidden ? "👁 Show" : "🙈 Hide"}</button>
+        <button type="button" class="btn small" data-pact="${allHidden ? "show" : "hide"}">${allHidden ? "<svg class=i aria-hidden=true focusable=false><use href=#i-eye></use></svg> Show" : "<svg class=i aria-hidden=true focusable=false><use href=#i-eyeoff></use></svg> Hide"}</button>
         <button type="button" class="btn small" data-pact="lay_flat">⤓ Lay flat</button>
-        <button type="button" class="btn small" data-pact="delete" ${s.length >= n ? "disabled" : ""}>🗑 Delete</button>
+        <button type="button" class="btn small" data-pact="delete" ${s.length >= n ? "disabled" : ""}><svg class=i aria-hidden=true focusable=false><use href=#i-trash></use></svg> Delete</button>
       </div>
       <div class="tool-row" role="group" aria-label="Combine">
         ${grouped ? `<button type="button" class="btn small" data-pact="ungroup">Ungroup</button>` : `<button type="button" class="btn small" data-pact="group" ${s.length < 2 ? "disabled" : ""}>Group</button>`}
@@ -124,7 +124,7 @@ function cutOffset(o) {
 function cutHTML(o) {
   const c = PL.cut, ext = o.size[AX[c.axis]], off = cutOffset(o), j = c.join;
   const num = (id, name, label, val, mn, mx, st) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" name="${name}" value="${val}" min="${mn}" max="${mx}" step="${st}"></div>`;
-  return `<details class="pcut" id="pCut" ${c.open ? "open" : ""}><summary>✂ Cut this object</summary>
+  return `<details class="pcut" id="pCut" ${c.open ? "open" : ""}><summary><svg class=i aria-hidden=true focusable=false><use href=#i-scissors></use></svg> Cut this object</summary>
     <form data-plate="cut" class="pform" aria-describedby="pCutHelp">
       <fieldset class="seg-radio"><legend>Cut across</legend>
         ${["z", "x", "y"].map(a => `<label><input type="radio" name="axis" value="${a}" ${c.axis === a ? "checked" : ""}> ${a.toUpperCase()}${a === "z" ? " (flat, like slicing the top off)" : ""}</label>`).join("")}
@@ -142,7 +142,7 @@ function cutHTML(o) {
         <select id="pCutMat" name="material"><option ${c.material === "PLA" ? "selected" : ""}>PLA</option><option ${c.material === "PETG" ? "selected" : ""}>PETG</option></select></div>
       <label class="check" ${c.axis === "z" ? "hidden" : ""} data-cutfor="xy"><input type="checkbox" name="lay_flat" id="pCutLay" ${c.lay_flat ? "checked" : ""}> Lay the pieces on their cut face (flat side down)</label>
       <p class="help" id="pCutHelp">Fit is <b>Simulated</b>: connector sizes are starting values from ZEIM's split specs, not tested on your printer. Print a small test piece first. The cut is one step: Undo puts the object back.</p>
-      <button class="btn small primary" id="pCutGo">✂ Cut into 2 pieces</button>
+      <button class="btn small primary" id="pCutGo"><svg class=i aria-hidden=true focusable=false><use href=#i-scissors></use></svg> Cut into 2 pieces</button>
     </form></details>`;
 }
 /* ---------- text tool: raised or engraved words on one side of the selected object ---------- */
@@ -152,7 +152,7 @@ function textHTML(o) {
   const t = PL.txt, fonts = PL.ctx.p.capabilities?.fonts || Object.keys(FONT_NAMES);
   const hMax = Math.max(1, Math.floor(Math.max(o.size[0], o.size[1], o.size[2])));
   const num = (id, name, label, val, mn, mx, st) => `<div class="field"><label for="${id}">${label}</label><input id="${id}" type="number" name="${name}" value="${val}" min="${mn}" max="${mx}" step="${st}"></div>`;
-  return `<details class="pcut ptext" id="pText" ${t.open ? "open" : ""}><summary>🔤 Add text</summary>
+  return `<details class="pcut ptext" id="pText" ${t.open ? "open" : ""}><summary><svg class=i aria-hidden=true focusable=false><use href=#i-text></use></svg> Add text</summary>
     <form data-plate="text" class="pform" aria-describedby="pTextHelp">
       <div class="field"><label for="pTxt">Words (up to 60 letters)</label><input id="pTxt" name="text" maxlength="60" value="${esc(t.text)}" placeholder="Your name" autocomplete="off" required></div>
       <fieldset class="seg-radio"><legend>Style</legend>
@@ -166,7 +166,7 @@ function textHTML(o) {
       <details><summary>Move the text on that side (mm)</summary><div class="grid2">
         ${num("pTxtU", "offset_u", "Right / left", t.offset_u, -1000, 1000, 0.5)}${num("pTxtV", "offset_v", "Up / down", t.offset_v, -1000, 1000, 0.5)}</div></details>
       <p class="help" id="pTextHelp">The text sits on the flat side of the object's box; on curved parts some letters may float or sink, and ZEIM tells you. Words are checked like any other words others can see. Undo removes it.</p>
-      <button class="btn small primary" id="pTextGo">🔤 Add text</button>
+      <button class="btn small primary" id="pTextGo"><svg class=i aria-hidden=true focusable=false><use href=#i-text></use></svg> Add text</button>
     </form></details>`;
 }
 function readText(f) {

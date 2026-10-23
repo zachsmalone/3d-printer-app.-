@@ -92,7 +92,7 @@ const GAP_KEY = "zeim_gap_ok";
 const gapDismissed = w => { try { return JSON.parse(sessionStorage.getItem(GAP_KEY) || "[]").includes(w); } catch { return false; } };
 function gapRow(g) {
   if (!g || g.ok !== false || !g.warning || gapDismissed(g.warning)) return "";
-  return `<p class="help gapwarn" role="status">⚠ ${esc(g.warning)} <button type="button" class="btn small" data-gapok="${esc(g.warning)}">Got it, slice anyway</button></p>`;
+  return `<p class="help gapwarn" role="status"><svg class=i aria-hidden=true focusable=false><use href=#i-alert></use></svg> ${esc(g.warning)} <button type="button" class="btn small" data-gapok="${esc(g.warning)}">Got it, slice anyway</button></p>`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest?.("[data-gapok]"); if (!b) return;
@@ -144,7 +144,7 @@ export function panelHTML(hintMode) {
 export function matWarnHTML(m, { ask = false } = {}) {
   const w = P.cat?.materials?.[m]?.warning;
   if (!w) return "";
-  return `<div class="matwarn" ${ask ? `role="alert"` : ""}><p><b>⚠ ${esc(w.title)}</b></p><p>${esc(w.message)}</p><p class="help">${esc(w.tested)}</p>` +
+  return `<div class="matwarn" ${ask ? `role="alert"` : ""}><p><b><svg class=i aria-hidden=true focusable=false><use href=#i-alert></use></svg> ${esc(w.title)}</b></p><p>${esc(w.message)}</p><p class="help">${esc(w.tested)}</p>` +
     (ask ? `<div class="row"><button type="button" class="btn primary" id="spVentOk">${esc(w.confirm)}</button><button type="button" class="btn" id="spVentNo">Pick another material</button></div>` : "") + `</div>`;
 }
 function readPanel() {
@@ -191,7 +191,7 @@ export function wirePanel(getModelId) {
       const paintNote = r.support_paint
         ? `<p class="help">Paint-on supports: ${r.support_paint.enforcers || 0} need / ${r.support_paint.blockers || 0} never. ${esc(r.support_paint.supports_note || r.support_paint.note || "")}</p>`
         : "";
-      out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
+      out.innerHTML = `<p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> ${esc(r.print_time_human || "time unknown")}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-spool></use></svg> ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
         ${costHTML(r)}
         ${paintNote}
@@ -199,7 +199,7 @@ export function wirePanel(getModelId) {
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
-        <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a><a class="btn" href="${r.downloads.stl}" download>⬇ STL</a></div>
+        <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> G-code</a><a class="btn" href="${r.downloads["3mf"]}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> 3MF</a><a class="btn" href="${r.downloads.stl}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> STL</a></div>
         ${HAS_GL ? gcodePreviewHTML() : r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
       wireCost();

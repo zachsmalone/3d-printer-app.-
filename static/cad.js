@@ -309,7 +309,7 @@ const SKETCH_TOOLS = [
   { id: "sdelete", key: "⌫", label: "Delete", sub: "selected", tip: "Delete the selected curves (or tap a curve)." },
 ];
 const CONS = [["horizontal", "Horizontal/Vertical", "H"], ["parallel", "Parallel", "∥"], ["perpendicular", "Perpendicular", "⊥"], ["equal", "Equal", "="],
-  ["tangent", "Tangent", "T"], ["concentric", "Concentric", "◎"], ["coincident", "Coincident", "•"], ["lock", "Lock", "🔒"]];
+  ["tangent", "Tangent", "T"], ["concentric", "Concentric", "◎"], ["coincident", "Coincident", "•"], ["lock", "Lock", "Fx"]];
 
 function toolBtn(t, active) {
   return `<button class="cw-tool" data-tool="${t.id}" aria-pressed="${active === t.id}" data-tip="${esc(t.tip)}" aria-label="${esc(t.label)} (${esc(t.key)}). ${esc(t.tip)}">${IC[t.id] || IC[t.id === "faceoffset" ? "offset" : t.id === "sdelete" ? "del" : "step"]}<span class="lbl">${esc(t.label)}<span class="sub">${esc(t.sub)}</span></span><kbd>${esc(t.key)}</kbd></button>`;

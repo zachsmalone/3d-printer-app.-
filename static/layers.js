@@ -6,7 +6,7 @@ const COLOURS = { outer: "#ff8a3d", inner: "#ffd166", infill: "#b48cff", solid: 
 
 export function layerPreviewHTML() {
   return `<section class="layerprev" aria-labelledby="lpH"><h4 id="lpH">Layer-by-layer preview</h4>
-    <button type="button" class="btn" id="lpOpen">🔍 Show layer-by-layer preview</button>
+    <button type="button" class="btn" id="lpOpen"><svg class=i aria-hidden=true focusable=false><use href=#i-search></use></svg> Show layer-by-layer preview</button>
     <div id="lpBox" hidden>
       <canvas id="lpCanvas" width="640" height="640" role="img" aria-label="Layer preview"></canvas>
       <div class="lprow">
@@ -28,7 +28,7 @@ export function wireLayerPreview(url) {
   const cv = $("#lpCanvas"), rg = $("#lpRange"), info = $("#lpInfo");
   open.onclick = async () => {
     open.disabled = true; open.textContent = "Loading layers…";
-    try { D = await api(url); } catch (e) { open.disabled = false; open.textContent = "🔍 Show layer-by-layer preview"; info.textContent = e.message; $("#lpBox").hidden = false; return; }
+    try { D = await api(url); } catch (e) { open.disabled = false; open.textContent = "Show layer-by-layer preview"; info.textContent = e.message; $("#lpBox").hidden = false; return; }
     open.hidden = true; $("#lpBox").hidden = false;
     rg.max = D.layers.length; rg.value = D.layers.length; cur = D.layers.length - 1;
     const used = new Set(D.layers.flatMap(l => l.paths.map(p => p.k)));

@@ -23,7 +23,7 @@ function testHTML(t, i) {
     <h4>If you see…</h4><ul>${bad}</ul>
     ${t.pick ? `<p><b>Then:</b> ${esc(t.pick)}</p>` : ""}
     ${keys ? `<p class="help">PrusaSlicer settings: ${keys}. ZEIM never changes them for you; you decide.</p>` : ""}
-    <div class="row"><a class="btn" href="${stl}" download>⬇ STL</a><button type="button" class="btn primary" data-calslice="${t.id}">Slice in ZEIM</button></div>
+    <div class="row"><a class="btn" href="${stl}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> STL</a><button type="button" class="btn primary" data-calslice="${t.id}">Slice in ZEIM</button></div>
     <div class="calout" id="calout_${t.id}" aria-live="polite"></div></details></li>`;
 }
 
@@ -50,15 +50,15 @@ async function sliceTest(id, ventOk) {
   out.innerHTML = `<p class="help">Slicing…</p>`;
   try {
     const r = await api(`/api/calibration/${id}/slice`, { method: "POST", body: fd });
-    out.innerHTML = `<p class="slicestats"><span class="pill">⏱ ${esc(r.print_time_human || "time unknown")}</span><span class="pill">🧵 ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}</span></p>
+    out.innerHTML = `<p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> ${esc(r.print_time_human || "time unknown")}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-spool></use></svg> ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}</span></p>
       ${r.temperature_bands_c ? `<p class="help">Temperature changes added: ${r.temperature_bands_c.map(t => t + " °C").join(" → ")} (bottom to top).</p>` : ""}
       <p class="help">${esc(r.printer)}, ${esc(r.material)}, ${r.nozzle} mm nozzle. Time and grams are estimates. ${esc(r.estimate_note)}</p>
       ${(r.temp_notes || []).map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
-      <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a></div>`;
+      <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> G-code</a><a class="btn" href="${r.downloads["3mf"]}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> 3MF</a></div>`;
   } catch (e) {
     if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {
       const w = e.body.detail.warning || {};
-      out.innerHTML = `<div class="matwarn" role="alert"><p><b>⚠ ${esc(w.title || "Ventilation")}</b></p><p>${esc(w.message || e.message)}</p>
+      out.innerHTML = `<div class="matwarn" role="alert"><p><b><svg class=i aria-hidden=true focusable=false><use href=#i-alert></use></svg> ${esc(w.title || "Ventilation")}</b></p><p>${esc(w.message || e.message)}</p>
         <div class="row"><button type="button" class="btn primary" id="calVentOk_${id}">${esc(w.confirm || "I understand, slice it")}</button></div></div>`;
       $(`#calVentOk_${id}`).onclick = () => sliceTest(id, true);
       $(`#calVentOk_${id}`).focus();

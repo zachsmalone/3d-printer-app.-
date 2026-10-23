@@ -304,26 +304,26 @@ function renderTools() {
   const unitSel = `<div class="row" style="justify-content:space-between"><b>${esc(E.p.title)}</b><span class="seg" id="unitSeg">${Object.keys(UNITS).map(u => `<button data-unit="${u}" class="${u === E.unit ? "on" : ""}">${u}</button>`).join("")}</span></div>`;
   const beginner = `<div data-lvl="beginner">
     <p class="help">Pick a job. ZEIM chooses sensible settings — switch to Experienced mode for every tool.</p>
-    <details class="tool smartorient" open><summary>🧭 Smart orient</summary>
+    <details class="tool smartorient" open><summary><svg class=i aria-hidden=true focusable=false><use href=#i-compass></use></svg> Smart orient</summary>
       <p class="help">Turn the model so it prints well. Lay flat puts its largest flat face on the bed; Best position picks the side with the least overhang and support.</p>
       <div class="tool-row"><button type="button" class="btn small" data-orient="lay_flat">⤓ Lay flat</button><button type="button" class="btn small" data-orient="best_orient">✦ Best position</button></div>
       <div class="tool-row"><button type="button" class="btn small ghost" data-rot="rx">+90° X</button><button type="button" class="btn small ghost" data-rot="ry">+90° Y</button><button type="button" class="btn small ghost" data-rot="rz">+90° Z</button></div>
       <p class="help" data-orient-out role="status" aria-live="polite"></p></details>
     <div class="bigtools">
-      <button class="bigtool ${E.tool === "fix" ? "on" : ""}" data-big="fix"><span class="ico">🩹</span><b>Fix</b><small>Repair holes &amp; flipped faces, put it on the bed</small></button>
+      <button class="bigtool ${E.tool === "fix" ? "on" : ""}" data-big="fix"><span class="ico"><svg class=i aria-hidden=true focusable=false><use href=#i-wrench></use></svg></span><b>Fix</b><small>Repair holes &amp; flipped faces, put it on the bed</small></button>
       <button class="bigtool ${E.tool === "scale" ? "on" : ""}" data-big="scale"><span class="ico">↔</span><b>Scale</b><small>Make it bigger or smaller</small></button>
-      <button class="bigtool ${E.tool === "hollow" ? "on" : ""}" data-big="hollow" ${cap.hollow ? "" : "disabled"}><span class="ico">🕳</span><b>Hollow</b><small>Save filament with a wall</small></button>
+      <button class="bigtool ${E.tool === "hollow" ? "on" : ""}" data-big="hollow" ${cap.hollow ? "" : "disabled"}><span class="ico"><svg class=i aria-hidden=true focusable=false><use href=#i-hole></use></svg></span><b>Hollow</b><small>Save filament with a wall</small></button>
       <button class="bigtool ${E.tool === "base" ? "on" : ""}" data-big="base" ${cap.boolean ? "" : "disabled"}><span class="ico">▭</span><b>Add base</b><small>Flat plate for a stronger first layer</small></button>
-      <button class="bigtool ${E.tool === "split" ? "on" : ""}" data-big="split" type="button" aria-pressed="${E.tool === "split" ? "true" : "false"}"><span class="ico">✂</span><b>Split to fit my printer</b><small>Cut into pieces that fit the bed (connectors Simulated)</small></button>
+      <button class="bigtool ${E.tool === "split" ? "on" : ""}" data-big="split" type="button" aria-pressed="${E.tool === "split" ? "true" : "false"}"><span class="ico"><svg class=i aria-hidden=true focusable=false><use href=#i-scissors></use></svg></span><b>Split to fit my printer</b><small>Cut into pieces that fit the bed (connectors Simulated)</small></button>
     </div>
     <div id="bDrawer"></div></div>`;
   const expert = `<div data-lvl="expert">
-    <details class="tool smartorient" open><summary>🧭 Smart orient</summary>
+    <details class="tool smartorient" open><summary><svg class=i aria-hidden=true focusable=false><use href=#i-compass></use></svg> Smart orient</summary>
       <p class="help">Turn the model so it prints well. Lay flat puts its largest flat face on the bed; Best position picks the side with the least overhang and support.</p>
       <div class="tool-row"><button type="button" class="btn small" data-orient="lay_flat">⤓ Lay flat</button><button type="button" class="btn small" data-orient="best_orient">✦ Best position</button></div>
       <div class="tool-row"><button type="button" class="btn small ghost" data-rot="rx">+90° X</button><button type="button" class="btn small ghost" data-rot="ry">+90° Y</button><button type="button" class="btn small ghost" data-rot="rz">+90° Z</button></div>
       <p class="help" data-orient-out role="status" aria-live="polite"></p></details>
-    <details class="tool" open><summary>📐 Move / Rotate / Scale</summary>
+    <details class="tool" open><summary><svg class=i aria-hidden=true focusable=false><use href=#i-ruler></use></svg> Move / Rotate / Scale</summary>
       <form data-form="translate"><div class="grid3t">${lenInput("dx", 0, "Move X")}${lenInput("dy", 0, "Move Y")}${lenInput("dz", 0, "Move Z")}</div><button class="btn small">Move</button></form>
       <form data-form="rotate"><div class="grid3t">${numInput("rx", 0, "Rot X", "°")}${numInput("ry", 0, "Rot Y", "°")}${numInput("rz", 0, "Rot Z", "°")}</div>
         <div class="tool-row"><button class="btn small">Rotate</button><button type="button" class="btn small ghost" data-rot="rx">+90° X</button><button type="button" class="btn small ghost" data-rot="ry">+90° Y</button><button type="button" class="btn small ghost" data-rot="rz">+90° Z</button></div></form>
@@ -332,7 +332,7 @@ function renderTools() {
       <div class="tool-row"><button class="btn small" data-op1="mirror:x">⇋ Mirror X</button><button class="btn small" data-op1="mirror:y">⇋ Mirror Y</button><button class="btn small" data-op1="mirror:z">⇋ Mirror Z</button></div>
       <div class="tool-row"><button class="btn small" data-op1="place:drop">⤓ Drop to bed</button><button class="btn small" data-op1="place:center">◎ Center on bed</button><button class="btn small" data-op1="place:both">Both</button></div>
     </details>
-    <details class="tool smartsplit" open><summary>✂ Smart Split</summary>
+    <details class="tool smartsplit" open><summary><svg class=i aria-hidden=true focusable=false><use href=#i-scissors></use></svg> Smart Split</summary>
       <p class="help">When a model is bigger than your printer bed, ZEIM cuts it into pieces that fit. Join options add magnet holes, dovetail tabs, alignment pins, or plain glue faces. Connector fit is <b>Simulated</b> until you test-print — starting sizes come from ZEIM split specs (e.g. 6×3 mm magnets).</p>
       <form data-form="smart_split">
         <div class="grid2">
@@ -364,34 +364,34 @@ function renderTools() {
           <label class="inl"><input type="checkbox" name="lay_flat" checked> Lay cut face flat on the bed</label><div><button class="btn small">Cut</button></div></form>
       </details>
     </details>
-    <details class="tool"><summary>🕳 Hollow</summary>${cap.hollow ? `<form data-form="hollow"><div class="grid2">${lenInput("wall", 2, "Wall thickness")}${lenInput("drain_diameter", 0, "Drain hole Ø (0 = none)")}</div><button class="btn small">Hollow</button>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-hole></use></svg> Hollow</summary>${cap.hollow ? `<form data-form="hollow"><div class="grid2">${lenInput("wall", 2, "Wall thickness")}${lenInput("drain_diameter", 0, "Drain hole Ø (0 = none)")}</div><button class="btn small">Hollow</button>
       <p class="help">Distance-field method, accurate to about one voxel (reported). Thin plates/lithophanes can't be hollowed.</p></form>` : `<p class="help">Needs manifold3d + scikit-image on the server.</p>`}</details>
     <details class="tool"><summary>▭ Base / brim</summary>${cap.boolean ? `<form data-form="base"><div class="grid3t"><div class="field"><label>Shape</label><select name="style"><option value="outline">Follow outline</option><option value="rect">Rectangle</option><option value="round">Round</option></select></div>${lenInput("margin", 3, "Margin")}${lenInput("thickness", 2, "Thickness")}</div><button class="btn small">Add base</button><p class="help">Thin (0.3–0.6 mm) = brim.</p></form>` : `<p class="help">Needs manifold3d.</p>`}</details>
-    <details class="tool"><summary>🧊 Add / subtract shapes</summary>${cap.boolean ? `<form data-form="boolean" data-ghost="boolean"><div class="grid2"><div class="field"><label>Operation</label><select name="kind"><option value="difference">Subtract (cut out)</option><option value="union">Add (union)</option><option value="intersection">Keep overlap</option></select></div>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg> Add / subtract shapes</summary>${cap.boolean ? `<form data-form="boolean" data-ghost="boolean"><div class="grid2"><div class="field"><label>Operation</label><select name="kind"><option value="difference">Subtract (cut out)</option><option value="union">Add (union)</option><option value="intersection">Keep overlap</option></select></div>
       <div class="field"><label>Shape</label><select name="shape"><option value="cylinder">Cylinder</option><option value="box">Box</option><option value="sphere">Sphere</option></select></div></div>
       <div class="grid3t" data-shape="box">${lenInput("bx", 10, "Width X")}${lenInput("by", 10, "Depth Y")}${lenInput("bz", 10, "Height Z")}</div>
       <div class="grid3t" data-shape="cylinder sphere">${lenInput("dia", 10, "Diameter")}<span data-shape="cylinder">${lenInput("h", 20, "Height")}</span><div class="field" data-shape="cylinder"><label>Axis</label><select name="axis"><option>z</option><option>x</option><option>y</option></select></div></div>
       <div class="grid3t">${lenInput("px", ctr[0], "Center X")}${lenInput("py", ctr[1], "Center Y")}${lenInput("pz", ctr[2], "Center Z")}</div><button class="btn small">Apply</button></form>` : `<p class="help">Boolean operations need manifold3d on the server.</p>`}</details>
-    <details class="tool" id="faceTool"><summary>🎯 On a face (add / cut)</summary>
+    <details class="tool" id="faceTool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-target></use></svg> On a face (add / cut)</summary>
       <p class="help">Pick a flat face found in your model, then add a box or cylinder on it, or cut a hole or pocket into it. Faces are found from the mesh, so sizes and positions are approximate, and the spot is fixed in space (moving the model later will not carry it).</p>
       <div id="faceBox"><button type="button" class="btn small" id="faceLoad">Find faces</button></div>
     </details>
-    <details class="tool"><summary>🔤 Text (emboss / deboss)</summary>${cap.boolean ? `<form data-form="text"><div class="field"><label>Text</label><input name="text" maxlength="60" value="ZEIM"></div>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-text></use></svg> Text (emboss / deboss)</summary>${cap.boolean ? `<form data-form="text"><div class="field"><label>Text</label><input name="text" maxlength="60" value="ZEIM"></div>
       <div class="grid2"><div class="field"><label>Font</label><select name="font">${cap.fonts.map(f => `<option>${f}</option>`).join("")}</select></div><div class="field"><label>Mode</label><select name="mode"><option value="emboss">Emboss (raised)</option><option value="deboss">Deboss (engraved)</option></select></div>
       ${lenInput("height", 8, "Letter height")}${lenInput("depth", 1, "Depth")}<div class="field"><label>Face</label><select name="face"><option>top</option><option>front</option><option>back</option><option>left</option><option>right</option><option>bottom</option></select></div>${numInput("rotation", 0, "Rotate", "°")}${lenInput("offset_u", 0, "Shift →")}${lenInput("offset_v", 0, "Shift ↑")}</div>
       <button class="btn small">Add text</button><p class="help">Placed on the model's flat bounding-box face — curved surfaces may not touch.</p></form>` : `<p class="help">Needs manifold3d.</p>`}</details>
-    <details class="tool"><summary>🩹 Repair &amp; simplify</summary>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-wrench></use></svg> Repair &amp; simplify</summary>
       <form data-form="repair"><label class="inl"><input type="checkbox" name="fix_normals" checked> Fix normals</label> <label class="inl"><input type="checkbox" name="fill_holes" checked> Fill holes</label> <label class="inl"><input type="checkbox" name="remove_duplicates" checked> Remove duplicates</label> <label class="inl"><input type="checkbox" name="keep_largest"> Drop floating bits</label><div><button class="btn small">Repair</button></div></form>
       ${cap.simplify ? `<form data-form="simplify"><div class="field"><label>Keep <em><span id="keepPct">50</span>% of triangles</em></label><input type="range" name="keep_ratio" min="0.05" max="0.95" step="0.05" value="0.5"></div><button class="btn small">Simplify</button></form>` : ""}</details>
-    <details class="tool"><summary>🏷 Named dimensions</summary>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-tag></use></svg> Named dimensions</summary>
       <p class="help">Give a size a name, then type <code>$name</code> instead of a number in a step (✎ on the history). Change it here and every step using it updates.</p>
       <div class="field"><label for="dimTxt">One per line, like: wall = 2.4</label><textarea id="dimTxt" rows="3">${esc(Object.entries(E.p.dims || {}).map(([k, v]) => `${k} = ${v}`).join("\n"))}</textarea></div>
       <button class="btn small" id="dimSave" type="button">Save &amp; update model</button><p class="help" id="dimMsg" role="status" aria-live="polite"></p></details>
-    <details class="tool"><summary>✅ Print check</summary>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-check></use></svg> Print check</summary>
       <div class="grid2"><div class="field"><label for="pcProc">Process</label><select id="pcProc"><option value="fdm">FDM (filament)</option><option value="resin">Resin</option></select></div></div>
       <button class="btn small" id="pcRun" type="button">Check bed fit, overhangs &amp; thin walls</button>
       <div id="pcBox" aria-live="polite"></div></details>
-    <details class="tool"><summary>📏 Measure &amp; info</summary>
+    <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-ruler></use></svg> Measure &amp; info</summary>
       <button class="btn small" id="toggleMeasure">${E.measure ? "Stop measuring" : "Measure two points"}</button>
       <table class="info-table"><tr><td>Size (${E.unit})</td><td>${sz.map(fmt).join(" × ")}</td></tr><tr><td>Volume</td><td>${(a.volume_mm3 / 1000).toFixed(2)} cm³</td></tr><tr><td>Surface area</td><td>${(a.area_mm2 / 100).toFixed(1)} cm²</td></tr>
       <tr><td>Triangles</td><td>${a.triangles.toLocaleString()}</td></tr><tr><td>Watertight</td><td>${a.watertight ? "yes" : "no"} (open edges: ${a.boundary_edges}, non-manifold: ${a.nonmanifold_edges})</td></tr>

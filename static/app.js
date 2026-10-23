@@ -69,14 +69,14 @@ try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unava
 /* ---------- level / mode ---------- */
 const isExpert = () => S.level === "expert";
 const LEVEL_NAME = { beginner: "Beginner", expert: "Experienced" };
-const LEVEL_ICO = { beginner: "🌱", expert: "🛠" };
+const LEVEL_ICO = { beginner: "<svg class=i aria-hidden=true focusable=false><use href=#i-leaf></use></svg>", expert: "<svg class=i aria-hidden=true focusable=false><use href=#i-wrench></use></svg>" };
 const LEVEL_LINE = { beginner: "Beginner mode: ZEIM picks the settings for you.", expert: "Experienced mode: every setting is yours." };
 const LEVEL_SAY = { beginner: "Beginner mode on. ZEIM picks the settings for you.", expert: "Experienced mode on. All the settings are showing." };
 function say(t) { const e = $("#modeStatus"); e.textContent = ""; setTimeout(() => e.textContent = t, 60); }
 function applyLevel(announce = false) {
   localStorage.level = S.level;
   document.body.dataset.level = S.level;
-  $("#modeSel").value = S.level; $("#modeIco").textContent = LEVEL_ICO[S.level]; $("#modeLine").textContent = LEVEL_LINE[S.level];
+  $("#modeSel").value = S.level; $("#modeIco").innerHTML = LEVEL_ICO[S.level]; $("#modeLine").textContent = LEVEL_LINE[S.level];
   document.dispatchEvent(new CustomEvent("zeim:level"));
   $("#beginnerOpts").hidden = isExpert() || S.mode === "trace2d";
   $("#expertOpts").hidden = !isExpert() || S.mode === "trace2d"; $("#lithThk").hidden = !isExpert();
@@ -220,7 +220,7 @@ function revealResult() {
   setTimeout(() => { const v = $("#viewer"); v.style.scrollMarginTop = ($(".topbar").offsetHeight + 8) + "px"; v.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); }, 60);
 }
 function buildDone(r) {                 /* shared success tail: a real build came back */
-  showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "✨ Make it again with these settings";
+  showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "Make it again with these settings";
   setPath(3, "Model ready. Step 3 of 3: save or print it.");
   toast("Your model is ready ✔", "ok");
   revealResult();
@@ -278,7 +278,7 @@ function showBuild(r) {
   $("#stats").innerHTML = `<span class="pill">${MODE_LABEL[r.mode]}</span><span class="pill">${sz} mm</span>` +
     `<span class="pill">${st.triangles.toLocaleString()} triangles</span><span class="pill">${st.bodies.length} ${st.bodies.length > 1 ? "bodies" : "body"}</span>` +
     `<span class="pill ${st.watertight ? "ok" : "bad"}">${st.watertight ? "✔ watertight" : "✖ not watertight"}</span>`;
-  const bw = (r.info?.warnings || []); $("#buildWarn").hidden = !bw.length; $("#buildWarn").innerHTML = bw.map(w => "⚠ " + esc(w)).join("<br>");
+  const bw = (r.info?.warnings || []); $("#buildWarn").hidden = !bw.length; $("#buildWarn").innerHTML = bw.map(w => "<svg class=i aria-hidden=true focusable=false><use href=#i-alert></use></svg> " + esc(w)).join("<br>");
   const notes = r.auto_notes || [];
   $("#autoBox").hidden = !notes.length;
   $("#autoTable").innerHTML = notes.map(n => `<tr><td>${n.label}</td><td><b>${n.value}</b></td><td>${n.why}</td></tr>`).join("");
@@ -336,7 +336,7 @@ async function mbRun(fmt) {
     $("#viewerEmpty").hidden = true; $("#vtools").hidden = false;
     viewer?.load(j.preview, "lithophane"); S.lightOn = false; syncLight();
     const w = j.info.warnings || [];
-    st.textContent = `Parts: ${j.info.parts.join(", ")}.` + (w.length ? " ⚠ " + w.join(" ") : "") + " Tap 💡 Light on to see it lit.";
+    st.textContent = `Parts: ${j.info.parts.join(", ")}.` + (w.length ? " " + w.join(" ") : "") + " Tap Light on to see it lit.";
   } catch (e) { st.textContent = "Couldn't make the box: " + (e.message || "something went wrong"); }
 }
 $("#mbPreview").onclick = () => mbRun("preview"); $("#mb3mf").onclick = () => mbRun("3mf"); $("#mbZip").onclick = () => mbRun("zip");
@@ -413,13 +413,13 @@ function renderHistory() {
   const cards = S.history.slice().reverse().map(b => `
     <li class="hcard ${S.current?.id === b.id ? "cur" : ""}" data-id="${b.id}">
       <button type="button" class="thumbbtn" data-open="${b.id}" aria-label="Open ${esc(b.title)}"><img src="${b.thumb}" alt=""></button>
-      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · 🔒"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
+      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · <svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg>"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
-        <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? "★" : "☆"}</button>
-        <button data-del="${b.id}" aria-label="Delete this build">🗑</button></div></li>`);
+        <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? '<svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg>' : '<svg class=i aria-hidden=true focusable=false><use href=#i-star></use></svg>'}</button>
+        <button data-del="${b.id}" aria-label="Delete this build"><svg class=i aria-hidden=true focusable=false><use href=#i-trash></use></svg></button></div></li>`);
   while (cards.length < Math.min(S.max, 5)) cards.push(`<li class="hslot">Empty slot</li>`);
-  const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap ☆ to keep one.`;
+  const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap the star to keep one.`;
   $("#histList").innerHTML = cards.join("");
 }
 const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -445,9 +445,9 @@ async function loadHistory() { const r = await api("/api/builds"); S.history = r
 function openFull() { renderFull(); $("#dlgFull").showModal(); }
 function renderFull() {
   const allStar = S.history.length > 0 && S.history.every(b => b.favorite);
-  $("#fullMsg").innerHTML = allStar ? `All <b>${S.max}</b> of your builds are starred ★, and ZEIM never removes a starred build. Un-star or delete one to make room.` : `You can keep <b>${S.max} builds</b>. Delete one yourself, or let ZEIM remove the oldest one that isn't starred.`;
+  $("#fullMsg").innerHTML = allStar ? `All <b>${S.max}</b> of your builds are starred, and ZEIM never removes a starred build. Un-star or delete one to make room.` : `You can keep <b>${S.max} builds</b>. Delete one yourself, or let ZEIM remove the oldest one that isn't starred.`;
   $("#btnAutoDel").hidden = allStar;
-  $("#fullList").innerHTML = S.history.map(b => `<div class="fl"><img src="${b.thumb}" alt=""><span><b>${b.favorite ? "★ " : ""}${esc(b.title)}</b><br><small>${MODE_LABEL[b.mode]} · ${ago(b.created)}</small></span>${b.favorite ? `<button class="btn small" data-funstar="${b.id}">Un-star</button>` : ""}<button class="btn small danger" data-fdel="${b.id}">Delete</button></div>`).join("");
+  $("#fullList").innerHTML = S.history.map(b => `<div class="fl"><img src="${b.thumb}" alt=""><span><b>${b.favorite ? '<svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg> ' : ""}${esc(b.title)}</b><br><small>${MODE_LABEL[b.mode]} · ${ago(b.created)}</small></span>${b.favorite ? `<button class="btn small" data-funstar="${b.id}">Un-star</button>` : ""}<button class="btn small danger" data-fdel="${b.id}">Delete</button></div>`).join("");
   $("#btnRetry").disabled = S.history.length >= S.max;
 }
 $("#fullList").onclick = async e => {
@@ -472,18 +472,18 @@ const isPhone = () => matchMedia("(max-width:768px),(pointer:coarse)").matches;
 function slicerDefault() { const v = printInfo.default_slicer; return v === "auto" ? (isPhone() ? "creality" : printInfo.effective_slicer) : v; }
 function slicerArea(b, caps) {
   const dl = b.downloads["3mf"];
-  const links = printInfo.slicers.map(s => `<a class="btn ${s.slicer === slicerDefault() ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === slicerDefault() ? " ★" : ""}</a>`).join("") +
+  const links = printInfo.slicers.map(s => `<a class="btn ${s.slicer === slicerDefault() ? "def" : ""}" href="${s.url}" title="${s.note || "Opens " + s.label}">Open in ${s.label}${s.slicer === slicerDefault() ? ' <svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg><span class="sr-only">(your default)</span>' : ""}</a>`).join("") +
     (printInfo.slicer_links_disabled ? `<p class="muted small" style="grid-column:1/-1">${esc(printInfo.slicer_links_disabled)}</p>` : "");
   if (!isPhone()) {
     // desktop: Creality Print has no verified deep link, so it is a plain download (open the file from your Downloads folder)
-    return `<a class="btn ${slicerDefault() === "creality" ? "def" : ""}" id="crDl" href="${dl}" download="ZEIM-build.3mf" title="Saves a 3MF. Open it in Creality Print.">⬇ Download 3MF for Creality Print${slicerDefault() === "creality" ? " ★" : ""}</a>` + links +
+    return `<a class="btn ${slicerDefault() === "creality" ? "def" : ""}" id="crDl" href="${dl}" download="ZEIM-build.3mf" title="Saves a 3MF. Open it in Creality Print."><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download 3MF for Creality Print${slicerDefault() === "creality" ? ' <svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg><span class="sr-only">(your default)</span>' : ""}</a>` + links +
       `<a class="btn ghost" href="${dl}" download>…or download 3MF for another slicer</a>`;
   }
   const share = caps.share_ui && navigator.share && navigator.canShare && isSecureContext
-    ? `<button type="button" class="btn" id="crShare" disabled>📤 Share… (choose Creality)</button>` : "";
+    ? `<button type="button" class="btn" id="crShare" disabled><svg class=i aria-hidden=true focusable=false><use href=#i-upload></use></svg> Share… (choose Creality)</button>` : "";
   return `<div class="cre" style="grid-column:1/-1">
-      <h5 style="margin:0 0 6px">★ Creality Cloud app <small class="help">(Creality K1 and other Creality printers)</small></h5>
-      <div class="row"><a class="btn primary def" id="crDl" href="${dl}" download="ZEIM-build.3mf">⬇ Download 3MF ★</a>${share}</div>
+      <h5 style="margin:0 0 6px"><svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg> Creality Cloud app <small class="help">(Creality K1 and other Creality printers)</small></h5>
+      <div class="row"><a class="btn primary def" id="crDl" href="${dl}" download="ZEIM-build.3mf"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download 3MF <svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg><span class="sr-only">(your default)</span></a>${share}</div>
       <ol class="help cre-steps"><li>Tap <b>Download 3MF</b>. It is saved in your <b>Files</b> or Downloads.</li>
         <li>Open the file from there, tap <b>Share</b> (or <b>Open in…</b>), then choose <b>Creality</b>.</li>
         <li>Slice and print from the Creality app.</li></ol>
