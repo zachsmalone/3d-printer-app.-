@@ -76,7 +76,8 @@ def test_relief_keeps_only_the_selected_region_and_stays_watertight():
     v, f = m.solid(); t = trimesh.Trimesh(v, f)
     assert t.is_watertight and t.is_winding_consistent
     fv, ff = full.solid()
-    assert len(f) < len(ff) * 0.6
+    fe = trimesh.Trimesh(fv, ff).extents                       # the whole photo is 4:3; the cut-out sun is round
+    assert fe[0] / fe[1] > 1.25 and abs(t.extents[0] - t.extents[1]) < 0.1 * t.extents[0]
     # footprint is a disc: its area is close to pi/4 of its bounding square (a rectangle would be ~1.0)
     ext = t.extents
     top_area = t.area_faces[t.face_normals[:, 2] < -0.99].sum()
