@@ -793,3 +793,43 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 .plate .pover { margin: 6px 0; padding: 8px; border-radius: 10px; }
 .plate .pover .btn { min-height: 44px; }
 @media (max-width: 400px) { .plate .pobj .picon { min-width: 44px; padding: 0; } .plate .pselect { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; } }
+
+/* ===== UI6 (approved 2026-10): split layout, settings search, floating toolbar, line icons, calm brand palette, bigger help, one-line consent ===== */
+.i-red{color:#D93636}.i-amber{color:#C26A00}
+.card .ico .i{width:24px;height:24px}.bigtool .ico .i{width:30px;height:30px}.drop .big .i{width:40px;height:40px}
+/* 6: bigger helper text (was 11-12px) */
+.help,small.help,.card small,.bigtool small,.acc small,.field em,.pp-note{font-size:14px;line-height:1.5}
+/* 5: calmer: flat backgrounds instead of glow gradients; brand blue only for primary actions and focus */
+body{background:var(--bg)!important}
+.hero{background:var(--panel)!important}
+/* 1: desktop ~75/25 view/sidebar split, viewer fills the viewport height (phones: single column, view full width) */
+@media (min-width:961px){
+  .layout{grid-template-columns:minmax(0,3fr) minmax(300px,1fr);max-width:none;grid-auto-flow:row dense}
+  .layout>.stage{grid-column:1}
+  .layout>aside.controls{grid-column:2;position:sticky;top:calc(var(--ui6-top,72px) + 8px);max-height:calc(100dvh - var(--ui6-top,72px) - 24px);overflow:auto}
+  .layout>.stage>.viewer{height:calc(100dvh - var(--ui6-top,72px) - 32px);max-height:none;min-height:420px}
+}
+/* 2: settings search */
+.setsearch{display:flex;gap:8px;align-items:center;margin:4px 0 8px}
+.setsearch input[type=search]{min-height:44px;font-size:16px;flex:1}
+.setsearch .setcount{color:var(--mut);font-size:14px;white-space:nowrap}
+.setnone{color:var(--mut);font-size:14px}
+.ui6-hide{display:none!important}
+/* 3: context-aware floating toolbar over the 3D view */
+.ctxbar{position:relative;align-self:center;margin:-70px auto 14px;z-index:5;display:flex;gap:4px;align-items:center;max-width:calc(100% - 40px);overflow-x:auto;padding:4px;border-radius:14px;background:color-mix(in srgb,#0A0A0A 86%,transparent);color:#F2F2F2;box-shadow:0 4px 16px rgba(0,0,0,.3);scrollbar-width:none}
+.ctxbar[hidden]{display:none}
+.ctxbar .ctxlbl{font-size:13px;color:#C9C9C9;padding:0 8px;white-space:nowrap}
+.ctxbar button{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;font-size:14px;padding:0 10px;cursor:pointer;white-space:nowrap}
+.ctxbar button:hover{background:rgba(255,255,255,.12)}
+.ctxbar button:focus-visible{outline:2px solid #6AA6FF;outline-offset:1px}
+.ctxbar button.pri{background:#0066FF;color:#fff}
+.ctxbar .i{width:20px;height:20px}
+@media (max-width:480px){.ctxbar button span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+/* 6: consent on one line; the full text is one tap away and stays the accessible description */
+.consent1{display:flex;align-items:flex-start;gap:8px;min-height:44px}
+.consent1>span{font-size:15px}
+.consent1>input{min-width:24px;min-height:24px;margin-top:2px}
+.consentmore summary{min-height:44px;display:flex;align-items:center;color:var(--accink);cursor:pointer;font-size:14px}
+.consentmore p{font-size:14px;margin:4px 0 8px}
+.i-fill{fill:currentColor}
+.modepick .ico .i{width:16px;height:16px}

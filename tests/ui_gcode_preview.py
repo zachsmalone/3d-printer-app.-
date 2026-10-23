@@ -4,7 +4,7 @@ layer/height readout, time/filament line, render on demand (no frames while idle
 at 390 and 320 px, DPR capped at 1.5 on a touch phone.
 Optional big-file run: GC_BIG=/path/file.gcode GC_SLICES=<server PHOTO3D_DATA>/slices serves that file as the slice's G-code and reports parse time and the
 longest main-thread task while it streams.   python tests/ui_gcode_preview.py URL"""
-import io, os, shutil, sys, tempfile, time
+import io, os, re, shutil, sys, tempfile, time
 import trimesh
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1].rstrip("/"); bad = []
@@ -69,7 +69,7 @@ def main_run(p, stl, width):
     leg = pg.inner_text("#gcLegend")
     ok(f"{name}: legend names the types", all(t in leg for t in ["Outer wall", "Inner wall", "Infill", "Support", "Skirt", "Travel"]), leg)
     ok(f"{name}: travel hidden by default, walls shown", not pg.is_checked("[data-gct=travel]") and pg.is_checked("[data-gct=outer]"))
-    ok(f"{name}: time/filament line", "⏱" in pg.inner_text("#gcEst") and "g" in pg.inner_text("#gcEst"), pg.inner_text("#gcEst"))
+    ok(f"{name}: time/filament line", "filament" in pg.inner_text("#gcEst") and re.search(r"\d+ g", pg.inner_text("#gcEst")), pg.inner_text("#gcEst"))
     pg.wait_for_timeout(400)
     lit = lit_pixels(pg); lines0 = pg.evaluate("window.__gcLines")
     ok(f"{name}: lines are drawn", lit > 150 and lines0 > 100, (lit, lines0))

@@ -115,7 +115,7 @@ export function wireGcodePreview(url, est = {}) {
       streaming = false; clearTimeout(streamTimer); progWrap.hidden = true; frame(m.stats.bounds); rg.max = Math.max(1, layers.length); if (follow) show(layers.length);
       window.__gcDone = { layers: m.layers, ms: m.ms, bytes: m.bytes, segments: m.stats.extrudeSegments + m.stats.travelSegments };
       const t = est.time || m.meta.time || "", g = est.grams ?? m.meta.filamentG, mm = est.mm ?? m.meta.filamentMm ?? m.stats.filamentMm;
-      $("#gcEst").textContent = [t && `⏱ ${t}`, g != null && `🧵 about ${g} g`, mm && `${(mm / 1000).toFixed(2)} m filament`].filter(Boolean).join(" · ");
+      $("#gcEst").textContent = [t && `${t}`, g != null && `about ${g} g`, mm && `${(mm / 1000).toFixed(2)} m filament`].filter(Boolean).join(" · ");
       if (!m.layers) warn("No printed layers were found in this G-code.");
       worker.terminate();
     } else if (m.kind === "error") { progWrap.hidden = true; warn(`Preview unavailable: ${m.message}. The G-code download still works.`); worker.terminate(); }
