@@ -18,6 +18,7 @@
     return "other";
   }
 
+  function utf8Len(s) { let n = 0; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); n += c < 0x80 ? 1 : c < 0x800 ? 2 : (c >= 0xd800 && c < 0xdc00) ? (i++, 4) : 3; } return n; }
   class GcodeParser {
     constructor(opts = {}) {
       this.onLayer = opts.onLayer || (() => {});
@@ -30,10 +31,13 @@
       this.layer = null; this.layerCount = 0; this.lastLayerZ = null;
       this.stats = { lines: 0, moves: 0, extrudeSegments: 0, travelSegments: 0, filamentMm: 0, bounds: [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity] };
       this.meta = {};  // estimated time / filament read from slicer comments
+      // code panel: byte + line offset of each layer's first line (the ;LAYER_CHANGE / Z lift before it when there is one)
+      this.byte = 0; this.lineNo = 0; this.curByte = 0; this.curLine = 0; this.mark = null;
     }
     _newLayer(z) {
       this._flush();
-      this.layer = { index: this.layerCount++, z, buf: TYPES.map(() => []), filamentMm: 0, height: this.lastLayerZ == null ? z : z - this.lastLayerZ };
+      const at = this.mark || { byte: this.curByte, line: this.curLine }; this.mark = null;
+      this.layer = { index: this.layerCount++, z, byte: at.byte, line: at.line, buf: TYPES.map(() => []), filamentMm: 0, height: this.lastLayerZ == null ? z : z - this.lastLayerZ };
       this.lastLayerZ = z;
     }
     _flush() {
@@ -43,7 +47,7 @@
       const pos = new Float32Array(total), groups = [];
       let o = 0;
       L.buf.forEach((b, i) => { if (!b.length) return; pos.set(b, o); groups.push({ type: TYPES[i], start: o / 3, count: b.length / 3 }); o += b.length; });
-      this.onLayer({ index: L.index, z: Math.round(L.z * 1000) / 1000, height: Math.round(L.height * 1000) / 1000, filamentMm: L.filamentMm, positions: pos, groups });
+      this.onLayer({ index: L.index, z: Math.round(L.z * 1000) / 1000, height: Math.round(L.height * 1000) / 1000, filamentMm: L.filamentMm, byte: L.byte, line: L.line, positions: pos, groups });
       this.layer = null;
     }
     _emitPend() { const q = this.pend; if (q) { this.pend = null; this.layer.buf[TYPE_INDEX[q.k]].push(q.a, q.b, q.c, q.x, q.y, q.z); } }
@@ -70,13 +74,16 @@
     }
     push(text) {
       const s = this.rest + text;
-      let i = 0, n;
-      while ((n = s.indexOf("\n", i)) !== -1) { this._line(s.slice(i, n)); i = n + 1; }
+      let i = 0, n; const ascii = !/[^\x00-\x7f]/.test(text);   // fast path: byte length == char length
+      if (ascii) while ((n = s.indexOf("\n", i)) !== -1) { this._line(s.slice(i, n)); this.byte += n - i + 1; this.lineNo++; i = n + 1; }
+      else while ((n = s.indexOf("\n", i)) !== -1) { const raw = s.slice(i, n); this._line(raw); this._adv(raw, false); i = n + 1; }
       this.rest = s.slice(i);
     }
-    end() { if (this.rest) { this._line(this.rest); this.rest = ""; } this._flush(); return { layers: this.layerCount, stats: this.stats, meta: this.meta }; }
+    _adv(raw, ascii) { this.byte += (ascii ? raw.length : utf8Len(raw)) + 1; this.lineNo++; }
+    end() { if (this.rest) { this._line(this.rest); this._adv(this.rest, false); this.rest = ""; } this.stats.bytes = this.byte; this._flush(); return { layers: this.layerCount, stats: this.stats, meta: this.meta }; }
     _comment(c) {
       if (c.startsWith("TYPE:")) { this.type = typeOf(c.slice(5)); return; }
+      if (c.startsWith("LAYER_CHANGE")) { this.mark = { byte: this.curByte, line: this.curLine }; return; }
       let m;
       if ((m = /^\s*estimated printing time \(normal mode\)\s*=\s*(.+)$/.exec(c))) this.meta.time = m[1].trim();
       else if ((m = /^\s*filament used \[g\]\s*=\s*([\d.]+)/.exec(c))) this.meta.filamentG = +m[1];
@@ -84,7 +91,7 @@
       else if ((m = /^TIME:(\d+)/.exec(c))) this.meta.seconds = +m[1];
     }
     _line(raw) {
-      this.stats.lines++;
+      this.stats.lines++; this.curByte = this.byte; this.curLine = this.lineNo;
       let line = raw, sc = line.indexOf(";");
       if (sc !== -1) { this._comment(line.slice(sc + 1).trim()); line = line.slice(0, sc); }
       line = line.trim(); if (!line) return;
@@ -122,8 +129,10 @@
       const extruding = de > 1e-9 && moved;
       if (extruding) {
         if (this.layer == null || Math.abs(nz - this.layer.z) > 1e-4) this._newLayer(nz);
+        else if (this.mark && this.mark.hop) this.mark = null;   // that Z move was a hop inside the layer
         this.layer.filamentMm += de; this.stats.filamentMm += de;
       }
+      else if (nz !== this.z && this.layer && this.mark == null) this.mark = { byte: this.curByte, line: this.curLine, hop: true };   // Z lift before the next layer
       const kind = extruding ? this.type : "travel";
       if (moved || nz !== this.z) {
         if (code === "G2" || code === "G3") this._arc(code === "G2", nx, ny, nz, w, kind);
