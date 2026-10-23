@@ -133,3 +133,20 @@ def test_api_slices_a_4_object_plate_as_one_plate():
     gx = (a["max"][0] + b["min"][0]) / 2 + off[0] if b["min"][0] > a["max"][0] else None
     if gx is not None:
         assert not any(abs(x - gx) < 1.0 and a["min"][1] + off[1] + 2 < y < a["max"][1] + off[1] - 2 for x, y in zip(xs, ys))
+
+
+@pytest.mark.skipif(not HAVE_SLICER, reason="PrusaSlicer not installed")
+def test_api_slice_skips_off_bed_objects_with_a_warning_instead_of_refusing():
+    c = U("Mk")
+    pid = _plate4(c, 6, 100)
+    r = c.post(f"/api/edit/{pid}/op", json={"op": "plate", "params": {"action": "arrange", "gap": 5, "printer_id": "creality_k1"}})
+    over = r.json()["report"]["arrange"]["overflow"]
+    assert len(over) == 2
+    s = c.post("/api/slice", data={"model_id": pid, "printer_id": "creality_k1", "nozzle": "0.4"})
+    assert s.status_code == 200, s.text                                # warned, never blocked
+    j = s.json()
+    assert j["skipped_objects"] == [f"Object {i + 1}" for i in over] and j["plate_objects"] == 4
+    assert "Split" in j["skipped_note"] and all(n in j["skipped_note"] for n in j["skipped_objects"])
+    assert j["model_size_mm"][0] <= 220 and j["model_size_mm"][1] <= 220
+    ok = c.post("/api/slice", data={"model_id": _plate4(c, 2, 20), "printer_id": "creality_k1", "nozzle": "0.4"}).json()
+    assert ok["skipped_objects"] == [] and ok["skipped_note"] == ""

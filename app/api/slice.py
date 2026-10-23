@@ -99,6 +99,7 @@ def slice_model(
     support_paint: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
+    plate_objs, skipped = None, []
     if bool(file) == bool(model_id):
         _fail(400, "bad_request", "Send either an STL file or a model id (not both, not neither).")
     opts = {"preset": preset, "layer_height": layer_height, "walls": walls, "top_bottom": top_bottom, "infill": infill,
@@ -148,6 +149,10 @@ def slice_model(
         else:
             shutil.copyfile(resolve_model(model_id, actor), work / "input.stl")  # type: ignore[arg-type]
             stl = work / "input.stl"
+            plate_objs, skipped = plate_on_bed(model_id, prof)
+            if skipped and plate_objs:              # warnings never block: slice what's on the bed, name the rest
+                import trimesh as _tm
+                stl.write_bytes(_tm.util.concatenate(plate_objs).export(file_type="stl"))
         fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit or fit, info=(scaling := {}))
         paint_info = None
         model_for_engine = work / "model.stl"
@@ -172,8 +177,8 @@ def slice_model(
                     paint_info = {**paint_info, "supports_forced": "auto",
                                   "supports_note": "You painted areas that need supports, so ZEIM turned Supports on (Auto). You can still pick Everywhere."}
         parts = None
-        if model_id and model_for_engine == work / "model.stl":
-            parts = plate_parts(model_id, work, scaling.get("scale", 1.0))
+        if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
+            parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
         res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
                                    bounds_stl=work / "model.stl", parts=parts)
     except eng.SliceError as e:
@@ -196,6 +201,9 @@ def slice_model(
         "slice_id": slice_id,
         "profile": prof.id,
         "plate_objects": len(parts) if parts else 1,
+        "skipped_objects": skipped,
+        "skipped_note": (f"Skipped {len(skipped)} object{'s' * (len(skipped) > 1)} off the bed: {', '.join(skipped)}. "
+                         "Only the objects on the bed were sliced. Split them onto another plate to print them too.") if skipped else "",
         "gcode_url": f"/api/slice/{slice_id}/gcode",
         "print_time_seconds": res.print_time_seconds,
         "print_time_human": eng.humanize(res.print_time_seconds),
@@ -224,24 +232,40 @@ def fit_scale(extents, limits, margin: float = FIT_MARGIN_MM) -> float:
     return min(1.0, min(u / d for u, d in zip(usable, extents) if d > 0))
 
 
-def plate_parts(model_id: str, work: Path, scale: float = 1.0) -> list[Path] | None:
-    """A plate-editor project with 2+ printable objects -> one STL per object, placed exactly where the whole
-    (already fitted) model.stl puts them, so PrusaSlicer gets every object of the plate as separate objects."""
-    import trimesh
+def plate_on_bed(model_id: str, prof) -> tuple[list | None, list[str]]:
+    """Plate-editor project -> (visible objects on the chosen printer's bed, names of visible objects that are off it).
+    Bed is centred on (0, 0) like the plate editor. Not a plate / nothing on the bed -> (None or objs, [])."""
     from app.core import plate
     from app.services import editproj
     from app.services.history import store
     try:
         meta = store.get(model_id)
         if not meta or meta.get("kind") != "edit":
-            return None
+            return None, []
         m = editproj.mesh_at(model_id, meta)
         L = editproj.layout_at(meta, m)
         if not L:
-            return None
-        objs = [o for o, h in zip(plate.objects(m, L), L["hidden"]) if not h]
-        if len(objs) < 2:
-            return None
+            return None, []
+        hx, hy, tol = prof.bed_x / 2, prof.bed_y / 2, 0.5
+        on, off = [], []
+        for i, (o, h) in enumerate(zip(plate.objects(m, L), L["hidden"])):
+            if h:
+                continue
+            lo, hi = o.bounds
+            inside = lo[0] >= -hx - tol and hi[0] <= hx + tol and lo[1] >= -hy - tol and hi[1] <= hy + tol
+            (on if inside else off).append((i, o))
+        if not on:                          # nothing on the bed: slice as before (the bed-fit check explains)
+            return [o for _, o in off], []
+        return [o for _, o in on], [f"Object {i + 1}" for i, _ in off]
+    except Exception:
+        return None, []
+
+
+def plate_parts(objs: list, work: Path, scale: float = 1.0) -> list[Path] | None:
+    """2+ plate objects -> one STL per object, placed exactly where the whole (already fitted) model.stl puts them,
+    so PrusaSlicer gets every object of the plate as separate objects."""
+    import trimesh
+    try:
         lo_o = np.min([o.bounds[0] for o in objs], axis=0)
         lo_m = trimesh.load(str(work / "model.stl"), force="mesh").bounds[0]
         t = lo_m - scale * lo_o
