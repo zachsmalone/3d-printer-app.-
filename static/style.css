@@ -550,7 +550,7 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 
 /* v2 nav: six tabs (Showcase, Slicer, CAD, Lithophane, Smart Fix, Account); feed-style Showcase; tool cards */
 .nav button{white-space:nowrap}
-@media (min-width:769px) and (max-width:1100px){.nav button span{display:none}.nav button{padding:var(--s2) var(--s3)}}
+@media (min-width:769px) and (max-width:1440px){.nav button span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}.nav button{padding:var(--s2) var(--s3)}}
 @media (max-width:768px){.topbar .nav button{font-size:11px;min-width:0;flex:1 1 0;letter-spacing:-.01em}.topbar .nav button span{overflow:hidden;text-overflow:ellipsis;max-width:100%}
   .topbar .nav button.on .i{width:44px;padding:2px 10px}}
 .feedbar{gap:var(--s2);align-items:center;flex-wrap:wrap;margin:var(--s2) 0}
@@ -834,3 +834,16 @@ body{background:var(--bg)!important}
 .consentmore p{font-size:14px;margin:4px 0 8px}
 .i-fill{fill:currentColor}
 .modepick .ico .i{width:16px;height:16px}
+
+/* FDM / Resin switch ("My printer") + header must never be wider than the viewport */
+.topbar{max-width:100%;box-sizing:border-box;min-width:0}.topbar>*{min-width:0}.topbar .brand,.topbar .themetoggle,.topbar #lookBtn{flex-shrink:0}
+.kindpick{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill,999px);background:var(--sunk,var(--panel2));flex-shrink:0}
+.kindpick .kp-lbl{font-size:var(--fs-xs,12px);color:var(--mut);padding:0 6px 0 8px;white-space:nowrap}
+.kindpick button{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:44px;min-width:44px;padding:0 10px;border:0;border-radius:var(--r-pill,999px);background:none;color:var(--mut);font:inherit;font-weight:600;cursor:pointer}
+.kindpick button[aria-pressed=true]{background:var(--tint,var(--panel));color:var(--accink,var(--txt));box-shadow:0 0 0 1px var(--acc2,var(--acc)) inset}
+.kindpick .i{width:18px;height:18px}
+.nav button.kind-primary{order:-1}.nav button[data-view=showcase]{order:-2}
+@media (max-width:1100px) and (min-width:769px){.kindpick .kp-lbl{display:none}}
+@media (max-width:768px){.topbar{flex-wrap:wrap}.topbar .themetoggle,.topbar #lookBtn{order:4}.kindpick{order:50;flex:1 0 100%;justify-content:center}.kindpick button{flex:1 1 0}}
+.kindnote{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;background:var(--panel)}
+.kindnote .x{margin-left:auto;min-width:44px;min-height:44px}
