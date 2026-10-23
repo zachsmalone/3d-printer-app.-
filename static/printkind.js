@@ -87,7 +87,8 @@ document.addEventListener("zeim:printkind", syncLithKind);
 setTimeout(syncLithKind, 0);
 
 /* S2: Print dialog with Resin chosen: no FDM slicers; "Open in TorchC0" instead */
-document.querySelector("#printToTorch")?.addEventListener("click", () => {
+document.querySelector("#printToTorch")?.addEventListener("click", () => {   // E: carries the model (static/handoff.js)
+  if (window.zeimHandoff?.openInTorch) { window.zeimHandoff.openInTorch(); return; }
   document.querySelector("#dlgPrint")?.close(); location.hash = "#torchc0";
 });
 
@@ -103,3 +104,6 @@ export function photoTips(host, where = "afterend") {
 }
 window.zeimPhotoTips = photoTips;
 photoTips(document.querySelector("#viewCreate #drop"));
+/* select mode (separate branch, static/selectmode.js) builds #selPanel itself: put the tip under its first line when present */
+const selTips = () => photoTips(document.querySelector("#selPanel #selSay"));
+setTimeout(selTips, 0); document.addEventListener("zeim:file", selTips); document.addEventListener("click", e => { if (e.target.closest?.("#selOpen")) selTips(); });

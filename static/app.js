@@ -706,3 +706,5 @@ document.getElementById("skipLink")?.addEventListener("click", e => {
   e.preventDefault(); m.tabIndex = -1; m.focus(); m.scrollIntoView?.({ block: "start" });
 });
 window.__errText = errText;   // tests
+/* E: Send to… / Back from CAD reopens the Studio model (static/handoff.js) */
+document.addEventListener("zeim:open-build", async e => { try { const r = await api("/api/builds/" + encodeURIComponent(e.detail)); if (S.current?.id) return; S.mode = r.mode; applyMode(); showBuild(r); } catch { } });

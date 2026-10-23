@@ -49,6 +49,14 @@
       <a role="menuitem" id="cwToSlicer" href="#">Open in Slicer &amp; plate editor</a>
     </div>
   </div>
+  <div class="cw-menu">
+    <button class="cw-btn wide" id="cwSendTo" aria-haspopup="menu" aria-expanded="false" title="Send this design to another section">Send to ▾</button>
+    <div class="cw-pop" id="cwSendToMenu" role="menu" hidden>
+      <a role="menuitem" id="cwSendSlicer" href="#" data-kind="fdm">FDM Slicer</a>
+      <a role="menuitem" id="cwSendTorch" href="#" data-kind="resin">TorchC0 (resin)</a>
+      <small class="cw-units-help" id="cwSendNote"></small>
+    </div>
+  </div>
   <div class="cw-menu cw-more">
     <button class="cw-btn" id="cwMore" aria-haspopup="menu" aria-expanded="false" aria-label="More: open, export, units, view and look" title="More"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
     <div class="cw-pop" id="cwMoreMenu" role="menu" aria-label="More" hidden></div>

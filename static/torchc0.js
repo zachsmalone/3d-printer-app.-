@@ -81,7 +81,7 @@ function wire() {
     const nm = shownName(f.name) || "(unnamed file)";
     if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, but you can still press Prepare for resin and TorchC0 will check the file itself.`; return; }
     st.textContent = `${nm}, ${kb(f.size)}, ready. Press Prepare for resin.`; };
-  inp.addEventListener("change", show);
+  inp.addEventListener("change", () => { delete document.body.dataset.torchStl; show(); });   // a new model: Send to… uses it, not the old result
   // tapping anywhere on the drop zone opens the picker (phones can't drop); the input itself already does
   drop.addEventListener("click", e => { if (e.target !== inp && !e.target.closest("a,button,label")) inp.click(); });
   ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
@@ -117,7 +117,7 @@ function wire() {
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
       const r = await api("/api/resin/prepare", { method: "POST", body: fd }), e = r.estimate;
-      last.rep = r;
+      last.rep = r; document.body.dataset.torchStl = r.downloads.stl;   // Send to… hands over the prepared model
       const lc = r.layer_check || { islands: [], suction: [] }, nI = lc.islands.length, nS = lc.suction.length;
       const costTxt = e.cost == null ? "<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> enter a price for a cost estimate" : `<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> about ${esc(money(e.cost, $("#rzCur").value))} (estimate)`;
       out.innerHTML = `<h2 class="rzResHead">Result</h2><div id="rzView" class="rzView" role="img" aria-label="3D view of the prepared model: red dots are islands, orange dots are suction cups" style="position:relative;width:100%;height:min(60vw,360px);min-height:220px;border-radius:8px;overflow:hidden"></div>
@@ -139,11 +139,14 @@ function wire() {
   }
 }
 
-async function load() {
+let loading = null;
+function load() { return loading || (loading = load1().finally(() => { loading = null; })); }   // one build of the panel even when called twice
+async function load1() {
   if (cat) return;
-  try { cat = await api("/api/resin/catalog"); $("#torchPanel").innerHTML = panelHTML(); wire(); }
+  try { cat = await api("/api/resin/catalog"); $("#torchPanel").innerHTML = panelHTML(); wire(); document.dispatchEvent(new CustomEvent("zeim:torchc0-ready")); }
   catch (e) { cat = null; $("#torchPanel").innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`; }
 }
 document.addEventListener("zeim:torchc0-shown", load);
 document.addEventListener("zeim:level", () => { const d = $("#rzAdv"); if (d) d.open = document.body.dataset.level === "expert"; });   // S9: Beginner sees preset + Hollow/Supports
+document.addEventListener("zeim:torchc0-file", () => load());   // Send to… (static/handoff.js) fills the file once the panel exists
 if (location.hash.startsWith("#torchc0") || location.hash.startsWith("#resin")) load();

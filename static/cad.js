@@ -1459,3 +1459,37 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
   };
   reg(); if (!reg.done) addEventListener("DOMContentLoaded", reg);
 }
+
+/* E: Send to… (CAD → FDM Slicer / TorchC0) and the one-tap way back. The Studio / Slicer / TorchC0 side is static/handoff.js. */
+{
+  const units = () => { try { return localStorage.getItem("zeim.cad.units") || "mm"; } catch { return "mm"; } };
+  const sl = $("#cwSendSlicer"), tc = $("#cwSendTorch");
+  const applyKind = () => {
+    let kind = "fdm"; try { kind = localStorage.getItem("zeim.printKind") === "resin" ? "resin" : "fdm"; } catch { }
+    document.body.dataset.printKind = kind; sl.hidden = kind !== "fdm"; tc.hidden = kind !== "resin";
+    $("#cwSendNote").textContent = kind === "resin" ? "Your printer type is Resin. Switch to FDM on the main page to use the Slicer." : "Your printer type is FDM. Switch to Resin on the main page to use TorchC0.";
+  };
+  applyKind();
+  addEventListener("pageshow", () => { document.documentElement.classList.remove("handing"); applyKind(); });
+  addEventListener("storage", e => { if (e.key === "zeim.printKind") applyKind(); });
+  const mark = to => { try { localStorage.setItem("eunit", units()); sessionStorage.setItem("zeim.back", JSON.stringify({ label: "CAD", url: `/static/cad.html?bid=${S.bid}`, to, t: Date.now() })); } catch { } };
+  const leave = (url, to) => {
+    if (!S.bid) { msg("Make a solid first: nothing to send yet."); return; }
+    document.dispatchEvent(new CustomEvent("zeim:save-now")); mark(to);
+    document.documentElement.classList.add("handing"); setTimeout(() => { location.href = url; }, 120);
+  };
+  const close = () => { $("#cwSendToMenu").hidden = true; $("#cwSendTo").setAttribute("aria-expanded", "false"); };
+  $("#cwSendTo").onclick = () => { const m = $("#cwSendToMenu"), open = m.hidden; m.hidden = !open; $("#cwSendTo").setAttribute("aria-expanded", String(open)); if (open) m.querySelector("a:not([hidden])")?.focus(); };
+  $("#cwSendToMenu").addEventListener("keydown", e => { if (e.key === "Escape") { close(); $("#cwSendTo").focus(); } });
+  document.addEventListener("click", e => { if (!e.target.closest("#cwSendTo, #cwSendToMenu")) close(); });
+  sl.onclick = e => { e.preventDefault(); leave(`/?edit=${encodeURIComponent(S.bid || "")}#slicer`, "FDM Slicer"); };
+  tc.onclick = e => { e.preventDefault(); leave(`/?resin=${encodeURIComponent(S.bid || "")}#torchc0`, "TorchC0"); };
+  $("#cwToSlicer").addEventListener("click", () => { if (S.bid) { document.dispatchEvent(new CustomEvent("zeim:save-now")); mark("FDM Slicer"); } });
+  const q = new URLSearchParams(location.search), from = q.get("from"), back = q.get("back");
+  if (from && back && back.startsWith("/") && !back.startsWith("//")) {
+    const a = document.createElement("a"); a.className = "backchip cad"; a.id = "backChip"; a.href = back;
+    a.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg> Back to ${esc(from)}`;
+    a.addEventListener("click", () => document.dispatchEvent(new CustomEvent("zeim:save-now")));
+    document.body.append(a);
+  }
+}

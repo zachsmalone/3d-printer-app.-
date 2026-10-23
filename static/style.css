@@ -1006,3 +1006,19 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 @media (max-width:768px){.safarinote{top:auto;bottom:calc(var(--tabbar-h,64px) + 44px + env(safe-area-inset-bottom))}}
 .saveind.inline{position:static;opacity:.8;white-space:nowrap}
 @media (max-width:768px){.saveslot{display:none}}
+/* E: Send to… */
+.sendlist{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
+.sendlist .btn.sendto{width:100%;min-height:56px;display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px}
+.sendlist .btn.sendto small{color:var(--mut);font-weight:400}
+.sendtobtn{min-height:44px}
+.backchip{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 76px);z-index:30;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;background:#0A0A0A;color:#fff;text-decoration:none;font-weight:600;box-shadow:0 4px 14px rgba(10,10,10,.2)}
+[data-theme="dark"] .backchip{background:#F2F2F2;color:#0A0A0A}
+.backchip[hidden]{display:none}
+body>.backchip.cad{top:60px}
+@media (max-width:768px){.backchip{top:auto;bottom:calc(var(--tabbar-h,64px) + 96px + env(safe-area-inset-bottom))}}
+html.handing main.page:not([hidden]),html.handing .cw-main{opacity:.4;transition:opacity .12s ease}
+@media (prefers-reduced-motion:reduce){html.handing main.page:not([hidden]),html.handing .cw-main{transition:none}}
+#viewTorch .pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sendfab{position:fixed;right:12px;bottom:12px;z-index:31;min-height:44px;border-radius:999px;box-shadow:0 4px 14px rgba(10,10,10,.2)}
+.sendfab[hidden]{display:none}
+@media (max-width:768px){.sendfab{bottom:calc(var(--tabbar-h,64px) + 44px + env(safe-area-inset-bottom))}}
