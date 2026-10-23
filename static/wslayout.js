@@ -61,7 +61,7 @@
       g.addEventListener("pointerup", end); g.addEventListener("pointercancel", end);
       g.addEventListener("click", function () { if (p.justDragged) { p.justDragged = false; return; } var s = state[p.id]; s.edge = EDGES[(EDGES.indexOf(s.edge || "top") + 1) % 4]; s.t = s.t || 0; save(); layout(); g.focus(); });
       w.querySelector(".zws-min").onclick = function () { state[p.id].min = true; save(); layout(); w.querySelector(".zws-chip").focus(); };
-      w.querySelector(".zws-chip").onclick = function () { if (p.justDragged) { p.justDragged = false; return; } p.pri = Date.now(); state[p.id].min = false; save(); layout(); };
+      w.querySelector(".zws-chip").onclick = function () { if (p.justDragged) { p.justDragged = false; return; } p.pri = p.chipPri = Date.now(); state[p.id].min = false; save(); layout(); };
       var hb = w.querySelector(".zws-hide"); if (hb) hb.onclick = function () { setHidden(p.id, true); };
       var rs = w.querySelector(".zws-rs");
       if (rs) { var rz = null;
@@ -108,7 +108,8 @@
         return c;
       }
       for (var i = 0; i < order.length; i++) { for (var k = 0; k < shrink.length; k++) { var c = fit(order[i], k, !i); if (c) return c; if (!order[i]) break; } }
-      if (!s.min) {   // still no room: show it as a chip for now (not saved), tap opens it (a core panel too, rather than lying on top of the panel just opened)
+      var yields = !p.core || P.some(function (q) { return q !== p && (q.chipPri || 0) > (p.pri || 0); });   // a core panel only yields to a panel the user just opened from its chip
+      if (yields && !s.min) {   // still no room: show it as a chip for now (not saved), tap opens it
         w.classList.add("min", "auto-min"); w.classList.toggle("v", !!s.edge && vert); w.classList.toggle("h", !!s.edge && !vert); w.dataset.edge = s.edge || "free"; w.style.maxWidth = box.w + "px"; w.style.maxHeight = box.h + "px"; W = Math.min(w.getBoundingClientRect().width, box.w); H = Math.min(w.getBoundingClientRect().height, box.h);
         for (var j = 0; j < order.length; j++) { var c2 = fit(order[j], 0, !j); if (c2) return c2; }
         var c3 = cands("", 0, W, H).find(function (r) { return !obs.some(function (b) { return hit(r, b); }); });   // anywhere free
