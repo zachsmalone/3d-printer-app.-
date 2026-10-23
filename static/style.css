@@ -1071,3 +1071,6 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 @media (max-width:1000px){.a3grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.a3out{grid-column:1/-1}}
 @media (max-width:640px){.a3grid{grid-template-columns:minmax(0,1fr)}.a3drop{min-height:140px}}
 @media (prefers-reduced-motion:reduce){.a3spin{animation:none}}
+/* 2D→3D made the phone tab bar 9 wide (9 x 44 px > 390). On phones Learn leaves the bar; it stays one tap away
+   from Showcase ("Learn" button) and the home tiles. */
+@media (max-width:420px){.topbar .nav [data-view=learn]{display:none}}
