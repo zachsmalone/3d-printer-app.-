@@ -54,7 +54,7 @@ def favorite(iid: str, body: dict | None = None, actor: Actor = Depends(get_acto
         raise HTTPException(e.status, e.msg)
     if not actor.user:
         raise HTTPException(401, "Make a free account to save favorites.")
-    if not ratelimit.hit("fav:" + actor.sid, 240, 3600):
+    if not config.TESTING_MODE and not ratelimit.hit("fav:" + actor.sid, 240, 3600):
         raise HTTPException(429, "That's a lot of taps. Please wait a little.")
     want = (body or {}).get("favorite")
     want = (not social.is_fav(actor.sid, iid)) if want is None else bool(want)
@@ -128,7 +128,7 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
         raise HTTPException(e.status, e.msg)
     if not catalog.is_public(i):
         raise HTTPException(403, "Print photos can only be added to public projects.")
-    if not (ratelimit.hit("printphoto:" + actor.sid, 10, 3600) and ratelimit.hit("printphotoip:" + _ip(request), 40, 3600)):
+    if not config.TESTING_MODE and not (ratelimit.hit("printphoto:" + actor.sid, 10, 3600) and ratelimit.hit("printphotoip:" + _ip(request), 40, 3600)):
         raise HTTPException(429, "That's a lot of photos for one hour. Please wait a while.")
     data = photo.file.read(MAX_PRINT_PHOTO + 1)
     if len(data) > MAX_PRINT_PHOTO:

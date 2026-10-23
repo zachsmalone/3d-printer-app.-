@@ -57,7 +57,7 @@ def _allowed(sid: str, now: float, source: str = "generate") -> bool:
     """Per-account hourly limit. db mode: SQLite counter (shared by all workers); json mode: in-process.
     Mesh edit/CAD imports have their own (larger) budget: opening your own files is cheap and frequent."""
     limit = config.EDIT_UPLOADS_PER_HOUR if source == "edit" else config.UPLOADS_PER_HOUR
-    if limit <= 0:
+    if limit <= 0 or config.TESTING_MODE:                 # testing mode: no hourly upload quota
         return True
     key = sid if source != "edit" else f"edit:{sid}"
     if config.STORAGE_MODE == "db":

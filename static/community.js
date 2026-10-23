@@ -7,6 +7,7 @@ let CFG = null, ME = null, shTab = "trending";
 /* ---------- config / branding (names come from app/branding.py) ---------- */
 async function init() {
   CFG = await api("/api/config");
+  { const tm = document.getElementById("accTestingMode"); if (tm) tm.hidden = !CFG.testing_mode; }
   document.title = CFG.product;
   $$("[data-sec]").forEach(e => e.textContent = CFG.sections[e.dataset.sec] || e.textContent);
   $("#logoImg").alt = CFG.product;

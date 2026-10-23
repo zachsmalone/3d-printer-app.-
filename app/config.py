@@ -126,6 +126,11 @@ COOKIE_SECURE = (os.environ.get("PHOTO3D_COOKIE_SECURE") or "auto").strip().lowe
 # Per-account upload limit per hour (0 = off). Enforced at /api/generate; the counter is
 # SQLite-backed in db mode (shared by all workers) and in-process in json mode.
 UPLOADS_PER_HOUR = _int("PHOTO3D_UPLOADS_PER_HOUR", 10)
+# Testing mode (ZEIM_TESTING_MODE=1, default off): lifts every USAGE quota and cooldown for everyone
+# (uploads/generate, editor imports, print photos, doctor checks, favorites, username tries and the rename wait).
+# Security limits (sign-in, admin token, signup-per-IP, reports, recovery codes, age gate), the malware scan
+# and file-size / memory / disk caps stay on.
+TESTING_MODE = _flag("ZEIM_TESTING_MODE", False)
 EDIT_UPLOADS_PER_HOUR = _int("PHOTO3D_EDIT_UPLOADS_PER_HOUR", 120)   # editor / CAD mesh imports (own budget)
 # Optional local malware scan of uploads via clamd (INSTREAM). Nothing is ever sent anywhere
 # else; if clamd is unreachable, uploads are allowed and the miss is logged.

@@ -68,7 +68,7 @@ def _now() -> datetime:
 def next_change(u: dict) -> str | None:
     """ISO time when this account may rename itself again, or None if it may do so now (a first rename is always free)."""
     last = u.get("username_changed")
-    if not last:
+    if not last or config.TESTING_MODE:                   # testing mode: no rename wait
         return None
     try:
         due = datetime.fromisoformat(last) + timedelta(days=config.USERNAME_CHANGE_DAYS)

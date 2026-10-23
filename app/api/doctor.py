@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from app.api.textcap import text_in
 from app.community.identity import Actor, get_actor
+from app import config
 from app.core import imagesafe, ratelimit
 from app.services import doctor
 
@@ -31,7 +32,7 @@ def diagnose(request: Request, actor: Actor = Depends(get_actor), photo: Optiona
              problems: str = Form(""), text: str = Form(""), photo_ack: bool = Form(False),
              printer_id: Optional[str] = Form(None), nozzle: Optional[str] = Form(None), material: Optional[str] = Form(None)):
     ip = request.client.host if request.client else "?"
-    if not (ratelimit.hit("doctor:" + actor.sid, 60, 3600) and ratelimit.hit("doctorip:" + ip, 200, 3600)):
+    if not config.TESTING_MODE and not (ratelimit.hit("doctor:" + actor.sid, 60, 3600) and ratelimit.hit("doctorip:" + ip, 200, 3600)):
         raise HTTPException(429, "That's a lot of checks for one hour. Please wait a while.")
     try:
         words = text_in(text, 500, "Description")

@@ -31,7 +31,8 @@ def D(e: catalog.Denied):
 def get_config():
     return {"product": branding.PRODUCT_NAME, "tagline": branding.TAGLINE, "sections": branding.SECTIONS,
             "showcase_tabs": branding.SHOWCASE_TABS, "max_builds": config.MAX_BUILDS, "group_name": branding.GROUP_NAME,
-            "group_name_plural": branding.GROUP_NAME_PLURAL, "chat_block_message": safety.BLOCK_MESSAGE}
+            "group_name_plural": branding.GROUP_NAME_PLURAL, "chat_block_message": safety.BLOCK_MESSAGE,
+            "testing_mode": config.TESTING_MODE}
 
 
 # ---------------- identity ----------------
@@ -106,7 +107,7 @@ def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)
     """Change my username. Server-enforced: 3-18 chars, unique ignoring case, passes the chat filter, no email/phone-like text."""
     if not actor.user:
         raise HTTPException(401, "Create an account first.")
-    if not ratelimit.hit("username:" + actor.sid, 20, 3600) or not ratelimit.hit("usernameip:" + _ip(request), 200, 3600):
+    if not config.TESTING_MODE and (not ratelimit.hit("username:" + actor.sid, 20, 3600) or not ratelimit.hit("usernameip:" + _ip(request), 200, 3600)):
         raise HTTPException(429, "Too many tries. Please wait a while.")
     try:
         return {"username": usernames.change(actor.sid, str(body.get("username", ""))[:60])}
@@ -120,7 +121,7 @@ def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)
 def suggest_username(actor: Actor = Depends(get_actor)):
     if not actor.user:
         raise HTTPException(401, "Create an account first.")
-    if not ratelimit.hit("usersuggest:" + actor.sid, 60, 3600):
+    if not config.TESTING_MODE and not ratelimit.hit("usersuggest:" + actor.sid, 60, 3600):
         raise HTTPException(429, "Too many tries. Please wait a while.")
     return {"suggestions": usernames.suggestions()}
 
