@@ -277,3 +277,13 @@ def legal_takedown():
 @app.get("/favicon.ico")
 def favicon():
     return FileResponse(STATIC / "favicon.ico")
+
+
+from .api.community import _Conflict as _ShareConflict
+
+
+@app.exception_handler(_ShareConflict)
+async def _share_conflict(request: Request, exc: _ShareConflict):
+    """Re-upload protection: a 409 with a structured body (code remix_offer / copy_refused, original, message)."""
+    from .api.community import conflict_response
+    return conflict_response(exc)

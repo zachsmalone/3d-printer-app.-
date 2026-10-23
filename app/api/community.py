@@ -24,7 +24,20 @@ router = APIRouter(prefix="/api")
 
 
 def D(e: catalog.Denied):
+    if getattr(e, "extra", None):
+        return _Conflict(e)
     return HTTPException(e.status, e.msg)
+
+
+class _Conflict(HTTPException):
+    """A Denied carrying a structured body (e.g. the re-upload remix offer); rendered by conflict_response."""
+    def __init__(self, e):
+        super().__init__(e.status, e.msg)
+        self.body = {"detail": e.msg, **e.extra}
+
+
+def conflict_response(e: _Conflict):
+    return JSONResponse(status_code=e.status_code, content=e.body)
 
 
 @router.get("/config")
@@ -376,7 +389,7 @@ def item_view_only(iid: str, body: dict, actor: Actor = Depends(get_actor)):
 def item_visibility(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Owner only; takes effect on the very next request by anyone."""
     try:
-        return catalog.public(catalog.set_visibility(actor, iid, body.get("visibility", "")), actor)
+        return catalog.public(catalog.set_visibility(actor, iid, body.get("visibility", ""), str(body.get("remix_of") or "")[:200]), actor)
     except catalog.Denied as e:
         raise D(e)
 
@@ -508,6 +521,53 @@ def report_stolen(iid: str, request: Request, body: dict | None = None, actor: A
         raise HTTPException(400, str(e))
     return {**rep, "original_url": link or None, "dmca_url": protect.DMCA_URL,
             "message": "Thanks. A moderator will compare it with the original. If you own the rights, you can also send a formal notice."}
+
+
+@router.get("/showcase/{iid}/copies")
+def item_copies(iid: str, actor: Actor = Depends(get_actor)):
+    """Owner only: later projects by other makers whose geometry matches this one (not credited remixes)."""
+    from ..community import protect
+    try:
+        i = catalog.get(iid, actor)
+    except catalog.Denied as e:
+        raise D(e)
+    if i.get("owner_sid") != actor.sid:
+        raise HTTPException(404, "not found")
+    return {"copies": protect.likely_copies(i)}
+
+
+@router.post("/showcase/{iid}/report-copy")
+def report_copy(iid: str, request: Request, body: dict | None = None, actor: Actor = Depends(get_actor)):
+    """Owner side of theft protection: the maker of `iid` reports another project as a copy of it. Goes to the same
+    moderation queue as 'Report as stolen' (reason 'stolen', by_owner=True). Never auto-hides anything."""
+    report_limit(request, actor)
+    guards.showcase_gate(actor)
+    from ..community import protect
+    body = body or {}
+    try:
+        mine = catalog.get(iid, actor)
+        if mine.get("owner_sid") != actor.sid:
+            raise HTTPException(404, "not found")
+        ref = str(body.get("copy_url") or body.get("copy_id") or "").strip()[:200]
+        cid = ref.rsplit("/p/", 1)[-1].strip("/ ").split("?")[0]
+        if not cid or cid == iid:
+            raise HTTPException(422, "Paste the Showcase link of the copy.")
+        cp = catalog.get(cid, actor)
+        if cp.get("owner_sid") == actor.sid:
+            raise HTTPException(422, "That project is yours too.")
+        note = text_in(body.get("details"), 1000, "Details")
+        details = f"Reported as a copy by the original's maker. Original: /p/{iid}" + (f" Note: {note}" if note else "")
+        owner = USERS.read().get(cp.get("owner_sid") or "") or {}
+        rep = moderation.report(cid, actor.sid, "stolen", details, owner.get("id"),
+                                ip=request.client.host if request.client else "", user_agent=request.headers.get("user-agent", ""))
+        moderation.MODERATION.update(lambda m: [r.update(original_url=f"/p/{iid}", original_id=iid, by_owner=True)
+                                                for r in m["reports"] if r["id"] == rep["id"]])
+    except catalog.Denied as e:
+        raise HTTPException(404 if e.status in (403, 404) else e.status, "We couldn't find that project.")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"id": rep["id"], "status": rep["status"], "copy_id": cid, "original_url": f"/p/{iid}", "dmca_url": protect.DMCA_URL,
+            "message": "Thanks. A moderator will compare the two. If you own the rights, you can also send a formal notice."}
 
 
 @router.post("/users/{uid}/report")
@@ -762,6 +822,16 @@ def mod_queue(request: Request, x_admin_token: str = Header("")):
     q = sorted(moderation.queue(), key=lambda r: r["created"])
     return {"reports": [{k: v for k, v in r.items() if k != "reporter"} | {"preview": _preview(r["item_id"])} for r in q],
             "oldest_open_age_s": moderation.oldest_open_age_s(), "pending_prints": _pending_prints()}
+
+
+@router.get("/moderation/copies")
+def mod_copies(request: Request, x_admin_token: str = Header("")):
+    """Admin review list for copy reports ('Report as stolen', owner 'Report a copy', older duplicate holds):
+    open ones, oldest first, each with a preview of the reported project AND the original it is said to copy."""
+    _admin(x_admin_token, request)
+    q = sorted((r for r in moderation.queue() if r["reason"] in ("stolen", "duplicate_hold")), key=lambda r: r["created"])
+    return {"reports": [{k: v for k, v in r.items() if k != "reporter"} | {"preview": _preview(r["item_id"]),
+                         "original_preview": _preview(r["original_id"]) if r.get("original_id") else None} for r in q]}
 
 
 @router.get("/moderation/audit")

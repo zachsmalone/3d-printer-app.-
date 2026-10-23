@@ -55,10 +55,12 @@ def _chain_ids(remix_of: str, items_by_id: dict) -> set:
 
 
 def find_match(fp: dict | None, creator_id: str, remix_of: str = "", exclude: str = "") -> dict | None:
-    """Best match among OTHER makers' projects, ignoring the credited remix source chain. None = passes."""
+    """Best match among OTHER makers' projects that are PUBLIC (live in the Showcase) or ZEIM Originals, ignoring the
+    credited remix source chain. Private / followers-only work of others is never compared, so a refusal can't reveal
+    it. None = passes."""
     if not fp:
         return None
-    from .catalog import _all
+    from .catalog import _all, is_public
     items = _all()
     by_id = {x["id"]: x for x in items}
     credited = _chain_ids(remix_of, by_id) if remix_of else set()
@@ -66,6 +68,8 @@ def find_match(fp: dict | None, creator_id: str, remix_of: str = "", exclude: st
     best = None
     for i in items:
         if i["id"] == exclude or i["id"] in credited or i.get("example") or i.get("creator_id") == creator_id:
+            continue
+        if not i.get("original") and not is_public(i):
             continue
         s = fingerprint.similar(fp, _fp_for(i, store))
         if s and (best is None or s["score"] > best["score"]):
@@ -82,6 +86,49 @@ def own_match(fp: dict | None, creator_id: str, exclude: str = "") -> dict | Non
         if i["id"] != exclude and i.get("creator_id") == creator_id and fingerprint.similar(fp, _fp_for(i, store)):
             return i
     return None
+
+
+REMIX_OFFER_MESSAGE = ("This looks very close to \u201c{title}\u201d by {creator}, which is already in the Showcase. "
+                       "Its maker allows remixes, so you can share yours as a credited remix that links back to it. "
+                       "You can also keep it Private in your library.")
+REFUSED_MESSAGE = ("Sorry, this can't be shared to the Showcase: it looks very close to \u201c{title}\u201d by {creator}, "
+                   "and its maker has turned remixes off. It is still saved in your library, and you can keep it Private. "
+                   "This check compares shapes, so it can be wrong; if you think it is, please contact the ZEIM team.")
+
+
+def share_conflict(match: dict) -> dict:
+    """The 409 body for a share that matches another maker's model: a credited-remix offer, or a refusal."""
+    from .catalog import remix_status
+    m = match["item"]
+    orig = {"id": m["id"], "title": m.get("title", ""), "creator": m.get("creator", ""), "share_url": f"/p/{m['id']}"}
+    fill = {"title": orig["title"][:60] or "a project", "creator": orig["creator"] or "another maker"}
+    if remix_status(m)["can_remix"]:
+        return {"code": "remix_offer", "message": REMIX_OFFER_MESSAGE.format(**fill), "original": orig,
+                "exact": bool(match["exact"]), "can_keep_private": True}
+    return {"code": "copy_refused", "message": REFUSED_MESSAGE.format(**fill), "original": orig,
+            "exact": bool(match["exact"]), "can_keep_private": True}
+
+
+def likely_copies(i: dict) -> list[dict]:
+    """For the owner's 'Report a copy': later, other-maker, live projects whose geometry matches, not credited remixes."""
+    from .catalog import _all, is_public
+    store = FINGERPRINTS.read()
+    fp = _fp_for(i, store)
+    if not fp:
+        return []
+    items = _all()
+    by_id = {x["id"]: x for x in items}
+    out = []
+    for x in items:
+        if x["id"] == i["id"] or x.get("creator_id") == i.get("creator_id") or x.get("example") or not is_public(x):
+            continue
+        if i["id"] in _chain_ids(x.get("remix_of", ""), by_id) or str(x.get("created", "")) < str(i.get("created", "")):
+            continue
+        s = fingerprint.similar(fp, _fp_for(x, store))
+        if s:
+            out.append({"id": x["id"], "title": x.get("title", ""), "creator": x.get("creator", ""),
+                        "share_url": f"/p/{x['id']}", "created": x.get("created"), "exact": s["exact"]})
+    return out
 
 
 def hold(item: dict, match: dict, account_id: str | None) -> dict:

@@ -22,9 +22,9 @@ LDIR.mkdir(exist_ok=True)
 
 
 class Denied(Exception):
-    def __init__(self, status, msg):
+    def __init__(self, status, msg, extra: dict | None = None):
         super().__init__(msg)
-        self.status, self.msg = status, msg
+        self.status, self.msg, self.extra = status, msg, extra or {}
 
 
 CREATORS: dict = {}      # the old invented "Example: Ada/Ben/Cleo" seed creators are gone (Originals-first, Oct 2026)
@@ -370,17 +370,37 @@ def mine(actor: Actor) -> list[dict]:
     return [i for i in _all() if i.get("owner_sid") == actor.sid and not i["hidden"]]
 
 
-def set_visibility(actor: Actor, item_id: str, level: str) -> dict:
+def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -> dict:
     try:
         level = privacy.check_level(actor, level)
     except (ValueError, PermissionError) as e:
         raise Denied(422 if isinstance(e, ValueError) else 403, str(e))
+    mine = next((i for i in _all() if i["id"] == item_id and i.get("owner_sid") == actor.sid), None)
+    if not mine:
+        raise Denied(404, "not found")
+    remix_of = (remix_of or "").strip().rsplit("/p/", 1)[-1].strip("/ ")
+    if remix_of:
+        try:
+            src = get(remix_of, actor)
+        except Denied:
+            raise Denied(422, "We couldn't find the project you remixed. Paste its Showcase link.")
+        if not remix_status(src)["can_remix"]:
+            raise Denied(403, REMIX_OFF_MSG)
+    if level != "private" and config.DUPLICATE_CHECK and actor.user:
+        from . import protect
+        fp = protect.FINGERPRINTS.read().get(item_id, {}).get("fp")
+        match = protect.find_match(fp, actor.user["id"], remix_of or mine.get("remix_of", ""), exclude=item_id)
+        if match:
+            c = protect.share_conflict(match)
+            raise Denied(409, c["message"], c)
     found = {}
 
     def f(l):
         for i in l:
             if i["id"] == item_id and i.get("owner_sid") == actor.sid:
                 i["visibility"] = level
+                if remix_of:
+                    i["remix_of"] = remix_of
                 found.update(i)
     LISTINGS.update(f)
     if not found:
@@ -451,7 +471,9 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "view_only": bool(view_only)}
     if remix_of:
         item["remix_of"] = remix_of
-    # theft protection: fingerprint the geometry; a near-match to ANOTHER maker's model is held for a moderator
+    # re-upload protection: fingerprint the geometry. Sharing (followers / public) a near-match of ANOTHER maker's
+    # visible project is not allowed as-is: remixable originals get a credited-remix offer, remix-off ones a refusal.
+    # Keeping it Private is always fine (it is also kept in the maker's Studio library either way).
     from . import fingerprint, protect
     fpr = fingerprint.safe_compute(d / f"{slug}.stl")
     match = protect.find_match(fpr, actor.user["id"], remix_of) if config.DUPLICATE_CHECK else None
@@ -459,12 +481,16 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
     mine_hit = protect.own_match(fpr, actor.user["id"]) if fpr else None
     if mine_hit:
         warnings.append(f"This looks like your project \"{mine_hit['title'][:60]}\". It was posted anyway.")
+    if match and visibility != "private":
+        shutil.rmtree(d, ignore_errors=True)
+        from ..services.history import store as _bs0
+        _bs0.set_saved(build_id)
+        c = protect.share_conflict(match)
+        raise Denied(409, c["message"], c)
+    if match:
+        item["copy_of"] = match["item"]["id"]          # private copy: fine, but re-checked if it is ever shared
     LISTINGS.update(lambda l: l.append(item))
     protect.remember(pid, fpr)
-    if match:
-        held = protect.hold(item, match, actor.user["id"])
-        LISTINGS.update(lambda l: [x.update(held=held) for x in l if x["id"] == pid])
-        item["held"], item["hidden"] = held, True
     item["_warnings"] = warnings
     from ..services.history import store as _bs
     _bs.set_saved(build_id)

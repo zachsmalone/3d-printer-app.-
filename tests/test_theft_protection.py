@@ -84,21 +84,16 @@ def test_bad_file_has_no_fingerprint(tmp_path):
 
 
 # ---------------- duplicate hold ----------------
-def test_copy_by_another_user_is_held_not_deleted():
+def test_copy_of_remix_off_model_is_refused_not_held():
+    """Re-upload protection (Oct 2026) replaces the old moderator hold for shares: remixes off -> refused, kept privately."""
     a, b = U("Orig"), U("Thief")
-    src = pub(a, "Original").json()
-    assert not src.get("held_for_review")
+    src = pub(a, "Original", allow_remixes=False).json()
     r = pub(b, "Totally mine")
-    assert r.status_code == 200
+    assert r.status_code == 409
     j = r.json()
-    assert j["held_for_review"] and "moderator" in j["hold_message"] and "deleted" in j["hold_message"]
-    assert b.get(f"/api/showcase/{j['id']}").status_code == 404           # not live
-    assert any(x["id"] == j["id"] for x in LISTINGS.read())               # but kept
-    q = a.get("/api/moderation/queue", headers=ADMIN).json()["reports"]
-    rep = next(x for x in q if x["item_id"] == j["id"])
-    assert rep["reason"] == "duplicate_hold" and rep["original_url"] == f"/p/{src['id']}"
-    assert a.post(f"/api/moderation/{rep['id']}/resolve", json={"action": "restore"}, headers=ADMIN).status_code == 200
-    assert b.get(f"/api/showcase/{j['id']}").status_code == 200            # released by the moderator
+    assert j["code"] == "copy_refused" and j["original"]["share_url"] == f"/p/{src['id']}" and j["can_keep_private"]
+    assert not any(x["title"] == "Totally mine" for x in LISTINGS.read())
+    assert pub(b, "Just for me", visibility="private").status_code == 200       # private keep is fine
 
 
 def test_owner_reupload_passes_with_warning():
@@ -109,18 +104,19 @@ def test_owner_reupload_passes_with_warning():
     assert j["warnings"] and "your project" in j["warnings"][0]
 
 
-def test_credited_remix_passes_uncredited_copy_held():
+def test_credited_remix_passes_uncredited_copy_gets_offer():
     a, b, c = U("RA"), U("RB"), U("RC")
     src = pub(a, "Src").json()
-    assert not pub(b, "Remix", remix_of=src["id"]).json().get("held_for_review")
-    assert pub(c, "No credit").json()["held_for_review"]
+    assert pub(b, "Remix", remix_of=src["id"]).status_code == 200
+    r = pub(c, "No credit")
+    assert r.status_code == 409 and r.json()["code"] == "remix_offer"
 
 
 def test_check_can_be_disabled(monkeypatch):
     monkeypatch.setattr(config, "DUPLICATE_CHECK", False)
     a, b = U("D1"), U("D2")
     pub(a)
-    assert not pub(b).json().get("held_for_review")
+    assert pub(b).status_code == 200
 
 
 # ---------------- owner tag, first posted, view only ----------------

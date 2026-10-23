@@ -350,7 +350,12 @@ async function openItem(id) {
       ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn ghost" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix</button>`}
       <button class="btn ghost" id="itShare"><svg class=i aria-hidden=true focusable=false><use href=#i-link></use></svg> Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>'}
-      ${i.example || i.owned || i.original ? "" : '<button class="btn ghost danger" id="itStolen">Report as stolen</button>'}</div>
+      ${i.example || i.owned || i.original ? "" : '<button class="btn ghost danger" id="itStolen">Report as stolen</button>'}
+      ${i.owned && !i.example && !i.original ? '<button class="btn ghost" id="itCopyBtn" aria-controls="itCopyBox"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report a copy</button>' : ""}</div>
+    ${i.owned && !i.example && !i.original ? `<div class="reup" id="itCopyBox" hidden><p class="help">Think someone re-posted this as their own? Pick a close match we found, or paste the link. A moderator compares the two; nothing is removed automatically.</p>
+      <ul class="reup-list" id="itCopyList"></ul>
+      <div class="field"><label for="itCopyUrl">Link to the copy</label><input id="itCopyUrl" maxlength="200" placeholder="https://…/p/abc123"></div>
+      <button type="button" class="btn" id="itCopySend">Send to moderators</button></div>` : ""}
     ${!i.example && !i.allow_remixes ? `<p class="help remix-off" id="itRemixOff"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Remixes off${i.owned ? "" : `: ${esc(i.remix_off_reason)}`}</p>` : !i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
@@ -373,7 +378,24 @@ async function openItem(id) {
     try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
     catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
   };
-  if ($("#itVis")) $("#itVis").onchange = async e => { try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: e.target.value })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) { toast(er.message, "err"); openItem(id); } };
+  if ($("#itVis")) $("#itVis").onchange = async e => { const v = e.target.value; try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: v })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) {
+    if (er.status === 409 && er.body?.code === "remix_offer" && confirm(er.message + "\n\nShare it as a credited remix?")) {
+      try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: v, remix_of: er.body.original.id })); toast("Shared as a credited remix", "ok"); loadShowcase(); return openItem(id); } catch (e2) { toast(e2.message, "err"); }
+    } else toast(er.message, "err");
+    openItem(id); } };
+  if ($("#itCopyBtn")) $("#itCopyBtn").onclick = async () => {
+    const box = $("#itCopyBox"); box.hidden = !box.hidden; if (box.hidden) return;
+    const list = $("#itCopyList"); list.innerHTML = '<li class="help">Looking for close matches…</li>';
+    try { const r = await api(`/api/showcase/${id}/copies`);
+      list.innerHTML = r.copies.length ? r.copies.map(c => `<li><a href="${esc(c.share_url)}" target="_blank" rel="noopener">${esc(c.title)}</a> by ${esc(c.creator)} <button type="button" class="btn ghost sm" data-copy="${esc(c.id)}">Report this one</button></li>`).join("")
+        : '<li class="help">No close matches found. A copy that was edited a lot can still slip past, so you can paste its link below.</li>';
+      list.querySelectorAll("[data-copy]").forEach(b => b.onclick = () => sendCopy(b.dataset.copy, b));
+    } catch (er) { list.innerHTML = `<li class="help">${esc(er.message)}</li>`; }
+  };
+  const sendCopy = async (ref, b) => { b.disabled = true;
+    try { const r = await api(`/api/showcase/${id}/report-copy`, J("POST", { copy_url: ref })); b.textContent = "Reported"; toast(r.message, "ok"); }
+    catch (er) { b.disabled = false; toast(er.message, "err"); } };
+  if ($("#itCopySend")) $("#itCopySend").onclick = () => sendCopy($("#itCopyUrl").value.trim(), $("#itCopySend"));
   if ($("#itFollow")) $("#itFollow").onclick = async () => { try { await api("/api/follow/" + i.creator_id, { method: i.following_creator ? "DELETE" : "POST" }); openItem(id); } catch (e) { toast(e.message, "err"); } };
   if (!i.no_model && !i.example && i.files?.length) loadCatalog().then(async () => {
     const put = r => { const w = $("#itWill"); if (!w) return; w.innerHTML = badgeHTML(r, { detail: true }) + (r.checks?.slices?.ok == null ? `<button type="button" class="btn" id="itSliceCheck">Test-slice it for my printer</button>` : "");
@@ -414,7 +436,19 @@ $("#btnPublish").onclick = () => {
   $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no"; if (!$("#pub_remix").value && sessionStorage.getItem("zeim_remix_of")) $("#pub_remix").value = sessionStorage.getItem("zeim_remix_of");
   $("#dlgPublish").showModal();
 };
+function showConflict(c) {
+  const box = $("#pubConflict"), o = c.original || {};
+  const offer = c.code === "remix_offer";
+  box.innerHTML = `<p><svg class=i aria-hidden=true focusable=false><use href=#i-${offer ? "repeat" : "lock"}></use></svg> ${esc(c.message)}</p>
+    ${o.share_url ? `<p class="help">Original: <a href="${esc(o.share_url)}" target="_blank" rel="noopener">${esc(o.title || "this project")}</a>${o.creator ? " by " + esc(o.creator) : ""}</p>` : ""}
+    <div class="reup-actions">${offer ? `<button type="button" class="btn primary" id="pubAsRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Post as a credited remix</button>` : ""}
+    <button type="button" class="btn ghost" id="pubKeepPrivate"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Keep it Private</button></div>`;
+  box.hidden = false; box.scrollIntoView({ block: "end", behavior: "instant" }); box.tabIndex = -1; box.focus({ preventScroll: true });
+  if ($("#pubAsRemix")) $("#pubAsRemix").onclick = () => { $("#pub_remix").value = location.origin + o.share_url; box.hidden = true; $("#btnDoPublish").click(); };
+  $("#pubKeepPrivate").onclick = () => { $("#pub_vis").value = "private"; box.hidden = true; $("#btnDoPublish").click(); };
+}
 $("#btnDoPublish").onclick = async () => {
+  if ($("#pubConflict")) $("#pubConflict").hidden = true;
   const nsfw = $("[name=pub_nsfw]:checked")?.value;
   if (!nsfw) return inlineMsg($("#btnDoPublish"), "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.");
   try {
@@ -426,7 +460,7 @@ $("#btnDoPublish").onclick = async () => {
     (i.warnings || []).forEach(w => toast(w, "ok"));
     if (i.held_for_review) return toast(i.hold_message, "ok");
     toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
-  } catch (e) { inlineMsg($("#btnDoPublish"), e.message); }
+  } catch (e) { if (e.status === 409 && e.body?.code) { clearInline($("#btnDoPublish")); return showConflict(e.body); } inlineMsg($("#btnDoPublish"), e.message); }
 };
 
 /* What ZEIM knows about you (Kenji S-07): live view, download metadata, delete everything I made */
