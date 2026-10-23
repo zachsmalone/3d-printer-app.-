@@ -69,9 +69,12 @@ def run(name, launch):
         pg.set_input_files("#sFile", FIXTURE)                    # Beginner: builds the whole photo straight away
     whole = ri.value.json()
     ok(f"{name}: whole photo builds first (no selection sent)", "select" not in (whole.get("params") or {}), whole.get("params"))
+    unfold(pg)
     ok(f"{name}: the Select bar appears after the photo", pg.is_visible("#selOpen") and "whole photo" in pg.inner_text("#selState"))
     pg.click("#selOpen"); wait(pg, "window.zeimSelectState.rgb")
-    pg.locator("#selPanel").scroll_into_view_if_needed(); pg.wait_for_timeout(300)
+    ok(f"{name}: photo tip under the first line of the real select panel",
+       pg.evaluate("document.querySelector('#selPanel #selSay')?.nextElementSibling?.classList.contains('phototips') && document.querySelectorAll('#selPanel .phototips').length === 1"))
+    unfold(pg); pg.locator("#selPanel").scroll_into_view_if_needed(); pg.wait_for_timeout(300)
     small = pg.evaluate("""[...document.querySelectorAll('#selPanel button,#selOpen,#selPanel label.inl,#selPanel input[type=range]')].filter(e=>e.offsetParent).filter(e=>{const r=e.getBoundingClientRect();return r.height<43.5||(e.tagName==='BUTTON'&&r.width<43.5)}).map(e=>e.id||e.textContent.trim())""")
     ok(f"{name}: every tool is at least 44 px", not small, small)
     ok(f"{name}: the photo area blocks page scroll / browser zoom while drawing",
@@ -106,7 +109,7 @@ def run(name, launch):
     shot(pg, "03-result-relief.png")
     # lithophane: outside Flat
     pg.click("#modeCards label[data-mode=lithophane]"); pg.wait_for_timeout(300)
-    pg.locator("#selPanel").scroll_into_view_if_needed()
+    unfold(pg); pg.locator("#selPanel").scroll_into_view_if_needed()
     ok(f"{name}: lithophane shows the outside choice", pg.is_visible("#selOutside"))
     pg.check("#selOutside input[value=flat]"); pg.wait_for_timeout(300)
     pg.locator("#selStage").scroll_into_view_if_needed(); shot(pg, "04-litho-flat-preview.png")
@@ -117,11 +120,17 @@ def run(name, launch):
     shot(pg, "05-result-litho-flat.png")
     # Use whole photo skips the selection
     with pg.expect_response(lambda r: "/api/generate" in r.url, timeout=90000) as ri:
-        pg.locator("#selWhole").scroll_into_view_if_needed(); pg.click("#selWhole")
+        unfold(pg); pg.locator("#selWhole").scroll_into_view_if_needed(); pg.click("#selWhole")
     ok(f"{name}: Use whole photo sends no selection", "select" not in ri.value.json().get("params", {}))
     ok(f"{name}: no page errors", not errs, errs)
     b.close()
     if not bad: print(f"PASS {name}")
+
+
+def unfold(pg):
+    # workspaces (C) fold "Photo & settings" to a chip once the model shows; tap it like a user would
+    if not pg.is_visible("#selPanel") and pg.is_visible("#zws-settings .zws-chip"):
+        pg.click("#zws-settings .zws-chip"); pg.wait_for_timeout(400)
 
 
 with sync_playwright() as p:
