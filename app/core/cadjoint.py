@@ -14,7 +14,7 @@ import trimesh
 
 KINDS = ("hinge", "snap_hinge", "ball", "pin", "chain")
 NAMES = {"hinge": "print-in-place hinge", "snap_hinge": "snap-on hinge", "ball": "ball joint", "pin": "pin joint", "chain": "chain"}
-KEYS = {"kind", "length", "width", "thickness", "knuckles", "clearance", "size", "links", "position"}
+KEYS = {"kind", "length", "width", "thickness", "knuckles", "clearance", "size", "links", "position", "mode", "replace"}
 MERGE_KEYS = {"bodies", "snap", "overlap"}
 SMART_KEYS = {"pieces", "tolerance"}
 SEG = 48
@@ -164,7 +164,7 @@ def build(p: dict):
 
 def op_cad_joint(m, p):
     tool, info = build(p)
-    out = C._combine(m, tool, "new")
+    out = C._combine(m, tool, "new", replace=bool(p.get("replace")))
     kind = p.get("kind", "hinge")
     msg = f"Added a {NAMES[kind]} ({info['clearance_mm']:g} mm gap)."
     warns = ["Moving-part fit is simulated, not test-printed. Print a small one first and adjust the clearance for your printer."]

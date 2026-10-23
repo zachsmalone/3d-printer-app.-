@@ -381,7 +381,7 @@ function setTool(id) {
   if (S.measure && id) toggleMeasure(false);
   if (!id) return;
   const needModel = !["sketch", "visualize"].includes(id);
-  if (needModel && !bodyCount() && !["extrude", "revolve", "text", "shapes"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
+  if (needModel && !bodyCount() && !["extrude", "revolve", "text", "shapes", "joints"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
   TOOL_PANELS[id]?.();
 }
 /* Beginner shapes: one tap drops a ready-made solid (server op cad_shape, reusing the parts-builder primitives). */
