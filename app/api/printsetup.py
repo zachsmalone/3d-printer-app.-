@@ -107,6 +107,40 @@ def put_my_adult(body: dict, actor: Actor = Depends(get_actor)):
     return {"signed_up": bool(actor.user), "stored": "profile" if actor.user else "browser", "confirmed": True}
 
 
+SAVE_MODES = ("auto", "remind", "off")
+SAVE_EVERY = (2, 5, 10)
+SAVE_DEFAULT = {"mode": "auto", "every": 5}
+
+
+def _clean_save_prefs(body: dict) -> dict:
+    mode = body.get("mode", SAVE_DEFAULT["mode"])
+    every = body.get("every", SAVE_DEFAULT["every"])
+    if mode not in SAVE_MODES:
+        raise HTTPException(400, "mode must be auto, remind or off.")
+    try:
+        every = int(every)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "every must be 2, 5 or 10 minutes.")
+    if every not in SAVE_EVERY:
+        raise HTTPException(400, "every must be 2, 5 or 10 minutes.")
+    return {"mode": mode, "every": every}
+
+
+@router.get("/api/me/save-prefs")
+def get_save_prefs(actor: Actor = Depends(get_actor)):
+    """Auto-save / save-reminder preference. Stored on the account when signed in; guests keep it in their browser."""
+    p = (actor.user or {}).get("save_prefs")
+    return {"signed_up": bool(actor.user), "prefs": p or dict(SAVE_DEFAULT), "stored": bool(p)}
+
+
+@router.put("/api/me/save-prefs")
+def put_save_prefs(body: dict, actor: Actor = Depends(get_actor)):
+    p = _clean_save_prefs(body or {})
+    if actor.user:
+        USERS.update(lambda d: d[actor.sid].__setitem__("save_prefs", p) if actor.sid in d else None)
+    return {"signed_up": bool(actor.user), "prefs": p, "stored": "profile" if actor.user else "browser"}
+
+
 def slice_check(mesh_path, printer_id, nozzle):
     """Real PrusaSlicer run (Standard preset) for the 'slices OK' check, cached per file + printer + nozzle."""
     import hashlib, json, tempfile

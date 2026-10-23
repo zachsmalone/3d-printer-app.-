@@ -502,6 +502,18 @@
     <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><button class="btn big primary" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></li>
     <li class="toolcard"><h2>Your printer</h2><p class="help">Pick your printer and nozzle. The Slicer, exports and "Will it print?" use it.</p><div id="accPrinter"></div></li>
     <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
+    <li class="toolcard"><h2 id="savePrefsH">Saving your work</h2><p class="help">For CAD, the FDM Slicer, TorchC0 and Lithophane. Projects are also saved after every step.</p>
+      <p class="help savewhere" id="saveWhere">Where your work is saved: checking…</p>
+      <form id="savePrefs" class="saveprefs" aria-labelledby="savePrefsH">
+        <fieldset><legend class="sr-only">How to save</legend>
+          <label class="radrow"><input type="radio" name="saveMode" value="auto" checked> Auto-save</label>
+          <label class="radrow"><input type="radio" name="saveMode" value="remind"> Remind me to save</label>
+          <label class="radrow"><input type="radio" name="saveMode" value="off"> Off</label>
+        </fieldset>
+        <div class="field"><label for="saveEvery">Every</label><select id="saveEvery"><option value="2">2 minutes</option><option value="5" selected>5 minutes</option><option value="10">10 minutes</option></select></div>
+        <p class="help" id="saveStatus" role="status" aria-live="polite"></p>
+      </form>
+      <p><a class="btn" id="backupAll" href="/api/me/backup.zip" download>Back up all</a> <span class="help">One zip of all your projects, with the names you chose.</span></p></li>
     <li class="toolcard"><h2>Learn</h2><p class="help">Short, clean and safe lessons.</p><a class="btn big" href="#learn">Open Learn</a></li>
   </ul>
   <section class="favs" aria-labelledby="favH"><h2 id="favH">Favorites</h2><p class="help" id="favNote">Projects you save with the heart. Only you can see this list.</p><ul class="grid" id="favGrid"></ul></section>
@@ -620,4 +632,6 @@
 <script type="module" src="/static/doctor.js"></script>
 <script src="/static/ui6.js" defer></script>
 <script src="/static/ws-main.js" defer></script>
+<script src="/static/worksave.js" defer></script>
+<script type="module" src="/static/exportpick.js"></script>
 </body></html>

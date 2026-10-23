@@ -30,7 +30,7 @@ def run(name, launch, stl):
     ok(f"{name}: estimate shown", "ml" in txt and "layers" in txt, txt)
     ok(f"{name}: cost shown", pg.is_visible("#rzCostOut") and "$" in pg.inner_text("#rzCostOut"), txt)
     ok(f"{name}: price remembered", "price" in (pg.evaluate("localStorage.getItem('zeim.resinPrice')") or ""))
-    ok(f"{name}: 3MF link", pg.locator("#torchOut a[href$='torchc0.3mf']").count() == 1)
+    ok(f"{name}: Export picker button", pg.locator("#torchOut #rzExport[data-export-rid]").count() == 1)
     ok(f"{name}: no page errors", not errs, errs)
     b.close()
     if not bad: print(f"PASS {name}")

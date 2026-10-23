@@ -15,7 +15,7 @@
 <body class="cadws">
 <header class="cw-top">
   <a class="cw-btn" id="cwBack" href="/" aria-label="Back" title="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></a>
-  <input id="cwTitle" class="cw-title" value="My design" aria-label="Design name" maxlength="60">
+  <input id="cwTitle" class="cw-title" value="My design" aria-label="Design name" maxlength="60"><span id="saveIndSlot" class="saveslot"></span>
   <span class="cw-mode" id="cwMode" aria-live="polite">Modeling</span>
   <span class="cw-sp"></span>
   <button type="button" class="cw-btn themetoggle" id="themeToggle" aria-pressed="false" aria-label="Dark mode" title="Switch to dark mode"></button>
@@ -42,8 +42,9 @@
   <div class="cw-menu">
     <button class="cw-btn wide" id="cwExport" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
     <div class="cw-pop" id="cwExportMenu" role="menu" hidden>
-      <a role="menuitem" id="cwDlStl" href="#">Download STL</a>
-      <a role="menuitem" id="cwDl3mf" href="#">Download 3MF</a>
+      <a role="menuitem" id="cwPick" href="#" aria-haspopup="dialog">Download… (pick a format)</a>
+      <a role="menuitem" id="cwDlStl" href="#">Quick STL</a>
+      <a role="menuitem" id="cwDl3mf" href="#" hidden>Download 3MF</a>
       <a role="menuitem" id="cwSaveCopy" href="#">Save as a new version (copy)</a>
       <a role="menuitem" id="cwToSlicer" href="#">Open in Slicer &amp; plate editor</a>
     </div>
@@ -103,5 +104,7 @@
 <script type="module" src="/static/cad.js"></script>
 <script src="/static/wslayout.js"></script>
 <script type="module" src="/static/cad-phone.js"></script>
+<script type="module" src="/static/exportpick.js"></script>
+<script src="/static/worksave.js" defer></script>
 </body>
 </html>

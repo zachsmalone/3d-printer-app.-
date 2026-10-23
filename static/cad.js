@@ -1441,3 +1441,21 @@ $("#cwDlStl").addEventListener("click", () => lessons.event("export")); $("#cwDl
 $("#cwHome").addEventListener("click", () => lessons.event("fit"));
 window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setTool, finishSketch, addConstraint, solveSketch, viewAlong, toggleSection, openStep: i => { S.openStep = i; renderHist(); } };
 
+/* saving: the design itself is saved on the server after every step; this keeps the open design, units and name */
+{
+  const units = () => { try { return localStorage.getItem("zeim.cad.units") || "mm"; } catch { return "mm"; } };
+  const reg = () => {
+    if (!window.zeimSave || reg.done) return; reg.done = true;
+    window.zeimSave.register("cad", {
+      collect: () => S.bid ? { bid: S.bid, units: units(), title: $("#cwTitle").value } : null,
+      restore: st => {
+        if (S.bid || !st?.bid || !/^[0-9a-f]{12}$/.test(st.bid)) return true;
+        const box = document.createElement("div"); box.className = "savetoast"; box.setAttribute("role", "status");
+        box.innerHTML = `<span>Reopen your last design?</span><a class="btn small primary" href="/static/cad.html?bid=${st.bid}">Reopen</a><button type="button" class="btn small ghost" aria-label="Dismiss">Not now</button>`;
+        box.querySelector("button").onclick = () => box.remove(); document.body.append(box); return true;
+      }
+    }, ".cw-main");
+    new MutationObserver(() => window.zeimSave._markDirty("cad")).observe($("#cwHist") || document.body, { childList: true, subtree: false });
+  };
+  reg(); if (!reg.done) addEventListener("DOMContentLoaded", reg);
+}

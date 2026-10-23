@@ -65,7 +65,7 @@ from .api import resin as resin_api
 for r in (builds.router, edit.router, parts_api.router, cad_api.router, printing.router, printing.files_router, settings_api.router,
           showcase_extras.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
-          export_api.router, calibration_api.router, doctor_api.router, repair_api.router, resin_api.router):
+          export_api.router, export_api.me_router, calibration_api.router, doctor_api.router, repair_api.router, resin_api.router):
     app.include_router(r)
 
 # Passkey + email-code login (docs/auth.md). Localhost / ZEIM_ENV=dev get safe defaults.

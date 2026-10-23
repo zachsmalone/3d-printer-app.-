@@ -64,7 +64,7 @@ def run(name, w, h, d):
     ok(f"{name}: suction count", "1 suction cup" in pg.inner_text("#rzCups"), pg.inner_text("#torchOut"))
     ok(f"{name}: cost with typed price, labelled estimate", "$" in pg.inner_text("#rzCostOut") and "estimate" in pg.inner_text("#rzCostOut"), pg.inner_text("#rzCostOut"))
     pg.click("#rzCups .rzDismiss"); ok(f"{name}: suction warning dismissible", pg.locator("#rzCups").count() == 0)
-    ok(f"{name}: downloads still there", pg.locator("#torchOut a[href$='torchc0.3mf']").count() == 1)
+    ok(f"{name}: downloads still there", pg.locator("#torchOut #rzExport[data-export-rid]").count() == 1 and pg.locator("#torchOut a[href$='torchc0.stl']").count() == 1)
     prep(pg, cup, "40"); again(pg, "#rzFixCup")
     ok(f"{name}: drain hole added", "0 suction cups" in pg.inner_text("#rzCups"), pg.inner_text("#torchOut"))
     ok(f"{name}: no page errors", not errs, errs)
