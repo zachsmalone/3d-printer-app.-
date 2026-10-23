@@ -46,3 +46,13 @@ html[data-theme=dark] #viewLearn{--zt-a:#9C98C0}
  [data-zt=lithophane]{height:128px}.zt-litho{width:106px;height:106px;right:14px;top:11px}.zt-cap{right:132px;max-width:52%;font-size:12px}
  .zt-rain{left:18%}}
 @media (prefers-reduced-motion:reduce){.zt-band *,.zt-band::before,.zt-band::after{animation:none!important;transition:none!important}.zt-petal{display:none}.zt-bolt{opacity:0}}
+/* 2D→3D: an ensō brush circle and a quiet line figure on washi, indigo (aizome) accent */
+[data-zt=ai3d]{--zt-ground:#F2EFE8;--zt-a:#3E5C76}
+.zt-ai3d{position:absolute;inset:0;width:100%;height:100%}
+.zt-ai3d .enso{fill:none;stroke:#3E5C76;stroke-width:7;stroke-linecap:round;opacity:.28}
+.zt-ai3d .wire{fill:none;stroke:#3E5C76;stroke-width:1.4;stroke-linejoin:round;opacity:.45}
+.zt-ai3d .hill{fill:#3E5C76;opacity:.06}
+#viewAi3d{--zt-a:#3E5C76}
+html[data-theme=dark] [data-zt=ai3d]{--zt-ground:#1B2026}
+html[data-theme=dark] #viewAi3d{--zt-a:#8FB0CC}
+html[data-theme=dark] .zt-ai3d .enso,html[data-theme=dark] .zt-ai3d .wire{stroke:#8FB0CC}

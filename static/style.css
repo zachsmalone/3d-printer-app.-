@@ -1038,3 +1038,36 @@ html.handing main.page:not([hidden]),html.handing .cw-main{opacity:.4;transition
 .reup-list { list-style: none; padding: 0; margin: 0 0 8px; }
 .reup-list li { padding: 4px 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 @media (max-width: 480px) { .reup-actions .btn { flex: 1 1 100%; } }
+/* ---------- 2D→3D tab ---------- */
+.a3grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr);gap:var(--s4,16px);align-items:start}
+.a3card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg,14px);padding:var(--s4,16px);display:flex;flex-direction:column;gap:10px;min-width:0}
+.a3card h2{margin:0;font-size:var(--fs-lg,18px);display:flex;align-items:center;gap:8px}
+.a3drop{position:relative;display:flex;align-items:center;justify-content:center;min-height:180px;border:1px dashed var(--line);border-radius:var(--r,12px);cursor:pointer;overflow:hidden;color:var(--mut)}
+.a3drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.a3drop img{max-width:100%;max-height:240px;object-fit:contain}
+.a3drop:focus-within{outline:2px solid var(--zt-a,#3E5C76);outline-offset:2px}
+.a3modes{display:grid;gap:8px}
+.a3mode{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r,12px);cursor:pointer;min-height:44px}
+.a3mode:has(input:checked){border-color:var(--zt-a,#3E5C76);box-shadow:inset 3px 0 0 var(--zt-a,#3E5C76)}
+.a3mode span{display:flex;flex-direction:column;gap:2px}.a3mode small{color:var(--mut)}
+.a3view{position:relative;aspect-ratio:4/3;border-radius:var(--r,12px);background:var(--bg2,#EDEAE3);overflow:hidden}
+.a3view canvas{width:100%!important;height:100%!important;display:block}
+.a3empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;margin:0}
+.a3note{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;margin:0 0 var(--s4,16px);border-radius:var(--r,12px);border:1px solid var(--line);background:var(--panel)}
+.a3note p{margin:2px 0 0}.a3note.warn{border-color:#C9A24A;background:color-mix(in srgb,#C9A24A 9%,var(--panel))}
+.a3note code{overflow-wrap:anywhere}
+.a3list{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:var(--fs-sm,13px)}
+.a3list li{display:flex;gap:6px;align-items:flex-start}.a3list.warn{color:var(--mut)}
+.a3title{margin:0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ailbl{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;font-size:12px;font-weight:600;color:#3E5C76;white-space:nowrap}
+html[data-theme=dark] .ailbl{color:#8FB0CC}
+.ailbl .i{width:12px;height:12px}
+.a3err{color:var(--err,#B3261E);display:flex;gap:6px;margin:0}
+.a3busy{display:flex;gap:8px;align-items:center;margin:0}
+.a3spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--zt-a,#3E5C76);animation:a3spin 1s linear infinite}
+@keyframes a3spin{to{transform:rotate(360deg)}}
+.a3cool{display:flex;gap:10px;align-items:flex-start;margin-top:var(--s4,16px);padding:10px 14px;border-radius:var(--r,12px);background:var(--panel);border:1px solid var(--line)}
+.a3cool p{margin:0;flex:1}
+@media (max-width:1000px){.a3grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.a3out{grid-column:1/-1}}
+@media (max-width:640px){.a3grid{grid-template-columns:minmax(0,1fr)}.a3drop{min-height:140px}}
+@media (prefers-reduced-motion:reduce){.a3spin{animation:none}}

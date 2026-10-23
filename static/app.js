@@ -61,7 +61,7 @@ const api = async (url, opt) => {
   return j;
 };
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(iso).toLocaleDateString(); };
-const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", popart: "Pop-art", trace2d: "Logo & Drawing", edit: "Edited model" };
+const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", popart: "Pop-art", trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model" };
 
 let viewer;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
@@ -418,7 +418,7 @@ function renderHistory() {
   const cards = S.history.slice().reverse().map(b => `
     <li class="hcard ${S.current?.id === b.id ? "cur" : ""}" data-id="${b.id}">
       <button type="button" class="thumbbtn" data-open="${b.id}" aria-label="Open ${esc(b.title)}"><img src="${b.thumb}" alt=""></button>
-      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · <svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg>"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
+      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.ai ? ' · <span class="ailbl">AI-made</span>' : ""}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · <svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg>"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
         <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? '<svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg>' : '<svg class=i aria-hidden=true focusable=false><use href=#i-star></use></svg>'}</button>

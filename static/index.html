@@ -42,6 +42,7 @@
     <button data-view="slicer" title="Slice for filament (FDM) printers"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/><path d="M8 4v6M16 9v6M11 14v6"/></svg><span class="nl">FDM Slicer</span><span class="ns" aria-hidden="true">Slicer</span></button>
     <button data-view="torchc0" title="TorchC0: prepare models for resin printers"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 15h10"/></svg><span class="nl">TorchC0</span><span class="ns" aria-hidden="true">Resin</span></button>
     <button data-view="cad" title="Design and edit 3D parts"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span class="nl">CAD</span><span class="ns" aria-hidden="true">CAD</span></button>
+    <button data-view="ai3d" title="2D to 3D: an AI figure or bust from one photo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="8" height="11" rx="1.5"/><path d="M3 13l3-3 3 3 2-2"/><path d="M14 10.5l3.5-2 3.5 2v4l-3.5 2-3.5-2z"/><path d="M14 10.5l3.5 2 3.5-2M17.5 12.5v4"/></svg><span class="nl">2D→3D</span><span class="ns" aria-hidden="true">2D→3D</span></button>
     <button data-view="lithophane" title="Turn a photo into a lithophane or relief"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span class="nl">Lithophane</span><span class="ns" aria-hidden="true">Litho</span></button>
     <button data-view="smartfix" title="Find and fix print problems"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span class="nl">Smart Fix</span><span class="ns" aria-hidden="true">Fix</span></button>
     <button data-view="learn" title="Short, practical lessons"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/></svg><span class="nl">Learn</span><span class="ns" aria-hidden="true">Learn</span></button>
@@ -474,6 +475,41 @@
   <div id="torchOut" aria-live="polite"></div>
 </main>
 
+<main class="page" id="viewAi3d" hidden>
+<div class="zt-band" data-zt="ai3d" aria-hidden="true"><svg class="zt-ai3d" viewBox="0 0 1000 150" preserveAspectRatio="xMaxYMid slice" focusable="false"><path class="enso" d="M842 30c38-6 74 18 80 54s-20 66-58 68-70-22-72-56c-1-24 14-46 38-56"/><g class="wire"><path d="M640 120l30-52 30 52zM670 68l30 52 28-30zM700 120l28-30 26 30zM670 68l58 22"/><circle cx="670" cy="52" r="15"/><path d="M655 52h30M670 37c-8 8-8 22 0 30M670 37c8 8 8 22 0 30"/></g><path class="hill" d="M0 150c120-30 260-34 420-14s300 10 580-22v36z"/></svg></div>
+  <div class="pagehead"><div><h1>2D→3D</h1><p class="help">Turn one photo into a figure or a bust to print. An open AI model guesses the sides it cannot see, so results are a starting point, not a scan.</p></div></div>
+  <div id="a3Engine" class="a3note" role="status" aria-live="polite"></div>
+  <div class="a3grid">
+    <section class="a3card" aria-labelledby="a3H1">
+      <h2 id="a3H1"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg> Your photo</h2>
+      <label class="a3drop" for="a3File"><input type="file" id="a3File" accept="image/jpeg,image/png,image/webp,image/heic" aria-describedby="a3Priv">
+        <img id="a3Img" alt="Your photo" hidden><span id="a3DropTxt"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-image"/></svg> Choose a photo</span></label>
+      <p class="help" id="a3Priv"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-lock"/></svg> Private. The photo is cleaned of location data and stays on this ZEIM server; only you can see it and the model.</p>
+      <button type="button" class="btn small ghost" id="a3Sample">Try the sample photo</button>
+      <label class="inl chk"><input type="checkbox" id="a3Ack"> The photo is mine, or I have permission from everyone in it.</label>
+    </section>
+    <section class="a3card" aria-labelledby="a3H2">
+      <h2 id="a3H2"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-user"/></svg> What to make</h2>
+      <div class="a3modes" role="radiogroup" aria-label="Figure or bust">
+        <label class="a3mode"><input type="radio" name="a3Mode" value="figure" checked><span><b>Figure</b><small>The whole subject, standing on a flat bottom. About 80 mm tall.</small></span></label>
+        <label class="a3mode"><input type="radio" name="a3Mode" value="bust"><span><b>Bust</b><small>Head and shoulders. About 60 mm tall.</small></span></label>
+      </div>
+      <div class="field"><label for="a3Title">Title</label><input id="a3Title" maxlength="80" placeholder="My figure" autocomplete="off"></div>
+      <div class="field"><label for="a3H">Height (mm)</label><input id="a3H" type="number" min="20" max="250" step="5" inputmode="numeric" placeholder="80"></div>
+      <p class="help">Works best with one subject, a plain background and soft light.</p>
+      <button type="button" class="btn primary" id="a3Go" disabled><svg class="i" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Make 3D model</button>
+      <div id="a3Plan" class="help" aria-live="polite"></div>
+    </section>
+    <section class="a3card a3out" aria-labelledby="a3H3">
+      <h2 id="a3H3"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-eye"/></svg> Preview</h2>
+      <div class="a3view" id="a3View"><p class="help a3empty" id="a3Empty">Your model appears here.</p></div>
+      <div id="a3Status" aria-live="polite"></div>
+      <div id="a3Res" hidden></div>
+    </section>
+  </div>
+  <div class="a3cool" id="a3Cool" role="note" hidden><svg class="i" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg><p>There is a short pause between AI models. It keeps the servers steady and helps nobody spend more than they meant to. The rest of ZEIM works as usual meanwhile.</p><button type="button" class="btn small ghost" id="a3CoolX" aria-label="Dismiss this note"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
+</main>
+
 <main class="page" id="viewFix" hidden>
 <div class="zt-band" data-zt="smartfix" aria-hidden="true"></div>
   <div class="pagehead"><div><h1>Smart Fix</h1><p class="help">Open a model in the editor, then repair, hollow or simplify it. ZEIM checks for holes, flipped faces and hidden voids.</p></div></div>
@@ -651,4 +687,5 @@
 <script type="module" src="/static/exportpick.js"></script>
 <script type="module" src="/static/membox.js"></script>
 <script type="module" src="/static/handoff.js"></script>
+<script type="module" src="/static/ai3d.js"></script>
 </body></html>

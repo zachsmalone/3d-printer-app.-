@@ -1,0 +1,11 @@
+# ZEIM 2D->3D worker (separate from the main app). Install torch first: CPU wheel or the CUDA wheel for your GPU.
+omegaconf==2.3.0
+einops==0.7.0
+transformers>=4.35,<4.46
+huggingface_hub>=0.20
+trimesh>=4.0
+pillow>=10
+scikit-image>=0.22
+rembg>=2.0.50
+onnxruntime>=1.16
+numpy<2.3

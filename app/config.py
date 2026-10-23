@@ -139,3 +139,14 @@ EDIT_UPLOADS_PER_HOUR = _int("PHOTO3D_EDIT_UPLOADS_PER_HOUR", 120)   # editor / 
 # else; if clamd is unreachable, uploads are allowed and the miss is logged.
 CLAMAV = _flag("PHOTO3D_CLAMAV", False)
 CLAMAV_SOCKET = (os.environ.get("PHOTO3D_CLAMAV_SOCKET") or "/var/run/clamav/clamd.ctl").strip()
+
+# ---- 2D->3D (AI figures and busts from one photo; app/services/ai3d.py, worker in workers/ai3d/) ----
+# The engine is an OPTIONAL separate worker (TripoSR, MIT). Empty URL = "engine not installed" (the tab says so).
+AI3D_URL = (os.environ.get("ZEIM_AI3D_URL") or "").strip().rstrip("/")
+AI3D_TOKEN = (os.environ.get("ZEIM_AI3D_TOKEN") or "").strip()
+AI3D_TIMEOUT_S = _int("ZEIM_AI3D_TIMEOUT_S", 900)            # CPU runs can take minutes
+AI3D_PRO_ONLY = _flag("ZEIM_AI3D_PRO_ONLY", False)            # after launch: Pro. During testing: unlocked for everyone, but capped
+AI3D_DAILY_CAP = _int("ZEIM_AI3D_DAILY_CAP", 5)               # models per account per day while testing (0 = no cap)
+AI3D_COOLDOWN_MIN = _int("ZEIM_AI3D_COOLDOWN_MIN", 5)         # minutes between models; starts when a model finishes
+AI3D_COOLDOWN_STEP_MIN = _int("ZEIM_AI3D_COOLDOWN_STEP_MIN", 5)   # extra minutes after each paid model (Pro); 0 = flat
+AI3D_FAKE = _flag("ZEIM_AI3D_FAKE", False)                     # TEST DOUBLE only (tests/screenshots): a made-up shape, no AI

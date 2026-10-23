@@ -1,0 +1,13 @@
+# Optional 2D->3D engine next to ZEIM.  docker compose -f workers/ai3d/docker-compose.ai3d.yml up -d
+# Then run ZEIM with ZEIM_AI3D_URL=http://zeim-ai3d:8765 on the same network (see workers/ai3d/README.md).
+services:
+  zeim-ai3d:
+    build: .
+    container_name: zeim-ai3d
+    restart: unless-stopped
+    volumes: ["zeim-ai3d-data:/data"]
+    networks: [zeim]
+    # NVIDIA GPU (optional): uncomment, and build with the CUDA TORCH_INDEX.
+    # deploy: {resources: {reservations: {devices: [{driver: nvidia, count: 1, capabilities: [gpu]}]}}}
+volumes: {zeim-ai3d-data: {}}
+networks: {zeim: {name: zeim}}

@@ -26,8 +26,8 @@ async function refreshMe() {
 }
 
 /* ---------- views ---------- */
-const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", account: "#viewAccount", learn: "#viewLearn" };
-const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", studio: "lithophane" };
+const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn" };
+const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", studio: "lithophane", "2d3d": "ai3d" };
 function show(view) {
   const tab = view;   // P10: Learn has its own nav button
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === tab); if (b.dataset.view === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
@@ -37,6 +37,7 @@ function show(view) {
   if (view === "torchc0") document.dispatchEvent(new CustomEvent("zeim:torchc0-shown"));
   if (view === "showcase") loadShowcase();
   if (view === "learn") loadLearn();
+  if (view === "ai3d") document.dispatchEvent(new CustomEvent("zeim:ai3d-shown"));
 }
 $$("#mainNav button").forEach(b => b.onclick = () => { location.hash = b.dataset.view; });
 const TOOLWORDS = { smartorient: "Smart orient", cut: "Cut", orient: "Rotate", text: "Text", repair: "Repair", hollow: "Hollow", simplify: "Repair" };
