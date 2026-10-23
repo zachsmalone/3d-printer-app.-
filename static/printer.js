@@ -195,6 +195,7 @@ export function wirePanel(getModelId) {
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
         ${costHTML(r)}
         ${paintNote}
+        ${r.skipped_objects?.length ? `<div class="help warn" role="alert" id="spSkipped"><p>${esc(r.skipped_note)}</p><div class="row"><button type="button" class="btn small" id="spSplit">Split onto another plate</button><button type="button" class="btn small ghost" id="spSkipX" aria-label="Dismiss this warning">Dismiss</button></div></div>` : ""}
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
@@ -202,6 +203,15 @@ export function wirePanel(getModelId) {
         ${HAS_GL ? gcodePreviewHTML() : r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
       wireCost();
+      if ($("#spSkipX")) $("#spSkipX").onclick = () => $("#spSkipped").remove();
+      if ($("#spSplit")) $("#spSplit").onclick = async () => {
+        const b = $("#spSplit"); b.disabled = true;
+        try {
+          const j = await api(`/api/edit/${encodeURIComponent(getModelId())}/plate/split`, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ printer_id: P.pref?.printer_id }) });
+          $("#spSkipped").innerHTML = `<p>${esc(j.message)}</p>${j.new_project ? `<a class="btn small" href="/?edit=${encodeURIComponent(j.new_project)}#slicer">Open plate 2</a>` : ""}`;
+        } catch (e) { b.disabled = false; $("#spSkipped p").textContent = e.message || "Couldn't split the plate."; }
+      };
       if (HAS_GL) gcDispose = wireGcodePreview(r.downloads.gcode, { time: r.print_time_human, grams: r.filament_grams, mm: r.filament_mm });
       else if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
     } catch (e) {

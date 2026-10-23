@@ -244,6 +244,25 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     return _act(bid, actor, lambda: editproj.add_op(bid, op, params))
 
 
+@router.post("/{bid}/plate/split")
+def split_plate(bid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
+    """Objects that don't fit the bed after Auto-arrange go onto a new plate project (offered, never forced)."""
+    body = body or {}
+    meta = _edit_meta(bid, actor, owner_only=True)
+    from .builds import disk_guard
+    disk_guard()
+    try:
+        out = editproj.split_plate(bid, actor.sid, meta.get("visibility") or privacy.default_level(actor), body,
+                                   auto_delete_oldest=bool(body.get("auto_delete_oldest")))
+    except HistoryFull:
+        return _full(actor)
+    except meshedit.OpError as e:
+        raise HTTPException(422, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {**out, "project": editproj.payload(bid)}
+
+
 @router.put("/{bid}/step/{i}")
 def edit_step(bid: str, i: int, body: dict, actor: Actor = Depends(get_actor)):
     """Change one step's parameters; every later step is replayed (all-or-nothing)."""

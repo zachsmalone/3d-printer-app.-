@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import { $, $$, esc } from "/static/app.js";
 
-const PL = { sel: new Set(), ctx: null, bed: null, drag: null, plane: null,
+const PL = { sel: new Set(), ctx: null, bed: null, drag: null, plane: null, gap: 5, rotate: true, copies: 2,
   txt: { open: false, text: "", mode: "emboss", face: "top", height: 8, depth: 1, font: "sans", rotation: 0, offset_u: 0, offset_v: 0 },
   cut: { open: false, axis: "z", offset: null, join: "none", material: "PLA", magnet_diameter: 6, magnet_thickness: 3, pin_diameter: 4, count: 2, lay_flat: false, for: null } };
 const objs = () => PL.ctx?.p?.plate?.objects || [];
@@ -11,6 +11,9 @@ const groupOf = i => objs()[i]?.group;
 const expand = set => { const gs = new Set([...set].map(groupOf)); return new Set(objs().filter(o => gs.has(o.group)).map(o => o.i)); };
 const selList = () => [...PL.sel].sort((a, b) => a - b);
 const r1 = x => Math.round(x * 10) / 10;
+/* the user's selected printer (Slicer tab picker) so Auto-arrange packs for that bed; the server resolves its size */
+const printerId = () => { try { return (typeof P !== "undefined" && P.pref?.printer_id) || undefined; } catch { return undefined; } };
+const SNAP_MM = 1;
 
 export function plateOp(action, extra = {}) {
   const sel = selList();
@@ -33,6 +36,13 @@ export function renderPlate(ctx) {
   return html;
 }
 
+function overflowHTML() {
+  const a = PL.ctx.p.report?.action === "arrange" ? PL.ctx.p.report.arrange : null;
+  if (!a || a.fits || !(a.overflow || []).length) return "";
+  return `<div class="warn pover" role="alert" id="plateOverflow"><p>${a.overflow.length} object${a.overflow.length > 1 ? "s don't" : " doesn't"} fit on the ${a.bed_mm[0]} × ${a.bed_mm[1]} mm bed${a.plates > 1 ? ` (needs ${a.plates} plates)` : ""}. They're placed beside the bed. You can still edit; slicing needs them on the bed.</p>
+    <button type="button" class="btn small" data-pact="split">Split onto another plate</button></div>`;
+}
+
 function panelHTML() {
   const pl = PL.ctx.p.plate, n = pl.objects.length, s = selList(), one = s.length === 1 ? pl.objects[s[0]] : null;
   const box = s.length ? selBox() : null;
@@ -44,6 +54,7 @@ function panelHTML() {
     return `<li class="pobj ${on ? "on" : ""} ${o.hidden ? "hid" : ""}">
       <button type="button" class="pselect" data-psel="${o.i}" aria-pressed="${on}"><b>${esc(o.name)}</b>${grp}<small>${o.size.map(r1).join(" × ")} mm · ${w}</small></button>
       <button type="button" class="picon" data-peye="${o.i}" aria-pressed="${!o.hidden}" aria-label="${o.hidden ? "Show" : "Hide"} ${esc(o.name)}" title="${o.hidden ? "Hidden, won't print. Show it" : "Hide (won't print)"}">${o.hidden ? "🙈" : "👁"}</button>
+      <button type="button" class="picon" data-pdup="${o.i}" aria-label="Duplicate ${esc(o.name)}" title="Duplicate">⧉</button>
       <button type="button" class="picon" data-pdel="${o.i}" aria-label="Delete ${esc(o.name)}" title="Delete (Undo brings it back)" ${n < 2 ? "disabled" : ""}>🗑</button></li>`;
   }).join("");
   const sz = box ? box.size : [0, 0, 0];
@@ -56,6 +67,15 @@ function panelHTML() {
       <button type="button" class="btn small" data-pact="arrange">▦ Auto-arrange</button>
       <button type="button" class="btn small ghost" data-pact="selall">Select all</button>
     </div>
+    <div class="tool-row parr" role="group" aria-label="Auto-arrange settings">
+      <label class="inl">Spacing <input type="number" id="pGap" min="0" max="50" step="0.5" value="${PL.gap}" inputmode="decimal" aria-label="Spacing between objects in mm"> mm</label>
+      <label class="inl"><input type="checkbox" id="pRot" ${PL.rotate ? "checked" : ""}> Allow 90° turns</label>
+    </div>
+    <div class="tool-row parr" role="group" aria-label="Add copies">
+      <label class="inl">Copies <input type="number" id="pCopies" min="1" max="50" step="1" value="${PL.copies}" inputmode="numeric" aria-label="Number of copies to add"></label>
+      <button type="button" class="btn small" data-pact="copies" ${s.length ? "" : "disabled"} title="${s.length ? "Add copies of the selection, then auto-arrange" : "Select an object first"}">＋ Add copies</button>
+    </div>
+    ${overflowHTML()}
     <p class="help" id="plateOut" role="status" aria-live="polite">${esc(PL.ctx.p.report?.action ? PL.ctx.p.report.message || "" : "")}</p>
     ${PL.ctx.p.report?.action === "text" && PL.ctx.p.report.text?.note ? `<p class="help" id="plateTextNote">${esc(PL.ctx.p.report.text.note)}</p>` : ""}
     ${PL.ctx.p.report?.action === "cut" && PL.ctx.p.report.cut ? `<p class="help simnote" id="plateCutNote"><span class="pill">Simulated</span> ${esc(PL.ctx.p.report.cut.note || "")}</p>` : ""}
@@ -195,7 +215,7 @@ function drawCutPlane() {
 function selBox() {
   const os = selList().map(i => objs()[i]);
   const lo = [0, 1, 2].map(a => Math.min(...os.map(o => o.min[a]))), hi = [0, 1, 2].map(a => Math.max(...os.map(o => o.max[a])));
-  return { c: lo.map((v, a) => (v + hi[a]) / 2), size: lo.map((v, a) => hi[a] - v) };
+  return { c: lo.map((v, a) => (v + hi[a]) / 2), size: lo.map((v, a) => hi[a] - v), min: lo, max: hi };
 }
 
 /* ---------- viewer: bed outline, highlight, hidden ghosts ---------- */
@@ -240,6 +260,19 @@ function hitObject(e) {
 }
 export function pickAt(e) { const h = hitObject(e); if (h) select(h.obj, e.shiftKey); }
 
+/* drag snapping: whole millimetres (hold Alt for free movement), and a selection that starts on the bed is
+   kept inside it (it snaps to the edge instead of hanging off). */
+function snapDrag(d, free) {
+  if (!free) { d.x = Math.round(d.x / SNAP_MM) * SNAP_MM; d.y = Math.round(d.y / SNAP_MM) * SNAP_MM; }
+  const b = PL.ctx?.p?.plate?.bed_mm, box = PL.sel.size ? selBox() : null;
+  if (b && box && box.min && box.max) {
+    const hx = b[0] / 2, hy = b[1] / 2;
+    if (box.min[0] >= -hx && box.max[0] <= hx) d.x = Math.max(-hx - box.min[0], Math.min(hx - box.max[0], d.x));
+    if (box.min[1] >= -hy && box.max[1] <= hy) d.y = Math.max(-hy - box.min[1], Math.min(hy - box.max[1], d.y));
+  }
+  return d;
+}
+
 /* drag a selected object across the bed (plane z=0); one "transform" step on release */
 export function wireDrag(v) {
   const el = v.renderer.domElement, plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -252,7 +285,7 @@ export function wireDrag(v) {
   el.addEventListener("pointermove", e => {
     if (!PL.drag) return;
     const h = hitObject(e); const p = h?.rc.ray.intersectPlane(plane, new THREE.Vector3()); if (!p) return;
-    PL.drag.d = p.sub(PL.drag.p0);
+    PL.drag.d = snapDrag(p.sub(PL.drag.p0), e.altKey);
     v.group.children.forEach((m, k) => { if (PL.sel.has(m.userData.object ?? k)) m.position.set(PL.drag.d.x, PL.drag.d.y, 0); });
   });
   const end = () => {
@@ -270,8 +303,18 @@ export function wirePanel(root) {
     if (eye) { const i = +eye.dataset.peye; return PL.ctx.doOp("plate", { action: objs()[i].hidden ? "show" : "hide", sel: [i] }, "Updating the plate…", $("#plateOut")); }
     const del = e.target.closest("[data-pdel]");
     if (del) { const i = +del.dataset.pdel; PL.sel.delete(i); return PL.ctx.doOp("plate", { action: "delete", sel: [i] }, "Deleting…", $("#plateOut")); }
+    const dup = e.target.closest("[data-pdup]");
+    if (dup) { const i = +dup.dataset.pdup; return PL.ctx.doOp("plate", { action: "duplicate", sel: [i] }, "Duplicating…", $("#plateOut")); }
     const a = e.target.closest("[data-pact]"); if (!a) return;
     const act = a.dataset.pact;
+    if (act === "arrange") return PL.ctx.doOp("plate", { action: "arrange", sel: [], gap: PL.gap, rotate: PL.rotate, printer_id: printerId() }, "Arranging…", $("#plateOut"));
+    if (act === "copies") {
+      const sel = selList(); if (!sel.length) return;
+      const count = Math.max(1, Math.min(50, Math.round(PL.copies) || 1));
+      return PL.ctx.doOp("plate", { action: "duplicate", sel, count }, "Adding copies…", $("#plateOut"))
+        .then(() => PL.ctx.doOp("plate", { action: "arrange", sel: [], gap: PL.gap, rotate: PL.rotate, printer_id: printerId() }, "Arranging…", $("#plateOut")));
+    }
+    if (act === "split") return splitPlate();
     if (act === "selall") { PL.sel = new Set(objs().map(o => o.i)); return rerender(); }
     if (act === "delete") { const s2 = selList(); PL.sel.clear(); return PL.ctx.doOp("plate", { action: "delete", sel: s2 }, "Deleting…", $("#plateOut")); }
     const sel = selList();
@@ -282,6 +325,12 @@ export function wirePanel(root) {
     if (e.target.id === "pCut") { PL.cut.open = e.target.open; drawCutPlane(); }
     if (e.target.id === "pText") PL.txt.open = e.target.open;
   }, true);
+  const onArr = e => {
+    if (e.target.id === "pGap") { const v = parseFloat(e.target.value); if (Number.isFinite(v)) PL.gap = Math.max(0, Math.min(50, v)); }
+    if (e.target.id === "pRot") PL.rotate = e.target.checked;
+    if (e.target.id === "pCopies") { const v = parseInt(e.target.value, 10); if (Number.isFinite(v)) PL.copies = Math.max(1, Math.min(50, v)); }
+  };
+  root.addEventListener("input", onArr); root.addEventListener("change", onArr);
   const onCut = e => {
     const f = e.target.closest("form[data-plate=cut]"); if (f) return syncCut(f, e.target);
     const t = e.target.closest("form[data-plate=text]"); if (t) readText(t);
@@ -308,4 +357,19 @@ export function wirePanel(root) {
     plateOp("transform", { x: num("x"), y: num("y"), rz: num("rz") || 0, scale_pct: num("scale_pct") || 100, size_mm: size });
   }, true);
 }
+async function splitPlate() {
+  const out = $("#plateOut"), id = PL.ctx.p.id;
+  if (out) out.textContent = "Moving the extra objects to a new plate…";
+  try {
+    const r = await fetch(`/api/edit/${id}/plate/split`, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+      body: JSON.stringify({ gap: PL.gap, rotate: PL.rotate, printer_id: printerId() }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { if (out) out.textContent = (typeof j.detail === "string" ? j.detail : j.detail?.message) || "Couldn't split the plate."; return; }
+    PL.sel.clear();
+    if (PL.ctx.refresh) await PL.ctx.refresh(j.project); else await PL.ctx.doOp("plate", { action: "arrange", sel: [], gap: PL.gap, rotate: PL.rotate, printer_id: printerId() }, "Arranging…", out);
+    const o2 = $("#plateOut"); if (o2) o2.textContent = j.message;
+    if (j.new_project && o2) o2.insertAdjacentHTML("beforeend", ` <a href="/?edit=${encodeURIComponent(j.new_project)}#slicer">Open plate 2</a>`);
+  } catch { if (out) out.textContent = "Couldn't reach the server. Try again."; }
+}
+
 export const plateState = PL;
