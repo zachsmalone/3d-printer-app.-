@@ -27,8 +27,9 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 
 These are not finished yet:
 
-1. **Live Sculpt.**
-2. **Subscriptions:** the core stays free forever; optional Semi Pro and Pro plans are planned. Details are not final.
+1. **Bust mode:** a dedicated mode for busts beyond the basic 2D→3D Bust option.
+2. **Live Sculpt.**
+3. **Subscriptions:** the core stays free forever; optional Semi Pro and Pro plans are planned. Details are not final.
 
 See [`ROADMAP.md`](ROADMAP.md) for more.
 
