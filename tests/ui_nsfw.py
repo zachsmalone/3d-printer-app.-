@@ -6,7 +6,7 @@ import os, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1].rstrip("/"); bad = []
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PNG = open(os.path.join(ROOT, "static", "sample.png"), "rb").read()
+PNG = open(os.path.join(ROOT, "static", "sample.jpg"), "rb").read()
 
 
 def ok(n, c, x=""):

@@ -99,7 +99,7 @@ def test_layers_endpoint_from_a_real_slice():
     from app.main import app
     from app.api import slice as sl
     c = TestClient(app)
-    with open(os.path.join(ROOT, "static", "sample_model.stl"), "rb") as f:
+    with open(os.path.join(ROOT, "tests", "fixtures", "sample_vase.stl"), "rb") as f:
         r = c.post("/api/slice", files={"file": ("m.stl", f.read(), "model/stl")})
     assert r.status_code == 200, r.text
     j = r.json(); sid = j["slice_id"]

@@ -177,7 +177,7 @@ drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (pick
 drop.addEventListener("click", () => pick.el("File").click());
 $("#changePhoto").onclick = () => pick.el("File").click();
 $("#sSample").onclick = async () => {
-  try { const b = await (await fetch("/static/sample.png")).blob(); setFile(new File([b], "sample.png", { type: "image/png" })); }
+  try { const b = await (await fetch("/static/sample.jpg")).blob(); setFile(new File([b], "sample.jpg", { type: "image/jpeg" })); }
   catch { pick.msg("We couldn't load the sample image. Please try again."); }
 };
 

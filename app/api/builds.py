@@ -100,11 +100,11 @@ def meta_for(bid: str, actor: Actor, owner_only: bool = False) -> dict:
     return meta
 
 
-DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera / school file names can hold a child's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 
 def disk_guard():

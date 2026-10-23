@@ -35,7 +35,7 @@ LIMITS = {"layer_mm": (0.01, 0.2), "exposure_s": (0.5, 30.0), "bottom_exposure_s
           "lift_mm": (1.0, 15.0), "lift_speed_mm_min": (10.0, 300.0), "tilt_deg": (0.0, 60.0), "wall_mm": (0.0, 6.0),
           "drain_mm": (0.0, 10.0), "price": (0.0, 10000.0), "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0)}
 SAFETY = ["Wear nitrile gloves and eye protection; uncured resin irritates skin and eyes.",
-          "Print and wash in a ventilated room; keep resin away from children, pets and food areas.",
+          "Print and wash in a ventilated room; keep resin away from pets, food areas and anyone not wearing gloves.",
           "Wash prints in IPA (or the resin maker's wash), then cure under UV. Cure used IPA and resin waste in sunlight before disposal; never pour it down a drain.",
           "Hollow prints need drain holes, or trapped liquid resin can crack the print later."]
 def _data_price():

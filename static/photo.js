@@ -30,8 +30,8 @@ export function photoBlock(p, { sample = true } = {}) {
   </div>
   <input type="file" id="${p}File" accept="image/*,.heic,.heif" class="sr-only" tabindex="-1" aria-hidden="true">
   <input type="file" id="${p}Cam" accept="image/*" capture="environment" class="sr-only" tabindex="-1" aria-hidden="true">
-  <label class="inl pp-ack"><input type="checkbox" id="${p}Ack"> <span>This is my photo or drawing, or I have permission from everyone in it. No addresses, school names or license plates.</span></label>
-  <p class="pp-note">Photos stay private to you unless you choose to share.<br>Use your own photo or drawing, or ask first. No addresses, school names or plates.</p>
+  <label class="inl pp-ack"><input type="checkbox" id="${p}Ack"> <span>This is my photo or drawing, or I have permission from everyone in it. No addresses, workplace names or license plates.</span></label>
+  <p class="pp-note">Photos stay private to you unless you choose to share.</p>
 </div>`;
 }
 

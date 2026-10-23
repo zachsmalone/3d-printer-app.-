@@ -847,3 +847,17 @@ body{background:var(--bg)!important}
 @media (max-width:768px){.topbar{flex-wrap:wrap}.topbar .themetoggle,.topbar #lookBtn{order:4}.kindpick{order:50;flex:1 0 100%;justify-content:center}.kindpick button{flex:1 1 0}}
 .kindnote{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;padding:8px 12px;border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:10px;background:var(--panel)}
 .kindnote .x{margin-left:auto;min-width:44px;min-height:44px}
+
+/* 18+ first-visit gate: calm, full screen, brand palette, 44px targets */
+html.gated,html.gated body{overflow:hidden}
+.agegate{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));background:var(--bg,#fff);color:var(--txt,#0A0A0A)}
+.agegate .ag-card{width:100%;max-width:420px;text-align:center;outline:none}
+.agegate .ag-logo{height:32px;width:auto;margin:0 auto 32px;display:block}
+.agegate h1{font-size:clamp(22px,5vw,28px);line-height:1.25;font-weight:650;letter-spacing:-.01em;margin:0 0 8px}
+.agegate p{margin:0 0 24px;color:var(--mut,#8A8A8A);font-size:16px;line-height:1.5}
+.agegate .ag-row{display:flex;flex-direction:column;gap:12px}
+.agegate .ag-row .btn{min-height:48px;width:100%;font-size:16px;justify-content:center}
+.agegate .ag-fine{font-size:13px;margin:20px 0 0}
+@media (min-width:480px){.agegate .ag-row{flex-direction:row}.agegate .ag-row .btn{flex:1}}
+html:not([data-theme=dark]) .agegate .logo-dark,html[data-theme=dark] .agegate .logo-light{display:none}
+

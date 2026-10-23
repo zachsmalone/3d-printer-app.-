@@ -82,7 +82,7 @@ function takeFiles(list) {
 $("#editFile").onchange = e => { const l = [...e.target.files]; e.target.value = ""; takeFiles(l); };
 drop.addEventListener("click", () => $("#editFile").click());
 $("#eSample").onclick = async () => {
-  try { const b = await (await fetch("/static/sample.png")).blob(); fromFile(new File([b], "sample.png", { type: "image/png" })); }
+  try { const b = await (await fetch("/static/sample.jpg")).blob(); fromFile(new File([b], "sample.jpg", { type: "image/jpeg" })); }
   catch { editPick.msg("We couldn't load the sample image. Please try again."); }
 };
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
@@ -132,7 +132,7 @@ async function sendMulti(mode, auto = false) {
 }
 $("#multiPlate").onclick = () => sendMulti("plate");
 $("#multiSeparate").onclick = () => sendMulti("separate");
-$("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_vase.stl")); };
+$("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_cat.stl")); };
 function fromBuild(id) {
   const mk = () => { const fd = new FormData(); fd.append("from_build", id); fd.append("beginner", !isExpert()); return fd; };
   create(mk(), mk);

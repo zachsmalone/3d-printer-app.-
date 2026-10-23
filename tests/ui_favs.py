@@ -10,7 +10,7 @@ bad = []
 def ok(n, c, x=""):
     print(("PASS " if c else "FAIL ") + n, x)
     if not c: bad.append(n)
-MK = """async () => { const sb = await (await fetch('/static/sample.png')).blob(); const fd = new FormData(); fd.append('file', new File([sb], 'a.png', {type:'image/png'}));
+MK = """async () => { const sb = await (await fetch('/static/sample.jpg')).blob(); const fd = new FormData(); fd.append('file', new File([sb], 'a.png', {type:'image/png'}));
   fd.append('mode','relief'); fd.append('resolution','40'); fd.append('width_mm','40'); const r = await fetch('/api/generate', {method:'POST', body: fd}); return r.status; }"""
 def run(name, launch):
     try: b = launch()

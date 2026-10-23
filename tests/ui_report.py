@@ -4,7 +4,7 @@ import os, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PNG = open(os.path.join(ROOT, "static", "sample.png"), "rb").read()
+PNG = open(os.path.join(ROOT, "static", "sample.jpg"), "rb").read()
 bad = []
 def ok(n, c, x=""):
     print(("PASS " if c else "FAIL ") + n, x)

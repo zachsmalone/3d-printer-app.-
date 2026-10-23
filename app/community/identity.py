@@ -6,7 +6,7 @@ Identity = an account record in users.json, keyed by an internal "account key" (
     whose `id` equals the session's auth `owner_id` (legacy id for upgraded cookie accounts, else the auth account id).
     Builds, Showcase items, follows and favourites then belong to that account on every device.
   * otherwise the old cookie login: `p3d_sid` -> account record (kept working; recovery codes still apply).
-  * no accounts under MIN_SIGNUP_AGE (18). Families can print designs together with an adult account holder.
+  * no accounts under MIN_SIGNUP_AGE (18). ZEIM is for adults only.
   * content is clean and safe for all, for everyone (see COMMUNITY_GUIDELINES.md)
   * an account is RESTRICTED (treated like signed out for sharing, its content shown to nobody else) while it is
     suspended by a moderator, or if it is a legacy account whose stored date of birth is under 18 (from the old 13+ rules)
@@ -224,8 +224,7 @@ def session_only_cookie(request: Request, response: Response, sid: str):
 
 
 AGE_COOKIE = "p3d_ag"
-AGE_MESSAGE = ("Sorry, ZEIM accounts are for adults 18 and over. You can still build, learn and download without an account, "
-               "and families can print designs together with an adult account holder.")
+AGE_MESSAGE = "Sorry, ZEIM accounts are for adults 18 and over, so we can't create an account for you."
 
 
 def _blk(sid: str) -> str:
