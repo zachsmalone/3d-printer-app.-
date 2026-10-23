@@ -38,6 +38,10 @@ function dlg() {
       <div class="row" id="expNameRow" hidden><label for="expName" class="sr-only">File name</label><input id="expName" maxlength="160" autocomplete="off" spellcheck="false"><button type="button" class="btn small" id="expNameOk">Done</button><button type="button" class="btn small ghost" id="expNameReset">Default</button></div>
       <p class="help" id="expNameHelp">Safe on Windows, Mac and phones.</p></div>
     <fieldset class="expfmts"><legend>Format</legend><div id="expList"></div></fieldset>
+    <fieldset class="expslots" id="expSlots"><legend>Filament slots (CFS / AMS)</legend>
+      <p class="help" id="expSlotsHelp">Use one slot: only the slots you tick go in the file. Empty slots are never checked.</p>
+      <div class="row" id="expSlotList">${[1, 2, 3, 4].map(n => `<label class="slotchk"><input type="checkbox" name="expSlot" value="${n}" ${n === 1 ? "checked" : ""}><span>Slot ${n}</span></label>`).join("")}</div>
+      <div class="expwarn" id="expSlotWarn" role="status" hidden><span id="expSlotWarnT"></span> <button type="button" class="btn small ghost" id="expSlotWarnOk">Continue</button></div></fieldset>
     <p class="help" id="expStep"></p>
     <p class="help" id="expMsg" role="status" aria-live="polite"></p>
     <div class="row end"><button type="button" class="btn ghost" id="expCancel">Close</button><a class="btn primary" id="expGo" href="#" download>Download</a></div></form>`;
@@ -49,9 +53,9 @@ function dlg() {
 export async function open(o) {
   const d = dlg(), ws = o.ws || "studio", list = await formats();
   let fmt = ls("zeim.exportfmt." + ws); if (!list.some(f => f.id === fmt)) fmt = o.defaultFormat || "3mf";
-  let name = o.name || "", def = o.name || "ZEIM model";
+  let name = o.name || "", def = o.name || "ZEIM model", colours = 0;
   if (o.bid) {
-    try { const j = await (await fetch(`/api/export/${encodeURIComponent(o.bid)}`, { credentials: "same-origin" })).json(); name = j.name || name; def = j.default_name || def; }
+    try { const j = await (await fetch(`/api/export/${encodeURIComponent(o.bid)}`, { credentials: "same-origin" })).json(); name = j.name || name; def = j.default_name || def; colours = j.colour_count || 0; }
     catch { }
   }
   name = safeName(name || def);
@@ -60,8 +64,23 @@ export async function open(o) {
   $("#expList").innerHTML = list.map(f => `<label class="radrow expfmt"><input type="radio" name="expFmt" value="${esc(f.id)}" ${f.id === fmt ? "checked" : ""}><span><b>${esc(f.label)}</b> <small>${esc(f.desc)}</small></span></label>`).join("");
   $("#expStep").textContent = STEPNOTE;
   $("#expMsg").textContent = "";
+  $("#expSlots").hidden = !!o.rid;
+  d.querySelectorAll("input[name=expSlot]").forEach(c => { c.checked = c.value === "1"; });
+  const slots = () => { const v = [...d.querySelectorAll("input[name=expSlot]:checked")].map(c => +c.value); return v.length ? v : [1]; };
+  let warnOff = false;
+  const slotWarn = () => {
+    const s = slots(), need = Math.max(1, colours); let t = "";
+    if (s.length > need) t = `This model has ${need === 1 ? "one colour" : need + " colours"}, so only slot ${s.slice(0, need).join(", ")} will be used. The others are left out of the file.`;
+    else if (s.length < need) t = `This model has ${need} colours but you picked ${s.length} slot${s.length > 1 ? "s" : ""}. Extra colours print from slot ${s[s.length - 1]}.`;
+    $("#expSlotWarnT").textContent = t; $("#expSlotWarn").hidden = !t || warnOff;
+  };
+  $("#expSlotsHelp").textContent = colours > 1
+    ? `This model has ${colours} colours. Tick one slot per colour, or keep one slot to print it in a single colour.`
+    : "Use one slot: only the slot you tick goes in the file. Unused slots are never checked or mapped.";
+  $("#expSlotWarnOk").onclick = () => { warnOff = true; $("#expSlotWarn").hidden = true; };
   const url = () => {
     const f = d.querySelector("input[name=expFmt]:checked")?.value || "3mf";
+    if (!o.rid) return `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}&slots=${slots().join(",")}`;
     return o.rid ? `/api/resin/${o.rid}/torchc0.${f}?name=${encodeURIComponent(name)}`
       : `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}`;
   };
@@ -84,9 +103,10 @@ export async function open(o) {
   $("#expNameReset").onclick = () => commit(def);
   $("#expName").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); commit($("#expName").value); } else if (e.key === "Escape") { e.preventDefault(); editing(false); } };
   $("#expName").oninput = () => { $("#expNameHelp").textContent = "Will save as: " + safeName($("#expName").value) + ". Safe on Windows, Mac and phones."; };
+  $("#expSlotList").onchange = () => { warnOff = false; slotWarn(); paint(); };
   $("#expList").onchange = e => { if (e.target.name === "expFmt") { ls("zeim.exportfmt." + ws, e.target.value); paint(); } };
   $("#expGo").onclick = () => { ls("zeim.exportfmt." + ws, d.querySelector("input[name=expFmt]:checked")?.value || "3mf"); $("#expMsg").textContent = "Downloading…"; };
-  editing(false); paint();
+  editing(false); slotWarn(); paint();
   if (!d.open) d.showModal();
   return d;
 }

@@ -1000,6 +1000,9 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 .exportdlg #expName{flex:1 1 200px;min-height:44px;font:inherit;padding:0 10px}
 .expfmts{border:0;padding:0;margin:8px 0;display:grid;gap:2px}
 .expfmts legend{font-weight:600;margin-bottom:4px}
+.expslots{border:1px solid var(--line,#D9DBDF);border-radius:10px;padding:8px 10px;margin:8px 0}.expslots legend{font-weight:600;padding:0 4px}
+.slotchk{display:inline-flex;align-items:center;gap:6px;min-height:44px;min-width:44px;padding:0 10px;border:1px solid var(--line,#D9DBDF);border-radius:10px;cursor:pointer}.slotchk input{width:20px;height:20px}
+.expwarn{margin-top:6px;padding:6px 10px;border-left:4px solid var(--warn,#B26B00);background:var(--sunk,#F4F5F7);border-radius:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .expfmt{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:4px 0;cursor:pointer}
 .expfmt input{margin-top:4px}
 .expfmt small{display:block;color:var(--mut,#5c5c5c);font-weight:400}

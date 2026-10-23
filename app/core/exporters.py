@@ -49,11 +49,13 @@ RELS = ('<?xml version="1.0" encoding="UTF-8"?>\n'
         'Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')
 
 
-def to_3mf(model: Model, title: str = "photo3d") -> bytes:
-    colors = []
-    for b in model.bodies:
-        if b.color and b.color.upper() not in colors:
-            colors.append(b.color.upper())
+def to_3mf(model: Model, title: str = "photo3d", slots=None) -> bytes:
+    """slots: the filament slots the maker picked (None = Slot 1, or Slots 1..n for an n-colour model). Only the slots
+    an object really uses are written (basematerials + Metadata/model_settings.config); see services/filament_slots."""
+    from app.services import filament_slots as fs
+    p = fs.plan(fs.model_colours(model), slots)
+    fil = p["filament_of_colour"]
+    cols = p["colour_of_filament"]
     x = io.StringIO()
     x.write('<?xml version="1.0" encoding="UTF-8"?>\n')
     x.write('<model unit="millimeter" xml:lang="en-US" '
@@ -61,18 +63,19 @@ def to_3mf(model: Model, title: str = "photo3d") -> bytes:
     x.write(f'<metadata name="Title">{escape(title)}</metadata>'
             '<metadata name="Application">photo3d</metadata><resources>')
     mat_id = None
-    if colors:
+    if any(cols):
         mat_id = 1
         x.write('<basematerials id="1">')
-        for i, c in enumerate(colors):
-            x.write(f'<base name="color{i}" displaycolor="{c}FF"/>')
+        for i, c in enumerate(cols):
+            x.write(f'<base name="slot{p["slots"][i]}" displaycolor="{c or "#808080"}FF"/>')
         x.write('</basematerials>')
     first = 2
+    ext = {}
     for i, b in enumerate(model.bodies):
         oid = first + i
-        attrs = ""
-        if mat_id and b.color:
-            attrs = f' pid="{mat_id}" pindex="{colors.index(b.color.upper())}"'
+        e = fil.get((b.color or "").upper(), 1)
+        ext[str(oid)] = e
+        attrs = f' pid="{mat_id}" pindex="{e - 1}"' if mat_id else ""
         x.write(f'<object id="{oid}" type="model" name="{escape(b.name)}"{attrs}><mesh><vertices>')
         np.savetxt(x, b.vertices, fmt='<vertex x="%.5f" y="%.5f" z="%.5f"/>', newline="")
         x.write('</vertices><triangles>')
@@ -87,7 +90,7 @@ def to_3mf(model: Model, title: str = "photo3d") -> bytes:
         z.writestr("[Content_Types].xml", CT)
         z.writestr("_rels/.rels", RELS)
         z.writestr("3D/3dmodel.model", x.getvalue())
-    return buf.getvalue()
+    return fs.annotate_3mf(buf.getvalue(), p, lambda oid: ext.get(oid, 1))
 
 
 WRITERS = {"stl": to_stl, "obj": to_obj, "3mf": to_3mf}

@@ -97,8 +97,14 @@ def slice_model(
     fit: bool = Form(False),
     ventilation_ok: bool = Form(False),
     support_paint: Optional[str] = Form(None),
+    slots: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
+    from app.services import filament_slots as fslots
+    try:
+        slot_plan = fslots.plan([], fslots.parse_slots(slots))   # the slicer gets one merged STL: one material, first picked slot
+    except ValueError as e:
+        _fail(400, "bad_slots", str(e))
     plate_objs, skipped = None, []
     if bool(file) == bool(model_id):
         _fail(400, "bad_request", "Send either an STL file or a model id (not both, not neither).")
@@ -190,6 +196,9 @@ def slice_model(
     finally:
         _slots.release()
         (work / "input.stl").unlink(missing_ok=True)
+    _g = work / "model.gcode"
+    _g.write_text(fslots.gcode_header(slot_plan) + _g.read_text(errors="ignore"))
+    (work / "slots.json").write_text(__import__("json").dumps(slot_plan))
     from app.services import slicer as _sl, willprint
     stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
     try:
@@ -216,7 +225,7 @@ def slice_model(
         "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
         "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
         "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
-        "support_paint": paint_info,
+        "support_paint": paint_info, "slots": slot_plan["slots"], "slot_notes": slot_plan["notes"],
         "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
@@ -331,7 +340,11 @@ def download_model(slice_id: str, ext: str):
     out = stl.with_suffix(".3mf")
     if not out.is_file():
         import trimesh
-        out.write_bytes(trimesh.load(str(stl), force="mesh").export(file_type="3mf"))
+        import json as _j
+        from app.services import filament_slots as fslots
+        sj = stl.parent / "slots.json"
+        plan = _j.loads(sj.read_text()) if sj.is_file() else fslots.plan([], None)
+        out.write_bytes(fslots.annotate_3mf(trimesh.load(str(stl), force="mesh").export(file_type="3mf"), plan))
     return FileResponse(out, media_type="model/3mf", filename="zeim-model.3mf")
 
 
