@@ -8,6 +8,10 @@ export function lightRGB(light) {
   if (m) { const n = parseInt(m[1], 16); return [(n >> 16) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]; }
   return LIGHTS[light] || LIGHTS.white;
 }
+/* backing colour behind the print (twin of app/core/litho_backing.py): '' = none, a preset, or "#rrggbb" */
+export const BACKINGS = { warm: "#ffe2b8", cool: "#e3ecff", paper: "#f3e8cf" };
+export const backingRGB = b => (!b || b === "none") ? [1, 1, 1] : lightRGB(BACKINGS[b] || b);
+export const toHex = c => "#" + c.map(x => Math.round(Math.min(1, Math.max(0, x)) * 255).toString(16).padStart(2, "0")).join("");
 export const brightness = (t, k = K_PER_MM) => Math.exp(-k * Math.max(0, t));
 
 export function wallThickness(pos, shape = "rect", box = null) {   // pos: flat Float32Array x,y,z,...; box {lo,hi}: whole-model bounds

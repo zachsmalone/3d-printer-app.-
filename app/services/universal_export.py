@@ -250,6 +250,7 @@ def export_build_for_printer(
     name: Optional[str] = None,
     nozzle: Optional[float] = None,
     slots=None,
+    preset: str = "",
 ) -> tuple[bytes, str, str, str, dict]:
     """Export a build for the chosen printer.
 
@@ -276,7 +277,14 @@ def export_build_for_printer(
     plan = fs.plan([], fs.parse_slots(slots))           # one merged mesh = one material = one slot (the first picked)
     if ext == "3mf":
         data = fs.annotate_3mf(data, plan)
-    info.update({"slots": plan["slots"], "slot_notes": plan["notes"]})
+    info.update({"slots": plan["slots"], "slot_notes": plan["notes"], "preset": ""})
+    if preset:
+        from app.services import litho_preset as lp
+        if preset != lp.PRESET_ID:
+            raise ValueError(f"Unknown print preset {preset!r}")
+        if ext == "3mf" and meta.get("mode") == "lithophane":      # anything else: plain file, no preset (never blocks)
+            data = lp.add_bambu(data, (meta.get("params") or {}).get("shape", "rect"), pid)
+            info["preset"] = lp.PRESET_ID
     filename = build_file_name(meta, pid, ext, nozzle=nozzle, name=name)
     return data, filename, ext, mime, info
 

@@ -81,7 +81,18 @@ def get_export_info(
         **ue.formats_public(),
         "open_in_hints": ue.get_open_in_hints(pref_pid),
         "colour_count": _colour_count(bid),
+        "print_presets": _presets(meta, p),
     }
+
+
+def _presets(meta: dict, p: dict) -> list:
+    """Print presets the picker can add to a 3MF of this build (lithophanes only, for now Bambu)."""
+    if meta.get("mode") != "lithophane":
+        return []
+    from app.services import litho_preset as lp
+    return [{"id": lp.PRESET_ID, "label": "Add lithophane print settings for Bambu Studio",
+             "desc": "0.12 mm layers, 100% infill, slower outer wall" + (", 5 mm brim" if (meta.get("params") or {}).get("shape") in lp.UPRIGHT else "") + ".",
+             "note": lp.NOTE, "suggested": str(p.get("brand", "")).startswith("Bambu") or str(p.get("id", "")).startswith("bambu_")}]
 
 
 def _colour_count(bid: str) -> int:
@@ -123,6 +134,7 @@ def download_export(
     nozzle: str = Query(""),
     name: str = Query("", max_length=400),
     slots: str = Query("", max_length=60, description="Filament slots to use, e.g. '2' or '1,3' (default Slot 1)"),
+    preset: str = Query("", pattern="^(|bambu_litho)$", description="bambu_litho: add lithophane print settings for Bambu Studio (3MF, lithophanes)"),
     actor: Actor = Depends(get_actor),
 ):
     """Download in the picked format, sized and named for the printer (3MF falls back to STL if it cannot be made)."""
@@ -136,7 +148,7 @@ def download_export(
         raise HTTPException(400, str(e))
     try:
         data, filename, ext, mime, info = ue.export_build_for_printer(
-            bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle), slots=picked)
+            bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle), slots=picked, preset=preset)
     except HTTPException:
         raise
     except Exception as e:
@@ -151,6 +163,7 @@ def download_export(
             "X-Export-Printer": info["printer_id"],
             "X-Export-Format": ext,
             "X-Export-Slots": ",".join(map(str, info.get("slots") or [])),
+            "X-Export-Preset": info.get("preset") or "",
         },
     )
 

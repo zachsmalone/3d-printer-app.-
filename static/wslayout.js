@@ -108,20 +108,22 @@
         return c;
       }
       for (var i = 0; i < order.length; i++) { for (var k = 0; k < shrink.length; k++) { var c = fit(order[i], k, !i); if (c) return c; if (!order[i]) break; } }
-      if (!p.core && !s.min) {   // still no room: show it as a chip for now (not saved), tap opens it
+      if (!s.min) {   // still no room: show it as a chip for now (not saved), tap opens it (a core panel too, rather than lying on top of the panel just opened)
         w.classList.add("min", "auto-min"); w.classList.toggle("v", !!s.edge && vert); w.classList.toggle("h", !!s.edge && !vert); w.dataset.edge = s.edge || "free"; w.style.maxWidth = box.w + "px"; w.style.maxHeight = box.h + "px"; W = Math.min(w.getBoundingClientRect().width, box.w); H = Math.min(w.getBoundingClientRect().height, box.h);
         for (var j = 0; j < order.length; j++) { var c2 = fit(order[j], 0, !j); if (c2) return c2; }
         var c3 = cands("", 0, W, H).find(function (r) { return !obs.some(function (b) { return hit(r, b); }); });   // anywhere free
         if (c3) { w.classList.add("free"); w.style.left = c3.x + "px"; w.style.top = c3.y + "px"; return c3; }
-        w.classList.add("auto-off"); return { x: 0, y: 0, w: 0, h: 0 };   // truly no room (a big tool panel is open): step aside until there is
+        if (p.core) { w.classList.remove("min", "auto-min", "free"); w.style.maxWidth = w.style.maxHeight = ""; var r0 = w.getBoundingClientRect(); W = Math.min(r0.width, box.w); H = Math.min(r0.height, box.h); }   // a core panel never steps aside
+        else { w.classList.add("auto-off"); return { x: 0, y: 0, w: 0, h: 0 }; }   // truly no room (a big tool panel is open): step aside until there is
       }
+      w.classList.toggle("v", !!s.edge && vert); w.classList.toggle("h", !!s.edge && !vert); w.dataset.edge = s.edge || "free";   // undo the trial edges' classes
       var f = cands(s.edge, s.t, W, H)[0] || { x: box.x, y: box.y, w: W, h: H }; w.style.left = f.x + "px"; w.style.top = f.y + "px"; w.dataset.crowded = "1"; return f;
     }
-    var queued = false, lastBox = null;
+    var queued = false, lastBox = null, api_watch = null;
     function layout() { if (queued) return; queued = true; Promise.resolve().then(function () { queued = false; doLayout(); }); }   // before the next paint: no frame with a panel on top of another
     function doLayout() {
       var want = !o.active || o.active(); if (want) mount(); else if (on) unmount(); if (!on) return;
-      if (o.before) o.before();
+      if (o.before) o.before(); if (api_watch) api_watch();
       var rr = root.getBoundingClientRect(), sa = safe(), vv = window.visualViewport;
       var bottom = vv ? Math.min(rr.height, vv.height + vv.offsetTop - rr.top) : rr.height;   // keyboard open: stay above it
       var box = { x: M + sa.l, y: M + Math.max(0, sa.t - rr.top), w: rr.width - 2 * M - sa.l - sa.r, h: Math.max(120, bottom - 2 * M - Math.max(0, sa.t - rr.top) - (rr.bottom >= innerHeight - 1 ? sa.b : 0)) };
@@ -160,6 +162,12 @@
     addEventListener("resize", layout); addEventListener("orientationchange", function () { load(); setTimeout(layout, 150); });
     matchMedia("(orientation: landscape)").addEventListener("change", function () { load(); layout(); });
     if (window.visualViewport) visualViewport.addEventListener("resize", layout);
+    /* an obstacle (e.g. the "Making your model" overlay) showing pushes panels aside; it going away must bring them
+       back, so watch each obstacle too (the selector's :not(...) part is dropped so a hidden one is still found) */
+    var watched = [];
+    function watchObstacles() { (o.obstacles || []).forEach(function (s) { document.querySelectorAll(s.replace(/:not\([^)]*\)/g, "")).forEach(function (el) {
+      if (watched.indexOf(el) >= 0) return; watched.push(el); new MutationObserver(layout).observe(el, { attributes: true, attributeFilter: ["hidden", "class", "style"] }); }); }); }
+    watchObstacles(); api_watch = watchObstacles;
     (o.watch || []).forEach(function (s) { var el = $(s); if (el) new MutationObserver(layout).observe(el, { attributes: true, attributeFilter: ["hidden", "class", "style", "data-sheet"], childList: !!o.watchChildren }); });
     layout();
     var api = { id: o.id, layout: layout, reset: reset, open: open, setHidden: setHidden, state: function () { return JSON.parse(JSON.stringify(state)); }, load: load, rekey: rekey, button: btn, panels: P };

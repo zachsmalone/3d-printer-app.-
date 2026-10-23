@@ -1121,3 +1121,9 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .itcols label.inl{display:flex;gap:8px;align-items:center;min-height:44px}
 #colNewRow{gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 #colNewRow input[type=text],#colNewRow input:not([type]){min-height:44px;flex:1;min-width:160px}
+/* lithophane backing colour: picker + hex side by side, wraps on a phone */
+.backingCustom{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.backingCustom[hidden]{display:none}
+.backingCustom input[type=color]{width:48px;height:44px;padding:2px}
+.backingCustom input[type=text]{width:9ch;min-height:44px;font-family:ui-monospace,monospace}
+.backingCustom input[aria-invalid=true]{outline:2px solid var(--bad,#c33)}

@@ -112,6 +112,16 @@
       <div class="grid2" id="curvedOpts" hidden>
         <div class="field"><label for="diameter_mm" id="diaLbl">Light diameter <em>mm</em></label><input type="number" id="diameter_mm" value="40" min="10" max="200" step="1"></div>
         <div class="field" id="heightFld"><label for="height_mm">Height <em>mm</em></label><input type="number" id="height_mm" value="60" min="10" max="240" step="1"></div>
+        <div class="field wide2" id="lipBox" hidden>
+          <label for="lip_mm">Lip width <em id="lipOut">2 mm</em></label>
+          <div class="range"><input type="range" id="lip_mm" min="0" max="10" step="0.5" value="2" aria-describedby="lipHelp"></div>
+          <label for="lip_taper">Lip edge</label>
+          <select id="lip_taper" aria-describedby="lipHelp"><option value="outward" selected>Sloped outward</option><option value="inward">Sloped inward</option><option value="both">Sloped both ways</option><option value="none">Flat ledge (may need supports)</option></select>
+          <label for="taper_deg">Slope <em id="taperOut">45°</em></label>
+          <div class="range"><input type="range" id="taper_deg" min="20" max="45" step="5" value="45" aria-describedby="lipHelp"></div>
+          <p class="help" id="lipHelp">The solid band round the top and bottom. 0 means no band, which prints faster. A slope of 45° or less from upright usually prints without supports. Sloped inward makes the opening a little narrower.</p>
+          <p class="help warn" id="lipWarn" hidden></p>
+        </div>
       </div>
       <div id="curveOpts" hidden>
         <div class="field"><label for="bend_deg">Bend <em id="bendOut">90°</em></label>
@@ -193,6 +203,11 @@
         <select id="lithMaterial" hidden aria-hidden="true" tabindex="-1"><option value="filament">Filament (FDM)</option><option value="resin">Resin (SLA / MSLA)</option></select>
         <label for="lithThk" class="sr-only">Thickness preset</label><select id="lithThk" class="exp-only"><option value="thin">Thin</option><option value="standard" selected>Standard</option><option value="thick">Thick</option></select>
         <p class="help" id="lithMatHelp">Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first.</p></div>
+      <div class="field" id="backingBox"><label for="backing">Backing colour</label>
+        <select id="backing" aria-describedby="backingHelp"><option value="">None (light only)</option><option value="warm">Warm white</option><option value="cool">Cool white</option><option value="paper">Paper</option><option value="custom">Custom colour</option></select>
+        <div class="backingCustom" id="backingCustom" hidden><label for="backingRGB" class="sr-only">Pick a backing colour</label><input type="color" id="backingRGB" value="#fff4e0">
+          <label for="backingHex" class="sr-only">Backing colour as hex, like #fff4e0</label><input type="text" id="backingHex" value="#fff4e0" maxlength="7" size="8" spellcheck="false" autocomplete="off" inputmode="text"></div>
+        <p class="help" id="backingHelp">What sits behind the print, such as a white diffuser or a sheet of paper. The Light on preview uses this colour, and it is saved with the build.</p></div>
       <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box (4 photos round a light)</summary>
         <div class="grid2">
           <div class="field wide2"><label for="mbFiles">Up to 4 photos, one per side</label><input type="file" id="mbFiles" accept="image/*" multiple>

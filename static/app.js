@@ -1,4 +1,4 @@
-import { effectRGB, defaultEffect, lightRGB as fxBase, materialRGB, transmit } from "/static/lithlight.js";
+import { effectRGB, defaultEffect, lightRGB as fxBase, materialRGB, transmit, backingRGB, toHex } from "/static/lithlight.js";
 import { Viewer } from "/static/viewer.js";
 
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -93,7 +93,7 @@ function applyMode() {
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
   applyShape();
-  $("#lithMatBox").hidden = S.mode !== "lithophane"; $("#mboxBox").hidden = S.mode !== "lithophane"; $("#lithThk").hidden = !isExpert();
+  $("#lithMatBox").hidden = S.mode !== "lithophane"; $("#backingBox").hidden = S.mode !== "lithophane"; $("#mboxBox").hidden = S.mode !== "lithophane"; $("#lithThk").hidden = !isExpert();
   const tr = S.mode === "trace2d";               // 'Logo & Drawing to 3D' has its own settings panel at both levels
   $("#traceOpts").hidden = !tr;
   $("#beginnerOpts").hidden = tr || isExpert(); $("#expertOpts").hidden = tr || !isExpert();
@@ -109,6 +109,7 @@ function applyShape() {
   $("#width_mm").closest(".field").hidden = curved;
   $("#diaLbl").firstChild.textContent = { globe: "Globe diameter ", cup: "Cup inside diameter " }[litShape()] || "Light diameter ";
   $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
+  $("#lipBox").hidden = !(curved && litShape() !== "globe");     // sleeve / cup: the band and its slope
   const curve = lit && litShape() === "curve";
   $("#curveOpts").hidden = !curve; syncBend();
   const hangOk = lit && ["rect", "square", "circle"].includes(litShape());
@@ -119,6 +120,16 @@ function applyShape() {
 }
 /* curved panel: bend 0..180 deg, optional built-in stand; the bed check uses the printer picked in Will-it-print */
 let PRN = null; import("/static/printer.js").then(m => { PRN = m; }).catch(() => { });
+function syncLip() {
+  const w = +$("#lip_mm").value, t = $("#lip_taper").value;
+  $("#lipOut").textContent = w ? w + " mm" : "0 (no band)";
+  $("#taperOut").textContent = $("#taper_deg").value + "°";
+  $("#lip_taper").disabled = $("#taper_deg").disabled = !w;
+  $("#taper_deg").closest(".range").hidden = t === "none";
+  const wn = $("#lipWarn");
+  wn.hidden = !(w && t === "none"); wn.textContent = "A flat ledge overhangs at 90° and usually needs supports. You can still build it.";
+}
+["#lip_mm", "#lip_taper", "#taper_deg"].forEach(s => $(s).addEventListener("input", syncLip)); syncLip();
 function syncBend() { const b = +$("#bend_deg").value; $("#bendOut").textContent = b + "°" + (b === 0 ? " (flat)" : b === 180 ? " (half circle)" : ""); }
 $("#bend_deg").addEventListener("input", syncBend);
 function curveFitNote(r) {
@@ -202,11 +213,13 @@ function formData(autoDelete) {
   if (S.mode === "lithophane") {
     fd.append("material", $("#lithMaterial").value);
     fd.append("shape", litShape());
+    if (backingVal()) fd.append("backing", backingVal());
     if (litShape() === "curve") {
       fd.append("bend_deg", $("#bend_deg").value); if ($("#curveStand").checked) fd.append("stand", "true");
       if (PRN?.P?.pref?.printer_id) fd.append("printer_id", PRN.P.pref.printer_id);
     }
-    if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
+    if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value);
+      if (litShape() !== "globe") { fd.append("lip_mm", $("#lip_mm").value); fd.append("lip_taper", $("#lip_taper").value); fd.append("taper_deg", $("#taper_deg").value); } }
     if (!$("#hangOpts").hidden) {
       if ($("#hang").value) { fd.append("hang", $("#hang").value); fd.append("hole_d", $("#hole_d").value); }
       if ($("#stand").checked) fd.append("stand", "true");
@@ -288,7 +301,8 @@ function showBuild(r) {
   r.visibility = r.visibility || "private";
   $("#viewerEmpty").hidden = true; $("#vtools").hidden = false; $("#result").hidden = false;
   viewer?.load(r.preview, r.mode);
-  S.lightOn = false; syncLight();
+  if (r.mode === "lithophane" && r.params) setBacking(r.params.backing || "");   // the build's own backing (none if it had none)
+  S.lightOn = r.mode === "lithophane" && !!backingVal(); syncLight();
   const st = r.stats, sz = st.size_mm.map(x => x.toFixed(1)).join(" × ");
   const nb = st.bodies?.length || 1;
   $("#viewer").setAttribute("aria-label", `3D preview: ${MODE_LABEL[r.mode] || "model"}, ${sz.replace(/ × /g, " by ")} millimetres, ${nb} ${nb > 1 ? "pieces" : "piece"}` +
@@ -393,6 +407,26 @@ $("#mbPreview").onclick = () => mbRun("preview"); $("#mbZip").onclick = () => mb
 $("#mbExport").onclick = () => { if (S.current?.id) window.zeimExport?.open({ ws: "studio", bid: S.current.id }); };
 /* "Light on": backlit lithophane preview estimate (thin = bright, thick = dark) */
 const litShapeOf = r => r?.info?.shape || r?.params?.shape || "rect";
+/* backing colour (Lithophane panel): what sits behind the print; it tints the Light on preview and is saved with the build */
+const HEX6 = /^#[0-9a-f]{6}$/i;
+function backingVal() { const v = $("#backing").value; if (v !== "custom") return v; const h = $("#backingHex").value.trim(); return HEX6.test(h) ? h.toLowerCase() : $("#backingRGB").value; }
+const withBacking = light => toHex(transmit(fxBase(light), backingRGB(backingVal())));
+function setBacking(v) {
+  v = v || ""; const preset = ["", "warm", "cool", "paper"].includes(v);
+  $("#backing").value = preset ? v : "custom";
+  if (!preset && HEX6.test(v)) { $("#backingRGB").value = v; $("#backingHex").value = v; }
+  $("#backingCustom").hidden = $("#backing").value !== "custom";
+}
+const saveBacking = () => { try { localStorage.lithBacking = backingVal(); } catch (_) {} };
+function backingChanged() {
+  $("#backingCustom").hidden = $("#backing").value !== "custom"; saveBacking();
+  if (S.current?.mode === "lithophane") { S.lightOn = !!backingVal() || S.lightOn; syncLight(); }   // show the tint straight away
+}
+try { setBacking(localStorage.lithBacking || ""); } catch (_) {}
+$("#backing").onchange = backingChanged;
+$("#backingRGB").oninput = () => { $("#backingHex").value = $("#backingRGB").value; $("#backingHex").removeAttribute("aria-invalid"); backingChanged(); };
+$("#backingHex").oninput = () => { const h = $("#backingHex").value.trim(), ok = HEX6.test(h);
+  if (ok) { $("#backingRGB").value = h.toLowerCase(); $("#backingHex").removeAttribute("aria-invalid"); backingChanged(); } else $("#backingHex").setAttribute("aria-invalid", "true"); };
 function syncLight() {
   const lit = S.current?.mode === "lithophane";
   $("#litLightBox").hidden = !lit;
@@ -400,7 +434,7 @@ function syncLight() {
   $("#vLight").setAttribute("aria-pressed", S.lightOn ? "true" : "false");
   $("#vLightNote").hidden = !S.lightOn;
   const lc = $("#vLightColor").value; $("#vLightRGB").hidden = lc !== "custom";
-  viewer?.setBacklight(!!S.lightOn, litShapeOf(S.current), lc === "custom" ? $("#vLightRGB").value : lc);
+  viewer?.setBacklight(!!S.lightOn, litShapeOf(S.current), withBacking(lc === "custom" ? $("#vLightRGB").value : lc));
   syncFx();
 }
 $("#vLight").onclick = () => { S.lightOn = !S.lightOn; syncLight(); };
@@ -421,7 +455,7 @@ try {
   const sp = +localStorage.lithFxSpeed; if (sp >= 1 && sp <= 10) $("#vLightSpeed").value = sp;
 } catch (_) {}
 let fxRaf = 0, fxT0 = 0;
-const fxColour = () => { const lc = $("#vLightColor").value; return fxBase(lc === "custom" ? $("#vLightRGB").value : lc); };
+const fxColour = () => { const lc = $("#vLightColor").value; return transmit(fxBase(lc === "custom" ? $("#vLightRGB").value : lc), backingRGB(backingVal())); };
 const matColour = () => { const m = $("#vMatColor").value; return materialRGB(m === "custom" ? $("#vMatRGB").value : m); };
 try {
   const mc = localStorage.lithMat, mr = localStorage.lithMatRGB;

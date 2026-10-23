@@ -42,6 +42,9 @@ function dlg() {
       <p class="help" id="expSlotsHelp">Use one slot: only the slots you tick go in the file. Empty slots are never checked.</p>
       <div class="row" id="expSlotList">${[1, 2, 3, 4].map(n => `<label class="slotchk"><input type="checkbox" name="expSlot" value="${n}" ${n === 1 ? "checked" : ""}><span>Slot ${n}</span></label>`).join("")}</div>
       <div class="expwarn" id="expSlotWarn" role="status" hidden><span id="expSlotWarnT"></span> <button type="button" class="btn small ghost" id="expSlotWarnOk">Continue</button></div></fieldset>
+    <fieldset class="exppreset" id="expPreset" hidden><legend>Print settings</legend>
+      <label class="inl"><input type="checkbox" id="expPresetOn"> <span id="expPresetL"></span></label>
+      <p class="help" id="expPresetD"></p><p class="help" id="expPresetN"></p></fieldset>
     <p class="help" id="expStep"></p>
     <p class="help" id="expMsg" role="status" aria-live="polite"></p>
     <div class="row end"><button type="button" class="btn ghost" id="expCancel">Close</button><a class="btn primary" id="expGo" href="#" download>Download</a></div></form>`;
@@ -53,9 +56,9 @@ function dlg() {
 export async function open(o) {
   const d = dlg(), ws = o.ws || "studio", list = await formats();
   let fmt = ls("zeim.exportfmt." + ws); if (!list.some(f => f.id === fmt)) fmt = o.defaultFormat || "3mf";
-  let name = o.name || "", def = o.name || "ZEIM model", colours = 0;
+  let name = o.name || "", def = o.name || "ZEIM model", colours = 0, presets = [];
   if (o.bid) {
-    try { const j = await (await fetch(`/api/export/${encodeURIComponent(o.bid)}`, { credentials: "same-origin" })).json(); name = j.name || name; def = j.default_name || def; colours = j.colour_count || 0; }
+    try { const j = await (await fetch(`/api/export/${encodeURIComponent(o.bid)}`, { credentials: "same-origin" })).json(); name = j.name || name; def = j.default_name || def; colours = j.colour_count || 0; presets = j.print_presets || []; }
     catch { }
   }
   name = safeName(name || def);
@@ -63,6 +66,11 @@ export async function open(o) {
   $("#expH").textContent = o.heading || "Export";
   $("#expList").innerHTML = list.map(f => `<label class="radrow expfmt"><input type="radio" name="expFmt" value="${esc(f.id)}" ${f.id === fmt ? "checked" : ""}><span><b>${esc(f.label)}</b> <small>${esc(f.desc)}</small></span></label>`).join("");
   $("#expStep").textContent = STEPNOTE;
+  const pr = presets[0];                                    // lithophanes: optional Bambu print settings inside the 3MF
+  if (pr) { $("#expPresetL").textContent = pr.label; $("#expPresetD").textContent = pr.desc; $("#expPresetN").textContent = pr.note;
+    const sv = ls("zeim.exportpreset." + ws); $("#expPresetOn").checked = sv == null ? !!pr.suggested : sv === pr.id; }
+  $("#expPresetOn").onchange = () => { ls("zeim.exportpreset." + ws, $("#expPresetOn").checked ? pr.id : ""); paint(); };
+  const preset = () => pr && $("#expPresetOn").checked && (d.querySelector("input[name=expFmt]:checked")?.value || "3mf") === "3mf" ? pr.id : "";
   $("#expMsg").textContent = "";
   $("#expSlots").hidden = !!o.rid;
   d.querySelectorAll("input[name=expSlot]").forEach(c => { c.checked = c.value === "1"; });
@@ -80,12 +88,13 @@ export async function open(o) {
   $("#expSlotWarnOk").onclick = () => { warnOff = true; $("#expSlotWarn").hidden = true; };
   const url = () => {
     const f = d.querySelector("input[name=expFmt]:checked")?.value || "3mf";
-    if (!o.rid) return `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}&slots=${slots().join(",")}`;
+    if (!o.rid) return `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}&slots=${slots().join(",")}` + (preset() ? `&preset=${preset()}` : "");
     return o.rid ? `/api/resin/${o.rid}/torchc0.${f}?name=${encodeURIComponent(name)}`
       : `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}`;
   };
   const paint = () => {
     const f = d.querySelector("input[name=expFmt]:checked")?.value || "3mf";
+    $("#expPreset").hidden = !pr || f !== "3mf";
     $("#expNameOut").textContent = name + "." + f; const go = $("#expGo"); go.href = url(); go.setAttribute("download", name + "." + f);
     go.textContent = "Download " + (list.find(x => x.id === f)?.label || f.toUpperCase());
   };

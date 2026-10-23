@@ -276,7 +276,7 @@ CUP_BOTTOM_MM = 2.0
 
 def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8, max_thickness=3.0,
                  border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False,
-                 color_mode="mono", place=None):
+                 color_mode="mono", place=None, lip_mm=None, lip_taper="none", taper_deg=45.0):
     scale = min(1.0, resolution / 200.0) if resolution else 1.0
     tmap = lambda c, r: thickness_map(im, c, r, min_thickness, max_thickness, smooth, gamma, auto_contrast,
                                       invert, color_mode, place, wrap=True)
@@ -309,7 +309,13 @@ def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8,
                     opening_diameter_mm=round(2 * rc, 1), mapping="equirectangular")
         shown = eq
     else:                                                     # nightlight sleeve / cup with a solid bottom
-        ring = max(RIM_RING_MM, border_mm) if border_mm > 0 else 0.0
+        if lip_mm is None:                                    # older builds: the band follows the border setting
+            ring = max(RIM_RING_MM, border_mm) if border_mm > 0 else 0.0
+        else:                                                 # lip_mm = how far the band reaches out past the wall
+            ring = (max(RIM_RING_MM, border_mm) if border_mm > 0 else RIM_RING_MM) if float(lip_mm) > 0 else 0.0
+        lip_w = float(lip_mm) if lip_mm is not None else 0.0
+        band_t = max_thickness + lip_w                        # full thickness of the band
+        lip_taper = check_lip(lip_w if lip_mm is not None else 0, lip_taper, taper_deg)[1] if (ring > 0 and lip_mm is not None) else "none"
         cup = shape == "cup"
         r_in = diameter_mm / 2 + (0 if cup else CLEARANCE_MM / 2)
         circ = 2 * np.pi * r_in
@@ -320,20 +326,44 @@ def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8,
         ring_rows = int(round(ring / (length / (Rr - 1)))) if ring > 0 else 0
         pic_rows = max(4, Rr - 2 * ring_rows)
         pic = tmap(C, pic_rows)[::-1]                         # row 0 = bottom of the print
-        thick = np.full((pic_rows + 2 * ring_rows, C), float(max_thickness))
+        thick = np.full((pic_rows + 2 * ring_rows, C), float(band_t))
         thick[ring_rows:ring_rows + pic_rows] = pic
         Rr = thick.shape[0]
         th = -np.linspace(0, 2 * np.pi, C, endpoint=False)
         d = np.stack([np.cos(th), np.sin(th), np.zeros(C)], -1)[None]
-        z = np.linspace(z_lo, height_mm, Rr)[:, None, None] * np.array([0, 0, 1.0])
-        inner = d * r_in + z; outer = d * (r_in + thick[..., None]) + z
+        zs = np.linspace(z_lo, height_mm, Rr)
+        inset = np.zeros(Rr)                                  # how far the band reaches inside the inner wall (mm)
+        if ring > 0 and lip_taper != "none":
+            # the band meets the picture on a slope, not a flat step: at most taper_deg from vertical, so the
+            # printer builds each layer on the one below and no supports are needed
+            delta = band_t - min_thickness
+            ramp = delta / (0.8 * np.tan(np.radians(taper_deg)))   # 20% spare: the picture's own slope adds on top
+            zr = zs - z_lo
+            from_band = np.minimum(np.maximum(zr - ring_rows * length / (Rr - 1), 0),
+                                   np.maximum((length - zr) - ring_rows * length / (Rr - 1), 0))
+            b = np.clip(1.0 - from_band / max(ramp, 1e-6), 0.0, 1.0)   # 1 in the band, slope down to 0
+            out_k, in_k = {"outward": (1.0, 0.0), "inward": (0.0, 1.0), "both": (0.5, 0.5)}[lip_taper]
+            pic_part = thick.copy()                           # the band rows take the picture's edge row
+            if ring_rows:
+                pic_part[:ring_rows] = pic_part[ring_rows]
+                pic_part[Rr - ring_rows:] = pic_part[Rr - ring_rows - 1]
+            inset = b * delta * in_k
+            thick = pic_part + b[:, None] * (band_t - pic_part) * out_k + inset[:, None]   # blend to full
+            thick = np.maximum(thick, np.where(b[:, None] >= 1.0, band_t, 0.0))
+        z = zs[:, None, None] * np.array([0, 0, 1.0])
+        inner = d * (r_in - inset[:, None, None]) + z; outer = inner + d * thick[..., None]
         if cup:                                               # bottom: outer goes down to z=0 and fans to the centre
-            outer = np.concatenate([d * (r_in + max_thickness), outer])
-            inner = np.concatenate([d * (r_in - 0.5) + [0, 0, z_lo], inner])     # tiny inner fillet ring
+            outer = np.concatenate([outer[:1] * [1, 1, 0], outer])                      # straight down to the bed
+            inner = np.concatenate([d * (r_in - inset[0] - 0.5) + [0, 0, z_lo], inner])     # tiny inner fillet ring
             v, f = _closed_cup(outer, inner, [0, 0, 0], [0, 0, z_lo])
         else:
             v, f = _shell(inner, d.repeat(Rr, 0), thick)
-        info = dict(pixels=[C, pic_rows], pitch_mm=round(circ / C, 4), inner_diameter_mm=round(2 * r_in, 2))
+        info = dict(pixels=[C, pic_rows], pitch_mm=round(circ / C, 4), inner_diameter_mm=round(2 * r_in, 2),
+                    lip_mm=round(lip_w, 2), band_mm=round(ring, 2), lip_taper=lip_taper)
+        if lip_taper != "none":
+            info["taper_deg"] = round(float(taper_deg), 1)
+        if inset.max() > 0:
+            info["lip_inner_diameter_mm"] = round(2 * (r_in - inset.max()), 2)   # the band narrows the opening
         if cup:
             info["bottom_mm"] = CUP_BOTTOM_MM
         shown = thick[::-1]
@@ -448,6 +478,23 @@ def _panel_foot(v, f, s, width_mm, bend_deg, max_thickness):
             dict(height_mm=h, lip_mm=lip, built_in=True))
 
 
+LIP_MAX_MM = 10.0
+LIP_TAPERS = ("none", "outward", "inward", "both")
+TAPER_MIN_DEG, TAPER_MAX_DEG = 20.0, 45.0
+
+
+def check_lip(lip_mm, lip_taper, taper_deg):
+    """Sleeve / cup band: lip_mm = reach past the wall 0..10 (0 = no band), taper none|outward|inward|both, slope 20..45 deg from vertical."""
+    lip_taper = (lip_taper or "none").strip().lower()
+    if lip_taper not in LIP_TAPERS:
+        raise ValueError("lip_taper must be one of " + " | ".join(LIP_TAPERS))
+    if not (0 <= float(lip_mm) <= LIP_MAX_MM):
+        raise ValueError(f"lip_mm must be 0..{LIP_MAX_MM:g}")
+    if not (TAPER_MIN_DEG <= float(taper_deg) <= TAPER_MAX_DEG):
+        raise ValueError(f"taper_deg must be {TAPER_MIN_DEG:g}..{TAPER_MAX_DEG:g}")
+    return float(lip_mm), lip_taper, float(taper_deg)
+
+
 def build(im, shape, **params):
     """Returns (vertices, faces, info, thickness map for the preview thumb)."""
     if shape in FLAT_SHAPES:
@@ -456,7 +503,7 @@ def build(im, shape, **params):
         return flat_shape(im, shape, **{k: params[k] for k in keys if k in params})
     if shape in CURVED_SHAPES:
         keys = ("diameter_mm", "height_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth",
-                "gamma", "auto_contrast", "invert", "color_mode", "place")
+                "gamma", "auto_contrast", "invert", "color_mode", "place", "lip_mm", "lip_taper", "taper_deg")
         return curved_shape(im, shape, **{k: params[k] for k in keys if k in params})
     if shape in PANEL_SHAPES:
         keys = ("width_mm", "bend_deg", "stand", "min_thickness", "max_thickness", "border_mm", "resolution",

@@ -219,13 +219,18 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
                border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0,
                auto_contrast=True, invert=False, shape="rect", diameter_mm=40.0, height_mm=60.0,
                color_mode="mono", place=None, hang="", hole_d=4.0, inset_mm=6.0,
-               spacing_mm=40.0, stand=False, bend_deg=90.0, **_) -> Model:
+               spacing_mm=40.0, stand=False, bend_deg=90.0, lip_mm=None, lip_taper="none", taper_deg=45.0,
+               **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
     if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
         raise ValueError(f"color_mode {color_mode!r} is not available yet")
     shape = shape or "rect"
     from . import litho_hang, litho_shapes
+    lip = {}
+    if lip_mm is not None and shape in ("nightlight", "cup"):
+        l_mm, l_tp, l_deg = litho_shapes.check_lip(lip_mm, lip_taper, taper_deg)
+        lip = dict(lip_mm=l_mm, lip_taper=l_tp, taper_deg=l_deg)
     if hang:                                    # validate + widen the rim before any mesh is built
         hang_opts = litho_hang.check_hang(hang, hole_d, inset_mm, spacing_mm)
         if shape in litho_shapes.CURVED_SHAPES + litho_shapes.PANEL_SHAPES:
@@ -249,7 +254,7 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
             im, shape, width_mm=width_mm, min_thickness=min_thickness, max_thickness=max_thickness,
             border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma, auto_contrast=auto_contrast,
             invert=invert, diameter_mm=diameter_mm, height_mm=height_mm, color_mode=color_mode,
-            place=litho_shapes.check_place(place))
+            place=litho_shapes.check_place(place), **lip)
         if hang or stand:                       # attachments for flat shapes: hang holes, display stand
             half = width_mm / 2.0
             poly = (litho_shapes.outline(shape, 8192) * half) + half   # plate mm coords, y up
