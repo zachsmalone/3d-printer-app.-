@@ -61,7 +61,9 @@ def test_uploaded_source_and_meta_are_never_downloadable_or_in_exports():
     for ext in ("zip", "png", "jpg", "json", "source"):
         assert c.get(f"/api/download/{bid}/{ext}").status_code == 404
     z = zipfile.ZipFile(io.BytesIO(c.get(f"/files/{bid}/model.3mf").content))
-    assert sorted(z.namelist()) == sorted(["[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model"])
+    assert sorted(z.namelist()) == sorted(["[Content_Types].xml", "_rels/.rels", "3D/3dmodel.model",
+                                           "Metadata/model_settings.config", "Metadata/zeim_slots.json"])   # slot mapping only
+    assert set(__import__("json").loads(z.read("Metadata/zeim_slots.json"))) == {"slots", "filament_to_slot", "colours", "notes"}
     stl = c.get(f"/files/{bid}/model.stl").content
     assert stl[:80].startswith(b"photo3d") and b"Ada" not in stl and b"s.png" not in stl
 
