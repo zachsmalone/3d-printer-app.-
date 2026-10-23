@@ -556,6 +556,10 @@ PARAM_KEYS["cad_text"] = _cadtext.KEYS
 from . import cadshape as _cadshape   # noqa: E402  (beginner shapes)
 OPS["cad_shape"] = _cadshape.op_cad_shape
 PARAM_KEYS["cad_shape"] = _cadshape.KEYS
+from . import cadjoint as _cadjoint   # noqa: E402  (print-in-place joints + merge)
+OPS.update({"cad_joint": lambda m, p: _cadjoint.op_cad_joint(m, p), "merge_bodies": lambda m, p: _cadjoint.op_merge_bodies(m, p),
+            "smart_merge": lambda m, p: _cadjoint.op_smart_merge(m, p)})
+PARAM_KEYS.update({"cad_joint": _cadjoint.KEYS, "merge_bodies": _cadjoint.MERGE_KEYS, "smart_merge": _cadjoint.SMART_KEYS})
 from . import meshedit as _meshedit   # noqa: E402  (register even when this module is imported first)
 _meshedit.OPS.update(OPS)
 
@@ -567,6 +571,8 @@ def label(op: str, p: dict) -> str | None:
         return _cadtext.label(p)
     if op == "cad_shape":
         return _cadshape.label(p)
+    if op in ("cad_joint", "merge_bodies", "smart_merge"):
+        return _cadjoint.label(op, p)
     g = lambda k, d="": p.get(k, d)
     b = lambda: "" if int(p.get("body", -1) if p.get("body") is not None else -1) < 0 else f" · Body {int(p['body']) + 1}"
     try:

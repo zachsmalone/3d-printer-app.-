@@ -134,4 +134,5 @@ def arrange(meshes: list[trimesh.Trimesh], bed=(220.0, 220.0), gap: float = 5.0,
     too_big = [i for i, p in enumerate(parts) if p.extents[0] > bx or p.extents[1] > by]
     return combined, {"fits": bool(fits), "footprint_mm": [round(width, 1), round(depth, 1), round(tall, 1)], "bed_mm": [bx, by] + ([height] if height else []),
                       "gap_mm": gap, "parts": len(parts), "too_big_parts": too_big,
-                      "positions": [[round(a - width / 2, 1), round(b - depth / 2, 1)] for a, b in placed]}
+                      "positions": [[round(a - width / 2, 1), round(b - depth / 2, 1)] for a, b in placed],
+                      "_exact": [[a - width / 2, b - depth / 2] for a, b in placed]}

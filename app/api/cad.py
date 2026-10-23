@@ -26,7 +26,7 @@ from .builds import _safe_title, disk_guard, meta_for, summary
 from .textcap import plain_text, text_in
 
 router = APIRouter(prefix="/api/cad", tags=["cad"])
-FIRST_OPS = ("sketch_extrude", "revolve", "cad_text", "cad_shape")
+FIRST_OPS = ("sketch_extrude", "revolve", "cad_text", "cad_shape", "cad_joint")
 
 
 def _sk(body: dict) -> dict:
@@ -193,7 +193,12 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
     meta = _edit(bid, actor)
     m = editproj.mesh_at(bid, meta)
     if len(m.faces) > MAX_SCENE_FACES:
-        raise HTTPException(413, "This model is too detailed for the CAD workspace view; open it in the editor instead.")
+        # big imports: say how big, and let the workspace offer a simplified copy as a new (undoable) step
+        n = int(len(m.faces))
+        raise HTTPException(413, {"message": f"This model has {n:,} triangles, more than the CAD workspace can show ({MAX_SCENE_FACES:,}). "
+                                             "You can open a simplified copy here (the original stays in History), or edit it in the editor.",
+                                  "triangles": n, "limit": MAX_SCENE_FACES,
+                                  "keep_ratio": round(max(0.02, min(0.98, (MAX_SCENE_FACES * 0.95) / n)), 4)})
     out = []
     for i, b in enumerate(cadops.bodies(m)):
         b = b.copy(); b.merge_vertices()

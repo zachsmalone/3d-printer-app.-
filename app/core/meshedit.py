@@ -985,7 +985,7 @@ HEAVY_OPS = {"remesh", "pattern", "round_edges", "body_boolean", "boolean", "sim
              "revolve", "repair", "hollow", "shell", "smooth", "subdivide", "thicken",
              # CADRT-9: the rest of the CAD / sculpt ops too (cheap per op, but unbounded on big meshes)
              "align", "face_offset", "body_transform", "sculpt_stroke", "sculpt", "scale", "cut", "smart_split",
-             "mirror", "translate", "rotate"}
+             "mirror", "translate", "rotate", "merge_bodies", "smart_merge"}
 HEAVY_MIN_FACES = 20_000          # tiny meshes are not worth a fork
 
 

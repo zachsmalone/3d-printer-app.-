@@ -14,7 +14,7 @@ async function api(url, opt = {}) {
   if (opt.json !== undefined) { opt.body = JSON.stringify(opt.json); opt.headers = { "Content-Type": "application/json" }; delete opt.json; }
   const r = await fetch(url, opt);
   let j = null; try { j = await r.json(); } catch { }
-  if (!r.ok) { const d = j?.detail ?? j?.message; const er = new Error(typeof d === "string" ? d : (r.statusText || "Something went wrong.")); er.status = r.status; throw er; }
+  if (!r.ok) { let d = j?.detail ?? j?.message; const info = d && typeof d === "object" && !Array.isArray(d) ? d : null; if (info) d = info.message; const er = new Error(typeof d === "string" ? d : (r.statusText || "Something went wrong.")); er.status = r.status; er.info = info; throw er; }
   return j;
 }
 
@@ -49,6 +49,8 @@ const IC = {
   eyeoff: P('<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7a9.6 9.6 0 0 0 4.4-1"/>'),
   lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   step: P('<circle cx="12" cy="12" r="3"/>'),
+  joints: P('<rect x="3" y="13" width="8" height="4" rx="1"/><rect x="13" y="13" width="8" height="4" rx="1"/><circle cx="12" cy="11" r="3"/><circle cx="12" cy="11" r="1"/>'),
+  merge: P('<path d="M4 6h6v12H4z"/><path d="M14 6h6v12h-6z"/><path d="M10 12h4"/><path d="M12 10l2 2-2 2"/>'),
   text: P('<path d="M5 6V4h14v2"/><path d="M12 4v14"/><path d="M9 18h6"/><path d="M3 21h18" stroke-dasharray="2 2"/>'),
 };
 const OP_ICON = { sketch_extrude: "extrude", revolve: "revolve", body_boolean: "boolean", round_edges: "fillet", hollow: "shell", face_offset: "offset",
@@ -293,6 +295,8 @@ const MODEL_TOOLS = [
   { id: "align", key: "A", label: "Align", sub: "to value or body", tip: "Line up a body's side or centre with a value or another body." },
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
   { id: "sculpt", key: "U", label: "Sculpt", sub: "brushes · remesh", tip: "Shape the mesh with brushes: draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts on the model; two fingers (or drag off the model) orbit." },
+  { id: "joints", key: "J", label: "Hinges/Joints", sub: "print-in-place", tip: "Add a hinge, ball joint, pin joint or chain whose parts move straight off the printer (a small clearance gap between them)." },
+  { id: "merge", key: "G", label: "Merge", sub: "snap · fuse · rejoin", tip: "Drag bodies on the bed (they snap to each other), then fuse them into one. Smart merge puts Smart Split pieces back along their cuts." },
   { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
   { id: "text", key: "T", label: "Text", sub: "emboss · engrave · plate", tip: "Raised or cut-in text on a spot you tap, or a standalone text plate." },
   { id: "visualize", key: "V", label: "Visualize", sub: "colour + finish", tip: "Pick body colours and finishes (display only; prints stay one colour)." },
@@ -364,6 +368,8 @@ const HINTS = {
   scale: ["Scale", "Uniform or per axis, about the body's centre."], pattern: ["Pattern", "Linear: step between copies. Circular: centre + axis."],
   align: ["Align", "Line up a body's side with a value or another body."], mirror: ["Mirror", "Across X, Y or Z through a point; keep the original for a pair."],
   visualize: ["Visualize", "Pick a colour and finish for each body."],
+  joints: ["Hinges/Joints", "Pick a joint and its size, then Add. It lands beside your model as new bodies."],
+  merge: ["Merge", "Drag a body on the bed: it snaps to the grid and to other bodies' sides. Then pick bodies and Fuse."],
   text: ["Text", "Tap the model where the text should go (its centre), then Apply. Or choose Text plate."],
 };
 function setTool(id) {
@@ -406,7 +412,53 @@ function shapeParams(kind, s, flat, mode, edge) {
     : [c[0], c[1], Math.max(lo[2] + 2, hi[2] - ht + 1)];                      // sinks in from the top, leaving a 2 mm floor
   return { kind, dims, position: pos, mode };
 }
+const JOINTS = [["hinge", "Hinge"], ["snap_hinge", "Snap hinge"], ["ball", "Ball joint"], ["pin", "Pin joint"], ["chain", "Chain"]];
+function smartPieces() {   // the last Smart Split step (at or before the current step) that recorded its pieces
+  const ops = (S.scene?.ops || []).filter(o => o.i <= (S.scene?.head ?? 0) && o.op === "smart_split" && o.params?.pieces?.length);
+  return ops.length ? ops[ops.length - 1].params.pieces : null;
+}
 const TOOL_PANELS = {
+  joints() {
+    const J = S.jt || (S.jt = { kind: "hinge" });
+    const rows = k => ({
+      hinge: `<div class="f"><label for="jL">Length (mm)</label>${num("jL", 40)}</div><div class="f"><label for="jW">Leaf width (mm)</label>${num("jW", 15)}</div><div class="f"><label for="jT">Leaf thickness (mm)</label>${num("jT", 2)}</div><div class="f"><label for="jN">Knuckles (3, 5, 7, 9)</label>${num("jN", 5, 2)}</div>`,
+      ball: `<div class="f"><label for="jS">Size (mm)</label>${num("jS", 20)}</div>`,
+      pin: `<div class="f"><label for="jL">Arm length (mm)</label>${num("jL", 40)}</div><div class="f"><label for="jW">Arm width (mm)</label>${num("jW", 10)}</div><div class="f"><label for="jT">Arm thickness (mm)</label>${num("jT", 3)}</div>`,
+      chain: `<div class="f"><label for="jK">Links</label>${num("jK", 5, 1)}</div><div class="f"><label for="jS">Link length (mm)</label>${num("jS", 16)}</div>`,
+    })[k === "snap_hinge" ? "hinge" : k];
+    const tips = { hinge: "Prints flat and assembled: the knuckles turn around a pin inside them. For box lids, Move it to the back edge and Join each leaf.", snap_hinge: "Two separate leaves: the C-shaped knuckles clip onto the other leaf's pin after printing.",
+      ball: "A ball trapped in a socket with an open top; the stem comes out through the opening.", pin: "Two arms turning on a capped pin. The upper arm steps down to the bed, so it needs no supports.", chain: "Flat and standing links that print already linked. The flat links bridge a small gap." };
+    const draw = () => {
+      panel("Hinges & joints", `${seg("jKind", JOINTS, J.kind)}<div id="jRows">${rows(J.kind)}</div>
+        <div class="f"><label for="jC">Clearance (mm)</label>${num("jC", 0.3)}</div>
+        <p class="help">${esc(tips[J.kind])} 0.3 mm suits most FDM printers; use more if parts fuse. Fit is simulated, so print a small one first.</p>`,
+        () => {
+          const p = { kind: J.kind, clearance: val("jC") }, g = id => $("#" + id) ? val(id) : undefined;
+          for (const [k, id] of [["length", "jL"], ["width", "jW"], ["thickness", "jT"], ["knuckles", "jN"], ["size", "jS"], ["links", "jK"]]) { const v = g(id); if (v !== undefined && !Number.isNaN(v)) p[k] = v; }
+          const B = modelBox(true); if (B) p.position = [B[1][0] + 10 + (p.length || p.size || 20) / 2, (B[0][1] + B[1][1]) / 2, 0];
+          addOp("cad_joint", p);
+        }, "Add");
+      $("#jKind").addEventListener("change", () => { J.kind = segVal("jKind"); draw(); });
+    };
+    draw();
+  },
+  merge() {
+    const n = bodyCount(), pcs = smartPieces();
+    if (n < 2 && !pcs) { msg("Merge needs two bodies. Add a shape or a joint, or Smart Split a model first."); return setTool(null); }
+    const sel = S.mergeSel || (S.mergeSel = new Set());
+    panel("Merge", `${pcs ? `<div class="f"><button type="button" class="cw-btn" id="mSmart">Smart merge: rejoin ${pcs.length} split pieces</button><p class="help">Puts the pieces back where Smart Split cut them, then fuses them. Pieces you moved since are left alone.</p></div>` : ""}
+      ${n >= 2 ? `<div class="f"><label>Bodies to fuse (first = stays put)</label><div class="cw-checks" id="mBodies">${S.scene.bodies.map(b => `<label class="cw-toggle"><span>${esc(b.name)}</span><input type="checkbox" value="${b.index}" ${sel.has(b.index) || (!sel.size && b.index < 2) ? "checked" : ""}></label>`).join("")}</div></div>
+      <div class="f"><label>Snap the others to the first</label>${seg("mSnap", [["none", "As placed"], ["x+", "+X side"], ["x-", "−X side"], ["y+", "+Y side"], ["y-", "−Y side"], ["z+", "On top"]], "none")}</div>
+      <p class="help">Drag a body on the bed to place it by hand: it snaps to the grid and to the other bodies' sides. Snapped pieces overlap 0.2 mm so they fuse.</p>` : ""}`,
+      () => {
+        const ids = [...$("#cwTool").querySelectorAll("#mBodies input:checked")].map(i => +i.value);
+        if (ids.length < 2) return msg("Pick at least two bodies to fuse.");
+        addOp("merge_bodies", { bodies: ids, snap: segVal("mSnap") || "none" });
+      }, "Fuse");
+    if (n < 2) $("#tApply").hidden = true;
+    $("#cwTool").querySelectorAll("#mBodies input").forEach(i => i.onchange = () => { i.checked ? sel.add(+i.value) : sel.delete(+i.value); });
+    if (pcs) $("#mSmart").onclick = () => addOp("smart_merge", { pieces: pcs });
+  },
   shapes() {
     const H = S.shp || (S.shp = { size: 20, flat: false, mode: "new", edge: false });
     const has = bodyCount() > 0;
@@ -571,7 +623,9 @@ const TOOL_PANELS = {
 async function load(keepCam) {
   hideCtx();
   if (!S.bid) { S.scene = null; buildWorld(); renderHist(); return; }
-  S.scene = await api(`/api/cad/${S.bid}/scene`);
+  try { S.scene = await api(`/api/cad/${S.bid}/scene`); }
+  catch (e) { if (e.status === 413 && e.info?.keep_ratio) { bigModel(e); return; } throw e; }
+  $("#cwBig")?.remove();
   S.appearance = S.scene.appearance || {};
   $("#cwTitle").value = S.scene.title || "My design";
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
@@ -581,6 +635,19 @@ function updateTop() {
   const d = S.scene?.downloads;
   $("#cwDlStl").href = d ? d.stl : "#"; $("#cwDl3mf").href = d ? d["3mf"] : "#";
   $("#cwToSlicer").href = S.bid ? `/?edit=${encodeURIComponent(S.bid)}#slicer` : "#";
+}
+/* Big imports (over the scene limit): offer a simplified copy as an undoable step. Never blocks: the editor link stays. */
+function bigModel(e) {
+  $("#cwBig")?.remove();
+  const d = document.createElement("div"); d.id = "cwBig"; d.className = "cw-warn"; d.setAttribute("role", "status");
+  d.innerHTML = `<div><b>Large model</b><p>${esc(e.message)}</p><div class="cw-row"><button type="button" class="cw-btn primary" data-b="simp">Open simplified copy</button><a class="cw-btn" href="/?edit=${encodeURIComponent(S.bid)}">Open in editor</a></div></div><button type="button" class="cw-btn" data-b="x" aria-label="Dismiss"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  d.querySelector("[data-b=x]").onclick = () => d.remove();
+  d.querySelector("[data-b=simp]").onclick = () => run(async () => {
+    await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "simplify", params: { keep_ratio: e.info.keep_ratio } } });
+    await load(true);
+  }, "Simplified copy opened. Undo or History brings back the full detail.");
+  $("#cwStage").append(d);
+  S.scene = null; buildWorld(); renderHist(); msg(e.message);
 }
 async function run(fn, okText) {
   busy(true); msg("");
@@ -599,7 +666,7 @@ async function addOp(op, params) {
   let rep = null;
   const ok = await run(async () => {
     if (!S.bid) {
-      if (!["sketch_extrude", "revolve", "cad_text", "cad_shape"].includes(op)) throw new Error("Start with a shape, or a sketch and Extrude.");
+      if (!["sketch_extrude", "revolve", "cad_text", "cad_shape", "cad_joint"].includes(op)) throw new Error("Start with a shape, or a sketch and Extrude.");
       const j = rep = await api("/api/cad/new", { method: "POST", json: { op, params, title: $("#cwTitle").value || "My design" } });
       if (!j.id) throw new Error("Your 5 recent builds are full. Delete one on the main page, then try again.");
       S.bid = j.id; history.replaceState(null, "", `?bid=${S.bid}`);
@@ -717,6 +784,9 @@ function toggleSection(on = !S.section) {
   if (on) hint("Section view", "Slide to cut the model open. Cut faces are not filled (you see inside).");
 }
 $("#cwSection").onclick = () => toggleSection(); $("#cwSecPos").oninput = sectionUpdate; $("#cwSecAxis").onchange = sectionUpdate;
+/* angle between two tapped faces: 0° = parallel facing the same way, 90° = square, 180° = facing each other */
+function measAngle(n1, n2) { return Math.acos(Math.max(-1, Math.min(1, n1.dot(n2)))) * 180 / Math.PI; }
+window.__measAngle = (a, b) => measAngle(new THREE.Vector3(...a).normalize(), new THREE.Vector3(...b).normalize());
 function toggleMeasure(on = !S.measure) {
   S.measure = on; S.measPts = []; $("#cwMeasure").setAttribute("aria-pressed", on); drawSelection();
   if (on) { S.tool = null; renderRail(); $("#cwTool").hidden = true; hint("Measure", "Tap two points on the model, or tap an edge for its length."); } else hint(...HINTS.null);
@@ -1270,6 +1340,50 @@ async function ctxRun(c) {
   if (c === "ms") { S.measPts = [e.a, e.b]; status("Edge length", showEdgeLen(e)); drawSelection(); }
 }
 
+/* ---------------------------------------------------------------- Merge: drag a body on the bed, snapping to grid + other bodies' sides */
+let mdrag = null;
+const MSNAP = 3, MOVERLAP = 0.2;   // mm: snap distance, and how far a snapped body overlaps so Fuse joins them
+function mergeSnap(b, d) {          // b = scene body, d = [dx, dy] proposed -> snapped [dx, dy] + what it snapped to
+  const g = S.snap ? S.grid / 10 : 0, out = d.map(v => g ? Math.round(v / g) * g : v); let hit = null;
+  for (const k of [0, 1]) {
+    const lo = b.center[k] - b.size[k] / 2 + out[k], hi = b.center[k] + b.size[k] / 2 + out[k];
+    let best = MSNAP + 1, fix = 0;
+    for (const o of S.scene.bodies) {
+      if (o.index === b.index) continue;
+      const olo = o.center[k] - o.size[k] / 2, ohi = o.center[k] + o.size[k] / 2, oc = o.center[k], c = (lo + hi) / 2;
+      for (const [cur, want] of [[lo, ohi - MOVERLAP], [hi, olo + MOVERLAP], [c, oc], [lo, olo], [hi, ohi]]) { const e = want - cur; if (Math.abs(e) < best) { best = Math.abs(e); fix = e; } }
+    }
+    if (best <= MSNAP) { out[k] += fix; hit = (hit ? hit + " + " : "") + "XY"[k]; }
+  }
+  return [out, hit];
+}
+stage.addEventListener("pointerdown", ev => {
+  if (S.tool !== "merge" || S.mode !== "model" || ev.button > 0 || pointers.size > 1) return;
+  const h = pickBody(ev); if (!h) return;
+  const g = world.children.find(x => x.userData.body === h.body), b = S.scene?.bodies?.[h.body]; if (!g || !b) return;
+  controls.enabled = false; ev.stopPropagation();
+  mdrag = { g, b, plane: new THREE.Plane(new THREE.Vector3(0, 0, 1), -h.point.z), start: h.point.clone(), d: [0, 0] };
+}, true);
+stage.addEventListener("pointermove", ev => {
+  if (!mdrag) return;
+  ray.setFromCamera(ndc(ev), camera); const q = new THREE.Vector3(); if (!ray.ray.intersectPlane(mdrag.plane, q)) return;
+  const [d, hit] = mergeSnap(mdrag.b, [q.x - mdrag.start.x, q.y - mdrag.start.y]);
+  mdrag.d = d; mdrag.g.position.set(d[0], d[1], 0); invalidate();
+  status("Move", `ΔX ${fmt(d[0])} · ΔY ${fmt(d[1])} mm${hit ? ` · snapped (${hit})` : ""}`);
+}, { capture: true, passive: true });
+async function endMergeDrag() {
+  if (!mdrag) return;
+  const { g, b, d } = mdrag; mdrag = null; controls.enabled = true;
+  if (Math.hypot(d[0], d[1]) < 1e-3) { g.position.set(0, 0, 0); return; }
+  const r = v => Math.round(v * 1e4) / 1e4;
+  const ok = await run(async () => { await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "body_transform", params: { body: b.index, move: [r(d[0]), r(d[1]), 0] } } }); await load(true); });
+  if (!ok) { g.position.set(0, 0, 0); invalidate(); }
+  if (S.tool === "merge") setTool("merge");
+}
+stage.addEventListener("pointerup", endMergeDrag, true);
+stage.addEventListener("pointercancel", endMergeDrag, true);
+window.__mergeSnap = mergeSnap;
+
 /* ---------------------------------------------------------------- stage pointer routing */
 let downAt = null;
 renderer.domElement.addEventListener("pointerdown", ev => {
@@ -1299,10 +1413,11 @@ function modelTap(ev) {
   }
   if (S.measure) {
     const e = pickEdge(ev), h = pickBody(ev);
-    if (onEdge(e, h)) { S.measPts = [e.a, e.b]; }
-    else if (h) { if (S.measPts.length >= 2) S.measPts = []; S.measPts.push(h.point); }
+    if (onEdge(e, h)) { S.measPts = [e.a, e.b]; S.measN = []; }
+    else if (h) { if (S.measPts.length >= 2) { S.measPts = []; S.measN = []; } S.measPts.push(h.point); (S.measN ||= []).push(h.normal); }
     if (S.measPts.length === 2) { const [a, b] = S.measPts, d = a.distanceTo(b), dv = b.clone().sub(a);
-      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})`, a.clone().add(b).multiplyScalar(0.5)); status("Measure", measLabel.text); }
+      const ang = S.measN?.length === 2 ? measAngle(S.measN[0], S.measN[1]) : null;
+      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})${ang === null ? "" : ` · faces ${fmt(ang)}°`}`, a.clone().add(b).multiplyScalar(0.5)); status("Measure", measLabel.text); }
     else setMeasLabel(null);
     drawSelection(); renderSkLabels(); return;
   }

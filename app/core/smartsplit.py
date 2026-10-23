@@ -402,6 +402,13 @@ def smart_split(mesh: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
         laid.append(q)
 
     combined, plate = orient.arrange(laid, (bed[0], bed[1]), gap, bed[2])
+    # record where each piece came from, so Smart merge can put them back along the cuts later
+    exact = plate.pop("_exact", None) or []
+    pieces = []
+    for part, xy in zip(parts, exact):
+        lo, hi = part.bounds
+        mv = np.array([xy[0] - lo[0], xy[1] - lo[1], -lo[2]])
+        pieces.append({"at": [round(float(v), 4) for v in (lo + hi) / 2 + mv], "move": [round(float(v), 4) for v in mv]})
     each_fit = all(fits_bed(p.extents, bed) for p in laid)
     too = plate.get("too_big_parts") or []
     msg = (f"Smart Split: {len(parts)} piece(s) for {printer_name} "
@@ -419,6 +426,7 @@ def smart_split(mesh: trimesh.Trimesh, p: dict) -> tuple[trimesh.Trimesh, dict]:
         "size_mm": [round(v, 1) for v in size],
         "plate": plate, "fits_each": each_fit, "verification": SIMULATED,
         "watertight": bool(combined.is_watertight),
+        "_persist": {"pieces": pieces},
     }
 
 
