@@ -11,6 +11,7 @@ import re
 from pathlib import Path
 from typing import Optional, Tuple
 
+import numpy as np
 import trimesh
 
 from app.community.identity import Actor
@@ -264,8 +265,39 @@ def export_build_for_printer(
     pref = ((actor.user or {}).get("printer") or {}) if actor.user else {}
     if nozzle is None and pref.get("printer_id") == pid:
         nozzle = pref.get("nozzle")
+    from app.api.builds import meta_for
+    if meta_for(bid, actor, owner_only=True).get("mode") == "memorybox":
+        return _memorybox_export(bid, actor, pid, force_format, name, nozzle)
     mesh, meta = load_build_mesh(bid, actor)
     prepared, info = prepare_mesh_for_printer(mesh, pid)
     data, ext, mime = export_mesh_data(prepared, force_format=force_format)
     filename = build_file_name(meta, pid, ext, nozzle=nozzle, name=name)
     return data, filename, ext, mime, info
+
+
+def _memorybox_export(bid, actor, pid, force_format, name, nozzle):
+    """Memory box: never scaled (that would break the fits). 3MF = one object per part; other formats hold every
+    part laid out apart in one file. A part larger than the bed is only a note (warnings never block)."""
+    from app.api.builds import load_model, meta_for
+    from app.core import exporters
+    meta = meta_for(bid, actor, owner_only=True)
+    model = load_model(bid)
+    p = ps.printer_public(pid)
+    bed = [float(v) for v in p["bed_mm"]]
+    f = (force_format or "3mf").lower()
+    if f not in FORMATS:
+        raise ValueError(f"Unknown format {f!r}")
+    big = []
+    for b in model.bodies:
+        e = np.ptp(np.asarray(b.vertices), 0)
+        if e[0] > bed[0] or e[1] > bed[1] or e[2] > bed[2]:
+            big.append(b.name)
+    if f == "3mf":
+        data, ext, mime = exporters.to_3mf(model, meta.get("title") or "Memory box"), "3mf", "model/3mf"
+    else:
+        v, fc = model.solid()
+        data, ext, mime = export_mesh_data(trimesh.Trimesh(v, fc, process=False), force_format=f)
+    info = {"printer_id": pid, "printer_name": p["name"], "bed_mm": bed, "scaled_pct": None,
+            "official_slicer": p.get("official_slicer"), "official_slicer_url": p.get("official_slicer_url"),
+            "parts": [b.name for b in model.bodies], "larger_than_bed": big}
+    return data, build_file_name(meta, pid, ext, nozzle=nozzle, name=name), ext, mime, info

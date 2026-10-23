@@ -310,15 +310,16 @@ function fillLithMat() {
 $("#lithMaterial").onchange = fillLithMat; $("#lithThk").onchange = fillLithMat;
 /* Memory box: 4 photos round a light (stateless API; preview is the assembled cube, downloads are the print parts) */
 $("#lithMaterial").addEventListener("change", () => { $("#mbClear").value = $("#lithMaterial").value === "resin" ? 0.1 : 0.2; });
-$("#mbHole").onchange = () => { $("#mbCustom").hidden = $("#mbHole").value !== "custom"; };
+$("#mbHole").onchange = () => { $("#mbCustom").hidden = $("#mbHole").value !== "custom"; $("#mbLightH").value = $("#mbHole").value === "puck" ? 22 : 24; };
 function mbForm(fmt) {
   const fs = [...$("#mbFiles").files];
-  if (fs.length !== 4) throw new Error("Choose exactly 4 photos, one per side.");
+  if (fs.length > 4 || (fs.length < 4 && !$("#mbSample").checked)) throw new Error("Choose up to 4 photos, one per side, or let the sample photo fill empty sides.");
   const fd = new FormData();
   fs.forEach(f => fd.append("files", f));
   const kv = { fmt, style: $("#mbStyle").value, panel_mm: $("#mbSize").value, material: $("#lithMaterial").value, clearance_mm: $("#mbClear").value,
     hole_preset: $("#mbHole").value, hole_shape: $("#mbHoleShape").value, hole_w: $("#mbHoleW").value, hole_d: $("#mbHoleD").value,
-    notch_mm: $("#mbNotch").value, lid: $("#mbLid").checked, photo_ack: $("#mbAck").checked };
+    notch_mm: $("#mbNotch").value, lid: $("#mbLid").checked, photo_ack: $("#mbAck").checked,
+    base: $("#mbBase").checked, light_h: $("#mbLightH").value, base_notch_mm: $("#mbBaseNotch").value, fill_sample: $("#mbSample").checked };
   for (const [k, v] of Object.entries(kv)) fd.append(k, v);
   return fd;
 }
@@ -334,14 +335,16 @@ async function mbRun(fmt) {
       st.textContent = "Downloaded. Every part is its own object."; return;
     }
     const j = await r.json();
-    S.current = { mode: "lithophane", info: j.info, params: { shape: "memorybox" }, preview: j.preview, stats: j.stats };
+    S.current = { id: j.id, mode: "lithophane", info: j.info, params: { shape: "memorybox" }, preview: j.preview, stats: j.stats };
+    $("#mbExport").disabled = !j.id; window.zeimMembox?.dims(j.info, $("#mbDims"));
     $("#viewerEmpty").hidden = true; $("#vtools").hidden = false;
     viewer?.load(j.preview, "lithophane"); S.lightOn = false; syncLight();
     const w = j.info.warnings || [];
     st.textContent = `Parts: ${j.info.parts.join(", ")}.` + (w.length ? " " + w.join(" ") : "") + " Tap Light on to see it lit.";
   } catch (e) { st.textContent = "Couldn't make the box: " + (e.message || "something went wrong"); }
 }
-$("#mbPreview").onclick = () => mbRun("preview"); $("#mb3mf").onclick = () => mbRun("3mf"); $("#mbZip").onclick = () => mbRun("zip");
+$("#mbPreview").onclick = () => mbRun("preview"); $("#mbZip").onclick = () => mbRun("zip");
+$("#mbExport").onclick = () => { if (S.current?.id) window.zeimExport?.open({ ws: "studio", bid: S.current.id }); };
 /* "Light on": backlit lithophane preview estimate (thin = bright, thick = dark) */
 const litShapeOf = r => r?.info?.shape || r?.params?.shape || "rect";
 function syncLight() {

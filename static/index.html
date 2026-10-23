@@ -184,17 +184,22 @@
         <p class="help" id="lithMatHelp">Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first.</p></div>
       <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box (4 photos round a light)</summary>
         <div class="grid2">
-          <div class="field wide2"><label for="mbFiles">4 photos, one per side</label><input type="file" id="mbFiles" accept="image/*" multiple></div>
-          <div class="field"><label for="mbStyle">Style</label><select id="mbStyle"><option value="frame">Frame (panels slide in)</option><option value="snap">Snap-together</option><option value="enclosed">Enclosed box + sliding lid</option></select></div>
+          <div class="field wide2"><label for="mbFiles">Up to 4 photos, one per side</label><input type="file" id="mbFiles" accept="image/*" multiple>
+            <label class="chk"><input type="checkbox" id="mbSample" checked> Use the sample photo (Tango) for empty sides</label></div>
+          <div class="field"><label for="mbStyle">Style</label><select id="mbStyle"><option value="frame">Frame (panels slide in)</option><option value="snap">Snap-together</option><option value="enclosed">One-piece box + sliding lid</option></select></div>
           <div class="field"><label for="mbSize">Box side <em>mm</em></label><input type="number" id="mbSize" value="80" min="40" max="200" step="5"></div>
           <div class="field"><label for="mbHole">Light hole</label><select id="mbHole"><option value="tealight">Tea light (40 mm)</option><option value="puck">LED puck (60 mm)</option><option value="custom">Custom</option></select></div>
           <div class="field"><label for="mbHoleShape">Hole shape</label><select id="mbHoleShape"><option value="round">Round</option><option value="square">Square</option></select></div>
           <div class="field" id="mbCustom" hidden><label for="mbHoleW">Hole width / depth <em>mm</em></label><input type="number" id="mbHoleW" value="40" min="5" step="1"><input type="number" id="mbHoleD" value="40" min="5" step="1" aria-label="Hole depth (square)"></div>
-          <div class="field"><label for="mbNotch">Cable notch <em>mm, 0 = none</em></label><input type="number" id="mbNotch" value="0" min="0" max="20" step="1"></div>
-          <div class="field"><label for="mbClear">Fit clearance <em>mm</em></label><input type="number" id="mbClear" value="0.2" min="0" max="1" step="0.05"></div>
-          <div class="field chk"><label><input type="checkbox" id="mbLid" checked> Lid (snap style)</label><label><input type="checkbox" id="mbAck"> These are my photos / I have permission</label></div>
+          <div class="field"><label for="mbLightH">Room for the light <em>mm tall</em></label><input type="number" id="mbLightH" value="24" min="8" max="80" step="1"></div>
+          <div class="field"><label for="mbBaseNotch">Base cable notch <em>mm, 0 = none</em></label><input type="number" id="mbBaseNotch" value="8" min="0" max="20" step="1"></div>
+          <div class="field"><label for="mbNotch">Box floor cable notch <em>mm, 0 = none</em></label><input type="number" id="mbNotch" value="0" min="0" max="20" step="1"></div>
+          <div class="field"><label for="mbClear">Fit clearance <em>mm</em></label><input type="number" id="mbClear" value="0.2" min="0" max="1" step="0.05" aria-describedby="mbClearHelp">
+            <p class="help" id="mbClearHelp">0.2–0.3 mm suits most printers. You can change it: more if parts are tight, less if loose.</p></div>
+          <div class="field chk"><label><input type="checkbox" id="mbBase" checked> Light base (sits over the light)</label><label><input type="checkbox" id="mbLid" checked> Lid (hides the light)</label><label><input type="checkbox" id="mbAck"> These are my photos / I have permission</label></div>
         </div>
-        <div class="row2"><button class="btn small" type="button" id="mbPreview">Preview box</button><button class="btn small ghost" type="button" id="mb3mf">Download 3MF</button><button class="btn small ghost" type="button" id="mbZip">Download STLs (zip)</button></div>
+        <div class="row2"><button class="btn small" type="button" id="mbPreview">Preview box</button><button class="btn small ghost" type="button" id="mbExport" aria-haspopup="dialog" disabled><svg class="i" aria-hidden="true" focusable="false"><use href="#i-download"></use></svg> Export…</button><button class="btn small ghost" type="button" id="mbZip">Download STLs (zip)</button></div>
+        <p class="help" id="mbDims" hidden></p>
         <p class="help" id="mbStatus" role="status" aria-live="polite">Uses the Printer type above (Filament or Resin). Sizes and fits are starting suggestions.</p>
       </details>
       <div id="beginnerOpts">
@@ -634,5 +639,6 @@
 <script src="/static/ws-main.js" defer></script>
 <script src="/static/worksave.js" defer></script>
 <script type="module" src="/static/exportpick.js"></script>
+<script type="module" src="/static/membox.js"></script>
 <script type="module" src="/static/handoff.js"></script>
 </body></html>

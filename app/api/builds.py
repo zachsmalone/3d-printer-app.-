@@ -81,6 +81,13 @@ def load_model(bid: str) -> geometry.Model:
             from ..services import editproj
             m = store.cache[bid] = editproj.model(bid)
             return m
+        if meta.get("mode") == "memorybox":         # no photo kept: reload the written parts (one body per 3MF object)
+            sc = trimesh.load(str(store.dir(bid) / "model.3mf"), force="scene")
+            m = geometry.Model([geometry.Body(n, np.asarray(g.vertices, float), np.asarray(g.faces, np.int64))
+                                for n, g in sc.geometry.items()], "memorybox")
+            m.info = meta.get("info") or {}
+            store.cache[bid] = m
+            return m
         im = geometry.load_image((store.dir(bid) / meta["source"]).read_bytes())
         m = geometry.build(im, meta["mode"], meta["params"])
         store.cache[bid] = m
@@ -534,21 +541,27 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
 
 
 @router.post("/memorybox")
-def memorybox_build(actor: Actor = Depends(get_actor), files: list[UploadFile] = File(...), photo_ack: bool = Form(False),
+def memorybox_build(actor: Actor = Depends(get_actor), files: list[UploadFile] = File(None), photo_ack: bool = Form(False),
                     fmt: str = Form("preview"), style: str = Form("frame"), panel_mm: float = Form(80.0),
                     material: str = Form("filament"), clearance_mm: str = Form(""), hole_shape: str = Form("round"),
                     hole_preset: str = Form("tealight"), hole_w: str = Form(""), hole_d: str = Form(""),
-                    notch_mm: str = Form(""), lid: bool = Form(True)):
-    """Memory box (4 lithophane sides round a light). Stateless like the trace preview: nothing is stored.
-    fmt=preview -> assembled preview + part list; fmt=3mf -> one 3MF with every part as its own object; fmt=zip -> STLs."""
+                    notch_mm: str = Form(""), lid: bool = Form(True), base: bool = Form(True), light_h: str = Form(""),
+                    base_notch_mm: str = Form(""), fill_sample: bool = Form(True), save: bool = Form(True)):
+    """Memory box (4 lithophane sides round a light, on a light base). Up to 4 photos; empty sides use the sample photo.
+    fmt=preview -> assembled preview + part list, saved as a build (title 'Memory box') so the export picker can
+    download it (3MF = one object per part); fmt=3mf -> one 3MF with every part as its own object; fmt=zip -> STLs."""
     from fastapi.responses import Response
     from ..core import memorybox
     if fmt not in ("preview", "3mf", "zip"):
         raise HTTPException(400, "fmt must be preview, 3mf or zip")
-    if len(files) != 4:
-        raise HTTPException(400, "A memory box needs exactly 4 photos, one per side.")
+    files = [f for f in (files or []) if getattr(f, "filename", "")]
+    if len(files) > 4:
+        raise HTTPException(400, "A memory box takes up to 4 photos, one per side.")
+    if len(files) < 4 and not fill_sample:
+        raise HTTPException(400, "A memory box needs 4 photos, one per side (or let the sample photo fill empty sides).")
     params = dict(style=style, panel_mm=panel_mm, material=material, clearance_mm=clearance_mm, hole_shape=hole_shape,
-                  hole_preset=hole_preset, hole_w=hole_w, hole_d=hole_d, notch_mm=notch_mm, lid=lid)
+                  hole_preset=hole_preset, hole_w=hole_w, hole_d=hole_d, notch_mm=notch_mm, lid=lid, base=base,
+                  light_h=light_h, base_notch_mm=base_notch_mm)
     try:
         memorybox.check_params(params)              # refuse bad options before any upload is read or rate-counted
     except ValueError as e:
@@ -574,14 +587,52 @@ def memorybox_build(actor: Actor = Depends(get_actor), files: list[UploadFile] =
         except Exception:
             raise HTTPException(400, imagesafe.UNREADABLE)
     try:
+        ims, sample_sides = memorybox.fill_slots(ims, fill_sample)
         pm, view = memorybox.build(ims, params)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    pm.info["sample_sides"] = view.info["sample_sides"] = [i + 1 for i, s in enumerate(sample_sides) if s]
     if fmt == "3mf":
         return Response(exporters.to_3mf(pm, "memory-box"), media_type="model/3mf",
                         headers={"Content-Disposition": 'attachment; filename="memory-box.3mf"'})
     if fmt == "zip":
         return Response(memorybox.stl_zip(pm), media_type="application/zip",
                         headers={"Content-Disposition": 'attachment; filename="memory-box-stls.zip"'})
-    return {"mode": "lithophane", "info": {**view.info, "shape": "memorybox"}, "preview": preview_payload(view),
-            "stats": mesh_stats(pm)}
+    out = {"mode": "lithophane", "info": {**view.info, "shape": "memorybox"}, "preview": preview_payload(view),
+           "stats": mesh_stats(pm)}
+    if save:
+        out.update(memorybox_save(actor, pm, params, photo_ack, ims[0]))
+    return out
+
+
+MEMORYBOX_TITLE = "Memory box"
+
+
+def memorybox_save(actor: Actor, pm, params: dict, ack: bool, thumb_im=None) -> dict:
+    """Keep the memory box as a build so the normal export picker (STL, 3MF, OBJ, ...) and file names work.
+    The print parts are stored as written files (no photo kept); 3MF keeps one object per part."""
+    disk_guard()
+    with store.lock:
+        try:
+            store.reserve(actor.sid, False)
+        except HistoryFull:
+            return {"saved": False, "save_note": "History is full, so this box was not kept. Downloads below still work."}
+        bid = uuid.uuid4().hex[:12]
+        d = store.dir(bid)
+        d.mkdir(parents=True)
+        for ext, fn in exporters.WRITERS.items():
+            (d / f"model.{ext}").write_bytes(fn(pm) if ext != "3mf" else exporters.to_3mf(pm, MEMORYBOX_TITLE))
+        th = (thumb_im or Image.new("RGB", (8, 8), (200, 200, 200))).convert("L")
+        th.thumbnail((256, 256)); th.save(d / "thumb.png")
+        from ..services import filestore
+        if filestore.enabled():
+            for ext in exporters.WRITERS:
+                filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
+            filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
+        stats = mesh_stats(pm)
+        meta = {"id": bid, "mode": "memorybox", "beginner": False, "preset": None, "title": MEMORYBOX_TITLE,
+                "source": None, "params": params, "auto_notes": [], "info": pm.info, "stats": stats,
+                "owner_sid": actor.sid, "visibility": "private", "photo_ack": ack}
+        store.save(meta)
+        store.cache[bid] = pm
+    return {"id": bid, "saved": True}
