@@ -26,6 +26,8 @@ def wait(pg, js, timeout=60000):
 def run(name, launch, stl):
     b = launch(); ctx = b.new_context(viewport={"width": 390, "height": 844}); pg = ctx.new_page()
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
+    # the 2D layer view is now the fallback when WebGL is off (the 3D G-code preview is covered by ui_gcode_preview.py)
+    pg.add_init_script("(() => { const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (t, ...a) { return /webgl/.test(t) ? null : g.call(this, t, ...a); }; })()")
     pg.goto(URL + "/#edit"); pg.wait_for_timeout(1000)
     pg.set_input_files("#editFile", stl)
     pg.wait_for_selector("#editResult:not([hidden])", timeout=60000)

@@ -199,10 +199,16 @@ def _slice_rlimits():
     resource.setrlimit(resource.RLIMIT_AS, (mb * 1024 * 1024, mb * 1024 * 1024))
 
 
-def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110)) -> None:
+def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110),
+               parts: list[Path] | None = None) -> None:
     # Argument list, no shell: nothing user-controlled is interpreted.
     # model is an STL or a PrusaSlicer-friendly 3MF (paint-on support enforcers/blockers).
-    cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
+    # parts: a multi-object plate, one STL per object already placed in bed coordinates -> one plate,
+    # --merge --dont-arrange keeps ZEIM's own layout (PrusaSlicer is only called, never copied).
+    if parts:
+        cmd = [engine, "--export-gcode", "--merge", "--dont-arrange", "--load", str(ini), "--output", str(out), *map(str, parts)]
+    else:
+        cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, preexec_fn=_slice_rlimits)
     except subprocess.TimeoutExpired:
@@ -286,7 +292,7 @@ class SliceResult:
 
 
 def slice_model_path(model: Path, profile: PrinterProfile, out_gcode: Path, *,
-                    bounds_stl: Path | None = None) -> SliceResult:
+                    bounds_stl: Path | None = None, parts: list[Path] | None = None) -> SliceResult:
     """Slice an STL or a paint-on-supports 3MF. Bed-fit uses `bounds_stl` (the plain model) when given,
     so painted enforcer/blocker volumes never change the size check."""
     src = bounds_stl or model
@@ -302,7 +308,8 @@ def slice_model_path(model: Path, profile: PrinterProfile, out_gcode: Path, *,
     with tempfile.TemporaryDirectory(prefix="zeim-slice-") as td:
         ini = Path(td) / "profile.ini"
         ini.write_text(profile.ini.strip() + "\n")
-        run_engine(engine, ini, model, out_gcode, center=(profile.bed_x / 2, profile.bed_y / 2))
+        kw = {"parts": parts} if parts else {}       # single-model calls keep the old signature (test doubles patch it)
+        run_engine(engine, ini, model, out_gcode, center=(profile.bed_x / 2, profile.bed_y / 2), **kw)
     seconds, grams = parse_gcode_stats(out_gcode)
     return SliceResult(out_gcode, seconds, grams, size, profile)
 

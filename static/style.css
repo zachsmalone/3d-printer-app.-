@@ -767,3 +767,29 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 #rzPrinter{min-width:44px;width:100%;min-height:44px;box-sizing:border-box}
 #rzFile{min-height:44px;box-sizing:border-box}
 .rzDrop{cursor:pointer}
+/* 3D G-code preview (gcodeview.js) */
+.gcprev { margin: 12px 0; max-width: 640px; }
+.gcstage { position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 70vh; border-radius: 10px; border: 1px solid var(--line, #33405c); background: #101826; overflow: hidden; touch-action: none; }
+.gcstage canvas { display: block; width: 100%; height: 100%; }
+.gcprog { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; font-size: .9rem; }
+.gcprog progress { width: 100%; height: 10px; }
+.gcrow { display: flex; gap: 6px; align-items: center; margin: 8px 0; }
+.gcrow input[type=range] { flex: 1; min-height: 44px; min-width: 0; }
+.gcprev .btn { min-height: 44px; min-width: 44px; padding-left: 8px; padding-right: 8px; }
+.gcinfo { font-weight: 600; margin: 4px 0; overflow-wrap: anywhere; }
+.gclegend { border: 0; padding: 0; margin: 6px 0; }
+.gclegend legend { font-size: .85rem; opacity: .8; }
+.gclegend > div { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.gcchip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: .9rem; cursor: pointer; }
+.gcchip input { width: 22px; height: 22px; margin: 0; }
+.gcchip .sw { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+
+/* plate: auto-arrange spacing / copies (44px taps, wraps at 320px) */
+.plate .parr { flex-wrap: wrap; gap: 8px; align-items: center; }
+.plate .parr label.inl { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.plate .parr input[type=number] { width: 4.5em; min-height: 44px; font-size: 16px; }
+.plate .parr input[type=checkbox] { width: 22px; height: 22px; }
+.plate .tool-row .btn.small { min-height: 44px; }
+.plate .pover { margin: 6px 0; padding: 8px; border-radius: 10px; }
+.plate .pover .btn { min-height: 44px; }
+@media (max-width: 400px) { .plate .pobj .picon { min-width: 44px; padding: 0; } .plate .pselect { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; } }
