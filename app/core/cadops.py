@@ -550,6 +550,9 @@ def clean_params(op: str, p: dict) -> dict:
 from . import sculptws as _sculptws   # noqa: E402  (workspace sculpt strokes + remesh)
 if hasattr(_sculptws, "OPS"):           # sculptws imported first: it registers itself at its end (QA B15)
     OPS.update(_sculptws.OPS)
+from . import cadtext as _cadtext   # noqa: E402  (Text & Emboss)
+OPS["cad_text"] = _cadtext.op_cad_text
+PARAM_KEYS["cad_text"] = _cadtext.KEYS
 from . import meshedit as _meshedit   # noqa: E402  (register even when this module is imported first)
 _meshedit.OPS.update(OPS)
 
@@ -557,6 +560,8 @@ _meshedit.OPS.update(OPS)
 def label(op: str, p: dict) -> str | None:
     if op in getattr(_sculptws, "OPS", ()):
         return _sculptws.label(op, p)
+    if op == "cad_text":
+        return _cadtext.label(p)
     g = lambda k, d="": p.get(k, d)
     b = lambda: "" if int(p.get("body", -1) if p.get("body") is not None else -1) < 0 else f" · Body {int(p['body']) + 1}"
     try:

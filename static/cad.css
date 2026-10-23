@@ -161,3 +161,9 @@ body.cadws{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-web
   .cw-hint,.cw-empty{max-width:calc(100% - 100px)}
   .cw-panel .f{grid-template-columns:1fr}
 }
+
+/* Text & emboss: Advanced fold + dismissible print tip */
+.cw-adv summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+.cw-warn{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:9;display:flex;gap:8px;align-items:flex-start;width:min(420px,calc(100% - 16px));box-sizing:border-box;padding:8px 8px 8px 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.3);font-size:13px}
+.cw-warn p{margin:4px 0 0}
+.cw-warn button{flex:none}

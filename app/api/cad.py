@@ -26,7 +26,7 @@ from .builds import _safe_title, disk_guard, meta_for, summary
 from .textcap import plain_text, text_in
 
 router = APIRouter(prefix="/api/cad", tags=["cad"])
-FIRST_OPS = ("sketch_extrude", "revolve")
+FIRST_OPS = ("sketch_extrude", "revolve", "cad_text")
 
 
 def _sk(body: dict) -> dict:
@@ -88,7 +88,14 @@ def new_project(body: dict, actor: Actor = Depends(get_actor)):
     params = body.get("params") or {}
     if op not in FIRST_OPS or not isinstance(params, dict):
         raise HTTPException(400, f"The first step must be one of {list(FIRST_OPS)}.")
-    params = {**params, "replace": True, "mode": "new"}
+    if op == "cad_text":   # same length cap + language / contact filter as every other model text
+        try:
+            params = editproj.check_op_text(op, params)
+        except safety.ChatBlocked as e:
+            return JSONResponse(status_code=e.status, content=e.payload)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+    params = {**params, "target": "plate", "replace": True} if op == "cad_text" else {**params, "replace": True, "mode": "new"}
     import trimesh
     try:
         mesh, rep = meshedit.apply(trimesh.Trimesh(), op, params)

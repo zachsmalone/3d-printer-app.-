@@ -47,9 +47,10 @@ const IC = {
   eyeoff: P('<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.8 8.4 2 12 2 12s4 7 10 7a9.6 9.6 0 0 0 4.4-1"/>'),
   lock: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   step: P('<circle cx="12" cy="12" r="3"/>'),
+  text: P('<path d="M5 6V4h14v2"/><path d="M12 4v14"/><path d="M9 18h6"/><path d="M3 21h18" stroke-dasharray="2 2"/>'),
 };
 const OP_ICON = { sketch_extrude: "extrude", revolve: "revolve", body_boolean: "boolean", round_edges: "fillet", hollow: "shell", face_offset: "offset",
-  body_transform: "move", pattern: "pattern", align: "align", translate: "move", rotate: "move", scale: "scale", mirror: "mirror", parts: "boolean" };
+  body_transform: "move", pattern: "pattern", align: "align", translate: "move", rotate: "move", scale: "scale", mirror: "mirror", parts: "boolean", cad_text: "text" };
 
 /* ---------------------------------------------------------------- state */
 const S = {
@@ -290,6 +291,7 @@ const MODEL_TOOLS = [
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
   { id: "sculpt", key: "U", label: "Sculpt", sub: "brushes · remesh", tip: "Shape the mesh with brushes: draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts on the model; two fingers (or drag off the model) orbit." },
   { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
+  { id: "text", key: "T", label: "Text", sub: "emboss · engrave · plate", tip: "Raised or cut-in text on a spot you tap, or a standalone text plate." },
   { id: "visualize", key: "V", label: "Visualize", sub: "colour + finish", tip: "Pick body colours and finishes (display only; prints stay one colour)." },
 ];
 const SKETCH_TOOLS = [
@@ -358,6 +360,7 @@ const HINTS = {
   scale: ["Scale", "Uniform or per axis, about the body's centre."], pattern: ["Pattern", "Linear: step between copies. Circular: centre + axis."],
   align: ["Align", "Line up a body's side with a value or another body."], mirror: ["Mirror", "Across X, Y or Z through a point; keep the original for a pair."],
   visualize: ["Visualize", "Pick a colour and finish for each body."],
+  text: ["Text", "Tap the model where the text should go (its centre), then Apply. Or choose Text plate."],
 };
 function setTool(id) {
   hideCtx();
@@ -368,7 +371,7 @@ function setTool(id) {
   if (S.measure && id) toggleMeasure(false);
   if (!id) return;
   const needModel = !["sketch", "visualize"].includes(id);
-  if (needModel && !bodyCount() && id !== "extrude" && id !== "revolve") { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
+  if (needModel && !bodyCount() && !["extrude", "revolve", "text"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
   TOOL_PANELS[id]?.();
 }
 const TOOL_PANELS = {
@@ -465,6 +468,40 @@ const TOOL_PANELS = {
     $("#tCancel").textContent = "Done";
   },
   repair() { panel("Fix mesh", `<p class="help">Repairs holes, flipped and duplicate faces. Imported files that aren't closed solids need this before Boolean, Fillet or Extrude join/cut.</p>`, () => addOp("repair", {})); },
+  text() {
+    const T = S.txt || (S.txt = { text: "ZEIM", font: "sans-bold", size: 8, depth: 1, style: "raised", target: bodyCount() ? "surface" : "plate", rotation: 0, nozzle: 0.4, plate_thickness: 2, margin: 3 });
+    if (!bodyCount()) T.target = "plate";
+    const face = S.selFace;
+    if (face && face !== T.face && bodyCount()) { T.face = face; T.target = "surface"; }   // a fresh tap means "put it here"
+    panel("Text & emboss", `<div class="f"><label for="tTxt">Text</label><input id="tTxt" type="text" maxlength="60" autocomplete="off" value="${esc(T.text)}"></div>
+      ${seg("tStyle", [["raised", "Raised"], ["cut", "Cut in"]], T.style)}
+      <div class="f"><label>Where</label>${seg("tTarget", [...(bodyCount() ? [["surface", "On model"]] : []), ["plate", "Text plate"]], T.target)}</div>
+      <p class="help" id="tWhere">${T.target === "plate" ? (bodyCount() ? "A new plate is placed beside the model." : "A standalone plate with your text.") : face ? "Spot picked: tap again to move it." : "Tap the model where the text should be centred."}</p>
+      ${bodyCount() ? `<div class="cw-row"><button type="button" id="tPick">${face ? "Move spot" : "Pick spot on model"}</button></div>` : ""}
+      <div class="f"><label for="tFont">Font</label><select id="tFont">${[["sans-bold", "Sans bold (recommended)"], ["sans", "Sans"], ["serif", "Serif"], ["mono", "Mono"]].map(([v, l]) => `<option value="${v}" ${v === T.font ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="f"><label for="tSize">Letter height (mm)</label>${num("tSize", T.size)}</div>
+      <div class="f"><label for="tDepth">${T.style === "cut" ? "Depth" : "Height"} (mm)</label>${num("tDepth", T.depth)}</div>
+      <details class="cw-adv"><summary>Advanced</summary>
+        <div class="f"><label for="tRot">Rotation°</label>${num("tRot", T.rotation)}</div>
+        <div class="f"><label for="tNoz">Nozzle (mm, for warnings)</label>${num("tNoz", T.nozzle)}</div>
+        <div class="f"><label for="tPth">Plate thickness (mm)</label>${num("tPth", T.plate_thickness)}</div>
+        <div class="f"><label for="tMg">Plate margin (mm)</label>${num("tMg", T.margin)}</div>
+      </details>
+      <p class="help">Recommended: Sans bold, 8 mm letters, 1 mm deep. The result is one solid; export as usual.</p>`,
+      () => {
+        sync();
+        if (!T.text.trim()) return msg("Type some text first.");
+        const p = { text: T.text, font: T.font, size: T.size, depth: T.depth, style: T.style, target: T.target, rotation: T.rotation, nozzle: T.nozzle };
+        if (T.target === "plate") Object.assign(p, { plate_thickness: T.plate_thickness, margin: T.margin });
+        else { if (!S.selFace) return msg("Tap the model where the text should go."); Object.assign(p, { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray() }); }
+        addOp("cad_text", p);
+      });
+    const sync = () => Object.assign(T, { text: $("#tTxt").value, font: $("#tFont").value, size: val("tSize"), depth: val("tDepth"), style: segVal("tStyle"), target: segVal("tTarget"),
+      rotation: val("tRot") || 0, nozzle: val("tNoz") || 0.4, plate_thickness: val("tPth"), margin: val("tMg") });
+    $("#cwTool").querySelectorAll("input,select").forEach(i => i.addEventListener("input", sync));
+    if ($("#tPick")) $("#tPick").onclick = () => { sync(); $("#cwTool").hidden = true; hint("Text", "Tap the model where the text should be centred.", true); };   // panel steps aside (phones), the tap brings it back
+    ["tStyle", "tTarget"].forEach(id => $("#" + id).addEventListener("change", () => { sync(); const open = $("#cwTool .cw-adv").open; TOOL_PANELS.text(); $("#cwTool .cw-adv").open = open; }));
+  },
   visualize() {
     const bs = S.scene?.bodies || [];
     panel("Visualize", bs.map(b => { const a = S.appearance[b.index] || {}; return `<div class="f"><label for="vc${b.index}">${esc(b.name)}</label><span style="display:flex;gap:4px"><input type="color" id="vc${b.index}" value="${a.color || PALETTE[b.index % PALETTE.length]}" style="width:48px">
@@ -498,20 +535,30 @@ async function run(fn, okText) {
   busy(true); msg("");
   try { await fn(); if (okText) msg(okText, true); return true; } catch (e) { msg(e.message); return false; } finally { busy(false); }
 }
+/* Print warnings (e.g. text thinner than the nozzle): advisory only, dismissible, never block. */
+function showWarn(list) {
+  $("#cwWarn")?.remove();
+  if (!list?.length) return;
+  const d = document.createElement("div"); d.id = "cwWarn"; d.className = "cw-warn"; d.setAttribute("role", "status");
+  d.innerHTML = `<div><b>Print tip</b>${list.map(w => `<p>${esc(w)}</p>`).join("")}</div><button type="button" class="cw-btn" aria-label="Dismiss print tip">✕</button>`;
+  d.querySelector("button").onclick = () => d.remove();
+  $("#cwStage").append(d);
+}
 async function addOp(op, params) {
+  let rep = null;
   const ok = await run(async () => {
     if (!S.bid) {
-      if (!["sketch_extrude", "revolve"].includes(op)) throw new Error("Start with a sketch and Extrude or Revolve.");
-      const j = await api("/api/cad/new", { method: "POST", json: { op, params, title: $("#cwTitle").value || "My design" } });
+      if (!["sketch_extrude", "revolve", "cad_text"].includes(op)) throw new Error("Start with a sketch and Extrude or Revolve.");
+      const j = rep = await api("/api/cad/new", { method: "POST", json: { op, params, title: $("#cwTitle").value || "My design" } });
       if (!j.id) throw new Error("Your 5 recent builds are full. Delete one on the main page, then try again.");
       S.bid = j.id; history.replaceState(null, "", `?bid=${S.bid}`);
     } else {
-      await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op, params } });
+      rep = await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op, params } });
     }
     S.selEdges = []; S.selFace = null;
     await load(true);
   }, "Done. It's a step in History: tap it to change it.");
-  if (ok) setTool(null);
+  if (ok) { setTool(null); showWarn(rep?.report?.warnings); }
 }
 async function histAction(fn) { await run(async () => { await fn(); await load(true); }); }
 $("#cwUndo").onclick = () => S.bid && histAction(() => api(`/api/edit/${S.bid}/undo`, { method: "POST" }));
