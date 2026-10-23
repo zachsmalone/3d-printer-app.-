@@ -10,6 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 
@@ -170,8 +171,11 @@ def slice_model(
                         _fail(e.status, e.code, e.message)
                     paint_info = {**paint_info, "supports_forced": "auto",
                                   "supports_note": "You painted areas that need supports, so ZEIM turned Supports on (Auto). You can still pick Everywhere."}
+        parts = None
+        if model_id and model_for_engine == work / "model.stl":
+            parts = plate_parts(model_id, work, scaling.get("scale", 1.0))
         res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
-                                   bounds_stl=work / "model.stl")
+                                   bounds_stl=work / "model.stl", parts=parts)
     except eng.SliceError as e:
         shutil.rmtree(work, ignore_errors=True)
         _fail(e.status, e.code, e.message)
@@ -191,6 +195,7 @@ def slice_model(
     return {
         "slice_id": slice_id,
         "profile": prof.id,
+        "plate_objects": len(parts) if parts else 1,
         "gcode_url": f"/api/slice/{slice_id}/gcode",
         "print_time_seconds": res.print_time_seconds,
         "print_time_human": eng.humanize(res.print_time_seconds),
@@ -217,6 +222,38 @@ def fit_scale(extents, limits, margin: float = FIT_MARGIN_MM) -> float:
         return 1.0
     usable = (limits[0] - 2 * margin, limits[1] - 2 * margin, limits[2] - margin)
     return min(1.0, min(u / d for u, d in zip(usable, extents) if d > 0))
+
+
+def plate_parts(model_id: str, work: Path, scale: float = 1.0) -> list[Path] | None:
+    """A plate-editor project with 2+ printable objects -> one STL per object, placed exactly where the whole
+    (already fitted) model.stl puts them, so PrusaSlicer gets every object of the plate as separate objects."""
+    import trimesh
+    from app.core import plate
+    from app.services import editproj
+    from app.services.history import store
+    try:
+        meta = store.get(model_id)
+        if not meta or meta.get("kind") != "edit":
+            return None
+        m = editproj.mesh_at(model_id, meta)
+        L = editproj.layout_at(meta, m)
+        if not L:
+            return None
+        objs = [o for o, h in zip(plate.objects(m, L), L["hidden"]) if not h]
+        if len(objs) < 2:
+            return None
+        lo_o = np.min([o.bounds[0] for o in objs], axis=0)
+        lo_m = trimesh.load(str(work / "model.stl"), force="mesh").bounds[0]
+        t = lo_m - scale * lo_o
+        out = []
+        for k, o in enumerate(objs):
+            o = o.copy(); o.apply_scale(scale); o.apply_translation(t)
+            f = work / f"part_{k + 1:02d}.stl"
+            f.write_bytes(o.export(file_type="stl"))
+            out.append(f)
+        return out
+    except Exception:                      # never block a slice: fall back to the single merged STL
+        return None
 
 
 def fit_to_printer(src: Path, dst: Path, prof, scale: bool, info: Optional[dict] = None):

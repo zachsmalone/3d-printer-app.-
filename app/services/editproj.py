@@ -277,6 +277,48 @@ def bed_of(meta: dict) -> list:
     return [float(x) for x in b[:3]] + [220.0, 220.0, 250.0][len(b[:3]):] if b else [220.0, 220.0, 250.0]
 
 
+def _plate_bed(params: dict) -> dict:
+    """A plate step may name the user's selected printer: its catalog bed is used (and saved with the step)."""
+    pid = params.pop("printer_id", None)
+    if pid:
+        from . import print_setup as ps
+        try:
+            params = {**params, "bed": list(ps.bed_of(ps.resolve(str(pid))[0]))}
+        except ps.SetupError as e:
+            raise meshedit.OpError(str(e))
+    return params
+
+
+def split_plate(bid: str, owner_sid: str, visibility: str, params: dict, *, auto_delete_oldest: bool = False) -> dict:
+    """Auto-arrange, then move every object that didn't fit onto a NEW plate project (arranged on its own).
+    The current plate keeps the rest (one "delete" step, so Undo brings them back). Caller holds no locks."""
+    from ..core import plate
+    p = _plate_bed({k: v for k, v in params.items() if k in ("printer_id", "bed", "gap", "rotate")})
+    rep = add_op(bid, "plate", {**p, "action": "arrange", "sel": []})
+    over = (rep.get("arrange") or {}).get("overflow") or []
+    if not over:
+        return {"split": False, "message": "Everything already fits on this plate.", "new_project": None}
+    meta = store.get(bid)
+    m = mesh_at(bid, meta)
+    objs, L = plate.normalise(m, layout_at(meta, m))
+    if len(over) >= len(objs):
+        return {"split": False, "message": "None of the objects fit this bed on their own; scale them down instead.", "new_project": None}
+    moved = [objs[i] for i in over]
+    combo, _ = plate.combine(moved, list(range(len(moved))), [False] * len(moved))
+    bed = p.get("bed") or bed_of(meta)
+    with store.lock:
+        store.reserve(owner_sid, auto_delete_oldest)
+        new = create(owner_sid, visibility, title=(meta.get("title") or "Plate")[:50] + " (plate 2)",
+                     base={"type": "plate", "parts": len(moved), "units": "mm", "plate": {"bed_mm": list(bed)}},
+                     original=combo.export(file_type="stl"), original_ext="stl", mesh=combo,
+                     beginner=meta.get("beginner", True), warnings=[f"Split from another plate: {len(moved)} object(s) that didn't fit."])
+    add_op(new["id"], "plate", {**p, "action": "arrange", "sel": []})
+    add_op(bid, "plate", {"action": "delete", "sel": over, "bed": bed})
+    add_op(bid, "plate", {**p, "action": "arrange", "sel": []})
+    return {"split": True, "new_project": new["id"], "moved": len(moved),
+            "message": f"Moved {len(moved)} object{'s' * (len(moved) > 1)} to a new plate. Open it from your history to slice it."}
+
+
 def layout_at(meta: dict, m: trimesh.Trimesh, head: int | None = None) -> dict:
     """The plate layout (objects / groups / hidden) at a step; stale or missing -> connected components."""
     from ..core import plate
@@ -300,6 +342,7 @@ def add_op(bid: str, op: str, params: dict) -> dict:
         cur = mesh_at(bid, meta)
         if op == "plate":                                 # the server's own layout + bed, never the client's
             params = {**params, "layout": layout_at(meta, cur)}
+            params = _plate_bed(params)
             params.setdefault("bed", bed_of(meta))
         new, rep = _apply(meta, cur, {"op": op, "params": params})       # raises OpError → nothing is stored
         # an op may resolve derived values once and ask for them to be SAVED with the step

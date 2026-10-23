@@ -767,3 +767,13 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 #rzPrinter{min-width:44px;width:100%;min-height:44px;box-sizing:border-box}
 #rzFile{min-height:44px;box-sizing:border-box}
 .rzDrop{cursor:pointer}
+
+/* plate: auto-arrange spacing / copies (44px taps, wraps at 320px) */
+.plate .parr { flex-wrap: wrap; gap: 8px; align-items: center; }
+.plate .parr label.inl { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.plate .parr input[type=number] { width: 4.5em; min-height: 44px; font-size: 16px; }
+.plate .parr input[type=checkbox] { width: 22px; height: 22px; }
+.plate .tool-row .btn.small { min-height: 44px; }
+.plate .pover { margin: 6px 0; padding: 8px; border-radius: 10px; }
+.plate .pover .btn { min-height: 44px; }
+@media (max-width: 400px) { .plate .pobj .picon { min-width: 44px; padding: 0; } .plate .pselect { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; } }

@@ -161,16 +161,39 @@ def transform_set(meshes, p):
     return [_move(o, d) for o in out]
 
 
-def arrange_units(units, bed, gap=5.0):
-    """units: list of lists of meshes that move together (a group). Shelf-pack, centred on (0,0)."""
-    from . import orient
-    blocks = [trimesh.util.concatenate(u) if len(u) > 1 else u[0] for u in units]
-    _, rep = orient.arrange(blocks, bed[:2], gap, bed[2] if len(bed) > 2 else None)
+def arrange_units(units, bed, gap=5.0, rotate=True):
+    """units: list of lists of meshes that move together (a group). 2D footprint bin-pack (app.core.arrange):
+    convex-hull footprint box, 0/90 deg turns, `gap` mm apart, inside the bed, centred on (0,0).
+    Units that don't fit spill to plate 2, 3... laid out to the right of the bed (warned, never refused)."""
+    from . import arrange
+    bx, by = float(bed[0]), float(bed[1])
+    fps = []
+    for u in units:
+        pts = np.vstack([np.asarray(o.vertices)[:, :2] for o in u])
+        fps.append(arrange.footprint(pts))
+    res = arrange.pack([(f[2], f[3]) for f in fps], (bx, by), gap, rotate=rotate)
     out = []
-    for u, b, pos in zip(units, blocks, rep["positions"]):
-        lo = b.bounds[0]
-        d = np.array([pos[0] - lo[0], pos[1] - lo[1], -lo[2]])
-        out.append([_move(o, d) for o in u])
+    for u, f, it in zip(units, fps, res["items"]):
+        cx, cy = f[0] + f[2] / 2, f[1] + f[3] / 2
+        M = rot_z(it["rot"], (cx, cy)) if it["rot"] else np.eye(4)
+        zlo = min(float(o.bounds[0][2]) for o in u)
+        shift = it["plate"] * (bx + 20.0)                  # later plates sit beside the bed
+        tx = it["x"] + it["w"] / 2 + shift - cx
+        ty = it["y"] + it["d"] / 2 - cy
+        T = np.eye(4); T[:3, 3] = [tx, ty, -zlo]
+        out.append([_T(o, T @ M) for o in u])
+    on = [o for ms, it in zip(out, res["items"]) if it["plate"] == 0 for o in ms]
+    if on:
+        lo, hi = _box(on)
+        fp = [round(float(hi[0] - lo[0]), 1), round(float(hi[1] - lo[1]), 1), round(float(hi[2] - lo[2]), 1)]
+    else:
+        fp = [0.0, 0.0, 0.0]
+    tall = max(float(o.extents[2]) for ms in out for o in ms)
+    fits = res["fits"] and (len(bed) < 3 or tall <= float(bed[2]) + 1e-6)
+    rep = {"fits": bool(fits), "footprint_mm": fp, "bed_mm": [bx, by] + ([float(bed[2])] if len(bed) > 2 else []),
+           "gap_mm": res["gap_mm"], "parts": len(units), "plates": res["plates"], "overflow_units": res["overflow"],
+           "too_big_parts": res["too_big"], "rotated": [i for i, it in enumerate(res["items"]) if it["rot"]],
+           "positions": [[it["plate"], it["x"], it["y"], it["rot"]] for it in res["items"]]}
     return out, rep
 
 
@@ -416,24 +439,36 @@ def apply(m, p) -> tuple[trimesh.Trimesh, dict]:
             if groups[i] not in order:
                 order.append(groups[i])
         units = [[i for i in idx if groups[i] == g] for g in order]
-        placed, rep = arrange_units([[objs[i] for i in u] for u in units], bed, gap)
+        rotate = str(p.get("rotate", True)).lower() not in ("0", "false", "no")
+        placed, rep = arrange_units([[objs[i] for i in u] for u in units], bed, gap, rotate)
         for u, ms in zip(units, placed):
             for i, o in zip(u, ms):
                 objs[i] = o
-        msg = (f"Arranged {len(units)} item{'s' * (len(units) > 1)} {gap:g} mm apart." if rep["fits"]
-               else f"Arranged, but they need {rep['footprint_mm'][0]:g} × {rep['footprint_mm'][1]:g} mm, more than the bed.")
+        over = sorted(i for k in rep["overflow_units"] for i in units[k])
+        extra_rep = {"arrange": {**rep, "overflow": over}}
+        if rep["fits"]:
+            msg = f"Arranged {len(units)} item{'s' * (len(units) > 1)} {gap:g} mm apart, all on the {bed[0]:g} × {bed[1]:g} mm bed."
+        elif over:
+            msg = (f"{len(over)} object{'s' * (len(over) > 1)} didn't fit on the {bed[0]:g} × {bed[1]:g} mm bed and "
+                   f"{'are' if len(over) > 1 else 'is'} placed beside it. Split them onto another plate, scale down, or remove some.")
+        else:
+            msg = "Arranged, but something is taller than the printer can print."
     elif act == "duplicate":
-        if n + len(sel) > MAX_OBJECTS:
+        count = int(_num(p, "count", 1, 1, MAX_OBJECTS))
+        if n + len(sel) * count > MAX_OBJECTS:
             raise PlateError(f"Up to {MAX_OBJECTS} objects on one plate.")
         lo, hi = _box([objs[i] for i in sel])
-        d = np.array([hi[0] - lo[0] + 5.0, 0, 0])
-        newg = {}
-        top = max(groups) + 1
-        for i in sel:
-            objs.append(_move(objs[i], d))
-            newg.setdefault(groups[i], top + len(newg))
-            groups.append(newg[groups[i]]); hidden.append(hidden[i])
-        msg = f"Duplicated {len(sel)} object{'s' * (len(sel) > 1)}."
+        step = hi[0] - lo[0] + 5.0
+        for c in range(1, count + 1):
+            d = np.array([step * c, 0, 0])
+            newg = {}
+            top = max(groups) + 1
+            for i in sel:
+                objs.append(_move(objs[i], d))
+                newg.setdefault(groups[i], top + len(newg))
+                groups.append(newg[groups[i]]); hidden.append(hidden[i])
+        k = len(sel) * count
+        msg = (f"Added {k} cop{'ies' if k > 1 else 'y'}." + (" Use Auto-arrange to pack them on the bed." if count > 1 else ""))
     elif act == "delete":
         if len(sel) >= n:
             raise PlateError("You can't delete every object. Keep at least one, or open another model.")
