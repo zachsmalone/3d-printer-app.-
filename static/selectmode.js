@@ -15,7 +15,7 @@ window.zeimSelectState = st;                       // for tests / debugging
 const host = document.createElement("div");
 host.className = "selm"; host.id = "selectMode"; host.hidden = true;
 host.innerHTML = `
-<div class="selm-bar"><button type="button" class="btn selm-open" id="selOpen" aria-expanded="false" aria-controls="selPanel">✂ Choose part of the photo</button>
+<div class="selm-bar"><button type="button" class="btn selm-open" id="selOpen" aria-expanded="false" aria-controls="selPanel">Choose part of the photo</button>
 <span class="selm-state" id="selState" role="status" aria-live="polite">Using the whole photo.</span></div>
 <div class="selm-panel" id="selPanel" hidden>
   <p class="help selm-say" id="selSay">Draw round what you want to keep. Use one finger or the mouse. Pinch with two fingers to zoom.</p>
@@ -233,7 +233,7 @@ host.querySelector("#selSnap").onchange = e => { st.snap = e.target.checked; rec
 host.querySelectorAll("input[name=selOut]").forEach(r => r.onchange = () => { st.outside = r.value; draw(); });
 function openPanel(o) {
   st.open = o; host.querySelector("#selPanel").hidden = !o; host.querySelector("#selOpen").setAttribute("aria-expanded", o);
-  host.querySelector("#selOpen").textContent = o ? "Hide selection tools" : "✂ Choose part of the photo";
+  host.querySelector("#selOpen").textContent = o ? "Hide selection tools" : "Choose part of the photo";
   if (o) { draw(); status(); }
 }
 host.querySelector("#selOpen").onclick = () => openPanel(!st.open);

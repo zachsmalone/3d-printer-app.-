@@ -2,6 +2,7 @@
 The share sheet is STUBBED (navigator.share/canShare replaced): this proves our page logic, NOT that an iPhone accepts STL/OBJ/3MF."""
 import json, os, sys
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 LOCAL, SHARED = sys.argv[1], sys.argv[2]
 R = []
 def ok(n, c, x=""): R.append(bool(c)); print(("PASS " if c else "FAIL ") + n, x)

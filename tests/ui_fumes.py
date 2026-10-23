@@ -4,6 +4,7 @@ Chrome + WebKit, 390 px.   python tests/ui_fumes.py URL  (TEMP-data server)"""
 import json, os, shutil, sys, tempfile
 import trimesh
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1].rstrip("/"); bad = []
 AXE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 

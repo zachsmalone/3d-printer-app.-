@@ -2,6 +2,7 @@
 python tests/ui_qa.py URL   (a TEMP-data server in PHOTO3D_MODE=local). Phone context 390x844, emulated touch. NOT a real iPhone."""
 import os, sys, tempfile
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1]
 R = []
 def ok(n, c, x=""): R.append(bool(c)); print(("PASS " if c else "FAIL ") + n, x)

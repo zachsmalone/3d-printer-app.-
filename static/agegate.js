@@ -7,14 +7,18 @@
   if (!gate) return;
   var ok = false;
   try { ok = localStorage.getItem(KEY) === "yes"; } catch (e) { }
-  function open() { gate.remove(); root.classList.remove("gated"); }
+  function open() { try { mo && mo.disconnect(); } catch (e) { } gate.remove(); root.classList.remove("gated"); }
   if (ok || root.getAttribute("data-agegate") === "off") { open(); return; }
   root.classList.add("gated");
   function inertRest(on) {
     for (var c = document.body.firstElementChild; c; c = c.nextElementSibling) if (c !== gate && c.tagName !== "SCRIPT") { if (on) c.setAttribute("inert", ""); else c.removeAttribute("inert"); }
   }
-  inertRest(true);
+  var mo; inertRest(true);
   addEventListener("DOMContentLoaded", function () { if (gate.isConnected) inertRest(true); });
+  try {   // things added to <body> later (floating buttons, dialogs) stay behind the gate too
+    mo = new MutationObserver(function () { if (gate.isConnected) inertRest(true); else mo.disconnect(); });
+    mo.observe(document.body || root, { childList: true, subtree: !document.body });
+  } catch (e) { }
   var yes = document.getElementById("ageYes"), no = document.getElementById("ageNo");
   setTimeout(function () { try { yes.focus(); } catch (e) { } }, 0);
   yes.addEventListener("click", function () {

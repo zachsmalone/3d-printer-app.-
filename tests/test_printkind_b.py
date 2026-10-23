@@ -90,12 +90,12 @@ def test_photo_tips_line_and_expander(base, w):
         b, pg, errs = _page(p, base, w, "fdm")
         for h in ("#studio", "#lithophane"):
             pg.goto(base + "/" + h); pg.wait_for_timeout(400)
-            t = pg.locator("#viewCreate .phototips")
+            t = pg.locator("#viewCreate .phototips:not(#selPanel .phototips)")   # E adds a second tip inside the select-mode panel
             assert t.count() == 1 and t.is_visible()
             txt = t.inner_text()
             assert "clear subject" in txt and "contrast" in txt and "simple background" in txt and "muddy" in txt
             assert not pg.is_visible("#viewCreate .phototips li")                              # tips folded away
-        bb = pg.locator("#viewCreate .phototips").bounding_box(); assert bb["height"] < 130, bb       # one line-ish, never a blocker
+        bb = pg.locator("#viewCreate .phototips:not(#selPanel .phototips)").bounding_box(); assert bb["height"] < 130, bb       # one line-ish, never a blocker
         pg.click("#viewCreate .phototips summary"); assert pg.is_visible("#viewCreate .phototips li")
         assert pg.evaluate("typeof window.zeimPhotoTips") == "function"                        # reusable for select mode
         assert not errs, errs

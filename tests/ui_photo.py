@@ -4,6 +4,7 @@ import io, os, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from PIL import Image
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8799"
 T = tempfile.mkdtemp(); R = []
 def ok(name, cond, extra=""): R.append((name, bool(cond), extra)); print(("PASS " if cond else "FAIL ") + name, extra)

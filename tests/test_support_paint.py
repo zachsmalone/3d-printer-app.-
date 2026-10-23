@@ -63,7 +63,7 @@ def test_slice_api_rejects_bad_paint_and_accepts_good(tmp_path, monkeypatch):
     # Stub the engine so CI boxes without a long slice still cover the paint path.
     from app.services import slice_engine as eng
 
-    def fake_slice(model, profile, out_gcode, *, bounds_stl=None):
+    def fake_slice(model, profile, out_gcode, *, bounds_stl=None, parts=None):
         out_gcode.write_text("; estimated printing time (normal mode) = 1m 0s\n; total filament used [g] = 1.5\n")
         assert model.suffix == ".3mf"
         assert "SupportEnforcer" in zipfile.ZipFile(model).read("3D/3dmodel.model").decode()

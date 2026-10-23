@@ -21,7 +21,7 @@ def test_slice_response_carries_the_numbers_the_cost_box_uses(tmp_path, monkeypa
     client = TestClient(app)
     stl = trimesh.creation.box(extents=(15, 15, 8)).export(file_type="stl")
 
-    def fake_slice(model, profile, out_gcode, *, bounds_stl=None):
+    def fake_slice(model, profile, out_gcode, *, bounds_stl=None, parts=None):
         out_gcode.write_text("; filament used [mm] = 2500.0\n; total filament used [g] = 7.45\n"
                              "; estimated printing time (normal mode) = 25m 10s\n")
         return eng.SliceResult(out_gcode, 1510, 7.45, (15.0, 15.0, 8.0), profile)
