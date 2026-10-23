@@ -729,7 +729,12 @@ function onEdge(e, h) {   // the tap is on this edge, not just near it on a face
   if (!e) return false; if (!h) return true;
   const [ax, ay] = toScreen(e.a), [bx, by] = toScreen(e.b), [px, py] = toScreen(h.point);
   const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L));
-  return Math.hypot(ax + dx * t - px, ay + dy * t - py) < SNAP_PX;
+  if (Math.hypot(ax + dx * t - px, ay + dy * t - py) >= SNAP_PX) return false;
+  // B13: an edge hidden behind the tapped surface (e.g. the far bottom edge of a box seen from above) can project right
+  // under the tap; only snap when the edge is not farther from the camera than the surface that was hit.
+  const q = new THREE.Line3(e.a, e.b).closestPointToPoint(h.point, true, new THREE.Vector3());
+  const dq = q.distanceTo(camera.position), dh = h.point.distanceTo(camera.position);
+  return dq <= dh + Math.max(0.5, 0.01 * dh);
 }
 function showEdgeLen(e) {   // B13: a picked edge shows its length on the model and in the polite live hint
   const t = `${fmt(e.a.distanceTo(e.b))} mm`; setMeasLabel(t, e.a.clone().add(e.b).multiplyScalar(0.5)); renderSkLabels(); return t;
