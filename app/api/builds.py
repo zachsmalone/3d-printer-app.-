@@ -111,7 +111,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'bend_deg', 'printer_id', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 
 def disk_guard():
@@ -266,7 +266,9 @@ def generate(
     hole_d: float = Form(4.0),               # hanging hole diameter (mm)
     inset_mm: float = Form(6.0),             # hanging hole centre from the top edge (mm)
     spacing_mm: float = Form(40.0),          # distance between the two holes of hang=two (mm)
-    stand: bool = Form(False),               # lithophane display stand as a second body
+    stand: bool = Form(False),               # lithophane display stand as a second body (curved panel: built-in foot)
+    bend_deg: float = Form(90.0),            # curved panel: bend from flat (0) to half circle (180)
+    printer_id: str = Form(""),              # bed-fit check for shaped lithophanes ("" = the default printer)
     base_mm: float = Form(2.0),
     relief_mm: float = Form(6.0),
     levels: int = Form(4),
@@ -338,8 +340,10 @@ def generate(
             raise HTTPException(400, "shape must be one of " + " | ".join(litho_shapes.SHAPES))
         if shape in litho_shapes.CURVED_SHAPES and not (10 <= diameter_mm <= 200 and 10 <= height_mm <= 240):
             raise HTTPException(400, "diameter_mm must be 10..200 and height_mm 10..240")
+        if shape in litho_shapes.PANEL_SHAPES and not (0 <= bend_deg <= litho_shapes.BEND_MAX_DEG):
+            raise HTTPException(400, "bend_deg must be 0..180")
     place = None
-    if mode == "lithophane" and shape != "rect":
+    if mode == "lithophane" and shape not in ("rect",) + litho_shapes.PANEL_SHAPES:
         raw = {k: v for k, v in (("x", place_x), ("y", place_y), ("scale", place_scale), ("rotation", place_rotation))
                if str(v).strip() != ""}
         try:
@@ -371,6 +375,8 @@ def generate(
             params.update(shape=shape)
             if shape in litho_shapes.CURVED_SHAPES:
                 params.update(diameter_mm=diameter_mm, height_mm=height_mm)
+            if shape in litho_shapes.PANEL_SHAPES:
+                params.update(bend_deg=float(bend_deg))
             if place:
                 params.update(place=place)
             params.update(hang=hang, hole_d=hole_d, inset_mm=inset_mm, spacing_mm=spacing_mm, stand=stand)
@@ -401,7 +407,7 @@ def generate(
         stats = mesh_stats(model)
         if mode == "lithophane" and params.get("shape", "rect") != "rect":
             from ..services import willprint            # same bed-fit check the Will-it-print box uses (default printer)
-            model.info = {**(model.info or {}), "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), "creality_k1")}
+            model.info = {**(model.info or {}), "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), _bed_printer(printer_id))}
         meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
                 "title": title.strip() or sample_title or DEFAULT_PHOTO_TITLE,
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
@@ -444,6 +450,15 @@ def trace_input(data: bytes, photo_ack: bool, trace_json: str, width_mm: float):
     except Exception:
         raise HTTPException(400, imagesafe.UNREADABLE)
     return clean, ext, im, params, ack
+
+
+def _bed_printer(printer_id: str) -> str:
+    """The printer the user picked (Will-it-print / slicer picker) when it is in the catalog, else the default K1."""
+    from ..services import print_setup as ps
+    try:
+        return ps.resolve(printer_id or None)[0]
+    except Exception:
+        return "creality_k1"
 
 
 def _trace_notes(info: dict) -> list:

@@ -25,7 +25,8 @@ from . import thumbnail
 
 FLAT_SHAPES = ("heart", "circle", "star", "square", "hexagon", "diamond")
 CURVED_SHAPES = ("globe", "nightlight", "cup")
-SHAPES = ("rect",) + FLAT_SHAPES + CURVED_SHAPES
+PANEL_SHAPES = ("curve",)        # adjustable curved panel: flat (0 deg) .. half circle (180 deg), see curved_panel()
+SHAPES = ("rect",) + FLAT_SHAPES + CURVED_SHAPES + PANEL_SHAPES
 COLOR_MODES = ("mono",)          # future: "cmyk" etc. - not built yet
 CLEARANCE_MM = 1.0               # night-light: inside diameter = light diameter + clearance
 RIM_RING_MM = 2.0                # curved shapes: solid band at the top and bottom edge
@@ -340,6 +341,113 @@ def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8,
     return v, f, info, shown
 
 
+# ------------------------------------------------------------------ curved panel (bend 0..180 deg)
+BEND_MAX_DEG = 180.0
+PANEL_STAND_H_MM = 4.0           # built-in stand: an arc-shaped foot under the panel, part of the same solid
+PANEL_STAND_LIP_MM = 8.0         # how far the foot reaches out on each side of the panel
+
+
+def _slab(inner: np.ndarray, normal: np.ndarray, thick: np.ndarray):
+    """Closed solid from an OPEN (rows, cols) surface grid (no wrap): outer = inner + normal*thick; the four edges are
+    closed by strips joining outer and inner. Same idea as _shell, minus the seam wrap."""
+    R, C = thick.shape
+    outer = inner + normal * thick[..., None]
+    n = R * C
+    verts = np.vstack([outer.reshape(-1, 3), inner.reshape(-1, 3)])
+    idx = np.arange(n).reshape(R, C)
+    a = idx[:-1, :-1]; b = idx[:-1, 1:]; c = idx[1:, 1:]; d = idx[1:, :-1]
+    out_f = np.vstack([np.stack([a, b, c], -1).reshape(-1, 3), np.stack([a, c, d], -1).reshape(-1, 3)])
+    in_f = (out_f + n)[:, ::-1]
+    loop = np.concatenate([idx[0, :-1], idx[:-1, -1], idx[-1, :0:-1], idx[:0:-1, 0]])   # boundary, one way round
+    nxt = np.roll(loop, -1)
+    side = np.vstack([np.stack([nxt, loop, loop + n], -1), np.stack([nxt, loop + n, nxt + n], -1)])
+    faces = np.vstack([out_f, in_f, side]).astype(np.int64)
+    tri = verts[faces]
+    if np.einsum("ij,ij->i", tri[:, 0], np.cross(tri[:, 1], tri[:, 2])).sum() < 0:
+        faces = faces[:, ::-1]
+    return verts, faces
+
+
+def arc_frame(s: np.ndarray, length: float, bend_deg: float):
+    """Inner-surface points (x, y) and outward normals for arc positions s (mm, centred on 0) of a panel `length` mm
+    long bent through bend_deg. Arc length is kept exactly, so the picture is not stretched along the bend.
+    The convex (picture) side faces -Y, the viewer; image left is -X."""
+    a = np.radians(bend_deg)
+    if a < 1e-4:
+        return np.stack([s, np.zeros_like(s)], -1), np.stack([np.zeros_like(s), -np.ones_like(s)], -1)
+    R = length / a
+    phi = s / R
+    return (np.stack([R * np.sin(phi), R - R * np.cos(phi)], -1),
+            np.stack([np.sin(phi), -np.cos(phi)], -1))
+
+
+def curved_panel(im, width_mm=100.0, bend_deg=90.0, stand=False, min_thickness=0.8, max_thickness=3.0,
+                 border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False,
+                 color_mode="mono", **_):
+    """A rectangle lithophane bent round a vertical axis, printed standing up.
+    width_mm = arc length of the panel (the picture's width along the bend); the height follows the photo's aspect.
+    Thickness is laid along the surface normal, so bright = thin holds at every point of the arc.
+    stand=True adds an arc-shaped foot under the panel, merged into ONE watertight solid."""
+    if not (0.0 <= bend_deg <= BEND_MAX_DEG):
+        raise ValueError(f"bend must be 0..{BEND_MAX_DEG:g} degrees")
+    scale = min(1.0, resolution / 200.0) if resolution else 1.0
+    iw, ih = im.size
+    height = width_mm * ih / max(1, iw)
+    border = max(0.0, float(border_mm))
+    C = int(np.clip(width_mm / TARGET_PITCH * scale, 32, 1200)) + 1
+    Rr = int(np.clip(height / TARGET_PITCH * scale, 16, MAX_SIDE)) + 1
+    bc = int(round(border / (width_mm / (C - 1)))) if border > 0 else 0
+    br = int(round(border / (height / (Rr - 1)))) if border > 0 else 0
+    pc, pr = max(4, C - 2 * bc), max(4, Rr - 2 * br)
+    pic = thickness_map(im, pc, pr, min_thickness, max_thickness, smooth, gamma, auto_contrast, invert,
+                        color_mode)[::-1]                    # row 0 = bottom of the print
+    thick = np.full((pr + 2 * br, pc + 2 * bc), float(max_thickness))
+    thick[br:br + pr, bc:bc + pc] = pic
+    Rr, C = thick.shape
+    s = np.linspace(-width_mm / 2, width_mm / 2, C)
+    xy, nrm = arc_frame(s, width_mm, bend_deg)
+    z = np.linspace(0.0, height, Rr)
+    inner = np.concatenate([np.broadcast_to(xy[None], (Rr, C, 2)), np.broadcast_to(z[:, None, None], (Rr, C, 1))], -1)
+    normal = np.concatenate([np.broadcast_to(nrm[None], (Rr, C, 2)), np.zeros((Rr, C, 1))], -1)
+    v, f = _slab(inner, normal, thick)
+    info = dict(pixels=[pc, pr], pitch_mm=round(width_mm / (C - 1), 4), bend_deg=round(float(bend_deg), 1),
+                arc_length_mm=round(width_mm, 2), panel_height_mm=round(height, 2))
+    if bend_deg > 1e-4:
+        info["radius_mm"] = round(width_mm / np.radians(bend_deg), 2)
+    if stand:
+        v, f, foot = _panel_foot(v, f, s, width_mm, bend_deg, max_thickness)
+        info["stand"] = foot
+    v = v.copy(); v[:, 2] -= v[:, 2].min()
+    return v, f, info, thick[::-1]
+
+
+def _panel_foot(v, f, s, width_mm, bend_deg, max_thickness):
+    """Built-in stand: an arc-shaped foot (follows the bend, reaches PANEL_STAND_LIP_MM out on both sides and past
+    both ends) unioned with the panel, which is raised to sit on it. One solid, so it prints in one go."""
+    import trimesh
+    lip, h = PANEL_STAND_LIP_MM, PANEL_STAND_H_MM
+    ext = lip if bend_deg < 1e-4 else min(lip, width_mm * (360.0 - bend_deg) / 720.0 / 2)  # ends never meet at 180
+    s2 = np.linspace(s[0] - ext, s[-1] + ext, len(s))
+    a = np.radians(bend_deg)
+    if a < 1e-4:
+        xy = np.stack([s2, np.zeros_like(s2)], -1); nrm = np.stack([np.zeros_like(s2), -np.ones_like(s2)], -1)
+    else:
+        R = width_mm / a; phi = s2 / R
+        xy = np.stack([R * np.sin(phi), R - R * np.cos(phi)], -1); nrm = np.stack([np.sin(phi), -np.cos(phi)], -1)
+    base = xy - nrm * lip                                       # start lip mm behind the inner (concave) side
+    inner = np.concatenate([np.broadcast_to(base[None], (2, len(s2), 2)),
+                            np.array([0.0, h])[:, None, None].repeat(len(s2), 1)], -1)
+    normal = np.concatenate([np.broadcast_to(nrm[None], (2, len(s2), 2)), np.zeros((2, len(s2), 1))], -1)
+    fv, ff = _slab(inner, normal, np.full((2, len(s2)), 2 * lip + max_thickness))
+    pv = v.copy(); pv[:, 2] += h - 0.5                         # 0.5 mm overlap so the union is solid, not touching
+    m = trimesh.boolean.union([trimesh.Trimesh(pv, f, process=False), trimesh.Trimesh(fv, ff, process=False)],
+                              engine="manifold")
+    if not m.is_watertight:
+        raise ValueError("curved panel stand did not come out watertight")
+    return (np.asarray(m.vertices, float), np.asarray(m.faces, np.int64),
+            dict(height_mm=h, lip_mm=lip, built_in=True))
+
+
 def build(im, shape, **params):
     """Returns (vertices, faces, info, thickness map for the preview thumb)."""
     if shape in FLAT_SHAPES:
@@ -350,6 +458,10 @@ def build(im, shape, **params):
         keys = ("diameter_mm", "height_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth",
                 "gamma", "auto_contrast", "invert", "color_mode", "place")
         return curved_shape(im, shape, **{k: params[k] for k in keys if k in params})
+    if shape in PANEL_SHAPES:
+        keys = ("width_mm", "bend_deg", "stand", "min_thickness", "max_thickness", "border_mm", "resolution",
+                "smooth", "gamma", "auto_contrast", "invert", "color_mode")
+        return curved_panel(im, **{k: params[k] for k in keys if k in params})
     raise ValueError(f"unknown shape {shape!r}")
 
 

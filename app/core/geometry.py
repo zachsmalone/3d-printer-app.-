@@ -219,7 +219,7 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
                border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0,
                auto_contrast=True, invert=False, shape="rect", diameter_mm=40.0, height_mm=60.0,
                color_mode="mono", place=None, hang="", hole_d=4.0, inset_mm=6.0,
-               spacing_mm=40.0, stand=False, **_) -> Model:
+               spacing_mm=40.0, stand=False, bend_deg=90.0, **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
     if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
@@ -228,11 +228,20 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
     from . import litho_hang, litho_shapes
     if hang:                                    # validate + widen the rim before any mesh is built
         hang_opts = litho_hang.check_hang(hang, hole_d, inset_mm, spacing_mm)
-        if shape in litho_shapes.CURVED_SHAPES:
+        if shape in litho_shapes.CURVED_SHAPES + litho_shapes.PANEL_SHAPES:
             raise ValueError("hanging holes are only available for flat lithophane shapes")
         border_mm = max(border_mm, litho_hang.border_needed(hole_d, inset_mm))
     if stand and shape in litho_shapes.CURVED_SHAPES:
         raise ValueError("the display stand is only available for flat lithophane shapes")
+    if shape in litho_shapes.PANEL_SHAPES:      # curved panel: its stand is built in (same solid), not a second body
+        v, f, info, thick = litho_shapes.build(
+            im, shape, width_mm=width_mm, bend_deg=bend_deg, stand=bool(stand), min_thickness=min_thickness,
+            max_thickness=max_thickness, border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma,
+            auto_contrast=auto_contrast, invert=invert, color_mode=color_mode)
+        m = Model([Body("lithophane", v, f)], "lithophane")
+        m.info = {**info, "shape": shape}
+        m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)
+        return m
     if shape != "rect":
         if shape not in litho_shapes.SHAPES:
             raise ValueError(f"unknown lithophane shape {shape!r}")

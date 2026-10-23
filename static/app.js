@@ -109,11 +109,23 @@ function applyShape() {
   $("#width_mm").closest(".field").hidden = curved;
   $("#diaLbl").firstChild.textContent = { globe: "Globe diameter ", cup: "Cup inside diameter " }[litShape()] || "Light diameter ";
   $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
+  const curve = lit && litShape() === "curve";
+  $("#curveOpts").hidden = !curve; syncBend();
   const hangOk = lit && ["rect", "square", "circle"].includes(litShape());
   $("#hangOpts").hidden = !hangOk; if (!hangOk) { $("#hang").value = ""; $("#stand").checked = false; }
   $("#hangHoleFld").hidden = !$("#hang").value;
-  $("#placeEditor").hidden = !lit || litShape() === "rect" || !S.file;
+  $("#placeEditor").hidden = !lit || litShape() === "rect" || curve || !S.file;   // curved panel: whole photo, its own aspect
   if (place && !$("#placeEditor").hidden) place.redraw();
+}
+/* curved panel: bend 0..180 deg, optional built-in stand; the bed check uses the printer picked in Will-it-print */
+let PRN = null; import("/static/printer.js").then(m => { PRN = m; }).catch(() => { });
+function syncBend() { const b = +$("#bend_deg").value; $("#bendOut").textContent = b + "°" + (b === 0 ? " (flat)" : b === 180 ? " (half circle)" : ""); }
+$("#bend_deg").addEventListener("input", syncBend);
+function curveFitNote(r) {
+  const el = $("#curveFit"), f = r?.info?.bed_fit;
+  if (!el || r?.info?.shape !== "curve" || !f) { if (el) el.textContent = ""; return; }
+  el.textContent = f.ok ? `About ${f.size_mm.join(" × ")} mm. Fits a ${f.bed_mm.join(" × ")} mm bed.`
+    : `About ${f.size_mm.join(" × ")} mm, larger than a ${f.bed_mm.join(" × ")} mm bed. A smaller width or more bend may help. You can still export it.`;
 }
 /* image placement inside the shape (Zach: shapes cut the photo off) - see /static/lithoplace.js */
 import { mountPlace } from "/static/lithoplace.js";
@@ -190,12 +202,16 @@ function formData(autoDelete) {
   if (S.mode === "lithophane") {
     fd.append("material", $("#lithMaterial").value);
     fd.append("shape", litShape());
+    if (litShape() === "curve") {
+      fd.append("bend_deg", $("#bend_deg").value); if ($("#curveStand").checked) fd.append("stand", "true");
+      if (PRN?.P?.pref?.printer_id) fd.append("printer_id", PRN.P.pref.printer_id);
+    }
     if (CURVED.includes(litShape())) { fd.append("diameter_mm", $("#diameter_mm").value); fd.append("height_mm", $("#height_mm").value); }
     if (!$("#hangOpts").hidden) {
       if ($("#hang").value) { fd.append("hang", $("#hang").value); fd.append("hole_d", $("#hole_d").value); }
       if ($("#stand").checked) fd.append("stand", "true");
     }
-    if (litShape() !== "rect" && !place.isDefault()) {
+    if (!["rect", "curve"].includes(litShape()) && !place.isDefault()) {
       const p = place.get(); fd.append("place_x", p.x.toFixed(4)); fd.append("place_y", p.y.toFixed(4));
       fd.append("place_scale", p.scale.toFixed(4)); fd.append("place_rotation", p.rotation.toFixed(2));
     }
@@ -267,7 +283,7 @@ async function build(autoDelete = false) {
 $("#btnBuild").onclick = () => build(false);
 
 function showBuild(r) {
-  S.current = r;
+  S.current = r; curveFitNote(r);
   document.dispatchEvent(new CustomEvent("zeim:build", { detail: r }));   // Select mode keeps the saved selection (selectmode.js)
   r.visibility = r.visibility || "private";
   $("#viewerEmpty").hidden = true; $("#vtools").hidden = false; $("#result").hidden = false;
