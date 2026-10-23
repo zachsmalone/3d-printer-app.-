@@ -81,7 +81,7 @@ def main_run(p, stl, width):
     lines1 = pg.evaluate("window.__gcLines")
     ok(f"{name}: unticking every type draws no lines (and re-renders)", lines1 == 0 and pg.evaluate("window.__gcFrames") > f1, (lines0, lines1))
     pg.check("[data-gct=outer]")
-    sz = pg.evaluate("[...document.querySelectorAll('#gcPrev button, #gcPrev .gcchip, #gcRange')].map(b => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); })")
+    sz = pg.evaluate("[...document.querySelectorAll('#gcPrev button, #gcPrev .gcchip, #gcRange')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return Math.round(Math.min(r.width, r.height)); })")
     ok(f"{name}: 44 px targets", all(v >= 44 for v in sz), sz)
     ok(f"{name}: no sideways scroll", pg.evaluate("document.documentElement.scrollWidth <= innerWidth + 1"), pg.evaluate("[document.documentElement.scrollWidth, innerWidth]"))
     dpr = pg.evaluate("(() => { const c = document.querySelector('#gcStage canvas'); return c.width / c.getBoundingClientRect().width; })()")

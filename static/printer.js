@@ -212,7 +212,8 @@ export function wirePanel(getModelId) {
           $("#spSkipped").innerHTML = `<p>${esc(j.message)}</p>${j.new_project ? `<a class="btn small" href="/?edit=${encodeURIComponent(j.new_project)}#slicer">Open plate 2</a>` : ""}`;
         } catch (e) { b.disabled = false; $("#spSkipped p").textContent = e.message || "Couldn't split the plate."; }
       };
-      if (HAS_GL) gcDispose = wireGcodePreview(r.downloads.gcode, { time: r.print_time_human, grams: r.filament_grams, mm: r.filament_mm });
+      if (HAS_GL) gcDispose = wireGcodePreview(r.downloads.gcode, { time: r.print_time_human, grams: r.filament_grams, mm: r.filament_mm },
+        { firmware: r.firmware, markers: r.problem_markers, pausedUrl: r.downloads.gcode + "-paused" });
       else if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once

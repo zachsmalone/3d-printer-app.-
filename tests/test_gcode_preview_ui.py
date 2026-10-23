@@ -16,3 +16,9 @@ def test_gcode_preview_in_chromium():
     from test_b4_ui import _run
     out = _run("ui_gcode_preview.py")
     assert "PASS chrome" in out, out
+
+
+def test_gcode_tools_code_pause_markers_in_chromium():
+    from test_b4_ui import _run
+    out = _run("ui_gcode_tools.py")
+    assert "PASS chrome" in out, out

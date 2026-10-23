@@ -196,6 +196,8 @@ def slice_model(
         badge = willprint.check_file(work / "model.stl", prof.id, prof.nozzle, slices_ok=True, filament_g=res.filament_grams)
     except Exception:
         badge = None
+    from app.services import gcode_hints, gcode_pause
+    hints = gcode_hints.markers(work / "model.stl", chosen.get("supports") or "off", badge)
 
     return {
         "slice_id": slice_id,
@@ -215,6 +217,7 @@ def slice_model(
         "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
         "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
         "support_paint": paint_info,
+        "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
     }
@@ -341,6 +344,34 @@ def download_gcode(slice_id: str):
     if not path.is_file():
         _fail(404, "not_found", "That G-code has expired. Please slice again.")
     return FileResponse(path, media_type="text/plain", filename="zeim-model.gcode")
+
+
+@router.get("/{slice_id}/gcode-paused")
+def download_gcode_paused(slice_id: str, layers: str = "", cmd: str = ""):
+    """A NEW file with a pause at the start of each listed layer (1-based, same numbering as the preview).
+    The original model.gcode is never touched."""
+    from app.services import gcode_pause
+    import hashlib
+    if not _SLICE_ID.match(slice_id):
+        _fail(404, "not_found", "G-code not found.")
+    path = slices_root() / slice_id / "model.gcode"
+    if not path.is_file():
+        _fail(404, "not_found", "That G-code has expired. Please slice again.")
+    if cmd not in gcode_pause.COMMANDS:
+        _fail(422, "bad_command", "Pick a pause command: " + ", ".join(gcode_pause.COMMANDS))
+    try:
+        want = sorted({int(x) for x in layers.split(",") if x.strip()})
+    except ValueError:
+        want = []
+    if not want or len(want) > 50 or want[0] < 1 or want[-1] > 1_000_000:
+        _fail(422, "bad_layers", "Give 1 to 50 layer numbers, like layers=12,40.")
+    key = hashlib.sha1(f"{cmd}|{want}".encode()).hexdigest()[:12]
+    out = path.with_name(f"paused-{key}.gcode")
+    if not out.is_file():
+        tmp = out.with_name(f"{out.name}.{uuid.uuid4().hex}.tmp")
+        gcode_pause.insert_pauses(path, tmp, want, cmd)
+        tmp.replace(out)
+    return FileResponse(out, media_type="text/plain", filename="zeim-model-with-pauses.gcode")
 
 
 @router.get("/{slice_id}/layers")
