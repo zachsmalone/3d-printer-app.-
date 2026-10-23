@@ -2,6 +2,9 @@
    Choice: signed-up users keep it on their profile (PUT /api/me/printer); everyone else in localStorage. Default Creality K1 at 0.4 mm. */
 import { api, esc, $, toast } from "/static/app.js";
 import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
+import { gcodePreviewHTML, wireGcodePreview } from "/static/gcodeview.js";
+const HAS_GL = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } })();
+let gcDispose = null;  // previous G-code preview (freed on the next slice)
 import { mountPaint, getStrokes } from "/static/supportpaint.js";
 import { costHTML, wireCost } from "/static/cost.js";
 
@@ -180,6 +183,7 @@ export function wirePanel(getModelId) {
     const out = $("#spOut"), fd = readPanel(); fd.append("model_id", getModelId());
     if (ventOk) fd.append("ventilation_ok", "true");
     $("#spMatWarn").hidden = false;
+    if (gcDispose) { gcDispose(); gcDispose = null; }
     out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}…</p>`; $("#spGo").disabled = true;
     try {
       const r = await api("/api/slice", { method: "POST", body: fd });
@@ -195,10 +199,11 @@ export function wirePanel(getModelId) {
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download>⬇ G-code</a><a class="btn" href="${r.downloads["3mf"]}" download>⬇ 3MF</a><a class="btn" href="${r.downloads.stl}" download>⬇ STL</a></div>
-        ${r.downloads.layers ? layerPreviewHTML() : ""}
+        ${HAS_GL ? gcodePreviewHTML() : r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
       wireCost();
-      if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
+      if (HAS_GL) gcDispose = wireGcodePreview(r.downloads.gcode, { time: r.print_time_human, grams: r.filament_grams, mm: r.filament_mm });
+      else if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
         out.innerHTML = matWarnHTML(e.body.detail.warning?.material || $("#spMat").value, { ask: true });
