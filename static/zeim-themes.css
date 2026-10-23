@@ -1,0 +1,48 @@
+/* ZEIM section themes. One quiet art band per section, above the page header, never under controls.
+   Art is pre-rendered (static/zt/, original artwork). Only transform/opacity animate; nothing animates under reduced motion. */
+.zt-band{position:relative;height:150px;margin:0 0 var(--s4,16px);border-radius:var(--r-lg,14px);overflow:hidden;contain:strict;background:var(--zt-ground,#F4F1EA);pointer-events:none;user-select:none}
+.layout>.zt-band{grid-column:1/-1;margin:0}
+.zt-art{position:absolute;top:0;right:0;height:100%;width:auto;max-width:none;aspect-ratio:1000/320;object-fit:cover;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 30%);mask-image:linear-gradient(90deg,transparent 0,#000 30%)}
+[data-zt=torchc0] .zt-art{left:0;width:100%;aspect-ratio:auto;-webkit-mask-image:none;mask-image:none}
+.zt-band::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--zt-a,#0066FF);opacity:.55}
+[data-zt=showcase]{--zt-ground:#F5EDE9;--zt-a:#C24D6B}
+[data-zt=slicer]{--zt-ground:#EFEADE;--zt-a:#0066FF}
+[data-zt=torchc0]{--zt-ground:#1A0606;--zt-a:#E2582C}
+[data-zt=cad]{--zt-ground:linear-gradient(#C9CED4,#9AA3AD);--zt-a:#B8792E}
+[data-zt=lithophane]{--zt-ground:#1C140E;--zt-a:#E2B66C;height:168px}
+[data-zt=smartfix]{--zt-ground:#F1ECE2;--zt-a:#8A5A2B;background-image:url(/static/zt/kumiko.svg);background-size:40px 40px;background-position:right top}
+[data-zt=smartfix]::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#F1ECE2 0,#F1ECE2 30%,rgba(241,236,226,.55) 100%)}
+[data-zt=learn]{--zt-ground:#F5F2ED;--zt-a:#3B3A4A}
+[data-zt=account]{--zt-ground:#F4F0EA;--zt-a:#A3241C}
+/* Workspace stays clean: the wave band shows only before a model is open */
+#viewEdit:has(#editStart[hidden])>.zt-band{display:none}
+/* Lithophane: Tango as a square, backlit lithophane in a thin wooden frame */
+.zt-litho{position:absolute;right:28px;top:14px;width:140px;height:140px;padding:5px;border-radius:4px;background:linear-gradient(135deg,#6B4A2E,#3E2A1A);box-shadow:0 0 0 1px #2A1C10,0 0 38px 6px rgba(255,190,110,.28)}
+.zt-litho img{display:block;width:100%;height:100%;object-fit:cover;border-radius:2px}
+.zt-cap{position:absolute;right:186px;bottom:14px;max-width:44%;margin:0;color:#E8D2A6;font-size:var(--fs-sm,13px);text-align:right}
+/* TorchC0: rain and a distant lightning flash over fire red */
+.zt-rain{position:absolute;inset:-40px 0 0 34%;background:repeating-linear-gradient(104deg,transparent 0 22px,rgba(255,220,200,.22) 22px 23px,transparent 23px 47px);background-size:47px 60px;will-change:transform;animation:zt-rain 1.6s linear infinite}
+.zt-rain.far{opacity:.5;background-size:31px 40px;animation-duration:2.4s}
+@keyframes zt-rain{to{transform:translate3d(-10px,40px,0)}}
+.zt-bolt{position:absolute;right:16%;top:0;width:60px;height:110px;opacity:0;animation:zt-bolt 9s ease-out infinite}
+.zt-bolt path{fill:none;stroke:#FFE7C9;stroke-width:2;stroke-linejoin:round}
+@keyframes zt-bolt{0%,86%,100%{opacity:0}87%{opacity:.9}88%{opacity:.15}89.5%{opacity:.7}93%{opacity:0}}
+/* Showcase: a few petals drift slowly */
+.zt-petal{position:absolute;top:-12px;width:9px;height:7px;border-radius:70% 0 70% 0;background:#F2B8C6;opacity:0;will-change:transform,opacity;animation:zt-fall 14s linear infinite}
+.zt-petal:nth-child(2){left:52%;animation-delay:0s}.zt-petal:nth-child(3){left:64%;animation-delay:-4s;animation-duration:17s}
+.zt-petal:nth-child(4){left:76%;animation-delay:-8s}.zt-petal:nth-child(5){left:86%;animation-delay:-11s;animation-duration:19s}
+.zt-petal:nth-child(6){left:93%;animation-delay:-2s;animation-duration:16s}
+@keyframes zt-fall{0%{transform:translate3d(0,0,0) rotate(0);opacity:0}10%{opacity:.85}90%{opacity:.7}100%{transform:translate3d(-60px,150px,0) rotate(240deg);opacity:0}}
+/* Gentle arrival when a section opens */
+main:not([hidden])>.zt-band .zt-art,main:not([hidden])>.zt-band .zt-litho{animation:zt-in .32s cubic-bezier(.22,.61,.36,1) .04s both}
+@keyframes zt-in{from{opacity:0;transform:translate3d(16px,0,0)}}
+.pagehead h1::after,#viewCreate #h1::after{content:"";display:block;width:36px;height:2px;margin-top:6px;border-radius:2px;background:var(--zt-a,#0066FF)}
+#viewShowcase{--zt-a:#C24D6B}#viewTorch{--zt-a:#C8321E}#viewCad{--zt-a:#B8792E}
+#viewFix{--zt-a:#8A5A2B}#viewLearn{--zt-a:#3B3A4A}#viewAccount{--zt-a:#A3241C}
+#viewCreate{--zt-a:#B8862E}
+html[data-theme=dark] .zt-band{opacity:.88}
+html[data-theme=dark] #viewLearn{--zt-a:#9C98C0}
+@media (max-width:640px){.zt-band{height:96px;border-radius:var(--r,12px)}
+ [data-zt=lithophane]{height:128px}.zt-litho{width:106px;height:106px;right:14px;top:11px}.zt-cap{right:132px;max-width:52%;font-size:12px}
+ .zt-rain{left:18%}}
+@media (prefers-reduced-motion:reduce){.zt-band *,.zt-band::before,.zt-band::after{animation:none!important;transition:none!important}.zt-petal{display:none}.zt-bolt{opacity:0}}
