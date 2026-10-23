@@ -86,7 +86,7 @@ def _sample_hash() -> str:
     import hashlib
     from ..config import STATIC
     try:
-        return hashlib.sha256((STATIC / "sample.png").read_bytes()).hexdigest()
+        return hashlib.sha256((STATIC / "sample.jpg").read_bytes()).hexdigest()
     except OSError:
         return ""
 
@@ -98,11 +98,11 @@ def is_builtin_sample(raw: bytes) -> bool:
 
 
 def builtin_title(raw: bytes) -> str:
-    """'Sample photo' / 'Sample vase' when the bytes are ZEIM's own sample files, else ''. (A title is NEVER taken from a person's file name.)"""
+    """'Sample photo' / 'Sample model' when the bytes are ZEIM's own sample files, else ''. (A title is NEVER taken from a person's file name.)"""
     import hashlib
     from ..config import STATIC
     h = hashlib.sha256(raw).hexdigest()
-    for fn, title in (("sample.png", "Sample photo"), ("sample_model.stl", "Sample vase")):
+    for fn, title in (("sample.jpg", "Sample photo"), ("sample_model.stl", "Sample model")):
         try:
             if hashlib.sha256((STATIC / fn).read_bytes()).hexdigest() == h:
                 return title

@@ -36,13 +36,13 @@ def ack_on(monkeypatch):
 
 
 def other_png():
-    """A photo that is NOT ZEIM's built-in sample image (tests/sample.png is byte-identical to static/sample.png, so it is exempt)."""
+    """A photo that is NOT ZEIM's built-in sample image (static/sample.jpg is exempt)."""
     import io
     from PIL import Image
     b = io.BytesIO(); Image.effect_mandelbrot((96, 96), (-2, -1.5, 1, 1.5), 40).convert("RGB").save(b, "PNG"); return b.getvalue()
 
 
-SAMPLE_PNG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "sample.png")
+SAMPLE_PNG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "sample.jpg")
 
 
 def test_cr5_studio_build_from_an_uploaded_photo_needs_the_box_and_records_it(ack_on):
@@ -259,6 +259,6 @@ def test_s01_local_mode_settings_refuse_a_cross_site_origin(monkeypatch):
 
 def test_built_in_samples_get_a_friendly_title_but_never_from_a_file_name():
     c = client(ADULT)
-    assert gen(c).json()["title"] == "Sample photo"                      # ZEIM's own sample.png
+    assert gen(c, data=open(SAMPLE_PNG, "rb").read()).json()["title"] == "Sample photo"                      # ZEIM's own sample.jpg
     stl = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static", "sample_model.stl"), "rb").read()
-    r = c.post("/api/edit/new", files={"file": ("whatever_name.stl", stl, "application/octet-stream")}); assert r.json()["title"] == "Sample vase"
+    r = c.post("/api/edit/new", files={"file": ("whatever_name.stl", stl, "application/octet-stream")}); assert r.json()["title"] == "Sample model"

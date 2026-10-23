@@ -1,4 +1,4 @@
-"""Learning library (Spark Lab) + public shareable pages. No grades, scores or school records (2026-10-12)."""
+"""Learning library (Learn) + public shareable pages. No grades or scores (2026-10-12)."""
 from __future__ import annotations
 
 from html import escape

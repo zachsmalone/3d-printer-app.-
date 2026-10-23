@@ -4,7 +4,7 @@ import os, sys
 from playwright.sync_api import sync_playwright
 URL, OUT = sys.argv[1].rstrip("/"), sys.argv[2]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PNG = open(os.path.join(ROOT, "static", "sample.png"), "rb").read()
+PNG = open(os.path.join(ROOT, "static", "sample.jpg"), "rb").read()
 with sync_playwright() as p:
     b = p.chromium.launch()
     owner = b.new_context(); r = owner.request

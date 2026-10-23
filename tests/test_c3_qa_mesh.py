@@ -29,7 +29,7 @@ def test_simplify_never_reports_a_broken_result_as_watertight():
 
 @pytest.mark.skipif(not me.have_hollow(), reason="hollow deps missing")
 def test_hollow_vase_enforces_the_minimum_wall_and_warns_about_thin_spots():
-    m = trimesh.load(os.path.join(ROOT, "static", "sample_model.stl"))
+    m = trimesh.load(os.path.join(ROOT, "tests", "fixtures", "sample_vase.stl"))
     out, r = me.op_hollow(m, {"wall": 2})
     assert r["wall_p1_mm"] >= 2 - r["resolution_mm"]                          # QA expectation: p1 >= wall - one voxel (was 1.23)
     if r["wall_min_probe_mm"] < 2 - r["resolution_mm"]:

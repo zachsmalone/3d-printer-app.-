@@ -90,6 +90,23 @@ def put_my_printer_kind(body: dict, actor: Actor = Depends(get_actor)):
     return {"signed_up": bool(actor.user), "stored": "profile" if actor.user else "browser", "kind": k}
 
 
+@router.get("/api/me/adult")
+def get_my_adult(actor: Actor = Depends(get_actor)):
+    """First-visit 18+ confirmation. Only a 'yes' is ever stored (and only on an account); a 'no' is never recorded."""
+    return {"signed_up": bool(actor.user), "confirmed": bool((actor.user or {}).get("adult_confirmed_at"))}
+
+
+@router.put("/api/me/adult")
+def put_my_adult(body: dict, actor: Actor = Depends(get_actor)):
+    if body.get("adult") is not True:
+        raise HTTPException(400, "Only a yes is recorded.")
+    if actor.user:
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        USERS.update(lambda d: d[actor.sid].__setitem__("adult_confirmed_at", ts) if actor.sid in d else None)
+    return {"signed_up": bool(actor.user), "stored": "profile" if actor.user else "browser", "confirmed": True}
+
+
 def slice_check(mesh_path, printer_id, nozzle):
     """Real PrusaSlicer run (Standard preset) for the 'slices OK' check, cached per file + printer + nozzle."""
     import hashlib, json, tempfile

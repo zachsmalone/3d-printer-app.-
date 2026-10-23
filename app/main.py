@@ -216,7 +216,11 @@ def healthz():
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    from app import config
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    if not config.AGE_GATE:                    # test-only switch (PHOTO3D_AGE_GATE=0): the 18+ overlay script sees this and stands down
+        html = html.replace('<html lang="en">', '<html lang="en" data-agegate="off">', 1)
+    return HTMLResponse(html)
 
 
 @app.get("/workbench", include_in_schema=False)

@@ -45,7 +45,10 @@ def harden_data_permissions() -> int:
 harden_data_permissions()
 
 # ---- community / policy constants (single source of truth) ----
-MIN_SIGNUP_AGE = 18          # ZEIM accounts are 18+ only (owner decision 2026-10-12). Families print together with an adult account holder.
+# First-visit 18+ confirmation for every visitor. Test-only switch: PHOTO3D_AGE_GATE=0 (tests/conftest.py) skips it so
+# automated UI tests are not stopped by the overlay. Never turn it off in production.
+AGE_GATE = os.environ.get("PHOTO3D_AGE_GATE", "1") != "0"
+MIN_SIGNUP_AGE = 18          # ZEIM accounts are 18+ only (owner decision 2026-10-12).
 USERNAME_CHANGE_DAYS = int(os.environ.get("PHOTO3D_USERNAME_CHANGE_DAYS", "90"))      # one username change per this many days
 ADMIN_TOKEN = __import__("os").environ.get("PHOTO3D_ADMIN_TOKEN", "")   # moderation queue access
 

@@ -107,6 +107,6 @@ def require_send(request: Request, actor: Actor):
 
 
 def showcase_gate(actor: Actor, likes: bool = False):
-    """Kept as a hook for page/route callers. The classroom Showcase switches were removed with school features (2026-10-12)."""
+    """Kept as a hook for page/route callers.."""
     return
 

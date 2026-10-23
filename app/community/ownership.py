@@ -1,4 +1,4 @@
-"""Helpers for builds / lesson checklist that belong to a browser session (moved out of the removed classrooms module, 2026-10-12)."""
+"""Helpers for builds / lesson checklist that belong to a browser session."""
 from __future__ import annotations
 
 

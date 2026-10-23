@@ -23,14 +23,14 @@ with sync_playwright() as p:
     pg.click("#mainNav [data-view=slicer]"); pg.click("#editSample"); pg.wait_for_selector("#editResult:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
     pg.click("#mainNav [data-view=lithophane]"); pg.wait_for_timeout(300)
     pg.click("#btnPrint"); pg.wait_for_selector("#dlgPrint[open]"); w = pg.inner_text("#printWhich")
-    ok("QA-1: Studio Print shows the Studio lithophane, not the Edit vase", "Lithophane" in w and "Sample vase" not in w, w)
+    ok("QA-1: Studio Print shows the Studio lithophane, not the Edit sample", "Lithophane" in w and "Sample model" not in w, w)
     pg.keyboard.press("Escape")
     pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
     pg.click("#editPrint"); pg.wait_for_selector("#dlgPrint[open]"); w2 = pg.inner_text("#printWhich")
-    ok("QA-1: Edit Print shows the Edit project", "Sample vase" in w2, w2)
+    ok("QA-1: Edit Print shows the Edit project", "Sample model" in w2, w2)
     pg.keyboard.press("Escape")
     pg.click("#editSend"); pg.wait_for_selector("#dlgSendSheet[open]"); w3 = pg.inner_text("#ssWhich")
-    ok("QA-1: Edit Send names the Edit project", "Sample vase" in w3, w3); pg.keyboard.press("Escape")
+    ok("QA-1: Edit Send names the Edit project", "Sample model" in w3, w3); pg.keyboard.press("Escape")
     pg.click("#mainNav [data-view=lithophane]"); pg.evaluate("location.hash=\'studio\'"); pg.click("#btnSendSheet"); pg.wait_for_selector("#dlgSendSheet[open]")
     ok("QA-1: Studio Send names the Studio build", "Sample photo" in pg.inner_text("#ssWhich"), pg.inner_text("#ssWhich")); pg.keyboard.press("Escape")
     # ---- QA-4: the finished model is brought into view after a Beginner build
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     ctx.close()
     # ---- Edit drop zone at the 5-build cap (item 6)
     ctx = b.new_context(viewport={"width": 1100, "height": 900}); pg = ctx.new_page(); pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(600)
-    n = pg.evaluate("""async () => { const sb = await (await fetch('/static/sample.png')).blob(); let ok = 0;
+    n = pg.evaluate("""async () => { const sb = await (await fetch('/static/sample.jpg')).blob(); let ok = 0;
         for (let i = 0; i < 5; i++) { const fd = new FormData(); fd.append('file', new File([sb], 'a'+i+'.png', {type:'image/png'})); fd.append('mode','relief'); fd.append('resolution','40'); fd.append('width_mm','40');
           fd.append('photo_ack','true'); const r = await fetch('/api/generate', {method:'POST', body: fd}); if (r.ok) { ok++; const id = (await r.json()).id;
             await fetch('/api/builds/' + id + '/favorite', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({favorite:true})}); } } return ok; }""")
