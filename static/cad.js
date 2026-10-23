@@ -4,6 +4,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "/static/vendor/OrbitControls.js";
 import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/cad-planes.js";
+import { initLessons } from "/static/cad-lessons.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -23,6 +24,7 @@ const IC = {
   sketch: P('<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/>'),
   extrude: P('<path d="M5 15l7 4 7-4"/><path d="M5 15V9l7-4 7 4v6"/><path d="M12 13V5"/><path d="M9.5 7.5L12 5l2.5 2.5"/>'),
   revolve: P('<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M7 6a8 3 0 1 0 10 0"/><path d="M15 4l2 2-2 2"/>'),
+  shapes: P('<rect x="3" y="11" width="9" height="9" rx="1"/><circle cx="16.5" cy="7.5" r="4.5"/>'),
   boolean: P('<circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/>'),
   fillet: P('<path d="M4 20V10a6 6 0 0 1 6-6h10"/><path d="M4 20h4M20 4v4"/>'),
   shell: P('<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M8 10l4-2 4 2v4l-4 2-4-2z"/>'),
@@ -277,6 +279,7 @@ function drawSelection() {
 
 /* ---------------------------------------------------------------- tools */
 const MODEL_TOOLS = [
+  { id: "shapes", key: "N", label: "Shapes", sub: "cube · cylinder · hole", tip: "Drop a ready-made shape: cube, cylinder, sphere, cone, ring, tube, wedge or a hole." },
   { id: "sketch", key: "K", label: "Sketch", sub: "on a plane or face", tip: "Draw a 2D shape on a plane (XY/XZ/YZ) or on a flat face you tapped first." },
   { id: "extrude", key: "E", label: "Extrude", sub: "up · down · both · cut", tip: "Pull a closed sketch into a solid, or cut it into the model." },
   { id: "revolve", key: "R", label: "Revolve", sub: "axis + angle", tip: "Spin a sketch profile around an axis (vases, knobs, wheels)." },
@@ -353,6 +356,7 @@ const HINTS = {
   repair: ["Fix mesh", "Repair an imported mesh."],
   sculpt: ["Sculpt", "Drag on the model to sculpt. Two fingers or drag off the model to orbit. Each stroke is a step (undo works)."],
   null: ["Select", "Tap a body to select it, or pick a tool on the left."],
+  shapes: ["Shapes", "Tap a shape to drop it. Pick New, Join or Cut first."],
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
   revolve: ["Revolve", "Choose the axis and angle, then Apply."], boolean: ["Boolean", "Choose the target and tool bodies."],
   fillet: ["Fillet/Chamfer", "Tap edges to round only those (none = all outside edges)."], shell: ["Shell", "Hollow the model with this wall thickness."],
@@ -371,10 +375,57 @@ function setTool(id) {
   if (S.measure && id) toggleMeasure(false);
   if (!id) return;
   const needModel = !["sketch", "visualize"].includes(id);
-  if (needModel && !bodyCount() && !["extrude", "revolve", "text"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
+  if (needModel && !bodyCount() && !["extrude", "revolve", "text", "shapes"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
   TOOL_PANELS[id]?.();
 }
+/* Beginner shapes: one tap drops a ready-made solid (server op cad_shape, reusing the parts-builder primitives). */
+const SHAPES = [["box", "Cube"], ["cylinder", "Cylinder"], ["sphere", "Sphere"], ["cone", "Cone"], ["torus", "Ring"], ["tube", "Tube"], ["wedge", "Wedge"], ["hole", "Hole"]];
+const SH_IC = { box: '<rect x="5" y="7" width="12" height="12" rx="1"/><path d="M5 7l3-3h12v12l-3 3M17 7l3-3"/>', cylinder: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v12c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5V6"/>',
+  sphere: '<circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="8" ry="3"/>', cone: '<path d="M12 3L5 18c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5z"/>',
+  torus: '<ellipse cx="12" cy="12" rx="9" ry="5"/><ellipse cx="12" cy="12" rx="4" ry="1.8"/>', tube: '<ellipse cx="12" cy="6" rx="7" ry="2.5"/><ellipse cx="12" cy="6" rx="3.5" ry="1.2"/><path d="M5 6v12c0 1.4 3 2.5 7 2.5s7-1.1 7-2.5V6"/>',
+  wedge: '<path d="M4 19h16L4 7z"/>', hole: '<circle cx="12" cy="12" r="8" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="3"/>' };
+function modelBox(all = false) {   // [min, max] of the picked body, or of everything
+  const bs = (S.scene?.bodies || []).filter(b => all || S.selBody < 0 || b.index === S.selBody);
+  if (!bs.length) return null;
+  return [[0, 1, 2].map(k => Math.min(...bs.map(b => b.center[k] - b.size[k] / 2))), [0, 1, 2].map(k => Math.max(...bs.map(b => b.center[k] + b.size[k] / 2)))];
+}
+function shapeParams(kind, s, flat, mode, edge) {
+  const h = flat ? 4 : s, B = modelBox();
+  if (kind === "hole") {   // a round hole straight through, at the centre or near the +X edge (key rings)
+    if (!B) return null;
+    const d = { 10: 3, 20: 5, 40: 8 }[s] || 5, [lo, hi] = B, cx = (lo[0] + hi[0]) / 2, x = edge ? Math.max(cx, hi[0] - d / 2 - 3) : cx;
+    return { kind: "cylinder", dims: { diameter: d, height: +(hi[2] - lo[2] + 2).toFixed(3) }, position: [x, (lo[1] + hi[1]) / 2, lo[2] - 1], mode: "cut" };
+  }
+  const dims = { box: { size: [s, s, h] }, cylinder: { diameter: s, height: h }, sphere: { diameter: s }, cone: { diameter: s, height: s },
+    torus: { outer: s, tube: s / 4 }, tube: { outer: s, inner: s * 0.6, height: h }, wedge: { size: [s, s, h] } }[kind];
+  const ht = { sphere: s, torus: s / 4, cone: s }[kind] ?? h;
+  if (!B) return { kind, dims, position: [0, 0, 0], mode: "new" };
+  const [lo, hi] = B, c = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2];
+  const pos = mode === "new" ? [modelBox(true)[1][0] + 5 + s / 2, c[1], 0]   // beside everything, on the bed
+    : mode === "join" ? [c[0], c[1], hi[2] - 0.5]                             // on top, a little overlap so it fuses
+    : [c[0], c[1], Math.max(lo[2] + 2, hi[2] - ht + 1)];                      // sinks in from the top, leaving a 2 mm floor
+  return { kind, dims, position: pos, mode };
+}
 const TOOL_PANELS = {
+  shapes() {
+    const H = S.shp || (S.shp = { size: 20, flat: false, mode: "new", edge: false });
+    const has = bodyCount() > 0;
+    if (!has) H.mode = "new";
+    panel("Shapes", `${has ? `<div class="f"><label>Adds as</label>${seg("shMode", [["new", "New piece"], ["join", "Join"], ["cut", "Cut out"]], H.mode)}</div>` : ""}
+      <div class="f"><label>Size</label>${seg("shSize", [["10", "Small"], ["20", "Medium"], ["40", "Large"]], String(H.size))}</div>
+      <label class="cw-toggle"><span>Flat (4 mm tall)</span><input type="checkbox" id="shFlat" ${H.flat ? "checked" : ""}></label>
+      <div class="cw-shapes" role="group" aria-label="Shapes">${SHAPES.map(([k, l]) => `<button type="button" data-shape="${k}" ${k === "hole" && !has ? "disabled" : ""}><svg viewBox="0 0 24 24" aria-hidden="true">${SH_IC[k]}</svg><span>${l}</span></button>`).join("")}</div>
+      ${has ? `<label class="cw-toggle"><span>Hole near the edge (key ring)</span><input type="checkbox" id="shEdge" ${H.edge ? "checked" : ""}></label>` : ""}
+      <p class="help">Small 10 mm · Medium 20 mm · Large 40 mm. ${has ? "Join and Cut use the picked body, or the whole model." : "Your first shape starts the design."} Move or Scale it afterwards; each shape is a step in History.</p>`,
+      () => setTool(null), "Done");
+    $("#tCancel").hidden = true;
+    const sync = () => { H.size = +segVal("shSize"); H.flat = $("#shFlat").checked; if (has) { H.mode = segVal("shMode"); H.edge = $("#shEdge").checked; } };
+    $("#cwTool").querySelectorAll("[data-shape]").forEach(b => b.onclick = async () => {
+      sync(); const p = shapeParams(b.dataset.shape, H.size, H.flat, H.mode, H.edge);
+      if (!p) return msg("Add a shape first, then cut a hole in it.");
+      await addOp("cad_shape", p); setTool("shapes");   // palette stays open for the next shape
+    });
+  },
   sketch() {
     const face = S.selFace, prev = S.prevFace;
     const pick = v => v === "face" ? planeFromFace(face) : v === "face2" ? planeFromFace(prev) : v;
@@ -523,7 +574,7 @@ async function load(keepCam) {
   S.scene = await api(`/api/cad/${S.bid}/scene`);
   S.appearance = S.scene.appearance || {};
   $("#cwTitle").value = S.scene.title || "My design";
-  buildWorld(keepCam); renderHist(); updateTop();
+  buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
 }
 function updateTop() {
   $("#cwUndo").disabled = !S.scene?.can_undo; $("#cwRedo").disabled = !S.scene?.can_redo;
@@ -548,7 +599,7 @@ async function addOp(op, params) {
   let rep = null;
   const ok = await run(async () => {
     if (!S.bid) {
-      if (!["sketch_extrude", "revolve", "cad_text"].includes(op)) throw new Error("Start with a sketch and Extrude or Revolve.");
+      if (!["sketch_extrude", "revolve", "cad_text", "cad_shape"].includes(op)) throw new Error("Start with a shape, or a sketch and Extrude.");
       const j = rep = await api("/api/cad/new", { method: "POST", json: { op, params, title: $("#cwTitle").value || "My design" } });
       if (!j.id) throw new Error("Your 5 recent builds are full. Delete one on the main page, then try again.");
       S.bid = j.id; history.replaceState(null, "", `?bid=${S.bid}`);
@@ -1383,4 +1434,7 @@ function lockedOut(text) {
   const ed = document.createElement("a"); ed.textContent = "Open in the editor"; ed.className = "btn"; ed.href = `/?edit=${encodeURIComponent(S.bid)}`;
   box.append(u, ed); stage.append(box);
 }
-window.__cad = { V3: THREE.Vector3, cam: camera, S, startSketch, setTool, finishSketch, addConstraint, solveSketch, viewAlong, toggleSection, openStep: i => { S.openStep = i; renderHist(); } };
+const lessons = initLessons({ S, setTool, hint, LS, $, esc });
+$("#cwDlStl").addEventListener("click", () => lessons.event("export")); $("#cwDl3mf").addEventListener("click", () => lessons.event("export")); $("#cwToSlicer").addEventListener("click", () => lessons.event("export"));
+$("#cwHome").addEventListener("click", () => lessons.event("fit"));
+window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setTool, finishSketch, addConstraint, solveSketch, viewAlong, toggleSection, openStep: i => { S.openStep = i; renderHist(); } };

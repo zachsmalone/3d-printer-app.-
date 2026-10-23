@@ -26,7 +26,7 @@ from .builds import _safe_title, disk_guard, meta_for, summary
 from .textcap import plain_text, text_in
 
 router = APIRouter(prefix="/api/cad", tags=["cad"])
-FIRST_OPS = ("sketch_extrude", "revolve", "cad_text")
+FIRST_OPS = ("sketch_extrude", "revolve", "cad_text", "cad_shape")
 
 
 def _sk(body: dict) -> dict:

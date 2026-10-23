@@ -553,6 +553,9 @@ if hasattr(_sculptws, "OPS"):           # sculptws imported first: it registers 
 from . import cadtext as _cadtext   # noqa: E402  (Text & Emboss)
 OPS["cad_text"] = _cadtext.op_cad_text
 PARAM_KEYS["cad_text"] = _cadtext.KEYS
+from . import cadshape as _cadshape   # noqa: E402  (beginner shapes)
+OPS["cad_shape"] = _cadshape.op_cad_shape
+PARAM_KEYS["cad_shape"] = _cadshape.KEYS
 from . import meshedit as _meshedit   # noqa: E402  (register even when this module is imported first)
 _meshedit.OPS.update(OPS)
 
@@ -562,6 +565,8 @@ def label(op: str, p: dict) -> str | None:
         return _sculptws.label(op, p)
     if op == "cad_text":
         return _cadtext.label(p)
+    if op == "cad_shape":
+        return _cadshape.label(p)
     g = lambda k, d="": p.get(k, d)
     b = lambda: "" if int(p.get("body", -1) if p.get("body") is not None else -1) < 0 else f" · Body {int(p['body']) + 1}"
     try:

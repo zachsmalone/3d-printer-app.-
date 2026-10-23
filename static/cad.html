@@ -66,6 +66,7 @@
       <button class="cw-pill" id="cwSection" aria-pressed="false" title="Section view · X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18"/><path d="M6 6h12v12H6z" stroke-dasharray="2 2"/></svg><span>Section</span></button>
       <button class="cw-pill" id="cwMeasure" aria-pressed="false" title="Measure · D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span>Measure</span></button>
       <button class="cw-pill" id="cwSearch" title="Search tools · Ctrl/⌘+F"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/></svg><span>Search</span></button>
+      <button class="cw-pill" id="cwLearn" aria-pressed="false" title="Short step-by-step lessons"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z"/><path d="M20 5h-7a2 2 0 0 0-2 2v12a2 2 0 0 1 2-2h7z"/></svg><span>Lessons</span></button>
       <button class="cw-pill" id="cwDesel" title="Deselect all · Esc"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>Deselect</span></button>
     </div>
     <div class="cw-section" id="cwSectionBar" hidden>
@@ -74,8 +75,9 @@
       <span id="cwSecVal">0 mm</span>
     </div>
     <div id="cwLabels" class="cw-labels"></div>
+    <section class="cw-lesson" id="cwLesson" hidden aria-label="Lesson" aria-live="polite"></section>
     <div class="cw-busy" id="cwBusy" hidden><div class="spin"></div><span>Working…</span></div>
-    <div class="cw-empty" id="cwEmpty"><b>Start:</b><span>Sketch (K) → plane → closed shape → Extrude</span></div>
+    <div class="cw-empty" id="cwEmpty"><b>Start:</b><span>Shapes (N) for quick solids, or Sketch (K) → Extrude. New here? Try Lessons.</span></div>
   </div>
   <aside class="cw-side" id="cwSide" aria-label="History and items">
     <div class="cw-tabs" role="tablist">

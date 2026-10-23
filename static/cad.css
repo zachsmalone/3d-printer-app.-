@@ -167,3 +167,37 @@ body.cadws{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-web
 .cw-warn{position:absolute;left:50%;bottom:72px;transform:translateX(-50%);z-index:9;display:flex;gap:8px;align-items:flex-start;width:min(420px,calc(100% - 16px));box-sizing:border-box;padding:8px 8px 8px 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.3);font-size:13px}
 .cw-warn p{margin:4px 0 0}
 .cw-warn button{flex:none}
+
+/* Beginner shapes palette + lessons card */
+.cw-shapes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}
+.cw-shapes button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;min-width:44px;padding:4px 2px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:inherit;font-size:12px;cursor:pointer}
+.cw-shapes button:disabled{opacity:.4;cursor:default}
+.cw-shapes svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.cw-lesson{position:absolute;right:12px;bottom:12px;z-index:8;width:min(340px,calc(100% - 84px));box-sizing:border-box;background:var(--panel);border:1px solid var(--accink,var(--line));border-radius:14px;box-shadow:0 8px 26px rgba(0,0,0,.3);font-size:14px;max-height:calc(100% - 24px);overflow:auto}
+.cw-lesson[hidden]{display:none}
+.cw-lhead{display:flex;align-items:center;gap:6px;padding:4px 4px 4px 12px}
+.cw-lhead>b{flex:1}
+.cw-lt{flex:1;display:flex;flex-direction:column;align-items:flex-start;min-height:44px;background:none;border:0;color:var(--txt);font:inherit;text-align:left;cursor:pointer;padding:0}
+.cw-lt small{color:var(--mut);font-size:12px}
+.cw-lx{flex:none;min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:inherit;cursor:pointer}
+.cw-lbody{padding:0 12px 10px}
+.cw-lesson.mini .cw-lbody{display:none}
+.cw-lsay{margin:4px 0 8px;line-height:1.4}
+.cw-lesson .cw-row button{min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:inherit;cursor:pointer}
+.cw-lesson .cw-row button.primary{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+.cw-llist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.cw-llist button{width:100%;min-height:48px;display:flex;flex-direction:column;align-items:flex-start;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:inherit;text-align:left;cursor:pointer}
+.cw-llist small{color:var(--mut);font-size:12px}
+.cw-pulse{outline:3px solid var(--acc) !important;outline-offset:2px;animation:cwPulse 1.2s ease-in-out 3}
+@keyframes cwPulse{50%{outline-color:transparent}}
+@media (prefers-reduced-motion:reduce){.cw-pulse{animation:none}}
+.cw-panel .cw-toggle{padding:0}
+.cw-panel .cw-toggle input{width:22px;height:22px;min-height:0;flex:none}
+@media (pointer:coarse){.cw-panel .cw-toggle{min-height:44px}}
+/* phones: the card leaves the stage and sits in the page flow above History, so it never covers the model,
+   the tool panel or the pills; while a tool panel is open it shows just the step text */
+/* short phone stages: the chip column scrolls instead of spilling under the panel below */
+@media (max-width:820px){.cw-chips{max-height:calc(100% - 142px);overflow-y:auto;overscroll-behavior:contain}}
+.cw-side>.cw-lesson{position:static;width:auto;max-height:none;margin:6px;box-shadow:none}
+body:has(#cwTool:not([hidden])) .cw-side>.cw-lesson .cw-row{display:none}
+body:has(#cwTool:not([hidden])) .cw-side>.cw-lesson .cw-lsay{margin:0 0 4px;font-size:13px;line-height:1.3}
