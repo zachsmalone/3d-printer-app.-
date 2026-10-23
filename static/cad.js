@@ -1422,7 +1422,9 @@ $("#cwHint").onclick = () => $("#cwHint").classList.toggle("open");
 renderRail(); hint(...HINTS.null); applyHints(); loop();
 /* Never silently drop a project (QA B4): if it exists but can't be shown here (e.g. too detailed),
    keep it and offer Undo / the editor instead of an empty workspace. */
-load().catch(e => {
+load().then(() => {   // S8: deep link to a tool, e.g. /static/cad.html?tool=text
+  const q = new URLSearchParams(location.search).get("tool"); if (q && HINTS[q] && q !== "null") setTool(q);
+}).catch(e => {
   if (S.bid && e.status && e.status !== 404 && e.status !== 403) return lockedOut(e.message);
   msg(e.message); S.bid = null; history.replaceState(null, "", location.pathname); load();
 });

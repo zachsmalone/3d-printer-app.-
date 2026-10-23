@@ -39,13 +39,13 @@ function panelHTML() {
   const brands = [...new Set(cat.printers.map(p => p.brand))];
   return `<h2>Resin print settings</h2>
     <div class="grid2 rzRow"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
-    <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" accept=".stl,.3mf,.obj"><span>or drop an STL, 3MF or OBJ file here</span></div>
+    <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn" accept=".stl,.3mf,.obj"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p></div></div>
     <p class="help" id="rzInfo"></p>
     <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div>
-    <div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
+    <details class="rzAdv" id="rzAdv"${document.body.dataset.level === "expert" ? " open" : ""}><summary>Advanced resin settings</summary><div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
       ${num("rzBL", "Bottom layers", 5, 1, 15, 1, "")}${num("rzLift", "Lift distance", 6, 1, 15, 0.5, "mm")}${num("rzLiftS", "Lift speed", 65, 10, 300, 5, "mm/min")}
-      ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div>
+      ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
     <p class="help warn rzWarn" id="rzWallWarn" hidden>Walls under 1 mm crack easily in resin. Use 1 mm or more, or prepare anyway.
       <button type="button" class="btn small" id="rzWallAnyway">Prepare anyway</button> <button type="button" class="btn small" id="rzWallDismiss" aria-label="Dismiss this warning">Dismiss</button></p>
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
@@ -76,6 +76,7 @@ function wire() {
   // displayed name only: drop bidi overrides/isolates, zero-width and control chars so the name can't be misread
   const shownName = n => n.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, "");
   const show = () => { const f = inp.files[0]; st.classList.remove("warn");
+    $("#torchOut").querySelector(".rzNeedFile")?.remove();   // P1: the "choose a file first" note goes as soon as a file is chosen
     if (!f) { st.textContent = ""; return; }
     const nm = shownName(f.name) || "(unnamed file)";
     if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, but you can still press Prepare for resin and TorchC0 will check the file itself.`; return; }
@@ -89,7 +90,7 @@ function wire() {
     const dt = new DataTransfer(); dt.items.add(fs[0]); inp.files = dt.files; show(); });
   $("#rzGo").onclick = async () => {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
-    if (!f) { out.innerHTML = `<p class="help warn" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
+    if (!f) { out.innerHTML = `<p class="help warn rzNeedFile" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
     const fd = new FormData();
     const v = { printer_id: $("#rzPrinter").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,
@@ -144,4 +145,5 @@ async function load() {
   catch (e) { cat = null; $("#torchPanel").innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`; }
 }
 document.addEventListener("zeim:torchc0-shown", load);
+document.addEventListener("zeim:level", () => { const d = $("#rzAdv"); if (d) d.open = document.body.dataset.level === "expert"; });   // S9: Beginner sees preset + Hollow/Supports
 if (location.hash.startsWith("#torchc0") || location.hash.startsWith("#resin")) load();

@@ -15,7 +15,9 @@ def run(name, launch, stl):
     b = launch(); pg = b.new_page(viewport={"width": 1280, "height": 900})
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(URL + "/#torchc0"); pg.wait_for_selector("#rzGo", timeout=20000)
-    for sel in ("#rzPrinter", "#rzFile", "#rzLayer", "#rzHollow", "#rzSup", "#rzCost"):
+    ok(f"{name}: Beginner hides expert resin settings", not pg.is_visible("#rzLayer"))
+    pg.click("#rzAdv > summary")                       # S9: expert settings live behind Advanced
+    for sel in ("#rzPrinter", "#rzDrop label.btn", "#rzLayer", "#rzHollow", "#rzSup", "#rzCost"):
         box = pg.locator(sel).bounding_box()
         ok(f"{name}: {sel} visible and sized", pg.is_visible(sel) and box and box["width"] > 8 and box["height"] > 8, box)
     pg.click("#rzHollow"); ok(f"{name}: hollow checkbox clickable", not pg.is_checked("#rzHollow"))

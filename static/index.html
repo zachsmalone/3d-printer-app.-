@@ -178,8 +178,8 @@
           <p class="help" id="traceStatus" aria-live="polite"></p></div>
       </div>
 
-      <div class="field" id="lithMatBox"><label for="lithMaterial">Printer type</label>
-        <select id="lithMaterial"><option value="filament">Filament (FDM)</option><option value="resin">TorchC0 resin (SLA / MSLA)</option></select>
+      <div class="field" id="lithMatBox"><p class="help lithKindLine">Printer type: <b id="lithKindName">Filament (FDM)</b>. Change it with <b>My printer</b> at the top.</p>
+        <select id="lithMaterial" hidden aria-hidden="true" tabindex="-1"><option value="filament">Filament (FDM)</option><option value="resin">Resin (SLA / MSLA)</option></select>
         <label for="lithThk" class="sr-only">Thickness preset</label><select id="lithThk" class="exp-only"><option value="thin">Thin</option><option value="standard" selected>Standard</option><option value="thick">Thick</option></select>
         <p class="help" id="lithMatHelp">Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first.</p></div>
       <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box (4 photos round a light)</summary>
@@ -304,11 +304,11 @@
       <p class="help">Tip: pick or drop several files at once to put them on one plate or make separate prints.</p>
       <p class="help"><a href="/static/repair.html" id="editRepairLink">Broken STL or 3MF? Repair it and download the fixed file</a> (free, no account).</p>
       <p class="help" id="editModelMsg" role="alert" hidden></p>
-      <h2 style="margin-top:14px"><i>or</i> Start from a photo</h2>
-      <div id="editPhoto"></div>
+      <p class="help photoLink" id="editPhotoLink">Starting from a photo? <a href="#lithophane">Make a lithophane or relief in Lithophane</a>.</p>
+      <div id="editPhoto" hidden></div>
       <div class="grid2" style="margin-top:10px">
         <div class="field"><label for="editUnits">Units in the file <em>STL / OBJ</em></label><select id="editUnits"><option value="mm">millimetres</option><option value="cm">centimetres</option><option value="in">inches</option><option value="m">metres</option></select></div>
-        <div class="field"><label for="editPhotoMode">If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>
+        <div class="field" hidden><label for="editPhotoMode">If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>
       </div>
       <div class="row"><button class="btn" id="editSample">Try a sample model</button></div>
       <h2 style="margin-top:16px"><i>or</i> Edit a Studio build</h2>
@@ -357,6 +357,12 @@
   <div class="body">
     <p class="help"><b id="printWhich"></b></p>
     <div class="row"><span class="help">Just need the file?</span> <button class="btn small ghost" id="printToSend">Send…</button></div>
+    <div class="printResin" data-kind-only="resin">
+      <h4>Prepare for resin</h4>
+      <p class="help">Your printer type is <b>Resin</b>. TorchC0 hollows, tilts and supports the model; then open the file in your resin printer's slicer (for example Lychee, CHITUBOX or Anycubic Photon Workshop).</p>
+      <div class="row"><button type="button" class="btn primary" id="printToTorch">Open in TorchC0</button></div>
+    </div>
+    <div class="printFdm" data-kind-only="fdm">
     <h4>Open in your slicer</h4>
     <p class="help" id="printHint"></p>
     <div class="slicers" id="slicerBtns"></div>
@@ -371,8 +377,8 @@
     </div>
     <div class="row"><button class="btn" id="btnSlice">Slice to G-code</button><span id="sliceOut" class="help"></span></div>
     </div>
-    <hr>
-    <div id="printerBlock">
+    <hr data-kind-only="fdm">
+    <div id="printerBlock" data-kind-only="fdm">
     <h4>Send to a network printer</h4>
     <p class="help" id="printerHonest">Tested with a pretend printer only. Not tried on a real printer yet.</p>
     <div class="row"><select id="printerSel" aria-label="Printer"></select>
@@ -446,7 +452,7 @@
     <li class="toolcard"><h2>CAD workspace</h2><p class="help">Sketch on a plane or face, type exact sizes, then build solids step by step. Exports STL/3MF to the Slicer.</p><a class="btn primary" href="/static/cad.html">Open the CAD workspace</a></li>
     <li class="toolcard"><h2>Cut &amp; split</h2><p class="help">Slice a model with a plane into parts that fit your printer.</p><a class="btn" href="#slicer/cut">Cut a model in the Slicer</a></li>
     <li class="toolcard"><h2>Orient &amp; place</h2><p class="help">Drop to the bed, centre, mirror, rotate and scale.</p><a class="btn" href="#slicer/orient">Orient a model in the Slicer</a></li>
-    <li class="toolcard"><h2>Text &amp; base</h2><p class="help">Add raised text or a base plate.</p><a class="btn" href="#slicer/text">Add text in the Slicer</a></li>
+    <li class="toolcard"><h2>Text &amp; base</h2><p class="help">Add raised text or a text plate in CAD.</p><a class="btn" href="/static/cad.html?tool=text" id="cadOpenText">Add text in CAD</a></li>
     <li class="toolcard"><h2>Logo &amp; Drawing to 3D</h2><p class="help">Turn a logo, sketch or drawing (PNG, JPG or SVG) into a clean shape, cookie cutter, stamp or colour layers.</p><button type="button" class="btn" id="cadTrace">Turn a logo into 3D</button></li>
   </ul>
 </main>

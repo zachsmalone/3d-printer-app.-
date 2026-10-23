@@ -28,6 +28,7 @@ def prep(pg, stl, price=""):
     pg.goto(URL + "/#torchc0"); show_go(pg)
     pg.evaluate("localStorage.removeItem('zeim.resinPrice')")
     pg.reload(); show_go(pg)
+    pg.evaluate("document.querySelector('#rzAdv').open = true")   # S9: expert settings live behind Advanced
     for sel, v in (("#rzTilt", "0"), ("#rzLayer", "0.1")):
         pg.fill(sel, v)
     if pg.is_checked("#rzHollow"): pg.click("#rzHollow")

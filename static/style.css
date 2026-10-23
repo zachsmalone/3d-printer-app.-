@@ -961,3 +961,17 @@ main.zws #viewerCtx{display:none!important}
 /* the page heading stays for screen readers while the 3D view fills the screen */
 main.zws>.hero{position:absolute;width:0;height:0;margin:0;padding:0;border:0}
 main.zws .hero h1{position:fixed;top:0;left:0;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;margin:0;padding:0}
+
+/* B: printer kind is one setting (S1/S2), TorchC0 Beginner view (S9), photo tips */
+body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=resin] [data-kind-only=fdm]{display:none !important}
+.rzDrop .rzFileIn{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden}
+.rzDrop{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px}
+.rzDrop label.btn{min-height:44px}
+.rzDrop:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+.rzAdv{margin:12px 0;border:1px solid var(--line);border-radius:var(--r);padding:0 12px}
+.rzAdv>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:600}
+.phototips{margin:8px 0;font-size:.92em}
+
+.phototips details{display:inline}
+.phototips summary{display:inline;cursor:pointer;color:var(--accent,inherit);text-decoration:underline;min-height:24px}
+.phototips ul{margin:6px 0 0 1.1em;padding:0}
