@@ -69,6 +69,22 @@ def put_my_printer(body: dict, actor: Actor = Depends(get_actor)):
     return {"signed_up": True, "stored": "profile", **save_pref(actor.sid, pid, n)}
 
 
+@router.get("/api/me/printer-kind")
+def get_my_printer_kind(actor: Actor = Depends(get_actor)):
+    k = (actor.user or {}).get("printer_kind")
+    return {"signed_up": bool(actor.user), "kind": k if k in ("fdm", "resin") else None}
+
+
+@router.put("/api/me/printer-kind")
+def put_my_printer_kind(body: dict, actor: Actor = Depends(get_actor)):
+    k = body.get("kind")
+    if k not in ("fdm", "resin"):
+        raise HTTPException(400, "kind must be fdm or resin")
+    if actor.user:
+        USERS.update(lambda d: d[actor.sid].__setitem__("printer_kind", k) if actor.sid in d else None)
+    return {"signed_up": bool(actor.user), "stored": "profile" if actor.user else "browser", "kind": k}
+
+
 def slice_check(mesh_path, printer_id, nozzle):
     """Real PrusaSlicer run (Standard preset) for the 'slices OK' check, cached per file + printer + nozzle."""
     import hashlib, json, tempfile

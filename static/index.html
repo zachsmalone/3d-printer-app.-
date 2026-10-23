@@ -39,6 +39,11 @@
     </select>
     <p class="sr-only" id="modeHelp">Beginner: ZEIM picks the settings. Experienced: every setting is yours.</p>
   </div>
+  <div class="kindpick" id="kindPick" role="group" aria-label="My printer type" title="What kind of printer do you use? Change it anytime.">
+    <span class="kp-lbl" aria-hidden="true">My printer</span>
+    <button type="button" data-kind="fdm" aria-pressed="true"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-spool"/></svg><span>FDM</span></button>
+    <button type="button" data-kind="resin" aria-pressed="false"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-flask"/></svg><span>Resin</span></button>
+  </div>
   <div class="spacer"></div>
   <button type="button" class="themetoggle" id="themeToggle" aria-pressed="false" aria-label="Dark mode" title="Switch to dark mode"></button>
 </header>
@@ -585,6 +590,7 @@
 <script type="module" src="/static/edit.js"></script>
 <script type="module" src="/static/printer.js"></script>
 <script type="module" src="/static/torchc0.js"></script>
+<script type="module" src="/static/printkind.js"></script>
 <script type="module" src="/static/trace2d.js"></script>
 <script type="module" src="/static/calibrate.js"></script>
 <script type="module" src="/static/doctor.js"></script>
