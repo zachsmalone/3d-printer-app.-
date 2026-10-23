@@ -6,6 +6,7 @@ import io, json, math, os, sys, time
 import numpy as np, trimesh
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1].rstrip("/"); SHOTS = sys.argv[2] if len(sys.argv) > 2 else None; bad = []
+FIXTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample.png")
 
 
 def ok(n, c, x=""):
@@ -64,7 +65,8 @@ def run(name, launch):
     pg.goto(URL + "/#studio"); pg.wait_for_timeout(800)
     pg.click("#modeCards label[data-mode=relief]")
     with pg.expect_response(lambda r: "/api/generate" in r.url, timeout=90000) as ri:
-        pg.click("#sSample")                                     # Beginner: builds the whole photo straight away
+        pg.check("#sAck")                                        # own photo: the test fixture (the 480x360 sun sample)
+        pg.set_input_files("#sFile", FIXTURE)                    # Beginner: builds the whole photo straight away
     whole = ri.value.json()
     ok(f"{name}: whole photo builds first (no selection sent)", "select" not in (whole.get("params") or {}), whole.get("params"))
     ok(f"{name}: the Select bar appears after the photo", pg.is_visible("#selOpen") and "whole photo" in pg.inner_text("#selState"))

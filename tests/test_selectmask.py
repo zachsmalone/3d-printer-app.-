@@ -8,7 +8,7 @@ from app.core import geometry, selectmask
 from app.main import app
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAMPLE = os.path.join(ROOT, "static", "sample.png")         # built-in sample: sky, hills, a face and a sun at (360, 85) r~48
+SAMPLE = os.path.join(ROOT, "tests", "sample.png")         # built-in sample: sky, hills, a face and a sun at (360, 85) r~48
 IM = Image.open(SAMPLE).convert("RGB")
 W, H = IM.size
 SUN_C, SUN_R = (360 / W, 85 / H), 48
