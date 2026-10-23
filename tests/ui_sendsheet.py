@@ -1,5 +1,6 @@
 """Headless Chrome: the Send sheet (SEND-2..9). argv: URL_LOCAL (PHOTO3D_MODE=local, PHOTO3D_SEND_SHARE=1) URL_SHARED (PHOTO3D_MODE=shared).
 The share sheet is STUBBED (navigator.share/canShare replaced): this proves our page logic, NOT that an iPhone accepts STL/OBJ/3MF."""
+import tempfile
 import json, os, sys
 from playwright.sync_api import sync_playwright
 import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
@@ -62,7 +63,12 @@ with sync_playwright() as p:
     # history card Send…
     pg.select_option("#modeSel", "beginner")
     ok("history card has Send…", pg.locator("#histList [data-send]").count() >= 1)
+    if not pg.locator("#histList [data-send]").first.is_visible():   # C hides Recent builds on phones; a user turns it on in Customise workspace
+        pg.click("#zwsCust-studio"); pg.check("#zwsDlg-studio input[data-zws=history]"); pg.click("#zwsDlg-studio button[value=ok]"); pg.wait_for_timeout(400)
+        if pg.is_visible("#zws-history .zws-chip"): pg.click("#zws-history .zws-chip"); pg.wait_for_timeout(300)
     pg.locator("#histList [data-send]").first.click(); pg.wait_for_selector("#dlgSendSheet[open]"); ok("history Send… opens the sheet", "Send or save your model" in sheet_text(pg)); pg.keyboard.press("Escape")
+    if pg.is_checked("#zwsDlg-studio input[data-zws=history]") and pg.evaluate("innerWidth") < 600:   # put the phone layout back (Recent builds off)
+        pg.click("#zwsCust-studio"); pg.uncheck("#zwsDlg-studio input[data-zws=history]"); pg.click("#zwsDlg-studio button[value=ok]"); pg.wait_for_timeout(400)
     # print dialog: Send… shortcut; local mode shows the honest label and Start print unchecked
     pg.click("#btnPrint"); pg.wait_for_selector("#dlgPrint[open]"); pt = pg.inner_text("#dlgPrint")
     ok("Print dialog: local mode keeps the printer block with the honest label", pg.is_visible("#printerBlock") and "Tested with a pretend printer only" in pt and not pg.is_checked("#startNow") and "stay nearby" in pt)
@@ -88,7 +94,9 @@ with sync_playwright() as p:
     ctx.set_offline(False); pg.keyboard.press("Escape")
     # Edit has the same sheet
     pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(300)
-    pg.click("#editSample"); pg.wait_for_selector("#editResult:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
+    stl = os.path.join(tempfile.mkdtemp(), "cube.stl"); import trimesh; trimesh.creation.box((20, 20, 20)).export(stl)   # B: Slicer has no photo sample now; open a 3D file
+    pg.set_input_files("#editFile", stl); pg.wait_for_selector("#editResult:not([hidden])", state="attached", timeout=60000)
+    if not pg.is_visible("#editResult") and pg.is_visible("#viewEdit #zws-result .zws-chip"): pg.click("#viewEdit #zws-result .zws-chip")   # C: phone panels fold to chips; pg.wait_for_timeout(500)
     ok("Edit: loose download buttons gone, Send is there", pg.locator("#editResult .actions a[download]").count() == 0 and pg.is_visible("#editSend"))
     pg.click("#editSend"); pg.wait_for_selector("#dlgSendSheet[open]"); et = sheet_text(pg)
     ok("Edit sheet: same rules + original file row, no photo warning", "Save to this device" in et and "Your original file" in et and "is the photo" not in et, et[:160].replace("\n", " "))

@@ -29,17 +29,21 @@ with sync_playwright() as p:
     pg.goto(URL.rstrip("/") + "/#studio"); pg.wait_for_timeout(700)
     for sel in ("#sChoose", "#sTake", "#sSample"):
         bx = pg.locator(sel).bounding_box(); ok(f"phone: {sel} visible, >=44px tall, inside viewport", bx and bx["height"] >= 44 and bx["x"] >= 0 and bx["x"] + bx["width"] <= 391, str(bx))
-    ok("phone: privacy + permission lines under the buttons", "stay private to you" in pg.inner_text("#sPick") and "ask first" in pg.inner_text("#sPick"))
+    ok("phone: privacy + permission lines under the buttons", "stay private to you" in pg.inner_text("#sPick") and "permission from everyone" in pg.inner_text("#sPick"))   # A moved the ask-first line into the permission tick
     ok("phone: capture input present", pg.locator('#sCam[capture="environment"]').count() == 1)
     pg.screenshot(path="previews/photo_phone_start.png")
     up(pg, "#sFile", "#sAck", jpg)
     pg.wait_for_selector("#result:not([hidden])", timeout=60000); pg.wait_for_timeout(500)
     ok("phone: Beginner auto-builds after choosing a photo", pg.locator("#result").is_visible())
+    if not pg.locator("#changePhoto").is_visible() and pg.is_visible("#zws-settings .zws-chip"):   # C folds Photo & settings to a chip once the model shows
+        pg.click("#zws-settings .zws-chip"); pg.wait_for_timeout(400)
     ok("phone: 'Change photo' link visible", pg.locator("#changePhoto").is_visible())
     pg.screenshot(path="previews/photo_phone_built.png")
     up(pg, "#sFile", "#sAck", heic); pg.wait_for_timeout(300); pg.wait_for_selector("#makingLine", state="hidden", timeout=60000)      # (no string eval: the page has a CSP without unsafe-eval)
     ok("phone: HEIC photo builds (no error message)", pg.locator("#sMsg").is_hidden())
-    up(pg, "#sFile", "#sAck", bad); pg.wait_for_selector("#sMsg:not([hidden])", timeout=30000); pg.wait_for_timeout(2500)
+    up(pg, "#sFile", "#sAck", bad); pg.wait_for_selector("#sMsg:not([hidden])", state="attached", timeout=30000); pg.wait_for_timeout(2500)
+    if not pg.locator("#sMsg").is_visible() and pg.is_visible("#zws-settings .zws-chip"):   # C: the message sits in Photo & settings, which may be folded
+        pg.click("#zws-settings .zws-chip"); pg.wait_for_timeout(400)
     ok("phone: unreadable photo -> persistent inline message", "couldn't open that photo" in pg.inner_text("#sMsg") and pg.locator("#sMsg").is_visible(), pg.inner_text("#sMsg"))
     pg.screenshot(path="previews/photo_phone_error.png")
     ok("phone: no horizontal scroll", pg.evaluate("document.documentElement.scrollWidth") <= 390)
@@ -65,10 +69,9 @@ with sync_playwright() as p:
     # Edit
     pg.click('#mainNav [data-view=slicer]'); pg.wait_for_timeout(400)
     ok("edit: 3D-file input has NO accept list (iOS greys out bare extensions); the type is checked by name in JS (tests/ui_files.py)", pg.get_attribute("#editFile", "accept") is None)
-    ok("edit: photo buttons present", pg.locator("#eChoose").is_visible() and pg.locator("#eTake").is_visible())
+    # B (S4): Slicer no longer starts from a photo; it links to Lithophane, which has the photo start checked above
+    ok("edit: photo start replaced by a link to Lithophane", pg.locator("#editPhoto").is_hidden() and pg.locator("#editPhotoLink a[href='#lithophane']").is_visible())
     pg.screenshot(path="previews/photo_edit_start.png")
-    up(pg, "#eFile", "#eAck", heic); pg.wait_for_selector("#editPanel:not([hidden])", timeout=60000)
-    ok("edit: HEIC photo opens as a project", pg.locator("#editPanel").is_visible())
     ok("desktop: no page errors", not errs, str(errs))
     ctx.close(); b.close()
 
