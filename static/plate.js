@@ -64,7 +64,7 @@ function panelHTML() {
     <ul class="plist" aria-label="Objects on the plate">${list}</ul>
     <div class="tool-row" role="group" aria-label="Whole plate">
       <button type="button" class="btn small" data-pact="center">⊕ Auto-center ${s.length ? "selection" : "all"}</button>
-      <button type="button" class="btn small" data-pact="arrange">▦ Auto-arrange</button>
+      <button type="button" class="btn small" data-pact="arrange"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 4h16v16H4zM4 12h16M12 4v16"/></svg> Auto-arrange</button>
       <button type="button" class="btn small ghost" data-pact="selall">Select all</button>
     </div>
     <div class="tool-row parr" role="group" aria-label="Auto-arrange settings">
@@ -234,7 +234,7 @@ export function paint() {
     const i = m.userData.object ?? k, o = os[i]; if (!o || !m.material?.color) return;
     const on = PL.sel.has(i), bad = !o.hidden && o.warnings.length;
     m.material.transparent = !!o.hidden; m.material.opacity = o.hidden ? 0.22 : 1; m.material.depthWrite = !o.hidden;
-    m.material.color.set(on ? "#ffb347" : bad ? "#e07a7a" : "#8fb0e0");
+    m.material.color.set(on ? "#0066FF" : bad ? "#e07a7a" : "#8fb0e0");
     if (m.material.emissive) m.material.emissive.set(on ? "#5a3300" : "#000000");
   });
   const live = $("#plateLive"); if (live) live.textContent = PL.sel.size ? `${PL.sel.size} selected` : "Nothing selected";

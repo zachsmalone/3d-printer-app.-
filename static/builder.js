@@ -43,7 +43,7 @@ function partCard(p, i) {
       <span style="display:flex;gap:4px">
         <button class="btn small" data-up="${i}" ${i === 0 ? "disabled" : ""}>↑</button>
         <button class="btn small" data-down="${i}" ${i === parts.length - 1 ? "disabled" : ""}>↓</button>
-        <button class="btn small ghost" data-del="${i}">✕</button>
+        <button class="btn small ghost" data-del="${i}"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </span>
     </div>
     <div class="prow" style="margin-top:6px;gap:8px">

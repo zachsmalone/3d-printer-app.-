@@ -84,10 +84,8 @@
     if (!$("#result")?.hidden) return { label: styleName(), acts: [
       { t: "Reset view", i: "compass", el: $("#vReset"), always: true },
       { t: "Wireframe", i: "grid", el: $("#vWire"), always: true },
-      { t: "Light", i: "bulb", el: $("#vLight") },
-      { t: "Edit", i: "pencil", el: $("#btnEditThis"), always: true },
-      { t: "Print", i: "printer", el: $("#btnPrint"), always: true },
-      { t: "Save", i: "download", el: $("#btnSendSheet"), pri: true, always: true }] };
+      { t: "Light", i: "bulb", el: $("#vLight"), always: !$("#litLightBox")?.hidden },
+      ] };   // S7: the viewer toolbar holds view controls only; Edit / Print / Save live once, in the result card
     return { label: styleName(), acts: [
       { t: "Take a photo", i: "camera", el: $("#sTake") },
       { t: "Choose a photo", i: "image", el: $("#sChoose"), pri: !$("#dropPreview") || $("#dropPreview").hidden, always: true },
@@ -98,10 +96,7 @@
     if ($("#editVtools")?.hidden) return { label: "", acts: [{ t: "Choose a model", i: "upload", el: $("#editChooseModel"), pri: true, always: true }] };
     const tool = $(".bigtool.on b")?.textContent;
     return { label: tool ? "Tool: " + tool : "Edit", acts: [
-      { t: "Undo", i: "repeat", el: $("#eUndo"), always: true },
-      { t: "Measure", i: "ruler", el: $("#eMeasure"), always: true },
       { t: "Reset view", i: "compass", el: $("#eReset"), always: true },
-      { t: "Print", i: "printer", el: $("#editPrint"), always: true },
-      { t: "Save", i: "download", el: $("#editSend"), pri: true, always: true }] };
+      ] };   // S7: Undo / Measure stay in the tool row; Print / Save stay in the action row
   });
 })();

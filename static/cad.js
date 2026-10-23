@@ -591,7 +591,7 @@ function showWarn(list) {
   $("#cwWarn")?.remove();
   if (!list?.length) return;
   const d = document.createElement("div"); d.id = "cwWarn"; d.className = "cw-warn"; d.setAttribute("role", "status");
-  d.innerHTML = `<div><b>Print tip</b>${list.map(w => `<p>${esc(w)}</p>`).join("")}</div><button type="button" class="cw-btn" aria-label="Dismiss print tip">✕</button>`;
+  d.innerHTML = `<div><b>Print tip</b>${list.map(w => `<p>${esc(w)}</p>`).join("")}</div><button type="button" class="cw-btn" aria-label="Dismiss print tip"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   d.querySelector("button").onclick = () => d.remove();
   $("#cwStage").append(d);
 }
@@ -1135,7 +1135,7 @@ function modePop() {
     b.onclick = () => { box.remove(); if (last.params.mode !== m) histAction(() => api(`/api/edit/${S.bid}/step/${last.i}`, { method: "PUT", json: { params: { ...last.params, mode: m } } })); };
     box.append(b);
   }
-  const x = document.createElement("button"); x.textContent = "✕"; x.setAttribute("aria-label", "Keep as is"); x.onclick = () => box.remove(); box.append(x);
+  const x = document.createElement("button"); x.innerHTML = '<svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>'; x.setAttribute("aria-label", "Keep as is"); x.onclick = () => box.remove(); box.append(x);
   stage.append(box); setTimeout(() => box.remove(), 12000);
 }
 function pickRegion(ev) {
@@ -1216,9 +1216,9 @@ function showCtx(kind, at) {
   const bar = document.createElement("div"); bar.className = "cw-ctx"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", kind === "face" ? "Face actions" : "Edge actions");
   if (kind === "face") bar.innerHTML = `<label class="sr-only" for="ctxD">Push or pull distance in mm</label><input id="ctxD" type="number" step="any" inputmode="decimal" value="0" title="Push/pull distance (mm): type a value or drag the arrow">
     <button class="primary" data-c="pp" title="Move this face by the distance (push/pull)">Push/Pull</button><button data-c="sk" title="Sketch on this face">Sketch</button>
-    <button data-c="sh" title="Shell (hollow) the body">Shell</button><button data-c="fa" title="Round all outside edges">Fillet all</button><button data-c="sc" title="Sculpt mode">Sculpt</button><button data-c="x" aria-label="Close">✕</button>`;
+    <button data-c="sh" title="Shell (hollow) the body">Shell</button><button data-c="fa" title="Round all outside edges">Fillet all</button><button data-c="sc" title="Sculpt mode">Sculpt</button><button data-c="x" aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   else bar.innerHTML = `<label class="sr-only" for="ctxD">Radius in mm</label><input id="ctxD" type="number" step="any" inputmode="decimal" value="1" title="Radius / size (mm)">
-    <button class="primary" data-c="fi">Fillet</button><button data-c="ch">Chamfer</button><button data-c="ms" title="Measure this edge">Length</button><button data-c="x" aria-label="Close">✕</button>`;
+    <button class="primary" data-c="fi">Fillet</button><button data-c="ch">Chamfer</button><button data-c="ms" title="Measure this edge">Length</button><button data-c="x" aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   stage.append(bar);
   CTX = { bar, at: at.clone(), kind, len: 0, d: 0 };
   if (kind === "face") {
@@ -1438,3 +1438,4 @@ const lessons = initLessons({ S, setTool, hint, LS, $, esc });
 $("#cwDlStl").addEventListener("click", () => lessons.event("export")); $("#cwDl3mf").addEventListener("click", () => lessons.event("export")); $("#cwToSlicer").addEventListener("click", () => lessons.event("export"));
 $("#cwHome").addEventListener("click", () => lessons.event("fit"));
 window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setTool, finishSketch, addConstraint, solveSketch, viewAlong, toggleSection, openStep: i => { S.openStep = i; renderHist(); } };
+

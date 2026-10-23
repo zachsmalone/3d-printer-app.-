@@ -48,6 +48,10 @@
       <a role="menuitem" id="cwToSlicer" href="#">Open in Slicer &amp; plate editor</a>
     </div>
   </div>
+  <div class="cw-menu cw-more">
+    <button class="cw-btn" id="cwMore" aria-haspopup="menu" aria-expanded="false" aria-label="More: open, export, units, view and look" title="More"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+    <div class="cw-pop" id="cwMoreMenu" role="menu" aria-label="More" hidden></div>
+  </div>
 </header>
 
 <main class="cw-main">
@@ -81,6 +85,7 @@
   </div>
   <aside class="cw-side" id="cwSide" aria-label="History and items">
     <div class="cw-tabs" role="tablist">
+      <button type="button" class="cw-sheetbtn" id="cwSheetBtn" aria-controls="cwSide" aria-expanded="false" aria-label="Show more of History and Items"><span aria-hidden="true"></span></button>
       <button role="tab" id="tabHist" aria-selected="true" aria-controls="cwHist">History</button>
       <button role="tab" id="tabItems" aria-selected="false" aria-controls="cwItems">Items</button>
     </div>
@@ -96,5 +101,7 @@
   <ul id="cwSearchList" role="listbox"></ul>
 </dialog>
 <script type="module" src="/static/cad.js"></script>
+<script src="/static/wslayout.js"></script>
+<script type="module" src="/static/cad-phone.js"></script>
 </body>
 </html>

@@ -18,7 +18,8 @@ function apply() {
   document.querySelectorAll("#mainNav [data-view=slicer],#mainNav [data-view=torchc0]").forEach(b => {
     const on = b.dataset.view === VIEW[kind];
     b.classList.toggle("kind-primary", on);
-    b.title = on ? "Your printer type's main tab" : "";
+    b.dataset.tip = b.dataset.tip || b.title;
+    b.title = b.dataset.tip + (on ? " (your printer type)" : "");
   });
   // Hollow shortcut: resin users hollow in TorchC0 (with drain hole); filament users in the Slicer editor.
   document.querySelectorAll('a[href="#slicer/hollow"],a[href="#torchc0"][data-kind-link]').forEach(a => {

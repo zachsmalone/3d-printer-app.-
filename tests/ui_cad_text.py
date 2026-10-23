@@ -38,7 +38,7 @@ with sync_playwright() as p:
         errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
         tap = (lambda x, y: pg.touchscreen.tap(x, y)) if touch else (lambda x, y: pg.mouse.click(x, y))
         pg.goto(URL + "/static/cad.html"); pg.wait_for_timeout(800)
-        pg.click("[data-tool=text]")
+        pg.click("[data-tool=text]"); pg.wait_for_selector("#tTxt", timeout=3000)
         ok(f"{tag}: Text tool opens with no model (plate only)", pg.is_visible("#tTxt") and pg.locator("#tTarget button").count() == 1)
         ok(f"{tag}: tap targets >= 44px (pointer:coarse on phones)", (not touch) or pg.evaluate(SMALL) == 0, pg.evaluate(SMALL))
         ok(f"{tag}: Advanced is folded by default", not pg.is_visible("#tRot"))
@@ -64,6 +64,7 @@ with sync_playwright() as p:
         ok(f"{tag}: tip fits the screen", pg.evaluate("(() => { const r = document.querySelector('#cwWarn').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5; })()"))
         pg.click("#cwWarn button")
         ok(f"{tag}: print tip dismissible", pg.locator("#cwWarn").count() == 0)
+        if touch and pg.is_visible("#tabHist"): pg.tap("#tabHist"); pg.wait_for_timeout(300)   # phone: History lives in the bottom sheet
         ok(f"{tag}: History shows the text step", "Text 'ab'" in pg.inner_text("#cwHist"))
         ok(f"{tag}: STL export link set", "/api/" in (pg.get_attribute("#cwDlStl", "href") or ""))
         ok(f"{tag}: no page errors", not errs, errs)

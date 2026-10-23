@@ -201,3 +201,80 @@ body.cadws{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-web
 .cw-side>.cw-lesson{position:static;width:auto;max-height:none;margin:6px;box-shadow:none}
 body:has(#cwTool:not([hidden])) .cw-side>.cw-lesson .cw-row{display:none}
 body:has(#cwTool:not([hidden])) .cw-side>.cw-lesson .cw-lsay{margin:0 0 4px;font-size:13px;line-height:1.3}
+
+/* ---- phone compact layout (cad-phone.js adds body.cw-phone). View ≥70% of the screen: one-row header,
+   floating dockable tool rail + quick cluster, History/Items as a bottom sheet (right drawer in landscape). */
+.cw-more,.cw-sheetbtn{display:none}
+.cw-safe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.cw-pop hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.cw-mi{display:flex;align-items:center;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--txt);font:inherit;text-align:left;cursor:pointer}
+.cw-mi:hover,.cw-mi:focus{background:var(--panel2)}
+.cw-mi[aria-checked=false]{color:var(--mut)}
+body.cadws.cw-phone{height:var(--vvh,100dvh);padding:0}
+.cw-phone .zws-p #cwSearch,.cw-phone .zws-p #cwLearn{display:none}
+.cw-phone .cw-top{flex-wrap:nowrap;gap:4px;padding:4px max(6px,env(safe-area-inset-right)) 4px max(6px,env(safe-area-inset-left));padding-top:max(4px,env(safe-area-inset-top))}
+.cw-phone .cw-top>*{flex:none}
+.cw-phone .cw-title{flex:1 1 60px;width:auto;min-width:40px;font-size:15px;padding:6px 4px}
+.cw-phone .cw-sp,.cw-phone .cw-mode,.cw-phone .cw-top>.cw-menu:not(.cw-more),.cw-phone .cw-top>#themeToggle,.cw-phone .cw-top>#lookBtn{display:none}
+.cw-phone .cw-more{display:block}
+.cw-phone #cwMoreMenu{left:auto;right:0;top:48px;min-width:240px;max-width:calc(100vw - 12px);max-height:calc(var(--vvh,100dvh) - 70px);overflow:auto;box-sizing:border-box;z-index:40}
+.cw-phone .cw-main{display:block;position:relative;flex:1;min-height:0;--peek:calc(48px + env(safe-area-inset-bottom))}
+.cw-phone .cw-stage{position:absolute;left:0;right:0;top:0;bottom:var(--peek)}
+.cw-phone .cw-chips{display:none}
+.cw-phone .cw-tool .lbl,.cw-phone .cw-tool kbd,.cw-phone .cw-rail h3,.cw-phone .cw-toggle span,.cw-phone .cw-bl .cw-pill span,.cw-phone .cw-tool[data-tip]:hover::after{display:none}
+.cw-phone .cw-tool{padding:0;min-width:44px;justify-content:center;flex:none}
+/* floats (wslayout.js wraps them in .zws-p) */
+.cw-phone .cw-float-x{display:none}
+/* panels on phones sit low, over the view but under the header, so the rail keeps its edge */
+
+.cw-phone .cw-section{left:6px;right:6px;max-width:none;bottom:6px}
+.cw-phone .cw-section input[type=range]{width:100%}
+.cw-phone .cw-cubewrap{right:max(6px,env(safe-area-inset-right));top:6px}
+/* sheet */
+.cw-phone .cw-side{position:absolute;z-index:12;left:0;right:0;bottom:0;height:var(--drag,var(--peek));max-height:none;border:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -6px 20px rgba(0,0,0,.25);padding-bottom:env(safe-area-inset-bottom);box-sizing:border-box;transition:height .18s ease,width .18s ease;overflow:hidden}
+.cw-phone .cw-side.drag{transition:none}
+.cw-phone .cw-side[data-sheet=half]{height:var(--drag,50%)}
+.cw-phone .cw-side[data-sheet=full]{height:var(--drag,100%)}
+.cw-phone .cw-tabs{flex:none;height:48px;box-sizing:border-box;padding:2px 6px;align-items:center;touch-action:none;border-bottom:1px solid var(--line)}
+.cw-phone .cw-tabs button[role=tab]{min-height:44px}
+.cw-phone .cw-sheetbtn{display:flex;flex:none;width:44px;height:44px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;cursor:pointer;padding:0}
+.cw-phone .cw-sheetbtn span{display:block;width:28px;height:5px;border-radius:3px;background:var(--mut)}
+.cw-phone .cw-side[data-sheet=peek]>:not(.cw-tabs):not(.cw-msg):not(#cwLesson){visibility:hidden}
+/* peek: a lesson card floats just above the tabs, so the step is always in view */
+.cw-phone .cw-side[data-sheet=peek]>#cwLesson:not([hidden]){position:absolute;left:6px;right:6px;bottom:calc(100% + 6px);height:auto;max-height:40vh;overflow:auto;margin:0}
+.cw-phone .cw-msg{position:absolute;left:8px;right:8px;bottom:calc(100% + 6px);min-height:0;padding:0;pointer-events:none}
+.cw-phone .cw-side{overflow:visible}
+.cw-phone .cw-side>.cw-hist,.cw-phone .cw-side>.cw-items{overflow:auto}
+.cw-phone .cw-msg:not(:empty){padding:6px 10px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+.cw-phone .cw-side[data-sheet=peek] .cw-msg:not(:empty){bottom:calc(100% + 60px)}
+/* landscape phones: the sheet becomes a right-hand drawer, 48px wide when closed */
+@media (orientation:landscape){
+  .cw-phone .cw-main{--peek:calc(48px + env(safe-area-inset-right))}
+  .cw-phone .cw-stage{bottom:0;right:var(--peek)}
+  .cw-phone .cw-side{left:auto;top:0;height:auto;width:var(--drag,var(--peek));border-top:0;border-left:1px solid var(--line);border-radius:14px 0 0 14px;padding:0 env(safe-area-inset-right) 0 0}
+  .cw-phone .cw-side[data-sheet=half]{height:auto;width:var(--drag,min(340px,55%))}
+  .cw-phone .cw-side[data-sheet=full]{height:auto;width:var(--drag,100%)}
+  .cw-phone .cw-side[data-sheet=peek] .cw-tabs{flex-direction:column;height:auto;width:48px;border-bottom:0;padding:2px}
+  .cw-phone .cw-side[data-sheet=peek] .cw-tabs button[role=tab]{flex:none;width:44px;writing-mode:vertical-rl;min-height:72px;font-size:12px}
+  .cw-phone .cw-cubewrap{right:6px;top:2px}
+  @media (pointer:coarse){.cw-phone .cw-cubewrap{transform:scale(1.1)}}
+  .cw-phone .cw-top{padding-top:max(2px,env(safe-area-inset-top));padding-bottom:2px}
+}
+
+/* ---- every CAD panel floats over a full-size view (desktop and phone) */
+.cw-main.zws{display:block;position:relative;flex:1;min-height:0}
+.cw-main.zws>.cw-stage{position:absolute;inset:0}
+.cw-phone .cw-main.zws>.cw-stage{bottom:var(--peek)}
+@media (orientation:landscape){.cw-phone .cw-main.zws>.cw-stage{bottom:0;right:var(--peek)}}
+.zws-p>.zws-body>.cw-rail,.zws-p>.zws-body>.cw-bl,.zws-p>.zws-body>.cw-chips,.zws-p>.zws-body>.cw-panel,.zws-p>.zws-body>.cw-side{position:static;inset:auto;display:flex;gap:2px;padding:2px;border:0;background:none;box-shadow:none;min-width:0;min-height:0;max-height:none;width:auto;overflow:visible;transform:none}
+.zws-p>.zws-body>.cw-panel{display:block;padding:10px;width:300px;max-width:100%;box-sizing:border-box}
+.zws-p>.zws-body>.cw-panel[hidden]{display:none}
+.zws-p>.zws-body>.cw-side{flex-direction:column;width:300px;max-width:100%;height:100%;min-height:240px}
+.zws-p.v>.zws-body>.cw-rail,.zws-p.v>.zws-body>.cw-bl,.zws-p.v>.zws-body>.cw-chips,.zws-p.free>.zws-body>.cw-rail{flex-direction:column}
+.zws-p.h>.zws-body>.cw-rail,.zws-p.h>.zws-body>.cw-bl,.zws-p.h>.zws-body>.cw-chips{flex-direction:row}
+.zws-p .cw-tool{flex:none}
+.cw-phone .zws-p .cw-tool{padding:0;min-width:44px;justify-content:center}
+.zws-p .cw-pill,.zws-p .cw-chip{flex:none;min-width:44px;min-height:44px}
+.cw-phone .zws-p .cw-pill{padding:0;justify-content:center}
+.cw-phone .cw-top>.zws-cust{display:none}
+.zws-cw .lbl{display:none}

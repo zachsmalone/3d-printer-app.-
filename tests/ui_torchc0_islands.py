@@ -16,10 +16,18 @@ def box(e, a):
     return trimesh.creation.box(extents=e).apply_translation(a)
 
 
+def show_go(pg):
+    # On phones the floating "Resin settings" panel starts as a chip once a result is showing: one tap opens it
+    pg.wait_for_selector("#rzGo", state="attached", timeout=20000)
+    chip = pg.locator(".zws-p.min:has(#rzGo) .zws-chip")
+    if chip.count(): chip.first.click()
+    pg.wait_for_selector("#rzGo", timeout=20000)
+
+
 def prep(pg, stl, price=""):
-    pg.goto(URL + "/#torchc0"); pg.wait_for_selector("#rzGo", timeout=20000)
+    pg.goto(URL + "/#torchc0"); show_go(pg)
     pg.evaluate("localStorage.removeItem('zeim.resinPrice')")
-    pg.reload(); pg.wait_for_selector("#rzGo", timeout=20000)
+    pg.reload(); show_go(pg)
     for sel, v in (("#rzTilt", "0"), ("#rzLayer", "0.1")):
         pg.fill(sel, v)
     if pg.is_checked("#rzHollow"): pg.click("#rzHollow")

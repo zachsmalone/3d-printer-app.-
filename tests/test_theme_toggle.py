@@ -39,7 +39,7 @@ def test_nav_has_the_seven_tabs_in_order_and_showcase_is_default():
     import re
     h = (S / "index.html").read_text()
     nav = h[h.index('id="mainNav"'):h.index("</nav>")]
-    assert re.findall(r'data-view="(\w+)"', nav) == ["showcase", "slicer", "torchc0", "cad", "lithophane", "smartfix", "account"]   # FDM Slicer + TorchC0 are separate tabs (Zach)
+    assert re.findall(r'data-view="(\w+)"', nav) == ["showcase", "slicer", "torchc0", "cad", "lithophane", "smartfix", "learn", "account"]   # FDM Slicer + TorchC0 are separate tabs (Zach); Learn has its own tab (P10)
     assert '<main class="page" id="viewShowcase">' in h and 'id="viewCreate" hidden' in h
     acc = h[h.index('id="viewAccount"'):]
     acc = acc[:acc.index("</main>")]

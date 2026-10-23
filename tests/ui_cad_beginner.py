@@ -55,7 +55,10 @@ with sync_playwright() as p:
         tap = (lambda x, y: pg.touchscreen.tap(x, y)) if touch else (lambda x, y: pg.mouse.click(x, y))
         pg.goto(URL + "/static/cad.html"); pg.wait_for_timeout(800)
         ok(f"{tag}: no lesson card until asked", pg.is_hidden("#cwLesson"))
-        pg.click("#cwLearn")
+        def via(sel, label):   # phone: header extras live in the '…' menu
+            if pg.is_visible(sel): pg.click(sel); return
+            pg.click("#cwMore"); pg.locator("#cwMoreMenu [role=menuitem]", has_text=label).first.click()
+        via("#cwLearn", "Lessons")
         ok(f"{tag}: lesson list opens with 5 lessons", pg.locator("[data-start]").count() == 5)
         txt = pg.inner_text("#cwLesson").lower()
         ok(f"{tag}: plain adult tone (no school / kid words)", not any(w in txt for w in ("kid", "teacher", "class", "student", "homework", "better than")))
@@ -86,6 +89,7 @@ with sync_playwright() as p:
         pg.click("#cwLesson [data-l=mini]")
         pg.click("#cwLesson [data-l=show]")
         ok(f"{tag}: text step opens Text", pg.is_visible("#tTxt"))
+        pg.wait_for_timeout(200)   # floats settle on the next frame
         ok(f"{tag}: card covers nothing in the Text panel", pg.evaluate(COVER) == 0, pg.evaluate(COVER))
         pg.fill("#tTxt", "KEY"); pg.click("#tPick")
         pg.evaluate("window.__cad.viewAlong(new window.__cad.V3(0.001,-0.001,1))"); pg.wait_for_timeout(400)
@@ -100,9 +104,9 @@ with sync_playwright() as p:
             pg.click("#cwWarn button"); ok(f"{tag}: print tip dismissible", pg.is_hidden("#cwWarn"))
         if pg.is_visible("#tCancel"):
             pg.click("#tCancel")
-        pg.click("#cwExport")
         with pg.expect_download():
-            pg.click("#cwDlStl")
+            if pg.is_visible("#cwExport"): pg.click("#cwExport"); pg.click("#cwDlStl")
+            else: via("#cwDlStl", "Download STL")
         wait(pg, "() => !window.__cad.lessons.state.cur")
         ok(f"{tag}: export finishes the lesson and marks it done", pg.evaluate("window.__cad.lessons.state.done.keychain") is True and "Nice work" in pg.inner_text("#cwLesson"))
         # skip + exit any time

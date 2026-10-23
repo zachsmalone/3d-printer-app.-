@@ -100,7 +100,7 @@ def test_fdm_slicer_and_torchc0_are_separate_main_tabs():
     import re
     html = (ROOT / "static" / "index.html").read_text()
     nav = html[html.index('id="mainNav"'):html.index("</nav>")]
-    tabs = dict(re.findall(r'data-view="([a-z0-9]+)".*?<span>([^<]+)</span>', nav))
+    tabs = dict(re.findall(r'data-view="([a-z0-9]+)".*?<span[^>]*>([^<]+)</span>', nav))
     assert tabs["slicer"] == "FDM Slicer" and tabs["torchc0"] == "TorchC0"
     assert 'id="viewTorch"' in html and 'id="viewEdit"' in html and "/static/torchc0.js" in html
     torch = html[html.index('id="viewTorch"'):]
