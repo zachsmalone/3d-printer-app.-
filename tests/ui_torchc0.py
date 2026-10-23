@@ -15,7 +15,9 @@ def run(name, launch, stl):
     b = launch(); pg = b.new_page(viewport={"width": 1280, "height": 900})
     errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.goto(URL + "/#torchc0"); pg.wait_for_selector("#rzGo", timeout=20000)
-    for sel in ("#rzPrinter", "#rzFile", "#rzLayer", "#rzHollow", "#rzSup", "#rzCost"):
+    ok(f"{name}: Beginner hides expert resin settings", not pg.is_visible("#rzLayer"))
+    pg.click("#rzAdv > summary")                       # S9: expert settings live behind Advanced
+    for sel in ("#rzPrinter", "#rzDrop label.btn", "#rzLayer", "#rzHollow", "#rzSup", "#rzCost"):
         box = pg.locator(sel).bounding_box()
         ok(f"{name}: {sel} visible and sized", pg.is_visible(sel) and box and box["width"] > 8 and box["height"] > 8, box)
     pg.click("#rzHollow"); ok(f"{name}: hollow checkbox clickable", not pg.is_checked("#rzHollow"))
@@ -28,7 +30,7 @@ def run(name, launch, stl):
     ok(f"{name}: estimate shown", "ml" in txt and "layers" in txt, txt)
     ok(f"{name}: cost shown", pg.is_visible("#rzCostOut") and "$" in pg.inner_text("#rzCostOut"), txt)
     ok(f"{name}: price remembered", "price" in (pg.evaluate("localStorage.getItem('zeim.resinPrice')") or ""))
-    ok(f"{name}: 3MF link", pg.locator("#torchOut a[href$='torchc0.3mf']").count() == 1)
+    ok(f"{name}: Export picker button", pg.locator("#torchOut #rzExport[data-export-rid]").count() == 1)
     ok(f"{name}: no page errors", not errs, errs)
     b.close()
     if not bad: print(f"PASS {name}")

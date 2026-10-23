@@ -4,6 +4,7 @@ python tests/ui_plate_cut.py URL"""
 import os, shutil, sys, tempfile
 import trimesh
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install(("tools",))   # C: phone panels start as chips; open Tools only (two open panels crowd a phone)
 URL = sys.argv[1].rstrip("/"); bad = []
 
 

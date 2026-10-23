@@ -3,6 +3,7 @@ friendly error text, 3px focus ring in Dark, skip link, stacked-dialog focus tra
 (Live view items 3-4 removed with school features, 2026-10-12.)  390px + 1280px, Chrome + WebKit (axe in Chrome).  No screen reader or real phone here."""
 import json, os, sys
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1]; bad = []
 AXE = os.environ.get("AXE_JS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 def ok(n, c, x=""):

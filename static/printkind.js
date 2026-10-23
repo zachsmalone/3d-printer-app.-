@@ -18,7 +18,8 @@ function apply() {
   document.querySelectorAll("#mainNav [data-view=slicer],#mainNav [data-view=torchc0]").forEach(b => {
     const on = b.dataset.view === VIEW[kind];
     b.classList.toggle("kind-primary", on);
-    b.title = on ? "Your printer type's main tab" : "";
+    b.dataset.tip = b.dataset.tip || b.title;
+    b.title = b.dataset.tip + (on ? " (your printer type)" : "");
   });
   // Hollow shortcut: resin users hollow in TorchC0 (with drain hole); filament users in the Slicer editor.
   document.querySelectorAll('a[href="#slicer/hollow"],a[href="#torchc0"][data-kind-link]').forEach(a => {
@@ -74,3 +75,35 @@ addEventListener("hashchange", () => { if (location.hash === "#print") location.
   await setKind(k, { save: false });
   if (location.hash === "#print") location.replace("#" + VIEW[kind]);
 })();
+
+/* S1: one source of truth for printer kind. The header "My printer" switch drives the lithophane material (its own select is hidden). */
+function syncLithKind() {
+  const sel = document.querySelector("#lithMaterial"), nm = document.querySelector("#lithKindName"); if (!sel) return;
+  const k = (kind || "fdm") === "resin" ? "resin" : "filament";
+  if (nm) nm.textContent = k === "resin" ? "Resin (SLA / MSLA)" : "Filament (FDM)";
+  if (sel.value !== k) { sel.value = k; sel.dispatchEvent(new Event("change")); }
+}
+document.addEventListener("zeim:printkind", syncLithKind);
+setTimeout(syncLithKind, 0);
+
+/* S2: Print dialog with Resin chosen: no FDM slicers; "Open in TorchC0" instead */
+document.querySelector("#printToTorch")?.addEventListener("click", () => {   // E: carries the model (static/handoff.js)
+  if (window.zeimHandoff?.openInTorch) { window.zeimHandoff.openInTorch(); return; }
+  document.querySelector("#dlgPrint")?.close(); location.hash = "#torchc0";
+});
+
+/* Photo tips: one quiet line plus "More tips", never blocking. Studio + Lithophane get it under the photo drop;
+   other photo pickers (e.g. select mode) can call window.zeimPhotoTips(el). */
+export function photoTips(host, where = "afterend") {
+  if (!host || host.parentElement?.querySelector(":scope > .phototips")) return null;
+  const d = document.createElement("div"); d.className = "phototips help";
+  d.innerHTML = `<span>Photos that work best: a clear subject, good contrast and a simple background. Busy photos give muddy results.</span> <details><summary>More tips</summary><ul>
+    <li>Fill the frame with the subject; crop away clutter.</li><li>Even, soft light. Avoid harsh shadows and very dark photos.</li>
+    <li>Sharp, in-focus photos at least 800 px wide.</li><li>Faces and pets: one or two at a time work better than groups.</li></ul></details>`;
+  host.insertAdjacentElement(where, d); return d;
+}
+window.zeimPhotoTips = photoTips;
+photoTips(document.querySelector("#viewCreate #drop"));
+/* select mode (separate branch, static/selectmode.js) builds #selPanel itself: put the tip under its first line when present */
+const selTips = () => photoTips(document.querySelector("#selPanel #selSay"));
+setTimeout(selTips, 0); document.addEventListener("zeim:file", selTips); document.addEventListener("click", e => { if (e.target.closest?.("#selOpen")) selTips(); });

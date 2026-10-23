@@ -121,7 +121,7 @@ Requested by Haruto. Read-only on app code: I edited nothing under `app/`, `stat
 | `rotated_exif3_gps.jpg` 300x200, orient 3, GPS | Studio Choose | `source.jpg` 300x200 | none | red marker top-left → bottom-right (correct 180°) |
 | `real_gps.heic` (genuine HEIF container, GPS, orient 6) | Studio Choose | `source.jpg` 200x300 | none | same as orient-6 JPEG |
 | same files | Edit Take / Choose | `source.jpg` 200x300 | none | same |
-| `sample.png` | Studio and Edit Sample | `source.png` 480x360 | none | n/a |
+| `sample.jpg` (cat photo, 600x800, no EXIF) | Studio and Edit Sample | `source.png` 600x800 | none | n/a |
 | fake camera (Chrome fake device, desktop) | Studio Take → Capture → Use photo | `source.jpg` 640x480 | none | n/a; stream tracks `ended` right after Capture |
 
 No copy of the camera name or GPS exists anywhere under the pinned `outputs/` or `data/` (grep). Edit photo projects keep only the derived STL as `original.stl`, not the photo upload.

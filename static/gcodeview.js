@@ -50,7 +50,7 @@ export function gcodePreviewHTML() {
     </div>
     <p class="help" id="gcJumpMsg" aria-live="polite"></p>
     <section class="gcx-box" id="gcMarks" hidden aria-labelledby="gcMarksH"><div class="gcx-row"><strong id="gcMarksH" style="flex:1">Possible trouble spots</strong>
-      <button type="button" class="btn" id="gcMarksX" aria-label="Hide trouble spots">✕</button></div>
+      <button type="button" class="btn" id="gcMarksX" aria-label="Hide trouble spots"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <p class="help">Likely trouble spots from ZEIM's checks, not a diagnosis. Tap one to see that layer and its code.</p>
       <ul class="gcx-list" id="gcMarkList"></ul></section>
     <details class="gcx-box" id="gcCodeBox"><summary id="gcCodeSum">G-code for this layer</summary>
@@ -233,7 +233,7 @@ export function wireGcodePreview(url, est = {}, extra = {}) {
   var pauseUI = function () {
     const cmd = cmdSel.value, list = [...pauses].sort((a, b) => a - b);
     $("#gcPauseNote").textContent = (fw.note || "") + (cmd ? ` Using ${cmd}.` : "");
-    $("#gcPauseList").innerHTML = list.map(n => `<li><span>⏸ Layer ${n}${layers[n - 1] ? ` · Z ${layers[n - 1].userData.z.toFixed(2)} mm` : ""} · ${esc(cmd || "no command yet")}</span><button type="button" class="btn" data-rm="${n}" aria-label="Remove pause at layer ${n}">✕</button></li>`).join("");
+    $("#gcPauseList").innerHTML = list.map(n => `<li><span>⏸ Layer ${n}${layers[n - 1] ? ` · Z ${layers[n - 1].userData.z.toFixed(2)} mm` : ""} · ${esc(cmd || "no command yet")}</span><button type="button" class="btn" data-rm="${n}" aria-label="Remove pause at layer ${n}"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></li>`).join("");
     $("#gcPauseList").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { pauses.delete(+b.dataset.rm); pauseUI(); });
     const dl = $("#gcPauseDl"), ok = list.length && cmd && extra.pausedUrl;
     dl.hidden = !ok; if (ok) { dl.href = `${extra.pausedUrl}?layers=${list.join(",")}&cmd=${encodeURIComponent(cmd)}`; dl.textContent = `⬇ G-code with ${list.length} pause${list.length > 1 ? "s" : ""} (${cmd})`; }

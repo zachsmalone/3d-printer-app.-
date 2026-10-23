@@ -28,7 +28,7 @@ def test_unknown_material_falls_back_and_other_modes_ignore_it():
 
 def test_resin_option_is_wired_into_ui_and_api():
     html = (ROOT / "static" / "index.html").read_text()
-    assert 'id="lithMaterial"' in html and 'value="resin"' in html and 'value="filament"' in html and 'for="lithMaterial"' in html
+    assert 'id="lithMaterial"' in html and 'value="resin"' in html and 'value="filament"' in html and 'id="lithKindName"' in html   # driven by the header printer kind (single source of truth)
     js = (ROOT / "static" / "app.js").read_text()
     assert 'fd.append("material"' in js and "resin: { thk: [[0.5, 2.5], [0.5, 2.8], [0.6, 3.0]]" in js and "#lithMatBox" in js
     api = (ROOT / "app" / "api" / "builds.py").read_text()

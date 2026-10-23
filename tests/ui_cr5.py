@@ -2,6 +2,7 @@
 import os, sys, tempfile
 from PIL import Image
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1]
 R = []
 def ok(n, c, x=""): R.append(bool(c)); print(("PASS " if c else "FAIL ") + n, x)
@@ -16,7 +17,7 @@ with sync_playwright() as p:
         if pre == "e": pg.click("#mainNav [data-view=slicer]"); pg.wait_for_timeout(400)
         box = f"#{pre}Ack"
         ok(f"{label}: permission box exists, is NOT pre-ticked", pg.is_visible(box) and not pg.is_checked(box))
-        ok(f"{label}: wording asks for own photo/permission, no addresses, school names or license plates", all(x in pg.inner_text(f"#{pre}Pick .pp-ack") for x in ("my photo", "permission", "addresses", "school names", "license plates")))
+        ok(f"{label}: wording asks for own photo/permission, no addresses, workplace names or license plates (A: 18+ wording)", all(x in pg.inner_text(f"#{pre}Pick .pp-ack") for x in ("my photo", "permission", "addresses", "workplace names", "license plates")))
         pg.set_input_files(f"#{pre}File", P); pg.wait_for_timeout(600)
         ok(f"{label}: choosing a photo without the tick is refused with a clear message", pg.is_visible(f"#{pre}Msg") and "tick the box" in pg.inner_text(f"#{pre}Msg"))
         ok(f"{label}: ...and nothing was built / opened", not pg.is_visible("#result") if pre == "s" else not pg.is_visible("#editPanel"))

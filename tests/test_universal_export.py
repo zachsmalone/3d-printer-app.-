@@ -36,7 +36,7 @@ def test_export_info_and_download_sized_for_printer():
     assert info["printer"]["id"] == "bambu_a1_mini"
     assert info["printer"]["bed_mm"][:2] == [180, 180] or info["printer"]["bed_mm"][:2] == [180.0, 180.0]
     assert info["downloads"]["3mf"].startswith(f"/api/export/{bid}/download")
-    assert "bambu_a1_mini" in info["filename"]
+    assert " - Bambu Lab A1 mini - 0.2mm.3mf" in info["filename"]
     assert len(info["open_in_hints"]) == 5
 
     # Photo builds are ~50 mm wide by default — still centered on the chosen bed.

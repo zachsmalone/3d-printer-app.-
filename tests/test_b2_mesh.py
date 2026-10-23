@@ -8,7 +8,7 @@ from tests import b1
 from tests.b1 import client, ADULT, ADMIN
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VASE = os.path.join(ROOT, "static", "sample_model.stl")
+VASE = os.path.join(ROOT, "tests", "fixtures", "sample_vase.stl")
 
 
 def _gear_mesh():

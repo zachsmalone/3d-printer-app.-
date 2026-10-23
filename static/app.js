@@ -126,7 +126,7 @@ var place = mountPlace($("#placeRoot"), { shape: litShape, aspect: litAspect });
 ["#diameter_mm", "#height_mm"].forEach(s => $(s).addEventListener("input", () => place.redraw()));
 $("#shapeCards").onchange = applyShape;
 $("#hang").onchange = applyShape;
-$("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked
+$("#modeCards").onchange = () => { S.mode = ($("#modeCards input:checked") || {}).value || "lithophane"; applyMode(); document.dispatchEvent(new CustomEvent("zeim:mode", { detail: S.mode })); };       // radios: the browser keeps "selected" for assistive tech; we just read input:checked
 $("#presetSeg").onchange = () => { S.preset = ($("#presetSeg input:checked") || {}).value || "standard"; applyMode(); };
 $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
 $("#width_mm").oninput = e => $("#widthRange").value = e.target.value;
@@ -177,7 +177,7 @@ drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (pick
 drop.addEventListener("click", () => pick.el("File").click());
 $("#changePhoto").onclick = () => pick.el("File").click();
 $("#sSample").onclick = async () => {
-  try { const b = await (await fetch("/static/sample.png")).blob(); setFile(new File([b], "sample.png", { type: "image/png" })); }
+  try { const b = await (await fetch("/static/sample.jpg")).blob(); setFile(new File([b], "sample.jpg", { type: "image/jpeg" })); }
   catch { pick.msg("We couldn't load the sample image. Please try again."); }
 };
 
@@ -201,6 +201,7 @@ function formData(autoDelete) {
     }
   }
   if (autoDelete) fd.append("auto_delete_oldest", "true");
+  if (S.mode !== "trace2d" && window.zeimSelect) { const sel = window.zeimSelect(S.mode); if (sel) fd.append("select", sel); }   // Select mode (selectmode.js)
   if (S.mode === "trace2d") { fd.set("beginner", "false"); fd.append("trace", JSON.stringify(window.zeimTraceOpts ? window.zeimTraceOpts() : {})); return fd; }
   if (isExpert()) {
     $$("#expertOpts [name]").forEach(el => {
@@ -267,6 +268,7 @@ $("#btnBuild").onclick = () => build(false);
 
 function showBuild(r) {
   S.current = r;
+  document.dispatchEvent(new CustomEvent("zeim:build", { detail: r }));   // Select mode keeps the saved selection (selectmode.js)
   r.visibility = r.visibility || "private";
   $("#viewerEmpty").hidden = true; $("#vtools").hidden = false; $("#result").hidden = false;
   viewer?.load(r.preview, r.mode);
@@ -704,3 +706,5 @@ document.getElementById("skipLink")?.addEventListener("click", e => {
   e.preventDefault(); m.tabIndex = -1; m.focus(); m.scrollIntoView?.({ block: "start" });
 });
 window.__errText = errText;   // tests
+/* E: Send to… / Back from CAD reopens the Studio model (static/handoff.js) */
+document.addEventListener("zeim:open-build", async e => { try { const r = await api("/api/builds/" + encodeURIComponent(e.detail)); if (S.current?.id) return; S.mode = r.mode; applyMode(); showBuild(r); } catch { } });

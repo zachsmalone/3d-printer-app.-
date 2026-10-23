@@ -16,7 +16,7 @@ def test_s04_age_gate_is_neutral_and_locks_the_session():
     r = c.post("/api/me/signup", json={"display_name": "Kid", "dob": "2018-01-01"})
     assert r.status_code == 403
     text = r.text.lower()
-    assert not any(w in text for w in NEUTRAL_BAD) and "without an account" in text    # no threshold; points to using ZEIM without an account
+    assert not any(w in text for w in NEUTRAL_BAD) and "adults 18 and over" in text and "can't create an account" in text   # A: plain 18+ refusal, no mention of the visitor's age
     # retry in the same browser session with a different DOB: refused with the SAME neutral answer, nothing stored
     r2 = c.post("/api/me/signup", json={"display_name": "Kid", "dob": "2000-01-01"})
     assert r2.status_code == 403 and r2.json() == r.json()

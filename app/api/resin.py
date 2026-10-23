@@ -78,7 +78,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = 
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
     isl, drn = _points(island_supports, "Island supports"), _points(drains, "Drain holes")
-    bed = None
+    bed, pname = None, None
     if printer_id:
         try:
             pid, _ = ps.resolve(printer_id, None)
@@ -87,7 +87,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = 
         p = ps.printer_public(pid)
         if p["technology"] != "Resin":
             raise HTTPException(400, f"The {p['name']} is a filament printer. Use the Slicer for it; TorchC0 is for resin printers.")
-        bed = p["bed_mm"]
+        bed, pname = p["bed_mm"], p["name"]
     if file is not None and file.filename:
         limit = editproj.MAX_UPLOAD_EDIT
         data = file.file.read(limit + 1)
@@ -122,21 +122,40 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), preset: str = 
     rid = uuid.uuid4().hex
     d = _dir()
     (d / f"{rid}.stl").write_bytes(stl); (d / f"{rid}.3mf").write_bytes(tmf)
-    (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid}))
+    from ..services import filenames as fnames
+    src = (file.filename.rsplit(".", 1)[0] if file is not None and file.filename else "") or "TorchC0 model"
+    stem = fnames.default_stem(src, pname, s.get("layer_mm") if isinstance(s, dict) else None)
+    (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid, "name": stem}))
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
+    rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
     return rep
 
 
+RESIN_FORMATS = ("stl", "3mf", "obj", "ply", "glb", "amf")
+
+
 @router.get("/{rid}/torchc0.{fmt}")
-def download(rid: str, fmt: str, actor: Actor = Depends(get_actor)):
-    if fmt not in ("stl", "3mf") or len(rid) != 32 or any(c not in "0123456789abcdef" for c in rid):
+def download(rid: str, fmt: str, name: str = "", actor: Actor = Depends(get_actor)):
+    """The prepared resin model in any picker format, under 'Title - Printer - 0.05mm' or the chosen name."""
+    from fastapi import Response
+    from ..services import filenames as fnames
+    from ..services import universal_export as ue
+    if fmt not in RESIN_FORMATS or len(rid) != 32 or any(c not in "0123456789abcdef" for c in rid) or len(name) > 400:
         raise HTTPException(404, "Not found")
     d = config.DATA / "resin"
     try:
-        owner = json.loads((d / f"{rid}.json").read_text())["sid"]
+        info = json.loads((d / f"{rid}.json").read_text())
+        owner = info["sid"]
     except (OSError, ValueError, KeyError):
         raise HTTPException(404, "That file has expired. Prepare it again.")
-    if owner != actor.sid or not (d / f"{rid}.{fmt}").is_file():
+    if owner != actor.sid or not (d / f"{rid}.stl").is_file():
         raise HTTPException(404, "That file has expired. Prepare it again.")
-    mt = "model/stl" if fmt == "stl" else "model/3mf"
-    return FileResponse(d / f"{rid}.{fmt}", media_type=mt, filename=f"torchc0.{fmt}")
+    fname = fnames.file_name(name or info.get("name") or "torchc0", fmt)
+    if fmt in ("stl", "3mf") and (d / f"{rid}.{fmt}").is_file():
+        data = (d / f"{rid}.{fmt}").read_bytes()
+    else:
+        import trimesh
+        m = trimesh.load(str(d / f"{rid}.stl"), file_type="stl", force="mesh")
+        data, _ext, _mt = ue.export_mesh_data(m, force_format=fmt)
+    return Response(content=data, media_type=ue.FORMATS[fmt]["mime"],
+                    headers={"Content-Disposition": fnames.disposition(fname), "Cache-Control": "no-store"})

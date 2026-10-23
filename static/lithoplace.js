@@ -33,7 +33,7 @@ export function mountPlace(root, { shape, aspect, onChange }) {
   <div class="field"><label for="lpZoom">Zoom <em id="lpZoomV">100%</em></label><input type="range" id="lpZoom" min="10" max="800" step="1" value="100"></div>
   <div class="field"><label for="lpRot">Rotate <em id="lpRotV">0°</em></label><input type="range" id="lpRot" min="-180" max="180" step="1" value="0"></div>
   <div class="row" role="group" aria-label="Placement shortcuts">
-    <button type="button" class="btn ghost" id="lpRotL" aria-label="Rotate 90 degrees left">⟲ 90°</button>
+    <button type="button" class="btn ghost" id="lpRotL" aria-label="Rotate 90 degrees left"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></svg> 90°</button>
     <button type="button" class="btn ghost" id="lpRotR" aria-label="Rotate 90 degrees right">⟳ 90°</button>
     <button type="button" class="btn ghost" id="lpFit" aria-label="Fit: show the whole photo inside the shape">Fit</button>
     <button type="button" class="btn ghost" id="lpFill" aria-label="Fill: cover the whole shape">Fill</button>

@@ -1,4 +1,4 @@
-"""'Logo & Drawing to 3D': flat picture (logo, sketch, kid's drawing, icon, PNG/JPG/SVG) -> clean printable 3D.
+"""'Logo & Drawing to 3D': flat picture (logo, sketch, hand drawing, icon, PNG/JPG/SVG) -> clean printable 3D.
 
 Pipeline: picture -> clean mask(s) (threshold with auto Otsu or a colour count, despeckle, smoothing)
 -> true vector outlines with holes kept (shapely) -> sized by target width in mm -> one of four outputs:

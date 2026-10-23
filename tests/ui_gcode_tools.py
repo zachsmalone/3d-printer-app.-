@@ -4,6 +4,7 @@ virtual list), 'Pause at this layer' add/remove + the new download contains the 
 import os, shutil, sys, tempfile
 import trimesh
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 sys.path.insert(0, os.path.dirname(__file__))
 from ui_gcode_preview import ok, wait, slice_cube, bad
 URL = sys.argv[1].rstrip("/")

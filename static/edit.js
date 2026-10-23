@@ -82,7 +82,7 @@ function takeFiles(list) {
 $("#editFile").onchange = e => { const l = [...e.target.files]; e.target.value = ""; takeFiles(l); };
 drop.addEventListener("click", () => $("#editFile").click());
 $("#eSample").onclick = async () => {
-  try { const b = await (await fetch("/static/sample.png")).blob(); fromFile(new File([b], "sample.png", { type: "image/png" })); }
+  try { const b = await (await fetch("/static/sample.jpg")).blob(); fromFile(new File([b], "sample.jpg", { type: "image/jpeg" })); }
   catch { editPick.msg("We couldn't load the sample image. Please try again."); }
 };
 ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
@@ -132,7 +132,7 @@ async function sendMulti(mode, auto = false) {
 }
 $("#multiPlate").onclick = () => sendMulti("plate");
 $("#multiSeparate").onclick = () => sendMulti("separate");
-$("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_vase.stl")); };
+$("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_cat.stl")); };
 function fromBuild(id) {
   const mk = () => { const fd = new FormData(); fd.append("from_build", id); fd.append("beginner", !isExpert()); return fd; };
   create(mk(), mk);
@@ -171,7 +171,7 @@ function loadProject(p, keepCamera = false) {
   $("#editMsg").innerHTML = msgs.map(m => `<span class="${/not watertight|needs repair|Fix the model|isn't|Still/.test(m) ? "warn" : ""}">${esc(m)}</span>`).join("<br>");
   const total = p.ops.length;
   $("#editHeadNote").textContent = `(${p.head} of ${total} applied — click a step to jump)`;
-  $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button>${o.editable ? ` <button type="button" class="stepbtn" data-editstep="${o.i}" title="Change this step's numbers; later steps are replayed" aria-label="Edit step ${o.i}">✎</button> <button type="button" class="stepbtn" data-delstep="${o.i}" title="Delete this step; later steps are replayed" aria-label="Delete step ${o.i}">✕</button>` : ""}</li>`).join("");
+  $("#editOps").innerHTML = `<li class="${p.head === 0 ? "cur" : ""}"><button type="button" class="stepbtn" data-goto="0"${p.head === 0 ? ' aria-current="step"' : ""}>0 · Original file (kept)</button></li>` + p.ops.map(o => `<li class="${o.i === p.head ? "cur" : o.i > p.head ? "future" : ""}"><button type="button" class="stepbtn" data-goto="${o.i}"${o.i === p.head ? ' aria-current="step"' : ""}>${o.i} · ${esc(o.label)}</button>${o.editable ? ` <button type="button" class="stepbtn" data-editstep="${o.i}" title="Change this step's numbers; later steps are replayed" aria-label="Edit step ${o.i}">✎</button> <button type="button" class="stepbtn" data-delstep="${o.i}" title="Delete this step; later steps are replayed" aria-label="Delete step ${o.i}"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>` : ""}</li>`).join("");
   renderTools();
   renderHistoryCard();
   renderSlicePanel();

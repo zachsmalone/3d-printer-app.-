@@ -3,6 +3,7 @@
 if installed.  python tests/ui_files.py URL    NOT a real iPhone: WebKit-on-Linux does not show the iOS picker."""
 import os, sys
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STL = open(os.path.join(ROOT, "static", "sample_model.stl"), "rb").read()

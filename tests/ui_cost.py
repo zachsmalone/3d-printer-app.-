@@ -4,6 +4,7 @@ is remembered in this browser for the next slice. python tests/ui_cost.py URL"""
 import os, re, shutil, sys, tempfile
 import trimesh
 from playwright.sync_api import sync_playwright
+import os as _o, sys as _s; _s.path.insert(0, _o.path.dirname(_o.path.abspath(__file__))); import zws_open; zws_open.install()   # C: phone panels start as chips
 URL = sys.argv[1].rstrip("/"); bad = []
 
 

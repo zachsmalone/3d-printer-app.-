@@ -591,7 +591,7 @@ function showWarn(list) {
   $("#cwWarn")?.remove();
   if (!list?.length) return;
   const d = document.createElement("div"); d.id = "cwWarn"; d.className = "cw-warn"; d.setAttribute("role", "status");
-  d.innerHTML = `<div><b>Print tip</b>${list.map(w => `<p>${esc(w)}</p>`).join("")}</div><button type="button" class="cw-btn" aria-label="Dismiss print tip">✕</button>`;
+  d.innerHTML = `<div><b>Print tip</b>${list.map(w => `<p>${esc(w)}</p>`).join("")}</div><button type="button" class="cw-btn" aria-label="Dismiss print tip"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   d.querySelector("button").onclick = () => d.remove();
   $("#cwStage").append(d);
 }
@@ -729,7 +729,12 @@ function onEdge(e, h) {   // the tap is on this edge, not just near it on a face
   if (!e) return false; if (!h) return true;
   const [ax, ay] = toScreen(e.a), [bx, by] = toScreen(e.b), [px, py] = toScreen(h.point);
   const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L));
-  return Math.hypot(ax + dx * t - px, ay + dy * t - py) < SNAP_PX;
+  if (Math.hypot(ax + dx * t - px, ay + dy * t - py) >= SNAP_PX) return false;
+  // B13: an edge hidden behind the tapped surface (e.g. the far bottom edge of a box seen from above) can project right
+  // under the tap; only snap when the edge is not farther from the camera than the surface that was hit.
+  const q = new THREE.Line3(e.a, e.b).closestPointToPoint(h.point, true, new THREE.Vector3());
+  const dq = q.distanceTo(camera.position), dh = h.point.distanceTo(camera.position);
+  return dq <= dh + Math.max(0.5, 0.01 * dh);
 }
 function showEdgeLen(e) {   // B13: a picked edge shows its length on the model and in the polite live hint
   const t = `${fmt(e.a.distanceTo(e.b))} mm`; setMeasLabel(t, e.a.clone().add(e.b).multiplyScalar(0.5)); renderSkLabels(); return t;
@@ -1135,7 +1140,7 @@ function modePop() {
     b.onclick = () => { box.remove(); if (last.params.mode !== m) histAction(() => api(`/api/edit/${S.bid}/step/${last.i}`, { method: "PUT", json: { params: { ...last.params, mode: m } } })); };
     box.append(b);
   }
-  const x = document.createElement("button"); x.textContent = "✕"; x.setAttribute("aria-label", "Keep as is"); x.onclick = () => box.remove(); box.append(x);
+  const x = document.createElement("button"); x.innerHTML = '<svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>'; x.setAttribute("aria-label", "Keep as is"); x.onclick = () => box.remove(); box.append(x);
   stage.append(box); setTimeout(() => box.remove(), 12000);
 }
 function pickRegion(ev) {
@@ -1216,9 +1221,9 @@ function showCtx(kind, at) {
   const bar = document.createElement("div"); bar.className = "cw-ctx"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", kind === "face" ? "Face actions" : "Edge actions");
   if (kind === "face") bar.innerHTML = `<label class="sr-only" for="ctxD">Push or pull distance in mm</label><input id="ctxD" type="number" step="any" inputmode="decimal" value="0" title="Push/pull distance (mm): type a value or drag the arrow">
     <button class="primary" data-c="pp" title="Move this face by the distance (push/pull)">Push/Pull</button><button data-c="sk" title="Sketch on this face">Sketch</button>
-    <button data-c="sh" title="Shell (hollow) the body">Shell</button><button data-c="fa" title="Round all outside edges">Fillet all</button><button data-c="sc" title="Sculpt mode">Sculpt</button><button data-c="x" aria-label="Close">✕</button>`;
+    <button data-c="sh" title="Shell (hollow) the body">Shell</button><button data-c="fa" title="Round all outside edges">Fillet all</button><button data-c="sc" title="Sculpt mode">Sculpt</button><button data-c="x" aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   else bar.innerHTML = `<label class="sr-only" for="ctxD">Radius in mm</label><input id="ctxD" type="number" step="any" inputmode="decimal" value="1" title="Radius / size (mm)">
-    <button class="primary" data-c="fi">Fillet</button><button data-c="ch">Chamfer</button><button data-c="ms" title="Measure this edge">Length</button><button data-c="x" aria-label="Close">✕</button>`;
+    <button class="primary" data-c="fi">Fillet</button><button data-c="ch">Chamfer</button><button data-c="ms" title="Measure this edge">Length</button><button data-c="x" aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   stage.append(bar);
   CTX = { bar, at: at.clone(), kind, len: 0, d: 0 };
   if (kind === "face") {
@@ -1422,7 +1427,9 @@ $("#cwHint").onclick = () => $("#cwHint").classList.toggle("open");
 renderRail(); hint(...HINTS.null); applyHints(); loop();
 /* Never silently drop a project (QA B4): if it exists but can't be shown here (e.g. too detailed),
    keep it and offer Undo / the editor instead of an empty workspace. */
-load().catch(e => {
+load().then(() => {   // S8: deep link to a tool, e.g. /static/cad.html?tool=text
+  const q = new URLSearchParams(location.search).get("tool"); if (q && HINTS[q] && q !== "null") setTool(q);
+}).catch(e => {
   if (S.bid && e.status && e.status !== 404 && e.status !== 403) return lockedOut(e.message);
   msg(e.message); S.bid = null; history.replaceState(null, "", location.pathname); load();
 });
@@ -1438,3 +1445,56 @@ const lessons = initLessons({ S, setTool, hint, LS, $, esc });
 $("#cwDlStl").addEventListener("click", () => lessons.event("export")); $("#cwDl3mf").addEventListener("click", () => lessons.event("export")); $("#cwToSlicer").addEventListener("click", () => lessons.event("export"));
 $("#cwHome").addEventListener("click", () => lessons.event("fit"));
 window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setTool, finishSketch, addConstraint, solveSketch, viewAlong, toggleSection, openStep: i => { S.openStep = i; renderHist(); } };
+
+/* saving: the design itself is saved on the server after every step; this keeps the open design, units and name */
+{
+  const units = () => { try { return localStorage.getItem("zeim.cad.units") || "mm"; } catch { return "mm"; } };
+  const reg = () => {
+    if (!window.zeimSave || reg.done) return; reg.done = true;
+    window.zeimSave.register("cad", {
+      collect: () => S.bid ? { bid: S.bid, units: units(), title: $("#cwTitle").value } : null,
+      restore: st => {
+        if (S.bid || !st?.bid || !/^[0-9a-f]{12}$/.test(st.bid)) return true;
+        const box = document.createElement("div"); box.className = "savetoast"; box.setAttribute("role", "status");
+        box.innerHTML = `<span>Reopen your last design?</span><a class="btn small primary" href="/static/cad.html?bid=${st.bid}">Reopen</a><button type="button" class="btn small ghost" aria-label="Dismiss">Not now</button>`;
+        box.querySelector("button").onclick = () => box.remove(); document.body.append(box); return true;
+      }
+    }, ".cw-main");
+    new MutationObserver(() => window.zeimSave._markDirty("cad")).observe($("#cwHist") || document.body, { childList: true, subtree: false });
+  };
+  reg(); if (!reg.done) addEventListener("DOMContentLoaded", reg);
+}
+
+/* E: Send to… (CAD → FDM Slicer / TorchC0) and the one-tap way back. The Studio / Slicer / TorchC0 side is static/handoff.js. */
+{
+  const units = () => { try { return localStorage.getItem("zeim.cad.units") || "mm"; } catch { return "mm"; } };
+  const sl = $("#cwSendSlicer"), tc = $("#cwSendTorch");
+  const applyKind = () => {
+    let kind = "fdm"; try { kind = localStorage.getItem("zeim.printKind") === "resin" ? "resin" : "fdm"; } catch { }
+    document.body.dataset.printKind = kind; sl.hidden = kind !== "fdm"; tc.hidden = kind !== "resin";
+    $("#cwSendNote").textContent = kind === "resin" ? "Your printer type is Resin. Switch to FDM on the main page to use the Slicer." : "Your printer type is FDM. Switch to Resin on the main page to use TorchC0.";
+  };
+  applyKind();
+  addEventListener("pageshow", () => { document.documentElement.classList.remove("handing"); applyKind(); });
+  addEventListener("storage", e => { if (e.key === "zeim.printKind") applyKind(); });
+  const mark = to => { try { localStorage.setItem("eunit", units()); sessionStorage.setItem("zeim.back", JSON.stringify({ label: "CAD", url: `/static/cad.html?bid=${S.bid}`, to, t: Date.now() })); } catch { } };
+  const leave = (url, to) => {
+    if (!S.bid) { msg("Make a solid first: nothing to send yet."); return; }
+    document.dispatchEvent(new CustomEvent("zeim:save-now")); mark(to);
+    document.documentElement.classList.add("handing"); setTimeout(() => { location.href = url; }, 120);
+  };
+  const close = () => { $("#cwSendToMenu").hidden = true; $("#cwSendTo").setAttribute("aria-expanded", "false"); };
+  $("#cwSendTo").onclick = () => { const m = $("#cwSendToMenu"), open = m.hidden; m.hidden = !open; $("#cwSendTo").setAttribute("aria-expanded", String(open)); if (open) m.querySelector("a:not([hidden])")?.focus(); };
+  $("#cwSendToMenu").addEventListener("keydown", e => { if (e.key === "Escape") { close(); $("#cwSendTo").focus(); } });
+  document.addEventListener("click", e => { if (!e.target.closest("#cwSendTo, #cwSendToMenu")) close(); });
+  sl.onclick = e => { e.preventDefault(); leave(`/?edit=${encodeURIComponent(S.bid || "")}#slicer`, "FDM Slicer"); };
+  tc.onclick = e => { e.preventDefault(); leave(`/?resin=${encodeURIComponent(S.bid || "")}#torchc0`, "TorchC0"); };
+  $("#cwToSlicer").addEventListener("click", () => { if (S.bid) { document.dispatchEvent(new CustomEvent("zeim:save-now")); mark("FDM Slicer"); } });
+  const q = new URLSearchParams(location.search), from = q.get("from"), back = q.get("back");
+  if (from && back && back.startsWith("/") && !back.startsWith("//")) {
+    const a = document.createElement("a"); a.className = "backchip cad"; a.id = "backChip"; a.href = back;
+    a.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg> Back to ${esc(from)}`;
+    a.addEventListener("click", () => document.dispatchEvent(new CustomEvent("zeim:save-now")));
+    document.body.append(a);
+  }
+}

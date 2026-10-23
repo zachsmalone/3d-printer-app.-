@@ -1,4 +1,4 @@
-"""Learning library (Spark Lab) + public shareable pages. No grades, scores or school records (2026-10-12)."""
+"""Learning library (Learn) + public shareable pages. No grades or scores (2026-10-12)."""
 from __future__ import annotations
 
 from html import escape
@@ -66,7 +66,7 @@ def lesson_page(lid: str):
         raise HTTPException(404)
     steps = "".join(f"<li><b>{escape(s['title'])}</b><p>{escape(s['body'])}</p></li>" for s in l["steps"])
     body = (f"<h1>{l['emoji']} {escape(l['title'])}</h1><p class=help>{escape(branding.SECTIONS['learn'])} · "
-            f"{l['minutes']} min · ages {escape(l['age'])}</p><p>{escape(l['summary'])}</p>"
+            f"{l['minutes']} min</p><p>{escape(l['summary'])}</p>"
             f"<h3>Objective</h3><p>{escape(l['objective'])}</p><ol class=steps>{steps}</ol>"
             f"<p><a class='btn primary' href='/#learn/{lid}'>Open this lesson in {escape(branding.PRODUCT_NAME)}</a></p>")
     return _page(l["title"], body, l["summary"])

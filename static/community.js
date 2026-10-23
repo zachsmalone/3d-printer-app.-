@@ -29,7 +29,7 @@ async function refreshMe() {
 const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", account: "#viewAccount", learn: "#viewLearn" };
 const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", studio: "lithophane" };
 function show(view) {
-  const tab = view === "learn" ? "account" : view;
+  const tab = view;   // P10: Learn has its own nav button
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === tab); if (b.dataset.view === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
   document.body.dataset.view = view;
@@ -69,7 +69,7 @@ function renderAccount() {
      so a Promise can never hide the fallback. */
   if (window.ZeimAccount && window.ZeimAccount.handles(ME)) { window.ZeimAccount.render(ME); return; }
   if (!ME.signed_up) {
-    $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. Anyone can build and learn in the ${esc(CFG.sections.learn)} without an account, and families can print designs together with an adult account holder.</p>
+    $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. You can build and learn in the ${esc(CFG.sections.learn)} without an account.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 18 letters, numbers or underscores. Leave it empty and ZEIM makes you a friendly nickname you can change later. Not your real name, email or phone number.</small></div>
@@ -174,7 +174,7 @@ function openSignout() {
     catch (e) { inlineMsg(go.parentElement, e.message); }
   };
   stackModal($("#dlgSignout"));
-  (adult ? $("#soCodeBtn") : $("#soOk")).focus();            // a11y #10: start on the first thing to do, not the ✕
+  (adult ? $("#soCodeBtn") : $("#soOk")).focus();            // a11y #10: start on the first thing to do, not the close button
 }
 
 /* Stacked dialogs (a11y #8): the dialog underneath is made inert while a child dialog is open, and Tab is kept inside the top dialog
@@ -482,7 +482,7 @@ async function openData() {
 async function loadLearn() {
   const r = await api("/api/learn/lessons");
   $("#lessonGrid").innerHTML = r.lessons.map(l => `<div class="pcard" data-lesson="${l.id}"><div class="ph" aria-hidden="true"><svg class=i aria-hidden=true focusable=false><use href=#i-sparkle></use></svg></div>
-    <div class="meta"><h3 class="lt"><a href="#" class="stretch" data-open-lesson="${l.id}">${esc(l.title)}</a></h3><span>${l.minutes} min · ages ${l.age}</span><div class="help">${esc(l.summary)}</div>
+    <div class="meta"><h3 class="lt"><a href="#" class="stretch" data-open-lesson="${l.id}">${esc(l.title)}</a></h3><span>${l.minutes} min</span><div class="help">${esc(l.summary)}</div>
     <div class="bar"><i style="width:${100 * l.done_steps / l.steps}%"></i></div><span>${l.completed ? l.badge : `${l.done_steps}/${l.steps} steps`}</span></div></div>`).join("");
 }
 $("#lessonGrid").onclick = e => { const c = e.target.closest("[data-lesson]"); if (c) { e.preventDefault(); openLesson(c.dataset.lesson); } };   // the title link (keyboard) and a tap anywhere on the card
@@ -510,7 +510,7 @@ async function loadRecent() {
   let r; try { r = await api("/api/me/searches"); } catch { box.hidden = true; return; }
   if (!r.searches.length) { box.hidden = true; box.innerHTML = ""; return; }
   box.hidden = false;
-  box.innerHTML = `<span class="help">Recent searches</span><ul class="chips">${r.searches.map(q => `<li class="rchip"><button type="button" class="chip" data-recent="${esc(q)}">${esc(q)}</button><button type="button" class="chip x" data-unrecent="${esc(q)}" aria-label="Remove ${esc(q)} from history">✕</button></li>`).join("")}</ul><button type="button" class="btn small ghost" id="shClearHist">Clear history</button>`;
+  box.innerHTML = `<span class="help">Recent searches</span><ul class="chips">${r.searches.map(q => `<li class="rchip"><button type="button" class="chip" data-recent="${esc(q)}">${esc(q)}</button><button type="button" class="chip x" data-unrecent="${esc(q)}" aria-label="Remove ${esc(q)} from history"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></li>`).join("")}</ul><button type="button" class="btn small ghost" id="shClearHist">Clear history</button>`;
 }
 $("#shRecent").addEventListener("click", async e => {
   const go = e.target.closest("[data-recent]"); if (go) { $("#shSearch").value = go.dataset.recent; return loadShowcase(); }

@@ -16,10 +16,19 @@ def box(e, a):
     return trimesh.creation.box(extents=e).apply_translation(a)
 
 
+def show_go(pg):
+    # On phones the floating "Resin settings" panel starts as a chip once a result is showing: one tap opens it
+    pg.wait_for_selector("#rzGo", state="attached", timeout=20000)
+    chip = pg.locator(".zws-p.min:has(#rzGo) .zws-chip")
+    if chip.count(): chip.first.click()
+    pg.wait_for_selector("#rzGo", timeout=20000)
+
+
 def prep(pg, stl, price=""):
-    pg.goto(URL + "/#torchc0"); pg.wait_for_selector("#rzGo", timeout=20000)
+    pg.goto(URL + "/#torchc0"); show_go(pg)
     pg.evaluate("localStorage.removeItem('zeim.resinPrice')")
-    pg.reload(); pg.wait_for_selector("#rzGo", timeout=20000)
+    pg.reload(); show_go(pg)
+    pg.evaluate("document.querySelector('#rzAdv').open = true")   # S9: expert settings live behind Advanced
     for sel, v in (("#rzTilt", "0"), ("#rzLayer", "0.1")):
         pg.fill(sel, v)
     if pg.is_checked("#rzHollow"): pg.click("#rzHollow")
@@ -55,7 +64,7 @@ def run(name, w, h, d):
     ok(f"{name}: suction count", "1 suction cup" in pg.inner_text("#rzCups"), pg.inner_text("#torchOut"))
     ok(f"{name}: cost with typed price, labelled estimate", "$" in pg.inner_text("#rzCostOut") and "estimate" in pg.inner_text("#rzCostOut"), pg.inner_text("#rzCostOut"))
     pg.click("#rzCups .rzDismiss"); ok(f"{name}: suction warning dismissible", pg.locator("#rzCups").count() == 0)
-    ok(f"{name}: downloads still there", pg.locator("#torchOut a[href$='torchc0.3mf']").count() == 1)
+    ok(f"{name}: downloads still there", pg.locator("#torchOut #rzExport[data-export-rid]").count() == 1 and pg.locator("#torchOut a[href$='torchc0.stl']").count() == 1)
     prep(pg, cup, "40"); again(pg, "#rzFixCup")
     ok(f"{name}: drain hole added", "0 suction cups" in pg.inner_text("#rzCups"), pg.inner_text("#torchOut"))
     ok(f"{name}: no page errors", not errs, errs)

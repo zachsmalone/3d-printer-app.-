@@ -606,7 +606,7 @@ def _what_zeim_knows(actor: Actor) -> dict:
         "personalization": {"enabled": p.get("enabled"), "interests": p.get("interests") or {},
                             "searches": p.get("searches") or []},
         "not_collected": ["email (unless you used passkey/email login)", "phone number", "precise location",
-                          "payment info", "ads or trackers", "grades or school records"],
+                          "payment info", "ads or trackers", "grades or scores"],
         "note": ("Here is everything ZEIM keeps for you on this server. Photos you uploaded are kept with each build "
                  "until you delete that build (EXIF/GPS is stripped on upload). ZEIM does not sell your data."),
     }

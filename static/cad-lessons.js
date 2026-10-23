@@ -57,19 +57,19 @@ export function initLessons({ S, setTool, LS, $, esc }) {
     unpulse(); place(); btn.setAttribute("aria-pressed", mode !== "closed");
     card.hidden = mode === "closed"; card.classList.toggle("mini", mini);
     if (mode === "list") {
-      card.innerHTML = `<div class="cw-lhead"><b>Lessons</b><button type="button" class="cw-lx" data-l="close" aria-label="Close lessons">✕</button></div>
+      card.innerHTML = `<div class="cw-lhead"><b>Lessons</b><button type="button" class="cw-lx" data-l="close" aria-label="Close lessons"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
         <div class="cw-lbody"><p class="help">Short and hands-on. Skip any step, stop any time; your place is kept on this device.</p>
         <ul class="cw-llist">${LESSONS.map(l => `<li><button type="button" data-start="${l.id}"><span>${st.done[l.id] ? "✓ " : ""}${esc(l.title)}</span><small>${l.steps.length} steps · about ${l.mins} min</small></button></li>`).join("")}</ul></div>`;
     } else if (mode === "step") {
       const L = cur(), i = st.cur.step, step = L.steps[i];
       card.innerHTML = `<div class="cw-lhead"><button type="button" class="cw-lt" data-l="mini" aria-expanded="${!mini}" aria-label="${mini ? "Show" : "Hide"} the lesson step"><b>${esc(L.title)}</b><small>Step ${i + 1} of ${L.steps.length}</small></button>
-        <button type="button" class="cw-lx" data-l="exit" aria-label="Exit the lesson">✕</button></div>
+        <button type="button" class="cw-lx" data-l="exit" aria-label="Exit the lesson"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
         <div class="cw-lbody"><p class="cw-lsay">${esc(step.say)}</p><div class="cw-row">
           ${step.tool || step.target ? `<button type="button" data-l="show">Show me</button>` : ""}
           <button type="button" ${step.done ? "" : 'class="primary"'} data-l="next">${step.done ? "Skip" : i + 1 < L.steps.length ? "Next" : "Finish"}</button></div></div>`;
       pulse(step);
     } else if (mode === "finished") {
-      card.innerHTML = `<div class="cw-lhead"><b>Nice work</b><button type="button" class="cw-lx" data-l="close" aria-label="Close lessons">✕</button></div>
+      card.innerHTML = `<div class="cw-lhead"><b>Nice work</b><button type="button" class="cw-lx" data-l="close" aria-label="Close lessons"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
         <div class="cw-lbody"><p class="cw-lsay">${esc(cur()?.title || "Lesson")} done.</p><div class="cw-row"><button type="button" class="primary" data-l="list">More lessons</button></div></div>`;
     }
   }

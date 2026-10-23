@@ -15,7 +15,7 @@
 <body class="cadws">
 <header class="cw-top">
   <a class="cw-btn" id="cwBack" href="/" aria-label="Back" title="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg></a>
-  <input id="cwTitle" class="cw-title" value="My design" aria-label="Design name" maxlength="60">
+  <input id="cwTitle" class="cw-title" value="My design" aria-label="Design name" maxlength="60"><span id="saveIndSlot" class="saveslot"></span>
   <span class="cw-mode" id="cwMode" aria-live="polite">Modeling</span>
   <span class="cw-sp"></span>
   <button type="button" class="cw-btn themetoggle" id="themeToggle" aria-pressed="false" aria-label="Dark mode" title="Switch to dark mode"></button>
@@ -42,11 +42,24 @@
   <div class="cw-menu">
     <button class="cw-btn wide" id="cwExport" aria-haspopup="menu" aria-expanded="false">Export ▾</button>
     <div class="cw-pop" id="cwExportMenu" role="menu" hidden>
-      <a role="menuitem" id="cwDlStl" href="#">Download STL</a>
-      <a role="menuitem" id="cwDl3mf" href="#">Download 3MF</a>
+      <a role="menuitem" id="cwPick" href="#" aria-haspopup="dialog">Download… (pick a format)</a>
+      <a role="menuitem" id="cwDlStl" href="#">Quick STL</a>
+      <a role="menuitem" id="cwDl3mf" href="#" hidden>Download 3MF</a>
       <a role="menuitem" id="cwSaveCopy" href="#">Save as a new version (copy)</a>
       <a role="menuitem" id="cwToSlicer" href="#">Open in Slicer &amp; plate editor</a>
     </div>
+  </div>
+  <div class="cw-menu">
+    <button class="cw-btn wide" id="cwSendTo" aria-haspopup="menu" aria-expanded="false" title="Send this design to another section">Send to ▾</button>
+    <div class="cw-pop" id="cwSendToMenu" role="menu" hidden>
+      <a role="menuitem" id="cwSendSlicer" href="#" data-kind="fdm">FDM Slicer</a>
+      <a role="menuitem" id="cwSendTorch" href="#" data-kind="resin">TorchC0 (resin)</a>
+      <small class="cw-units-help" id="cwSendNote"></small>
+    </div>
+  </div>
+  <div class="cw-menu cw-more">
+    <button class="cw-btn" id="cwMore" aria-haspopup="menu" aria-expanded="false" aria-label="More: open, export, units, view and look" title="More"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+    <div class="cw-pop" id="cwMoreMenu" role="menu" aria-label="More" hidden></div>
   </div>
 </header>
 
@@ -81,6 +94,7 @@
   </div>
   <aside class="cw-side" id="cwSide" aria-label="History and items">
     <div class="cw-tabs" role="tablist">
+      <button type="button" class="cw-sheetbtn" id="cwSheetBtn" aria-controls="cwSide" aria-expanded="false" aria-label="Show more of History and Items"><span aria-hidden="true"></span></button>
       <button role="tab" id="tabHist" aria-selected="true" aria-controls="cwHist">History</button>
       <button role="tab" id="tabItems" aria-selected="false" aria-controls="cwItems">Items</button>
     </div>
@@ -96,5 +110,9 @@
   <ul id="cwSearchList" role="listbox"></ul>
 </dialog>
 <script type="module" src="/static/cad.js"></script>
+<script src="/static/wslayout.js"></script>
+<script type="module" src="/static/cad-phone.js"></script>
+<script type="module" src="/static/exportpick.js"></script>
+<script src="/static/worksave.js" defer></script>
 </body>
 </html>

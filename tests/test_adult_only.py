@@ -38,7 +38,7 @@ def test_18_today_is_allowed_one_day_short_is_refused_with_a_friendly_message_an
     r = TestClient(app).post("/api/me/signup", json={"display_name": "Almost", "dob": young})
     assert r.status_code == 403
     msg = r.json()["detail"]
-    assert "18" in msg and "without an account" in msg and "adult account holder" in msg
+    assert msg == "Sorry, ZEIM accounts are for adults 18 and over, so we can't create an account for you."   # A's 18+ wording
     for w in ("kid", "teen", "grown-up"):
         assert w not in msg.lower()
     blob = "".join(p.read_text() for p in config.DATA.glob("*.json"))

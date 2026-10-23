@@ -52,7 +52,7 @@
   var LOOK_KEY = "zeim_look";
   function look() { try { return JSON.parse(localStorage.getItem(LOOK_KEY) || "{}") || {}; } catch (e) { return {}; } }
   function applyLook(l) {
-    ["accent", "contrast", "cb"].forEach(function (k) { if (l[k] && l[k] !== "default") root.setAttribute("data-" + k, l[k]); else root.removeAttribute("data-" + k); });
+    ["accent", "contrast", "cb"].forEach(function (k) { if (l[k] && l[k] !== "default" && !(k === "accent" && l[k] !== "mono")) root.setAttribute("data-" + k, l[k]); else root.removeAttribute("data-" + k); });
   }
   function themePref() { try { return localStorage.theme === "dark" ? "dark" : (localStorage.theme === "light" || localStorage.theme === "warm") ? "light" : "system"; } catch (e) { return "system"; } }
   function setTheme(v) {
@@ -68,10 +68,10 @@
     var d = document.getElementById("dlgLook");
     if (!d) { d = document.createElement("dialog"); d.id = "dlgLook"; d.setAttribute("aria-labelledby", "lookTitle"); document.body.appendChild(d); }
     var l = look(), t = themePref();
-    d.innerHTML = '<div class="dlg"><div class="dh"><h3 id="lookTitle">Colours &amp; accessibility</h3><button type="button" class="x" data-lookclose aria-label="Close">✕</button></div>' +
+    d.innerHTML = '<div class="dlg"><div class="dh"><h3 id="lookTitle">Colours &amp; accessibility</h3><button type="button" class="x" data-lookclose aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
       '<div class="body lookgrid">' +
       '<label>Theme<select id="lookTheme">' + opt("light", "Light", t) + opt("dark", "Dark", t) + opt("system", "Same as my device", t) + "</select></label>" +
-      '<label>Accent colour<select id="lookAccent">' + opt("default", "Blue (ZEIM)", l.accent || "default") + opt("teal", "Teal", l.accent) + opt("orange", "Orange", l.accent) + "</select></label>" +
+      '<label>Accent colour<select id="lookAccent">' + opt("default", "Blue (ZEIM)", l.accent || "default") + opt("mono", "Black (ZEIM)", l.accent) + "</select></label>" +
       '<label class="inl"><input type="checkbox" id="lookContrast"' + (l.contrast === "high" ? " checked" : "") + "> High contrast</label>" +
       '<label>Colour vision<select id="lookCb">' + opt("default", "Standard colours", l.cb || "default") + opt("redgreen", "Red-green safe (deuteranopia / protanopia)", l.cb) + opt("blueyellow", "Blue-yellow safe (tritanopia)", l.cb) + "</select></label>" +
       '<p class="help">Saved on this device. Warnings and problems always show a symbol and words, not just a colour.</p>' +

@@ -4,7 +4,7 @@ import json, os, re, sys
 from playwright.sync_api import sync_playwright
 URL = sys.argv[1]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PNG = open(os.path.join(ROOT, "static", "sample.png"), "rb").read()
+PNG = open(os.path.join(ROOT, "static", "sample.jpg"), "rb").read()
 AXE = os.environ.get("AXE_JS") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor", "axe.min.js")
 bad = []
 def ok(n, c, x=""):
