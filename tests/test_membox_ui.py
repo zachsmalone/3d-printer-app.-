@@ -14,7 +14,8 @@ pytestmark = pytest.mark.skipif(not HAS, reason="needs playwright Chromium")
 def test_membox_ui_styles_base_export_1280_390():
     s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     d = tempfile.mkdtemp(prefix="zeim-ui-")
-    env = {**os.environ, "PORT": str(port), "HOST": "127.0.0.1", "PHOTO3D_DATA": d + "/d", "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "local"}
+    env = {**os.environ, "PORT": str(port), "HOST": "127.0.0.1", "PHOTO3D_DATA": d + "/d", "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "local",
+           "PHOTO3D_UPLOADS_PER_HOUR": "0"}  # 4 photos x 3 styles = 12 uploads per viewport, over the default 10/hour
     p = subprocess.Popen([sys.executable, "-m", "app.serve"], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(120):

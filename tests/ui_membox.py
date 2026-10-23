@@ -4,8 +4,8 @@ from playwright.sync_api import sync_playwright
 URL = sys.argv[1].rstrip("/"); SHOTS = sys.argv[2] if len(sys.argv) > 2 else "/workspace/qa/membox/shots"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.makedirs(SHOTS, exist_ok=True); bad = []
-# Demo panels: Zach's rose/butterfly photos (side 4 falls back to the Tango sample fill).
-ROSES = [os.path.join(ROOT, "tests", "membox_roses", f) for f in ("rose_butterfly.jpg", "rose_skipper.jpg", "rosebud.jpg")]
+# Demo panels: Zach's rose/butterfly photos (one per side 1-4, so no Tango sample fill).
+ROSES = [os.path.join(ROOT, "tests", "membox_roses", f) for f in ("rose1.jpg", "rose2.jpg", "rose3.jpg", "rose4.jpg")]
 def ok(n, c):
     print(("PASS " if c else "FAIL ") + n); c or bad.append(n)
 with sync_playwright() as p:
@@ -32,7 +32,7 @@ with sync_playwright() as p:
             pg.wait_for_timeout(600)
             ok(f"{name}: {st} preview has light base", "light_base" in pg.inner_text("#mbStatus"))
             ok(f"{name}: {st} dims shown", pg.is_visible("#mbDims") and "Cable notch: 8 mm" in pg.inner_text("#mbDims")
-               and "Sample photo on side 4" in pg.inner_text("#mbDims"))
+               and "Sample photo" not in pg.inner_text("#mbDims"))
             pg.locator("#viewer").scroll_into_view_if_needed()
             pg.locator("#viewer").screenshot(path=f"{SHOTS}/{st}-{name}.png")
         pg.locator("#mbDims").screenshot(path=f"{SHOTS}/base-dims-{name}.png")
