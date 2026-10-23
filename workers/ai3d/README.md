@@ -27,4 +27,4 @@ ZEIM_AI3D_TOKEN=<optional shared secret, same value as on the worker>
 To check it: `curl http://localhost:8765/health` should return `"ready": true`.
 
 ## Limits and quotas (main app)
-`ZEIM_AI3D_PRO_ONLY` (off during testing), `ZEIM_AI3D_DAILY_CAP` (5), `ZEIM_AI3D_COOLDOWN_MIN` (5), `ZEIM_AI3D_COOLDOWN_STEP_MIN` (+5 per paid model; set it to 0 for a flat cooldown). `ZEIM_TESTING_MODE=1` lifts caps and cooldowns. Photos are never logged by the worker.
+`ZEIM_AI3D_PRO_ONLY` (off during testing), `ZEIM_AI3D_DAILY_CAP` (5), `ZEIM_AI3D_COOLDOWN_MIN` (5), `ZEIM_AI3D_COOLDOWN_STEP_MIN` (0 = flat 5 min, the default; a value >0 adds that many minutes after each paid model). `ZEIM_TESTING_MODE=1` lifts caps and cooldowns. Photos are never logged by the worker.

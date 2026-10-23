@@ -45,6 +45,7 @@ with sync_playwright() as p:
         shot(pg, f"w{w}-ready.png")
         pg.click("#a3Go"); pg.wait_for_selector("#a3Res:not([hidden])", timeout=90000); pg.wait_for_timeout(1200)
         res = pg.inner_text("#a3Res")
+        ok(f"w{w}: saved title is the Title field (Tango), not the sample name", "Tango" in res and "Sample photo" not in res, res)
         ok(f"w{w}: result carries AI label", "AI-made" in res, res)
         ok(f"w{w}: no overlaps (result)", pg.evaluate(OVERLAP) == [], pg.evaluate(OVERLAP))
         shot(pg, f"w{w}-result.png")

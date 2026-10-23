@@ -101,6 +101,21 @@ def test_daily_cap(monkeypatch):
     r = start(c); assert r.status_code == 429 and r.json()["detail"]["code"] == "cap"
 
 
+def test_default_cooldown_is_flat_5_min():
+    import importlib, os
+    assert os.environ.get("ZEIM_AI3D_COOLDOWN_STEP_MIN") is None
+    src = (ROOT / "app/config.py").read_text()
+    assert '_int("ZEIM_AI3D_COOLDOWN_STEP_MIN", 0)' in src and '_int("ZEIM_AI3D_COOLDOWN_MIN", 5)' in src
+
+
+def test_title_field_wins_over_sample_name():
+    c = client(ADULT)
+    r = c.post("/api/ai3d/jobs", files={"file": ("sample.jpg", (ROOT / "static/sample.jpg").read_bytes(), "image/jpeg")},
+               data={"mode": "bust", "photo_ack": "true", "title": "Tango"})
+    assert r.status_code == 200, r.text
+    assert wait(c, r.json()["job"])["result"]["title"] == "Tango"
+
+
 def test_pro_only_and_paid_step(monkeypatch):
     monkeypatch.setattr(config, "AI3D_PRO_ONLY", True)
     c = client(ADULT)

@@ -79,7 +79,7 @@ function showResult(r) {
 async function go() {
   const fd = new FormData();
   fd.append("file", file); fd.append("mode", mode()); fd.append("photo_ack", $("#a3Ack").checked ? "true" : "false");
-  fd.append("title", $("#a3Title").value); if ($("#a3H").value) fd.append("height_mm", $("#a3H").value);
+  fd.append("title", ($("#a3Title").value.trim() || $("#a3Title").placeholder));   // what the field shows is what gets saved if ($("#a3H").value) fd.append("height_mm", $("#a3H").value);
   $("#a3Go").disabled = true;
   const st = $("#a3Status");
   let j;
@@ -96,11 +96,11 @@ async function go() {
   }, 1500);
 }
 
-$("#a3File").onchange = e => { const f = e.target.files?.[0]; if (f) setFile(f); };
-$("#a3Sample").onclick = async () => { const b = await (await fetch("/static/sample.jpg")).blob(); setFile(new File([b], "sample.jpg", { type: "image/jpeg" })); $("#a3Ack").checked = true; if (!$("#a3Title").value) $("#a3Title").placeholder = "Tango"; ready(); };
+$("#a3File").onchange = e => { const f = e.target.files?.[0]; if (f) { delete $("#a3Title").dataset.sample; $("#a3Title").placeholder = mode() === "bust" ? "My bust" : "My figure"; setFile(f); } };
+$("#a3Sample").onclick = async () => { const b = await (await fetch("/static/sample.jpg")).blob(); setFile(new File([b], "sample.jpg", { type: "image/jpeg" })); $("#a3Ack").checked = true; $("#a3Title").dataset.sample = "Tango"; if (!$("#a3Title").value) $("#a3Title").placeholder = "Tango"; ready(); };
 $("#a3Ack").onchange = ready;
 $("#a3Go").onclick = go;
 $("#a3CoolX").onclick = () => { coolNoteOff = true; $("#a3Cool").hidden = true; try { sessionStorage.setItem("zeim.ai3d.coolnote", "off"); } catch { } };
-document.querySelectorAll("input[name=a3Mode]").forEach(r => r.onchange = () => { $("#a3H").placeholder = mode() === "bust" ? "60" : "80"; $("#a3Title").placeholder = mode() === "bust" ? "My bust" : "My figure"; });
+document.querySelectorAll("input[name=a3Mode]").forEach(r => r.onchange = () => { $("#a3H").placeholder = mode() === "bust" ? "60" : "80"; $("#a3Title").placeholder = $("#a3Title").dataset.sample || (mode() === "bust" ? "My bust" : "My figure"); });
 document.addEventListener("zeim:ai3d-shown", refresh);
 if (document.body.dataset.view === "ai3d") refresh();

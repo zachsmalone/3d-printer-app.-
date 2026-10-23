@@ -148,5 +148,5 @@ AI3D_TIMEOUT_S = _int("ZEIM_AI3D_TIMEOUT_S", 900)            # CPU runs can take
 AI3D_PRO_ONLY = _flag("ZEIM_AI3D_PRO_ONLY", False)            # after launch: Pro. During testing: unlocked for everyone, but capped
 AI3D_DAILY_CAP = _int("ZEIM_AI3D_DAILY_CAP", 5)               # models per account per day while testing (0 = no cap)
 AI3D_COOLDOWN_MIN = _int("ZEIM_AI3D_COOLDOWN_MIN", 5)         # minutes between models; starts when a model finishes
-AI3D_COOLDOWN_STEP_MIN = _int("ZEIM_AI3D_COOLDOWN_STEP_MIN", 5)   # extra minutes after each paid model (Pro); 0 = flat
+AI3D_COOLDOWN_STEP_MIN = _int("ZEIM_AI3D_COOLDOWN_STEP_MIN", 0)   # flat 5 min by default (Zach); >0 adds minutes after each paid model
 AI3D_FAKE = _flag("ZEIM_AI3D_FAKE", False)                     # TEST DOUBLE only (tests/screenshots): a made-up shape, no AI
