@@ -211,19 +211,45 @@ def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SL
         cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, preexec_fn=_slice_rlimits)
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as e:
+        log.error("slicer timed out after %ss: %s", timeout, cmd)
+        if not (e.stdout or e.stderr):                     # no output at all: it hung before slicing anything
+            raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
         raise SliceError("slice_timeout", "Slicing took too long and was stopped. Try a smaller or "
                          "simpler model.", 504)
-    except OSError:
-        log.exception("could not start slicer")
-        raise SliceError("slicer_unavailable", "The slicer couldn't be started on this server.", 503)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        log.exception("could not start slicer: %s", cmd)
+        raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
     tail = (proc.stderr or "")[-600:] + (proc.stdout or "")[-600:]
     if proc.returncode != 0 or not out.exists() or out.stat().st_size == 0:
         log.error("slicer failed rc=%s: %s", proc.returncode, tail)
+        if is_startup_failure(proc.returncode, (proc.stderr or "") + (proc.stdout or "")):
+            raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
         if "could not fit" in tail.lower():
             raise SliceError("too_big", "This model doesn't fit on the printer bed. Try scaling it down, or cut it into pieces with Edit → Split.", 422)
         raise SliceError("slice_failed", "The slicer couldn't process this model. If it has holes or "
                          "broken surfaces, run Fix in the Edit tab and try again.", 500)
+
+
+SLICER_ENV_MSG = "The slicer couldn't start on the server. This isn't your model. Please try again later."
+_STARTUP_MARKERS = ("error while loading shared libraries", "cannot open shared object", "not found (required by",
+                    "symbol lookup error", "exec format error", "glibc_", "no such file or directory: '",
+                    "cannot execute", "permission denied", "could not load the qt platform plugin",
+                    "segmentation fault", "core dumped", "bus error")
+_MODEL_MARKERS = ("loading of a model file failed", "slicing", "objects were loaded", "could not fit", "empty layer")
+
+
+def is_startup_failure(rc: int | None, output: str) -> bool:
+    """True when the slicer died before it got to the model (missing binary/libs, killed by a signal before any
+    slicing output, shell 'command not found'), so the error must not blame the user's model."""
+    low = (output or "").lower()
+    if any(m in low for m in _MODEL_MARKERS):
+        return False
+    if rc in (126, 127):
+        return True
+    if any(m in low for m in _STARTUP_MARKERS):
+        return True
+    return rc is not None and rc < 0                       # signal (SIGSEGV/SIGABRT/SIGKILL) with no model output
 
 
 # --------------------------------------------------------------------------- G-code stats

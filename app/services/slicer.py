@@ -129,7 +129,7 @@ def slice_model(model: Model, outdir: Path, layer_height=0.2, fill_density=15,
     try:
         eng.run_engine(st["path"], ini, stl, gcode, timeout=600, center=center)
     except eng.SliceError as e:
-        return {"available": True, "ok": False, "message": e.message, "log": e.message}
+        return {"available": True, "ok": False, "code": e.code, "message": e.message, "log": e.message}
     text = gcode.read_text(errors="ignore")
     stats = parse_stats(text)
     layers = len(re.findall(r"^;LAYER_CHANGE", text, re.M))

@@ -49,6 +49,38 @@ def _health(m) -> dict:
             "inverted": bool(wt and mm.volume < 0), "volume_mm3": round(abs(float(mm.volume)), 3) if wt else None}
 
 
+OVERLAP_NOTE = "Some parts overlap but aren't joined. That usually prints fine; join them if you see seams."
+OVERLAP_MAX_SHELLS = 40                                   # cheap: skip the check on very fragmented meshes
+OVERLAP_SAMPLES = 32
+
+
+def overlapping_shells(m: trimesh.Trimesh) -> bool:
+    """Cheap check: do two separate closed shells intersect/overlap? Bounding boxes first, then a few
+    sampled vertices of one shell tested for containment in the other. Never raises."""
+    try:
+        if len(m.faces) > 2_000_000:
+            return False
+        shells = [s for s in m.split(only_watertight=False) if len(s.faces) >= 4]
+        if not (1 < len(shells) <= OVERLAP_MAX_SHELLS):
+            return False
+        bb = [s.bounds for s in shells]
+        for i in range(len(shells)):
+            for j in range(i + 1, len(shells)):
+                if np.any(bb[i][1] <= bb[j][0]) or np.any(bb[j][1] <= bb[i][0]):
+                    continue
+                for a, b in ((shells[i], shells[j]), (shells[j], shells[i])):
+                    if not b.is_watertight:
+                        continue
+                    v = a.vertices
+                    if len(v) > OVERLAP_SAMPLES:
+                        v = v[np.linspace(0, len(v) - 1, OVERLAP_SAMPLES).astype(int)]
+                    if b.contains(v).any():
+                        return True
+    except Exception:
+        return False
+    return False
+
+
 def repair_mesh(m: trimesh.Trimesh) -> tuple[trimesh.Trimesh, dict]:
     if len(m.faces) == 0:
         raise OpError("The file has no triangles.")
@@ -91,6 +123,9 @@ def repair_mesh(m: trimesh.Trimesh) -> tuple[trimesh.Trimesh, dict]:
     if nm_before and after["nonmanifold_edges"]:
         report["warnings"].append(f"{after['nonmanifold_edges']} non-manifold edge(s) could not be fixed automatically "
                                   "(e.g. bodies touching along an edge). Most slicers still cope; Union them in the editor if not.")
+    report["notes"] = []                                  # informational, dismissible, never block
+    if overlapping_shells(out):
+        report["notes"].append({"code": "overlapping_bodies", "text": OVERLAP_NOTE, "dismissible": True})
     return out, report
 
 

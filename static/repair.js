@@ -22,7 +22,9 @@ $("#rpForm").onsubmit = async e => {
       ${rows.map(([k, p, q]) => `<tr><th scope="row">${k}</th><td>${esc(p)}</td><td>${esc(q)}</td></tr>`).join("")}</tbody></table>
       <ul class="rp-fx">${fx.map(([k, v]) => `<li>${k}: <b>${esc(v)}</b></li>`).join("")}</ul>
       ${(j.warnings || []).map(w => `<p class="help">${esc(w)}</p>`).join("")}
+      ${(j.notes || []).map(n => `<p class="help rp-note" role="note">${esc(n.text)} <button type="button" class="link rp-note-x" aria-label="Dismiss note">Dismiss</button></p>`).join("")}
       <p class="help">The file is kept for one hour. Check it in your slicer before printing.</p>`;
+    out.querySelectorAll(".rp-note-x").forEach(b => b.onclick = () => b.parentElement.remove());
   } catch (err) { out.innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
   finally { $("#rpGo").disabled = !$("#rpFile").files[0]; }
 };
