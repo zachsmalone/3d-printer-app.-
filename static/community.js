@@ -347,11 +347,11 @@ async function openItem(id) {
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
       ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
-      ${i.example || i.owned ? "" : `<button class="btn ghost" id="itRemix" ${i.can_remix ? "" : 'disabled aria-describedby="itRemixWhy"'}><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix</button>`}
+      ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn ghost" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix</button>`}
       <button class="btn ghost" id="itShare"><svg class=i aria-hidden=true focusable=false><use href=#i-link></use></svg> Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>'}
       ${i.example || i.owned || i.original ? "" : '<button class="btn ghost danger" id="itStolen">Report as stolen</button>'}</div>
-    ${!i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
+    ${!i.example && !i.allow_remixes ? `<p class="help remix-off" id="itRemixOff"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Remixes off${i.owned ? "" : `: ${esc(i.remix_off_reason)}`}</p>` : !i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
     <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4><ul class="pgallery" id="prGallery"></ul>
@@ -387,7 +387,7 @@ async function openItem(id) {
       b.insertAdjacentHTML("afterend", `<p class="help">Sent to the moderators${r.original_url ? `, with a link to <a href="${esc(r.original_url)}">the original</a>` : ""}. Rights holders can also send a <a href="${esc(r.dmca_url)}" target="_blank" rel="noopener">formal takedown notice</a>.</p>`);
     } catch (e) { b.disabled = false; toast(e.message, "err"); }
   };
-  if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); } catch (er) { toast(er.message, "err"); openItem(id); } };
+  if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => { sessionStorage.setItem("zeim_remix_of", location.origin + i.share_url); toast("Make your version in the Studio, then Share it: this project will be credited as the original.", "ok"); };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
   if ($("#itReport")) $("#itReport").onclick = () => {

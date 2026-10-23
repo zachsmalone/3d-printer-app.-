@@ -90,7 +90,8 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
     eng = f" · {_pub['likes']} {'nozzle' if _pub['likes'] == 1 else 'nozzles'} · ⬇ {_pub['downloads']}" if _pub["likes"] is not None else ""
     cl = credits.credit_line(i)
     credit = (f"<p class=credit>Credit: <b>{escape(cl['creator'])}</b>" + (f" · Licence: {_lic(cl['licence'], cl['licence_url'])}" if cl["licence"] else "") + " · <a href='/credits'>Thank you &amp; credits</a></p>") if cl else ""
-    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{thumb}"
+    off = "<p class=help>Remixes off</p>" if not catalog.allows_remixes(i) else ""
+    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{off}{thumb}"
             f"<p>{escape(i['description'])}</p><p>{' '.join('<span class=pill>' + escape(t) + '</span>' for t in i['tags'])}</p>"
             f"<h3>Free downloads</h3>{('<ul>' + files + '</ul>') if files else '<p class=help>No model yet.</p>'}")
     return _page(i["title"], body, i["description"])

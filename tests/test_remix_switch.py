@@ -62,3 +62,25 @@ def test_legacy_item_without_field_defaults_yes():
     from app.community import catalog
     assert catalog.allows_remixes({}) is True
     assert catalog.remix_status({"license_id": "cc-by-nd-4.0"})["can_remix"] is False
+
+
+def test_legacy_project_without_the_field_defaults_to_yes():
+    a, b = client({"display_name": "A5", "dob": "1990-01-01"}), client({"display_name": "B5", "dob": "1990-01-01"})
+    src = pub(a).json()
+    LISTINGS.update(lambda items: [{k: v for k, v in i.items() if k != "allow_remixes"} if i.get("id") == src["id"] else i for i in items])
+    assert b.get(f"/api/showcase/{src['id']}").json()["allow_remixes"] is True
+    assert pub(b, "Old remix", remix_of=src["id"]).status_code == 200
+
+
+def test_downloads_keep_working_when_remixes_are_off():
+    a, b = client({"display_name": "A6", "dob": "1990-01-01"}), client({"display_name": "B6", "dob": "1990-01-01"})
+    src = pub(a, allow_remixes=False).json()
+    seen = b.get(f"/api/showcase/{src['id']}").json()
+    assert not seen["download_blocked"] and seen["files"]
+    assert b.get(seen["files"][0]["url"]).status_code == 200
+
+
+def test_public_page_shows_remixes_off_note():
+    a = client({"display_name": "A7", "dob": "1990-01-01"})
+    on, off = pub(a).json(), pub(a, "Off", allow_remixes=False).json()
+    assert "Remixes off" in a.get(off["share_url"]).text and "Remixes off" not in a.get(on["share_url"]).text
