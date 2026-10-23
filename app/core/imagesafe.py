@@ -97,6 +97,20 @@ def is_builtin_sample(raw: bytes) -> bool:
     return bool(h) and hashlib.sha256(raw).hexdigest() == h
 
 
+def is_membox_sample(raw: bytes) -> bool:
+    """True when the bytes are one of ZEIM's own memory-box sample photos (static/samples/membox/rose1-4.jpg)."""
+    import hashlib
+    from ..config import STATIC
+    h = hashlib.sha256(raw).hexdigest()
+    for i in range(1, 5):
+        try:
+            if hashlib.sha256((STATIC / "samples" / "membox" / f"rose{i}.jpg").read_bytes()).hexdigest() == h:
+                return True
+        except OSError:
+            pass
+    return False
+
+
 def builtin_title(raw: bytes) -> str:
     """'Sample photo' / 'Sample model' when the bytes are ZEIM's own sample files, else ''. (A title is NEVER taken from a person's file name.)"""
     import hashlib

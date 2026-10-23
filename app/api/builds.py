@@ -571,14 +571,17 @@ def memorybox_build(actor: Actor = Depends(get_actor), files: list[UploadFile] =
         data = up.file.read(MAX_UPLOAD + 1)
         if len(data) > MAX_UPLOAD:
             raise HTTPException(413, "image too large (max 25 MB)")
+        sample = imagesafe.is_membox_sample(data)   # ZEIM's own sample-box photo: no rate count, no permission tick needed
+        if not sample:
+            try:
+                checked = uploadgate.gate(data, actor.sid, source="memorybox")
+            except uploadgate.GateError as e:
+                raise HTTPException(e.status, e.message)
+            if getattr(checked, "scan_state", "off") == "unscanned":
+                raise HTTPException(503, "The photo safety check is unavailable right now. Nothing was saved; please try again soon.")
         try:
-            checked = uploadgate.gate(data, actor.sid, source="memorybox")
-        except uploadgate.GateError as e:
-            raise HTTPException(e.status, e.message)
-        if getattr(checked, "scan_state", "off") == "unscanned":
-            raise HTTPException(503, "The photo safety check is unavailable right now. Nothing was saved; please try again soon.")
-        try:
-            imagesafe.check_ack(data, photo_ack)
+            if not sample:
+                imagesafe.check_ack(data, photo_ack)
             ims.append(imagesafe.sanitize(data)[2])
         except imagesafe.ImageRefused as e:
             raise HTTPException(400, str(e))

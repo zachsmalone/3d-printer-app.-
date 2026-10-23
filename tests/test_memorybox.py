@@ -126,3 +126,36 @@ def test_backlit_thickness_for_box_walls_and_ui_wiring():
     assert 'fetch("/api/memorybox"' in app and 'shape: "memorybox"' in app and "syncLight()" in app
     css = (root / "static" / "style.css").read_text()
     assert "#mboxBox .btn, #mboxBox select" in css and "min-height: 44px" in css
+
+
+ROSES = [f"static/samples/membox/rose{i}.jpg" for i in range(1, 5)]
+
+
+def test_sample_box_assets_small_and_metadata_free():
+    import os
+    for p in ROSES:
+        im = Image.open(p)
+        assert im.size == (600, 800) and os.path.getsize(p) < 300_000
+        assert not dict(im.getexif()) and "exif" not in im.info and "icc_profile" not in im.info
+
+
+def test_api_sample_box_fills_all_4_sides_and_tango_still_fills_empty_sides(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app import config
+    monkeypatch.setattr(config, "PHOTO_ACK_REQUIRED", True)
+    from app.core import imagesafe
+    from app.main import app
+    c = TestClient(app)
+    roses = [("files", (f"sample-rose-{i}.jpg", open(p, "rb").read(), "image/jpeg")) for i, p in enumerate(ROSES, 1)]
+    assert all(imagesafe.is_membox_sample(f[1][1]) for f in roses)
+    r = c.post("/api/memorybox", files=roses, data={"style": "frame", "panel_mm": "60"})   # ZEIM's own sample: no permission tick needed
+    assert r.status_code == 200, r.text
+    assert r.json()["info"]["sample_sides"] == []                                          # roses on sides 1-4, Tango not used
+    b = io.BytesIO(); IMS[0].save(b, "PNG")
+    r = c.post("/api/memorybox", files=[("files", ("p.png", b.getvalue(), "image/png"))],
+               data={"style": "frame", "panel_mm": "60", "photo_ack": "true"})
+    assert r.status_code == 200, r.text
+    assert r.json()["info"]["sample_sides"] == [2, 3, 4]                                   # empty sides: Tango fill
+    assert not imagesafe.is_membox_sample(b.getvalue())
+    r = c.post("/api/memorybox", files=[roses[0], ("files", ("p.png", b.getvalue(), "image/png"))], data={"panel_mm": "60"})
+    assert r.status_code == 400                                                            # a user's own photo still needs the tick

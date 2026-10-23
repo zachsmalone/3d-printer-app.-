@@ -311,8 +311,38 @@ $("#lithMaterial").onchange = fillLithMat; $("#lithThk").onchange = fillLithMat;
 /* Memory box: 4 photos round a light (stateless API; preview is the assembled cube, downloads are the print parts) */
 $("#lithMaterial").addEventListener("change", () => { $("#mbClear").value = $("#lithMaterial").value === "resin" ? 0.1 : 0.2; });
 $("#mbHole").onchange = () => { $("#mbCustom").hidden = $("#mbHole").value !== "custom"; $("#mbLightH").value = $("#mbHole").value === "puck" ? 22 : 24; };
+/* One photo per side. Choosing files fills sides 1..n; "Try the sample box" loads the 4 rose photos; any side can be replaced. */
+const MB_SAMPLE = [1, 2, 3, 4].map(i => `/static/samples/membox/rose${i}.jpg`);
+const mbSlots = [null, null, null, null];
+function mbShowSides() {
+  mbSlots.forEach((f, i) => {
+    const img = $(`#mbSideImg${i + 1}`); if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+    if (f) { img.dataset.url = URL.createObjectURL(f); img.src = img.dataset.url; img.alt = `Side ${i + 1} photo`; }
+    else { delete img.dataset.url; img.removeAttribute("src"); img.alt = ""; }
+  });
+}
+$("#mbFiles").addEventListener("change", () => {
+  const fs = [...$("#mbFiles").files].slice(0, 4); mbSlots.fill(null); fs.forEach((f, i) => { mbSlots[i] = f; }); mbShowSides();
+});
+$("#mbTrySample").onclick = async () => {
+  const st = $("#mbStatus");
+  try {
+    const fs = await Promise.all(MB_SAMPLE.map(async (u, i) => {
+      const r = await fetch(u); if (!r.ok) throw new Error("sample photo missing");
+      return new File([await r.blob()], `sample-rose-${i + 1}.jpg`, { type: "image/jpeg" });
+    }));
+    fs.forEach((f, i) => { mbSlots[i] = f; }); $("#mbFiles").value = ""; mbShowSides();
+    st.textContent = "Sample box loaded: four rose photos on sides 1 to 4. Tap Preview box.";
+  } catch (e) { st.textContent = "Couldn't load the sample box: " + (e.message || "try again"); }
+};
+let mbReplacing = 0;
+document.querySelectorAll("#mbSides button[data-side]").forEach(b => { b.onclick = () => { mbReplacing = +b.dataset.side; $("#mbSideFile").click(); }; });
+$("#mbSideFile").addEventListener("change", () => {
+  const f = $("#mbSideFile").files[0]; if (f && mbReplacing) { mbSlots[mbReplacing - 1] = f; mbShowSides(); }
+  $("#mbSideFile").value = "";
+});
 function mbForm(fmt) {
-  const fs = [...$("#mbFiles").files];
+  const fs = mbSlots.filter(Boolean);
   if (fs.length > 4 || (fs.length < 4 && !$("#mbSample").checked)) throw new Error("Choose up to 4 photos, one per side, or let the sample photo fill empty sides.");
   const fd = new FormData();
   fs.forEach(f => fd.append("files", f));

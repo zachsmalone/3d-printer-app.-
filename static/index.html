@@ -188,6 +188,14 @@
       <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box (4 photos round a light)</summary>
         <div class="grid2">
           <div class="field wide2"><label for="mbFiles">Up to 4 photos, one per side</label><input type="file" id="mbFiles" accept="image/*" multiple>
+            <div class="mbsample"><button class="btn small ghost" type="button" id="mbTrySample"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-image"></use></svg> Try the sample box</button>
+              <span class="help" id="mbSampleHelp">Four rose photos, one per side. Replace any side after.</span></div>
+            <ol class="mbsides" id="mbSides" aria-label="Photos on each side">
+              <li><img alt="" id="mbSideImg1"><span>Side 1</span><button class="btn small ghost" type="button" data-side="1" aria-label="Replace side 1">Replace</button></li>
+              <li><img alt="" id="mbSideImg2"><span>Side 2</span><button class="btn small ghost" type="button" data-side="2" aria-label="Replace side 2">Replace</button></li>
+              <li><img alt="" id="mbSideImg3"><span>Side 3</span><button class="btn small ghost" type="button" data-side="3" aria-label="Replace side 3">Replace</button></li>
+              <li><img alt="" id="mbSideImg4"><span>Side 4</span><button class="btn small ghost" type="button" data-side="4" aria-label="Replace side 4">Replace</button></li>
+            </ol><input type="file" id="mbSideFile" accept="image/*" hidden aria-hidden="true" tabindex="-1">
             <label class="chk"><input type="checkbox" id="mbSample" checked> Use the sample photo (Tango) for empty sides</label></div>
           <div class="field"><label for="mbStyle">Style</label><select id="mbStyle"><option value="frame">Frame (panels slide in)</option><option value="snap">Snap-together</option><option value="enclosed">One-piece box + sliding lid</option></select></div>
           <div class="field"><label for="mbSize">Box side <em>mm</em></label><input type="number" id="mbSize" value="80" min="40" max="200" step="5"></div>

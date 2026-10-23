@@ -1074,3 +1074,12 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 /* 2D→3D made the phone tab bar 9 wide (9 x 44 px > 390). On phones Learn leaves the bar; it stays one tap away
    from Showcase ("Learn" button) and the home tiles. */
 @media (max-width:420px){.topbar .nav [data-view=learn]{display:none}}
+
+/* Memory box: sample box button + one thumbnail per side */
+#mboxBox .mbsample { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+#mboxBox .mbsample .help { margin: 0; flex: 1 1 180px; }
+#mboxBox .mbsides { list-style: none; padding: 0; margin: 8px 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+#mboxBox .mbsides li { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; font-size: .85rem; }
+#mboxBox .mbsides img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 6px; border: 1px solid var(--line, #8884); background: var(--panel, #8881); }
+#mboxBox .mbsides img:not([src]) { visibility: visible; }
+#mboxBox .mbsides .btn { width: 100%; padding-left: 4px; padding-right: 4px; }
