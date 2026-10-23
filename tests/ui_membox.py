@@ -4,6 +4,8 @@ from playwright.sync_api import sync_playwright
 URL = sys.argv[1].rstrip("/"); SHOTS = sys.argv[2] if len(sys.argv) > 2 else "/workspace/qa/membox/shots"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.makedirs(SHOTS, exist_ok=True); bad = []
+# Demo panels: Zach's rose/butterfly photos (side 4 falls back to the Tango sample fill).
+ROSES = [os.path.join(ROOT, "tests", "membox_roses", f) for f in ("rose_butterfly.jpg", "rose_skipper.jpg", "rosebud.jpg")]
 def ok(n, c):
     print(("PASS " if c else "FAIL ") + n); c or bad.append(n)
 with sync_playwright() as p:
@@ -16,7 +18,7 @@ with sync_playwright() as p:
         if not box.get_attribute("open"): pg.click("#mboxBox > summary")
         ok(f"{name}: memory box option visible", pg.is_visible("#mbStyle") and pg.is_visible("#mbSample"))
         ok(f"{name}: line icon, no emoji in summary", box.locator("summary svg").count() == 1)
-        pg.set_input_files("#mbFiles", [os.path.join(ROOT, "tests", "sample.png")])
+        pg.set_input_files("#mbFiles", ROSES)
         pg.check("#mbAck")
         ok(f"{name}: tolerance note", "can change it" in pg.inner_text("#mbClearHelp"))
         for st in ("frame", "snap", "enclosed"):
@@ -30,7 +32,7 @@ with sync_playwright() as p:
             pg.wait_for_timeout(600)
             ok(f"{name}: {st} preview has light base", "light_base" in pg.inner_text("#mbStatus"))
             ok(f"{name}: {st} dims shown", pg.is_visible("#mbDims") and "Cable notch: 8 mm" in pg.inner_text("#mbDims")
-               and "Sample photo on side 2, 3, 4" in pg.inner_text("#mbDims"))
+               and "Sample photo on side 4" in pg.inner_text("#mbDims"))
             pg.locator("#viewer").scroll_into_view_if_needed()
             pg.locator("#viewer").screenshot(path=f"{SHOTS}/{st}-{name}.png")
         pg.locator("#mbDims").screenshot(path=f"{SHOTS}/base-dims-{name}.png")
