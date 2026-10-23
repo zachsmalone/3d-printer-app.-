@@ -80,7 +80,18 @@ def get_export_info(
         "downloads": {k: f"/api/export/{bid}/download?format={k}&printer_id={pref_pid}" for k in ue.FORMATS},
         **ue.formats_public(),
         "open_in_hints": ue.get_open_in_hints(pref_pid),
+        "colour_count": _colour_count(bid),
     }
+
+
+def _colour_count(bid: str) -> int:
+    """Distinct body colours of the build (0/1 = one material). The slot picker offers multi-slot only above 1."""
+    try:
+        from app.api.builds import load_model
+        from app.services import filament_slots as fs
+        return len(fs.model_colours(load_model(bid)))
+    except Exception:
+        return 0
 
 
 @router.put("/{bid}/name")
@@ -111,15 +122,21 @@ def download_export(
     printer_id: str = Query("", description="Optional printer ID (defaults to account setting)"),
     nozzle: str = Query(""),
     name: str = Query("", max_length=400),
+    slots: str = Query("", max_length=60, description="Filament slots to use, e.g. '2' or '1,3' (default Slot 1)"),
     actor: Actor = Depends(get_actor),
 ):
     """Download in the picked format, sized and named for the printer (3MF falls back to STL if it cannot be made)."""
     from ..services import quarantine
     quarantine.guard(bid)                        # quarantined builds are not served
     pref_pid = _pid(actor, printer_id)
+    from ..services import filament_slots as fs
+    try:
+        picked = fs.parse_slots(slots or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     try:
         data, filename, ext, mime, info = ue.export_build_for_printer(
-            bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle))
+            bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle), slots=picked)
     except HTTPException:
         raise
     except Exception as e:
@@ -133,6 +150,7 @@ def download_export(
             "Cache-Control": "no-store",
             "X-Export-Printer": info["printer_id"],
             "X-Export-Format": ext,
+            "X-Export-Slots": ",".join(map(str, info.get("slots") or [])),
         },
     )
 

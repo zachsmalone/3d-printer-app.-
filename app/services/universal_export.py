@@ -249,6 +249,7 @@ def export_build_for_printer(
     force_format: Optional[str] = None,
     name: Optional[str] = None,
     nozzle: Optional[float] = None,
+    slots=None,
 ) -> tuple[bytes, str, str, str, dict]:
     """Export a build for the chosen printer.
 
@@ -267,21 +268,28 @@ def export_build_for_printer(
         nozzle = pref.get("nozzle")
     from app.api.builds import meta_for
     if meta_for(bid, actor, owner_only=True).get("mode") == "memorybox":
-        return _memorybox_export(bid, actor, pid, force_format, name, nozzle)
+        return _memorybox_export(bid, actor, pid, force_format, name, nozzle, slots)
+    from app.services import filament_slots as fs
     mesh, meta = load_build_mesh(bid, actor)
     prepared, info = prepare_mesh_for_printer(mesh, pid)
     data, ext, mime = export_mesh_data(prepared, force_format=force_format)
+    plan = fs.plan([], fs.parse_slots(slots))           # one merged mesh = one material = one slot (the first picked)
+    if ext == "3mf":
+        data = fs.annotate_3mf(data, plan)
+    info.update({"slots": plan["slots"], "slot_notes": plan["notes"]})
     filename = build_file_name(meta, pid, ext, nozzle=nozzle, name=name)
     return data, filename, ext, mime, info
 
 
-def _memorybox_export(bid, actor, pid, force_format, name, nozzle):
+def _memorybox_export(bid, actor, pid, force_format, name, nozzle, slots=None):
     """Memory box: never scaled (that would break the fits). 3MF = one object per part; other formats hold every
     part laid out apart in one file. A part larger than the bed is only a note (warnings never block)."""
     from app.api.builds import load_model, meta_for
     from app.core import exporters
+    from app.services import filament_slots as fs
     meta = meta_for(bid, actor, owner_only=True)
     model = load_model(bid)
+    plan = fs.plan(fs.model_colours(model), fs.parse_slots(slots))
     p = ps.printer_public(pid)
     bed = [float(v) for v in p["bed_mm"]]
     f = (force_format or "3mf").lower()
@@ -293,11 +301,12 @@ def _memorybox_export(bid, actor, pid, force_format, name, nozzle):
         if e[0] > bed[0] or e[1] > bed[1] or e[2] > bed[2]:
             big.append(b.name)
     if f == "3mf":
-        data, ext, mime = exporters.to_3mf(model, meta.get("title") or "Memory box"), "3mf", "model/3mf"
+        data, ext, mime = exporters.to_3mf(model, meta.get("title") or "Memory box", slots=fs.parse_slots(slots)), "3mf", "model/3mf"
     else:
         v, fc = model.solid()
         data, ext, mime = export_mesh_data(trimesh.Trimesh(v, fc, process=False), force_format=f)
     info = {"printer_id": pid, "printer_name": p["name"], "bed_mm": bed, "scaled_pct": None,
             "official_slicer": p.get("official_slicer"), "official_slicer_url": p.get("official_slicer_url"),
-            "parts": [b.name for b in model.bodies], "larger_than_bed": big}
+            "parts": [b.name for b in model.bodies], "larger_than_bed": big,
+            "slots": plan["slots"], "slot_notes": plan["notes"]}
     return data, build_file_name(meta, pid, ext, nozzle=nozzle, name=name), ext, mime, info
