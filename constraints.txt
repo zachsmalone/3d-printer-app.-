@@ -6,6 +6,7 @@ anyio==4.15.1
 argon2-cffi==25.1.0
 argon2-cffi-bindings==26.1.0
 certifi==2026.7.22
+charset-normalizer==3.5.2
 click==8.5.0
 contourpy==1.4.0
 cryptography==50.0.0
@@ -35,6 +36,7 @@ pydantic==2.13.5
 pyparsing==3.3.3
 python-dateutil==2.9.0.post0
 python-multipart==0.0.32
+requests==2.34.2
 rtree==1.4.1
 scikit-image==0.26.0
 scipy==1.18.1
@@ -42,10 +44,12 @@ segno==1.6.6
 shapely==2.1.2
 six==1.17.0
 starlette==1.7.0
+stripe==16.0.0
 tifffile==2026.9.20
 trimesh==5.1.1
 typing-extensions==4.16.0
 typing-inspection==0.4.4
+urllib3==2.0.7
 uvicorn==0.54.0
 webauthn==2.8.0
 cbor2==5.9.0

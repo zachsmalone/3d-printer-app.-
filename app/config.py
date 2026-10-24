@@ -169,8 +169,9 @@ def coming_soon_enabled() -> bool:
 def plans_enabled() -> bool:
     """Paid Semi Pro / Pro checkout. Default off. Core ZEIM stays free either way.
 
-    ZEIM_PLANS_ENABLED=1 only re-opens the honest "not live yet" stub. It does not
-    start a payment. A processor, if one is added later, must check this flag.
+    ZEIM_PLANS_ENABLED=1 allows hosted Stripe Checkout when the secret key, webhook
+    secret, and both Price ids are set. Without those, plans stay Coming and nothing
+    is charged. Soft launch leaves this unset. The flag does not store card data.
     """
     return _flag("ZEIM_PLANS_ENABLED", False)
 

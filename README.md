@@ -23,7 +23,7 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **Learn** | Guided lessons inside the app. On phones (≤420px wide) Learn leaves the bottom tab bar but stays reachable from Showcase / home. |
 | **Bust mode** | Photo → printable bust: thicker rounded-back body with photo relief on a clean round / rect / outline pedestal. Auto head & shoulders (editable starting mask) or manual Select trace; whole photo still works, with a tip. Separate from AI 2D→3D Bust — not figure-scan quality. |
 | **Live Sculpt** | CAD sculpt brushes (draw, carve, smooth, inflate, pinch, flatten, grab) show live on the model as you drag; each stroke saves in the background without a blocking spinner. |
-| **Subscriptions** | Core stays free forever. Account → Plans lists optional Semi Pro (~$3.50) and Pro (~$5.50) as **Coming later**. **ZEIM_PLANS_ENABLED=0** (the default) does not start checkout, and missing Stripe keys are not an error. ZEIM never takes a cut of creator tips or Showcase sales. |
+| **Subscriptions** | Core stays free forever. Account → Plans lists optional Semi Pro ($3.50/month) and Pro ($5.50/month). **ZEIM_PLANS_ENABLED** defaults off, so those buttons say **Coming later** and checkout is refused even if Stripe keys are present. With the flag on and Stripe configured, Checkout is Stripe-hosted (ZEIM never sees the card). A ~1% ZEIM service fee (nearest cent: 4¢ and 6¢) is a separate line on the plan only. Stripe's processing fee is separate. Plans renew monthly through Stripe until canceled. Without keys, nothing is charged. ZEIM never takes a cut of creator tips or Showcase sales. |
 | **Themes** | Japanese-inspired theme per section. The art fades into that section. Quiet CSS motion already in the page turns off under prefers-reduced-motion. A heavier entrance package is not part of this. |
 
 ## In progress
@@ -52,12 +52,12 @@ Open <http://localhost:8765>. Health check: <http://localhost:8765/healthz> retu
 | Flag | Default | What it does |
 |---|---|---|
 | `ZEIM_COMING_SOON` | off (`0` or unset) | `1` serves a short coming-soon page for every path except `/healthz`. Off, a normal visit gets the full app. Caddy uses the same flag (`reports/deploy/caddy-run.sh`). |
-| `ZEIM_PLANS_ENABLED` | off (`0` or unset) | `0` keeps Semi Pro and Pro visible as Coming later and refuses checkout. `1` still does not charge until a processor is wired, and it does not error when Stripe keys are missing. |
+| `ZEIM_PLANS_ENABLED` | off (`0` or unset) | `0` keeps Semi Pro and Pro visible as Coming later and refuses checkout, even if Stripe keys are present. `1` opens hosted Checkout only when the secret key, webhook secret, and both Price ids are set. Missing keys stay Coming and are not an error. Soft launch leaves this off. |
 | `ZEIM_2D3D_ENABLED` | off (`0` or unset) | `0` hides the 2D→3D tab and refuses `POST /api/ai3d/jobs` (the TripoSR worker is not called). `1` turns that tab back on. Lithophanes, slicers, CAD and Showcase stay available either way. |
 | `ZEIM_TESTING_MODE` | off (`0`) | `1` lifts usage quotas and cooldowns for this server. Password guesses, sign-in limits, upload scanning, file-size caps, and payments stay on. Not a control in the app. |
 | `ZEIM_TESTING_ALLOW_PAID` | off (`0`) | With testing mode, `1` also lifts the local 2D→3D daily model cap. It does not open Stripe or start a charge. |
 
-Testers use the main site, [https://zeimapp.com](https://zeimapp.com). On GCP **zeim-prod**, set both flags to `0`, deploy `reports/deploy/Caddyfile` (the file that proxies every path to the app), and reload Caddy. Steps are in [`reports/deploy/README.md`](reports/deploy/README.md). Do not put live Stripe keys on the server for this release.
+Testers use the main site, [https://zeimapp.com](https://zeimapp.com). On GCP **zeim-prod**, set `ZEIM_COMING_SOON`, `ZEIM_PLANS_ENABLED`, and `ZEIM_2D3D_ENABLED` to `0`, deploy `reports/deploy/Caddyfile` (the file that proxies every path to the app), and reload Caddy. Steps are in [`reports/deploy/README.md`](reports/deploy/README.md). Do not put live Stripe keys on the server for this soft launch.
 
 ## Optional: 2D→3D worker
 
@@ -97,7 +97,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2691 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and Subscriptions with paid checkout closed by default).
+Tests use temporary data folders; slicer and printer tests use mocks. Subscription tests mock Stripe (no network, no card numbers). Paid checkout stays closed unless `ZEIM_PLANS_ENABLED=1`. `pytest --collect-only` counts the suite, including Showcase Collections, lithophane batches, slicer plate-drag, Lithophane handoff, FDM multi-head filament slots, Edit upgrades, Showcase print settings, printer sending (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and optional Semi Pro / Pro (`tests/test_subscriptions.py`, `tests/test_stripe_plans.py`).
 
 ## Layout
 
@@ -136,6 +136,18 @@ Point a Creality K1 at ZEIM: type Moonraker, address `http://<printer-ip>:7125` 
 https://zeimapp.com does not turn these on. On your own PC, recreate the container with `PHOTO3D_MODE=shared`, `PHOTO3D_LAN_PRINTERS=1` and `ZEIM_PRINTER_DIRECT=1`. Sign in as an adult. For a Creality K1 use type Moonraker, preset Creality K1, and address `http://<printer-ip>:7125` (not 4408). Press Test connection (it never starts a print), then Send. The label is Live API, not Hardware-tested. Bambu stays Simulated. Link-local addresses, including cloud metadata `169.254.169.254`, stay blocked. Do not put those three flags in the default compose file.
 
 Direct printer control stays off in production (`ZEIM_ENV=production`) unless `ZEIM_PRINTER_DIRECT=1`. Addresses are SSRF-checked. Never copies GPL/AGPL printer UIs. Never claims a successful send when the printer was not reached.
+
+## Optional plans (Stripe)
+
+Semi Pro is **$3.50/month** and Pro is **$5.50/month**. The core app stays free. Checkout stays off unless `ZEIM_PLANS_ENABLED=1` is set on the server. The examples and the soft-launch deploy keep that flag at `0`.
+
+ZEIM adds a service fee of about **1%** of that plan price, rounded to the nearest cent (4¢ and 6¢), as its own line on the Stripe invoice. That fee is only on these plan charges. It is not a cut of creator tips or Showcase sales, and it is not a Stripe Connect application fee.
+
+Card numbers stay on Stripe. Hosted Checkout and the Customer Portal are the only payment forms. ZEIM stores the plan tier plus the Stripe Customer id and Subscription id, updated by the webhook at `/api/subscriptions/webhook`. The account's `plan` field is what feature gates read (Pro-only 2D→3D when that flag is on).
+
+People sign in with a passkey, a password, or an email code. Billing cancel and card updates are the Stripe Customer Portal, not a login reset.
+
+Until the plans flag is on and the secret key, webhook secret, and both Price ids are set, the plan buttons say Coming later. Test keys are labeled test mode and do not charge a real card. Full Dashboard steps: [`docs/ops/stripe-plans.md`](docs/ops/stripe-plans.md).
 
 ## Community rules
 

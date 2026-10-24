@@ -56,6 +56,10 @@ Existing cookie accounts can add a passkey: the legacy resolver maps today's `p3
 
 The auth module still **refuses to start** if the three required values are missing or weak when it is asked to load outside the local/dev case. That refuse is caught at mount time so the rest of ZEIM keeps serving.
 
+## Billing is not a login reset
+
+Optional Semi Pro / Pro use Stripe. Getting back into an account is a passkey, a password, or an email sign-in code (this document). Older cookie accounts may still have a one-time recovery code. Canceling a plan or changing the card is the Stripe Customer Portal, not a password reset. The Stripe Customer id stays on the same ZEIM account, so signing back in keeps the plan. Details: [`docs/ops/stripe-plans.md`](ops/stripe-plans.md).
+
 ## Still open (not blocking local/pilot)
 1. Retire the old recovery codes once accounts have a passkey, a password, or an email.
 2. Someone who loses their only passkey and never added an email or a password still cannot be signed in from here. Do not delete that account. The way back is the original device, then Account → Add a password.
