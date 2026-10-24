@@ -126,10 +126,50 @@ def ensure_exports(bid: str):
         store.save(meta)
 
 
+# ---------------------------------------------------------------- AI-made provenance (T&S F1/F8)
+AI_3MF_KEY = "zeim:AIMade"
+
+
+def ai_lineage(meta: dict | None, _hops: int = 0) -> bool:
+    """True if this build, or any build it was made from (parent_build / version_of / base.from_build), is AI-made."""
+    if not meta or _hops > 32:
+        return False
+    if meta.get("ai") or meta.get("mode") == "ai3d":
+        return True
+    for pid in {meta.get("parent_build"), meta.get("version_of"), (meta.get("base") or {}).get("from_build")} - {None, ""}:
+        try:
+            if ai_lineage(store.get(pid), _hops + 1):
+                return True
+        except (KeyError, FileNotFoundError, OSError, ValueError):
+            continue
+    return False
+
+
+def ai_in_3mf(data: bytes) -> bool:
+    """A 3MF that ZEIM exported from an AI-made model carries zeim:AIMade=true (model metadata or Metadata/zeim_owner.json)."""
+    import io
+    import json
+    import re
+    import zipfile
+    try:
+        z = zipfile.ZipFile(io.BytesIO(data))
+        names = {n.lower(): n for n in z.namelist()}
+        if "3d/3dmodel.model" in names:
+            xml = z.read(names["3d/3dmodel.model"])[:4 * 2**20]
+            if re.search(rb'<metadata\s+name=["\']zeim:AIMade["\'][^>]*>\s*true\s*<', xml, re.I):
+                return True
+        if "metadata/zeim_owner.json" in names:
+            return json.loads(z.read(names["metadata/zeim_owner.json"])[:65536]).get("AIMade") in (True, "true")
+    except Exception:
+        return False
+    return False
+
+
 # ---------------------------------------------------------------- creation
 def create(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes, original_ext: str,
            mesh: trimesh.Trimesh, beginner: bool, warnings: list[str], import_scale: float = 1.0,
-           import_units: str = "mm", source_image: tuple[bytes, str] | None = None) -> dict:
+           import_units: str = "mm", source_image: tuple[bytes, str] | None = None,
+           ai: bool = False, parent_build: str = "") -> dict:
     """Caller must already hold `store.lock` and have reserved a history slot."""
     bid = uuid.uuid4().hex[:12]
     d = store.dir(bid)
@@ -143,6 +183,10 @@ def create(owner_sid: str, visibility: str, *, title: str, base: dict, original:
     meta = {"id": bid, "kind": "edit", "mode": "edit", "beginner": beginner, "title": title[:60] or "Untitled",
             "base": base, "ops": ops, "head": len(ops), "warnings": warnings, "source": "",
             "params": {}, "auto_notes": [], "info": {}, "owner_sid": owner_sid, "visibility": visibility}
+    if parent_build:
+        meta["parent_build"] = parent_build
+    if ai or (original_ext == "3mf" and ai_in_3mf(original)) or (parent_build and ai_lineage({"parent_build": parent_build})):
+        meta["ai"] = True                                         # AI-made provenance survives the editor
     _BASES[bid] = mesh
     try:
         m = mesh_at(bid, {**meta, "head": len(ops)})
@@ -175,7 +219,9 @@ def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner
         meta = {"id": bid, "kind": "edit", "mode": "edit", "beginner": beginner, "title": title[:60] or "Untitled",
                 "base": copy.deepcopy(src.get("base") or {}), "ops": copy.deepcopy(src.get("ops", [])[:head]), "head": head,
                 "warnings": [], "source": "", "params": {}, "auto_notes": [], "info": {},
-                "owner_sid": owner_sid, "visibility": visibility, "version_of": src_bid}
+                "owner_sid": owner_sid, "visibility": visibility, "version_of": src_bid, "parent_build": src_bid}
+        if ai_lineage(src):
+            meta["ai"] = True
         for k in ("dims", "appearance", "photo_ack"):
             if src.get(k):
                 meta[k] = copy.deepcopy(src[k])

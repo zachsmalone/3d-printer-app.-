@@ -227,7 +227,7 @@ async function loadShowcase() {
   $("#shClear").hidden = !q;
   let r;
   if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent($("#shAi")?.value || "show")}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
   if (r.filters && $("#shMature")) $("#shMature").value = r.filters.mature;
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
@@ -241,26 +241,45 @@ async function loadShowcase() {
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
-    const e = r.empty || { text: "Nothing here yet. Check back soon.", action: null };
+    const filtered = !!(q || shCat || shAiVal() !== "show");
+    const e = filtered ? { text: "Your filters are hiding results. Nothing matches all of them right now.", action: { do: "reset-filters", label: "Reset filters" } }
+      : (r.empty || { text: "Nothing here yet. Check back soon.", action: null });
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
   }
 }
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
-$("#shAi")?.addEventListener("change", () => loadShowcase());
+// AI filter survives a reload: ?ai= in the URL wins, then the last choice in localStorage
+const SH_AI_OK = ["show", "hide", "only"];
+function shAiVal() { const v = $("#shAi")?.value; return SH_AI_OK.includes(v) ? v : "show"; }
+function shAiSave(v) {
+  try { localStorage.setItem("zeim.showcase.ai", v); } catch { }
+  const u = new URL(location.href); if (v === "show") u.searchParams.delete("ai"); else u.searchParams.set("ai", v);
+  history.replaceState(history.state, "", u);
+}
+(() => { const el = $("#shAi"); if (!el) return; let v = new URLSearchParams(location.search).get("ai");
+  if (!SH_AI_OK.includes(v)) { try { v = localStorage.getItem("zeim.showcase.ai"); } catch { v = null; } }
+  if (SH_AI_OK.includes(v)) el.value = v; })();
+$("#shAi")?.addEventListener("change", () => { shAiSave(shAiVal()); loadShowcase(); });
 // printer / material / supports / licence / mature filters (server validates; 'Not stated' = the model does not say)
 const SH_FILTERS = { printer: "#shPrinter", material: "#shMaterial", supports: "#shSupports", licence: "#shLicence", mature: "#shMature" };
 let shMatureTouched = false;
 function shFilterQS() { return Object.entries(SH_FILTERS).map(([k, sel]) => { const el = $(sel); return el && (k !== "mature" || shMatureTouched) ? `&${k}=${encodeURIComponent(el.value)}` : ""; }).join(""); }
+function shFiltersReset() { Object.values(SH_FILTERS).forEach(sel => { const el = $(sel); if (el) el.selectedIndex = 0; }); shMatureTouched = false; }
 $("#shMature")?.addEventListener("change", () => { shMatureTouched = true; });
 Object.values(SH_FILTERS).forEach(sel => $(sel)?.addEventListener("change", () => loadShowcase()));
-$("#shFiltReset")?.addEventListener("click", () => { Object.values(SH_FILTERS).forEach(sel => { const el = $(sel); if (el) el.selectedIndex = 0; }); shMatureTouched = false; loadShowcase(); });
+$("#shFiltReset")?.addEventListener("click", () => { shFiltersReset(); loadShowcase(); });
+$("#shGrid").addEventListener("click", e => { if (!e.target.closest('[data-empty="reset-filters"]')) return;
+  e.stopPropagation(); $("#shSearch").value = ""; shCat = ""; if ($("#shAi")) $("#shAi").value = "show"; shAiSave("show"); shFiltersReset(); loadShowcase(); }, true);
 // honest provenance labels: AI-made (creator said so, or 2D to 3D tab) and 'Printed by the community' (>=1 approved print photo). No counts, no ranking.
 function provHTML(i) {
   return `${i.ai_made ? '<span class="prov ai"><svg class=i aria-hidden=true focusable=false><use href=#i-chip></use></svg> AI-made</span>' : ""}${i.community_printed ? '<span class="prov printed"><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Printed by the community</span>' : ""}`;
 }
 function tipHTML(i) {
-  return /^https:\/\//.test(i.tip_url || "") ? `<p class="help tiplink">Want to support ${esc(i.creator)}? <a href="${esc(i.tip_url)}" target="_blank" rel="noopener nofollow noreferrer">Tip link</a></p>` : "";
+  if (!/^https:\/\//i.test(i.tip_url || "")) return "";
+  let host = ""; try { host = new URL(i.tip_url).hostname.toLowerCase(); } catch { return ""; }
+  const who = i.creator_username ? "@" + i.creator_username : i.creator;
+  return `<p class="help tiplink"><a href="${esc(i.tip_url)}" target="_blank" rel="noopener nofollow noreferrer">Tip link for ${esc(who)} (${esc(host)})</a></p>`;
 }
 $("#shCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; shCat = b.dataset.cat; loadShowcase(); });
 $("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };
@@ -453,6 +472,10 @@ async function openItem(id) {
 $("#btnPublish").onclick = () => {
   if (!ME.signed_up) { toast("Create an account first to share projects.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
   $("#pub_title").value = S.current.title; $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $$("[name=pub_nsfw]").forEach(r => r.checked = false);
+  // 2D to 3D builds are always saved as AI-made by the server, so show that honestly instead of a box that can be unticked
+  const aiForced = !!(S.current?.ai || S.current?.mode === "ai3d" || S.current?.base?.from_mode === "ai3d"), aiBox = $("#pub_ai");
+  if (aiBox) { aiBox.checked = aiForced || aiBox.checked && !aiBox.disabled; aiBox.disabled = aiForced; }
+  if ($("#pub_ai_note")) $("#pub_ai_note").hidden = !aiForced;
   $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no"; if (!$("#pub_remix").value && sessionStorage.getItem("zeim_remix_of")) $("#pub_remix").value = sessionStorage.getItem("zeim_remix_of");
   $("#dlgPublish").showModal();
 };

@@ -184,7 +184,8 @@ def new_project(
         try:
             meta = editproj.create(actor.sid, privacy.default_level(actor), title=title.strip(), base=base,
                                    original=original, original_ext=ext, mesh=mesh, beginner=beginner,
-                                   warnings=warnings, import_scale=scale, import_units=units, source_image=source_image)
+                                   warnings=warnings, import_scale=scale, import_units=units, source_image=source_image,
+                                   parent_build=from_build or "")
         except meshedit.OpError as e:
             raise HTTPException(422, str(e))
         if ack is not None:
@@ -405,7 +406,8 @@ def new_multi(
                 meta = editproj.create(actor.sid, privacy.default_level(actor), title=f"Plate of {len(loaded)} parts",
                                        base={"type": "plate", "parts": len(loaded), "units": units, "plate": plate},
                                        original=combined.export(file_type="stl"), original_ext="stl", mesh=combined, beginner=beginner,
-                                       warnings=warnings, import_scale=1.0, import_units="mm")
+                                       warnings=warnings, import_scale=1.0, import_units="mm",
+                                       ai=any(x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]) for x in loaded))
             except meshedit.OpError as e:
                 raise HTTPException(422, str(e))
             made.append(meta["id"])
@@ -422,7 +424,8 @@ def new_multi(
                     meta = editproj.create(actor.sid, privacy.default_level(actor), title=f"Part {x['n']} of {len(loaded)}",
                                            base={"type": "upload", "format": x["ext"], "units": units if x["ext"] != "3mf" else "from file"},
                                            original=x["data"], original_ext=x["ext"], mesh=x["mesh"], beginner=beginner,
-                                           warnings=x["warnings"], import_scale=x["scale"], import_units=units)
+                                           warnings=x["warnings"], import_scale=x["scale"], import_units=units,
+                                           ai=x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]))
                 except meshedit.OpError as e:
                     raise HTTPException(422, f"File {x['n']}: {e}")
                 made.append(meta["id"])

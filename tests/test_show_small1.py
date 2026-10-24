@@ -54,7 +54,7 @@ def test_ai_toggle_owner_only_and_ai3d_build_locked():
 def test_ai3d_build_is_labelled_automatically():
     """Builds from the 2D->3D tab (meta ai=True / mode ai3d) get the label at publish time."""
     src = open(os.path.join(ROOT, "app/community/catalog.py")).read()
-    assert 'bool(bmeta.get("ai")) or mode == "ai3d"' in src
+    assert 'bool(bmeta.get("ai")) or bmeta.get("mode") == "ai3d"' in src
 
 
 # ---- printed by the community ----

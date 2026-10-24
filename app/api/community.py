@@ -397,9 +397,19 @@ def item_view_only(iid: str, body: dict, actor: Actor = Depends(get_actor)):
         raise D(e)
 
 
+TIP_AI_CHANGES_PER_HOUR = 10
+
+
+def _label_limit(actor: Actor):
+    """Tip link / AI label changes: 10 per hour per user (shared bucket, same limiter as the other write routes)."""
+    if not ratelimit.hit("tipai:" + ((actor.user or {}).get("id") or actor.sid), TIP_AI_CHANGES_PER_HOUR, 3600):
+        raise HTTPException(429, "You've changed tip links or AI labels a lot just now. Please try again in an hour.")
+
+
 @router.put("/showcase/{iid}/tip")
 def item_tip(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Owner only: one optional https tip link ('' removes it)."""
+    _label_limit(actor)
     try:
         return catalog.public(catalog.set_tip_url(actor, iid, body.get("tip_url")), actor)
     except catalog.Denied as e:
@@ -409,6 +419,7 @@ def item_tip(iid: str, body: dict, actor: Actor = Depends(get_actor)):
 @router.put("/showcase/{iid}/ai")
 def item_ai(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Owner only: the AI-made label."""
+    _label_limit(actor)
     try:
         v = _yes_no(body.get("ai_made"), None, "ai_made")
         if v is None:
@@ -797,7 +808,7 @@ def _preview(item_id: str) -> dict:
     i = next((x for x in catalog._all() if x["id"] == item_id), None)
     if not i:
         return {"kind": "unknown", "title": "(item no longer exists)", "text": ""}
-    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]), "nsfw": bool(i.get("nsfw")),       # @username via the account id, never the display name
+    return {"kind": "showcase project", "title": i["title"], "text": (i.get("description") or "")[:300], "creator": catalog.resolve(i)["creator"], "hidden": bool(i["hidden"]), "nsfw": bool(i.get("nsfw")), "tip_url": i.get("tip_url") or "",       # @username via the account id, never the display name
             "thumb": f"/api/moderation/item/{item_id}/thumb" if i.get("has_thumb") else None}
 
 
@@ -987,6 +998,15 @@ def mod_resolve(rid: str, body: dict, request: Request, x_admin_token: str = Hea
         raise HTTPException(404)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@router.post("/moderation/item/{iid}/tip")
+def mod_tip(iid: str, request: Request, body: dict | None = None, x_admin_token: str = Header("")):
+    """Moderator removes just the tip link (the project stays up). Logged in the audit trail."""
+    _admin(x_admin_token, request)
+    if not moderation.clear_tip(iid, str((body or {}).get("reason") or "")):
+        raise HTTPException(404)
+    return {"id": iid, "tip_url": ""}
 
 
 @router.post("/moderation/item/{iid}/nsfw")

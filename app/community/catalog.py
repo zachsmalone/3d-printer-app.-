@@ -218,7 +218,7 @@ def public(i: dict, actor: Actor) -> dict:
             **remix_status(i),
             "first_posted": str(i.get("created", ""))[:10],
             "view_only": bool(i.get("view_only")),
-            "ai_made": bool(i.get("ai_made")),
+            "ai_made": bool(i.get("ai_made")), "ai_locked": bool(i.get("ai_locked") or i.get("mode") == "ai3d"),
             "facets": facets(i),
             "community_printed": bool(not i.get("example") and _social().prints_for(i["id"])),   # >=1 approved 'I printed this'
             "tip_url": i.get("tip_url") or "",
@@ -318,7 +318,13 @@ def set_tip_url(actor: Actor, item_id: str, url) -> dict:
         url = tips.check(url)
     except ValueError as e:
         raise Denied(400, str(e))
-    return _owner_edit(actor, item_id, lambda i: i.__setitem__("tip_url", url))
+    hidden = set(MODERATION.read()["hidden"])
+
+    def fn(i):
+        if i.get("hidden") or i["id"] in hidden:
+            raise Denied(403, "This project is hidden by moderation, so its tip link can't be changed right now.")
+        i["tip_url"] = url
+    return _owner_edit(actor, item_id, fn)
 
 
 def set_ai_made(actor: Actor, item_id: str, on) -> dict:
@@ -328,6 +334,8 @@ def set_ai_made(actor: Actor, item_id: str, on) -> dict:
     def fn(i):
         if not on and i.get("mode") == "ai3d":
             raise Denied(400, "This model came from the 2D to 3D tab, so it keeps the AI-made label.")
+        if not on and i.get("ai_locked"):
+            raise Denied(400, "This model was made from an AI-made model, so it keeps the AI-made label.")
         i["ai_made"] = on
     return _owner_edit(actor, item_id, fn)
 
@@ -499,6 +507,8 @@ def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -
                 i["visibility"] = level
                 if remix_of:
                     i["remix_of"] = remix_of
+                    if src.get("ai_made"):                    # F9: a remix of an AI-made model is AI-made too
+                        i["ai_made"] = i["ai_locked"] = True
                 found.update(i)
     LISTINGS.update(f)
     if not found:
@@ -552,6 +562,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             raise Denied(422, "That project's licence doesn't allow publishing remixes of it. "
                                 "Pick a project marked as remixable, or ask its maker to change the licence.")
     from ..services import editproj
+    ai_locked = bool(bmeta.get("ai")) or bmeta.get("mode") == "ai3d" or editproj.ai_lineage(bmeta) or bool(remix_of and src.get("ai_made"))
     editproj.ensure_exports(build_id)       # edit projects write their STL/3MF lazily
     pid = secrets.token_hex(5)
     d = LDIR / pid
@@ -571,8 +582,9 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
             "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False,
             "view_only": bool(view_only),
-            # honest AI label: the creator said so, or the build came from ZEIM's 2D->3D tab (can't be unticked)
-            "ai_made": bool(ai_made) or bool(bmeta.get("ai")) or mode == "ai3d"}
+            # honest AI label: the creator said so, the build (or any build it came from) is from ZEIM's 2D->3D tab,
+            # or it remixes an AI-made project. Inherited labels are locked (can't be unticked).
+            "ai_made": bool(ai_made) or ai_locked, "ai_locked": ai_locked}
     if tip_url:
         item["tip_url"] = tip_url
     if remix_of:

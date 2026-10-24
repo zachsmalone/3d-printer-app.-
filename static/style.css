@@ -319,6 +319,10 @@ fieldset.seg label{position:relative;display:flex;align-items:center;justify-con
 ul.grid{list-style:none;padding:0;margin:14px 0 0}
 .pcard{position:relative}.pcard .meta h2{margin:0;font-size:inherit}.pcard .meta h2 a{color:var(--txt);text-decoration:none;display:inline-block;min-height:44px;line-height:22px;padding:11px 0;font-weight:700}
 .pcard .meta h2 a::after{content:"";position:absolute;inset:0;z-index:1}
+/* long unbroken titles: wrap anywhere, then clamp to 2 lines with an ellipsis (both card styles) */
+.pcard .meta{min-width:0}.pcard .meta b,.pcard .meta h2 a{overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+.pcard .meta h2 a{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;text-overflow:ellipsis;max-height:66px;box-sizing:border-box}
+.pcard .meta b{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-overflow:ellipsis}
 .pcard .meta h2 a:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
 .pcard .meta{padding-bottom:0}
 .cardfoot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 11px 10px;margin-top:auto}.cardfoot .dl{color:var(--mut);font-size:13px}

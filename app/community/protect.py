@@ -168,7 +168,8 @@ def owner_meta(i: dict) -> dict:
     return {"Title": i.get("title", ""), "Designer": i.get("creator", ""),
             "CreationDate": str(i.get("created", ""))[:10],
             "zeim:ModelId": i["id"], "zeim:CreatorHandle": i.get("creator", ""),
-            "zeim:FirstPosted": str(i.get("created", "")), "zeim:SourceURL": f"{base}/p/{i['id']}"}
+            "zeim:FirstPosted": str(i.get("created", "")), "zeim:SourceURL": f"{base}/p/{i['id']}",
+            **({"zeim:AIMade": "true"} if i.get("ai_made") else {})}
 
 
 ZNS = "https://zeim.app/ns/owner-tag/2026"

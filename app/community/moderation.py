@@ -306,6 +306,22 @@ def unsuspend(account_id: str) -> bool:
     return bool(done)
 
 
+def clear_tip(item_id: str, reason: str = "") -> bool:
+    """Moderator removes ONLY the tip link of a Showcase project (the project stays up). Returns False if not found."""
+    from .store import LISTINGS
+    done = []
+
+    def f(l):
+        for i in l:
+            if i["id"] == item_id and not i.get("example"):
+                done.append(i.get("tip_url") or "")
+                i["tip_url"] = ""
+    LISTINGS.update(f)
+    if done:
+        _log("tip_removed", item_id=item_id, old_tip_url=done[0], reason=(reason or "")[:200])
+    return bool(done)
+
+
 def set_nsfw(item_id: str, on: bool) -> bool:
     """Moderator flips the mature tag on a Showcase project or a print photo ("print:<id>"). Returns False if not found."""
     from .store import LISTINGS

@@ -538,7 +538,7 @@ def trace_preview(actor: Actor = Depends(get_actor), file: UploadFile = File(...
 def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     if ext not in exporters.WRITERS or not bid.isalnum():
         raise HTTPException(404)
-    meta_for(bid, actor)
+    bmeta = meta_for(bid, actor)
     from ..services import quarantine
     quarantine.guard(bid)                        # quarantined builds are not served
     from ..services import editproj, filestore
@@ -552,6 +552,11 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
         filestore.put_build(bid, f"model.{ext}", p.read_bytes())
         return RedirectResponse(filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900),
                                 status_code=303)
+    if ext == "3mf" and editproj.ai_lineage(bmeta):          # F8: AI-made provenance travels with the file
+        from fastapi.responses import Response
+        from ..community import protect
+        return Response(protect.tag_3mf(p.read_bytes(), {editproj.AI_3MF_KEY: "true"}), media_type="model/3mf",
+                        headers={**NO_STORE, "Content-Disposition": f'attachment; filename="photo3d_{bid}.3mf"'})
     return FileResponse(p, filename=f"photo3d_{bid}.{ext}", headers=NO_STORE)
 
 
