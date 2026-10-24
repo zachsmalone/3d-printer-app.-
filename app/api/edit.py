@@ -1,6 +1,8 @@
 """Edit workspace API: upload STL/OBJ/3MF (or a photo, or a ZEIM build) → non-destructive edit → export / slice / print."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -12,6 +14,7 @@ from ..config import MAX_BUILDS
 from ..core import autotune, exporters, geometry, imagesafe, meshedit
 from ..core import features as features_mod
 from ..core import printcheck as printcheck_mod
+from ..core import volcost as volcost_mod
 from ..core import thickness as thickness_mod
 from ..services import editproj
 from ..services.history import HistoryFull, store
@@ -219,6 +222,42 @@ def printcheck(bid: str, process: str = "fdm", min_wall: float | None = None, ac
         raise HTTPException(400, str(e))
 
 
+
+
+@router.get("/{bid}/volcost")
+def volcost(bid: str, material: str = "PLA", price_per_kg: float | None = None,
+            infill_pct: float = 20.0, wall_factor: float = 1.15, actor: Actor = Depends(get_actor)):
+    """Material grams and cost estimate from mesh volume (not from G-code)."""
+    meta = _edit_meta(bid, actor)
+    try:
+        return volcost_mod.estimate(editproj.mesh_at(bid, meta), material, price_per_kg, infill_pct, wall_factor)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/{bid}/fonts")
+async def upload_font(bid: str, file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
+    """Upload a custom TTF/OTF for text ops in this bot's shared font library (data/fonts/)."""
+    _edit_meta(bid, actor, owner_only=True)
+    name = (file.filename or "font.ttf").rsplit("/", 1)[-1]
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if ext not in ("ttf", "otf"):
+        raise HTTPException(400, "Only .ttf or .otf font files are accepted.")
+    data = await file.read()
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(400, "Font file is too large (max 5 MB).")
+    if len(data) < 100:
+        raise HTTPException(400, "That does not look like a font file.")
+    # Safe stem
+    import re
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", name.rsplit(".", 1)[0]).strip("-").lower() or "custom"
+    dest_dir = Path(__file__).resolve().parents[2] / "data" / "fonts"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"{stem}.{ext}"
+    dest.write_bytes(data)
+    return {"ok": True, "font": stem, "fonts": meshedit.list_fonts(), "message": f"Saved font “{stem}”."}
+
+
 @router.get("/{bid}/features")
 def features(bid: str, actor: Actor = Depends(get_actor)):
     """Flat faces, cylinders and holes found in the current mesh (read-only, approximate)."""
@@ -247,7 +286,7 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     params = body.get("params") or {}
     if not isinstance(params, dict):
         raise HTTPException(400, "params must be an object")
-    if op in ("hollow", "boolean", "text", "base", "smart_split", "on_face"):                      # the heavy ones write big new meshes
+    if op in ("hollow", "boolean", "text", "base", "smart_split", "on_face", "thread"):                      # the heavy ones write big new meshes
         from .builds import disk_guard
         disk_guard()
     return _act(bid, actor, lambda: editproj.add_op(bid, op, params))

@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import math
 import zipfile
+from pathlib import Path
 
 import numpy as np
 import trimesh
@@ -269,19 +270,57 @@ def op_rotate(m, p):
 
 
 def op_scale(m, p):
-    f = p.get("factor")
-    sx, sy, sz = ((_num(p, k, f if f is not None else 1.0, 1e-3, 1e3)) for k in ("sx", "sy", "sz"))
+    """Uniform / per-axis scale, or scale-to-target (longest side / fit bed / target volume)."""
     pivot = p.get("pivot", "base")
     lo, hi = _bounds(m)
+    size = hi - lo
+    mode = (p.get("mode") or "").lower()
+    note = ""
+    if mode == "longest" or p.get("target_longest") is not None:
+        target = _num(p, "target_longest", None, 1, 1000)
+        cur = float(max(size))
+        if cur < 1e-9:
+            raise OpError("Model has no size to scale.")
+        k = target / cur
+        sx = sy = sz = k
+        note = f"Scaled longest side to {target:g} mm (×{k:.4g})."
+    elif mode == "fit_bed" or p.get("fit_bed"):
+        bed = p.get("bed") or p.get("bed_mm") or [220, 220, 250]
+        if not isinstance(bed, (list, tuple)) or len(bed) < 2:
+            raise OpError("fit_bed needs bed [X, Y] or [X, Y, Z] mm.")
+        bx, by = float(bed[0]), float(bed[1])
+        bz = float(bed[2]) if len(bed) > 2 else 1e9
+        margin = _num(p, "margin", 2, 0, 50)
+        usable = [max(1.0, bx - margin), max(1.0, by - margin), max(1.0, bz - margin)]
+        ratios = [usable[i] / max(float(size[i]), 1e-9) for i in range(3)]
+        k = min(ratios)
+        if k <= 0:
+            raise OpError("Bed size is too small.")
+        sx = sy = sz = k
+        note = f"Scaled to fit bed {bx:g}×{by:g}" + (f"×{bz:g}" if len(bed) > 2 else "") + f" mm with {margin:g} mm margin (×{k:.4g})."
+    elif mode == "volume" or p.get("target_volume_cm3") is not None:
+        target_cm3 = _num(p, "target_volume_cm3", None, 0.01, 1e6)
+        vol = float(abs(m.volume)) if len(m.faces) else 0.0
+        if vol < 1e-9:
+            raise OpError("Model has no volume to scale (not watertight?).")
+        # volume scales with cube of linear factor
+        k = (target_cm3 * 1000.0 / vol) ** (1.0 / 3.0)
+        sx = sy = sz = k
+        note = f"Scaled to about {target_cm3:g} cm³ (×{k:.4g})."
+    else:
+        f = p.get("factor")
+        sx, sy, sz = ((_num(p, k, f if f is not None else 1.0, 1e-3, 1e3)) for k in ("sx", "sy", "sz"))
     c = {"origin": np.zeros(3), "center": (lo + hi) / 2,
          "base": np.array([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, lo[2]])}.get(pivot)
     if c is None:
         raise OpError("pivot must be base | center | origin")
     S = np.diag([sx, sy, sz, 1.0])
-    out = _transform(m, _mat_translate(c) @ S @ _mat_translate(-c))
-    if max(out.extents) > 5000:
-        raise OpError("Result would be larger than 5 m — check your units.")
-    return out, {}
+    T = _mat_translate(c) @ S @ _mat_translate(-c)
+    out = _transform(m, T)
+    rep = {"sx": sx, "sy": sy, "sz": sz}
+    if note:
+        rep["message"] = note
+    return out, rep
 
 
 def op_mirror(m, p):
@@ -681,6 +720,27 @@ def op_cut(m, p):
             parts.append(("below", b, -normal))
     if not parts:
         raise OpError("The plane doesn't cut through the model (nothing left on the chosen side).")
+    join_rep = {}
+    join = (p.get("join") or "").lower().strip()
+    if keep == "both" and len(parts) == 2 and join and join != "none":
+        # parts are ("above", mesh, normal) and ("below", mesh, -normal)
+        above = next(x[1] for x in parts if x[0] == "above")
+        below = next(x[1] for x in parts if x[0] == "below")
+        # Cut plane: origin along +normal from the cut; above sits on +normal side
+        from . import smartsplit
+        nrm = next(x[2] for x in parts if x[0] == "above")
+        if axis in ("x", "y", "z"):
+            join_origin = nrm * float(pos)
+        else:
+            join_origin = np.asarray(origin, float)
+        try:
+            below, above, join_rep = smartsplit.apply_join(below, above, join_origin, nrm, join, p)
+            join_rep["join"] = join
+            join_rep["connector_fit"] = "simulated"
+            # rebuild parts list with joined meshes
+            parts = [("above", above, nrm), ("below", below, -nrm)]
+        except Exception as e:
+            raise OpError(f"Could not add {join} join on the cut: {e}") from e
     if keep == "both" and len(parts) == 2 and p.get("lay_flat", True):
         gap = _num(p, "gap", 5, 0, 200)
         placed, x = [], 0.0
@@ -702,7 +762,15 @@ def op_cut(m, p):
     out = _check(_new(out.vertices, out.faces))
     if cap and not out.is_watertight and not warn:       # input was closed but the cut left it open: never report plain success
         warn = "The cut left the model with an open face, so it is not watertight. Try Fix (repair) on the result, or cut at a different height."
-    return out, {"message": f"kept {keep}; {len(parts)} piece(s)" + ((" · " + warn) if warn else ""), "warning": warn, "watertight": bool(out.is_watertight)}
+    msg = f"kept {keep}; {len(parts)} piece(s)"
+    if join_rep.get("join"):
+        msg += f" · join={join_rep['join']} (Simulated)"
+    if warn:
+        msg += " · " + warn
+    rep = {"message": msg, "warning": warn, "watertight": bool(out.is_watertight)}
+    if join_rep:
+        rep["join"] = join_rep
+    return out, rep
 
 
 # ------------------------------------------------------------------ hollow
@@ -794,12 +862,46 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
         raise OpError("Nothing left to hollow with this wall thickness (only tiny pockets would remain). Try a thinner wall.")
     cav = trimesh.util.concatenate(parts) if len(parts) > 1 else parts[0]
     out = _boolean(mm, cav, "difference")
-    if drain > 0:
+    # User-placed drain holes: list of {x,y,z} (or [x,y,z]) on the outer surface.
+    # Each punches a cylinder of diameter `drain` (or per-hole diameter) inward along -Z by default,
+    # or along `direction` if given. Falls back to one auto hole at the cavity floor when drain>0 and no points.
+    drain_points = p.get("drain_points") or []
+    if drain_points and not isinstance(drain_points, list):
+        raise OpError("drain_points must be a list of {x,y,z} or [x,y,z].")
+    holes = []
+    for i, pt in enumerate(drain_points):
+        if isinstance(pt, dict):
+            xyz = [pt.get("x"), pt.get("y"), pt.get("z")]
+            d_i = float(pt.get("diameter", drain or 3))
+            direc = pt.get("direction")
+        elif isinstance(pt, (list, tuple)) and len(pt) >= 3:
+            xyz = list(pt[:3]); d_i = float(drain or 3); direc = None
+        else:
+            raise OpError(f"drain_points[{i}] must be {{x,y,z}} or [x,y,z].")
+        try:
+            xyz = [float(v) for v in xyz]
+        except (TypeError, ValueError):
+            raise OpError(f"drain_points[{i}] needs numeric x,y,z.")
+        if d_i <= 0:
+            continue
+        holes.append((xyz, d_i, direc))
+    if not holes and drain > 0:
         low = cav.vertices[cav.vertices[:, 2] < cav.bounds[0][2] + pitch * 1.5]
         xy = low[:, :2].mean(0)
-        z0 = mm.bounds[0][2] - 1.0; z1 = cav.bounds[0][2] + wall * 0.5 + pitch
-        cyl = trimesh.creation.cylinder(radius=drain / 2, height=z1 - z0, sections=48)
-        cyl = _new(cyl.vertices + [xy[0], xy[1], (z0 + z1) / 2], cyl.faces)
+        holes.append(([xy[0], xy[1], float(mm.bounds[0][2])], drain, None))
+    for xyz, d_i, direc in holes:
+        if direc and len(direc) == 3:
+            n = np.asarray(direc, float)
+            n = n / (np.linalg.norm(n) or 1)
+        else:
+            n = np.array([0.0, 0.0, -1.0])  # punch downward by default (resin drain)
+        length = float(np.linalg.norm(mm.extents)) * 0.6 + wall * 2 + 2.0
+        cyl = trimesh.creation.cylinder(radius=d_i / 2, height=length, sections=48)
+        # Align cylinder +Z to n
+        T = trimesh.geometry.align_vectors([0, 0, 1], n)
+        cyl = _transform(_new(cyl.vertices, cyl.faces), T)
+        # Centre of cylinder at xyz, extending both ways so it breaks the wall
+        cyl = _new(cyl.vertices + np.asarray(xyz, float), cyl.faces)
         out = _boolean(out, cyl, "difference")
     out, floating = _drop_slivers(out, min_cav)
     wall_min = _measure_wall(mm, cav)
@@ -820,14 +922,58 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
                              "(thin or very detailed parts of the shape). It may print badly: try a thicker wall or check it in your slicer.")
     saved = 100 * (1 - out.volume / mm.volume) if out.volume > 0 else 0
     return out, {"message": f"hollowed: wall {wall:g} mm, volume −{saved:.0f}% (resolution ≈ {pitch:.2f} mm)"
-                 + (f", drain hole Ø{drain:g}" if drain else ""), "resolution_mm": round(pitch, 3),
+                 + (f", {len(holes)} drain hole(s)" if holes else ""), "resolution_mm": round(pitch, 3),
                  "volume_saved_pct": round(saved, 1), **rep_extra}
 
 
 # ------------------------------------------------------------------ text
 FONTS = {"sans": ("DejaVu Sans", "normal"), "sans-bold": ("DejaVu Sans", "bold"),
          "serif": ("DejaVu Serif", "normal"), "serif-bold": ("DejaVu Serif", "bold"),
-         "mono": ("DejaVu Sans Mono", "normal")}
+         "mono": ("DejaVu Sans Mono", "normal"),
+         "mono-bold": ("DejaVu Sans Mono", "bold"),
+         "liberation-sans": ("Liberation Sans", "normal"),
+         "liberation-serif": ("Liberation Serif", "normal"),
+         "liberation-mono": ("Liberation Mono", "normal")}
+# Extra TTF paths (bundled or user-uploaded under data/fonts/). Key = font id for the UI.
+CUSTOM_FONT_DIRS = [
+    Path(__file__).resolve().parents[2] / "data" / "fonts",
+    Path(__file__).resolve().parents[2] / "static" / "fonts",
+]
+
+
+def list_fonts() -> list[str]:
+    """Built-in + any *.ttf / *.otf found in CUSTOM_FONT_DIRS (stem as id)."""
+    ids = list(FONTS)
+    seen = set(ids)
+    for d in CUSTOM_FONT_DIRS:
+        if not d.is_dir():
+            continue
+        for f in sorted(d.glob("*.ttf")) + sorted(d.glob("*.otf")):
+            key = f.stem.lower().replace(" ", "-")
+            if key not in seen:
+                ids.append(key); seen.add(key)
+    return ids
+
+
+def _font_prop(font: str):
+    """matplotlib FontProperties for a built-in id or a custom TTF path."""
+    from matplotlib.font_manager import FontProperties
+    if font in FONTS:
+        fam, weight = FONTS[font]
+        return FontProperties(family=fam, weight=weight)
+    # custom file
+    for d in CUSTOM_FONT_DIRS:
+        for ext in (".ttf", ".otf", ".TTF", ".OTF"):
+            cand = d / f"{font}{ext}"
+            if cand.is_file():
+                return FontProperties(fname=str(cand))
+            # allow stem match ignoring case
+        if d.is_dir():
+            for f in d.iterdir():
+                if f.suffix.lower() in (".ttf", ".otf") and f.stem.lower().replace(" ", "-") == font:
+                    return FontProperties(fname=str(f))
+    fam, weight = FONTS["sans"]
+    return FontProperties(family=fam, weight=weight)
 # face -> (normal, u (text right), v (text up)); right-handed so text reads correctly seen from outside
 FACES = {"top": ([0, 0, 1], [1, 0, 0], [0, 1, 0]), "bottom": ([0, 0, -1], [1, 0, 0], [0, -1, 0]),
          "front": ([0, -1, 0], [1, 0, 0], [0, 0, 1]), "back": ([0, 1, 0], [-1, 0, 0], [0, 0, 1]),
@@ -836,12 +982,10 @@ FACES = {"top": ([0, 0, 1], [1, 0, 0], [0, 1, 0]), "bottom": ([0, 0, -1], [1, 0,
 
 def text_polygon(text: str, font: str, height: float):
     """Text outline as a shapely (Multi)Polygon, capital-letter height = `height` mm, centred on (0,0)."""
-    from matplotlib.font_manager import FontProperties
     from matplotlib.textpath import TextPath
     from shapely.geometry import Polygon
     from shapely import affinity
-    fam, weight = FONTS.get(font, FONTS["sans"])
-    fp = FontProperties(family=fam, weight=weight)
+    fp = _font_prop(font)
     cap = TextPath((0, 0), "H", size=100, prop=fp).get_extents().height
     tp = TextPath((0, 0), text, size=100 * height / cap, prop=fp)
     rings = [r for r in tp.to_polygons(closed_only=True) if len(r) >= 3]
@@ -856,6 +1000,12 @@ def text_polygon(text: str, font: str, height: float):
 
 
 def op_text(m, p):
+    """Emboss/deboss text on a BB face, or on a tapped surface point (curved-surface text).
+
+    placement: "face" (default, flat BB face) | "surface" (point + normal from a click)
+    wrap: when True on surface, sample the mesh near the text baseline so glyphs follow curvature
+          (approximate; works best on gently curved surfaces).
+    """
     txt = str(p.get("text", "")).strip()
     if not txt or len(txt) > 60:
         raise OpError("Text must be 1–60 characters.")
@@ -863,19 +1013,96 @@ def op_text(m, p):
         raise OpError("Text contains control characters.")
     height = _num(p, "height", 8, 1, 500); depth = _num(p, "depth", 1, 0.1, 100)
     mode = p.get("mode", "emboss")
-    face = p.get("face", "top")
-    if mode not in ("emboss", "deboss") or face not in FACES:
-        raise OpError("mode must be emboss|deboss and face one of " + "|".join(FACES))
+    if mode not in ("emboss", "deboss"):
+        raise OpError("mode must be emboss|deboss")
     ou, ov = _num(p, "offset_u", 0), _num(p, "offset_v", 0)
     rot = _num(p, "rotation", 0, -360, 360)
     poly = text_polygon(txt, p.get("font", "sans"), height)
-    n, u, v = (np.array(x, float) for x in FACES[face])
-    lo, hi = _bounds(m); c = (lo + hi) / 2
-    half = (hi - lo) / 2
-    face_pt = c + n * np.abs(n * half).sum()                 # centre of the bounding-box face
+    placement = (p.get("placement") or "face").lower()
+    wrap = bool(p.get("wrap") or p.get("curved"))
     overlap = 0.3
     z0, z1 = (-overlap, depth) if mode == "emboss" else (-depth, overlap + 0.2)
     polys = [g for g in (poly.geoms if hasattr(poly, "geoms") else [poly]) if g.area > 1e-6]
+    note_bits = []
+
+    if placement == "surface":
+        pt = p.get("point") or p.get("position")
+        nrm = p.get("normal")
+        if not pt or not nrm:
+            raise OpError("Surface text needs point [x,y,z] and normal [x,y,z] from a click on the model.")
+        face_pt = np.asarray(pt, float).reshape(3)
+        n = np.asarray(nrm, float).reshape(3)
+        ln = np.linalg.norm(n)
+        if ln < 1e-9 or not np.isfinite(face_pt).all():
+            raise OpError("Surface point/normal is invalid.")
+        n = n / ln
+        # Local frame
+        a = np.zeros(3); a[int(np.argmin(np.abs(n)))] = 1.0
+        u = np.cross(n, a); u /= (np.linalg.norm(u) or 1)
+        v = np.cross(n, u)
+        a_rad = math.radians(rot)
+        ca, sa = math.cos(a_rad), math.sin(a_rad)
+        u2 = ca * u + sa * v
+        v2 = -sa * u + ca * v
+        u, v = u2, v2
+        if wrap and len(m.faces) and len(m.faces) < 500_000:
+            # Project each glyph polygon onto the nearest surface (ray from offset along -n)
+            tools = []
+            for g in polys:
+                # Centroid of glyph in UV
+                cx, cy = g.centroid.x + ou, g.centroid.y + ov
+                origin = face_pt + u * cx + v * cy + n * (max(m.extents) * 0.05 + 2)
+                # Ray toward the model
+                loc, ri, ti = m.ray.intersects_location([origin], [-n], multiple_hits=False)
+                if len(loc):
+                    hit = loc[0]
+                    hn = m.face_normals[ti[0]]
+                    # Rebuild local frame at hit
+                    aa = np.zeros(3); aa[int(np.argmin(np.abs(hn)))] = 1.0
+                    hu = np.cross(hn, aa); hu /= (np.linalg.norm(hu) or 1)
+                    hv = np.cross(hn, hu)
+                    # Keep text "up" roughly aligned with v
+                    if np.dot(hv, v) < 0:
+                        hu, hv = -hu, -hv
+                    solid = trimesh.creation.extrude_polygon(g, z1 - z0)
+                    verts = solid.vertices + [0, 0, z0]
+                    # Centre glyph at its own centroid so hit is the glyph centre
+                    verts = verts - [g.centroid.x, g.centroid.y, 0]
+                    world = hit + np.outer(verts[:, 0], hu) + np.outer(verts[:, 1], hv) + np.outer(verts[:, 2], hn)
+                    f = solid.faces
+                    if np.linalg.det(np.array([hu, hv, hn])) < 0:
+                        f = f[:, ::-1]
+                    tools.append(_new(world, f))
+                else:
+                    # Fallback: flat at face_pt
+                    solid = trimesh.creation.extrude_polygon(g, z1 - z0)
+                    verts = solid.vertices + [0, 0, z0]
+                    x = verts[:, 0] + ou; y = verts[:, 1] + ov
+                    world = face_pt + np.outer(x, u) + np.outer(y, v) + np.outer(verts[:, 2], n)
+                    tools.append(_new(world, solid.faces))
+            tool = trimesh.util.concatenate(tools) if len(tools) > 1 else tools[0]
+            note_bits.append("Curved-surface wrap: each letter follows the nearest surface (approximate).")
+        else:
+            solid = trimesh.util.concatenate([trimesh.creation.extrude_polygon(g, z1 - z0) for g in polys])
+            verts = solid.vertices + [0, 0, z0]
+            x = verts[:, 0] + ou; y = verts[:, 1] + ov
+            world = face_pt + np.outer(x, u) + np.outer(y, v) + np.outer(verts[:, 2], n)
+            f = solid.faces
+            if np.linalg.det(np.array([u, v, n])) < 0:
+                f = f[:, ::-1]
+            tool = _new(world, f)
+            note_bits.append("Surface text at the clicked point (flat on the local tangent).")
+        out = _boolean(m, tool, "union" if mode == "emboss" else "difference")
+        return out, {"message": f"{mode} “{txt}” on surface", "note": " ".join(note_bits), "placement": "surface"}
+
+    # --- classic BB-face placement ---
+    face = p.get("face", "top")
+    if face not in FACES:
+        raise OpError("face one of " + "|".join(FACES))
+    n, u, v = (np.array(x, float) for x in FACES[face])
+    lo, hi = _bounds(m); c = (lo + hi) / 2
+    half = (hi - lo) / 2
+    face_pt = c + n * np.abs(n * half).sum()
     solid = trimesh.util.concatenate([trimesh.creation.extrude_polygon(g, z1 - z0) for g in polys])
     verts = solid.vertices + [0, 0, z0]
     a = math.radians(rot)
@@ -886,7 +1113,6 @@ def op_text(m, p):
     if np.linalg.det(np.array([u, v, n])) < 0:
         f = f[:, ::-1]
     tool = _new(world, f)
-    # Where does the text sit on the face? (QA-6: text pushed past the face used to be accepted as "success")
     hu, hv = float(np.abs(u * half).sum()), float(np.abs(v * half).sum())
     tx0, tx1, ty0, ty1 = float(x.min()), float(x.max()), float(y.min()), float(y.max())
     if tx1 < -hu or tx0 > hu or ty1 < -hv or ty0 > hv:
@@ -901,13 +1127,14 @@ def op_text(m, p):
         floating = len(out.split(only_watertight=False)) - len(m.split(only_watertight=False))
         if floating >= len(polys):
             raise OpError("The raised text would float free of the model (it doesn't touch it here), so it was not added. Move it onto the model or make it smaller.")
-    note = "Text is placed on the flat bounding-box face; on curved/sloped surfaces it may float or sink."
+    note = "Text is placed on the flat bounding-box face; on curved/sloped surfaces it may float or sink. Use placement=surface for a clicked point."
     if overhang:
         note = (f"Part of the text goes past the edge of the {face} face ({2 * hu:.0f} × {2 * hv:.0f} mm), so only the part over the model is "
                 + ("added" if mode == "emboss" else "cut") + (", and the raised part that overhangs hangs in the air" if mode == "emboss" else "") + ". " + note)
     if floating > 0:
         note = f"{floating} separate piece{'s' if floating != 1 else ''} of the text (e.g. letters over a curved part) do not touch the model and would float in the air. Make the text smaller or move it. " + note
-    return out, {"message": f"{mode} “{txt}” on {face}", "note": note}
+    return out, {"message": f"{mode} “{txt}” on {face}", "note": note, "placement": "face"}
+
 
 
 def op_lay_flat(m, p):
@@ -925,6 +1152,11 @@ def op_smart_split(m, p):
     return smartsplit.smart_split(m, p)
 
 
+def op_thread(m, p):
+    from . import cadthread
+    return cadthread.op_thread(m, p)
+
+
 def op_plate(m, p):
     from . import plate
     try:
@@ -939,7 +1171,7 @@ from . import sculpt    # the voxel-remesh op: one-click watertight rebuild
 
 OPS = {"plate": op_plate, "lay_flat": op_lay_flat, "best_orient": op_best_orient, "smart_split": op_smart_split, "translate": op_translate, "rotate": op_rotate, "scale": op_scale, "mirror": op_mirror, "place": op_place,
        "repair": op_repair, "simplify": op_simplify, "cut": op_cut, "hollow": op_hollow, "base": op_base,
-       "boolean": op_boolean, "text": op_text, "on_face": op_on_face,
+       "boolean": op_boolean, "text": op_text, "on_face": op_on_face, "thread": op_thread,
        "parts": parts.op_parts,        # the parts builder (app/core/parts.py): recipe -> mesh
        "voxremesh": voxremesh.op_voxremesh,   # voxel remesh (app/core/voxremesh.py): watertight rebuild
        "sculpt": sculpt.op_sculpt}             # sculpt brushes (app/core/sculpt.py): smooth/flatten/inflate
@@ -973,6 +1205,7 @@ def label(op: str, p: dict) -> str:
             "boolean": lambda: f"{str(g('kind')).title()} {(p.get('primitive') or {}).get('type', '')}",
             "on_face": lambda: ("Add " if g("mode", "add") == "add" else "Cut ") + ("outline" if g("shape", "box") == "polygon" else f"Ø{g('diameter', 10):g} hole/cyl" if g("shape", "box") == "cylinder" else f"{g('width', 10):g}×{g('depth', 10):g} box") + f", {g('height', 10):g} mm on face",
             "text": lambda: f"{str(g('mode', 'emboss')).title()} “{g('text')}”",
+            "thread": lambda: f"Thread M{g('diameter', 6):g} {g('mode', 'add')}",
             "import": lambda: str(g("label", "Import")),
             "plate": lambda: __import__("app.core.plate", fromlist=["label"]).label(p),
         }[op]()
@@ -984,7 +1217,7 @@ def label(op: str, p: dict) -> str:
 HEAVY_OPS = {"remesh", "pattern", "round_edges", "body_boolean", "boolean", "simplify", "sketch_extrude",
              "revolve", "repair", "hollow", "shell", "smooth", "subdivide", "thicken",
              # CADRT-9: the rest of the CAD / sculpt ops too (cheap per op, but unbounded on big meshes)
-             "align", "face_offset", "body_transform", "sculpt_stroke", "sculpt", "scale", "cut", "smart_split",
+             "align", "face_offset", "body_transform", "sculpt_stroke", "sculpt", "scale", "cut", "smart_split", "thread",
              "mirror", "translate", "rotate", "merge_bodies", "smart_merge"}
 HEAVY_MIN_FACES = 20_000          # tiny meshes are not worth a fork
 

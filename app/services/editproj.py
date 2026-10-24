@@ -553,7 +553,7 @@ def redo(bid):
 
 def capabilities() -> dict:
     return {"boolean": meshedit.have_boolean(), "simplify": meshedit.have_simplify(), "hollow": meshedit.have_hollow(),
-            "text": True, "fonts": list(meshedit.FONTS), "max_upload_mb": MAX_UPLOAD_EDIT // 2**20,
+            "text": True, "fonts": meshedit.list_fonts(), "max_upload_mb": MAX_UPLOAD_EDIT // 2**20,
             "formats": sorted(meshedit.ALLOWED), "image_formats": sorted(meshedit.IMAGE_EXT), "units": list(meshedit.UNIT_MM)}
 
 
