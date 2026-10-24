@@ -110,6 +110,8 @@ function applyShape() {
   $("#diaLbl").firstChild.textContent = { globe: "Globe diameter ", cup: "Cup inside diameter " }[litShape()] || "Light diameter ";
   $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
   $("#lipBox").hidden = !(curved && litShape() !== "globe");     // sleeve / cup: the band and its slope
+  if ($("#lightFitBox")) $("#lightFitBox").hidden = !(curved && litShape() === "nightlight");
+  if ($("#frameSizeBox")) $("#frameSizeBox").hidden = !(lit && ["rect", "square", "circle", "heart", "star", "hexagon", "diamond"].includes(litShape()));
   const curve = lit && litShape() === "curve";
   $("#curveOpts").hidden = !curve; syncBend();
   const hangOk = lit && ["rect", "square", "circle"].includes(litShape());
@@ -130,6 +132,38 @@ function syncLip() {
   wn.hidden = !(w && t === "none"); wn.textContent = "A flat ledge overhangs at 90° and usually needs supports. You can still build it.";
 }
 ["#lip_mm", "#lip_taper", "#taper_deg"].forEach(s => $(s).addEventListener("input", syncLip)); syncLip();
+
+/* litho-up2: tone sliders, seamless tile, night-light fits, plate sizes */
+const LIGHT_FITS = { tealight: 38, puck50: 50, puck70: 70, e12: 16 };
+const FRAME_SIZES = { "4x6": 152.4, "5x7": 177.8, "8x10": 254, a6: 148, a5: 210 };
+function syncToneLabels() {
+  const b = $("#xo_bright"), c = $("#xo_contrast"), s = $("#xo_sharpen"), m = $("#xo_mmrep");
+  if (b) $("#brightOut").textContent = (+b.value).toFixed(2).replace(/\.?0+$/, "") || "0";
+  if (c) $("#contrastOut").textContent = (+c.value).toFixed(2).replace(/\.?0+$/, "") || "0";
+  if (s) $("#sharpenOut").textContent = (+s.value).toFixed(1).replace(/\.0$/, "");
+  if (m) $("#mmrepOut").textContent = (+m.value || 40) + " mm";
+  if ($("#xo_tile") && m) m.disabled = !$("#xo_tile").checked;
+}
+["#xo_bright", "#xo_contrast", "#xo_sharpen", "#xo_mmrep", "#xo_tile"].forEach(s => {
+  const el = $(s); if (el) el.addEventListener("input", syncToneLabels);
+});
+syncToneLabels();
+function applyLightFit() {
+  const id = $("#lightFit")?.value || "";
+  if (id && LIGHT_FITS[id] != null) { $("#diameter_mm").value = LIGHT_FITS[id]; place.redraw?.(); }
+}
+function applyFrameSize() {
+  const id = $("#frameSize")?.value || "";
+  if (id && FRAME_SIZES[id] != null) {
+    const w = Math.round(FRAME_SIZES[id]);
+    $("#width_mm").value = w;
+    if ($("#widthRange")) { $("#widthRange").value = Math.min(300, Math.max(30, w)); }
+  }
+}
+if ($("#lightFit")) $("#lightFit").addEventListener("change", applyLightFit);
+if ($("#frameSize")) $("#frameSize").addEventListener("change", applyFrameSize);
+$("#diameter_mm")?.addEventListener("input", () => { if ($("#lightFit")) $("#lightFit").value = ""; });
+$("#width_mm")?.addEventListener("input", () => { if ($("#frameSize")) $("#frameSize").value = ""; });
 function syncBend() { const b = +$("#bend_deg").value; $("#bendOut").textContent = b + "°" + (b === 0 ? " (flat)" : b === 180 ? " (half circle)" : ""); }
 $("#bend_deg").addEventListener("input", syncBend);
 function curveFitNote(r) {

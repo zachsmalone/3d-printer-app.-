@@ -43,6 +43,9 @@ function dlg() {
       <p class="help" id="expSlotsHelp">Use one slot: only the slots you tick go in the file. Empty slots are never checked.</p>
       <div class="row" id="expSlotList">${[1, 2, 3, 4].map(n => `<label class="slotchk"><input type="checkbox" name="expSlot" value="${n}" ${n === 1 ? "checked" : ""}><span>Slot ${n}</span></label>`).join("")}</div>
       <div class="expwarn" id="expSlotWarn" role="status" hidden><span id="expSlotWarnT"></span> <button type="button" class="btn small ghost" id="expSlotWarnOk">Continue</button></div></fieldset>
+    <fieldset class="expparts" id="expParts" hidden><legend>Parts</legend>
+      <p class="help">This build has more than one piece. Download them together or one at a time.</p>
+      <div id="expPartList"></div></fieldset>
     <fieldset class="exppreset" id="expPreset" hidden><legend>Print settings</legend>
       <label class="inl"><input type="checkbox" id="expPresetOn"> <span id="expPresetL"></span></label>
       <p class="help" id="expPresetD"></p><p class="help" id="expPresetN"></p></fieldset>
@@ -57,9 +60,9 @@ function dlg() {
 export async function open(o) {
   const d = dlg(), ws = o.ws || "studio", list = await formats();
   let fmt = ls("zeim.exportfmt." + ws); if (!list.some(f => f.id === fmt)) fmt = o.defaultFormat || "3mf";
-  let name = o.name || "", def = o.name || "ZEIM model", colours = 0, presets = [];
+  let name = o.name || "", def = o.name || "ZEIM model", colours = 0, presets = [], parts = [];
   if (o.bid) {
-    try { const j = await (await fetch(`/api/export/${encodeURIComponent(o.bid)}`, { credentials: "same-origin" })).json(); name = j.name || name; def = j.default_name || def; colours = j.colour_count || 0; presets = j.print_presets || []; }
+    try { const j = await (await fetch(`/api/export/${encodeURIComponent(o.bid)}`, { credentials: "same-origin" })).json(); name = j.name || name; def = j.default_name || def; colours = j.colour_count || 0; presets = j.print_presets || []; parts = j.parts || []; }
     catch { }
   }
   name = safeName(name || def);
@@ -72,6 +75,9 @@ export async function open(o) {
     const sv = ls("zeim.exportpreset." + ws); $("#expPresetOn").checked = sv == null ? !!pr.suggested : sv === pr.id; }
   $("#expPresetOn").onchange = () => { ls("zeim.exportpreset." + ws, $("#expPresetOn").checked ? pr.id : ""); paint(); };
   const preset = () => pr && $("#expPresetOn").checked && (d.querySelector("input[name=expFmt]:checked")?.value || "3mf") === "3mf" ? pr.id : "";
+  $("#expParts").hidden = parts.length < 2;
+  $("#expPartList").innerHTML = parts.map((p, i) => `<label class="radrow"><input type="radio" name="expPart" value="${esc(p.id)}" ${i === 0 ? "checked" : ""}><span>${esc(p.label)}</span></label>`).join("");
+  const part = () => parts.length >= 2 ? (d.querySelector("input[name=expPart]:checked")?.value || "") : "";
   $("#expMsg").textContent = "";
   // Multi-head / slot pickers live only in the FDM Slicer panel. Studio/Lithophane/CAD/TorchC0 exports use Slot 1.
   $("#expSlots").hidden = true;
@@ -90,7 +96,8 @@ export async function open(o) {
   $("#expSlotWarnOk").onclick = () => { warnOff = true; $("#expSlotWarn").hidden = true; };
   const url = () => {
     const f = d.querySelector("input[name=expFmt]:checked")?.value || "3mf";
-    if (!o.rid) return `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}&slots=${slots().join(",")}` + (preset() ? `&preset=${preset()}` : "");
+    if (!o.rid) return `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}&slots=${slots().join(",")}`
+      + (preset() ? `&preset=${preset()}` : "") + (part() ? `&part=${encodeURIComponent(part())}` : "");
     return o.rid ? `/api/resin/${o.rid}/torchc0.${f}?name=${encodeURIComponent(name)}`
       : `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}`;
   };
@@ -116,6 +123,7 @@ export async function open(o) {
   $("#expName").oninput = () => { $("#expNameHelp").textContent = "Will save as: " + safeName($("#expName").value) + ". Safe on Windows, Mac and phones."; };
   $("#expSlotList").onchange = () => { warnOff = false; slotWarn(); paint(); };
   $("#expList").onchange = e => { if (e.target.name === "expFmt") { ls("zeim.exportfmt." + ws, e.target.value); paint(); } };
+  $("#expPartList").onchange = () => paint();
   $("#expGo").onclick = () => { ls("zeim.exportfmt." + ws, d.querySelector("input[name=expFmt]:checked")?.value || "3mf"); $("#expMsg").textContent = "Downloading…"; };
   editing(false); slotWarn(); paint();
   if (!d.open) d.showModal();

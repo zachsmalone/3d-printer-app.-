@@ -110,6 +110,17 @@
       </fieldset>
       <p class="help" id="shapeHelp">Flat shapes lie on the bed. Globe, cup, night-light and curved panel print standing up.</p>
       <div class="grid2" id="curvedOpts" hidden>
+        <div class="field wide2" id="lightFitBox" hidden>
+          <label for="lightFit">Light fit</label>
+          <select id="lightFit" aria-describedby="lightFitHelp">
+            <option value="">Custom diameter</option>
+            <option value="tealight">LED tea-light (~38 mm)</option>
+            <option value="puck50">LED puck (~50 mm)</option>
+            <option value="puck70">LED puck (~70 mm)</option>
+            <option value="e12">E12 LED candelabra (~16 mm)</option>
+          </select>
+          <p class="help" id="lightFitHelp">Starting size for an LED / battery light the sleeve slips over. Measure yours. Not for flame candles or hot mains bulbs — use a certified socket for household power.</p>
+        </div>
         <div class="field"><label for="diameter_mm" id="diaLbl">Light diameter <em>mm</em></label><input type="number" id="diameter_mm" value="40" min="10" max="200" step="1"></div>
         <div class="field" id="heightFld"><label for="height_mm">Height <em>mm</em></label><input type="number" id="height_mm" value="60" min="10" max="240" step="1"></div>
         <div class="field wide2" id="lipBox" hidden>
@@ -145,6 +156,18 @@
       <h2><i>3</i> Size &amp; settings</h2>
       <div class="field"><label for="width_mm">Width <em>mm</em></label>
         <div class="range"><input type="range" id="widthRange" min="30" max="300" step="5" value="100"><input type="number" name="width_mm" id="width_mm" value="100" min="5" max="1000" step="1"></div></div>
+      <div class="field" id="frameSizeBox" hidden>
+        <label for="frameSize">Plate size</label>
+        <select id="frameSize" aria-describedby="frameSizeHelp">
+          <option value="">Custom width</option>
+          <option value="4x6">4 × 6 in (152 mm)</option>
+          <option value="5x7">5 × 7 in (178 mm)</option>
+          <option value="8x10">8 × 10 in (254 mm)</option>
+          <option value="a6">A6 postcard (148 mm)</option>
+          <option value="a5">A5 (210 mm)</option>
+        </select>
+        <p class="help" id="frameSizeHelp">Sets the plate width to a common photo size. Height follows your picture.</p>
+      </div>
 
       <div id="traceOpts" hidden>
         <p class="help">Best with a flat picture: a logo, icon, sketch or drawing on a plain background. PNG, JPG or SVG.</p>
@@ -250,7 +273,28 @@
             <div class="field"><label>Resolution <em>px wide</em></label><input type="number" name="resolution" value="200" min="16" max="600"></div>
             <div class="field"><label>Smoothing <em>σ</em></label><input type="number" name="smooth" value="0.8" min="0" max="5" step="0.1"></div>
             <div class="field"><label>Gamma</label><input type="number" name="gamma" value="1.0" min="0.2" max="3" step="0.05"></div>
+            <div class="field"><label for="xo_grey">Grey method</label>
+              <select name="grey_method" id="xo_grey" aria-describedby="greyHelp">
+                <option value="rec601" selected>Rec. 601 (default)</option>
+                <option value="rec709">Rec. 709</option>
+                <option value="average">Average RGB</option>
+                <option value="lightness">Lightness</option>
+                <option value="max">Max channel</option>
+              </select>
+              <p class="help" id="greyHelp">How the photo becomes thickness. Try another if a colour washes out.</p></div>
+            <div class="field"><label for="xo_bright">Brightness <em id="brightOut">0</em></label>
+              <div class="range"><input type="range" name="brightness" id="xo_bright" min="-1" max="1" step="0.05" value="0"></div></div>
+            <div class="field"><label for="xo_contrast">Contrast <em id="contrastOut">0</em></label>
+              <div class="range"><input type="range" name="contrast" id="xo_contrast" min="-1" max="1" step="0.05" value="0"></div></div>
+            <div class="field"><label for="xo_sharpen">Sharpen <em id="sharpenOut">0</em></label>
+              <div class="range"><input type="range" name="sharpen" id="xo_sharpen" min="0" max="2" step="0.1" value="0"></div></div>
             <div class="field chk"><label><input type="checkbox" name="auto_contrast" checked> Auto contrast</label><label><input type="checkbox" name="invert"> Invert</label></div>
+            <div class="field wide2" data-modes="lithophane" id="tileBox">
+              <label class="chk"><input type="checkbox" name="tile" id="xo_tile"> Seamless tile</label>
+              <label for="xo_mmrep">Repeat every <em id="mmrepOut">40 mm</em></label>
+              <div class="range"><input type="range" name="mm_per_repeat" id="xo_mmrep" min="5" max="200" step="1" value="40" disabled aria-describedby="tileHelp"></div>
+              <p class="help" id="tileHelp">Repeats the photo across the plate or around a sleeve so the seam matches. Use place left/right to slide the join.</p>
+            </div>
           </div></details>
         <details open data-modes="lithophane"><summary>Lithophane</summary>
           <div class="grid2">
