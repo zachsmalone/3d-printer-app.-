@@ -4,7 +4,16 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HTML = open(os.path.join(ROOT, "static", "index.html"), encoding="utf-8").read()
 CSS = open(os.path.join(ROOT, "static", "zeim-themes.css"), encoding="utf-8").read()
+CAD = open(os.path.join(ROOT, "static", "cad.html"), encoding="utf-8").read()
 SECS = {"viewShowcase": "showcase", "viewEdit": "slicer", "viewTorch": "torchc0", "viewCad": "cad", "viewCreate": "lithophane", "viewFix": "smartfix", "viewLearn": "learn", "viewAccount": "account"}
+MOTION = {
+    "showcase": "zt-petal",
+    "torchc0": "zt-ember",
+    "slicer": "zt-wave",
+    "lithophane": "zt-glow",
+    "account": "zt-ink",
+    "cad": "zt-mist",
+}
 
 
 def test_every_section_has_its_theme_band():
@@ -13,6 +22,13 @@ def test_every_section_has_its_theme_band():
         m = re.search(r'<main [^>]*id="%s"[^>]*>\s*<div class="zt-band" data-zt="%s"' % (vid, sec), HTML)
         assert m, vid
         assert f"[data-zt={sec}]" in CSS, sec
+
+
+def test_main_sections_have_subtle_motion_markup():
+    for sec, cls in MOTION.items():
+        i = HTML.find('data-zt="%s"' % sec)
+        assert i >= 0, sec
+        assert cls in HTML[i:i + 900], (sec, cls)
 
 
 def test_theme_assets_small_and_present():
@@ -26,10 +42,19 @@ def test_theme_assets_small_and_present():
 
 def test_reduced_motion_rule_disables_theme_animation():
     rm = CSS[CSS.index("@media (prefers-reduced-motion:reduce)"):]
-    assert "animation:none!important" in rm and ".zt-petal{display:none}" in rm
+    assert "animation:none!important" in rm
+    for cls in (".zt-petal", ".zt-ember", ".zt-wave", ".zt-mist", ".zt-ink", ".zt-glow"):
+        assert cls in rm and "display:none" in rm
     for kf in re.findall(r"@keyframes (zt-[a-z]+)\{((?:[^{}]*\{[^{}]*\})*)\}", CSS):   # animations only use transform/opacity
         props = set(re.findall(r"([a-z-]+):", kf[1]))
         assert props <= {"transform", "opacity"}, kf[0]
+
+
+def test_cad_work_canvas_has_no_theme_band():
+    """Ronin mist is for #viewCad home/empty/success landing only — never over the CAD workspace."""
+    assert "zt-band" not in CAD and "zeim-themes" not in CAD and "zt-mist" not in CAD
+    assert "#viewCad" in CSS or "viewCad" in CSS
+    assert "cad.html" in CSS  # documented never-on-canvas guard in the stylesheet header
 
 
 def test_copy_is_humble_and_adult():

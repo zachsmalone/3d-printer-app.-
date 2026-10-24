@@ -27,7 +27,7 @@ with sync_playwright() as p:
                 if not r["ok"]: bad.append(tag + ": art did not load")
                 if r["sw"] > 1: bad.append(tag + f": horizontal overflow {r['sw']}")
                 if rm == "reduce" and r["anims"]: bad.append(tag + ": animates under reduced motion " + ",".join(r["anims"]))
-                if rm != "reduce" and sec in ("torchc0", "showcase") and not r["anims"]: bad.append(tag + ": expected subtle motion")
+                if rm != "reduce" and sec in ("torchc0", "showcase", "slicer", "lithophane", "account", "cad") and not r["anims"]: bad.append(tag + ": expected subtle motion")
                 if SHOTS and rm == "no-preference":
                     pg.wait_for_timeout(300); pg.screenshot(path=f"{SHOTS}/{sec}-w{w}{'' if ENG=='chromium' else '-'+ENG}.png")
             pg.close()
