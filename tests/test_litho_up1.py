@@ -166,9 +166,12 @@ def test_layout_watches_obstacles_so_panels_come_back():
     assert "undo the trial edges' classes" in js
 
 
-def test_core_panel_becomes_a_chip_not_an_overlap():
+def test_core_panel_yields_only_to_a_chip_open():
+    """A core panel only becomes a chip when another panel was just opened from its chip (phone overlap).
+    Otherwise it stays open so Edit's ops stay visible."""
     js = open("static/wslayout.js", encoding="utf-8").read()
-    assert "if (!s.min) {   // still no room" in js and "a core panel never steps aside" in js
+    assert "chipPri" in js and "a core panel only yields to a panel the user just opened from its chip" in js
+    assert "a core panel never steps aside" in js
 
 
 # ------------------------------------------------------------------ (d) sleeve / cup lip with a sloped edge
