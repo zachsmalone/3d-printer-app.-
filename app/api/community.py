@@ -278,7 +278,7 @@ def unfollow(uid: str, actor: Actor = Depends(get_actor)):
 
 # ---------------- showcase ----------------
 @router.get("/showcase")
-def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", ai: str = "show", actor: Actor = Depends(get_actor)):
+def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", ai: str = "show", printer: str = "", material: str = "", supports: str = "", licence: str = "", mature: str = "", actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
     if tab not in branding.SHOWCASE_TABS:
         raise HTTPException(400, "unknown tab")
@@ -290,14 +290,21 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str =
     q = q.strip()[:80]
     if q:
         personalization.record_search(actor.sid, q, catalog.known_tags(actor))
-    items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {}, category.strip()[:60])
+    try:
+        # default hide; an account that opted in (settings) gets show unless the filter says hide
+        filters = catalog.check_filters(printer, material, supports, licence, mature or ("hide" if catalog.hides_mature(actor) else "show"))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {}, category.strip()[:60],
+                               include_mature=(filters["mature"] == "show"))
     if ai not in ("show", "hide", "only"):
         raise HTTPException(400, "ai must be show, hide or only")
     if ai != "show":
         items = [i for i in items if bool(i.get("ai_made")) == (ai == "only")]
+    items = catalog.apply_filters(items, filters, actor)
     items = discovery.apply_sort(items, sort)
     out = {"categories": catalog.categories(actor), "category": category.strip()[:60],
-           "originals_notice": _originals_notice(),"tab": tab, "ai": ai, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
+           "originals_notice": _originals_notice(),"tab": tab, "ai": ai, "filters": filters, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
            "subtitle": "Newest projects first." if tab == "free" else "",
            "example_notice": ""}
     if tab == "foryou" and not out["items"]:

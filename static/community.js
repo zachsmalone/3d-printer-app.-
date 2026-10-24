@@ -227,8 +227,9 @@ async function loadShowcase() {
   $("#shClear").hidden = !q;
   let r;
   if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent($("#shAi")?.value || "show")}`); } catch (e) { toast(e.message, "err"); return; }
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent($("#shAi")?.value || "show")}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
+  if (r.filters && $("#shMature")) $("#shMature").value = r.filters.mature;
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
   $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
   $("#shSub").textContent = r.subtitle || "";
@@ -247,6 +248,13 @@ async function loadShowcase() {
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
 $("#shAi")?.addEventListener("change", () => loadShowcase());
+// printer / material / supports / licence / mature filters (server validates; 'Not stated' = the model does not say)
+const SH_FILTERS = { printer: "#shPrinter", material: "#shMaterial", supports: "#shSupports", licence: "#shLicence", mature: "#shMature" };
+let shMatureTouched = false;
+function shFilterQS() { return Object.entries(SH_FILTERS).map(([k, sel]) => { const el = $(sel); return el && (k !== "mature" || shMatureTouched) ? `&${k}=${encodeURIComponent(el.value)}` : ""; }).join(""); }
+$("#shMature")?.addEventListener("change", () => { shMatureTouched = true; });
+Object.values(SH_FILTERS).forEach(sel => $(sel)?.addEventListener("change", () => loadShowcase()));
+$("#shFiltReset")?.addEventListener("click", () => { Object.values(SH_FILTERS).forEach(sel => { const el = $(sel); if (el) el.selectedIndex = 0; }); shMatureTouched = false; loadShowcase(); });
 // honest provenance labels: AI-made (creator said so, or 2D to 3D tab) and 'Printed by the community' (>=1 approved print photo). No counts, no ranking.
 function provHTML(i) {
   return `${i.ai_made ? '<span class="prov ai"><svg class=i aria-hidden=true focusable=false><use href=#i-chip></use></svg> AI-made</span>' : ""}${i.community_printed ? '<span class="prov printed"><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Printed by the community</span>' : ""}`;

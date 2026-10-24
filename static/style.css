@@ -1091,3 +1091,11 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .tiplink{font-size:13px}
 .tiplink a{color:var(--acc2)}
 .aifilter{max-width:260px;margin:6px 0}
+
+/* Showcase filters (printer / material / supports / licence / mature) */
+.shfilters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 12px;margin:8px 0}
+.shfilters>.i{width:18px;height:18px;align-self:center}
+.shfilters .field{margin:0;min-width:130px}
+.shfilters select{min-height:44px}
+.shfilters .btn{min-height:44px}
+.shfilters small.help{flex-basis:100%;margin:0}

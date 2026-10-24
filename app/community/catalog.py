@@ -219,6 +219,7 @@ def public(i: dict, actor: Actor) -> dict:
             "first_posted": str(i.get("created", ""))[:10],
             "view_only": bool(i.get("view_only")),
             "ai_made": bool(i.get("ai_made")),
+            "facets": facets(i),
             "community_printed": bool(not i.get("example") and _social().prints_for(i["id"])),   # >=1 approved 'I printed this'
             "tip_url": i.get("tip_url") or "",
             "download_blocked": _dl_blocked(i, actor),
@@ -230,6 +231,66 @@ def public(i: dict, actor: Actor) -> dict:
 
 
 VIEW_ONLY_MSG = "The maker made this project view only: you can look at it, but it can't be downloaded."
+
+
+# ---- Showcase filters: printer / material / supports / licence. Read from existing metadata only;
+# a model that does not say is 'unknown' (only hidden when the viewer picks a specific value).
+FILTER_PRINTERS = ("fdm", "resin", "unknown")
+FILTER_MATERIALS = ("pla", "petg", "abs", "asa", "tpu", "nylon", "resin", "unknown")
+FILTER_SUPPORTS = ("yes", "no", "unknown")
+
+
+def _words(t) -> set:
+    return set(re.split(r"[^a-z0-9]+", str(t or "").lower()))
+
+
+def facets(i: dict) -> dict:
+    from . import licensing
+    pw = _words(i.get("printer")) | _words(i.get("printer_type"))
+    printer = "resin" if pw & {"resin", "sla", "msla", "dlp"} else "fdm" if pw & {"fdm", "fff", "nozzle", "filament"} else "unknown"
+    mw = _words(i.get("material"))
+    material = next((m for m in FILTER_MATERIALS[:-1] if m in mw), "unknown")
+    lvl = str(i.get("supports_level") or "").strip().lower()
+    if i.get("needs_supports"):
+        supports = "yes"
+    elif lvl in ("none", "no", "not needed", "false"):
+        supports = "no"
+    elif lvl:
+        supports = "yes"
+    else:
+        supports = "unknown"
+    lid = i.get("license_id") or ""
+    return {"printer": printer, "material": material, "supports": supports,
+            "licence": lid if lid in licensing.LICENSES else "unknown"}
+
+
+def check_filters(printer="", material="", supports="", licence="", mature="hide") -> dict:
+    """Validated filter values ('' = any). Raises ValueError on anything else."""
+    from . import licensing
+    allowed = {"printer": FILTER_PRINTERS, "material": FILTER_MATERIALS, "supports": FILTER_SUPPORTS,
+               "licence": tuple(licensing.LICENSES) + ("unknown",)}
+    out = {}
+    for k, v in (("printer", printer), ("material", material), ("supports", supports), ("licence", licence)):
+        v = (v or "").strip().lower() if k != "licence" else (v or "").strip()
+        if v and v not in allowed[k]:
+            raise ValueError(f"unknown {k} filter value")
+        out[k] = v
+    if mature not in ("show", "hide"):
+        raise ValueError("mature must be show or hide")
+    out["mature"] = mature
+    return out
+
+
+def apply_filters(items: list[dict], f: dict, actor: Actor | None = None) -> list[dict]:
+    """Mature=hide drops NSFW for everyone but the owner (same rule as mature_ok)."""
+    keep = []
+    for i in items:
+        if f.get("mature") == "hide" and i.get("nsfw") and not (actor and i.get("owner_sid") == actor.sid):
+            continue
+        fc = facets(i)
+        if all(not f.get(k) or fc[k] == f[k] for k in ("printer", "material", "supports", "licence")):
+            keep.append(i)
+    return keep
 
 
 def _dl_blocked(i: dict, actor) -> bool:
@@ -372,9 +433,9 @@ def mature_ok(i: dict, actor: Actor) -> bool:
     return not (i.get("nsfw") and hides_mature(actor) and i.get("owner_sid") != actor.sid)
 
 
-def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None, category: str = "") -> list[dict]:
+def list_items(actor: Actor, tab: str, q: str = "", weights: dict | None = None, category: str = "", include_mature: bool = False) -> list[dict]:
     ok = _visible(actor, USERS.read())
-    items = [i for i in _all() if ok(i) and mature_ok(i, actor)]
+    items = [i for i in _all() if ok(i) and (include_mature or mature_ok(i, actor))]
     if category:
         items = [i for i in items if i.get("category") == category]
     if q:
