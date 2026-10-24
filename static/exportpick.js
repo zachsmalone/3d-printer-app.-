@@ -4,6 +4,7 @@
    - Remembers the last format per workspace (localStorage "zeim.exportfmt.<workspace>").
    - File name defaults to "Title - Printer - 0.2mm"; one tap on Rename edits it. Names are made safe on the server
      for Windows, Mac and phones; the same rules run here so the preview matches.
+   Filament slots / multi-head controls are NOT here — they belong only in the FDM Slicer panel.
    Usage: zeimExport.open({ ws: "studio", bid }) or zeimExport.open({ ws: "torchc0", rid, name }). */
 const FALLBACK = [
   { id: "stl", label: "STL", desc: "Works in every slicer. Shape only, no colour or units." },
@@ -38,7 +39,7 @@ function dlg() {
       <div class="row" id="expNameRow" hidden><label for="expName" class="sr-only">File name</label><input id="expName" maxlength="160" autocomplete="off" spellcheck="false"><button type="button" class="btn small" id="expNameOk">Done</button><button type="button" class="btn small ghost" id="expNameReset">Default</button></div>
       <p class="help" id="expNameHelp">Safe on Windows, Mac and phones.</p></div>
     <fieldset class="expfmts"><legend>Format</legend><div id="expList"></div></fieldset>
-    <fieldset class="expslots" id="expSlots"><legend>Filament slots (CFS / AMS)</legend>
+    <fieldset class="expslots" id="expSlots" hidden><legend>Filament slots (CFS / AMS)</legend>
       <p class="help" id="expSlotsHelp">Use one slot: only the slots you tick go in the file. Empty slots are never checked.</p>
       <div class="row" id="expSlotList">${[1, 2, 3, 4].map(n => `<label class="slotchk"><input type="checkbox" name="expSlot" value="${n}" ${n === 1 ? "checked" : ""}><span>Slot ${n}</span></label>`).join("")}</div>
       <div class="expwarn" id="expSlotWarn" role="status" hidden><span id="expSlotWarnT"></span> <button type="button" class="btn small ghost" id="expSlotWarnOk">Continue</button></div></fieldset>
@@ -72,9 +73,10 @@ export async function open(o) {
   $("#expPresetOn").onchange = () => { ls("zeim.exportpreset." + ws, $("#expPresetOn").checked ? pr.id : ""); paint(); };
   const preset = () => pr && $("#expPresetOn").checked && (d.querySelector("input[name=expFmt]:checked")?.value || "3mf") === "3mf" ? pr.id : "";
   $("#expMsg").textContent = "";
-  $("#expSlots").hidden = !!o.rid;
+  // Multi-head / slot pickers live only in the FDM Slicer panel. Studio/Lithophane/CAD/TorchC0 exports use Slot 1.
+  $("#expSlots").hidden = true;
   d.querySelectorAll("input[name=expSlot]").forEach(c => { c.checked = c.value === "1"; });
-  const slots = () => { const v = [...d.querySelectorAll("input[name=expSlot]:checked")].map(c => +c.value); return v.length ? v : [1]; };
+  const slots = () => [1];
   let warnOff = false;
   const slotWarn = () => {
     const s = slots(), need = Math.max(1, colours); let t = "";

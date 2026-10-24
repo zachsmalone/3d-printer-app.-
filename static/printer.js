@@ -124,6 +124,26 @@ export const checkShowcase = (id, slice = false) => api(`/api/showcase/${id}/wil
 const presetOf = id => P.cat.presets.find(x => x.id === id) || P.cat.presets.find(x => x.id === P.cat.default_preset) || {};
 // same formula as print_setup.preset_layer(): the nozzle's recommended layer scaled by the preset, kept in the nozzle's range
 export const presetLayer = (pv, rec, lo, hi) => +Math.min(Math.max(rec * (pv.layer_frac ?? 0.5) / 0.5, lo), hi).toFixed(3);
+/* Per-slot filament + colour when the printer has AMS / CFS / MMU / ACE. Single-head printers stay simple. */
+function slotsHTML(p, mats) {
+  const n = +p?.filament_slots || 1, systems = p?.multi_color_system || [];
+  if (n <= 1 || !systems.length) return "";
+  const label = systems.join(" / ");
+  const defCols = ["#FFFFFF", "#FF0000", "#00AA00", "#0066FF", "#FFD000", "#FF00AA", "#00DDDD", "#222222"];
+  return `<fieldset class="spslots" id="spSlots"><legend>Filament per ${esc(label)} slot</legend>
+    <p class="help">Turn on only the slots this print uses. Unused ports are not heated, primed or purged.</p>
+    ${Array.from({ length: n }, (_, i) => {
+      const s = i + 1, col = defCols[i % defCols.length];
+      return `<div class="spslot" data-slot="${s}">
+        <label class="inl chk"><input type="checkbox" name="spSlotOn" value="${s}" ${s === 1 ? "checked" : ""}> Slot ${s}</label>
+        <label class="sr-only" for="spSlotMat${s}">Slot ${s} material</label>
+        <select id="spSlotMat${s}">${mats.map(m => `<option value="${esc(m)}" ${m === "PLA" ? "selected" : ""}>${esc(m)}</option>`).join("")}</select>
+        <label class="sr-only" for="spSlotCol${s}">Slot ${s} colour</label>
+        <input type="color" id="spSlotCol${s}" value="${col}" title="Slot ${s} colour">
+      </div>`;
+    }).join("")}
+    <p class="help" id="spSlotNotes" aria-live="polite"></p></fieldset>`;
+}
 export function panelHTML(hintMode) {
   const pref = P.pref, p = printerOf(pref.printer_id), n = pref.nozzle || 0.4;
   const o = nozzleOpt(pref.printer_id, n), lh = o?.layer_height_mm || { min: n / 4, max: n * 0.75, recommended: n / 2 };
@@ -143,7 +163,8 @@ export function panelHTML(hintMode) {
     <p class="help nozzlespec">${mfrHTML(pref.printer_id, n)}</p>
     <div class="segmented" role="group" aria-label="Settings level"><button type="button" id="spBeginner" aria-pressed="${beginner}">Beginner</button><button type="button" id="spAdvanced" aria-pressed="${!beginner}">Advanced</button></div>
     <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset"><input type="radio" name="spPreset" value="${x.id}" ${x.id === wantPreset ? "checked" : ""}><span><b>${esc(x.label)}</b><small>${esc(x.help)}</small></span></label>`).join("")}</div>
-    <div class="grid2">${sel("spMat", "Material", mats, "PLA")}${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
+    <div class="grid2" id="spMatRow">${sel("spMat", "Material", mats, "PLA")}${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
+    ${slotsHTML(p, mats)}
     <div id="spPaintHost"></div>
     <div id="spMatWarn" aria-live="polite">${matWarnHTML("PLA")}</div>
     <div id="spAdv" ${beginner ? "hidden" : ""}><div class="grid3">
@@ -173,6 +194,13 @@ function readPanel() {
   if ($("#spFit").checked) fd.append("scale_to_fit", "true");
   const paint = getStrokes();
   if (paint.length) fd.append("support_paint", JSON.stringify(paint));
+  const on = [...document.querySelectorAll("[name=spSlotOn]:checked")].map(c => +c.value);
+  if ($("#spSlots") && on.length) {
+    fd.append("slots", on.join(","));
+    fd.append("slot_materials", JSON.stringify(on.map(s => ($("#spSlotMat" + s)?.value) || "PLA")));
+    fd.append("slot_colours", JSON.stringify(on.map(s => ($("#spSlotCol" + s)?.value) || "#FFFFFF")));
+    const m0 = $("#spSlotMat" + on[0]); if (m0) fd.set("material", m0.value);
+  }
   return fd;
 }
 export function openInHTML(dl) {
@@ -184,6 +212,29 @@ export function wirePanel(getModelId) {
   const mat = $("#spMat");
   if (!mat) return;
   mountPaint($("#spPaintHost"));
+  const slotBox = $("#spSlots");
+  if (slotBox) {
+    // Multi-head: per-slot material replaces the single Material field (slot 1 is primary).
+    const matField = mat.closest(".field");
+    if (matField) matField.hidden = true;
+    const syncSlots = () => {
+      const on = [...slotBox.querySelectorAll("[name=spSlotOn]:checked")].map(c => +c.value);
+      const note = $("#spSlotNotes");
+      if (!on.length) { slotBox.querySelector("[name=spSlotOn]").checked = true; return syncSlots(); }
+      on.forEach(s => { const sel = $("#spSlotMat" + s), col = $("#spSlotCol" + s); if (sel) sel.disabled = false; if (col) col.disabled = false; });
+      slotBox.querySelectorAll("[name=spSlotOn]").forEach(c => {
+        const s = +c.value, off = !c.checked;
+        const sel = $("#spSlotMat" + s), col = $("#spSlotCol" + s);
+        if (sel) sel.disabled = off; if (col) col.disabled = off;
+      });
+      const m0 = $("#spSlotMat" + on[0]); if (m0) { mat.value = m0.value; mat.dispatchEvent(new Event("change")); }
+      if (note) note.textContent = on.length === 1
+        ? `Only slot ${on[0]} will be heated and primed. Other ports stay unused.`
+        : `Slots ${on.join(", ")} will be used. Other ports are not heated, primed or purged.`;
+    };
+    slotBox.addEventListener("change", syncSlots);
+    syncSlots();
+  }
   const mode = adv => { localStorage.setItem("zeim.slicerMode", adv ? "advanced" : "beginner"); $("#spAdv").hidden = !adv; $("#spBeginner").setAttribute("aria-pressed", !adv); $("#spAdvanced").setAttribute("aria-pressed", adv); };
   $("#spBeginner").onclick = () => mode(false); $("#spAdvanced").onclick = () => mode(true);
   // reference temps, capped to what this printer can reach (the server caps them the same way and says so)
@@ -214,6 +265,8 @@ export function wirePanel(getModelId) {
         ${paintNote}
         ${r.skipped_objects?.length ? `<div class="help warn" role="alert" id="spSkipped"><p>${esc(r.skipped_note)}</p><div class="row"><button type="button" class="btn small" id="spSplit">Split onto another plate</button><button type="button" class="btn small ghost" id="spSkipX" aria-label="Dismiss this warning">Dismiss</button></div></div>` : ""}
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
+        ${(r.slot_notes || []).map(n => `<p class="help">${esc(n)}</p>`).join("")}
+        ${r.slots ? `<p class="help">Filament slots used: ${esc((r.slots || []).join(", "))}. Unused ports are not heated, primed or purged.</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> G-code</a><a class="btn" href="${r.downloads["3mf"]}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> 3MF</a><a class="btn" href="${r.downloads.stl}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> STL</a></div>
