@@ -222,7 +222,7 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
                color_mode="mono", place=None, hang="", hole_d=4.0, inset_mm=6.0,
                spacing_mm=40.0, stand=False, bend_deg=90.0, lip_mm=None, lip_taper="none", taper_deg=45.0,
                grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0,
-               tile=False, mm_per_repeat=None, **_) -> Model:
+               tile=False, mm_per_repeat=None, frame_style="plain", stand_caps=False, **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
     if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
@@ -240,8 +240,14 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
         border_mm = max(border_mm, litho_hang.border_needed(hole_d, inset_mm))
     if stand and shape in litho_shapes.CURVED_SHAPES:
         raise ValueError("the display stand is only available for flat lithophane shapes")
+    if stand_caps and not stand:
+        raise ValueError("stand end caps need the display stand turned on")
+    if stand_caps and shape in litho_shapes.CURVED_SHAPES + litho_shapes.PANEL_SHAPES:
+        raise ValueError("stand end caps are only available for flat lithophane shapes")
+    from . import litho_frame
+    frame_style = litho_frame.check(frame_style)
     tone = dict(grey_method=grey_method, brightness=brightness, contrast=contrast, sharpen=sharpen,
-                tile=tile, mm_per_repeat=mm_per_repeat)
+                tile=tile, mm_per_repeat=mm_per_repeat, frame_style=frame_style)
     if shape in litho_shapes.PANEL_SHAPES:      # curved panel: its stand is built in (same solid), not a second body
         v, f, info, thick = litho_shapes.build(
             im, shape, width_mm=width_mm, bend_deg=bend_deg, stand=bool(stand), min_thickness=min_thickness,
@@ -265,10 +271,17 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
             v, f, info = _flat_attachments(v, f, info, width_mm, max_thickness,
                                            poly, hang, hang_opts if hang else None, stand)
         m = Model([Body("lithophane", v, f)], "lithophane")
+        caps_info = None
         if stand:
             y0 = v[:, 1].max() + 5.0 + info["stand"]["depth_mm"] / 2.0   # park it beside the plate: parts must not overlap in a combined print
             m.bodies.append(litho_stand_body(width_mm, max_thickness, y0))
+            if stand_caps:
+                caps_info = _append_stand_caps(m, width_mm, max_thickness)
         m.info = {**info, "shape": shape}
+        if frame_style != "plain":
+            m.info["frame_style"] = frame_style
+        if caps_info is not None:
+            m.info["stand_caps"] = caps_info
         m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)
         return m
     from . import litho_image as LI
@@ -302,19 +315,28 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
             while (pad - 1) * (width_mm / (nx - 1 + 2 * pad)) < border_mm:
                 pad += 1
         thick = np.pad(thick, pad, constant_values=max_thickness)
+        if frame_style != "plain":
+            thick = litho_frame.apply_rect(thick, pad, max_thickness, frame_style)
     pitch = width_mm / (nx - 1 + 2 * pad)          # width_mm is the OUTSIDE width: picture + border together (it used to be picture only)
     v, f = heightfield_solid(thick, pitch)
     info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4), border_cells=pad)
+    if frame_style != "plain":
+        info["frame_style"] = frame_style
     if hang or stand:
         H = v[:, 1].max()
         poly = np.array([[0.0, 0.0], [width_mm, 0.0], [width_mm, H], [0.0, H]])
         v, f, info = _flat_attachments(v, f, info, width_mm, max_thickness,
                                        poly, hang, hang_opts if hang else None, stand)
     m = Model([Body("lithophane", v, f)], "lithophane")
+    caps_info = None
     if stand:
         y0 = v[:, 1].max() + 5.0 + info["stand"]["depth_mm"] / 2.0   # park it beside the plate: parts must not overlap in a combined print
         m.bodies.append(litho_stand_body(width_mm, max_thickness, y0))
+        if stand_caps:
+            caps_info = _append_stand_caps(m, width_mm, max_thickness)
     m.info = info
+    if caps_info is not None:
+        m.info["stand_caps"] = caps_info
     m.thumb = thumbnail.lithophane_backlit(thick, min_thickness, max_thickness)
     return m
 
@@ -351,6 +373,22 @@ def litho_stand_body(width_mm: float, max_thickness: float, y_offset: float = 0.
         v[:, 1] += y_offset
     return Body("stand", v, f)
 
+
+def _append_stand_caps(m: Model, width_mm: float, max_thickness: float) -> dict:
+    """Park two end-cap plugs beside the stand (friction-fit mechanical stops for the U-channel).
+
+    Returns the cap info dict; caller merges into m.info after assigning the rest of the info.
+    """
+    from . import litho_socket
+    x0 = max(b.vertices[:, 0].max() for b in m.bodies) + 8.0
+    caps_info = None
+    for i, (v, f, name, info) in enumerate(litho_socket.end_caps(width_mm, max_thickness)):
+        vv = v.copy()
+        span = float(np.ptp(vv[:, 0]))
+        vv[:, 0] += x0 + i * (span + 4.0)
+        m.bodies.append(Body(name, vv, f))
+        caps_info = info
+    return caps_info or {}
 
 def relief(im: Image.Image, width_mm=100.0, base_mm=2.0, relief_mm=6.0, resolution=200,
            smooth=1.0, gamma=1.0, auto_contrast=True, invert=False, _alpha=None, **_) -> Model:

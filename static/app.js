@@ -2,7 +2,7 @@ import { effectRGB, defaultEffect, lightRGB as fxBase, materialRGB, transmit, ba
 import { Viewer } from "/static/viewer.js";
 
 const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert" : "beginner", me: null, preset: "standard", file: null,
+const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert" : "beginner", me: null, preset: "standard", file: null, collageFiles: [],
             current: null, history: [], max: 5, settings: null };
 const PRESET_HELP = {
   lithophane: { thin: "Lighter, glows brighter, more fragile (0.6–2.4 mm).", standard: "Balanced contrast and strength (0.8–3.2 mm).", thick: "Deep shadows, sturdy (1.0–4.0 mm)." },
@@ -112,15 +112,34 @@ function applyShape() {
   $("#heightFld").hidden = litShape() === "globe";             // a globe is a sphere: diameter only
   $("#lipBox").hidden = !(curved && litShape() !== "globe");     // sleeve / cup: the band and its slope
   if ($("#lightFitBox")) $("#lightFitBox").hidden = !(curved && litShape() === "nightlight");
-  if ($("#frameSizeBox")) $("#frameSizeBox").hidden = !(lit && ["rect", "square", "circle", "heart", "star", "hexagon", "diamond"].includes(litShape()));
+  const FLAT = ["rect", "square", "circle", "heart", "star", "hexagon", "diamond", "oval", "triangle", "scallop"];
+  if ($("#frameSizeBox")) $("#frameSizeBox").hidden = !(lit && FLAT.includes(litShape()));
+  if ($("#frameStyleBox")) $("#frameStyleBox").hidden = !(lit && FLAT.includes(litShape()));
+  if ($("#collageBox")) $("#collageBox").hidden = !(lit && FLAT.includes(litShape()));
   const curve = lit && litShape() === "curve";
   $("#curveOpts").hidden = !curve; syncBend();
-  const hangOk = lit && ["rect", "square", "circle"].includes(litShape());
-  $("#hangOpts").hidden = !hangOk; if (!hangOk) { $("#hang").value = ""; $("#stand").checked = false; }
+  const hangOk = lit && FLAT.includes(litShape());
+  $("#hangOpts").hidden = !hangOk; if (!hangOk) { $("#hang").value = ""; $("#stand").checked = false; if ($("#stand_caps")) $("#stand_caps").checked = false; }
   $("#hangHoleFld").hidden = !$("#hang").value;
+  syncStandCaps();
   $("#placeEditor").hidden = !lit || litShape() === "rect" || curve || !S.file;   // curved panel: whole photo, its own aspect
   if (place && !$("#placeEditor").hidden) place.redraw();
 }
+function syncStandCaps() {
+  const on = $("#stand")?.checked && !$("#hangOpts")?.hidden;
+  if ($("#standCapsRow")) $("#standCapsRow").hidden = !on;
+  if (!on && $("#stand_caps")) $("#stand_caps").checked = false;
+}
+$("#stand")?.addEventListener("change", syncStandCaps);
+function syncCollage() {
+  const on = $("#collageOn")?.checked;
+  if ($("#collageOpts")) $("#collageOpts").hidden = !on;
+  if (!on) { S.collageFiles = []; if ($("#collageExtra")) $("#collageExtra").value = ""; }
+}
+$("#collageOn")?.addEventListener("change", syncCollage);
+$("#collageExtra")?.addEventListener("change", e => {
+  S.collageFiles = [...(e.target.files || [])].slice(0, 5);
+});
 /* curved panel: bend 0..180 deg, optional built-in stand; the bed check uses the printer picked in Will-it-print */
 let PRN = null; import("/static/printer.js").then(m => { PRN = m; }).catch(() => { });
 function syncLip() {
@@ -258,6 +277,13 @@ function formData(autoDelete) {
     if (!$("#hangOpts").hidden) {
       if ($("#hang").value) { fd.append("hang", $("#hang").value); fd.append("hole_d", $("#hole_d").value); }
       if ($("#stand").checked) fd.append("stand", "true");
+      if ($("#stand_caps")?.checked) fd.append("stand_caps", "true");
+    }
+    if ($("#frameStyleBox") && !$("#frameStyleBox").hidden && $("#frame_style")?.value)
+      fd.append("frame_style", $("#frame_style").value);
+    if ($("#collageOn")?.checked && S.collageFiles?.length) {
+      fd.append("collage_layout", $("#collage_layout")?.value || "grid");
+      S.collageFiles.forEach(f => fd.append("extra", f));
     }
     if (!["rect", "curve"].includes(litShape()) && !place.isDefault()) {
       const p = place.get(); fd.append("place_x", p.x.toFixed(4)); fd.append("place_y", p.y.toFixed(4));

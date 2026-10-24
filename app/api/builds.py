@@ -111,7 +111,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'base_style', 'base_margin', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'stand_caps', 'frame_style', 'collage_layout', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'base_style', 'base_margin', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 
 def disk_guard():
@@ -255,7 +255,7 @@ def generate(
     max_thickness: float = Form(3.0),
     border_mm: float = Form(3.0),
     material: str = Form("filament"),       # lithophane printer type: filament | resin (beginner defaults only)
-    shape: str = Form("rect"),               # lithophane outline: rect | heart | circle | star | square | hexagon | diamond | globe | nightlight | cup
+    shape: str = Form("rect"),               # lithophane outline: rect | flat (heart/circle/star/square/hexagon/diamond/oval/triangle/scallop) | globe | nightlight | cup | curve
     diameter_mm: float = Form(40.0),         # curved shapes: globe diameter / light diameter the night-light slips over
     height_mm: float = Form(60.0),           # curved shapes: height
     place_x: str = Form(""),                 # image placement inside the shape (see litho_shapes.check_place)
@@ -267,6 +267,10 @@ def generate(
     inset_mm: float = Form(6.0),             # hanging hole centre from the top edge (mm)
     spacing_mm: float = Form(40.0),          # distance between the two holes of hang=two (mm)
     stand: bool = Form(False),               # lithophane display stand as a second body (curved panel: built-in foot)
+    stand_caps: bool = Form(False),          # friction-fit end-cap plugs for the U-channel stand (two extra bodies)
+    frame_style: str = Form("plain"),        # flat rim style: plain | double | ledge
+    collage_layout: str = Form(""),          # "" = single photo; hstrip | vstrip | grid = multi-photo collage
+    extra: list[UploadFile] = File(None),    # extra photos for collage (with `file` = 2..6 total)
     backing: str = Form(""),               # lithophane backing / backlight colour: warm, cool, paper or #rrggbb (saved with the build)
     bend_deg: float = Form(90.0),            # curved panel: bend from flat (0) to half circle (180)
     lip_mm: str = Form(""),                   # sleeve / cup band height; "" = follow border_mm (older builds)
@@ -337,6 +341,7 @@ def generate(
         raise HTTPException(400, str(e))
     except Exception:
         raise HTTPException(400, imagesafe.UNREADABLE)
+    collage_meta = None
     if not (5 <= width_mm <= 1000):
         raise HTTPException(400, "width_mm must be 5..1000")
     try:
@@ -364,6 +369,41 @@ def generate(
                 lip = litho_shapes.check_lip(float(lip_mm), lip_taper, taper_deg)
             except ValueError as e:
                 raise HTTPException(400, str(e))
+    # Collage: compose 2–6 photos into one image, then the normal lithophane path.
+    # Distinct from the memory box (no cube / light base). CMYK colour layers are out of scope.
+    if mode == "lithophane" and str(collage_layout or "").strip():
+        from ..core import litho_collage
+        extras = [f for f in (extra or []) if getattr(f, "filename", "")]
+        try:
+            layout = litho_collage.check_layout(collage_layout)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        ims = [im]
+        for up in extras:
+            raw_e = up.file.read(MAX_UPLOAD + 1)
+            if len(raw_e) > MAX_UPLOAD:
+                raise HTTPException(413, "image too large (max 25 MB)")
+            try:
+                checked_e = uploadgate.gate(raw_e, actor.sid, source="generate")
+            except uploadgate.GateError as e:
+                raise HTTPException(e.status, e.message)
+            if getattr(checked_e, "scan_state", "off") == "unscanned":
+                raise HTTPException(503, "A collage photo is still waiting on the malware scan. Try again in a moment.")
+            try:
+                imagesafe.check_ack(raw_e, photo_ack)
+                raw_e, _, _ = imagesafe.sanitize(raw_e)
+                ims.append(geometry.load_image(raw_e))
+            except imagesafe.ImageRefused as e:
+                raise HTTPException(400, str(e))
+            except Exception:
+                raise HTTPException(400, imagesafe.UNREADABLE)
+        try:
+            litho_collage.check_count(len(ims))
+            im = litho_collage.compose(ims, layout)
+            collage_meta = litho_collage.info(len(ims), layout)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+
     place = None
     if mode == "lithophane" and shape not in ("rect",) + litho_shapes.PANEL_SHAPES:
         raw = {k: v for k, v in (("x", place_x), ("y", place_y), ("scale", place_scale), ("rotation", place_rotation))
@@ -419,12 +459,25 @@ def generate(
             if on:
                 params.update(tile=True, mm_per_repeat=mm)
             params.update(hang=hang, hole_d=hole_d, inset_mm=inset_mm, spacing_mm=spacing_mm, stand=stand)
+            from ..core import litho_frame, litho_socket
+            try:
+                params.update(frame_style=litho_frame.check(frame_style))
+            except ValueError as e:
+                raise HTTPException(400, str(e))
+            if litho_socket.check(stand_caps):
+                params.update(stand_caps=True)
+            if collage_meta:
+                params.update(collage_layout=collage_meta["layout"], collage_photos=collage_meta["photos"])
         t0 = time.time()
         try:
             model = geometry.build(im, mode, params)
+            if collage_meta:
+                model.info = {**(model.info or {}), **collage_meta}
             prev = model
             if params["resolution"] > PREVIEW_RES:
                 prev = geometry.build(im, mode, {**params, "resolution": PREVIEW_RES})
+                if collage_meta:
+                    prev.info = {**(prev.info or {}), **collage_meta}
         except ValueError as e:
             raise HTTPException(400, str(e))
         bid = uuid.uuid4().hex[:12]

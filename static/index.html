@@ -104,6 +104,9 @@
 <label class="card" data-shape="star"><input type="radio" name="litho_shape" value="star"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-star"/></svg></span><b>Star</b><small>Flat star</small></label>
 <label class="card" data-shape="hexagon"><input type="radio" name="litho_shape" value="hexagon"><span class="ico" aria-hidden="true">⬡</span><b>Hexagon</b><small>Flat hexagon</small></label>
 <label class="card" data-shape="diamond"><input type="radio" name="litho_shape" value="diamond"><span class="ico" aria-hidden="true">◇</span><b>Diamond</b><small>Flat diamond</small></label>
+<label class="card" data-shape="oval"><input type="radio" name="litho_shape" value="oval"><span class="ico" aria-hidden="true">⬭</span><b>Oval</b><small>Flat ellipse</small></label>
+<label class="card" data-shape="triangle"><input type="radio" name="litho_shape" value="triangle"><span class="ico" aria-hidden="true">△</span><b>Triangle</b><small>Flat triangle</small></label>
+<label class="card" data-shape="scallop"><input type="radio" name="litho_shape" value="scallop"><span class="ico" aria-hidden="true">❁</span><b>Scallop</b><small>Flat ornament</small></label>
 <label class="card" data-shape="globe"><input type="radio" name="litho_shape" value="globe"><span class="ico" aria-hidden="true">◍</span><b>Globe</b><small>Full sphere, open base</small></label>
 <label class="card" data-shape="cup"><input type="radio" name="litho_shape" value="cup"><span class="ico" aria-hidden="true">◫</span><b>Cylinder / Cup</b><small>Pen holder or cup</small></label>
 <label class="card" data-shape="curve"><input type="radio" name="litho_shape" value="curve"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-curve"/></svg></span><b>Curved panel</b><small>Flat to half circle</small></label>
@@ -148,7 +151,34 @@
           <div class="field" id="hangHoleFld" hidden><label for="hole_d">Hole diameter <em>mm</em></label><input type="number" id="hole_d" value="4" min="2" max="20" step="0.5"></div>
         </div>
         <label class="inl"><input type="checkbox" id="stand"> Add a display stand (printed as a second piece)</label>
-        <p class="help">Flat shapes only (rectangle, square, circle, heart, star, hexagon, diamond). The stand is sized to the panel with a small slip-fit gap.</p>
+        <label class="inl" id="standCapsRow" hidden><input type="checkbox" id="stand_caps"> Add stand end caps (two friction-fit plugs so the panel cannot slide out)</label>
+        <p class="help">Flat shapes only. The stand is sized to the panel with a small slip-fit gap. End caps are plastic stops for the U-channel — not an electrical socket.</p>
+      </div>
+      <div id="frameStyleBox" hidden>
+        <div class="field"><label for="frame_style">Frame style</label>
+          <select id="frame_style" aria-describedby="frameStyleHelp">
+            <option value="plain" selected>Plain rim</option>
+            <option value="double">Double rim (channel)</option>
+            <option value="ledge">Ledge (stepped)</option>
+          </select>
+          <p class="help" id="frameStyleHelp">Changes the rim thickness pattern on flat lithophanes. Still one solid mesh — not multi-colour.</p>
+        </div>
+      </div>
+      <div id="collageBox" hidden>
+        <label class="inl"><input type="checkbox" id="collageOn"> Collage (2–6 photos on one panel)</label>
+        <div id="collageOpts" hidden>
+          <div class="field"><label for="collage_layout">Layout</label>
+            <select id="collage_layout">
+              <option value="grid" selected>Grid</option>
+              <option value="hstrip">Horizontal strip</option>
+              <option value="vstrip">Vertical strip</option>
+            </select>
+          </div>
+          <div class="field"><label for="collageExtra">More photos</label>
+            <input type="file" id="collageExtra" accept="image/*,.heic,.heif" multiple>
+            <p class="help">Pick 1–5 more photos (with the main photo above = 2–6 total). One flat lithophane — not a memory box, not colour layers.</p>
+          </div>
+        </div>
       </div>
       <details class="placeEd" id="placeEditor" hidden open><summary>Move &amp; size the photo in the shape</summary><div id="placeRoot"></div></details>
     </section>

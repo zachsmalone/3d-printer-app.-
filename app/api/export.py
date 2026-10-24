@@ -106,7 +106,8 @@ def _colour_count(bid: str) -> int:
         return 0
 
 
-_PART_LABELS = {"lithophane": "Lithophane panel", "stand": "Display stand"}
+_PART_LABELS = {"lithophane": "Lithophane panel", "stand": "Display stand",
+               "stand_cap_a": "Stand end cap A", "stand_cap_b": "Stand end cap B"}
 
 
 def _parts(bid: str, meta: dict) -> list:

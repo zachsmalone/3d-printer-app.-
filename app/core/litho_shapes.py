@@ -1,4 +1,4 @@
-"""Lithophane shapes: flat outlines (heart, circle, star, square, hexagon, diamond) and curved shells (globe, night-light cover).
+"""Lithophane shapes: flat outlines (heart, circle, star, square, hexagon, diamond, oval, triangle, scallop) and curved shells (globe, night-light cover).
 
 Same pipeline as the flat rectangle in geometry.lithophane: photo -> grayscale -> tone -> thickness map
 (bright = thin, dark = thick, between min_thickness and max_thickness).
@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 
 from . import thumbnail
 
-FLAT_SHAPES = ("heart", "circle", "star", "square", "hexagon", "diamond")
+FLAT_SHAPES = ("heart", "circle", "star", "square", "hexagon", "diamond", "oval", "triangle", "scallop")
 CURVED_SHAPES = ("globe", "nightlight", "cup")
 PANEL_SHAPES = ("curve",)        # adjustable curved panel: flat (0 deg) .. half circle (180 deg), see curved_panel()
 SHAPES = ("rect",) + FLAT_SHAPES + CURVED_SHAPES + PANEL_SHAPES
@@ -150,6 +150,16 @@ def outline_radius(shape: str, ang: np.ndarray) -> np.ndarray:
         # diamond (square rotated 45 deg), pointy top
         a = np.array([np.pi/2, np.pi, 3*np.pi/2, 0.0])
         return _ray_hit(np.stack([np.cos(a), np.sin(a)], -1), ang)
+    if shape == "oval":
+        # ellipse, wider than tall (rx=1, ry=0.72), still star-shaped about the centre
+        return 1.0 / np.sqrt((np.cos(ang) / 1.0) ** 2 + (np.sin(ang) / 0.72) ** 2)
+    if shape == "triangle":
+        # equilateral triangle, point up
+        a = np.array([np.pi / 2, np.pi / 2 + 2 * np.pi / 3, np.pi / 2 + 4 * np.pi / 3])
+        return _ray_hit(np.stack([np.cos(a), np.sin(a)], -1), ang)
+    if shape == "scallop":
+        # decorative 6-lobe scalloped circle (ornament-style), printable flat outline
+        return 0.82 + 0.18 * np.cos(6 * ang)
     raise ValueError(f"unknown flat shape {shape!r}")
 
 
@@ -190,7 +200,8 @@ def _bilinear(img, u, v):
 
 def flat_shape(im, shape, width_mm=100.0, min_thickness=0.8, max_thickness=3.0, border_mm=3.0,
                resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, color_mode="mono", place=None,
-               grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0, tile=False, mm_per_repeat=None):
+               grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0, tile=False, mm_per_repeat=None,
+               frame_style="plain"):
     """Polar mesh inside the vector outline: rings scaled from the centre to the exact (smooth) edge, so the
     outer wall and rim follow the curve with no pixel steps. One watertight solid on z=0."""
     from scipy.spatial import cKDTree
@@ -220,6 +231,9 @@ def flat_shape(im, shape, width_mm=100.0, min_thickness=0.8, max_thickness=3.0, 
         z = max_thickness + (z - max_thickness) * w
         z[1 + (len(s) - 1) * A:] = max_thickness
         rim_cells = max(1, int(round(border_mm / pitch)))
+    if border_mm > 0 and frame_style and frame_style != "plain":
+        from . import litho_frame
+        z = litho_frame.apply_polar(z, s, border_mm, half, max_thickness, frame_style)
     nv = len(xy)
     idx = 1 + np.arange(len(s) * A).reshape(len(s), A)
     nxt = np.roll(idx, -1, 1)
@@ -233,8 +247,10 @@ def flat_shape(im, shape, width_mm=100.0, min_thickness=0.8, max_thickness=3.0, 
     verts = np.vstack([np.column_stack([xy + half, z]), np.column_stack([xy + half, np.zeros(nv)])])
     mask = outline_mask(shape, n)
     shown = np.where(np.pad(mask, ((0, 1), (0, 1)), mode="edge"), thick_img, np.nan)
-    return verts, faces, dict(pixels=[n, n], pitch_mm=round(pitch, 4), border_cells=rim_cells,
-                              outline_points=A), shown
+    info = dict(pixels=[n, n], pitch_mm=round(pitch, 4), border_cells=rim_cells, outline_points=A)
+    if frame_style and frame_style != "plain":
+        info["frame_style"] = frame_style
+    return verts, faces, info, shown
 
 
 # ------------------------------------------------------------------ curved shells
@@ -522,7 +538,7 @@ def build(im, shape, **params):
     """Returns (vertices, faces, info, thickness map for the preview thumb)."""
     if shape in FLAT_SHAPES:
         keys = ("width_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth", "gamma",
-                "auto_contrast", "invert", "color_mode", "place") + _TONE_KEYS
+                "auto_contrast", "invert", "color_mode", "place", "frame_style") + _TONE_KEYS
         return flat_shape(im, shape, **{k: params[k] for k in keys if k in params})
     if shape in CURVED_SHAPES:
         keys = ("diameter_mm", "height_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth",
