@@ -660,16 +660,72 @@ async function openPrint(b) {
   // SEND-6: the printer block exists only where it can really work (ZEIM on the user's own computer); hosted ZEIM promises nothing
   $("#printerBlock").hidden = !caps.printer_ui; $("#printerHosted").hidden = !!caps.printer_ui;
   startNowOff(); fillPrinterSel(); $("#sendOut").textContent = "";
+  if ($("#spoolOut")) $("#spoolOut").textContent = "";
+  if ($("#printerHonest")) $("#printerHonest").textContent = (printInfo.printer_verification || S.settings?.printer_verification || "Simulated")
+    + " until a real-hardware pass. Tested with a pretend printer only.";
   $("#dlgPrint").showModal();
 }
 $("#btnPrint").onclick = () => openPrint(S.current);          // Studio's own build; Edit passes its project (they used to share S.current: QA-1)
 const startNowOff = () => { $("#startNow").checked = false; };          // "Start print" is always a separate, unchecked choice
-const TYPE_LABEL = { octoprint: "OctoPrint", moonraker: "Moonraker (Klipper)" };
+const TYPE_LABEL = { octoprint: "OctoPrint", moonraker: "Moonraker (Klipper)", bambu: "Bambu Lab LAN" };
 function fillPrinterSel() {
   const ps = printInfo.printers;
   $("#printerSel").innerHTML = ps.length ? ps.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.profile_label || TYPE_LABEL[p.type] || p.type)})</option>`).join("") : `<option value="">No printers configured — add one in Settings</option>`;
   $("#btnSend").disabled = !ps.length;
+  if ($("#btnQueueAdd")) $("#btnQueueAdd").disabled = !ps.length;
+  const live = $("#liveStatus");
+  if (live) live.hidden = !ps.length;
+  if (ps.length) refreshLiveStatus();
 }
+async function refreshLiveStatus() {
+  const id = $("#printerSel")?.value; const out = $("#liveStatusText"); const cam = $("#camRow");
+  if (!id || !out) return;
+  out.textContent = "Checking printer…";
+  try {
+    const r = await api(`/api/printers/${id}/status`);
+    const pct = r.progress_pct != null ? ` · ${Number(r.progress_pct).toFixed(1)}%` : "";
+    const job = r.job_name ? ` · ${r.job_name}` : "";
+    out.textContent = (r.ok ? `${r.state || "ok"}${pct}${job}` : (r.message || "Unavailable"))
+      + (r.verification ? ` · ${r.verification}` : "");
+    if (cam) {
+      cam.hidden = false;
+      const img = $("#camSnap");
+      if (img) img.src = `/api/printers/${id}/camera?t=${Date.now()}`;
+    }
+  } catch (e) { out.textContent = e.message; }
+}
+$("#printerSel")?.addEventListener("change", () => refreshLiveStatus());
+$("#btnRefreshStatus")?.addEventListener("click", () => refreshLiveStatus());
+$("#btnCamRefresh")?.addEventListener("click", () => {
+  const id = $("#printerSel")?.value; const img = $("#camSnap");
+  if (id && img) img.src = `/api/printers/${id}/camera?t=${Date.now()}`;
+});
+async function controlSelected(action) {
+  const id = $("#printerSel")?.value; if (!id) return;
+  $("#liveStatusText").textContent = `Sending ${action}…`;
+  try {
+    const fd = new FormData(); fd.append("action", action);
+    const r = await api(`/api/printers/${id}/control`, { method: "POST", body: fd });
+    $("#liveStatusText").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || action) + (r.verification ? ` · ${r.verification}` : "");
+    refreshLiveStatus();
+  } catch (e) { $("#liveStatusText").textContent = "✖ " + e.message; }
+}
+$("#btnPause")?.addEventListener("click", () => controlSelected("pause"));
+$("#btnResume")?.addEventListener("click", () => controlSelected("resume"));
+$("#btnCancel")?.addEventListener("click", () => {
+  if (confirm("Stop this print on the printer? You cannot undo that from ZEIM.")) controlSelected("cancel");
+});
+$("#btnQueueAdd")?.addEventListener("click", async () => {
+  const id = $("#printerSel")?.value; if (!id || !printId) return;
+  const fd = new FormData(); fd.append("printer_id", id); fd.append("build_id", printId);
+  fd.append("name", printLabel || printId); fd.append("start_on_send", $("#startNow").checked);
+  try {
+    const r = await api("/api/print-queue", { method: "POST", body: fd });
+    $("#sendOut").textContent = r.ok ? "✔ Added to manual queue (start it from All printers)." : ("✖ " + (r.message || "failed"));
+  } catch (e) { $("#sendOut").textContent = "✖ " + e.message; }
+});
+$("#btnOpenBoard")?.addEventListener("click", () => window.ZEIM_openPrinterBoard?.());
+
 $("#btnSlice").onclick = async () => {
   $("#sliceOut").textContent = "Slicing…";
   try {
@@ -687,8 +743,12 @@ $("#btnSlice").onclick = async () => {
 $("#btnSend").onclick = async () => {
   const fd = sliceOpts(); fd.set("printer_id", $("#printerSel").value); fd.append("start", $("#startNow").checked);
   $("#sendOut").textContent = "Slicing and uploading…";
-  try { const r = await api(`/api/send/${printId}`, { method: "POST", body: fd }); $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || r.log || "failed"); }
-  catch (e) { $("#sendOut").textContent = "✖ " + e.message; }
+  try {
+    const r = await api(`/api/send/${printId}`, { method: "POST", body: fd });
+    $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || r.log || "failed") + (r.verification ? ` · ${r.verification}` : "");
+    if ($("#spoolOut")) $("#spoolOut").textContent = r.spool?.message || (r.stage === "spool" ? (r.message || "") : "");
+    if (r.ok) refreshLiveStatus();
+  } catch (e) { $("#sendOut").textContent = "✖ " + e.message; }
 };
 
 /* ---------- settings ---------- */
@@ -699,26 +759,44 @@ async function openSettings() {
 }
 function renderPrinters() {
   const types = S.settings.printer_types;
+  const dc = !!S.settings.direct_control;
+  const ver = S.settings.printer_verification || "Simulated";
   $("#printerList").innerHTML = S.settings.printers.map((p, i) => `<div class="printer" data-i="${i}">
     <div class="grid2">
       <div class="field"><label>Name</label><input data-f="name" value="${esc(p.name || "")}"></div>
       <div class="field"><label>Type</label><select data-f="type">${types.map(t => `<option value="${t.type}" ${t.type === p.type ? "selected" : ""}>${t.label}</option>`).join("")}</select></div>
+      ${dc ? `<div class="field"><label>Address</label><input data-f="url" value="${esc(p.url || "")}" placeholder="http://printer.local:7125"></div>` : ""}
       <div class="field"><label>API key ${p.has_key ? "<em>(stored — leave blank to keep)</em>" : ""}</label><input data-f="api_key" type="password" placeholder="${p.has_key ? "••••••••" : ""}"></div>
       <div class="field"><label>Preset</label><select data-f="profile"><option value="">None (generic)</option>${(S.settings.printer_presets || []).map(x => `<option value="${x.id}" ${x.id === p.profile ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
       <div class="field"><label>Bed X mm</label><input data-f="bed_x" type="number" value="${p.bed_x || 250}"></div>
       <div class="field"><label>Bed Y mm</label><input data-f="bed_y" type="number" value="${p.bed_y || 210}"></div>
-    </div><p class="help">${types.find(t => t.type === p.type)?.hint || ""}</p>
+      <div class="field"><label>Serial <em>Bambu</em></label><input data-f="serial" value="${esc(p.serial || "")}" placeholder="01P…"></div>
+      <div class="field"><label>Spool left (g)</label><input data-f="spool_remaining_g" type="number" step="1" value="${p.spool_remaining_g != null ? p.spool_remaining_g : ""}" placeholder="optional"></div>
+    </div>
+    <div class="row" style="flex-wrap:wrap;gap:10px;margin:.4rem 0">
+      <label class="inl"><input type="checkbox" data-f="alert_done" ${p.alert_done ? "checked" : ""}> Alert when done</label>
+      <label class="inl"><input type="checkbox" data-f="alert_failed" ${p.alert_failed ? "checked" : ""}> Alert on fail</label>
+      <label class="inl"><input type="checkbox" data-f="watch_failures" ${p.watch_failures ? "checked" : ""}> Failure watch (pause only)</label>
+      <label class="inl"><input type="checkbox" data-f="timelapse" ${p.timelapse ? "checked" : ""}> Timelapse folder</label>
+    </div>
+    <p class="help">${types.find(t => t.type === p.type)?.hint || ""}</p>
     ${(S.settings.printer_presets || []).find(x => x.id === p.profile) ? `<p class="help"><b>Experimental.</b> ${esc(S.settings.printer_presets.find(x => x.id === p.profile).hint)}</p>` : ""}
-    <p class="help">Direct control is off: slice, download the G-code and print from your printer's own app. (Arbitrary printer URLs can no longer be entered — they were an SSRF risk.)</p>
+    ${dc
+      ? `<p class="help">Direct control is on for this install. Addresses are checked against SSRF rules before every request. Status: <b>${esc(ver)}</b>.</p>`
+      : `<p class="help">Direct control is off: slice, download the G-code and print from your printer's own app. (Arbitrary printer URLs can no longer be entered — they were an SSRF risk.)</p>`}
     <p class="help">Tested with a pretend printer only. Not tried on a real printer yet.</p>
     <button class="btn small" data-test="${i}" ${p.id ? "" : "disabled title='Save first, then test'"}>Test connection</button> <button class="btn small danger" data-rm="${i}">Remove</button>
     <p class="help" data-testout="${i}" role="status" aria-live="polite">${p.id ? "A test only asks the printer if it is there. It never starts a print." : "Save settings first, then you can test the connection."}</p></div>`).join("") || `<p class="help">No printers yet.</p>`;
 }
 function readPrinters() {
+  const dc = !!S.settings.direct_control;
   return $$("#printerList .printer").map(el => {
     const p = { ...S.settings.printers[+el.dataset.i] };
-    $$("[data-f]", el).forEach(i => p[i.dataset.f] = i.value);
-    delete p.url;                                   /* never send a printer URL (SSRF) */
+    $$("[data-f]", el).forEach(i => {
+      if (i.type === "checkbox") p[i.dataset.f] = i.checked;
+      else p[i.dataset.f] = i.value;
+    });
+    if (!dc) delete p.url;                          /* production / direct control off: never send a URL */
     return p;
   });
 }
@@ -825,3 +903,5 @@ document.getElementById("skipLink")?.addEventListener("click", e => {
 window.__errText = errText;   // tests
 /* E: Send to… / Back from CAD reopens the Studio model (static/handoff.js) */
 document.addEventListener("zeim:open-build", async e => { try { const r = await api("/api/builds/" + encodeURIComponent(e.detail)); if (S.current?.id) return; S.mode = r.mode; applyMode(); showBuild(r); } catch { } });
+
+$("#btnOpenBoardFromSettings")?.addEventListener("click", () => window.ZEIM_openPrinterBoard?.());
