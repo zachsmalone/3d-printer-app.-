@@ -124,6 +124,8 @@ def nozzle_option(pid: str, n: float):
 def printer_public(pid: str) -> dict:
     p = _catalog()[pid]
     resin = _v(p, "technology") == "Resin"
+    systems = ([] if resin else (_v(p, "multi_color_system") or [])) or []
+    from app.services.filament_slots import slot_count_for_systems
     return {"id": pid, "name": f"{_v(p, 'brand')} {_v(p, 'model')}", "brand": _v(p, "brand"), "model": _v(p, "model"),
             "technology": _v(p, "technology"), "bed_mm": _v(p, "bed_size_mm"),
             "stock_nozzle_mm": None if resin else _v(p, "nozzle_diameter_mm"),
@@ -132,7 +134,9 @@ def printer_public(pid: str) -> dict:
             "max_nozzle_c": _v(p, "max_nozzle_temperature_c"), "max_bed_c": _v(p, "max_bed_temperature_c"),
             "official_slicer": _v(p, "official_slicer_name"), "official_slicer_url": _v(p, "official_slicer_download_url"),
             "native_formats": _v(p, "native_file_formats") or [], "firmware": _v(p, "firmware", "unknown"),
-            "xy_resolution_um": _v(p, "xy_resolution_um"), "layer_range_mm": _v(p, "layer_height_range_mm")}
+            "xy_resolution_um": _v(p, "xy_resolution_um"), "layer_range_mm": _v(p, "layer_height_range_mm"),
+            # Multi-head / multi-material (AMS, CFS, MMU, ACE): FDM Slicer only. 1 = single-head, stay simple.
+            "multi_color_system": list(systems), "filament_slots": 1 if resin else slot_count_for_systems(systems)}
 
 
 def public() -> dict:

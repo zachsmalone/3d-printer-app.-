@@ -111,3 +111,33 @@ def test_slice_rejects_bad_slot():
 def app_():
     from app.main import app
     return app
+
+
+def test_plan_heads_only_lists_used_slots_with_filament_and_colour():
+    p = fs.plan_heads("1,3", '["PLA","PETG"]', '["#ff0000","#0033aa"]')
+    assert p["slots"] == [1, 3]
+    assert p["materials"] == ["PLA", "PETG"]
+    assert p["colours"] == ["#FF0000", "#0033AA"]
+    assert "1, 3" in p["notes"][0] and "not heated" in p["notes"][0]
+
+
+def test_gcode_header_and_strip_unused_heads():
+    p = fs.plan_heads("2", "PETG", "#00FF00")
+    h = fs.gcode_header(p)
+    assert "; ZEIM filament slots used: 2" in h
+    assert "; ZEIM slot 2: PETG #00FF00" in h
+    assert "only listed slots are heated" in h
+    junk = "; prelude\nT0\nT1\nM104 S220 T0\nM104 S220 T3\nM109 S220\nG1 X1\nM600\nM701 T4\n"
+    out = fs.strip_unused_heads(junk, p)
+    assert "T0" not in out and "T1" not in out and "M600" not in out and "M701" not in out
+    assert "M109 S220" in out and "G1 X1" in out
+    # multi: keep tools for used slots only (0-based T0/T1 for slots 1+2)
+    multi = fs.strip_unused_heads(junk, fs.plan_heads("1,2"))
+    assert "T0" in multi and "T1" in multi
+    assert "M104 S220 T3" not in multi and "M701" not in multi
+
+
+def test_slot_count_for_systems():
+    assert fs.slot_count_for_systems([]) == 1
+    assert fs.slot_count_for_systems(["AMS"]) == 4
+    assert fs.slot_count_for_systems(["MMU3"]) == 5

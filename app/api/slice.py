@@ -98,11 +98,22 @@ def slice_model(
     ventilation_ok: bool = Form(False),
     support_paint: Optional[str] = Form(None),
     slots: Optional[str] = Form(None),
+    slot_materials: Optional[str] = Form(None),
+    slot_colours: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
     from app.services import filament_slots as fslots
     try:
-        slot_plan = fslots.plan([], fslots.parse_slots(slots))   # the slicer gets one merged STL: one material, first picked slot
+        # Only turned-on slots (with optional per-slot filament + colour) go into the plan.
+        # Unused AMS/CFS/MMU ports are never referenced, heated, primed or purged.
+        if slot_materials is not None or slot_colours is not None:
+            # FDM Slicer multi-head: every turned-on slot keeps its filament + colour.
+            slot_plan = fslots.plan_heads(slots, slot_materials, slot_colours)
+        else:
+            # Single-material merge: only the first picked slot is used (extra slots left out).
+            slot_plan = fslots.plan([], fslots.parse_slots(slots))
+            if slots:
+                slot_plan = fslots.plan_heads(slot_plan["slots"], material, None)
     except ValueError as e:
         _fail(400, "bad_slots", str(e))
     plate_objs, skipped = None, []
@@ -197,7 +208,8 @@ def slice_model(
         _slots.release()
         (work / "input.stl").unlink(missing_ok=True)
     _g = work / "model.gcode"
-    _g.write_text(fslots.gcode_header(slot_plan) + _g.read_text(errors="ignore"))
+    _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
+    _g.write_text(fslots.gcode_header(slot_plan) + _body)
     (work / "slots.json").write_text(__import__("json").dumps(slot_plan))
     from app.services import slicer as _sl, willprint
     stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
