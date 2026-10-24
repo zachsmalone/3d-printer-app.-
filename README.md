@@ -16,7 +16,7 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **FDM Slicer** | Wraps the PrusaSlicer CLI. Creality K1 profile, printer picker covering many brands (Longer included), and a CFS / AMS filament slot picker. |
 | **TorchC0 (resin)** | Resin program with resin cost estimate and island / suction-cup detection. |
 | **ZEIM CAD** | Smart Split and Smart Merge, manual merge, hinges, print-in-place joints, Measure (including the angle between faces), simplified import for big models, and select mode. |
-| **Showcase** | Community feed. Remix Yes / No switch per upload, credited remixes, and re-upload protection using a shape fingerprint plus **Report a copy**. |
+| **Showcase** | Community feed. Remix Yes / No switch per upload, credited remixes, and re-upload protection using a shape fingerprint plus **Report a copy**. **AI-made** label set by the creator (automatic and locked for 2D→3D models), with a Show / Hide / Only filter. A **Printed by the community** yes/no badge appears once a model has an approved **I printed this** photo (no counts or ranking). Optional creator tip link (https only), shown as one quiet line with no prompts; ZEIM takes no cut. |
 | **Export** | One format picker with file naming: STL, 3MF, OBJ, SVG, PLY, GLB, AMF, and G-code from the slicer. |
 | **Smart Fix** | Mesh repair and auto-orient. |
 | **2D→3D** | Makes a rough Figure or Bust from one photo using TripoSR (MIT-licensed open model) in an optional separate worker container (GPU or CPU). Results are labelled **AI-made**, auto-repaired, and private by default. 5 min cooldown between models and a daily cap of 5 per account during testing. Without the worker the tab says the engine is not installed. Results are rough guesses of the hidden sides and have not been test-printed. |
@@ -88,7 +88,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2391 tests.
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2410 tests.
 
 ## Layout
 
