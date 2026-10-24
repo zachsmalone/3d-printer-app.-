@@ -6,7 +6,7 @@ URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8818"
 OUT = "/workspace/qa/litho-up1/shots/"
 fails = []
 def check(ok, msg):
-    print(("ok  " if ok else "FAIL"), msg); ok or fails.append(msg)
+    print(("PASS " if ok else "FAIL ") + msg); ok or fails.append(msg)
 
 PANELS = """()=>[...document.querySelectorAll('.zws-p')].filter(w=>!w.hidden).map(w=>({id:w.id,
   off:w.classList.contains('auto-off'), r:(r=>[r.x,r.y,r.right,r.bottom])(w.getBoundingClientRect())}))"""
@@ -93,4 +93,4 @@ def run(p, w, h, tag):
 
 with sync_playwright() as p:
     run(p, 1280, 900, "w1280"); run(p, 390, 844, "w390")
-print("FAILS:", fails); sys.exit(1 if fails else 0)
+print("PASS chrome" if not fails else "FAILS: " + str(fails)); sys.exit(1 if fails else 0)
