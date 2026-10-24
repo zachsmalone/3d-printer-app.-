@@ -67,11 +67,57 @@ addEventListener("hashchange", route);
 
 /* ---------- account ---------- */
 $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
+
+/* ---------- Optional Semi Pro / Pro (payment not live — honest Coming) ---------- */
+async function renderPlans() {
+  const box = $("#accPlans"); if (!box) return;
+  let data;
+  try { data = await api("/api/subscriptions/me"); }
+  catch (e) { box.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
+  const cur = (data.plan && data.plan.id) || "free";
+  const note = `<p class="help">${esc(data.payment_note || "")}</p><p class="help">${esc(data.tip_note || "")}</p>`;
+  const cards = (data.catalog || []).map(p => {
+    const on = p.id === cur;
+    const coming = !!p.coming || !data.payment_live;
+    const price = esc(p.price_label || "");
+    const go = p.id === "free"
+      ? `<span class="pill">${on ? "Your plan" : "Always free"}</span>`
+      : `<button type="button" class="btn small" data-plan="${esc(p.id)}" ${on ? "disabled" : ""}>${on ? "Your plan" : (coming ? "Coming" : "Choose " + esc(p.name))}</button>`;
+    return `<div class="plan-card ${on ? "on" : ""}" data-plan-id="${esc(p.id)}">
+      <b>${esc(p.name)}</b> <span class="help">${price}</span>
+      <p class="help">${esc(p.summary || "")}</p>
+      <ul class="help">${(p.includes || []).map(i => `<li>${esc(i)}</li>`).join("")}</ul>
+      ${go}</div>`;
+  }).join("");
+  box.innerHTML = note + `<div class="plan-grid">${cards}</div>`;
+  box.querySelectorAll("[data-plan]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const r = await api("/api/subscriptions/checkout", J("POST", { plan: b.dataset.plan }));
+      if (r.coming || !r.ok) toast(r.message || "Coming — payment is not live yet.", "ok");
+      else { toast(r.message || "Plan updated", "ok"); await refreshMe(); renderAccount(); }
+    } catch (e) { toast(e.message, "err"); b.disabled = false; }
+  });
+}
+
 function renderAccount() {
   /* Real auth (passkeys/email) renders the modern account dialog when mounted; the
      legacy cookie UI below is the fallback for when it is not. handles() is synchronous
      so a Promise can never hide the fallback. */
-  if (window.ZeimAccount && window.ZeimAccount.handles(ME)) { window.ZeimAccount.render(ME); return; }
+  if (window.ZeimAccount && window.ZeimAccount.handles(ME)) {
+    const done = window.ZeimAccount.render(ME);
+    const showPlans = () => {
+      if (!$("#accPlans")) {
+        const body = $("#accBody"); if (!body) return;
+        body.insertAdjacentHTML("beforeend",
+          `<h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>`);
+      }
+      renderPlans();
+    };
+    if (done && typeof done.then === "function") done.then(showPlans).catch(showPlans);
+    else showPlans();
+    return;
+  }
   if (!ME.signed_up) {
     $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. You can build and learn in the ${esc(CFG.sections.learn)} without an account.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
@@ -124,8 +170,11 @@ function renderAccount() {
       <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
       <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden"}</b></li></ul>
       <p class="help">Add link-outs in Settings → Promote your accounts.</p>
+      <h4>Plans</h4>
+      <div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>
       <h4>Sign out</h4><p class="help">Signing out makes this browser forget your account. Use it on a shared computer.</p>
       <button class="btn small" id="so_open">Sign out…</button>`;
+    renderPlans();
     $("#so_open").onclick = () => openSignout();
     $("#un_save").onclick = async () => {
       try { const r = await api("/api/me/username", J("PUT", { username: $("#un_new").value.trim() })); await refreshMe(); renderAccount(); toast("Your username is now @" + r.username, "ok"); }

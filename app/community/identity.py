@@ -314,10 +314,12 @@ def public_profile(actor: Actor) -> dict:
     u = actor.user
     if not u:
         return {"signed_up": False, "restrictions": restrictions(actor)}
+    from ..services import subscriptions as _subs
     return {"signed_up": True, "id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
             "username_next_change": _next_username_change(u),
             "suspended": suspended(u), "links": u.get("links", {}),
             "following": u.get("following", []), "privacy": _priv(u), "printer": u.get("printer"), "restrictions": restrictions(actor),
+            "plan": _subs.public_plan(u),
             "recovery": {"has_code": bool(u.get("recovery")), "issued": u.get("recovery_issued")} if actor.is_adult else None}
 
 

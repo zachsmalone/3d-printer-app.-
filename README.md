@@ -21,17 +21,14 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **Smart Fix** | Mesh repair and auto-orient. |
 | **2D→3D** | Makes a rough Figure or Bust from one photo using TripoSR (MIT-licensed open model) in an optional separate worker container (GPU or CPU). Results are labelled **AI-made**, auto-repaired, and private by default. 5 min cooldown between models and a daily cap of 5 per account during testing. Without the worker the tab says the engine is not installed. Results are rough guesses of the hidden sides and have not been test-printed. |
 | **Learn** | Guided lessons inside the app. On phones (≤420px wide) Learn leaves the bottom tab bar but stays reachable from Showcase / home. |
+| **Bust mode** | Photo → printable bust: raised face on a clean round / rect / outline pedestal. Uses Select mode to trace head & shoulders (whole photo still works, with a tip). Separate from AI 2D→3D Bust. |
+| **Live Sculpt** | CAD sculpt brushes (draw, carve, smooth, inflate, pinch, flatten, grab) show live on the model as you drag; each stroke saves in the background without a blocking spinner. |
+| **Subscriptions** | Core stays free forever. Optional Semi Pro (~$3.50) and Pro (~$5.50) are listed in Account → Plans. **Payment is not live yet** — choosing a paid plan says Coming; nothing is charged. ZEIM never takes a cut of creator tips or Showcase sales. |
 | **Themes** | Japanese-inspired theme per section. |
 
 ## In progress
 
-These are not finished yet:
-
-1. **Bust mode:** a dedicated mode for busts beyond the basic 2D→3D Bust option.
-2. **Live Sculpt.**
-3. **Subscriptions:** the core stays free forever; optional Semi Pro and Pro plans are planned. Details are not final.
-
-See [`ROADMAP.md`](ROADMAP.md) for more.
+See [`ROADMAP.md`](ROADMAP.md) for more. Leftovers from recent work are listed in commit messages and QA notes when a batch ships partial.
 
 ## Run with Docker (Windows)
 

@@ -56,6 +56,7 @@
         <button class="btn small" id="au_code_go">Verify my code</button>
         <p class="mini">Codes sign you in to an existing account — they do not create one.</p>
       </details>` : ""}
+      <h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>
       <details class="recover" style="margin-top:10px"><summary>Signed out before? Get your account back with a recovery code</summary>
         <div class="field"><label for="rc_code">Recovery code</label><input id="rc_code" maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
         <button class="btn" id="rc_go">Get my account back</button></details>`;
@@ -123,7 +124,8 @@
       </div>
       <div id="accMsg" class="help" style="min-height:1.2em"></div>
       <button class="btn primary" id="au_up">Secure my account with a passkey</button>
-      <p class="mini" style="margin-top:10px">Or keep using the cookie account for now — everything keeps working.</p>`;
+      <p class="mini" style="margin-top:10px">Or keep using the cookie account for now — everything keeps working.</p>
+      <h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>`;
     $("#au_up").onclick = async () => {
       say("Your browser will ask you to save a passkey…");
       try {
@@ -145,7 +147,8 @@
       </div>
       <div id="accMsg" class="help" style="min-height:1.2em"></div>
       <div id="accSecurity"></div>
-      <button class="btn" id="au_out" style="margin-top:10px">Sign out</button>`;
+      <button class="btn" id="au_out" style="margin-top:10px">Sign out</button>
+      <h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>`;
     root.ZeimAuth.mountSecurityPanel($("#accSecurity"), {
       onSignedOut: afterIdentityChange,
       emailAvailable: !!(me.auth && me.auth.email_codes),   /* do not offer email adding when the server cannot send codes */
