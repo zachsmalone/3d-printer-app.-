@@ -117,7 +117,7 @@ def test_printer_send():
     c.put("/api/settings", json={"printers": [
         {"name": "o", "type": "octoprint", "url": f"http://127.0.0.1:{port}", "api_key": "k"},
         {"name": "m", "type": "moonraker", "url": f"http://127.0.0.1:{port}"},
-        {"name": "b", "type": "bambu", "url": "x"}]})
+        {"name": "b", "type": "prusalink", "url": "x"}]})
     ps = c.get("/api/settings").json()["printers"]; assert "api_key" not in ps[0] and ps[0]["has_key"]
     clear(); bid = build(resolution="60").json()["id"]
     for p, key in zip(ps, ("octo", "moon", None)):

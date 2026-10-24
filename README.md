@@ -88,7 +88,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2565 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, and Edit upgrades 1–10).
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2565 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, and printer-sending upgrades 1–10).
 
 ## Layout
 
@@ -101,6 +101,23 @@ workers/ai3d/    optional 2D→3D worker (TripoSR)
 static/          web UI
 tests/           pytest suite
 ```
+
+## Printer sending (upgrades 1–10)
+
+OctoPrint / Moonraker / Bambu LAN paths in ZEIM (mock-tested; labelled **Simulated** until a real-hardware pass):
+
+1. Live status for OctoPrint / Moonraker (and Bambu reachability)
+2. Remote pause / resume / stop
+3. Bambu LAN send (LAN Only + Developer Mode for control; keep **Open in Bambu Studio** as fallback)
+4. Camera snapshot proxy in ZEIM (same host as the printer)
+5. Opt-in done / failed alerts
+6. Real-hardware tests still pending — UI and API carry `verification: Simulated`
+7. Spool-enough check (optional grams on the printer row vs slice filament)
+8. Multi-printer board
+9. Simple manual-start queue (no auto-chain onto a busy printer)
+10. Timelapse folder + opt-in local failure detection that **only pauses**
+
+Direct printer control stays off in production (`ZEIM_ENV=production`) unless `ZEIM_PRINTER_DIRECT=1`. Addresses are SSRF-checked. Never copies GPL/AGPL printer UIs.
 
 ## Community rules
 

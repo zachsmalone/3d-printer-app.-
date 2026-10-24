@@ -34,7 +34,9 @@ def test_malformed_addresses_are_refused_everywhere(url):
 
 
 def test_stub_printer_types_keep_loose_addresses():
-    assert client(ADULT).put("/api/settings", json={"printers": [{"name": "b", "type": "bambu", "url": "x"}]}).status_code == 200
+    # Coming-soon types still allow a placeholder address; implemented types (incl. bambu) do not.
+    assert client(ADULT).put("/api/settings", json={"printers": [{"name": "b", "type": "prusalink", "url": "x"}]}).status_code == 200
+    assert client(ADULT).put("/api/settings", json={"printers": [{"name": "b", "type": "bambu", "url": "x"}]}).status_code == 400
 
 
 # ---- local mode stays open (the server sits next to the printer) ------------------------------------------------------
