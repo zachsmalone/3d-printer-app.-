@@ -111,7 +111,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'stand_caps', 'frame_style', 'collage_layout', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'base_style', 'base_margin', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'stand_caps', 'frame_style', 'collage_layout', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'base_style', 'base_margin', 'back_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 
 def disk_guard():
@@ -287,6 +287,7 @@ def generate(
     relief_mm: float = Form(6.0),
     base_style: str = Form("round"),          # bust pedestal: round | rect | outline
     base_margin: float = Form(8.0),            # bust pedestal margin beyond footprint (mm)
+    back_mm: float = Form(14.0),               # bust rounded-back depth (mm); 0 = flat back
     levels: int = Form(4),
     layer_mm: float = Form(1.0),
     style: str = Form("posterize"),
@@ -430,7 +431,8 @@ def generate(
                 "relief": dict(base_mm=base_mm, relief_mm=relief_mm),
                 "bust": dict(base_mm=base_mm if base_mm >= 0.2 else 12.0, relief_mm=relief_mm,
                              base_style=base_style if base_style in ("round", "rect", "outline") else "round",
-                             base_margin=max(0.0, float(base_margin))),
+                             base_margin=max(0.0, float(base_margin)),
+                             back_mm=max(0.0, min(40.0, float(back_mm)))),
                 "popart": dict(base_mm=base_mm, levels=levels, layer_mm=layer_mm, style=style,
                                halftone_cell=halftone_cell, multi_body=multi_body, palette=palette or None),
             }[mode])
@@ -603,6 +605,30 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
     return {**summary(meta), "params": params, "auto_notes": meta["auto_notes"], "info": model.info,
             "seconds": round(time.time() - t0, 2), "preview": preview_payload(model),
             "history": [summary(m) for m in store.list(actor.sid)]}
+
+
+@router.post("/bust/auto-mask")
+def bust_auto_mask(actor: Actor = Depends(get_actor), file: UploadFile = File(...),
+                   photo_ack: bool = Form(False)):
+    """Starting head-and-shoulders Select mask for Bust mode (editable; not a finished cut)."""
+    from ..core import bust_detect
+    data = file.file.read(MAX_UPLOAD + 1)
+    if len(data) > MAX_UPLOAD:
+        raise HTTPException(413, "image too large (max 25 MB)")
+    try:
+        uploadgate.gate(data, actor.sid, source="bust-auto-mask")
+    except uploadgate.GateError as e:
+        raise HTTPException(e.status, e.message)
+    try:
+        imagesafe.check_ack(data, photo_ack)
+        data, _, _ = imagesafe.sanitize(data)
+        im = geometry.load_image(data)
+    except imagesafe.ImageRefused as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, imagesafe.UNREADABLE)
+    sel = bust_detect.auto_select(im)
+    return {"select": sel, "tip": sel["tip"], "method": sel["method"]}
 
 
 @router.post("/trace2d/preview")

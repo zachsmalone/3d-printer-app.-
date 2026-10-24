@@ -78,10 +78,12 @@ def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standar
     elif mode == "bust":
         rel = round(width_mm * [0.08, 0.10, 0.13][k], 1)
         ped = [8.0, 12.0, 16.0][k]
-        P.update(base_mm=ped, relief_mm=rel, base_style="round", base_margin=8.0)
+        back = [10.0, 14.0, 18.0][k]
+        P.update(base_mm=ped, relief_mm=rel, base_style="round", base_margin=8.0, back_mm=back)
         note("Face depth", f"{rel} mm", f"'{preset}' preset ≈ {[8, 10, 13][k]}% of the width")
+        note("Rounded back", f"{back:g} mm", "extra depth behind the face so it reads as a bust, not a flat plaque")
         note("Pedestal", f"{ped:g} mm round base", "clean stand under the bust so it sits on the bed")
-        note("Tip", "trace head & shoulders", "Select mode gives a classical bust silhouette; whole photo still works")
+        note("Tip", "auto-select or trace", "Auto head & shoulders is a starting mask you can edit; whole photo still works")
     else:
         levels = [3, 4, 5][k]
         lm = round(max(0.6, width_mm * [0.008, 0.012, 0.016][k]), 1)

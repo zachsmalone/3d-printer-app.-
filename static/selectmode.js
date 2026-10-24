@@ -8,7 +8,7 @@ const $ = s => document.querySelector(s);
 const WORK = 384;                                   // long side of the mask raster (sent to the server)
 const MODES = ["lithophane", "relief", "popart", "bust"];
 const st = { img: null, w: 0, h: 0, paths: [], invert: false, soft: 0, outside: "plain", snap: true, tool: "new",
-             undo: [], mask: null, rough: null, open: false, use: false, mode: "lithophane", rgb: null, zoom: 1, panX: 0, panY: 0 };
+             undo: [], mask: null, rough: null, open: false, use: false, mode: "lithophane", rgb: null, zoom: 1, panX: 0, panY: 0, file: null };
 window.zeimSelectState = st;                       // for tests / debugging
 
 /* ---------------- DOM ---------------- */
@@ -26,6 +26,7 @@ host.innerHTML = `
     <button type="button" class="selm-t" id="selUndo" disabled>↶ Undo</button>
     <button type="button" class="selm-t" id="selClear" disabled>Clear</button>
     <button type="button" class="selm-t" id="selInvert" aria-pressed="false">Invert</button>
+    <button type="button" class="selm-t" id="selAuto" hidden>Auto head &amp; shoulders</button>
   </div>
   <div class="selm-stage" id="selStage"><div class="selm-zoom" id="selZoom"><canvas id="selCanvas" aria-label="Your photo. Draw round the part to keep."></canvas></div>
     <button type="button" class="selm-t selm-fit" id="selFit" hidden>Fit</button></div>
@@ -59,6 +60,8 @@ function status() {
   host.querySelector("#selInvert").setAttribute("aria-pressed", st.invert);
   host.querySelector("#selUse").disabled = !st.paths.length;
   host.querySelector("#selOutside").hidden = st.mode !== "lithophane";
+  const autoBtn = host.querySelector("#selAuto");
+  if (autoBtn) autoBtn.hidden = st.mode !== "bust" || !st.file;
 }
 function warn(t) { const w = host.querySelector("#selWarn"); w.hidden = !t; w.textContent = t || ""; }
 
@@ -231,6 +234,39 @@ const softIn = host.querySelector("#selSoft");
 softIn.oninput = () => { st.soft = +softIn.value; host.querySelector("#selSoftOut").textContent = st.soft ? st.soft : "Off"; draw(); };
 host.querySelector("#selSnap").onchange = e => { st.snap = e.target.checked; recompute(); draw(); };
 host.querySelectorAll("input[name=selOut]").forEach(r => r.onchange = () => { st.outside = r.value; draw(); });
+async function autoHeadShoulders() {
+  if (st.mode !== "bust" || !st.file) return;
+  const btn = host.querySelector("#selAuto");
+  btn.disabled = true; say("Finding a starting head & shoulders mask…");
+  try {
+    const fd = new FormData();
+    fd.append("file", st.file);
+    const ack = (window.zeimPhotoAck && window.zeimPhotoAck()) || "true";
+    fd.append("photo_ack", ack);
+    const r = await fetch("/api/bust/auto-mask", { method: "POST", body: fd, credentials: "same-origin" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.detail || j.message || ("Auto-select failed (" + r.status + ")"));
+    const sel = j.select || {};
+    if (!sel.paths || !sel.paths.length) throw new Error("No outline came back. Trace the head and shoulders instead.");
+    push();
+    st.paths = sel.paths;
+    st.invert = false;
+    st.soft = +sel.soft || 2;
+    softIn.value = st.soft;
+    host.querySelector("#selSoftOut").textContent = st.soft || "Off";
+    st.use = true;
+    setTool("add");
+    openPanel(true);
+    recompute(); draw();
+    say(j.tip || sel.tip || "Starting mask ready — edit it, then press Make it from my selection.");
+  } catch (e) {
+    say((e && e.message) ? e.message : "Auto-select failed. Trace the head and shoulders instead.");
+  } finally {
+    btn.disabled = false; status();
+  }
+}
+host.querySelector("#selAuto").onclick = () => { autoHeadShoulders(); };
+
 function openPanel(o) {
   st.open = o; host.querySelector("#selPanel").hidden = !o; host.querySelector("#selOpen").setAttribute("aria-expanded", o);
   host.querySelector("#selOpen").textContent = o ? "Hide selection tools" : "Choose part of the photo";
@@ -260,13 +296,13 @@ window.zeimSelect = mode => {
 
 /* ---------------- app events ---------------- */
 document.addEventListener("zeim:file", e => {
-  mount(); st.paths = []; st.undo = []; st.invert = false; st.mask = null; st.use = false; st.zoom = 1; applyZoom(); setTool("new");
+  mount(); st.file = e.detail || null; st.paths = []; st.undo = []; st.invert = false; st.mask = null; st.use = false; st.zoom = 1; applyZoom(); setTool("new");
   host.hidden = !MODES.includes(st.mode); status();
   const img = $("#dropPreview"); loadImage(img && img.src ? img.src : URL.createObjectURL(e.detail));
 });
 document.addEventListener("zeim:mode", e => {
   st.mode = e.detail; host.hidden = !MODES.includes(st.mode) || !st.img; status(); draw();
-  if (st.mode === "bust") say("For a bust, draw round the head and shoulders. The rest becomes the clean pedestal cut.");
+  if (st.mode === "bust") say("For a bust, press Auto head & shoulders for a starting mask you can edit, or draw round them yourself.");
 });
 document.addEventListener("zeim:build", e => {        /* a saved build carries its selection: keep it for "make it again" */
   const s = e.detail?.params?.select; if (!s || !Array.isArray(s.paths)) return;

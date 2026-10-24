@@ -7,7 +7,7 @@ const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert
 const PRESET_HELP = {
   lithophane: { thin: "Lighter, glows brighter, more fragile (0.6–2.4 mm).", standard: "Balanced contrast and strength (0.8–3.2 mm).", thick: "Deep shadows, sturdy (1.0–4.0 mm)." },
   relief: { thin: "Shallow, subtle relief (≈4% of width).", standard: "Clear depth (≈7% of width).", thick: "Dramatic depth (≈11% of width)." },
-  bust: { thin: "Shallower face, shorter pedestal.", standard: "Clear face depth on a solid round pedestal.", thick: "Deeper face, taller pedestal." },
+  bust: { thin: "Shallower face, shorter pedestal, lighter rounded back.", standard: "Clear face depth, rounded back, solid round pedestal.", thick: "Deeper face, taller pedestal, fuller rounded back." },
   popart: { thin: "3 colour layers, small steps.", standard: "4 colour layers, medium steps.", thick: "5 colour layers, tall steps." } };
 
 function toast(msg, kind = "") {
@@ -62,6 +62,7 @@ const api = async (url, opt) => {
   return j;
 };
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(iso).toLocaleDateString(); };
+window.zeimPhotoAck = () => (typeof pick !== "undefined" && pick.acked ? pick.acked() : "true");
 const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", bust: "Bust", popart: "Pop-art", trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model" };
 
 let viewer;

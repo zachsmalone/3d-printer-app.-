@@ -90,15 +90,20 @@ def _tone(g: np.ndarray, contrast: bool, gamma: float, smooth: float) -> np.ndar
 
 
 # ------------------------------------------------- heightfield solid mesh
-def heightfield_solid(top: np.ndarray, pitch: float, bottom: float = 0.0):
-    """Watertight solid: node-grid top surface `top` (ny,nx) in mm, flat bottom."""
+def heightfield_solid(top: np.ndarray, pitch: float, bottom: float | np.ndarray = 0.0):
+    """Watertight solid: node-grid top surface `top` (ny,nx) in mm; bottom is a flat plane or a matching (ny,nx) back surface."""
     ny, nx = top.shape
     n = ny * nx
     jj, ii = np.meshgrid(np.arange(nx), np.arange(ny))
     x = jj * pitch
     y = (ny - 1 - ii) * pitch
     vt = np.stack([x, y, top], -1).reshape(-1, 3)
-    vb = np.stack([x, y, np.full_like(top, bottom)], -1).reshape(-1, 3)
+    bot = np.asarray(bottom, float)
+    if bot.ndim == 0:
+        bot = np.full_like(top, float(bot))
+    elif bot.shape != top.shape:
+        raise ValueError("bottom heightfield must match top shape")
+    vb = np.stack([x, y, bot], -1).reshape(-1, 3)
     verts = np.vstack([vt, vb]).astype(np.float64)
 
     idx = np.arange(n).reshape(ny, nx)
@@ -122,9 +127,10 @@ def heightfield_solid(top: np.ndarray, pitch: float, bottom: float = 0.0):
     return verts, faces
 
 
-def masked_heightfield_solid(top: np.ndarray, pitch: float, cells: np.ndarray, bottom: float = 0.0):
+def masked_heightfield_solid(top: np.ndarray, pitch: float, cells: np.ndarray, bottom: float | np.ndarray = 0.0):
     """Like heightfield_solid but only over the grid cells where `cells` (ny-1, nx-1) is True (Select mode).
-    The cell mask is de-checkered first so the walls stay 2-manifold; unused vertices are dropped."""
+    The cell mask is de-checkered first so the walls stay 2-manifold; unused vertices are dropped.
+    `bottom` may be a flat plane or a matching (ny,nx) back surface (rounded bust back)."""
     cells = fix_checkers(cells)
     ny, nx = top.shape
     n = ny * nx
@@ -132,7 +138,12 @@ def masked_heightfield_solid(top: np.ndarray, pitch: float, cells: np.ndarray, b
     x = jj * pitch
     y = (ny - 1 - ii) * pitch
     vt = np.stack([x, y, top], -1).reshape(-1, 3)
-    vb = np.stack([x, y, np.full_like(top, bottom)], -1).reshape(-1, 3)
+    bot = np.asarray(bottom, float)
+    if bot.ndim == 0:
+        bot = np.full_like(top, float(bot))
+    elif bot.shape != top.shape:
+        raise ValueError("bottom heightfield must match top shape")
+    vb = np.stack([x, y, bot], -1).reshape(-1, 3)
     idx = np.arange(n).reshape(ny, nx)
     a, b = idx[:-1, :-1][cells], idx[:-1, 1:][cells]
     d, c = idx[1:, :-1][cells], idx[1:, 1:][cells]
@@ -413,22 +424,62 @@ def relief(im: Image.Image, width_mm=100.0, base_mm=2.0, relief_mm=6.0, resoluti
 
 
 def bust(im: Image.Image, width_mm=80.0, base_mm=12.0, relief_mm=8.0,
-         base_style="round", base_margin=8.0, resolution=180, smooth=0.8, gamma=1.0,
+         base_style="round", base_margin=8.0, back_mm=14.0, core_mm=5.0,
+         resolution=180, smooth=0.8, gamma=1.0,
          auto_contrast=True, invert=False, _alpha=None, **_) -> Model:
-    """Portrait bust: photo as raised relief on a clean pedestal.
+    """Portrait bust: photo as a raised face on a thicker, rounded-back body with a clean pedestal.
 
-    Trace the head and shoulders (Select mode) for a classical bust silhouette;
-    without a selection the whole photo becomes a portrait plaque on a pedestal.
-    Pedestal styles: round (default), rect, or outline (follows the footprint).
+    Not an AI figure (see 2D→3D for that). Geometry is a printable 2.5D bust: photo relief on the
+    front, a smooth rounded back from the silhouette depth, sitting on a pedestal. Trace or
+    auto-select the head and shoulders for a classical cut; without a selection the whole photo
+    becomes a volumetric portrait plaque. Pedestal styles: round (default), rect, or outline.
     """
     style = (base_style or "round").lower().strip()
     if style not in ("round", "rect", "outline"):
         style = "round"
-    face_base = 1.5  # thin plate under the face so shoulders have thickness above the pedestal
-    face = relief(im, width_mm=width_mm, base_mm=face_base, relief_mm=relief_mm,
-                  resolution=resolution, smooth=smooth, gamma=gamma,
-                  auto_contrast=auto_contrast, invert=invert, _alpha=_alpha)
-    v, f = face.bodies[0].vertices, face.bodies[0].faces
+    core = max(float(core_mm), 2.0)          # minimum solid depth through the bust body
+    back = max(float(back_mm), 0.0)          # extra rounded bulge behind the core (0 = flat back)
+    rel = max(float(relief_mm), 0.5)
+
+    small = _resize(im, resolution)
+    g = _tone(_luma(np.asarray(small, np.float64)), auto_contrast, gamma, smooth)
+    if invert:
+        g = 1 - g
+    ny, nx = g.shape
+    cells = None
+    keep = np.ones((ny, nx), bool)
+    if _alpha is not None:
+        na, cells = _cells_from_alpha(_alpha, nx, ny)
+        g = g * np.clip((na - 0.5) * 2.0, 0, 1) ** 0.5 if na.min() < 1 else g
+        keep = na >= 0.5
+
+    # Silhouette depth → rounded back (fuller in the middle, tapering to the rim)
+    if keep.any() and not keep.all():
+        dist = ndimage.distance_transform_edt(keep)
+    else:
+        # Whole-frame plaque: still round the back from a soft inset so it does not look like a flat card
+        border = max(2, int(0.04 * max(ny, nx)))
+        inset = np.ones((ny, nx), bool)
+        inset[:border, :] = inset[-border:, :] = inset[:, :border] = inset[:, -border:] = False
+        dist = ndimage.distance_transform_edt(inset)
+    dmax = float(dist.max()) or 1.0
+    dnorm = np.clip(dist / dmax, 0, 1)
+    # Slightly peaked profile reads as a classical bust back, not a sphere
+    back_profile = dnorm ** 0.65
+    back_profile = ndimage.gaussian_filter(back_profile, 0.8)
+
+    top = core + rel * g
+    bottom = -back * back_profile
+    pitch = width_mm / (nx - 1)
+    if cells is None or cells.all():
+        v, f = heightfield_solid(top, pitch, bottom)
+    else:
+        v, f = masked_heightfield_solid(top, pitch, cells, bottom)
+
+    # Sit the lowest back point on z=0 so the pedestal unions cleanly underneath
+    z0 = float(v[:, 2].min())
+    v = v.copy(); v[:, 2] -= z0
+
     ped = max(float(base_mm), MIN_BASE_MM)
     margin = max(0.0, float(base_margin))
     try:
@@ -440,13 +491,16 @@ def bust(im: Image.Image, width_mm=80.0, base_mm=12.0, relief_mm=8.0,
         base_info = {"style": style, "thickness_mm": ped, "margin_mm": margin,
                      "message": rep.get("message", "")}
     except Exception as e:
-        # Boolean / manifold unavailable: keep the face relief and note the pedestal was skipped
         base_info = {"style": style, "thickness_mm": ped, "margin_mm": margin,
-                     "skipped": True, "message": f"Pedestal could not be added ({e}). Face relief only."}
+                     "skipped": True, "message": f"Pedestal could not be added ({e}). Bust body only."}
     m = Model([Body("bust", v, f)], "bust")
-    m.info = {**(face.info or {}), "pedestal": base_info, "relief_mm": float(relief_mm),
-              "face_base_mm": face_base, "width_mm": float(width_mm)}
-    m.thumb = face.thumb
+    m.info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4), pedestal=base_info,
+                  relief_mm=float(rel), core_mm=core, back_mm=back, width_mm=float(width_mm),
+                  volumetric=True,
+                  note="Printable photo bust with a rounded back — not an AI figure scan.")
+    m.thumb = thumbnail.relief_shaded(top - bottom, pitch)
+    if cells is not None:
+        m.thumb = _cut_thumb(m.thumb, cells)
     return m
 
 
@@ -585,7 +639,7 @@ def build(im: Image.Image, mode: str, params: dict) -> Model:
         m.info = {**(m.info or {}), "select": selectmask.summary(sel)}
     elif mode == "bust":
         warnings = warnings + [
-            "Tip: use Choose part of the photo to trace the head and shoulders for a cleaner bust silhouette."
+            "Tip: Auto-select head & shoulders (or trace them) for a cleaner bust cut. Auto is a starting mask you can edit."
         ]
     if warnings:
         m.info = {**(m.info or {}), "warnings": warnings}
