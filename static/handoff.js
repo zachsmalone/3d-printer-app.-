@@ -1,5 +1,5 @@
 /* "Send to…": one hand-off between sections, the same everywhere.
-   Studio/Lithophane → CAD · Slicer · TorchC0, Slicer → CAD · TorchC0, TorchC0 → CAD · Slicer (CAD → … lives in cad.js).
+   Studio/Lithophane → three buttons (Save work · Send to Slicer/TorchC0 · Send to CAD); Slicer → CAD · TorchC0, TorchC0 → CAD · Slicer (CAD → … lives in cad.js).
    The same mesh travels (orientation and size kept), units go with it, work is saved first, and a "Back to …" chip
    gives a one-tap way back. Only the slicer that matches the printer type (FDM / Resin) is offered.
    Kept models: Studio remembers the build it sent (sessionStorage zeim.studio.return) so Back from CAD reopens it; TorchC0 keeps
@@ -117,13 +117,43 @@ function addBtn(id, after, src, cls = "btn") {
   const b = document.createElement("button"); b.type = "button"; b.className = cls + " sendtobtn"; b.id = id; b.setAttribute("aria-haspopup", "dialog");
   b.innerHTML = `${ICON} Send to…`; b.onclick = () => menu(src, b); after.after(b);
 }
-addBtn("btnSendTo", $("#btnSendSheet"), "lithophane");
+/* Studio/Lithophane: three side-by-side buttons after generate (Save work | Send to Slicer/TorchC0 | Send to CAD).
+   Nozzle / multi-head controls stay out of this section — those live only in the FDM Slicer. */
+function wireStudioHandoff() {
+  const save = $("#btnSaveWork"), slicer = $("#btnSendSlicer"), cad = $("#btnSendCad"), lab = $("#btnSendSlicerL");
+  if (!save || !slicer || !cad) return;
+  const paint = () => {
+    const resin = kind() === "resin";
+    slicer.dataset.to = resin ? "torchc0" : "slicer";
+    if (lab) lab.textContent = resin ? "Send to TorchC0" : "Send to Slicer";
+    slicer.title = resin
+      ? "Save first, then open this model in TorchC0 for resin"
+      : "Save first, then open this model in the FDM Slicer";
+    slicer.hidden = !targetsFor("lithophane").includes(slicer.dataset.to);
+    cad.hidden = !targetsFor("lithophane").includes("cad");
+  };
+  save.onclick = () => {
+    const ok = window.zeimSave ? !!window.zeimSave.saveNow() : (document.dispatchEvent(new CustomEvent("zeim:save-now")), true);
+    toast(ok ? "Work saved." : "Nothing new to save yet.", ok ? undefined : "err");
+  };
+  const go = async (btn, target) => {
+    if (btn.disabled) return;
+    btn.disabled = true; btn.setAttribute("aria-busy", "true");
+    try { await sendTo(target, "lithophane"); } finally { btn.disabled = false; btn.removeAttribute("aria-busy"); }
+  };
+  slicer.onclick = () => go(slicer, slicer.dataset.to || "slicer");
+  cad.onclick = () => go(cad, "cad");
+  paint();
+  new MutationObserver(paint).observe(document.body, { attributes: true, attributeFilter: ["data-print-kind"] });
+}
+wireStudioHandoff();
 addBtn("editSendTo", $("#editSend"), "slicer");
 { const ph = $("#viewTorch .pagehead"); if (ph && !$("#torchSendTo")) { const s = document.createElement("span"); ph.append(s); addBtn("torchSendTo", s, "torchc0"); s.remove(); } }
 
 /* Phone layouts can fold a section's panels away (the Slicer's result panel starts minimised), which hid its Send to…
-   button. A small floating "Send to…" stands in whenever the section has a model but its own button is not on screen. */
-const SRC_BTN = { lithophane: "#btnSendTo", slicer: "#editSendTo", torchc0: "#torchSendTo" };
+   button. A small floating "Send to…" stands in whenever the section has a model but its own button is not on screen.
+   Studio uses the three handoff buttons instead of a Send to… menu. */
+const SRC_BTN = { lithophane: "#btnSendSlicer", slicer: "#editSendTo", torchc0: "#torchSendTo" };
 const hasModel = v => v === "lithophane" ? !!S.current?.id : v === "slicer" ? !!window.__zeimEdit?.p?.id : v === "torchc0" ? !!($("#rzFile")?.files?.length || document.body.dataset.torchStl) : false;
 let fab = null;
 function syncFab() {

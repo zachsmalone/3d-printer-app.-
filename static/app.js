@@ -275,7 +275,7 @@ async function resumePending() {        /* the scanner was down: re-check the pa
 async function build(autoDelete = false) {
   if (S.pending) return resumePending();          /* parked earlier: re-check instead of re-uploading */
   if (!S.file) return;
-  setPath(2, "Making your 3D model. Step 2 of 3."); $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; S.building = true;   // no printing/sending a stale build mid-rebuild
+  setPath(2, "Making your 3D model. Step 2 of 3."); $("#busy").hidden = false; $("#makingLine").hidden = false; $("#btnBuild").disabled = true; $("#btnPrint").disabled = true; $("#btnSendSheet").disabled = true; ["btnSaveWork","btnSendSlicer","btnSendCad"].forEach(id => { const b = $(id); if (b) b.disabled = true; }); S.building = true;   // no printing/sending a stale build mid-rebuild
   try {
     const r = await api("/api/generate", { method: "POST", body: formData(autoDelete) });
     if (r && r.status === "pending_scan") {        /* scanner down: parked, NOT built */
@@ -291,7 +291,7 @@ async function build(autoDelete = false) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
     else if (e.status === 400 && /photo/i.test(e.message)) { clearFile(); pick.msg(e.message); }          // photo problems stay visible under the buttons; the refused photo is forgotten (QA-2)
     else { setPath(S.file ? 1 : 1, "That didn't work. Your photo is still here, so you can try again."); toast("We couldn't make your model: " + (e.message || "something went wrong") + " Your photo is still here. Try again.", "err"); }
-  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = !S.file; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; S.building = false; }
+  } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = !S.file; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; ["btnSaveWork","btnSendSlicer","btnSendCad"].forEach(id => { const b = $(id); if (b) b.disabled = false; }); S.building = false; }
 }
 $("#btnBuild").onclick = () => build(false);
 

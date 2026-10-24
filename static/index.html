@@ -305,7 +305,12 @@
       <div class="resbar">
         <div class="stats" id="stats"></div>
         <div class="actions">
-          <button class="btn primary" id="btnSendSheet" aria-haspopup="dialog" title="Save this model or send it somewhere"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg> Send or save</button>
+          <div class="handoffrow" id="studioHandoff" role="group" aria-label="Save or send this model">
+            <button type="button" class="btn" id="btnSaveWork" title="Save your work in this browser (and on your account when signed in)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-check"/></svg> Save work</button>
+            <button type="button" class="btn primary" id="btnSendSlicer" title="Save first, then open this model in the matching slicer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-send"/></svg> <span id="btnSendSlicerL">Send to Slicer</span></button>
+            <button type="button" class="btn" id="btnSendCad" title="Save first, then open this model in CAD"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Send to CAD</button>
+          </div>
+          <button class="btn" id="btnSendSheet" aria-haspopup="dialog" title="Save this model or send it somewhere"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg> Send or save</button>
           <label class="inl" title="Who can open this build's files"><select id="resVis"><option value="private">Private</option><option value="followers">Followers</option><option value="public">Public</option></select></label>
           <button class="btn" id="btnEditThis" title="Open this model in the Edit workspace"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg> Edit this</button>
           <button class="btn" id="btnPublish"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-globe"/></svg> Share to Showcase</button>
