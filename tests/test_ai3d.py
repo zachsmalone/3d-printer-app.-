@@ -12,6 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 @pytest.fixture(autouse=True)
 def _clean(monkeypatch):
     ai3d.reset()
+    monkeypatch.setenv("ZEIM_2D3D_ENABLED", "1")
     monkeypatch.setattr(config, "TESTING_MODE", False)
     monkeypatch.setattr(config, "AI3D_FAKE", True)
     monkeypatch.setattr(config, "AI3D_PRO_ONLY", False)
@@ -147,8 +148,8 @@ def test_static_tab_and_copy():
 def test_ui_tab_in_a_real_browser():
     import os, subprocess, sys
     from tests.test_b1_ui import _spawn
-    fake = {"ZEIM_AI3D_FAKE": "1", "ZEIM_TESTING_MODE": "0"}
-    p1, u1 = _spawn("local", fake); p3, u3 = _spawn("local", fake); p2, u2 = _spawn("local", {"ZEIM_AI3D_URL": "", "ZEIM_AI3D_FAKE": "0"})
+    fake = {"ZEIM_AI3D_FAKE": "1", "ZEIM_TESTING_MODE": "0", "ZEIM_2D3D_ENABLED": "1"}
+    p1, u1 = _spawn("local", fake); p3, u3 = _spawn("local", fake); p2, u2 = _spawn("local", {"ZEIM_AI3D_URL": "", "ZEIM_AI3D_FAKE": "0", "ZEIM_2D3D_ENABLED": "1"})
     try:
         shots = os.environ.get("ZEIM_SHOTS", "")
         r = subprocess.run([sys.executable, str(ROOT / "tests/ui_ai3d.py"), u1, u3, u2, shots], cwd=ROOT, capture_output=True, text=True, timeout=500)

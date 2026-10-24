@@ -154,6 +154,15 @@ def plans_enabled() -> bool:
     return _flag("ZEIM_PLANS_ENABLED", False)
 
 
+def ai3d_enabled() -> bool:
+    """Photo-to-3D (TripoSR) tab and jobs. Default off for the soft launch.
+
+    ZEIM_2D3D_ENABLED=1 turns the tab and POST /api/ai3d/jobs back on.
+    It does not start a payment. Core tools stay available either way.
+    """
+    return _flag("ZEIM_2D3D_ENABLED", False)
+
+
 EDIT_UPLOADS_PER_HOUR = _int("PHOTO3D_EDIT_UPLOADS_PER_HOUR", 120)   # editor / CAD mesh imports (own budget)
 # Optional local malware scan of uploads via clamd (INSTREAM). Nothing is ever sent anywhere
 # else; if clamd is unreachable, uploads are allowed and the miss is logged.

@@ -39,6 +39,8 @@ def _day(now=None) -> str:
 
 def engine_status() -> dict:
     """{'installed': bool, 'ready': bool, 'device': ..., 'test_double': bool}. Never raises."""
+    if not config.ai3d_enabled():
+        return {"installed": False, "ready": False, "device": None, "engine": "TripoSR", "test_double": False}
     if config.AI3D_FAKE:
         return {"installed": True, "ready": True, "device": "test double", "engine": "test double", "test_double": True}
     if not config.AI3D_URL:
@@ -53,7 +55,9 @@ def engine_status() -> dict:
 
 
 def engine_call(image: bytes, mode: str, resolution: int = 192) -> bytes:
-    """Photo bytes -> PLY bytes from the worker."""
+    """Photo bytes -> PLY bytes from the worker. Refuses while ZEIM_2D3D_ENABLED is off."""
+    if not config.ai3d_enabled():
+        raise EngineMissing("2D to 3D is not available yet.")
     if config.AI3D_FAKE:
         from ..core.ai3d_mesh import fake_engine_mesh
         time.sleep(0.4)
@@ -83,6 +87,9 @@ def is_pro(actor) -> bool:
 
 def plan(actor) -> dict:
     """What this account may do right now (shown in the tab; enforced in start())."""
+    if not config.ai3d_enabled():
+        return {"allowed": False, "reason": "unavailable", "phase": "off", "wait_s": 0,
+                "cap": 0, "used_today": 0, "testing_mode": False}
     now = time.time()
     sid = actor.sid
     if config.TESTING_MODE:

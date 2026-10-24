@@ -45,7 +45,7 @@ def get_config():
     return {"product": branding.PRODUCT_NAME, "tagline": branding.TAGLINE, "sections": branding.SECTIONS,
             "showcase_tabs": branding.SHOWCASE_TABS, "max_builds": config.MAX_BUILDS, "group_name": branding.GROUP_NAME,
             "group_name_plural": branding.GROUP_NAME_PLURAL, "chat_block_message": safety.BLOCK_MESSAGE,
-            "testing_mode": config.TESTING_MODE}
+            "testing_mode": config.TESTING_MODE, "ai3d_enabled": config.ai3d_enabled()}
 
 
 # ---------------- identity ----------------

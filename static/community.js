@@ -8,6 +8,7 @@ let CFG = null, ME = null, shTab = "trending";
 async function init() {
   CFG = await api("/api/config");
   { const tm = document.getElementById("accTestingMode"); if (tm) tm.hidden = !CFG.testing_mode; }
+  applyAi3dFlag();
   document.title = CFG.product;
   $$("[data-sec]").forEach(e => e.textContent = CFG.sections[e.dataset.sec] || e.textContent);
   $("#logoImg").alt = CFG.product;
@@ -15,6 +16,21 @@ async function init() {
   await refreshMe();
   route();
   window.__zeimStarted = true;                 // static/boot.js shows a visible error if this never happens
+}
+function applyAi3dFlag() {
+  /* ZEIM_2D3D_ENABLED=0: hide the nav tab. The view, if opened by a link, says Coming later. */
+  const on = !!CFG.ai3d_enabled;
+  $$('[data-view="ai3d"]').forEach(b => { b.hidden = !on; b.disabled = !on; });
+  const grid = document.querySelector("#viewAi3d .a3grid");
+  const go = document.getElementById("a3Go");
+  const note = document.getElementById("a3Engine");
+  if (!on) {
+    if (grid) grid.hidden = true;
+    if (go) { go.disabled = true; go.hidden = true; }
+    const cool = document.getElementById("a3Cool");
+    if (cool) cool.hidden = true;
+    if (note) note.innerHTML = "<p><b>2D to 3D is coming later.</b> Lithophanes, the slicers, CAD and Showcase stay available. Nothing here starts a model.</p>";
+  }
 }
 async function refreshMe() {
   ME = await api("/api/me");

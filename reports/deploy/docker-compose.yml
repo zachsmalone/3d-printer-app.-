@@ -24,6 +24,7 @@ services:
       PHOTO3D_PUBLIC_BASE_URL: ${PHOTO3D_PUBLIC_BASE_URL:-https://${ZEIM_DOMAIN:-zeim.example.org}}
       ZEIM_PLANS_ENABLED: ${ZEIM_PLANS_ENABLED:-0}          # 0 = Semi Pro / Pro cannot start checkout
       ZEIM_COMING_SOON: ${ZEIM_COMING_SOON:-0}              # 0 = full app; 1 = holding page except /healthz
+      ZEIM_2D3D_ENABLED: ${ZEIM_2D3D_ENABLED:-0}            # 0 = hide 2D→3D and refuse TripoSR jobs
     volumes:
       - ${ZEIM_HOST_DIR:-/srv/zeim}/data:/data
       - ${ZEIM_HOST_DIR:-/srv/zeim}/outputs:/outputs

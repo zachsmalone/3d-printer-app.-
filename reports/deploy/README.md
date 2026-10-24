@@ -38,9 +38,10 @@ On the zeim-prod host, from a checkout of this repo:
    - `ZEIM_DOMAIN=zeimapp.com`
    - `ZEIM_COMING_SOON=0` — full app for a normal visit. `1` puts the static page back; `/healthz` still reaches the app.
    - `ZEIM_PLANS_ENABLED=0` — Account → Plans may list Semi Pro and Pro as Coming later. Checkout does not start. Leave Stripe keys unset.
+   - `ZEIM_2D3D_ENABLED=0` — the 2D→3D tab stays hidden and photo-to-3D jobs do not run. Lithophanes, slicers, CAD and Showcase stay on.
 2. Point Caddy at `reports/deploy/Caddyfile` (it proxies every path to the app). With Compose, `caddy-run.sh` does that when the flag is `0`.
 3. Reload Caddy, and recreate the app container so it reads `.env`.
-4. Check: `https://zeimapp.com/` is the ZEIM app (18+ gate, then the maker UI). `https://zeimapp.com/healthz` is still `{"status":"ok"}`. Account → Plans shows Free and Coming later, and does not open a payment page. If a browser still shows the old page, reload once — the holding page is now `Cache-Control: no-store` when the flag is on, and the app page is `no-cache`.
+4. Check: `https://zeimapp.com/` is the ZEIM app (18+ gate, then the maker UI). `https://zeimapp.com/healthz` is still `{"status":"ok"}`. Account → Plans shows Free and Coming later, and does not open a payment page. The 2D→3D tab is not in the nav. Lithophane, FDM Slicer, TorchC0, CAD and Showcase are. If a browser still shows the old page, reload once — the holding page is `Cache-Control: no-store` when that flag is on, and the app page is `no-cache`.
 
 Do not put Stripe secret keys on the server for this release. `ZEIM_PLANS_ENABLED=1` only restores the honest "payment is not live" stub. It still does not charge, and a missing Stripe key is not an error.
 
