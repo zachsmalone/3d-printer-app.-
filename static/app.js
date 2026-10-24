@@ -690,8 +690,14 @@ async function openPrint(b) {
   $("#printerBlock").hidden = !caps.printer_ui; $("#printerHosted").hidden = !!caps.printer_ui;
   startNowOff(); fillPrinterSel(); $("#sendOut").textContent = "";
   if ($("#spoolOut")) $("#spoolOut").textContent = "";
-  if ($("#printerHonest")) $("#printerHonest").textContent = (printInfo.printer_verification || S.settings?.printer_verification || "Simulated")
-    + " until a real-hardware pass. Tested with a pretend printer only.";
+  if ($("#printerHonest")) {
+    const honesty = printInfo.printer_honesty || S.settings?.printer_honesty;
+    const ver = printInfo.printer_verification || S.settings?.printer_verification || "Simulated";
+    $("#printerHonest").textContent = honesty
+      || (ver === "Live API"
+           ? "Moonraker / OctoPrint: Live API (real HTTP). Not yet confirmed on Zach's Creality K1 hardware. Bambu / stubs stay Simulated."
+           : ver + " until a real-hardware pass. Tested with a pretend printer only.");
+  }
   $("#dlgPrint").showModal();
 }
 $("#btnPrint").onclick = () => openPrint(S.current);          // Studio's own build; Edit passes its project (they used to share S.current: QA-1)
@@ -811,9 +817,9 @@ function renderPrinters() {
     <p class="help">${types.find(t => t.type === p.type)?.hint || ""}</p>
     ${(S.settings.printer_presets || []).find(x => x.id === p.profile) ? `<p class="help"><b>Experimental.</b> ${esc(S.settings.printer_presets.find(x => x.id === p.profile).hint)}</p>` : ""}
     ${dc
-      ? `<p class="help">Direct control is on for this install. Addresses are checked against SSRF rules before every request. Status: <b>${esc(ver)}</b>.</p>`
+      ? `<p class="help">Direct control is on for this install. Addresses are checked against SSRF rules before every request. This printer path: <b>${esc((p.type === "moonraker" || p.type === "octoprint") ? "Live API" : (p.type === "bambu" ? "Simulated" : ver))}</b>${(p.type === "moonraker" || p.type === "octoprint") ? " (real HTTP; not yet Hardware-tested on Zach's K1)." : (p.type === "bambu" ? " — Bambu LAN not confirmed on real hardware; keep Open in Bambu Studio as fallback." : ".")}</p>`
       : `<p class="help">Direct control is off: slice, download the G-code and print from your printer's own app. (Arbitrary printer URLs can no longer be entered — they were an SSRF risk.)</p>`}
-    <p class="help">Tested with a pretend printer only. Not tried on a real printer yet.</p>
+    <p class="help">${(S.settings.printer_honesty || "Moonraker / OctoPrint: Live API. Bambu / stubs: Simulated.")}</p>
     <button class="btn small" data-test="${i}" ${p.id ? "" : "disabled title='Save first, then test'"}>Test connection</button> <button class="btn small danger" data-rm="${i}">Remove</button>
     <p class="help" data-testout="${i}" role="status" aria-live="polite">${p.id ? "A test only asks the printer if it is there. It never starts a print." : "Save settings first, then you can test the connection."}</p></div>`).join("") || `<p class="help">No printers yet.</p>`;
 }

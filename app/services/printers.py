@@ -1,11 +1,16 @@
 """Network printer clients (upload, status, control, camera).
 
-OctoPrint and Moonraker: implemented against public HTTP APIs (mock-tested; not verified on
-real hardware yet — responses carry verification="Simulated").
+OctoPrint and Moonraker: real HTTP clients against the public printer APIs (upload, status,
+control, camera, connection test). Responses carry verification="Live API" — the protocol
+talks to a reachable endpoint; they are not pretend/mock success. Zach's Creality K1 has not
+been confirmed as a hardware pass yet (HARDWARE_VERIFIED_TYPES stays empty until then).
 
 Bambu Lab LAN: FTPS upload + MQTT print start when LAN Only and Developer Mode are on
-(see BAMBU_LIMITS). Not verified on a real Bambu — verification="Simulated". Always keep
-Open in Bambu Studio as the fallback.
+(see BAMBU_LIMITS). Still verification="Simulated" (mock env or unconfirmed hardware). Always
+keep Open in Bambu Studio as the fallback.
+
+Stubs / unconfigured printers stay Simulated. Never fake a successful send when the printer
+did not answer.
 
 Never copies GPL/AGPL frontends (OctoPrint UI, Mainsail, Fluidd, Moonraker sources, Bambu Studio).
 """
@@ -26,14 +31,21 @@ from . import netguard
 
 PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
 DEFAULT_BED = (250.0, 210.0)
-# Flip when Zach confirms a real-printer pass for a path.
-HARDWARE_VERIFIED = False
+# Add a type here only after Zach confirms that path on real hardware (e.g. "moonraker" for his K1).
+HARDWARE_VERIFIED_TYPES: set[str] = set()
+# Backward-compat bool: True only when every Live-API type has a hardware pass.
+HARDWARE_VERIFIED = False  # kept as False until HARDWARE_VERIFIED_TYPES covers moonraker+octoprint
+
+# Types that speak a real network protocol (not a pretend success path).
+LIVE_API_TYPES = frozenset({"moonraker", "octoprint"})
 
 PROFILES = {
-    "creality_k1": {"label": "Creality K1 (Experimental)", "type": "moonraker", "bed": (220.0, 220.0), "max_z": 250.0,
+    "creality_k1": {"label": "Creality K1 (Moonraker)", "type": "moonraker", "bed": (220.0, 220.0), "max_z": 250.0,
                     "ini": PROFILE_DIR / "creality_k1.ini", "experimental": True,
-                    "hint": "Experimental: not tested on a real K1. Needs Moonraker on the printer (usually http://<printer-ip>:7125, not the Fluidd page on 4408). "
-                            "It may not work with the factory firmware."},
+                    "hint": ("Point ZEIM at Moonraker on the K1: http://<printer-ip>:7125 (not Fluidd/Mainsail on 4408). "
+                             "Root/community firmware with Moonraker works; stock Creality UI alone may not. "
+                             "Add the printer as type Moonraker, optional API key if auth is on, then use Test connection. "
+                             "Hardware pass on Zach's K1 is still pending — label is Live API, not Hardware-tested.")},
 }
 
 # Verified from Bambu Lab Wiki (third-party integration + Developer Mode pages, 2026):
@@ -53,11 +65,21 @@ BAMBU_LIMITS = {
              "Simulated until tested on a real Bambu."),
 }
 
+HONESTY_NOTE_LIVE = (
+    "Moonraker / OctoPrint use a real HTTP send (Live API). "
+    "Not yet confirmed on Zach's Creality K1 hardware. "
+    "Bambu LAN and unconfigured/stub paths stay Simulated."
+)
+HONESTY_NOTE_NONE = (
+    "No network printer configured. Add a Moonraker (K1) or OctoPrint printer in Settings, "
+    "or download G-code / Open in slicer. Unconfigured send stays Simulated."
+)
+
 TYPES = [
     {"type": "octoprint", "label": "OctoPrint", "implemented": True,
      "hint": "URL like http://octopi.local ; API key from OctoPrint > Settings > API"},
-    {"type": "moonraker", "label": "Moonraker (Klipper / Mainsail / Fluidd)", "implemented": True,
-     "hint": "URL like http://printer.local:7125 ; API key only if auth is enabled"},
+    {"type": "moonraker", "label": "Moonraker (Klipper / Mainsail / Fluidd / Creality K1)", "implemented": True,
+     "hint": "URL like http://printer.local:7125 (K1: printer IP port 7125, not 4408). API key only if auth is enabled. Live API — real HTTP upload/status/control."},
     {"type": "prusalink", "label": "PrusaLink (Coming soon)", "implemented": False,
      "hint": "Coming soon. For now use the slicer hand-off or download the G-code."},
     {"type": "bambu", "label": "Bambu Lab LAN (Simulated)", "implemented": True,
@@ -71,12 +93,39 @@ IMPLEMENTED = {t["type"] for t in TYPES if t["implemented"]}
 CONTROL_TYPES = {"octoprint", "moonraker", "bambu"}
 
 
-def verification_tag() -> str:
-    return "Hardware-tested" if HARDWARE_VERIFIED else "Simulated"
+def verification_tag(ptype: str | None = None) -> str:
+    """Per-path honesty label.
+
+    - Hardware-tested: type listed in HARDWARE_VERIFIED_TYPES after a real-printer pass
+    - Live API: Moonraker / OctoPrint real HTTP clients (clears Simulated for that path)
+    - Simulated: Bambu (unconfirmed), stubs, mocks, or unknown/unconfigured
+    Global (ptype None): Live API, because the primary K1 path is Moonraker. UI honesty notes
+    still say Bambu stays Simulated.
+    """
+    t = (ptype or "").strip().lower()
+    if t and t in HARDWARE_VERIFIED_TYPES:
+        return "Hardware-tested"
+    if t in LIVE_API_TYPES:
+        return "Live API"
+    if t:  # bambu, stubs, anything else named
+        return "Simulated"
+    return "Live API"
 
 
-def _v(extra: dict | None = None) -> dict:
-    out = {"verification": verification_tag(), "hardware_verified": HARDWARE_VERIFIED}
+def honesty_note(printers_configured: bool = True) -> str:
+    return HONESTY_NOTE_LIVE if printers_configured else HONESTY_NOTE_NONE
+
+
+def _hardware_verified_for(ptype: str | None) -> bool:
+    t = (ptype or "").strip().lower()
+    return bool(t) and t in HARDWARE_VERIFIED_TYPES
+
+
+def _v(extra: dict | None = None, ptype: str | None = None) -> dict:
+    out = {
+        "verification": verification_tag(ptype),
+        "hardware_verified": _hardware_verified_for(ptype) if ptype else HARDWARE_VERIFIED,
+    }
     if extra:
         out.update(extra)
     return out
@@ -131,22 +180,23 @@ def shared_mode_denial(url: str) -> str | None:
 
 def _guard_printer(printer: dict) -> dict | None:
     """Return an error result dict, or None if the printer may be dialed."""
-    if not direct_control_enabled():
-        return {"ok": False, "message": DIRECT_OFF_MESSAGE, **_v()}
     t = printer.get("type")
+    if not direct_control_enabled():
+        return {"ok": False, "message": DIRECT_OFF_MESSAGE, **_v(ptype=t)}
     if t not in IMPLEMENTED:
         return {"ok": False, "stub": True,
                 "message": f"'{t}' support is a stub and not implemented yet. "
-                           "Use 'Open in slicer' or download the G-code and send it manually.", **_v()}
+                           "Use 'Open in slicer' or download the G-code and send it manually.", **_v(ptype=t)}
     if not printer.get("url"):
-        return {"ok": False, "message": "printer URL is not configured", **_v()}
+        return {"ok": False, "message": "printer URL is not configured — add an address in Settings, or use Open in slicer / download G-code.",
+                **_v(ptype=t)}
     denial = shared_mode_denial(printer["url"])
     if denial:
-        return {"ok": False, "message": denial, **_v()}
+        return {"ok": False, "message": denial, **_v(ptype=t)}
     try:
         check_url(printer["url"])
     except ValueError as e:
-        return {"ok": False, "message": str(e), **_v()}
+        return {"ok": False, "message": str(e), **_v(ptype=t)}
     return None
 
 
@@ -170,6 +220,8 @@ def send(printer: dict, gcode: "Path | None", name: str, start: bool) -> dict:
     t = printer.get("type")
     if t == "bambu":
         return _send_bambu(printer, gcode, name, start)
+    if gcode is None or not Path(gcode).is_file():
+        return {"ok": False, "message": "No G-code file to upload. Slice first, or use Open in slicer.", **_v(ptype=t)}
     try:
         with _client(printer) as c, open(gcode, "rb") as fh:
             if t == "octoprint":
@@ -179,11 +231,13 @@ def send(printer: dict, gcode: "Path | None", name: str, start: bool) -> dict:
                 r = c.post("/server/files/upload", files={"file": (name, fh, "application/octet-stream")},
                            data={"root": "gcodes", "print": "true" if start else "false"})
         if r.status_code >= 300:
-            return {"ok": False, "message": f"{t} answered HTTP {r.status_code}: {r.text[:200]}", **_v()}
-        return {"ok": True, "message": f"Uploaded '{name}' to {printer['name']}"
-                + (" and started the print" if start else ""), "response": r.text[:300], **_v()}
+            return {"ok": False, "message": f"{t} answered HTTP {r.status_code}: {r.text[:200]}", **_v(ptype=t)}
+        return {"ok": True, "message": f"Uploaded '{name}' to {printer.get('name') or 'printer'}"
+                + (" and started the print" if start else "")
+                + " (Live API — real HTTP upload; not yet Hardware-tested on Zach's K1).",
+                "response": r.text[:300], **_v(ptype=t)}
     except httpx.HTTPError as e:
-        return {"ok": False, "message": f"could not reach printer: {e}", **_v()}
+        return {"ok": False, "message": f"could not reach printer: {e}", **_v(ptype=t)}
 
 
 def profile_of(printer: dict | None) -> dict | None:
@@ -211,33 +265,34 @@ def test(printer: dict) -> dict:
     if t == "bambu":
         return _test_bambu(printer)
     if t not in IMPLEMENTED:
-        return {"ok": False, "message": f"'{t}' is not implemented yet, so it cannot be tested.", "detail": {}, **_v()}
+        return {"ok": False, "message": f"'{t}' is not implemented yet, so it cannot be tested.", "detail": {}, **_v(ptype=t)}
     if not printer.get("url"):
-        return {"ok": False, "message": "Add the printer's address first.", "detail": {}, **_v()}
+        return {"ok": False, "message": "Add the printer's address first.", "detail": {}, **_v(ptype=t)}
     denial = shared_mode_denial(printer["url"])
     if denial:
-        return {"ok": False, "message": denial, "detail": {}, **_v()}
+        return {"ok": False, "message": denial, "detail": {}, **_v(ptype=t)}
     try:
         check_url(printer["url"])
     except ValueError as e:
-        return {"ok": False, "message": str(e), "detail": {}, **_v()}
+        return {"ok": False, "message": str(e), "detail": {}, **_v(ptype=t)}
     try:
         with httpx.Client(base_url=printer["url"].rstrip("/"), timeout=5, follow_redirects=False,
                           headers={"X-Api-Key": printer["api_key"]} if printer.get("api_key") else {}) as c:
             if t == "octoprint":
                 r = c.get("/api/version")
                 if r.status_code in (401, 403):
-                    return {"ok": False, "message": "The printer asked for a key. Check the API key.", "detail": {"status": r.status_code}, **_v()}
+                    return {"ok": False, "message": "The printer asked for a key. Check the API key.", "detail": {"status": r.status_code}, **_v(ptype=t)}
                 if r.status_code != 200:
-                    return {"ok": False, "message": f"The address answered, but not like OctoPrint (HTTP {r.status_code}).", "detail": {"status": r.status_code}, **_v()}
+                    return {"ok": False, "message": f"The address answered, but not like OctoPrint (HTTP {r.status_code}).", "detail": {"status": r.status_code}, **_v(ptype=t)}
                 j = _json(r)
-                return {"ok": True, "message": "Reached OctoPrint" + (f" {j.get('server')}" if j.get("server") else "") + ".", "detail": {"server": j.get("server"), "api": j.get("api")}, **_v()}
+                return {"ok": True, "message": "Reached OctoPrint" + (f" {j.get('server')}" if j.get("server") else "") + " (Live API).",
+                        "detail": {"server": j.get("server"), "api": j.get("api")}, **_v(ptype=t)}
             r = c.get("/server/info")                                                # moonraker
             if r.status_code in (401, 403):
-                return {"ok": False, "message": "The printer asked for a key. Check the API key." + note, "detail": {"status": r.status_code}, **_v()}
+                return {"ok": False, "message": "The printer asked for a key. Check the API key." + note, "detail": {"status": r.status_code}, **_v(ptype=t)}
             if r.status_code != 200:
                 return {"ok": False, "message": f"The address answered, but not like Moonraker (HTTP {r.status_code}). For a K1 this usually means Moonraker is not installed, or the port is 4408 instead of 7125." + note,
-                        "detail": {"status": r.status_code}, **_v()}
+                        "detail": {"status": r.status_code}, **_v(ptype=t)}
             res = _json(r).get("result") or {}
             state = res.get("klippy_state")
             d = {"klippy_state": state, "moonraker_version": res.get("moonraker_version")}
@@ -245,18 +300,18 @@ def test(printer: dict) -> dict:
             if r2.status_code == 200:
                 d["printer_state"] = (_json(r2).get("result") or {}).get("state")
             if state == "ready" and d.get("printer_state", "ready") == "ready":
-                return {"ok": True, "message": "Reached the printer and it is ready." + note, "detail": d, **_v()}
-            return {"ok": False, "message": f"Found the printer service, but the printer is not ready (state={d.get('printer_state') or state or 'unknown'})." + note, "detail": d, **_v()}
+                return {"ok": True, "message": "Reached Moonraker and the printer is ready (Live API)." + note, "detail": d, **_v(ptype=t)}
+            return {"ok": False, "message": f"Found Moonraker, but the printer is not ready (state={d.get('printer_state') or state or 'unknown'})." + note, "detail": d, **_v(ptype=t)}
     except httpx.TimeoutException:
-        return {"ok": False, "message": "Nothing answered within 5 seconds. Check the address and that the printer is on." + note, "detail": {}, **_v()}
+        return {"ok": False, "message": "Nothing answered within 5 seconds. Check the address and that the printer is on." + note, "detail": {}, **_v(ptype=t)}
     except httpx.HTTPError:
-        return {"ok": False, "message": "Could not reach that address. Nothing answers there." + note, "detail": {}, **_v()}
+        return {"ok": False, "message": "Could not reach that address. Nothing answers there." + note, "detail": {}, **_v(ptype=t)}
 
 
 # ---------- 1. Live status ----------
 
 def status(printer: dict) -> dict:
-    """Live job/printer state for OctoPrint / Moonraker / Bambu (Simulated until hardware-verified)."""
+    """Live job/printer state for OctoPrint / Moonraker / Bambu. Labels are per-path (Live API vs Simulated)."""
     err = _guard_printer(printer)
     if err:
         return err
@@ -268,18 +323,18 @@ def status(printer: dict) -> dict:
             return _status_moonraker(printer)
         if t == "bambu":
             return _status_bambu(printer)
-        return {"ok": False, "message": f"Status is not available for '{t}'.", **_v()}
+        return {"ok": False, "message": f"Status is not available for '{t}'.", **_v(ptype=t)}
     except httpx.HTTPError as e:
-        return {"ok": False, "message": f"could not reach printer: {e}", **_v()}
+        return {"ok": False, "message": f"could not reach printer: {e}", **_v(ptype=t)}
 
 
 def _status_octoprint(printer: dict) -> dict:
     with _client(printer, timeout=8) as c:
         job, pr = c.get("/api/job"), c.get("/api/printer")
         if job.status_code in (401, 403) or pr.status_code in (401, 403):
-            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v()}
+            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v(ptype="octoprint")}
         if job.status_code != 200:
-            return {"ok": False, "message": f"OctoPrint job status HTTP {job.status_code}.", **_v()}
+            return {"ok": False, "message": f"OctoPrint job status HTTP {job.status_code}.", **_v(ptype="octoprint")}
         j, p = _json(job), _json(pr) if pr.status_code == 200 else {}
         progress = (j.get("progress") or {})
         state = (j.get("state") or (p.get("state") or {}).get("text") or "unknown")
@@ -290,7 +345,7 @@ def _status_octoprint(printer: dict) -> dict:
                 "print_time_left": progress.get("printTimeLeft"),
                 "temperatures": _temps_octo(p),
                 "flags": ((p.get("state") or {}).get("flags") or {}),
-                **_v()}
+                **_v(ptype="octoprint")}
 
 
 def _temps_octo(p: dict) -> dict:
@@ -312,9 +367,9 @@ def _status_moonraker(printer: dict) -> dict:
             "heater_bed": "temperature,target",
         })
         if r.status_code in (401, 403):
-            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v()}
+            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v(ptype="moonraker")}
         if r.status_code != 200:
-            return {"ok": False, "message": f"Moonraker status HTTP {r.status_code}.", **_v()}
+            return {"ok": False, "message": f"Moonraker status HTTP {r.status_code}.", **_v(ptype="moonraker")}
         st = ((_json(r).get("result") or {}).get("status") or {})
         ps, ds = st.get("print_stats") or {}, st.get("display_status") or {}
         vs = st.get("virtual_sdcard") or {}
@@ -330,22 +385,23 @@ def _status_moonraker(printer: dict) -> dict:
                 "temperatures": {
                     "tool0": {"actual": ex.get("temperature"), "target": ex.get("target")},
                     "bed": {"actual": bed.get("temperature"), "target": bed.get("target")},
-                }, **_v()}
+                }, **_v(ptype="moonraker")}
 
 
 # ---------- 2. Remote pause / resume / stop ----------
 
 def control(printer: dict, action: str) -> dict:
-    """pause | resume | cancel. Never starts a new print. Simulated until hardware-verified."""
+    """pause | resume | cancel. Never starts a new print. Labels are per-path."""
     action = (action or "").strip().lower()
+    t0 = (printer or {}).get("type")
     if action not in ("pause", "resume", "cancel"):
-        return {"ok": False, "message": "Action must be pause, resume, or cancel.", **_v()}
+        return {"ok": False, "message": "Action must be pause, resume, or cancel.", **_v(ptype=t0)}
     err = _guard_printer(printer)
     if err:
         return err
     t = printer.get("type")
     if t not in CONTROL_TYPES:
-        return {"ok": False, "message": f"Remote control is not available for '{t}'.", **_v()}
+        return {"ok": False, "message": f"Remote control is not available for '{t}'.", **_v(ptype=t)}
     try:
         if t == "octoprint":
             return _control_octoprint(printer, action)
@@ -354,8 +410,8 @@ def control(printer: dict, action: str) -> dict:
         if t == "bambu":
             return _control_bambu(printer, action)
     except httpx.HTTPError as e:
-        return {"ok": False, "message": f"could not reach printer: {e}", **_v()}
-    return {"ok": False, "message": "Unsupported printer type.", **_v()}
+        return {"ok": False, "message": f"could not reach printer: {e}", **_v(ptype=t)}
+    return {"ok": False, "message": "Unsupported printer type.", **_v(ptype=t)}
 
 
 def _control_octoprint(printer: dict, action: str) -> dict:
@@ -363,12 +419,12 @@ def _control_octoprint(printer: dict, action: str) -> dict:
     with _client(printer, timeout=15) as c:
         r = c.post("/api/job", json=body)
         if r.status_code in (401, 403):
-            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v()}
+            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v(ptype="octoprint")}
         if r.status_code in (204, 200):
-            return {"ok": True, "action": action, "message": f"Sent {action} to {printer.get('name') or 'printer'}.", **_v()}
+            return {"ok": True, "action": action, "message": f"Sent {action} to {printer.get('name') or 'printer'}.", **_v(ptype="octoprint")}
         if r.status_code == 409:
-            return {"ok": False, "message": f"OctoPrint refused {action} (nothing active to {action}).", **_v()}
-        return {"ok": False, "message": f"OctoPrint answered HTTP {r.status_code}: {r.text[:200]}", **_v()}
+            return {"ok": False, "message": f"OctoPrint refused {action} (nothing active to {action}).", **_v(ptype="octoprint")}
+        return {"ok": False, "message": f"OctoPrint answered HTTP {r.status_code}: {r.text[:200]}", **_v(ptype="octoprint")}
 
 
 def _control_moonraker(printer: dict, action: str) -> dict:
@@ -376,10 +432,10 @@ def _control_moonraker(printer: dict, action: str) -> dict:
     with _client(printer, timeout=15) as c:
         r = c.post(path)
         if r.status_code in (401, 403):
-            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v()}
+            return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v(ptype="moonraker")}
         if r.status_code == 200:
-            return {"ok": True, "action": action, "message": f"Sent {action} to {printer.get('name') or 'printer'}.", **_v()}
-        return {"ok": False, "message": f"Moonraker answered HTTP {r.status_code}: {r.text[:200]}", **_v()}
+            return {"ok": True, "action": action, "message": f"Sent {action} to {printer.get('name') or 'printer'}.", **_v(ptype="moonraker")}
+        return {"ok": False, "message": f"Moonraker answered HTTP {r.status_code}: {r.text[:200]}", **_v(ptype="moonraker")}
 
 
 # ---------- 4. Camera (snapshot proxy) ----------
@@ -397,10 +453,10 @@ def camera_snapshot(printer: dict) -> dict:
             return _camera_moonraker(printer)
         if t == "bambu":
             return {"ok": False, "message": "Bambu camera in ZEIM is Simulated and not wired yet. Use Bambu Studio / Handy for live view until a real-hardware pass.",
-                    "fallback": "bambu_studio", **_v()}
-        return {"ok": False, "message": f"Camera is not available for '{t}'.", **_v()}
+                    "fallback": "bambu_studio", **_v(ptype="bambu")}
+        return {"ok": False, "message": f"Camera is not available for '{t}'.", **_v(ptype=t)}
     except httpx.HTTPError as e:
-        return {"ok": False, "message": f"could not reach camera: {e}", **_v()}
+        return {"ok": False, "message": f"could not reach camera: {e}", **_v(ptype=t)}
 
 
 def _same_host(printer_url: str, candidate: str) -> bool:
@@ -409,22 +465,23 @@ def _same_host(printer_url: str, candidate: str) -> bool:
 
 
 def _fetch_image(printer: dict, path_or_url: str) -> dict:
+    t = printer.get("type")
     base = printer["url"].rstrip("/") + "/"
     full = urljoin(base, path_or_url)
     if not _same_host(printer["url"], full):
-        return {"ok": False, "message": "Camera address must be on the same host as the printer.", **_v()}
+        return {"ok": False, "message": "Camera address must be on the same host as the printer.", **_v(ptype=t)}
     try:
         check_url(full if urlsplit(full).scheme else printer["url"])
     except ValueError as e:
-        return {"ok": False, "message": str(e), **_v()}
+        return {"ok": False, "message": str(e), **_v(ptype=t)}
     with _client(printer, timeout=10) as c:
         r = c.get(full if full.startswith("http") else path_or_url)
         if r.status_code != 200:
-            return {"ok": False, "message": f"Camera answered HTTP {r.status_code}.", **_v()}
+            return {"ok": False, "message": f"Camera answered HTTP {r.status_code}.", **_v(ptype=t)}
         ctype = (r.headers.get("content-type") or "image/jpeg").split(";")[0].strip()
         if not ctype.startswith("image/"):
-            return {"ok": False, "message": "Camera did not return an image.", **_v()}
-        return {"ok": True, "content_type": ctype, "data": r.content, **_v()}
+            return {"ok": False, "message": "Camera did not return an image.", **_v(ptype=t)}
+        return {"ok": True, "content_type": ctype, "data": r.content, **_v(ptype=t)}
 
 
 def _camera_octoprint(printer: dict) -> dict:
@@ -463,22 +520,23 @@ def spool_check(printer: dict, filament_g: float | None) -> dict:
         need = float(filament_g) if filament_g is not None else None
     except (TypeError, ValueError):
         need = None
+    t = printer.get("type")
     if remaining is None:
-        return {"ok": True, "checked": False, "message": "No spool amount saved for this printer — skipped.", **_v()}
+        return {"ok": True, "checked": False, "message": "No spool amount saved for this printer — skipped.", **_v(ptype=t)}
     if need is None:
-        return {"ok": True, "checked": False, "message": "Slice did not report filament grams — skipped.", **_v()}
+        return {"ok": True, "checked": False, "message": "Slice did not report filament grams — skipped.", **_v(ptype=t)}
     enough = remaining + 1e-6 >= need
     return {"ok": enough, "checked": True, "need_g": need, "remaining_g": remaining,
             "message": (f"Spool looks like enough (~{remaining:.1f} g left, job needs ~{need:.1f} g)."
                         if enough else
                         f"Spool may run out: ~{remaining:.1f} g left, job needs ~{need:.1f} g."),
-            **_v()}
+            **_v(ptype=t)}
 
 
 # ---------- Bambu LAN (3) ----------
 
 def bambu_limits() -> dict:
-    return {**BAMBU_LIMITS, **_v()}
+    return {**BAMBU_LIMITS, **_v(ptype="bambu")}
 
 
 def _bambu_host(printer: dict) -> str:
@@ -496,17 +554,17 @@ def _bambu_serial(printer: dict) -> str:
 def _test_bambu(printer: dict) -> dict:
     host, code, serial = _bambu_host(printer), _bambu_code(printer), _bambu_serial(printer)
     if not host:
-        return {"ok": False, "message": "Add the printer's address (http://printer-ip).", "detail": {}, **_v(),
+        return {"ok": False, "message": "Add the printer's address (http://printer-ip).", "detail": {}, **_v(ptype="bambu"),
                 "limits": BAMBU_LIMITS}
     if not (code.isdigit() and len(code) == 8):
         return {"ok": False, "message": "Bambu LAN access code must be 8 digits (from the printer's LAN Only screen).",
-                "detail": {}, **_v(), "limits": BAMBU_LIMITS}
+                "detail": {}, **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     if not serial:
         return {"ok": False, "message": "Add the printer serial (on the printer screen or Bambu Studio device info).",
-                "detail": {}, **_v(), "limits": BAMBU_LIMITS}
+                "detail": {}, **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     if (os.environ.get("ZEIM_BAMBU_MOCK") or "").lower() in ("1", "true", "yes"):
         return {"ok": True, "message": "Simulated Bambu LAN reachability (mock). Needs LAN Only + Developer Mode on a real printer.",
-                "detail": {"host": host, "serial": serial, "mock": True}, **_v(), "limits": BAMBU_LIMITS}
+                "detail": {"host": host, "serial": serial, "mock": True}, **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     # Probe MQTT (8883) and FTPS (990) — connect only, no credentials exchange beyond TLS.
     ports = {}
     for port in (8883, 990):
@@ -518,10 +576,10 @@ def _test_bambu(printer: dict) -> dict:
     if ports.get(8883) == "open" or ports.get(990) == "open":
         return {"ok": True, "message": ("Reached Bambu LAN ports (Simulated — not a full login). "
                                         "Send/control need Developer Mode. Keep Open in Bambu Studio as fallback."),
-                "detail": {"host": host, "ports": ports, "serial": serial}, **_v(), "limits": BAMBU_LIMITS}
+                "detail": {"host": host, "ports": ports, "serial": serial}, **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     return {"ok": False, "message": ("Nothing answered on Bambu LAN ports 8883/990. Check LAN Only Mode, the IP, "
                                      "and that this computer is on the same network. Or use Open in Bambu Studio."),
-            "detail": {"host": host, "ports": ports}, **_v(), "limits": BAMBU_LIMITS}
+            "detail": {"host": host, "ports": ports}, **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
 
 
 def _send_bambu(printer: dict, gcode: Path | None, name: str, start: bool) -> dict:
@@ -529,11 +587,11 @@ def _send_bambu(printer: dict, gcode: Path | None, name: str, start: bool) -> di
     if not host or not (code.isdigit() and len(code) == 8) or not serial:
         return {"ok": False, "fallback": "bambu_studio",
                 "message": "Bambu LAN needs address, 8-digit access code, and serial. Or use Open in Bambu Studio.",
-                "limits": BAMBU_LIMITS, **_v()}
+                "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
     if (os.environ.get("ZEIM_BAMBU_MOCK") or "").lower() in ("1", "true", "yes"):
         return {"ok": True, "message": f"Simulated Bambu LAN upload of '{name}'"
                 + (" and print start" if start else "") + ". Not tried on a real Bambu.",
-                "fallback": "bambu_studio", "limits": BAMBU_LIMITS, "mock": True, **_v()}
+                "fallback": "bambu_studio", "limits": BAMBU_LIMITS, "mock": True, **_v(ptype="bambu")}
     # Real path: FTPS put, then optional MQTT start. Label Simulated until hardware-verified.
     try:
         _bambu_ftps_upload(host, code, gcode, name)
@@ -541,7 +599,7 @@ def _send_bambu(printer: dict, gcode: Path | None, name: str, start: bool) -> di
         return {"ok": False, "fallback": "bambu_studio",
                 "message": f"Bambu FTPS upload failed ({e}). Use Open in Bambu Studio. "
                            "Confirm LAN Only + Developer Mode.",
-                "limits": BAMBU_LIMITS, **_v()}
+                "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
     if start:
         try:
             _bambu_mqtt_print(host, code, serial, name)
@@ -549,10 +607,10 @@ def _send_bambu(printer: dict, gcode: Path | None, name: str, start: bool) -> di
             return {"ok": True, "started": False, "fallback": "bambu_studio",
                     "message": f"Uploaded '{name}' but could not start print ({e}). "
                                "Open the file on the printer or use Open in Bambu Studio. Needs Developer Mode.",
-                    "limits": BAMBU_LIMITS, **_v()}
+                    "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
     return {"ok": True, "message": f"Uploaded '{name}' to Bambu (Simulated path)"
             + (" and asked it to start" if start else "") + ". Not verified on real hardware yet.",
-            "fallback": "bambu_studio", "limits": BAMBU_LIMITS, **_v()}
+            "fallback": "bambu_studio", "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
 
 
 def _bambu_ftps_upload(host: str, code: str, path: Path, name: str) -> None:
@@ -611,33 +669,33 @@ def _bambu_mqtt_print(host: str, code: str, serial: str, filename: str) -> None:
 def _status_bambu(printer: dict) -> dict:
     if (os.environ.get("ZEIM_BAMBU_MOCK") or "").lower() in ("1", "true", "yes"):
         return {"ok": True, "type": "bambu", "state": "IDLE", "job_name": None, "progress_pct": 0,
-                "message": "Simulated Bambu status.", **_v(), "limits": BAMBU_LIMITS}
+                "message": "Simulated Bambu status.", **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     # Without a standing MQTT subscription we only report reachability.
     t = _test_bambu(printer)
     if not t.get("ok"):
         return {**t, "type": "bambu"}
     return {"ok": True, "type": "bambu", "state": "reachable", "job_name": None, "progress_pct": None,
             "message": "Bambu LAN ports answer. Live job % needs a sustained MQTT session (Simulated).",
-            **_v(), "limits": BAMBU_LIMITS}
+            **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
 
 
 def _control_bambu(printer: dict, action: str) -> dict:
     host, code, serial = _bambu_host(printer), _bambu_code(printer), _bambu_serial(printer)
     if not host or not code or not serial:
         return {"ok": False, "fallback": "bambu_studio", "message": "Bambu control needs address, access code, and serial.",
-                "limits": BAMBU_LIMITS, **_v()}
+                "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
     if (os.environ.get("ZEIM_BAMBU_MOCK") or "").lower() in ("1", "true", "yes"):
-        return {"ok": True, "action": action, "message": f"Simulated Bambu {action}.", **_v(), "limits": BAMBU_LIMITS}
+        return {"ok": True, "action": action, "message": f"Simulated Bambu {action}.", **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     cmd = {"pause": "pause", "resume": "resume", "cancel": "stop"}[action]
     try:
         _bambu_mqtt_cmd(host, code, serial, cmd)
         return {"ok": True, "action": action,
                 "message": f"Sent {action} to Bambu (Simulated path; needs Developer Mode).",
-                **_v(), "limits": BAMBU_LIMITS}
+                **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     except Exception as e:
         return {"ok": False, "fallback": "bambu_studio",
                 "message": f"Bambu {action} failed ({e}). Use Bambu Studio. Needs Developer Mode.",
-                "limits": BAMBU_LIMITS, **_v()}
+                "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
 
 
 def _bambu_mqtt_cmd(host: str, code: str, serial: str, cmd: str) -> None:

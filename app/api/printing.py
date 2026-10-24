@@ -67,6 +67,7 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
             "slicer_links_disabled": ("Slicer links are off until the site's public address is set in Settings. You can still download the file." if no_base else ""),
             "printers": settings.public(s, redact=not guards.can_see_printer_urls(request, actor))["printers"], "printer_types": printers.TYPES,
             "printer_verification": printers.verification_tag(),
+            "printer_honesty": printers.honesty_note(bool(s.get("printers"))),
             "direct_control": printers.direct_control_enabled(),
             "bambu_limits": printers.bambu_limits(),
             "builtin_slicer": slicer.status(),
@@ -162,7 +163,7 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
     if spool.get("checked") and not spool.get("ok"):
         return JSONResponse({"ok": False, "stage": "spool", "spool": spool, "slice": res,
                              "message": spool.get("message"),
-                             "verification": printers.verification_tag()})
+                             "verification": printers.verification_tag(pr.get("type"))})
     out = printers.send(pr, store.dir(bid) / "model.gcode", f"photo3d_{bid}.gcode", start)
     return JSONResponse({**out, "stage": "upload", "slice": res, "spool": spool})
 
@@ -259,7 +260,8 @@ def printer_camera(printer_id: str, request: Request, actor: Actor = Depends(get
     if not snap.get("ok"):
         return JSONResponse(snap, status_code=502 if snap.get("message") else 200)
     return Response(snap["data"], media_type=snap.get("content_type") or "image/jpeg",
-                    headers={"Cache-Control": "no-store", "X-ZEIM-Verification": printers.verification_tag()})
+                    headers={"Cache-Control": "no-store",
+                             "X-ZEIM-Verification": printers.verification_tag(pr.get("type"))})
 
 
 @router.post("/printers/{printer_id}/timelapse/start")

@@ -141,6 +141,7 @@ def public(s: dict | None = None, redact: bool = False) -> dict:
     s["public_base_url_locked"] = bool(config.PUBLIC_BASE_URL)
     s["direct_control"] = printers_mod.direct_control_enabled()
     s["printer_verification"] = printers_mod.verification_tag()
+    s["printer_honesty"] = printers_mod.honesty_note(bool(s.get("printers")))
     s["bambu_limits"] = printers_mod.bambu_limits()
     return s
 

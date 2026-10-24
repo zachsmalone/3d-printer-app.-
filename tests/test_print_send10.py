@@ -1,4 +1,7 @@
-"""Print-send10: status, control, camera, bambu limits, spool, queue, board, alerts, timelapse (Simulated)."""
+"""Print-send10: status, control, camera, bambu limits, spool, queue, board, alerts, timelapse.
+
+Moonraker/OctoPrint paths are Live API; Bambu stays Simulated.
+"""
 from __future__ import annotations
 
 import os
@@ -113,11 +116,12 @@ def test_status_control_camera_spool_queue_board(adult, tmp_path, monkeypatch):
 
     st = adult.get(f"/api/printers/{pid}/status").json()
     assert st["ok"] and st["state"] == "Printing" and st["progress_pct"] == 42.5
-    assert st["verification"] == "Simulated"
+    assert st["verification"] == "Live API"
+    assert st.get("hardware_verified") is False
 
     cam = adult.get(f"/api/printers/{pid}/camera")
     assert cam.status_code == 200 and cam.headers["content-type"].startswith("image/")
-    assert cam.headers.get("X-ZEIM-Verification") == "Simulated"
+    assert cam.headers.get("X-ZEIM-Verification") == "Live API"
     assert len(cam.content) > 50
 
     fd = {"action": "pause"}
@@ -155,11 +159,12 @@ def test_status_control_camera_spool_queue_board(adult, tmp_path, monkeypatch):
     assert started["ok"], started
 
     board = adult.get("/api/printers/board").json()
-    assert board["verification"] == "Simulated"
-    assert any(p["id"] == pid for p in board["printers"])
+    assert board["verification"] == "Live API"
+    assert "Live API" in (board.get("honesty") or board.get("note") or "")
+    assert any(p["id"] == pid and p.get("verification") == "Live API" for p in board["printers"])
 
     tl = adult.post(f"/api/printers/{pid}/timelapse/start").json()
-    assert tl["ok"] and tl["verification"] == "Simulated"
+    assert tl["ok"] and tl["verification"] == "Live API"
     tick = adult.post(f"/api/printers/{pid}/timelapse/tick").json()
     assert tick["ok"] and tick["frames"] >= 1
     assert adult.post(f"/api/printers/{pid}/timelapse/stop").json()["ok"]
@@ -203,12 +208,21 @@ def test_failure_watch_pauses_only(monkeypatch):
     assert "cancel" not in calls
 
 
-def test_verification_tag_default_simulated():
+def test_verification_tag_live_api_default_bambu_simulated():
     assert printers.HARDWARE_VERIFIED is False
-    assert printers.verification_tag() == "Simulated"
+    assert printers.verification_tag() == "Live API"  # primary K1 / Moonraker path
+    assert printers.verification_tag("moonraker") == "Live API"
+    assert printers.verification_tag("octoprint") == "Live API"
+    assert printers.verification_tag("bambu") == "Simulated"
+    assert printers.verification_tag("prusa_link") == "Simulated"
+    assert "Live API" in printers.honesty_note()
+    assert "Simulated" in printers.honesty_note()
 
 
 def test_settings_exposes_direct_control_and_bambu(adult):
     s = adult.get("/api/settings", headers=ADMIN).json()
     assert "direct_control" in s and "printer_verification" in s and "bambu_limits" in s
+    assert s["printer_verification"] == "Live API"
+    assert "printer_honesty" in s and "Live API" in s["printer_honesty"]
     assert any(t["type"] == "bambu" and t["implemented"] for t in s["printer_types"])
+    assert any(t["type"] == "moonraker" for t in s["printer_types"])
