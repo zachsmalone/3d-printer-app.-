@@ -219,12 +219,26 @@ def build_file_name(meta: dict, printer_id: str, ext: str, nozzle: Optional[floa
     return fn.file_name(fn.default_stem(*name_parts(meta, printer_id, nozzle)), ext)
 
 
-def load_build_mesh(bid: str, actor: Actor) -> tuple[trimesh.Trimesh, dict]:
-    """Load model mesh for a build owned by actor."""
+def load_build_mesh(bid: str, actor: Actor, part: str = "") -> tuple[trimesh.Trimesh, dict]:
+    """Load model mesh for a build owned by actor.
+
+    part: empty = whole model (merged); otherwise a body name such as "lithophane" or "stand"
+    (separate panel / add-on download)."""
     from app.api.builds import meta_for
     from app.services import editproj
 
     meta = meta_for(bid, actor, owner_only=True)
+    part = (part or "").strip()
+    if part:
+        from app.api.builds import load_model
+        model = load_model(bid)
+        bodies = [b for b in model.bodies if b.name == part]
+        if not bodies:
+            names = ", ".join(b.name for b in model.bodies) or "(none)"
+            raise ValueError(f"no part named {part!r}; this build has: {names}")
+        b = bodies[0]
+        return trimesh.Trimesh(b.vertices, b.faces, process=False), meta
+
     if meta.get("kind") == "edit":
         editproj.ensure_exports(bid)
         m = editproj.mesh_at(bid, meta)
@@ -251,6 +265,7 @@ def export_build_for_printer(
     nozzle: Optional[float] = None,
     slots=None,
     preset: str = "",
+    part: str = "",
 ) -> tuple[bytes, str, str, str, dict]:
     """Export a build for the chosen printer.
 
@@ -271,13 +286,13 @@ def export_build_for_printer(
     if meta_for(bid, actor, owner_only=True).get("mode") == "memorybox":
         return _memorybox_export(bid, actor, pid, force_format, name, nozzle, slots)
     from app.services import filament_slots as fs
-    mesh, meta = load_build_mesh(bid, actor)
+    mesh, meta = load_build_mesh(bid, actor, part=part)
     prepared, info = prepare_mesh_for_printer(mesh, pid)
     data, ext, mime = export_mesh_data(prepared, force_format=force_format)
     plan = fs.plan([], fs.parse_slots(slots))           # one merged mesh = one material = one slot (the first picked)
     if ext == "3mf":
         data = fs.annotate_3mf(data, plan)
-    info.update({"slots": plan["slots"], "slot_notes": plan["notes"], "preset": ""})
+    info.update({"slots": plan["slots"], "slot_notes": plan["notes"], "preset": "", "part": (part or "").strip()})
     if preset:
         from app.services import litho_preset as lp
         if preset != lp.PRESET_ID:
@@ -286,6 +301,14 @@ def export_build_for_printer(
             data = lp.add_bambu(data, (meta.get("params") or {}).get("shape", "rect"), pid)
             info["preset"] = lp.PRESET_ID
     filename = build_file_name(meta, pid, ext, nozzle=nozzle, name=name)
+    part_s = (part or "").strip()
+    if part_s and name is None and not meta.get("file_name"):
+        # "Title - Printer - 0.2mm - stand.3mf" so panel and stand do not overwrite each other
+        stem = filename.rsplit(".", 1)[0]
+        label = {"lithophane": "panel", "stand": "stand"}.get(part_s, part_s)
+        filename = f"{stem} - {label}.{ext}"
+    elif part_s and name:
+        pass
     return data, filename, ext, mime, info
 
 

@@ -82,6 +82,7 @@ def get_export_info(
         "open_in_hints": ue.get_open_in_hints(pref_pid),
         "colour_count": _colour_count(bid),
         "print_presets": _presets(meta, p),
+        "parts": _parts(bid, meta),
     }
 
 
@@ -103,6 +104,26 @@ def _colour_count(bid: str) -> int:
         return len(fs.model_colours(load_model(bid)))
     except Exception:
         return 0
+
+
+_PART_LABELS = {"lithophane": "Lithophane panel", "stand": "Display stand"}
+
+
+def _parts(bid: str, meta: dict) -> list:
+    """Separate download choices when a lithophane has a panel + stand (or other named bodies)."""
+    if meta.get("mode") != "lithophane":
+        return []
+    try:
+        from app.api.builds import load_model
+        names = [b.name for b in load_model(bid).bodies]
+    except Exception:
+        return []
+    if len(names) < 2:
+        return []
+    out = [{"id": "", "label": "Both (one file)"}]
+    for n in names:
+        out.append({"id": n, "label": _PART_LABELS.get(n, n)})
+    return out
 
 
 @router.put("/{bid}/name")
@@ -135,6 +156,7 @@ def download_export(
     name: str = Query("", max_length=400),
     slots: str = Query("", max_length=60, description="Filament slots to use, e.g. '2' or '1,3' (default Slot 1)"),
     preset: str = Query("", pattern="^(|bambu_litho)$", description="bambu_litho: add lithophane print settings for Bambu Studio (3MF, lithophanes)"),
+    part: str = Query("", max_length=40, description="Optional body name: lithophane | stand (empty = whole model)"),
     actor: Actor = Depends(get_actor),
 ):
     """Download in the picked format, sized and named for the printer (3MF falls back to STL if it cannot be made)."""
@@ -148,7 +170,8 @@ def download_export(
         raise HTTPException(400, str(e))
     try:
         data, filename, ext, mime, info = ue.export_build_for_printer(
-            bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle), slots=picked, preset=preset)
+            bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle),
+            slots=picked, preset=preset, part=part)
     except HTTPException:
         raise
     except Exception as e:
@@ -164,6 +187,7 @@ def download_export(
             "X-Export-Format": ext,
             "X-Export-Slots": ",".join(map(str, info.get("slots") or [])),
             "X-Export-Preset": info.get("preset") or "",
+            "X-Export-Part": info.get("part") or "",
         },
     )
 

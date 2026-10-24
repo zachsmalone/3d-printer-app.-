@@ -111,7 +111,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 
 def disk_guard():
@@ -273,6 +273,12 @@ def generate(
     lip_taper: str = Form("none"),            # none | outward | inward | both
     taper_deg: float = Form(45.0),            # slope from vertical, 20..45 (no supports)
     printer_id: str = Form(""),              # bed-fit check for shaped lithophanes ("" = the default printer)
+    grey_method: str = Form("rec601"),       # lithophane grey: rec601 | rec709 | average | lightness | max
+    brightness: float = Form(0.0),           # -1..1 manual brightness after auto-contrast
+    contrast: float = Form(0.0),             # -1..1 manual contrast after auto-contrast
+    sharpen: float = Form(0.0),              # 0..2 unsharp amount
+    tile: bool = Form(False),                # seamless tile the photo across the plate / circumference
+    mm_per_repeat: float = Form(40.0),       # physical width of one tile when tile=true
     base_mm: float = Form(2.0),
     relief_mm: float = Form(6.0),
     levels: int = Form(4),
@@ -397,6 +403,16 @@ def generate(
                 params.update(backing=backing)
             if place:
                 params.update(place=place)
+            from ..core import litho_image as LI
+            try:
+                tone = LI.check_tone(grey_method, brightness, contrast, sharpen)
+                on, mm = LI.check_tile(tile, mm_per_repeat)
+            except ValueError as e:
+                raise HTTPException(400, str(e))
+            params.update(grey_method=tone["grey_method"], brightness=tone["brightness"],
+                          contrast=tone["contrast"], sharpen=tone["sharpen"])
+            if on:
+                params.update(tile=True, mm_per_repeat=mm)
             params.update(hang=hang, hole_d=hole_d, inset_mm=inset_mm, spacing_mm=spacing_mm, stand=stand)
         t0 = time.time()
         try:
