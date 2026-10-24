@@ -11,7 +11,7 @@ result).  When only ``paths`` arrive (API callers, old clients) the server raste
 same edge-snap here (numpy/scipy only, no OpenCV).
 
 Effect per mode (``apply``):
-* relief / popart: the photo is cropped to the selection and everything outside is REMOVED from the mesh.
+* relief / popart / bust: the photo is cropped to the selection and everything outside is REMOVED from the mesh.
 * lithophane: the panel keeps its shape; outside the selection becomes plain (thin, glows evenly white)
   or flat (full thickness, dark, no picture) - the user's choice.
 Warnings are returned, never raised: a tiny or empty selection still builds (empty = whole photo).
@@ -198,7 +198,7 @@ def mask_for(im: Image.Image, sel: dict) -> np.ndarray:
 # ---------------------------------------------------------------- apply
 def apply(im: Image.Image, mode: str, sel: dict | None):
     """-> (image to build from, keep-alpha float (H, W) or None, warnings).
-    relief / popart: image cropped to the selection, alpha used to cut the mesh.
+    relief / popart / bust: image cropped to the selection, alpha used to cut the mesh.
     lithophane: same frame, outside composited to plain white (thin) or flat black (thick); alpha None."""
     if not sel:
         return im, None, []

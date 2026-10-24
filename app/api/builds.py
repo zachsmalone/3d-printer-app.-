@@ -111,7 +111,7 @@ DEFAULT_PHOTO_TITLE = "My photo build"      # never derived from the uploaded fi
 
 # every form field of /api/generate — captured verbatim into a pending upload's context so
 # /api/uploads/resume can replay the exact request once the malware scan clears
-_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
+_GENERATE_FORM_FIELDS = ('mode', 'beginner', 'preset', 'auto_delete_oldest', 'title', 'width_mm', 'resolution', 'smooth', 'gamma', 'auto_contrast', 'invert', 'min_thickness', 'max_thickness', 'border_mm', 'material', 'shape', 'diameter_mm', 'height_mm', 'place_x', 'place_y', 'place_scale', 'place_rotation', 'hang', 'hole_d', 'inset_mm', 'spacing_mm', 'stand', 'bend_deg', 'lip_mm', 'lip_taper', 'taper_deg', 'printer_id', 'backing', 'grey_method', 'brightness', 'contrast', 'sharpen', 'tile', 'mm_per_repeat', 'base_mm', 'relief_mm', 'base_style', 'base_margin', 'levels', 'layer_mm', 'style', 'halftone_cell', 'multi_body', 'palette', 'photo_ack', 'trace', 'select')      # never derived from the uploaded file name (camera file names can hold a person's name)
 
 
 def disk_guard():
@@ -281,6 +281,8 @@ def generate(
     mm_per_repeat: float = Form(40.0),       # physical width of one tile when tile=true
     base_mm: float = Form(2.0),
     relief_mm: float = Form(6.0),
+    base_style: str = Form("round"),          # bust pedestal: round | rect | outline
+    base_margin: float = Form(8.0),            # bust pedestal margin beyond footprint (mm)
     levels: int = Form(4),
     layer_mm: float = Form(1.0),
     style: str = Form("posterize"),
@@ -291,7 +293,7 @@ def generate(
     trace: str = Form(""),                   # mode=trace2d ('Logo & Drawing to 3D'): JSON of the trace2d options
     select: str = Form(""),                  # Select mode: JSON of the traced selection (app/core/selectmask.py); "" = whole photo
 ):
-    if mode not in ("lithophane", "relief", "popart", "trace2d"):
+    if mode not in ("lithophane", "relief", "popart", "bust", "trace2d"):
         raise HTTPException(400, f"unknown mode {mode}")
     try:
         title = text_in(title, 80, "Title")
@@ -386,6 +388,9 @@ def generate(
             params.update({
                 "lithophane": dict(min_thickness=min_thickness, max_thickness=max_thickness, border_mm=border_mm),
                 "relief": dict(base_mm=base_mm, relief_mm=relief_mm),
+                "bust": dict(base_mm=base_mm if base_mm >= 0.2 else 12.0, relief_mm=relief_mm,
+                             base_style=base_style if base_style in ("round", "rect", "outline") else "round",
+                             base_margin=max(0.0, float(base_margin))),
                 "popart": dict(base_mm=base_mm, levels=levels, layer_mm=layer_mm, style=style,
                                halftone_cell=halftone_cell, multi_body=multi_body, palette=palette or None),
             }[mode])

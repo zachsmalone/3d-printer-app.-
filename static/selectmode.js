@@ -1,12 +1,12 @@
 /* Select mode: trace round the part of the photo you want (finger or mouse). The outline snaps to the
-   subject's edges; only that part becomes the relief / pop-art model, and for a lithophane the rest turns
+   subject's edges; only that part becomes the relief / pop-art / bust model, and for a lithophane the rest turns
    plain (glows white) or flat (solid, no picture). Tools: Trace, Add, Subtract, Undo, Clear, Invert,
    Soft edge, Use whole photo. One finger draws; two fingers pinch-zoom and pan. The page never scrolls
    while drawing. The selection is sent with the build (app.js formData -> "select") and kept in the
    saved build's params, so re-opening, rebuilding and Send-to keep it. Warnings never block. */
 const $ = s => document.querySelector(s);
 const WORK = 384;                                   // long side of the mask raster (sent to the server)
-const MODES = ["lithophane", "relief", "popart"];
+const MODES = ["lithophane", "relief", "popart", "bust"];
 const st = { img: null, w: 0, h: 0, paths: [], invert: false, soft: 0, outside: "plain", snap: true, tool: "new",
              undo: [], mask: null, rough: null, open: false, use: false, mode: "lithophane", rgb: null, zoom: 1, panX: 0, panY: 0 };
 window.zeimSelectState = st;                       // for tests / debugging
@@ -264,7 +264,10 @@ document.addEventListener("zeim:file", e => {
   host.hidden = !MODES.includes(st.mode); status();
   const img = $("#dropPreview"); loadImage(img && img.src ? img.src : URL.createObjectURL(e.detail));
 });
-document.addEventListener("zeim:mode", e => { st.mode = e.detail; host.hidden = !MODES.includes(st.mode) || !st.img; status(); draw(); });
+document.addEventListener("zeim:mode", e => {
+  st.mode = e.detail; host.hidden = !MODES.includes(st.mode) || !st.img; status(); draw();
+  if (st.mode === "bust") say("For a bust, draw round the head and shoulders. The rest becomes the clean pedestal cut.");
+});
 document.addEventListener("zeim:build", e => {        /* a saved build carries its selection: keep it for "make it again" */
   const s = e.detail?.params?.select; if (!s || !Array.isArray(s.paths)) return;
   st.paths = s.paths; st.invert = !!s.invert; st.soft = +s.soft || 0; st.outside = s.outside || "plain"; st.snap = s.snap !== false; st.use = true;

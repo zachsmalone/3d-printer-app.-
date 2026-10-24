@@ -93,6 +93,7 @@
         <label class="card" data-mode="lithophane"><input type="radio" name="style" value="lithophane" checked><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-bulb"/></svg></span><b>Lithophane</b><small>A picture that glows with a light behind it</small></label>
         <label class="card" data-mode="relief"><input type="radio" name="style" value="relief"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-mountain"/></svg></span><b>Relief</b><small>Your picture as raised hills and valleys</small></label>
         <label class="card" data-mode="popart"><input type="radio" name="style" value="popart"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-palette"/></svg></span><b>Pop-art</b><small>Flat colour layers stacked up</small></label>
+        <label class="card" data-mode="bust"><input type="radio" name="style" value="bust"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/><path d="M8 21h8v-1.5c0-1.5-1.5-2.5-4-2.5s-4 1-4 2.5V21z"/></svg></span><b>Bust</b><small>Head &amp; shoulders on a clean pedestal</small></label>
         <label class="card" data-mode="trace2d"><input type="radio" name="style" value="trace2d"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg></span><b>Logo &amp; Drawing to 3D</b><small>A logo, sketch or drawing as a clean 3D shape, cookie cutter or stamp</small></label>
       </fieldset>
       <fieldset class="cards shapes" id="shapeCards" aria-describedby="shapeHelp"><legend>Lithophane shape</legend>
@@ -304,8 +305,16 @@
           </div></details>
         <details open data-modes="relief popart"><summary>Base &amp; height</summary>
           <div class="grid2">
-            <div class="field"><label>Base plate <em>mm</em></label><input type="number" name="base_mm" value="2" min="0.2" step="0.2"></div>
-            <div class="field" data-modes="relief"><label>Relief height <em>mm</em></label><input type="number" name="relief_mm" value="6" min="0.2" step="0.5"></div>
+            <div class="field"><label>Base plate <em>mm</em></label><input type="number" name="base_mm" id="exp_base_mm" value="2" min="0.2" step="0.2"></div>
+            <div class="field" data-modes="relief"><label>Relief height <em>mm</em></label><input type="number" name="relief_mm" id="exp_relief_mm" value="6" min="0.2" step="0.5"></div>
+          </div></details>
+        <details open data-modes="bust"><summary>Bust &amp; pedestal</summary>
+          <p class="help">Trace the head and shoulders with Choose part of the photo for a classical bust. The pedestal is a clean stand under the face.</p>
+          <div class="grid2">
+            <div class="field"><label>Pedestal height <em>mm</em></label><input type="number" name="base_mm" id="bust_base_mm" value="12" min="2" step="1"></div>
+            <div class="field"><label>Face depth <em>mm</em></label><input type="number" name="relief_mm" id="bust_relief_mm" value="8" min="0.5" step="0.5"></div>
+            <div class="field"><label>Pedestal shape</label><select name="base_style" id="bust_base_style"><option value="round" selected>Round</option><option value="rect">Rectangle</option><option value="outline">Follow outline</option></select></div>
+            <div class="field"><label>Pedestal margin <em>mm</em></label><input type="number" name="base_margin" id="bust_base_margin" value="8" min="0" step="1"></div>
           </div></details>
         <details open data-modes="popart"><summary>Pop-art layers</summary>
           <div class="grid2">

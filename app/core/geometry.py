@@ -374,6 +374,44 @@ def relief(im: Image.Image, width_mm=100.0, base_mm=2.0, relief_mm=6.0, resoluti
     return m
 
 
+def bust(im: Image.Image, width_mm=80.0, base_mm=12.0, relief_mm=8.0,
+         base_style="round", base_margin=8.0, resolution=180, smooth=0.8, gamma=1.0,
+         auto_contrast=True, invert=False, _alpha=None, **_) -> Model:
+    """Portrait bust: photo as raised relief on a clean pedestal.
+
+    Trace the head and shoulders (Select mode) for a classical bust silhouette;
+    without a selection the whole photo becomes a portrait plaque on a pedestal.
+    Pedestal styles: round (default), rect, or outline (follows the footprint).
+    """
+    style = (base_style or "round").lower().strip()
+    if style not in ("round", "rect", "outline"):
+        style = "round"
+    face_base = 1.5  # thin plate under the face so shoulders have thickness above the pedestal
+    face = relief(im, width_mm=width_mm, base_mm=face_base, relief_mm=relief_mm,
+                  resolution=resolution, smooth=smooth, gamma=gamma,
+                  auto_contrast=auto_contrast, invert=invert, _alpha=_alpha)
+    v, f = face.bodies[0].vertices, face.bodies[0].faces
+    ped = max(float(base_mm), MIN_BASE_MM)
+    margin = max(0.0, float(base_margin))
+    try:
+        import trimesh
+        from . import meshedit
+        m0 = trimesh.Trimesh(v, f, process=False)
+        out, rep = meshedit.op_base(m0, {"style": style, "thickness": ped, "margin": margin})
+        v, f = np.asarray(out.vertices, float), np.asarray(out.faces, np.int64)
+        base_info = {"style": style, "thickness_mm": ped, "margin_mm": margin,
+                     "message": rep.get("message", "")}
+    except Exception as e:
+        # Boolean / manifold unavailable: keep the face relief and note the pedestal was skipped
+        base_info = {"style": style, "thickness_mm": ped, "margin_mm": margin,
+                     "skipped": True, "message": f"Pedestal could not be added ({e}). Face relief only."}
+    m = Model([Body("bust", v, f)], "bust")
+    m.info = {**(face.info or {}), "pedestal": base_info, "relief_mm": float(relief_mm),
+              "face_base_mm": face_base, "width_mm": float(width_mm)}
+    m.thumb = face.thumb
+    return m
+
+
 def _cut_thumb(thumb, cells):
     """Grey out the removed part of the preview picture."""
     t = np.asarray(thumb).copy()
@@ -490,7 +528,7 @@ def popart(im: Image.Image, width_mm=100.0, levels=4, base_mm=2.0, layer_mm=1.0,
 
 
 def build(im: Image.Image, mode: str, params: dict) -> Model:
-    fn = {"lithophane": lithophane, "relief": relief, "popart": popart}.get(mode)
+    fn = {"lithophane": lithophane, "relief": relief, "popart": popart, "bust": bust}.get(mode)
     if fn is None:
         raise ValueError(f"unknown mode {mode!r}")
     params = dict(params)
@@ -507,6 +545,10 @@ def build(im: Image.Image, mode: str, params: dict) -> Model:
     m = fn(im, **params, **({"_alpha": alpha} if alpha is not None else {}))
     if sel:
         m.info = {**(m.info or {}), "select": selectmask.summary(sel)}
+    elif mode == "bust":
+        warnings = warnings + [
+            "Tip: use Choose part of the photo to trace the head and shoulders for a cleaner bust silhouette."
+        ]
     if warnings:
         m.info = {**(m.info or {}), "warnings": warnings}
     return m
@@ -525,7 +567,7 @@ def check_params(im: Image.Image, mode: str, params: dict) -> tuple[dict, list]:
         shortmm = w * min(im.width, im.height) / max(im.width, im.height) if im.width >= im.height else w * im.width / im.height
         warnings.append(f"This picture is long and thin, so the model is {w:g} × {w * im.height / im.width:.0f} mm "
                         f"(or the other way round). Check that is the shape you want." + (f" The short side is only {shortmm:.1f} mm: fine details won't print." if shortmm < 10 else ""))
-    if mode in ("relief", "popart") and float(params.get("base_mm", 2.0)) < MIN_BASE_MM:
+    if mode in ("relief", "popart", "bust") and float(params.get("base_mm", 2.0 if mode != "bust" else 12.0)) < MIN_BASE_MM:
         warnings.append(f"A base of {float(params.get('base_mm', 0)):g} mm can't be printed, so {MIN_BASE_MM:g} mm was used.")
         params["base_mm"] = MIN_BASE_MM
     nx = int(np.clip(params.get("resolution", 200), 16, MAX_RES)); ny = int(round(nx * im.height / im.width))

@@ -41,7 +41,7 @@ def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standar
         notes.append({"label": label, "value": str(value), "why": why})
 
     note("Size", f"{width_mm:g} mm wide", "from your size choice")
-    pitch_target = {"lithophane": mat["pitch"], "relief": 0.5, "popart": 0.8}[mode]
+    pitch_target = {"lithophane": mat["pitch"], "relief": 0.5, "bust": 0.45, "popart": 0.8}[mode]
     res = int(np.clip(round(width_mm / pitch_target), 100, 500))
     if res > im.width:
         res = max(100, im.width)
@@ -75,6 +75,13 @@ def autotune(im: Image.Image, mode: str, width_mm: float, preset: str = "standar
         P.update(base_mm=[1.5, 2.0, 3.0][k], relief_mm=rel)
         note("Relief height", f"{rel} mm", f"'{preset}' preset = {[4, 7, 11][k]}% of the width")
         note("Base plate", f"{P['base_mm']} mm", "solid backing for strength")
+    elif mode == "bust":
+        rel = round(width_mm * [0.08, 0.10, 0.13][k], 1)
+        ped = [8.0, 12.0, 16.0][k]
+        P.update(base_mm=ped, relief_mm=rel, base_style="round", base_margin=8.0)
+        note("Face depth", f"{rel} mm", f"'{preset}' preset ≈ {[8, 10, 13][k]}% of the width")
+        note("Pedestal", f"{ped:g} mm round base", "clean stand under the bust so it sits on the bed")
+        note("Tip", "trace head & shoulders", "Select mode gives a classical bust silhouette; whole photo still works")
     else:
         levels = [3, 4, 5][k]
         lm = round(max(0.6, width_mm * [0.008, 0.012, 0.016][k]), 1)
