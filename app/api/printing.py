@@ -66,6 +66,9 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
             "slicers": [] if no_base else handoff.links(base_url(request), bid, lambda n: privacy.make_token(bid, n)),
             "slicer_links_disabled": ("Slicer links are off until the site's public address is set in Settings. You can still download the file." if no_base else ""),
             "printers": settings.public(s, redact=not guards.can_see_printer_urls(request, actor))["printers"], "printer_types": printers.TYPES,
+            "printer_verification": printers.verification_tag(),
+            "direct_control": printers.direct_control_enabled(),
+            "bambu_limits": printers.bambu_limits(),
             "builtin_slicer": slicer.status(),
             "hint": "Deep links need the slicer installed on the SAME computer as your browser, and the "
                     "file URL must be reachable from it (set 'Public base URL' in Settings if the server "
@@ -150,8 +153,18 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
     res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr))
     if not res.get("ok"):
         return JSONResponse({"ok": False, "stage": "slice", **res})
+    filament_g = None
+    try:
+        filament_g = (res.get("stats") or {}).get("filament_g")
+    except Exception:
+        pass
+    spool = printers.spool_check(pr, filament_g)
+    if spool.get("checked") and not spool.get("ok"):
+        return JSONResponse({"ok": False, "stage": "spool", "spool": spool, "slice": res,
+                             "message": spool.get("message"),
+                             "verification": printers.verification_tag()})
     out = printers.send(pr, store.dir(bid) / "model.gcode", f"photo3d_{bid}.gcode", start)
-    return JSONResponse({**out, "stage": "upload", "slice": res})
+    return JSONResponse({**out, "stage": "upload", "slice": res, "spool": spool})
 
 
 @router.post("/printers/{printer_id}/test")
@@ -182,3 +195,115 @@ def sharetest_file(fmt: str, request: Request, actor: Actor = Depends(get_actor)
     data = trimesh.creation.box(extents=(20, 20, 20)).export(file_type={"stl": "stl", "obj": "obj", "3mf": "3mf"}[fmt])
     data = data.encode() if isinstance(data, str) else data
     return Response(data, media_type="application/octet-stream", headers={"Cache-Control": "no-store"})
+
+
+# ---- Print-send10 upgrades (status, control, camera, board, alerts, queue, timelapse) ----
+
+from fastapi.responses import Response
+
+from ..services import print_queue, print_watch
+
+
+def _require_printer(printer_id: str, request: Request, actor: Actor) -> dict:
+    guards.require_send(request, actor)
+    if not printers.direct_control_enabled():
+        raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
+    if not guards.can_see_printer_urls(request, actor):
+        raise HTTPException(403, "Only the person who manages this server can control printers.")
+    pr = settings.get_printer(printer_id)
+    if not pr:
+        raise HTTPException(404, "unknown printer")
+    return pr
+
+
+@router.get("/bambu/limits")
+def get_bambu_limits():
+    """Documented Bambu LAN / Developer Mode limits (no secrets)."""
+    return printers.bambu_limits()
+
+
+@router.get("/printers/board")
+def printers_board(request: Request, actor: Actor = Depends(get_actor)):
+    """Multi-printer status board (feature 8). Also runs opt-in alert/failure-watch side effects."""
+    guards.require_send(request, actor)
+    if not printers.direct_control_enabled():
+        raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
+    return JSONResponse(print_watch.board())
+
+
+@router.get("/printers/alerts")
+def printers_alerts(request: Request, actor: Actor = Depends(get_actor), drain: bool = False):
+    guards.require_send(request, actor)
+    if drain:
+        return JSONResponse(print_watch.drain_alerts())
+    return JSONResponse(print_watch.peek_alerts())
+
+
+@router.get("/printers/{printer_id}/status")
+def printer_status(printer_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    pr = _require_printer(printer_id, request, actor)
+    return JSONResponse(printers.status(pr))
+
+
+@router.post("/printers/{printer_id}/control")
+def printer_control(printer_id: str, request: Request, actor: Actor = Depends(get_actor),
+                    action: str = Form(...)):
+    pr = _require_printer(printer_id, request, actor)
+    return JSONResponse(printers.control(pr, action))
+
+
+@router.get("/printers/{printer_id}/camera")
+def printer_camera(printer_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    pr = _require_printer(printer_id, request, actor)
+    snap = printers.camera_snapshot(pr)
+    if not snap.get("ok"):
+        return JSONResponse(snap, status_code=502 if snap.get("message") else 200)
+    return Response(snap["data"], media_type=snap.get("content_type") or "image/jpeg",
+                    headers={"Cache-Control": "no-store", "X-ZEIM-Verification": printers.verification_tag()})
+
+
+@router.post("/printers/{printer_id}/timelapse/start")
+def timelapse_start(printer_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    _require_printer(printer_id, request, actor)
+    return JSONResponse(print_watch.timelapse_start(printer_id))
+
+
+@router.post("/printers/{printer_id}/timelapse/stop")
+def timelapse_stop(printer_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    _require_printer(printer_id, request, actor)
+    return JSONResponse(print_watch.timelapse_stop(printer_id))
+
+
+@router.post("/printers/{printer_id}/timelapse/tick")
+def timelapse_tick(printer_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    _require_printer(printer_id, request, actor)
+    return JSONResponse(print_watch.timelapse_tick(printer_id))
+
+
+@router.get("/print-queue")
+def queue_list(request: Request, actor: Actor = Depends(get_actor)):
+    guards.require_send(request, actor)
+    return JSONResponse(print_queue.list_jobs())
+
+
+@router.post("/print-queue")
+def queue_add(request: Request, actor: Actor = Depends(get_actor),
+              printer_id: str = Form(...), build_id: str = Form(...),
+              name: str = Form(""), start_on_send: bool = Form(False)):
+    guards.require_send(request, actor)
+    meta_for(build_id, actor, owner_only=True)
+    return JSONResponse(print_queue.enqueue(printer_id, build_id, name=name, start_on_send=start_on_send))
+
+
+@router.delete("/print-queue/{job_id}")
+def queue_del(job_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    guards.require_send(request, actor)
+    return JSONResponse(print_queue.remove(job_id))
+
+
+@router.post("/print-queue/{job_id}/start")
+def queue_start(job_id: str, request: Request, actor: Actor = Depends(get_actor)):
+    guards.require_send(request, actor)
+    if not printers.direct_control_enabled():
+        raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
+    return JSONResponse(print_queue.start_job(job_id))
