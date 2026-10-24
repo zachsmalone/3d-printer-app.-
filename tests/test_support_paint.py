@@ -22,7 +22,10 @@ def test_parse_accepts_json_string_and_empty():
     assert sp.parse_strokes(None) == []
     assert sp.parse_strokes("[]") == []
     got = sp.parse_strokes('[{"kind":"block","x":10,"y":20,"r":3}]')
-    assert got == [{"kind": "block", "x": 10.0, "y": 20.0, "z": 0.0, "r": 3.0, "h": sp.H_DEFAULT}]
+    assert got[0]["kind"] == "block" and got[0]["x"] == 10.0 and got[0]["y"] == 20.0
+    assert got[0]["z"] == 0.0 and got[0]["r"] == 3.0 and got[0]["h"] == sp.H_DEFAULT
+    assert got[0].get("filament_slot") == "same"
+    assert "tip_r" in got[0] and "thickness" in got[0]
 
 
 def test_meshes_and_3mf_carry_prusaslicer_volume_types(tmp_path):
