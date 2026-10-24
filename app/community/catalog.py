@@ -218,6 +218,9 @@ def public(i: dict, actor: Actor) -> dict:
             **remix_status(i),
             "first_posted": str(i.get("created", ""))[:10],
             "view_only": bool(i.get("view_only")),
+            "ai_made": bool(i.get("ai_made")),
+            "community_printed": bool(not i.get("example") and _social().prints_for(i["id"])),   # >=1 approved 'I printed this'
+            "tip_url": i.get("tip_url") or "",
             "download_blocked": _dl_blocked(i, actor),
             "held_for_review": bool(i.get("owner_sid") == actor.sid and i.get("hidden") and i.get("held")),
             "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],
@@ -232,6 +235,40 @@ VIEW_ONLY_MSG = "The maker made this project view only: you can look at it, but 
 def _dl_blocked(i: dict, actor) -> bool:
     """'View only, no download': everyone but the owner is refused the files (enforced again in the file route)."""
     return bool(i.get("view_only")) and not (actor is not None and i.get("owner_sid") and i["owner_sid"] == actor.sid)
+
+
+def _owner_edit(actor: Actor, item_id: str, fn) -> dict:
+    found = {}
+
+    def f(l):
+        for i in l:
+            if i["id"] == item_id and i.get("owner_sid") == actor.sid and not i.get("example"):
+                fn(i)
+                found["i"] = dict(i)
+    LISTINGS.update(f)
+    if "i" not in found:
+        raise Denied(404, "not found")
+    return found["i"]
+
+
+def set_tip_url(actor: Actor, item_id: str, url) -> dict:
+    from . import tips
+    try:
+        url = tips.check(url)
+    except ValueError as e:
+        raise Denied(400, str(e))
+    return _owner_edit(actor, item_id, lambda i: i.__setitem__("tip_url", url))
+
+
+def set_ai_made(actor: Actor, item_id: str, on) -> dict:
+    """Owner may add the AI-made label; a 2D->3D build keeps it (it is honest provenance)."""
+    if not isinstance(on, bool):
+        raise Denied(400, "ai_made must be true or false")
+    def fn(i):
+        if not on and i.get("mode") == "ai3d":
+            raise Denied(400, "This model came from the 2D to 3D tab, so it keeps the AI-made label.")
+        i["ai_made"] = on
+    return _owner_edit(actor, item_id, fn)
 
 
 def set_view_only(actor: Actor, item_id: str, on) -> dict:
@@ -409,8 +446,12 @@ def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -
 
 
 def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None, license_id: str | None = None,
-                   allow_remixes: bool = True, view_only: bool = False) -> dict:
-    from . import licensing
+                   allow_remixes: bool = True, view_only: bool = False, ai_made: bool = False, tip_url: str = "") -> dict:
+    from . import licensing, tips
+    try:
+        tip_url = tips.check(tip_url)
+    except ValueError as e:
+        raise Denied(400, str(e))
     try:
         lid = licensing.check(license_id)              # new projects always carry one (default: private use)
     except ValueError as e:
@@ -468,7 +509,11 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
             "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False,
-            "view_only": bool(view_only)}
+            "view_only": bool(view_only),
+            # honest AI label: the creator said so, or the build came from ZEIM's 2D->3D tab (can't be unticked)
+            "ai_made": bool(ai_made) or bool(bmeta.get("ai")) or mode == "ai3d"}
+    if tip_url:
+        item["tip_url"] = tip_url
     if remix_of:
         item["remix_of"] = remix_of
     # re-upload protection: fingerprint the geometry. Sharing (followers / public) a near-match of ANOTHER maker's

@@ -278,7 +278,7 @@ def unfollow(uid: str, actor: Actor = Depends(get_actor)):
 
 # ---------------- showcase ----------------
 @router.get("/showcase")
-def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", actor: Actor = Depends(get_actor)):
+def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", ai: str = "show", actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
     if tab not in branding.SHOWCASE_TABS:
         raise HTTPException(400, "unknown tab")
@@ -291,9 +291,13 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str =
     if q:
         personalization.record_search(actor.sid, q, catalog.known_tags(actor))
     items = catalog.list_items(actor, tab, q, prefs["interests"] if prefs["enabled"] else {}, category.strip()[:60])
+    if ai not in ("show", "hide", "only"):
+        raise HTTPException(400, "ai must be show, hide or only")
+    if ai != "show":
+        items = [i for i in items if bool(i.get("ai_made")) == (ai == "only")]
     items = discovery.apply_sort(items, sort)
     out = {"categories": catalog.categories(actor), "category": category.strip()[:60],
-           "originals_notice": _originals_notice(),"tab": tab, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
+           "originals_notice": _originals_notice(),"tab": tab, "ai": ai, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
            "subtitle": "Newest projects first." if tab == "free" else "",
            "example_notice": ""}
     if tab == "foryou" and not out["items"]:
@@ -356,7 +360,8 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
                                    accept_guidelines=bool(body.get("accept_guidelines")),
                                    visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw,
                                    license_id=body.get("license_id"), allow_remixes=_yes_no(body.get("allow_remixes"), True, "allow_remixes"),
-                                   view_only=_yes_no(body.get("view_only"), False, "view_only"))
+                                   view_only=_yes_no(body.get("view_only"), False, "view_only"),
+                                   ai_made=_yes_no(body.get("ai_made"), False, "ai_made"), tip_url=body.get("tip_url") or "")
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:
@@ -379,6 +384,29 @@ def item_view_only(iid: str, body: dict, actor: Actor = Depends(get_actor)):
         if v is None:
             raise ValueError("view_only must be Yes or No")
         return catalog.public(catalog.set_view_only(actor, iid, v), actor)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except catalog.Denied as e:
+        raise D(e)
+
+
+@router.put("/showcase/{iid}/tip")
+def item_tip(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Owner only: one optional https tip link ('' removes it)."""
+    try:
+        return catalog.public(catalog.set_tip_url(actor, iid, body.get("tip_url")), actor)
+    except catalog.Denied as e:
+        raise D(e)
+
+
+@router.put("/showcase/{iid}/ai")
+def item_ai(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Owner only: the AI-made label."""
+    try:
+        v = _yes_no(body.get("ai_made"), None, "ai_made")
+        if v is None:
+            raise ValueError("ai_made must be Yes or No")
+        return catalog.public(catalog.set_ai_made(actor, iid, v), actor)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except catalog.Denied as e:

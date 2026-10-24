@@ -1083,3 +1083,11 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 #mboxBox .mbsides img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 6px; border: 1px solid var(--line, #8884); background: var(--panel, #8881); }
 #mboxBox .mbsides img:not([src]) { visibility: visible; }
 #mboxBox .mbsides .btn { width: 100%; padding-left: 4px; padding-right: 4px; }
+/* Showcase provenance labels (AI-made, Printed by the community) + quiet tip link: calm, no counts */
+.prov{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:1.2;padding:2px 8px;margin:4px 4px 0 0;border-radius:999px;border:1px solid var(--line);color:var(--mut);background:transparent}
+.prov .i{width:14px;height:14px}
+.prov.printed{border-color:var(--acc2,currentColor);color:var(--acc2,inherit)}
+.provrow{margin:4px 0}
+.tiplink{font-size:13px}
+.tiplink a{color:var(--acc2)}
+.aifilter{max-width:260px;margin:6px 0}

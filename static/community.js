@@ -227,7 +227,7 @@ async function loadShowcase() {
   $("#shClear").hidden = !q;
   let r;
   if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}`); } catch (e) { toast(e.message, "err"); return; }
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent($("#shAi")?.value || "show")}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
   $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
@@ -236,7 +236,7 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
@@ -246,6 +246,14 @@ async function loadShowcase() {
 }
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
+$("#shAi")?.addEventListener("change", () => loadShowcase());
+// honest provenance labels: AI-made (creator said so, or 2D to 3D tab) and 'Printed by the community' (>=1 approved print photo). No counts, no ranking.
+function provHTML(i) {
+  return `${i.ai_made ? '<span class="prov ai"><svg class=i aria-hidden=true focusable=false><use href=#i-chip></use></svg> AI-made</span>' : ""}${i.community_printed ? '<span class="prov printed"><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Printed by the community</span>' : ""}`;
+}
+function tipHTML(i) {
+  return /^https:\/\//.test(i.tip_url || "") ? `<p class="help tiplink">Want to support ${esc(i.creator)}? <a href="${esc(i.tip_url)}" target="_blank" rel="noopener nofollow noreferrer">Tip link</a></p>` : "";
+}
 $("#shCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; shCat = b.dataset.cat; loadShowcase(); });
 $("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };
 $("#shSearch").addEventListener("focus", () => loadRecent());            // Search button, Enter and touch-keyboard "Go" all end up here
@@ -340,9 +348,11 @@ async function openItem(id) {
     ${i.thumb ? `<img src="${i.thumb}" alt="${i.nsfw ? "Preview picture (mature content)" : `Preview picture of ${esc(i.title)}`}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
     ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · <svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}` : ""}</p>
+    ${provHTML(i) ? `<p class="provrow">${provHTML(i)}</p>` : ""}${tipHTML(i)}
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.first_posted && !i.example ? `<p class="help first-posted">First posted on ${esc(new Date(i.first_posted + "T12:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</p>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itViewOnly">Downloads</label><select id="itViewOnly"><option value="no" ${i.view_only ? "" : "selected"}>Anyone who can see it may download it</option><option value="yes" ${i.view_only ? "selected" : ""}>View only, no download</option></select></div>` : ""}
+    ${i.owned && !i.original && !i.example ? `<div class="field"><label for="itTip">Tip link <em>optional</em></label><div class="row"><input id="itTip" type="url" maxlength="300" placeholder="https://…" value="${esc(i.tip_url || "")}"><button type="button" class="btn small ghost" id="itTipSave">Save</button></div><small class="help">One https link. Leave it empty to remove it.</small></div>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itRemixSw">Allow remixes</label><select id="itRemixSw"><option value="yes" ${i.allow_remixes ? "selected" : ""}>Yes</option><option value="no" ${i.allow_remixes ? "" : "selected"}>No</option></select><small class="help">Remixes already posted keep their credit either way.</small></div>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "Private — only me", followers: "Followers only", public: "Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
@@ -410,6 +420,7 @@ async function openItem(id) {
       b.insertAdjacentHTML("afterend", `<p class="help">Sent to the moderators${r.original_url ? `, with a link to <a href="${esc(r.original_url)}">the original</a>` : ""}. Rights holders can also send a <a href="${esc(r.dmca_url)}" target="_blank" rel="noopener">formal takedown notice</a>.</p>`);
     } catch (e) { b.disabled = false; toast(e.message, "err"); }
   };
+  if ($("#itTipSave")) $("#itTipSave").onclick = async () => { try { await api(`/api/showcase/${id}/tip`, J("PUT", { tip_url: $("#itTip").value.trim() })); toast($("#itTip").value.trim() ? "Tip link saved" : "Tip link removed", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); } };
   if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => { sessionStorage.setItem("zeim_remix_of", location.origin + i.share_url); toast("Make your version in the Studio, then Share it: this project will be credited as the original.", "ok"); };
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
@@ -455,7 +466,8 @@ $("#btnDoPublish").onclick = async () => {
   try {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
       tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim(), nsfw: nsfw === "yes",
-      allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes" }));
+      allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
+      ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim() }));
     if ($("#pub_remix").value.trim()) sessionStorage.removeItem("zeim_remix_of");
     clearInline($("#btnDoPublish")); $("#dlgPublish").close();
     (i.warnings || []).forEach(w => toast(w, "ok"));
