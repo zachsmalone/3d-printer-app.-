@@ -12,8 +12,8 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | Area | What it does |
 |---|---|
 | **Age gate** | 18+ confirmation before entering the app. |
-| **Lithophane** | Photo to lithophane, with a Tango sample image to try. **Curved panel:** bend adjustable from flat (0°) to a half circle (180°), with an optional built-in stand and a check that it fits your printer's bed (not yet test-printed). **Memory box:** up to 4 photos, snap, frame or enclosed styles, and a light base. **Try the sample box** fills sides 1-4 with sample rose photos; empty sides use the Tango sample. |
-| **FDM Slicer** | Wraps the PrusaSlicer CLI. Creality K1 profile, printer picker covering many brands (Longer included), and a CFS / AMS filament slot picker. |
+| **Lithophane** | Photo to lithophane, with a Tango sample image to try. **Curved panel:** bend adjustable from flat (0°) to a half circle (180°), with an optional built-in stand and a check that it fits your printer's bed (not yet test-printed). **Memory box:** up to 4 photos, snap, frame or enclosed styles, and a light base. **Try the sample box** fills sides 1-4 with sample rose photos; empty sides use the Tango sample. Core panels stay open after a build (busy watch); only a panel just opened from its chip yields to chip layout. **Backing colour:** paper / warm / cool / custom (preview and saved with the build). Optional **Bambu lithophane preset** in 3MF (labelled not tested on a real Bambu). Adjustable **lip** width 0–10 mm with taper (default 45°, outward / inward / both / flat). |
+| **FDM Slicer** | Wraps the PrusaSlicer CLI. Creality K1 profile, printer picker covering many brands (Longer included), and a CFS / AMS filament slot picker. On the plate, dragged objects stay where released (orbit damping is frozen mid-drag so the camera does not drift the bed mapping). |
 | **TorchC0 (resin)** | Resin program with resin cost estimate and island / suction-cup detection. |
 | **ZEIM CAD** | Smart Split and Smart Merge, manual merge, hinges, print-in-place joints, Measure (including the angle between faces), simplified import for big models, and select mode. |
 | **Showcase** | Community feed. Remix Yes / No switch per upload, credited remixes, and re-upload protection using a shape fingerprint plus **Report a copy**. **AI-made** label set by the creator (automatic and locked for 2D→3D models, and carried through edit / remix / 3MF re-upload lineage), with a Show / Hide / Only filter that remembers the choice. Filters for printer, material, supports, licence, and mature content (mature defaults to hide; missing metadata is Not stated). A **Printed by the community** yes/no badge appears once a model has an approved **I printed this** photo (no counts or ranking). Optional creator tip link (https only, hardened against private hosts / shorteners / personal info); the tip line shows the destination domain; moderators can clear a tip; ZEIM takes no cut. **Collections:** creators group their own Showcase models into named lists (public or private), manage them from Account, add or remove from a project page, and show public collections on the profile strip for other adults to browse (no ranking or boosting). |
@@ -88,7 +88,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2473 tests (includes Showcase Collections).
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2519 tests (includes Showcase Collections, lithophane batch 1, and slicer plate-drag).
 
 ## Layout
 
