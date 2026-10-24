@@ -72,8 +72,9 @@ def _resize(im: Image.Image, nx: int) -> Image.Image:
     return im.resize((nx, ny), Image.LANCZOS)
 
 
-def _luma(rgb: np.ndarray) -> np.ndarray:
-    return (0.299 * rgb[..., 0] + 0.587 * rgb[..., 1] + 0.114 * rgb[..., 2]) / 255.0
+def _luma(rgb: np.ndarray, method: str = "rec601") -> np.ndarray:
+    from . import litho_image
+    return litho_image.luma(rgb, method)
 
 
 def _tone(g: np.ndarray, contrast: bool, gamma: float, smooth: float) -> np.ndarray:
@@ -220,7 +221,8 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
                auto_contrast=True, invert=False, shape="rect", diameter_mm=40.0, height_mm=60.0,
                color_mode="mono", place=None, hang="", hole_d=4.0, inset_mm=6.0,
                spacing_mm=40.0, stand=False, bend_deg=90.0, lip_mm=None, lip_taper="none", taper_deg=45.0,
-               **_) -> Model:
+               grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0,
+               tile=False, mm_per_repeat=None, **_) -> Model:
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
     if color_mode != "mono":                       # hook for a future colour lithophane; only mono exists today
@@ -238,11 +240,13 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
         border_mm = max(border_mm, litho_hang.border_needed(hole_d, inset_mm))
     if stand and shape in litho_shapes.CURVED_SHAPES:
         raise ValueError("the display stand is only available for flat lithophane shapes")
+    tone = dict(grey_method=grey_method, brightness=brightness, contrast=contrast, sharpen=sharpen,
+                tile=tile, mm_per_repeat=mm_per_repeat)
     if shape in litho_shapes.PANEL_SHAPES:      # curved panel: its stand is built in (same solid), not a second body
         v, f, info, thick = litho_shapes.build(
             im, shape, width_mm=width_mm, bend_deg=bend_deg, stand=bool(stand), min_thickness=min_thickness,
             max_thickness=max_thickness, border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma,
-            auto_contrast=auto_contrast, invert=invert, color_mode=color_mode)
+            auto_contrast=auto_contrast, invert=invert, color_mode=color_mode, **tone)
         m = Model([Body("lithophane", v, f)], "lithophane")
         m.info = {**info, "shape": shape}
         m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)
@@ -254,7 +258,7 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
             im, shape, width_mm=width_mm, min_thickness=min_thickness, max_thickness=max_thickness,
             border_mm=border_mm, resolution=resolution, smooth=smooth, gamma=gamma, auto_contrast=auto_contrast,
             invert=invert, diameter_mm=diameter_mm, height_mm=height_mm, color_mode=color_mode,
-            place=litho_shapes.check_place(place), **lip)
+            place=litho_shapes.check_place(place), **lip, **tone)
         if hang or stand:                       # attachments for flat shapes: hang holes, display stand
             half = width_mm / 2.0
             poly = (litho_shapes.outline(shape, 8192) * half) + half   # plate mm coords, y up
@@ -267,8 +271,21 @@ def lithophane(im: Image.Image, width_mm=100.0, min_thickness=0.8, max_thickness
         m.info = {**info, "shape": shape}
         m.thumb = litho_shapes.thumb(thick, min_thickness, max_thickness)
         return m
-    small = _resize(im, resolution)
-    g = _tone(_luma(np.asarray(small, np.float64)), auto_contrast, gamma, smooth)
+    from . import litho_image as LI
+    tone_c = LI.check_tone(grey_method, brightness, contrast, sharpen)
+    on, mm = LI.check_tile(tile, mm_per_repeat if mm_per_repeat is not None else LI.DEFAULT_MM_PER_REPEAT)
+    if on:
+        # match _resize aspect: width = resolution, height follows photo
+        nx = int(np.clip(resolution, 16, MAX_RES))
+        ny = max(2, int(round(nx * im.height / im.width)))
+        if nx * ny > MAX_CELLS:
+            k = (MAX_CELLS / (nx * ny)) ** 0.5
+            nx, ny = max(16, int(nx * k)), max(2, int(ny * k))
+        small = LI.place_tiled(im, nx, ny, mm, float(width_mm), place=None, wrap=False)
+    else:
+        small = _resize(im, resolution)
+    g = LI.prepare_grey(np.asarray(small, np.float64), tone_c["grey_method"], auto_contrast, gamma, smooth,
+                        tone_c["brightness"], tone_c["contrast"], tone_c["sharpen"])
     if invert:
         g = 1 - g
     thick = max_thickness - (max_thickness - min_thickness) * g  # bright -> thin

@@ -88,15 +88,26 @@ def place_image(im: Image.Image, nx: int, ny: int, place, wrap=False) -> Image.I
 
 
 def thickness_map(im: Image.Image, nx: int, ny: int, min_thickness, max_thickness, smooth=0.8, gamma=1.0,
-                  auto_contrast=True, invert=False, color_mode="mono", place=None, wrap=False):
-    """(ny, nx) thickness in mm, bright = thin. The picture is centre-cropped to nx:ny first (or placed by `place`)."""
-    from .geometry import _luma, _tone
+                  auto_contrast=True, invert=False, color_mode="mono", place=None, wrap=False,
+                  grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0,
+                  tile=False, mm_per_repeat=None, span_mm=None):
+    """(ny, nx) thickness in mm, bright = thin. The picture is centre-cropped to nx:ny first (or placed by `place`).
+    tile=True repeats the photo every mm_per_repeat mm across span_mm (plate width / circumference / arc)."""
+    from . import litho_image as LI
     if color_mode not in COLOR_MODES:
         raise ValueError(f"color_mode {color_mode!r} is not available yet")
     if max_thickness <= min_thickness:
         raise ValueError("max_thickness must be greater than min_thickness")
-    small = place_image(im, nx, ny, place, wrap) if place else ImageOps.fit(im, (int(nx), int(ny)), Image.LANCZOS)
-    g = _tone(_luma(np.asarray(small, np.float64)), auto_contrast, gamma, smooth)
+    tone = LI.check_tone(grey_method, brightness, contrast, sharpen)
+    on, mm = LI.check_tile(tile, mm_per_repeat if mm_per_repeat is not None else LI.DEFAULT_MM_PER_REPEAT)
+    if on:
+        if span_mm is None or float(span_mm) <= 0:
+            raise ValueError("tiling needs a positive span_mm (plate width, circumference, or panel arc)")
+        small = LI.place_tiled(im, nx, ny, mm, float(span_mm), place=place, wrap=wrap)
+    else:
+        small = place_image(im, nx, ny, place, wrap) if place else ImageOps.fit(im, (int(nx), int(ny)), Image.LANCZOS)
+    g = LI.prepare_grey(np.asarray(small, np.float64), tone["grey_method"], auto_contrast, gamma, smooth,
+                        tone["brightness"], tone["contrast"], tone["sharpen"])
     if invert:
         g = 1 - g
     return max_thickness - (max_thickness - min_thickness) * g
@@ -178,14 +189,17 @@ def _bilinear(img, u, v):
 
 
 def flat_shape(im, shape, width_mm=100.0, min_thickness=0.8, max_thickness=3.0, border_mm=3.0,
-               resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, color_mode="mono", place=None):
+               resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False, color_mode="mono", place=None,
+               grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0, tile=False, mm_per_repeat=None):
     """Polar mesh inside the vector outline: rings scaled from the centre to the exact (smooth) edge, so the
     outer wall and rim follow the curve with no pixel steps. One watertight solid on z=0."""
     from scipy.spatial import cKDTree
     n = int(np.clip(resolution, 32, MAX_SIDE))
     half = width_mm / 2
     pitch = width_mm / n
-    thick_img = thickness_map(im, n + 1, n + 1, min_thickness, max_thickness, smooth, gamma, auto_contrast, invert, color_mode, place)
+    thick_img = thickness_map(im, n + 1, n + 1, min_thickness, max_thickness, smooth, gamma, auto_contrast, invert,
+                              color_mode, place, span_mm=width_mm, grey_method=grey_method, brightness=brightness,
+                              contrast=contrast, sharpen=sharpen, tile=tile, mm_per_repeat=mm_per_repeat)
     A = N_OUTLINE
     ang = np.linspace(0, 2 * np.pi, A, endpoint=False)
     edge = np.stack([np.cos(ang), np.sin(ang)], -1) * outline_radius(shape, ang)[:, None] * half   # (A,2) mm
@@ -276,16 +290,20 @@ CUP_BOTTOM_MM = 2.0
 
 def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8, max_thickness=3.0,
                  border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False,
-                 color_mode="mono", place=None, lip_mm=None, lip_taper="none", taper_deg=45.0):
+                 color_mode="mono", place=None, lip_mm=None, lip_taper="none", taper_deg=45.0,
+                 grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0, tile=False, mm_per_repeat=None):
     scale = min(1.0, resolution / 200.0) if resolution else 1.0
-    tmap = lambda c, r: thickness_map(im, c, r, min_thickness, max_thickness, smooth, gamma, auto_contrast,
-                                      invert, color_mode, place, wrap=True)
+    def tmap(c, r, span):
+        return thickness_map(im, c, r, min_thickness, max_thickness, smooth, gamma, auto_contrast,
+                             invert, color_mode, place, wrap=True, span_mm=span, grey_method=grey_method,
+                             brightness=brightness, contrast=contrast, sharpen=sharpen, tile=tile,
+                             mm_per_repeat=mm_per_repeat)
     if shape == "globe":
         # full sphere, equirectangular: image columns = longitude (360), rows = latitude (+90 top .. -90 bottom)
         r_in = diameter_mm / 2
         C = int(np.clip(2 * np.pi * r_in / TARGET_PITCH * scale, 64, 1200))
         Rf = max(16, C // 2)
-        eq = tmap(C, Rf)                                      # (Rf, C), 2:1 crop
+        eq = tmap(C, Rf, 2 * np.pi * r_in)                    # (Rf, C), 2:1 crop
         lat_lo = -np.radians(GLOBE_OPENING_DEG)
         nrow = int(np.clip(round(Rf * (np.pi / 2 - lat_lo) / np.pi), 8, MAX_SIDE))
         lat = np.linspace(np.pi / 2, lat_lo, nrow + 1)[1:]   # rows below the pole down to the opening
@@ -325,7 +343,7 @@ def curved_shape(im, shape, diameter_mm=40.0, height_mm=60.0, min_thickness=0.8,
         Rr = int(np.clip(length / TARGET_PITCH * scale, 8, MAX_SIDE)) + 1
         ring_rows = int(round(ring / (length / (Rr - 1)))) if ring > 0 else 0
         pic_rows = max(4, Rr - 2 * ring_rows)
-        pic = tmap(C, pic_rows)[::-1]                         # row 0 = bottom of the print
+        pic = tmap(C, pic_rows, circ)[::-1]                   # row 0 = bottom of the print
         thick = np.full((pic_rows + 2 * ring_rows, C), float(band_t))
         thick[ring_rows:ring_rows + pic_rows] = pic
         Rr = thick.shape[0]
@@ -413,7 +431,8 @@ def arc_frame(s: np.ndarray, length: float, bend_deg: float):
 
 def curved_panel(im, width_mm=100.0, bend_deg=90.0, stand=False, min_thickness=0.8, max_thickness=3.0,
                  border_mm=3.0, resolution=200, smooth=0.8, gamma=1.0, auto_contrast=True, invert=False,
-                 color_mode="mono", **_):
+                 color_mode="mono", grey_method="rec601", brightness=0.0, contrast=0.0, sharpen=0.0,
+                 tile=False, mm_per_repeat=None, **_):
     """A rectangle lithophane bent round a vertical axis, printed standing up.
     width_mm = arc length of the panel (the picture's width along the bend); the height follows the photo's aspect.
     Thickness is laid along the surface normal, so bright = thin holds at every point of the arc.
@@ -430,7 +449,8 @@ def curved_panel(im, width_mm=100.0, bend_deg=90.0, stand=False, min_thickness=0
     br = int(round(border / (height / (Rr - 1)))) if border > 0 else 0
     pc, pr = max(4, C - 2 * bc), max(4, Rr - 2 * br)
     pic = thickness_map(im, pc, pr, min_thickness, max_thickness, smooth, gamma, auto_contrast, invert,
-                        color_mode)[::-1]                    # row 0 = bottom of the print
+                        color_mode, span_mm=width_mm, grey_method=grey_method, brightness=brightness,
+                        contrast=contrast, sharpen=sharpen, tile=tile, mm_per_repeat=mm_per_repeat)[::-1]
     thick = np.full((pr + 2 * br, pc + 2 * bc), float(max_thickness))
     thick[br:br + pr, bc:bc + pc] = pic
     Rr, C = thick.shape
@@ -495,19 +515,22 @@ def check_lip(lip_mm, lip_taper, taper_deg):
     return float(lip_mm), lip_taper, float(taper_deg)
 
 
+_TONE_KEYS = ("grey_method", "brightness", "contrast", "sharpen", "tile", "mm_per_repeat")
+
+
 def build(im, shape, **params):
     """Returns (vertices, faces, info, thickness map for the preview thumb)."""
     if shape in FLAT_SHAPES:
         keys = ("width_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth", "gamma",
-                "auto_contrast", "invert", "color_mode", "place")
+                "auto_contrast", "invert", "color_mode", "place") + _TONE_KEYS
         return flat_shape(im, shape, **{k: params[k] for k in keys if k in params})
     if shape in CURVED_SHAPES:
         keys = ("diameter_mm", "height_mm", "min_thickness", "max_thickness", "border_mm", "resolution", "smooth",
-                "gamma", "auto_contrast", "invert", "color_mode", "place", "lip_mm", "lip_taper", "taper_deg")
+                "gamma", "auto_contrast", "invert", "color_mode", "place", "lip_mm", "lip_taper", "taper_deg") + _TONE_KEYS
         return curved_shape(im, shape, **{k: params[k] for k in keys if k in params})
     if shape in PANEL_SHAPES:
         keys = ("width_mm", "bend_deg", "stand", "min_thickness", "max_thickness", "border_mm", "resolution",
-                "smooth", "gamma", "auto_contrast", "invert", "color_mode")
+                "smooth", "gamma", "auto_contrast", "invert", "color_mode") + _TONE_KEYS
         return curved_panel(im, **{k: params[k] for k in keys if k in params})
     raise ValueError(f"unknown shape {shape!r}")
 
