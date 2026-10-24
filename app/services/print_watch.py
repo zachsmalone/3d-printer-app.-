@@ -1,7 +1,7 @@
 """Opt-in done/failed alerts, multi-printer board polling, timelapse hooks,
 and opt-in local failure detection that ONLY pauses (features 5, 6, 8, 10).
 
-All paths are labelled Simulated until HARDWARE_VERIFIED flips in printers.py.
+Labels are per-path (Live API for Moonraker/OctoPrint; Simulated for Bambu/stubs).
 Never cancels on failure detection — pause only.
 """
 from __future__ import annotations
@@ -68,7 +68,7 @@ def board() -> dict:
             rows.append({**pub, **prefs, "ok": False,
                          "state": "unavailable",
                          "message": "Direct control off or type not implemented.",
-                         "verification": printers_mod.verification_tag()})
+                         "verification": printers_mod.verification_tag(p.get("type"))})
             continue
         st = printers_mod.status(p)
         row = {**pub, **prefs, **{k: st.get(k) for k in (
@@ -86,7 +86,9 @@ def board() -> dict:
         rows.append(row)
     return {"printers": rows, "verification": printers_mod.verification_tag(),
             "hardware_verified": printers_mod.HARDWARE_VERIFIED,
-            "note": "Simulated until a real-hardware pass. Failure watch only pauses — it never stops the job."}
+            "honesty": printers_mod.honesty_note(bool(rows)),
+            "note": printers_mod.honesty_note(bool(rows))
+                    + " Failure watch only pauses — it never stops the job."}
 
 
 def _norm_state(s: str | None) -> str:

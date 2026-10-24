@@ -85,7 +85,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2589 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 all Simulated, Bust mode, Live Sculpt, and Subscriptions Coming stubs).
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2589 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and Subscriptions Coming stubs).
 
 ## Layout
 
@@ -101,20 +101,25 @@ tests/           pytest suite
 
 ## Printer sending (upgrades 1–10)
 
-OctoPrint / Moonraker / Bambu LAN paths in ZEIM (mock-tested; labelled **Simulated** until a real-hardware pass):
+Per-path honesty labels (`verification` on API/UI responses):
+
+- **Live API** — OctoPrint and Moonraker (Creality K1 / Klipper): real HTTP upload, status, control, camera. Mock-tested. Not yet confirmed on Zach's K1 hardware (`Hardware-tested` stays off until that pass).
+- **Simulated** — Bambu Lab LAN (and stubs / unconfigured): mock or unconfirmed path. Keep **Open in Bambu Studio** as fallback.
 
 1. Live status for OctoPrint / Moonraker (and Bambu reachability)
 2. Remote pause / resume / stop
-3. Bambu LAN send (LAN Only + Developer Mode for control; keep **Open in Bambu Studio** as fallback)
+3. Bambu LAN send (LAN Only + Developer Mode for control; keep **Open in Bambu Studio** as fallback) — still Simulated
 4. Camera snapshot proxy in ZEIM (same host as the printer)
 5. Opt-in done / failed alerts
-6. Real-hardware tests still pending — UI and API carry `verification: Simulated`
+6. Hardware pass still pending for K1 — Moonraker/OctoPrint clear Simulated → Live API; Bambu stays Simulated
 7. Spool-enough check (optional grams on the printer row vs slice filament)
 8. Multi-printer board
 9. Simple manual-start queue (no auto-chain onto a busy printer)
 10. Timelapse folder + opt-in local failure detection that **only pauses**
 
-Direct printer control stays off in production (`ZEIM_ENV=production`) unless `ZEIM_PRINTER_DIRECT=1`. Addresses are SSRF-checked. Never copies GPL/AGPL printer UIs.
+Point a Creality K1 at ZEIM: type Moonraker, address `http://<printer-ip>:7125` (not 4408), optional API key if Moonraker auth is on, preset Creality K1. Enable direct control with `ZEIM_PRINTER_DIRECT=1` (or `ZEIM_ENV=dev`). Use **Test connection** before Send — a test never starts a print.
+
+Direct printer control stays off in production (`ZEIM_ENV=production`) unless `ZEIM_PRINTER_DIRECT=1`. Addresses are SSRF-checked. Never copies GPL/AGPL printer UIs. Never claims a successful send when the printer was not reached.
 
 ## Community rules
 
