@@ -368,7 +368,8 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
                                    visibility=body.get("visibility"), remix_of=str(body.get("remix_of") or "")[:200], nsfw=nsfw,
                                    license_id=body.get("license_id"), allow_remixes=_yes_no(body.get("allow_remixes"), True, "allow_remixes"),
                                    view_only=_yes_no(body.get("view_only"), False, "view_only"),
-                                   ai_made=_yes_no(body.get("ai_made"), False, "ai_made"), tip_url=body.get("tip_url") or "")
+                                   ai_made=_yes_no(body.get("ai_made"), False, "ai_made"), tip_url=body.get("tip_url") or "",
+                                   print_settings=body.get("print_settings"))
     except ValueError as e:
         raise HTTPException(400, str(e))
     except safety.ChatBlocked as e:

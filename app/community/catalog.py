@@ -222,6 +222,7 @@ def public(i: dict, actor: Actor) -> dict:
             "facets": facets(i),
             "community_printed": bool(not i.get("example") and _social().prints_for(i["id"])),   # >=1 approved 'I printed this'
             "tip_url": i.get("tip_url") or "",
+            "print_settings": _ps().public(i.get("print_settings")),
             "download_blocked": _dl_blocked(i, actor),
             "held_for_review": bool(i.get("owner_sid") == actor.sid and i.get("hidden") and i.get("held")),
             "remix_chain": remix_chain(i, actor), "prints_count": len(_social().prints_for(i["id"])), "no_model": not i["files"],
@@ -327,6 +328,27 @@ def set_tip_url(actor: Actor, item_id: str, url) -> dict:
     return _owner_edit(actor, item_id, fn)
 
 
+
+def set_print_settings(actor: Actor, item_id: str, raw) -> dict:
+    """Owner only: attach / clear optional print settings. Feeds Showcase filters."""
+    from . import print_settings as ps
+    try:
+        clean = ps.check(raw)
+    except ps.Bad as e:
+        raise Denied(400, str(e))
+    hidden = set(MODERATION.read()["hidden"])
+
+    def fn(i):
+        if i.get("hidden") or i["id"] in hidden:
+            raise Denied(403, "This project is hidden by moderation, so its print settings can't be changed right now.")
+        ps.apply_to_listing(i, clean)
+        if not clean:
+            # clear mirrored filter fields when settings are wiped
+            for k in ("printer", "printer_type", "material", "needs_supports", "supports_level"):
+                i.pop(k, None)
+    return _owner_edit(actor, item_id, fn)
+
+
 def set_ai_made(actor: Actor, item_id: str, on) -> dict:
     """Owner may add the AI-made label; a 2D->3D build keeps it (it is honest provenance)."""
     if not isinstance(on, bool):
@@ -389,6 +411,11 @@ def set_allow_remixes(actor: Actor, item_id: str, allow) -> dict:
     if not found:
         raise Denied(404, "not found")
     return get(item_id, actor)
+
+
+def _ps():
+    from . import print_settings as _ps_mod
+    return _ps_mod
 
 
 def _social():
@@ -517,11 +544,17 @@ def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -
 
 
 def create_project(actor: Actor, *, title, description, tags, build_id, accept_guidelines, visibility=None, remix_of: str = "", nsfw: bool | None = None, license_id: str | None = None,
-                   allow_remixes: bool = True, view_only: bool = False, ai_made: bool = False, tip_url: str = "") -> dict:
+                   allow_remixes: bool = True, view_only: bool = False, ai_made: bool = False, tip_url: str = "",
+                   print_settings=None) -> dict:
     from . import licensing, tips
     try:
         tip_url = tips.check(tip_url)
     except ValueError as e:
+        raise Denied(400, str(e))
+    from . import print_settings as ps
+    try:
+        print_settings = ps.check(print_settings)
+    except ps.Bad as e:
         raise Denied(400, str(e))
     try:
         lid = licensing.check(license_id)              # new projects always carry one (default: private use)
@@ -587,6 +620,8 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "ai_made": bool(ai_made) or ai_locked, "ai_locked": ai_locked}
     if tip_url:
         item["tip_url"] = tip_url
+    if print_settings:
+        ps.apply_to_listing(item, print_settings)
     if remix_of:
         item["remix_of"] = remix_of
     # re-upload protection: fingerprint the geometry. Sharing (followers / public) a near-match of ANOTHER maker's

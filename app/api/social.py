@@ -97,9 +97,11 @@ def _print_public(p: dict, actor: Actor) -> dict:
     users = USERS.read()
     tu = next((u for u in users.values() if u.get("id") == p["uid"]), None)
     name = (tu or {}).get("username") or p.get("username")
+    from ..community import print_settings as ps
     return {"id": p["id"], "url": f"/api/prints/{p['id']}/photo", "caption": p.get("caption", ""),
             "by": "@" + name if name else "a ZEIM maker", "created": p["created"], "mine": p["owner_sid"] == actor.sid,
-            "status": social.status(p), "pending": social.status(p) != "approved", "nsfw": bool(p.get("nsfw"))}
+            "status": social.status(p), "pending": social.status(p) != "approved", "nsfw": bool(p.get("nsfw")),
+            "settings": ps.public(p.get("settings"))}
 
 
 @router.get("/showcase/{iid}/prints")
@@ -114,7 +116,10 @@ def list_prints(iid: str, actor: Actor = Depends(get_actor)):
 
 @router.post("/showcase/{iid}/prints")
 def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), photo: UploadFile = File(...),
-              caption: str = Form(""), photo_ack: bool = Form(False), nsfw: str = Form("")):
+              caption: str = Form(""), photo_ack: bool = Form(False), nsfw: str = Form(""),
+              printer: str = Form(""), material: str = Form(""), layer_height_mm: str = Form(""),
+              infill_pct: str = Form(""), supports: str = Form(""), nozzle_mm: str = Form(""),
+              printer_name: str = Form(""), notes: str = Form("")):
     """Same pipeline as every other photo: permission box (CR-5), content sniffing, EXIF/GPS stripped by re-encoding, size caps;
     the caption goes through the chat filter; the image-moderation hook runs (default: needs human review, never auto-approves);
     every photo can be reported (minor_safety hides it at once) and reviewed in the queue."""
@@ -145,7 +150,21 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
         return JSONResponse(status_code=e.status, content=e.payload)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack, nsfw=is_nsfw)
+    settings = {"printer": printer, "material": material, "layer_height_mm": layer_height_mm or None,
+                "infill_pct": infill_pct or None, "supports": supports, "nozzle_mm": nozzle_mm or None,
+                "printer_name": printer_name, "notes": notes}
+    try:
+        if notes:
+            settings["notes"] = safety.gate(actor, text_in(notes, 400, "Notes"), "prints:notes", is_nsfw)
+    except safety.ChatBlocked as e:
+        return JSONResponse(status_code=e.status, content=e.payload)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    try:
+        rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack,
+                               nsfw=is_nsfw, settings=settings)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return _print_public(rec, actor)
 
 
