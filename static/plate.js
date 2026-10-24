@@ -273,25 +273,45 @@ function snapDrag(d, free) {
   return d;
 }
 
-/* drag a selected object across the bed (plane z=0); one "transform" step on release */
+/* screen → bed (z=0) in mm; camera must stay still during a drag or this point jumps under the cursor */
+function bedPoint(e, v, plane) {
+  const r = v.renderer.domElement.getBoundingClientRect(); if (!r.width || !r.height) return null;
+  const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, v.camera);
+  return rc.ray.intersectPlane(plane, new THREE.Vector3());
+}
+function resetDragOffsets(v) { v.group.children.forEach(m => m.position.set(0, 0, 0)); }
+
+/* drag a selected object across the bed (plane z=0); one "transform" step on release.
+   Capture-phase + stopPropagation so OrbitControls never starts the same gesture; freezeControls so
+   leftover orbit damping can't move the camera (that made the object jump all over the bed). */
 export function wireDrag(v) {
   const el = v.renderer.domElement, plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
   el.addEventListener("pointerdown", e => {
     if (e.shiftKey || e.button !== 0 || PL.ctx?.measuring?.()) return;
     const h = hitObject(e); if (!h || h.obj == null || !PL.sel.has(h.obj)) return;
-    const p0 = h.rc.ray.intersectPlane(plane, new THREE.Vector3()); if (!p0) return;
-    PL.drag = { p0, d: new THREE.Vector3(), id: e.pointerId }; v.controls.enabled = false; el.setPointerCapture(e.pointerId);
-  });
+    const p0 = bedPoint(e, v, plane); if (!p0) return;
+    e.preventDefault(); e.stopPropagation();
+    try { el.setPointerCapture(e.pointerId); } catch { /* already captured: fine */ }
+    if (v.freezeControls) v.freezeControls(); else v.controls.enabled = false;
+    PL.drag = { p0: p0.clone(), d: new THREE.Vector3(), id: e.pointerId };
+  }, true);
   el.addEventListener("pointermove", e => {
-    if (!PL.drag) return;
-    const h = hitObject(e); const p = h?.rc.ray.intersectPlane(plane, new THREE.Vector3()); if (!p) return;
+    if (!PL.drag || e.pointerId !== PL.drag.id) return;
+    const p = bedPoint(e, v, plane); if (!p) return;
     PL.drag.d = snapDrag(p.sub(PL.drag.p0), e.altKey);
     v.group.children.forEach((m, k) => { if (PL.sel.has(m.userData.object ?? k)) m.position.set(PL.drag.d.x, PL.drag.d.y, 0); });
   });
-  const end = () => {
-    if (!PL.drag) return; const d = PL.drag.d; PL.drag = null; v.controls.enabled = true;
-    if (Math.hypot(d.x, d.y) > 0.5) plateOp("transform", { dx: d.x, dy: d.y });
-    else v.group.children.forEach(m => m.position.set(0, 0, 0));
+  const end = e => {
+    if (!PL.drag || (e && e.pointerId != null && e.pointerId !== PL.drag.id)) return;
+    const d = PL.drag.d; PL.drag = null;
+    if (v.unfreezeControls) v.unfreezeControls(); else v.controls.enabled = true;
+    if (Math.hypot(d.x, d.y) > 0.5) {
+      // on success load() replaces meshes at position 0; on failure (act swallows errors) snap the preview back
+      Promise.resolve(plateOp("transform", { dx: d.x, dy: d.y })).then(() => {
+        if (v.group.children.some(m => Math.hypot(m.position.x, m.position.y) > 0.01)) resetDragOffsets(v);
+      });
+    } else resetDragOffsets(v);
   };
   el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
 }
