@@ -23,7 +23,7 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **Learn** | Guided lessons inside the app. On phones (≤420px wide) Learn leaves the bottom tab bar but stays reachable from Showcase / home. |
 | **Bust mode** | Photo → printable bust: raised face on a clean round / rect / outline pedestal. Uses Select mode to trace head & shoulders (whole photo still works, with a tip). Separate from AI 2D→3D Bust. |
 | **Live Sculpt** | CAD sculpt brushes (draw, carve, smooth, inflate, pinch, flatten, grab) show live on the model as you drag; each stroke saves in the background without a blocking spinner. |
-| **Subscriptions** | Core stays free forever. Optional Semi Pro (~$3.50) and Pro (~$5.50) are listed in Account → Plans. **Payment is not live yet** — choosing a paid plan says Coming; nothing is charged. ZEIM never takes a cut of creator tips or Showcase sales. |
+| **Subscriptions** | Core stays free forever. Optional Semi Pro ($3.50/month) and Pro ($5.50/month) are in Account → Plans. Without Stripe keys the buttons say **Coming** and nothing is charged. With test keys the page says **Stripe test mode**. With live keys, Checkout is Stripe-hosted (ZEIM never sees the card). A ~1% ZEIM service fee (nearest cent) is a separate line on the plan only. Stripe's processing fee is separate. Plans renew monthly through Stripe until canceled. ZEIM never takes a cut of creator tips or Showcase sales. |
 | **Themes** | Japanese-inspired theme per section. |
 
 ## In progress
@@ -85,7 +85,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2589 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 all Simulated, Bust mode, Live Sculpt, and Subscriptions Coming stubs).
+Tests use temporary data folders; slicer and printer tests use mocks. Subscription tests mock Stripe (no network, no card numbers). `pytest --collect-only` currently counts 2589 tests plus the Stripe plan tests in `tests/test_stripe_plans.py` (Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 all Simulated, Bust mode, Live Sculpt, and optional Semi Pro / Pro).
 
 ## Layout
 
@@ -115,6 +115,16 @@ OctoPrint / Moonraker / Bambu LAN paths in ZEIM (mock-tested; labelled **Simulat
 10. Timelapse folder + opt-in local failure detection that **only pauses**
 
 Direct printer control stays off in production (`ZEIM_ENV=production`) unless `ZEIM_PRINTER_DIRECT=1`. Addresses are SSRF-checked. Never copies GPL/AGPL printer UIs.
+
+## Optional plans (Stripe)
+
+Semi Pro is **$3.50/month** and Pro is **$5.50/month**. The core app stays free. ZEIM adds a service fee of about **1%** of that plan price, rounded to the nearest cent (4¢ and 6¢), as its own line on the Stripe invoice. That fee is only on these plan charges. It is not a cut of creator tips or Showcase sales, and it is not a Stripe Connect application fee.
+
+Card numbers stay on Stripe. Hosted Checkout and the Customer Portal are the only payment forms. ZEIM stores the plan tier plus the Stripe Customer id and Subscription id, updated by the webhook at `/api/subscriptions/webhook`. The account's `plan` field is what feature gates read (Pro-only 2D→3D when that flag is on).
+
+There is no password reset. People get back into an account with a passkey or an email code. Billing cancel / card update is the Stripe Customer Portal.
+
+Until the secret key, webhook secret, and both Price ids are set, the plan buttons say Coming. Test keys are labeled test mode and do not charge a real card. Full Dashboard steps: [`docs/ops/stripe-plans.md`](docs/ops/stripe-plans.md).
 
 ## Community rules
 

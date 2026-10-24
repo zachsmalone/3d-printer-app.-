@@ -1,13 +1,31 @@
-"""Subscription plan stubs: honest Coming until payment is live."""
+"""Subscription catalog: honest Coming until Stripe is configured."""
 from __future__ import annotations
+
+import pytest
 
 from app.services import subscriptions as subs
 from tests.b1 import client, ADULT
+
+_STRIPE_KEYS = (
+    "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_PRICE_SEMI_PRO", "STRIPE_PRICE_PRO",
+    "STRIPE_PRICE_FEE_SEMI_PRO", "STRIPE_PRICE_FEE_PRO",
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_stripe_env(monkeypatch):
+    for key in _STRIPE_KEYS:
+        monkeypatch.delenv(key, raising=False)
 
 
 def test_catalog_is_honest():
     c = subs.catalog()
     assert c["payment_live"] is False
+    assert c["stripe_mode"] == "off"
+    assert c["stores_cards"] is False
+    assert "about 1%" in c["fee_note"]
+    assert "processing" in c["processing_note"].lower()
     assert "never takes a cut" in c["tip_note"].lower()
     ids = {p["id"] for p in c["plans"]}
     assert ids == {"free", "semi_pro", "pro"}
