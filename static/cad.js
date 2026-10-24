@@ -294,7 +294,7 @@ const MODEL_TOOLS = [
   { id: "pattern", key: "P", label: "Pattern", sub: "linear · circular", tip: "Repeat a body in a row or around a centre." },
   { id: "align", key: "A", label: "Align", sub: "to value or body", tip: "Line up a body's side or centre with a value or another body." },
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
-  { id: "sculpt", key: "U", label: "Sculpt", sub: "brushes · remesh", tip: "Shape the mesh with brushes: draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts on the model; two fingers (or drag off the model) orbit." },
+  { id: "sculpt", key: "U", label: "Live Sculpt", sub: "brushes · remesh", tip: "Live Sculpt: every brush shows as you drag; strokes save in the background. Draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts; two fingers (or drag off the model) orbit." },
   { id: "joints", key: "J", label: "Hinges/Joints", sub: "print-in-place", tip: "Add a hinge, ball joint, pin joint or chain whose parts move straight off the printer (a small clearance gap between them)." },
   { id: "merge", key: "G", label: "Merge", sub: "snap · fuse · rejoin", tip: "Drag bodies on the bed (they snap to each other), then fuse them into one. Smart merge puts Smart Split pieces back along their cuts." },
   { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
@@ -358,7 +358,7 @@ function panel(title, html, onApply, applyLabel = "Apply") {
 }
 const HINTS = {
   repair: ["Fix mesh", "Repair an imported mesh."],
-  sculpt: ["Sculpt", "Drag on the model to sculpt. Two fingers or drag off the model to orbit. Each stroke is a step (undo works)."],
+  sculpt: ["Live Sculpt", "Drag on the model — the shape updates live. Two fingers or drag off the model to orbit. Each stroke saves in the background (undo works)."],
   null: ["Select", "Tap a body to select it, or pick a tool on the left."],
   shapes: ["Shapes", "Tap a shape to drop it. Pick New, Join or Cut first."],
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
@@ -558,12 +558,13 @@ const TOOL_PANELS = {
   },
   sculpt() {
     const B = S.brush || (S.brush = { brush: "draw", radius: 5, strength: 0.5, sym: false, edge: 1 });
-    panel("Sculpt", `${seg("tBrush", [["draw", "Draw"], ["carve", "Carve"], ["smooth", "Smooth"], ["inflate", "Inflate"], ["pinch", "Pinch"], ["flatten", "Flatten"], ["grab", "Grab"]], B.brush)}
+    panel("Live Sculpt", `<p class="help" id="cwLiveSculpt" role="status" aria-live="polite">Live Sculpt · drag to shape</p>
+      ${seg("tBrush", [["draw", "Draw"], ["carve", "Carve"], ["smooth", "Smooth"], ["inflate", "Inflate"], ["pinch", "Pinch"], ["flatten", "Flatten"], ["grab", "Grab"]], B.brush)}
       <div class="f"><label for="tRad">Size <b id="tRadV">${B.radius} mm</b></label><input id="tRad" type="range" min="0.5" max="40" step="0.5" value="${B.radius}"></div>
       <div class="f"><label for="tStr">Strength <b id="tStrV">${Math.round(B.strength * 100)}%</b></label><input id="tStr" type="range" min="0.05" max="1" step="0.05" value="${B.strength}"></div>
       <label class="cw-toggle"><span>Symmetry X (mirror across X = 0)</span><input type="checkbox" id="tSym" ${B.sym ? "checked" : ""}></label>
       <div class="f"><label for="tEdge">Detail (remesh edge, mm)</label>${num("tEdge", B.edge)}</div>
-      <p class="help">Low detail? Remesh first so brushes have points to move. Strokes are steps in History: undo with Ctrl/⌘+Z. The brush is a sphere: on thin walls the back moves too.</p>`,
+      <p class="help">Every brush shows live on the model as you drag. Strokes save in the background (no waiting spinner). Undo with Ctrl/⌘+Z. Remesh first if the mesh is too coarse. The brush is a sphere: on thin walls the back moves too.</p>`,
       () => addOp("remesh", { edge: val("tEdge") }).then(() => setTool("sculpt")), "Remesh for detail");
     const sync = () => { B.brush = segVal("tBrush"); B.radius = val("tRad"); B.strength = val("tStr"); B.sym = $("#tSym").checked; B.edge = val("tEdge");
       $("#tRadV").textContent = B.radius + " mm"; $("#tStrV").textContent = Math.round(B.strength * 100) + "%"; };
@@ -1232,13 +1233,39 @@ function pickRegion(ev) {
 let stroke = null; const pointers = new Set();
 const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffb26b, depthTest: false, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
 ring.visible = false; scene.add(ring);
-function previewDab(c, n, k) {   // approximate live feedback (draw/carve/inflate/grab); the server result replaces it on release
-  const B = S.brush, r = B.radius, dir = B.brush === "carve" ? -1 : 1;
-  for (const g of world.children) { const pos = g.children[0].geometry.attributes.position, a = pos.array;
-    for (let i = 0; i < a.length; i += 3) { const dx = a[i] - c.x, dy = a[i + 1] - c.y, dz = a[i + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz; if (d2 >= r * r) continue;
-      const w = (1 - d2 / (r * r)) ** 2 * (B.brush === "grab" ? 1 : B.strength * 0.15 * r * dir);
-      if (B.brush === "grab") { a[i] += k.x * w; a[i + 1] += k.y * w; a[i + 2] += k.z * w; } else { a[i] += n.x * w; a[i + 1] += n.y * w; a[i + 2] += n.z * w; } }
-    pos.needsUpdate = true; g.children[0].geometry.computeVertexNormals(); }
+function previewDab(c, n, k) {   // Live Sculpt: approximate feedback for every brush; server result replaces it on release
+  const B = S.brush, r = B.radius, brush = B.brush;
+  const dir = brush === "carve" ? -1 : 1;
+  for (const g of world.children) {
+    const geo = g.children[0].geometry, pos = geo.attributes.position, a = pos.array;
+    // Flatten uses a plane through the first dab (stored on stroke); fall back to camera-facing
+    const planeN = (brush === "flatten" && stroke?.flatN) ? stroke.flatN : n;
+    const planeC = (brush === "flatten" && stroke?.flatC) ? stroke.flatC : c;
+    for (let i = 0; i < a.length; i += 3) {
+      const dx = a[i] - c.x, dy = a[i + 1] - c.y, dz = a[i + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 >= r * r) continue;
+      const fall = (1 - d2 / (r * r)) ** 2, s = B.strength;
+      if (brush === "grab") {
+        a[i] += k.x * fall; a[i + 1] += k.y * fall; a[i + 2] += k.z * fall;
+      } else if (brush === "smooth") {
+        // Pull toward the brush centre (cheap Laplacian stand-in)
+        const t = fall * s * 0.35;
+        a[i] += (c.x - a[i]) * t; a[i + 1] += (c.y - a[i + 1]) * t; a[i + 2] += (c.z - a[i + 2]) * t;
+      } else if (brush === "pinch") {
+        const t = fall * s * 0.25;
+        a[i] += (c.x - a[i]) * t; a[i + 1] += (c.y - a[i + 1]) * t; a[i + 2] += (c.z - a[i + 2]) * t;
+      } else if (brush === "flatten" && planeN) {
+        const px = a[i] - planeC.x, py = a[i + 1] - planeC.y, pz = a[i + 2] - planeC.z;
+        const d = px * planeN.x + py * planeN.y + pz * planeN.z;
+        const t = fall * s * 0.4;
+        a[i] -= planeN.x * d * t; a[i + 1] -= planeN.y * d * t; a[i + 2] -= planeN.z * d * t;
+      } else if (n) {
+        const w = fall * s * 0.15 * r * dir;
+        a[i] += n.x * w; a[i + 1] += n.y * w; a[i + 2] += n.z * w;
+      }
+    }
+    pos.needsUpdate = true; geo.computeVertexNormals();
+  }
 }
 stage.addEventListener("pointerdown", ev => {
   pointers.add(ev.pointerId);
@@ -1248,7 +1275,8 @@ stage.addEventListener("pointerdown", ev => {
   const h = pickBody(ev); if (!h) return;                                                                // off the model: orbit
   controls.enabled = false; ev.stopPropagation();
   stroke = { pts: [h.point.clone()], n: h.normal.clone(), start: h.point.clone(), plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), h.point), last: h.point.clone() };
-  if (!["grab", "smooth", "pinch", "flatten"].includes(S.brush.brush)) previewDab(h.point, h.normal);
+  if (S.brush.brush === "flatten") { stroke.flatC = h.point.clone(); stroke.flatN = h.normal.clone(); }
+  if (S.brush.brush !== "grab") previewDab(h.point, h.normal);
 }, true);
 const sculptMove = perFrame(ev => {
   if (S.tool !== "sculpt") { if (ring.visible) { ring.visible = false; invalidate(); } return; }
@@ -1261,10 +1289,15 @@ const sculptMove = perFrame(ev => {
     const k = q.clone().sub(stroke.last); stroke.last = q; stroke.delta = q.clone().sub(stroke.start); previewDab(stroke.start.clone().add(stroke.delta).sub(k), null, k); return;
   }
   if (h && h.point.distanceTo(stroke.pts[stroke.pts.length - 1]) > S.brush.radius / 3 && stroke.pts.length < 400) {
-    stroke.pts.push(h.point.clone()); if (!["smooth", "pinch", "flatten"].includes(S.brush.brush)) previewDab(h.point, stroke.n);
+    stroke.pts.push(h.point.clone()); if (S.brush.brush !== "grab") previewDab(h.point, stroke.n);
   }
 });
 stage.addEventListener("pointermove", sculptMove, { capture: true, passive: true });
+let sculptSaving = false;
+function setLiveSculptStatus(text) {
+  const el = document.getElementById("cwLiveSculpt");
+  if (el) el.textContent = text || "";
+}
 async function endStroke(ev) {
   sculptMove.flush();
   pointers.delete(ev.pointerId);
@@ -1273,7 +1306,17 @@ async function endStroke(ev) {
   const r = (v) => v.toArray().map(x => Math.round(x * 1e4) / 1e4);
   const params = { brush: B.brush, radius: B.radius, strength: B.strength, symmetry_x: B.sym, points: st.pts.map(r), normal: r(st.n) };
   if (B.brush === "grab") { if (!st.delta) return; params.delta = r(st.delta); params.strength = 1; }
-  await run(async () => { await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "sculpt_stroke", params } }); await load(true); });
+  // Live Sculpt: keep the approximate mesh on screen; save in the background (no full-screen busy spinner)
+  sculptSaving = true; setLiveSculptStatus("Saving stroke…");
+  try {
+    await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "sculpt_stroke", params } });
+    await load(true);
+    setLiveSculptStatus("Live Sculpt · stroke saved");
+    setTimeout(() => { if (!sculptSaving) setLiveSculptStatus("Live Sculpt · drag to shape"); }, 1200);
+  } catch (e) {
+    msg(e.message); await load(true);   // revert approximate preview to last good server mesh
+    setLiveSculptStatus("Save failed — mesh restored");
+  } finally { sculptSaving = false; }
 }
 stage.addEventListener("pointerup", endStroke, true);
 stage.addEventListener("pointercancel", endStroke, true);
