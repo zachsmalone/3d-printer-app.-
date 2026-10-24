@@ -114,3 +114,8 @@ ACTIVITY = JsonFile("activity", [])        # [{"k": fav|download|printed|nozzle,
 PRINTS = JsonFile("prints", [])            # "I printed this" photo records (photo files live in data/prints/)
 # Showcase collections: creator-named groups of their own models (docs/specs/showcase-gaps.md #2)
 COLLECTIONS = JsonFile("collections", [])   # [{id, owner_sid, uid, name, public, items: [iid], created, updated}]
+# Showcase rest (task 4): project Q&A, prize-free challenges, entries
+QUESTIONS = JsonFile("questions", [])          # creator-answered project questions (no DMs)
+CHALLENGES = JsonFile("challenges", [])        # prize-free themed challenges (seeded with Remix)
+CHALLENGE_ENTRIES = JsonFile("challenge_entries", [])  # [{id, challenge_id, item_id, owner_sid, uid, remix_of, created}]
+
