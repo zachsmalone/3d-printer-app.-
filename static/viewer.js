@@ -84,4 +84,83 @@ export class Viewer {
   /* LED effects: retint the backlit materials in place each frame (no new materials, no geometry upload) */
   setTint(rgb) { if (!this.backlit) return; for (const m of this.group.children) if (m.material !== m.userData.lit) m.material.color.setRGB(rgb[0], rgb[1], rgb[2]); }
   toggleWire() { this.wire = !this.wire; this.group.children.forEach(m => { m.material.wireframe = this.wire; if (m.userData.lit) m.userData.lit.wireframe = this.wire; }); }
+
+  /* Colour problem faces (print check): highlights = {faces:[{face,category}], colors:{overhang:[r,g,b], thin:[..], ok:[..]}} */
+  setProblemHighlights(highlights) {
+    this.clearProblemHighlights();
+    if (!highlights || !highlights.faces || !highlights.faces.length) return;
+    const colors = highlights.colors || {};
+    const colOf = (c) => {
+      const rgb = colors[c] || (c === "thin" ? [1, 0.2, 0.35] : c === "overhang" ? [1, 0.55, 0.1] : [0.56, 0.69, 0.88]);
+      return rgb;
+    };
+    const map = new Map();
+    for (const f of highlights.faces) map.set(f.face | 0, f.category);
+    for (const mesh of this.group.children) {
+      if (!mesh.isMesh) continue;
+      const geom = mesh.geometry;
+      const idx = geom.getIndex();
+      const pos = geom.getAttribute("position");
+      if (!pos) continue;
+      // Build per-vertex colours from face categories (non-indexed or indexed)
+      const nVert = pos.count;
+      const cols = new Float32Array(nVert * 3);
+      const ok = colOf("ok");
+      for (let i = 0; i < nVert; i++) { cols[i*3]=ok[0]; cols[i*3+1]=ok[1]; cols[i*3+2]=ok[2]; }
+      const paintFace = (fi, a, b, c) => {
+        const cat = map.get(fi); if (!cat || cat === "ok") return;
+        const rgb = colOf(cat);
+        for (const vi of [a, b, c]) { cols[vi*3]=rgb[0]; cols[vi*3+1]=rgb[1]; cols[vi*3+2]=rgb[2]; }
+      };
+      if (idx) {
+        const nFaces = (idx.count / 3) | 0;
+        for (let fi = 0; fi < nFaces; fi++) paintFace(fi, idx.getX(fi*3), idx.getX(fi*3+1), idx.getX(fi*3+2));
+      } else {
+        const nFaces = (nVert / 3) | 0;
+        for (let fi = 0; fi < nFaces; fi++) paintFace(fi, fi*3, fi*3+1, fi*3+2);
+      }
+      geom.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+      if (!mesh.userData._problemMatBackup) mesh.userData._problemMatBackup = mesh.material;
+      mesh.material = new THREE.MeshStandardMaterial({
+        vertexColors: true, roughness: 0.65, metalness: 0.05, wireframe: this.wire, side: THREE.DoubleSide
+      });
+      mesh.userData._problemColored = true;
+    }
+    // Thin-point markers
+    const pts = highlights.thin_points || [];
+    if (pts.length && !this._thinGroup) {
+      this._thinGroup = new THREE.Group(); this.scene.add(this._thinGroup);
+    }
+    if (this._thinGroup) {
+      while (this._thinGroup.children.length) {
+        const c = this._thinGroup.children.pop();
+        c.geometry?.dispose(); c.material?.dispose();
+      }
+      for (const p of pts) {
+        if (!p.at) continue;
+        const s = new THREE.Mesh(
+          new THREE.SphereGeometry(0.6, 10, 8),
+          new THREE.MeshBasicMaterial({ color: 0xff3366, depthTest: false })
+        );
+        s.position.set(p.at[0], p.at[1], p.at[2]); s.renderOrder = 10;
+        this._thinGroup.add(s);
+      }
+    }
+  }
+  clearProblemHighlights() {
+    for (const mesh of this.group.children) {
+      if (!mesh.userData._problemColored) continue;
+      if (mesh.material && mesh.material !== mesh.userData._problemMatBackup) mesh.material.dispose();
+      if (mesh.userData._problemMatBackup) mesh.material = mesh.userData._problemMatBackup;
+      mesh.geometry.deleteAttribute("color");
+      mesh.userData._problemColored = false;
+    }
+    if (this._thinGroup) {
+      while (this._thinGroup.children.length) {
+        const c = this._thinGroup.children.pop();
+        c.geometry?.dispose(); c.material?.dispose();
+      }
+    }
+  }
 }
+
