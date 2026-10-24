@@ -104,7 +104,7 @@
         if (!e || v || !p.bare) Hk = Math.max(Math.min(Hk, 96), Hk * shrink[k]);
         if (e && (!v || !p.bare)) Wk = Math.max(Math.min(Wk, 120), Wk * shrink[k]);
         var c = cands(e, first ? s.t : 0, Wk, Hk).find(function (r) { return !obs.some(function (b) { return hit(r, b); }); });
-        if (c) { w.style.left = c.x + "px"; w.style.top = c.y + "px"; if (Hk < H || e && v) w.style.maxHeight = Hk + "px"; if (Wk < W || e && !v) w.style.maxWidth = Wk + "px"; }
+        if (c) { w.style.left = c.x + "px"; w.style.top = c.y + "px"; if (Hk < H || e && v) w.style.maxHeight = Hk + "px"; if (Wk < W || e && !v) w.style.maxWidth = Wk + "px"; if (Wk < W) w.style.width = Wk + "px"; }
         return c;
       }
       for (var i = 0; i < order.length; i++) { for (var k = 0; k < shrink.length; k++) { var c = fit(order[i], k, !i); if (c) return c; if (!order[i]) break; } }
