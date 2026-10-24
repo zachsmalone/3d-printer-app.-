@@ -1,11 +1,13 @@
-# ZEIM sign-in (passkeys + email codes)
+# ZEIM sign-in (passkeys + passwords + email codes)
 
 The code lives in `app/auth/` (rules) and `app/api/auth.py` (HTTP routes under `/api/auth`).
 It is **mounted** from `app/main.py` via `try_mount_auth(app)` (which calls `init_auth` with a
 legacy resolver). The old cookie login (`p3d_sid`) still works alongside it.
 
 ## How it works, in plain words
-- **No passwords.** People sign up with a *passkey* (Face ID, fingerprint, phone or security key).
+- **Passkeys** still work (Face ID, fingerprint, phone or security key). Sign-up and sign-in with a passkey are unchanged.
+- **Passwords** are the other way in. Sign up with a display name, a username, a password, and a birth date (18+). An email is optional. Sign in with the username or a verified email, plus the password. Passwords are stored as Argon2id hashes only — never in plain text, and never written to a log.
+- **An existing passkey account can add a password** while signed in (Account → Add a password). That does not remove the passkey or the projects. If a verified email is already on the account, the sign-in screen can email a one-time code that sets a password and signs in. There is no way to set a password with no passkey and no email; that account is not deleted.
 - **Email codes** are a backup: add an email, then sign in with a 6-digit code that works once, for 10 minutes.
 - **Sessions** live on the server. The browser only holds a random cookie (`__Host-zeim_session`:
   HttpOnly, Secure, SameSite=Lax, Path=/). Idle sessions end after 14 days, every session after 30.
@@ -55,7 +57,16 @@ Existing cookie accounts can add a passkey: the legacy resolver maps today's `p3
 The auth module still **refuses to start** if the three required values are missing or weak when it is asked to load outside the local/dev case. That refuse is caught at mount time so the rest of ZEIM keeps serving.
 
 ## Still open (not blocking local/pilot)
-1. Retire the old recovery codes once accounts have a passkey or email.
-2. Decide what happens when someone loses their only passkey and has no email.
-3. Set `ZEIM_RP_ID`, `ZEIM_ORIGINS` and `ZEIM_AUTH_PEPPER` on the live server (and SMTP if email codes are wanted).
+1. Retire the old recovery codes once accounts have a passkey, a password, or an email.
+2. Someone who loses their only passkey and never added an email or a password still cannot be signed in from here. Do not delete that account. The way back is the original device, then Account → Add a password.
+3. Set `ZEIM_RP_ID`, `ZEIM_ORIGINS` and `ZEIM_AUTH_PEPPER` on the live server (and SMTP if email codes or password-reset codes are wanted).
 4. ~~Wire the new session into the rest of the app~~ **Done (2026-10-13).** See "Who owns what" below.
+
+## Setting a password on an existing account (ZeimApp)
+The account is not re-created. Projects stay on it.
+
+1. On the phone that still has the passkey: open Account, **Sign in with my passkey**, then **Add a password** (at least 10 characters). Sign out. On any device, sign in with username `ZeimApp` and that password. The passkey still works on the original phone.
+2. If a verified email is already on the account and the server can send mail: on the sign-in screen open **Forgot your password?** and use the code to set a password. That also signs you in. The passkey is left in place.
+3. If the passkey is gone and no email was added, this deploy cannot invent a way in. The account stays as it is.
+
+`ZeimApp` is already stored as that account's username. New sign-ups cannot choose a name that starts with `zeim` (reserved). Adding a password does not re-check that rule, so the existing name keeps working. Emails are only a keyed hash plus a masked hint, so this repo cannot show whether that account has an email.

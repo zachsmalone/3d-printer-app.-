@@ -25,6 +25,15 @@ def code_email(code: str, minutes: int) -> tuple:
     return subject, text
 
 
+def password_reset_email(code: str, minutes: int) -> tuple:
+    subject = "Your ZEIM password code"
+    text = (f"Your ZEIM code is {code}\n\n"
+            f"Use it to set a password on your account. It works for {minutes} minutes and can be used once.\n"
+            "If you didn't ask for this, you can ignore this email. Your passkey still works.\n"
+            "ZEIM will never ask you for this code by phone or chat.\n")
+    return subject, text
+
+
 class SmtpMailer:
     def __init__(self, host: str, port: int, sender: str, user: Optional[str] = None,
                  password: Optional[str] = None, starttls: bool = True, timeout: int = 15):

@@ -1,4 +1,4 @@
-/* ZEIM auth client: passkeys (WebAuthn) + email codes + Account security panel.
+/* ZEIM auth client: passkeys (WebAuthn) + password + email codes + Account security panel.
    Vanilla JS, no dependencies, no third-party requests. All text is inserted with textContent (never innerHTML). */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(root);
@@ -91,6 +91,13 @@
 
   const A = {
     AuthApiError, supportsPasskeys, signUp, signInWithPasskey, addPasskey,
+    registerWithPassword: (displayName, birthDate, username, password, email) =>
+      api("/password/register", "POST", { display_name: displayName, birth_date: birthDate, username, password, email: email || undefined }),
+    signInWithPassword: (identifier, password) => api("/password/login", "POST", { identifier, password }),
+    addPassword: (password, username) => api("/password/add", "POST", username ? { password, username } : { password }),
+    changePassword: (currentPassword, password) => api("/password/change", "POST", { current_password: currentPassword, password }),
+    requestPasswordReset: email => api("/password/reset/request", "POST", { email }),
+    confirmPasswordReset: (email, code, password) => api("/password/reset/confirm", "POST", { email, code, password }),
     requestEmailCode: email => api("/email/request", "POST", { email }),
     verifyEmailCode: (email, code) => api("/email/verify", "POST", { email, code }),
     addEmailRequest: email => api("/email/add/request", "POST", { email }),
@@ -120,7 +127,7 @@
     const say = (msg, bad) => { status.textContent = msg || ""; status.setAttribute("class", "zeim-auth-status" + (bad ? " bad" : "")); };
     const run = async (fn, okMsg) => {
       try { await fn(); if (okMsg) say(okMsg); await render(); }
-      catch (e) { say(e.code === "reauth_required" ? "For your security, please sign in again with your passkey, then retry." : e.message, true); }
+      catch (e) { say(e.code === "reauth_required" ? "For your security, please sign in again, then retry." : e.message, true); }
     };
     const status = h(doc, "p", { "class": "zeim-auth-status", role: "status" });
     async function render() {
@@ -153,6 +160,26 @@
         container.appendChild(h(doc, "div", { "class": "zeim-auth-row" }, [em,
           h(doc, "button", { type: "button", text: "Send code", onclick: () => run(() => A.addEmailRequest(em.value), "Code sent. Check your inbox.") }), code,
           h(doc, "button", { type: "button", text: "Verify", onclick: () => run(() => A.addEmailVerify(em.value, code.value), "Email added.") })]));
+      }
+
+      container.appendChild(h(doc, "h3", { text: "Password" }));
+      if (acct.has_password) {
+        const who = acct.login_name ? "username " + acct.login_name : "your username";
+        container.appendChild(h(doc, "p", { text: "You can sign in with " + who + " and this password. Your passkey still works." }));
+        const cur = h(doc, "input", { id: "zeim-pw-cur", type: "password", autocomplete: "current-password", maxlength: "128" });
+        const nw = h(doc, "input", { id: "zeim-pw-new", type: "password", autocomplete: "new-password", maxlength: "128" });
+        container.appendChild(h(doc, "div", { "class": "zeim-auth-row" }, [
+          h(doc, "label", { for: "zeim-pw-cur", text: "Current password" }), cur,
+          h(doc, "label", { for: "zeim-pw-new", text: "New password" }), nw,
+          h(doc, "button", { type: "button", text: "Change password", onclick: () => run(() => A.changePassword(cur.value, nw.value), "Password changed.") }),
+        ]));
+      } else {
+        container.appendChild(h(doc, "p", { text: "Add a password to sign in on another phone or computer. Your passkey keeps working." }));
+        const nw = h(doc, "input", { id: "zeim-pw-new", type: "password", autocomplete: "new-password", maxlength: "128" });
+        container.appendChild(h(doc, "div", { "class": "zeim-auth-row" }, [
+          h(doc, "label", { for: "zeim-pw-new", text: "New password" }), nw,
+          h(doc, "button", { type: "button", text: "Add a password", onclick: () => run(() => A.addPassword(nw.value), "Password added.") }),
+        ]));
       }
 
       container.appendChild(h(doc, "h3", { text: "Your devices" }));

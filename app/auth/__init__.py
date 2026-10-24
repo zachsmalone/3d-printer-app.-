@@ -1,4 +1,5 @@
-"""ZEIM account security: passkeys (WebAuthn), email one-time codes, server-side sessions.
+"""ZEIM account security: passkeys (WebAuthn), passwords, email one-time codes, server-side sessions.
 
-No passwords. Emails are never stored in plain text (only a keyed hash + a masked hint).
+Passwords are stored as Argon2id hashes only. Emails are never stored in plain text
+(only a keyed hash + a masked hint).
 """

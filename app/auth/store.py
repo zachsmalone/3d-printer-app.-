@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS accounts(
   email_hash TEXT UNIQUE,            -- HMAC(pepper, email); the address itself is never stored
   email_hint TEXT,                   -- j***@e***.com
   email_verified_at REAL,
+  login_name TEXT,                   -- lowercase username for password sign-in; NULL until a password exists
+  password_hash TEXT,                -- Argon2id hash only; the password is never stored
+  password_set_at REAL,
   created_at REAL NOT NULL,
   disabled_at REAL
 );
@@ -86,11 +89,25 @@ class AuthStore:
         if path != ":memory:":
             self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+        self._migrate()
         if path != ":memory:":
             try:
                 os.chmod(path, 0o600)
             except OSError:
                 pass
+
+    def _migrate(self) -> None:
+        """Add password columns to an auth database created before passwords existed.
+
+        CREATE TABLE IF NOT EXISTS does not alter an old table. Existing accounts
+        (including passkey-only ones) are left in place; the new columns stay NULL
+        until that person sets a password.
+        """
+        have = {row["name"] for row in self._db.execute("PRAGMA table_info(accounts)")}
+        for name, typ in (("login_name", "TEXT"), ("password_hash", "TEXT"), ("password_set_at", "REAL")):
+            if name not in have:
+                self._db.execute(f"ALTER TABLE accounts ADD COLUMN {name} {typ}")
+        self._db.execute("CREATE UNIQUE INDEX IF NOT EXISTS accounts_login_name ON accounts(login_name)")
 
     @contextmanager
     def tx(self):

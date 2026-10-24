@@ -9,3 +9,11 @@
   border: 1px solid var(--ctl); border-radius: var(--r-sm, 8px); min-width: 9rem; }
 .zeim-auth-danger { background: var(--bad) !important; color: var(--panel) !important; margin-top: 1rem; }
 .zeim-auth-status { min-height: 1.4em; color: var(--ok); } .zeim-auth-status.bad { color: var(--bad); }
+/* Sign-in on a phone: full-width fields, 16px so iOS does not zoom, targets tall enough to tap. */
+#dlgAccount .auth-stack { display: flex; flex-direction: column; gap: 2px; }
+#dlgAccount .auth-stack .btn { width: 100%; margin-top: 6px; }
+#dlgAccount .auth-stack input, #accSecurity input {
+  font-size: 16px; min-height: 44px; width: 100%; box-sizing: border-box;
+}
+#dlgAccount details > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+#dlgAccount .auth-stack details { margin-top: 8px; }

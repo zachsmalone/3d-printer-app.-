@@ -1,3 +1,4 @@
-# Already added to requirements.txt (webauthn==2.8.0). Everything else the auth package uses is the standard library.
+# Already added to requirements.txt (webauthn==2.8.0, argon2-cffi==25.1.0).
 webauthn>=2.1,<3        # py_webauthn: WebAuthn attestation/assertion verification (we do not hand-roll crypto)
 cryptography>=42        # pulled in by webauthn; also used by tests/softauth.py
+argon2-cffi>=23.1,<26   # Argon2id password hashes (a salt is stored in the hash; the password is not)

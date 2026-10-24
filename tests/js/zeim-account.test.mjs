@@ -35,8 +35,11 @@ function makeDoc() {
 
 function stubAuth(over = {}) {
   globalThis.ZeimAuth = {
+    supportsPasskeys: () => true,
     signUp: async () => {}, signInWithPasskey: async () => {}, addPasskey: async () => {},
+    signInWithPassword: async () => {}, registerWithPassword: async () => ({}), addPassword: async () => ({}),
     signOut: async () => {}, requestEmailCode: async () => {}, verifyEmailCode: async () => {},
+    requestPasswordReset: async () => {}, confirmPasswordReset: async () => {},
     mountSecurityPanel: () => {}, ...over,
   };
 }
@@ -72,9 +75,12 @@ test("guest state renders passkey sign-up, sign-in and the recovery flow; email 
   assert.equal(await A.render(GUEST), true);
   assert.ok(d.html("accBody").includes("Create my account with a passkey"));
   assert.ok(d.html("accBody").includes("Sign in with my passkey"));
+  assert.ok(d.html("accBody").includes("Username or email"), "password sign-in is on the same screen");
+  assert.ok(d.html("accBody").includes('id="au_pw"'), "the password field is visible, not tucked away");
   assert.ok(d.html("accBody").includes("recovery code"), "recovery must stay reachable");
   assert.ok(!d.html("accBody").includes("Send my code"), "email sign-in must not render when email_codes is false");
-  assert.ok(d.el("au_go").onclick && d.el("au_in").onclick && d.el("rc_go").onclick);
+  assert.ok(d.html("accBody").includes("Password reset by email is not available"));
+  assert.ok(d.el("au_go").onclick && d.el("au_in").onclick && d.el("au_pw_go").onclick && d.el("pw_go").onclick && d.el("rc_go").onclick);
 
   reset(); const d2 = makeDoc(); stubAuth();
   assert.equal(await A.render({ ...GUEST, auth: { available: true, email_codes: true, session: false } }), true);
@@ -135,6 +141,39 @@ test("rendering failure with auth available shows an error — never silently do
   assert.equal(await A.render(SIGNED_IN), true);
   assert.ok(d.html("accBody").includes("could not load"));
   assert.ok(!d.html("accBody").includes("Create account"), "no legacy signup fallback while auth is available");
+});
+
+test("password sign-in sends the username and password through ZeimAuth, then reloads", async () => {
+  reset(); const d = makeDoc();
+  let got = null;
+  stubAuth({ signInWithPassword: async (id, pw) => { got = { id, pw }; } });
+  require("../../static/zeim-account.js");
+  const A = globalThis.ZeimAccount;
+  await A.render(GUEST);
+  d.el("au_id").value = "ZeimApp";
+  d.el("au_pw").value = "correct horse";
+  await d.el("au_pw_go").onclick();
+  await new Promise(r => setTimeout(r, 0));
+  assert.deepEqual(got, { id: "ZeimApp", pw: "correct horse" });
+  assert.equal(reloaded, 1);
+});
+
+test("a mismatched password on sign-up does not call the server", async () => {
+  reset(); const d = makeDoc();
+  let called = 0;
+  stubAuth({ registerWithPassword: async () => { called++; } });
+  require("../../static/zeim-account.js");
+  await globalThis.ZeimAccount.render(GUEST);
+  d.el("au_name").value = "Sam";
+  d.el("au_user").value = "SamMaker";
+  d.el("au_pw_new").value = "correct horse";
+  d.el("au_pw_new2").value = "other phrase";
+  d.el("au_dob").value = "1990-01-01";
+  await d.el("pw_go").onclick();
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(called, 0);
+  assert.equal(reloaded, 0);
+  assert.match(d.el("accMsg").textContent, /don't match/i);
 });
 
 test("the recovery code goes to /api/me/recover with the CSRF header", async () => {

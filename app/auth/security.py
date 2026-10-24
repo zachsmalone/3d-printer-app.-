@@ -10,6 +10,7 @@ from typing import Optional
 from app.auth.errors import AuthError
 
 _EMAIL_RE = re.compile(r"^[a-z0-9][a-z0-9._%+\-]{0,63}@[a-z0-9\-]+(?:\.[a-z0-9\-]+)+$")
+_LOGIN_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{2,17}$")
 
 
 def new_token(nbytes: int = 32) -> str:
@@ -40,6 +41,22 @@ def normalize_code(raw: object) -> Optional[str]:
         return None
     digits = raw.replace(" ", "").replace("-", "")
     return digits if len(digits) == 6 and digits.isdigit() else None
+
+
+def normalize_login_name(raw: object) -> str:
+    """Username used to sign in with a password. Stored lowercase; typed case does not matter.
+
+    Shape only. Reserved words and the chat filter are applied by the signup route
+    (and by the username already saved on an existing account). An existing name
+    such as one chosen before a reserved-prefix rule must still be usable here.
+    """
+    bad = AuthError("bad_username", "Use 3 to 18 letters, numbers or underscores, starting with a letter.", 422)
+    if not isinstance(raw, str):
+        raise bad
+    n = raw.strip()
+    if not _LOGIN_RE.match(n):
+        raise bad
+    return n.lower()
 
 
 def normalize_email(raw: object) -> str:

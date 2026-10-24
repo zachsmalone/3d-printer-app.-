@@ -5,16 +5,18 @@ import base64
 import json
 import logging
 import re
+import sqlite3
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
 from typing import Callable, Optional
 
+from app.auth import passwords
 from app.auth import security as sec
 from app.auth.config import AuthConfig
 from app.auth.errors import AuthError, RateLimited
-from app.auth.mailer import Mailer, code_email
+from app.auth.mailer import Mailer, NullMailer, code_email, password_reset_email
 from app.auth.ratelimit import RateLimiter
 from app.auth.store import AuthStore
 from app.auth.webauthn_backend import WebAuthnBackend
@@ -195,9 +197,10 @@ class AuthService:
     def is_upgraded(self, legacy_id: str) -> bool:
         """True once a legacy (cookie-only) account has a passkey or a verified email. The old
         recovery-code login should be refused/demoted for such accounts, or it bypasses strong login."""
-        r = self.store.one("SELECT a.id, a.email_verified_at, (SELECT COUNT(*) FROM credentials c WHERE c.account_id=a.id) AS n"
+        r = self.store.one("SELECT a.id, a.email_verified_at, a.password_hash,"
+                           " (SELECT COUNT(*) FROM credentials c WHERE c.account_id=a.id) AS n"
                            " FROM accounts a WHERE a.legacy_id=?", (legacy_id,))
-        return bool(r and (r["n"] or r["email_verified_at"]))
+        return bool(r and (r["n"] or r["email_verified_at"] or r["password_hash"]))
 
     def ephemeral_legacy_session(self, account_id: str) -> SessionInfo:
         """In-memory stand-in (NOT stored, no cookie) so a cookie-only account can run the add-passkey /
@@ -304,9 +307,9 @@ class AuthService:
             mine = self.store.all("SELECT id FROM credentials WHERE account_id=?", (session.account_id,))
             if cred_id not in {r["id"] for r in mine}:
                 raise AuthError("not_found", "That passkey wasn't found.", 404)
-            acct = self.store.one("SELECT email_hash FROM accounts WHERE id=?", (session.account_id,))
-            if len(mine) == 1 and not acct["email_hash"]:
-                raise AuthError("last_method", "That's your only way to sign in. Add another passkey or an email first.", 409)
+            acct = self.store.one("SELECT email_hash, password_hash FROM accounts WHERE id=?", (session.account_id,))
+            if len(mine) == 1 and not acct["email_hash"] and not acct["password_hash"]:
+                raise AuthError("last_method", "That's your only way to sign in. Add a password, another passkey, or an email first.", 409)
             self.store.run("DELETE FROM credentials WHERE id=?", (cred_id,))
         log.info("passkey removed acct=%s", session.account_id)
 
@@ -323,8 +326,11 @@ class AuthService:
             self.store.run("DELETE FROM email_codes WHERE expires_at<?", (now - 86400,))
         return code
 
-    def _deliver(self, email: str, code: str) -> None:
-        subject, text = code_email(code, self.cfg.otp_ttl_s // 60)
+    def _deliver(self, email: str, code: str, kind: str = "login") -> None:
+        if kind == "reset":
+            subject, text = password_reset_email(code, self.cfg.otp_ttl_s // 60)
+        else:
+            subject, text = code_email(code, self.cfg.otp_ttl_s // 60)
         def send():
             try:
                 self.mailer.send(email, subject, text)
@@ -414,14 +420,246 @@ class AuthService:
         self._require_recent(session)
         with self.store.tx():
             n = self.store.one("SELECT COUNT(*) AS n FROM credentials WHERE account_id=?", (session.account_id,))["n"]
-            if n == 0:
-                raise AuthError("last_method", "That's your only way to sign in. Add a passkey first.", 409)
+            pw = self.store.one("SELECT password_hash FROM accounts WHERE id=?", (session.account_id,))
+            if n == 0 and not (pw and pw["password_hash"]):
+                raise AuthError("last_method", "That's your only way to sign in. Add a passkey or a password first.", 409)
             self.store.run("UPDATE accounts SET email_hash=NULL, email_hint=NULL, email_verified_at=NULL WHERE id=?",
                            (session.account_id,))
 
+    # ------------------------------------------------------------------ passwords
+    def _pw_fail(self) -> AuthError:
+        return AuthError("signin_failed",
+                         "That username, email or password didn't match. You can also use a passkey.", 401)
+
+    def _password_row(self, ident: str):
+        """Account for a username or email, or None. Does not reveal which through errors."""
+        if not ident:
+            return None
+        if "@" in ident:
+            try:
+                email = sec.normalize_email(ident)
+            except AuthError:
+                return None
+            return self.store.one("SELECT id, password_hash, disabled_at, login_name FROM accounts"
+                                  " WHERE email_hash=? AND email_verified_at IS NOT NULL", (self._ehash(email),))
+        try:
+            name = sec.normalize_login_name(ident)
+        except AuthError:
+            return None
+        return self.store.one("SELECT id, password_hash, disabled_at, login_name FROM accounts WHERE login_name=?",
+                              (name,))
+
+    def _set_password(self, account_id: str, password: object, *, username: Optional[str] = None,
+                      email: Optional[str] = None, login_name: Optional[str] = None,
+                      only_if_empty: bool = False) -> str:
+        """Store an Argon2id hash. Returns the login_name written, if one was. Never logs the password."""
+        pw = passwords.check_password(password, username=username or login_name, email=email)
+        hashed = passwords.hash_password(pw)
+        now = self.clock()
+        guard = " AND password_hash IS NULL" if only_if_empty else ""
+        try:
+            with self.store.tx():
+                if login_name:
+                    taken = self.store.one("SELECT id FROM accounts WHERE login_name=? AND id<>?", (login_name, account_id))
+                    if taken:
+                        raise AuthError("username_taken", "That username is taken. Please pick another.", 409)
+                    n = self.store.run("UPDATE accounts SET password_hash=?, password_set_at=?, login_name=? WHERE id=?" + guard,
+                                       (hashed, now, login_name, account_id))
+                else:
+                    n = self.store.run("UPDATE accounts SET password_hash=?, password_set_at=? WHERE id=?" + guard,
+                                       (hashed, now, account_id))
+        except sqlite3.IntegrityError:
+            raise AuthError("username_taken", "That username is taken. Please pick another.", 409)
+        if not n:
+            if only_if_empty:
+                raise AuthError("password_exists", "This account already has a password. You can change it.", 409)
+            raise AuthError("bad_account", "Account not recognised.", 400)
+        log.info("password set acct=%s", account_id)
+        return login_name or ""
+
+    def password_register(self, display_name: object, birth_date: object, username: object, password: object,
+                          email: object, ua: Optional[str], ip: Optional[str]) -> tuple:
+        """Create an account with a username and a password. A passkey is not required.
+
+        Returns (token, session, {"email_pending", "email_skipped"}). The optional email
+        is not stored until the person enters the code (same as adding an email later).
+        """
+        self.limiter.hit(f"pw_reg:{self._ip(ip)}", self.cfg.limits.password_register_ip)
+        name = self._signup_checker()(display_name, birth_date)
+        login = sec.normalize_login_name(username)
+        email_norm = None
+        if email not in (None, ""):
+            email_norm = sec.normalize_email(email)
+        passwords.check_password(password, username=login, email=email_norm)
+        shown = username.strip() if isinstance(username, str) else login
+        aid = "acc_" + sec.new_token(12)
+        now = self.clock()
+        hashed = passwords.hash_password(password)
+        try:
+            with self.store.tx():
+                if self.store.one("SELECT 1 FROM accounts WHERE login_name=?", (login,)):
+                    raise AuthError("username_taken", "That username is taken. Please pick another.", 409)
+                self.store.run("INSERT INTO accounts(id, display_name, login_name, password_hash, password_set_at, created_at)"
+                               " VALUES(?,?,?,?,?,?)", (aid, name, login, hashed, now, now))
+        except AuthError:
+            raise
+        except sqlite3.IntegrityError:
+            raise AuthError("username_taken", "That username is taken. Please pick another.", 409)
+        if self.on_account_created:
+            try:
+                self.on_account_created(aid, name, birth_date if isinstance(birth_date, str) else None, shown)
+            except AuthError:
+                self.store.run("DELETE FROM accounts WHERE id=?", (aid,))
+                raise
+            except Exception as e:
+                self.store.run("DELETE FROM accounts WHERE id=?", (aid,))
+                if type(e).__name__ in ("UsernameError", "UsernameWait"):
+                    status = 409 if "taken" in str(e).lower() else 422
+                    raise AuthError("bad_username", str(e), status)
+                log.exception("password signup hook failed acct=%s", aid)
+                raise AuthError("signup_failed", "We couldn't finish creating the account. Please try again.", 500)
+        token, session = self._new_session(aid, ua, "password-signup")
+        pending = skipped = False
+        if email_norm and isinstance(self.mailer, NullMailer):
+            skipped = True
+            log.info("signup email skipped; mailer off acct=%s", aid)
+        elif email_norm:
+            try:
+                self.email_add_request(session, email_norm, ip)
+                pending = True
+            except AuthError as e:
+                log.info("signup email not sent acct=%s code=%s", aid, e.code)
+        log.info("password signup acct=%s", aid)
+        return token, session, {"email_pending": pending, "email_skipped": skipped}
+
+    def password_login(self, identifier: object, password: object, ua: Optional[str], ip: Optional[str]) -> tuple:
+        """Username or email, plus password. Unknown account and wrong password look the same."""
+        ipk = f"pw_fail:ip:{self._ip(ip)}"
+        ident = identifier.strip() if isinstance(identifier, str) else ""
+        if len(ident) > 254:
+            ident = ident[:254]
+        idk = f"pw_fail:id:{sec.keyed_hash(self.cfg.pepper, 'pw-id', ident.casefold())}"
+        self.limiter.check(ipk, self.cfg.limits.password_login_fail_ip)
+        self.limiter.check(idk, self.cfg.limits.password_login_fail_id)
+        self.limiter.hit(f"pw_try:ip:{self._ip(ip)}", self.cfg.limits.password_login_ip)
+        row = self._password_row(ident)
+        stored = row["password_hash"] if row and row["disabled_at"] is None else None
+        if not passwords.matches(stored, password):
+            self.limiter.record(ipk)
+            self.limiter.record(idk)
+            raise self._pw_fail()
+        if stored and passwords.needs_rehash(stored) and isinstance(password, str):
+            self.store.run("UPDATE accounts SET password_hash=? WHERE id=?",
+                           (passwords.hash_password(password), row["id"]))
+        return self._new_session(row["id"], ua, "password")
+
+    def password_add(self, session: SessionInfo, password: object, login_name: object) -> dict:
+        """Set the first password on an account that already exists (passkey or email). Needs a recent sign-in."""
+        self._require_recent(session)
+        acct = self.store.one("SELECT password_hash, login_name FROM accounts WHERE id=?", (session.account_id,))
+        if not acct:
+            raise AuthError("bad_account", "Account not recognised.", 400)
+        if acct["password_hash"]:
+            raise AuthError("password_exists", "This account already has a password. You can change it.", 409)
+        name = acct["login_name"]
+        write_name = None
+        if not name:
+            if login_name in (None, ""):
+                raise AuthError("bad_username", "Pick a username before adding a password.", 422)
+            name = sec.normalize_login_name(login_name)
+            write_name = name
+        self._set_password(session.account_id, password, username=name, login_name=write_name, only_if_empty=True)
+        return {"ok": True, "login_name": name}
+
+    def password_change(self, session: SessionInfo, current: object, new: object) -> dict:
+        """Replace the password. The current password is the proof; other devices are signed out."""
+        acct = self.store.one("SELECT password_hash, login_name FROM accounts WHERE id=?", (session.account_id,))
+        if not acct or not acct["password_hash"]:
+            raise AuthError("no_password", "This account has no password yet. Add one first.", 409)
+        key = f"pw_chg:{session.account_id}"
+        self.limiter.check(key, self.cfg.limits.password_change_fail)
+        if not passwords.matches(acct["password_hash"], current):
+            self.limiter.record(key)
+            raise AuthError("signin_failed", "That current password didn't match.", 401)
+        self._set_password(session.account_id, new, username=acct["login_name"])
+        self.revoke_all(session.account_id, keep_session_id=session.id)
+        return {"ok": True}
+
+    def password_reset_request(self, email_raw: object, ip: Optional[str]) -> None:
+        """Email a one-time code that can set a password. Same reply whether or not the address is on an account."""
+        email = sec.normalize_email(email_raw)
+        eh = self._ehash(email)
+        self.limiter.hit(f"email_req:ip:{self._ip(ip)}", self.cfg.limits.email_request_ip)
+        self.limiter.hit(f"email_req:em:{eh}", self.cfg.limits.email_request_email)
+        acct = self.store.one("SELECT id FROM accounts WHERE email_hash=? AND email_verified_at IS NOT NULL"
+                              " AND disabled_at IS NULL", (eh,))
+        if not acct:
+            log.info("password reset requested for unknown email fp=%s", sec.fingerprint(eh))
+            return
+        self._deliver(email, self._issue_code("reset", eh, acct["id"]), kind="reset")
+        log.info("password reset code sent fp=%s", sec.fingerprint(eh))
+
+    def password_reset_confirm(self, email_raw: object, code: object, password: object,
+                               ua: Optional[str], ip: Optional[str]) -> tuple:
+        """Set a password from an email code and sign in. Other sessions are signed out. Passkeys stay."""
+        email = sec.normalize_email(email_raw)
+        self._check_code("reset", email, code, ip)
+        acct = self.store.one("SELECT id, login_name FROM accounts WHERE email_hash=? AND email_verified_at IS NOT NULL"
+                              " AND disabled_at IS NULL", (self._ehash(email),))
+        if not acct:
+            raise AuthError("bad_code", "That code didn't work. Check it, or ask for a new one.", 400)
+        self._set_password(acct["id"], password, username=acct["login_name"], email=email)
+        self.revoke_all(acct["id"])
+        return self._new_session(acct["id"], ua, "password-reset")
+
+    def prepare_login_rename(self, account_id: str, username: object) -> None:
+        """Before the public username changes: refuse if this account's password name would collide."""
+        row = self.store.one("SELECT login_name, password_hash FROM accounts WHERE id=?", (account_id,))
+        if not row or not (row["login_name"] or row["password_hash"]):
+            return
+        name = sec.normalize_login_name(username)
+        if row["login_name"] == name:
+            return
+        if self.store.one("SELECT 1 FROM accounts WHERE login_name=? AND id<>?", (name, account_id)):
+            raise AuthError("username_taken", "That username is taken. Please pick another.", 409)
+
+    def sync_login_name(self, account_id: str, username: object) -> None:
+        """Keep password sign-in on the same username the account shows publicly."""
+        row = self.store.one("SELECT login_name, password_hash FROM accounts WHERE id=?", (account_id,))
+        if not row or not (row["login_name"] or row["password_hash"]):
+            return
+        name = sec.normalize_login_name(username)
+        if row["login_name"] == name:
+            return
+        self.store.run("UPDATE accounts SET login_name=? WHERE id=?", (name, account_id))
+
+    def bind_login_name(self, account_id: str, username: object) -> bool:
+        """Copy an existing username onto the account if it has no password name yet.
+
+        A taken name does not fail the sign-in that just succeeded: email + password still works.
+        """
+        try:
+            name = sec.normalize_login_name(username)
+        except AuthError:
+            return False
+        row = self.store.one("SELECT login_name FROM accounts WHERE id=?", (account_id,))
+        if not row or row["login_name"]:
+            return bool(row and row["login_name"])
+        if self.store.one("SELECT 1 FROM accounts WHERE login_name=?", (name,)):
+            log.info("login name left unset acct=%s (taken)", account_id)
+            return False
+        try:
+            self.store.run("UPDATE accounts SET login_name=? WHERE id=? AND login_name IS NULL", (name, account_id))
+        except Exception as e:
+            if "UNIQUE" in str(e):
+                return False
+            raise
+        return True
+
     # ------------------------------------------------------------------ account overview (Account page)
     def overview(self, session: SessionInfo) -> dict:
-        a = self.store.one("SELECT display_name, email_hint FROM accounts WHERE id=?", (session.account_id,))
+        a = self.store.one("SELECT display_name, email_hint, login_name, password_hash FROM accounts WHERE id=?",
+                           (session.account_id,))
         keys = self.store.all("SELECT id, name, created_at, last_used_at, device_type, backed_up FROM credentials"
                               " WHERE account_id=? ORDER BY created_at", (session.account_id,))
         sess = self.store.all("SELECT id, label, created_at, last_seen_at, auth_method FROM sessions WHERE account_id=?"
@@ -430,6 +668,8 @@ class AuthService:
         return {
             "display_name": a["display_name"],
             "email": {"hint": a["email_hint"]} if a["email_hint"] else None,
+            "has_password": bool(a["password_hash"]),
+            "login_name": a["login_name"],
             "passkeys": [dict(k) | {"backed_up": bool(k["backed_up"])} for k in keys],
             "devices": [dict(s) | {"current": s["id"] == session.id} for s in sess],
             "recent_signin": self.clock() - session.authed_at <= self.cfg.recent_auth_s,

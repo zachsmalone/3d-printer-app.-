@@ -22,6 +22,11 @@ class Limits:
     email_verify_fail_email: tuple = (10, 900)
     email_verify_fail_ip: tuple = (30, 900)
     email_add_account: tuple = (5, 3600)
+    password_register_ip: tuple = (10, 3600)
+    password_login_ip: tuple = (40, 900)
+    password_login_fail_ip: tuple = (10, 900)
+    password_login_fail_id: tuple = (8, 900)
+    password_change_fail: tuple = (8, 900)
 
 
 @dataclass(frozen=True)

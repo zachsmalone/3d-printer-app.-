@@ -213,6 +213,122 @@ def email_verify(request: Request, payload: dict = Body(...)):
     return _json(request, {"signed_in": True}, token=token)
 
 
+def _checked_username(raw: object) -> str:
+    """New usernames go through ZEIM's public-name rules. Existing names do not (see _saved_username)."""
+    from app.community import usernames
+    try:
+        return usernames.check_shape(raw if isinstance(raw, str) else "")
+    except usernames.UsernameError as e:
+        raise HTTPException(422, detail={"code": "bad_username", "message": str(e)})
+
+
+def _saved_username(request: Request, session, legacy: bool) -> Optional[str]:
+    """Username already on this account. Not re-checked against reserved-word rules."""
+    if legacy:
+        try:
+            from app.community import identity as idn
+            from app.community.store import USERS
+            sid = request.cookies.get(idn.COOKIE)
+            user = USERS.read().get(sid) if sid else None
+            return (user or {}).get("username") or None
+        except Exception:
+            return None
+    try:
+        from app.community.identity import account_for_session
+        key, user = account_for_session(session, _svc(request))
+    except Exception:
+        import logging
+        logging.getLogger("zeim.auth").exception("username lookup failed")
+        return None
+    if not user:
+        return None
+    name = user.get("username")
+    if not name and key:
+        try:
+            from app.community import usernames
+            name = usernames.ensure(key)
+        except Exception:
+            return None
+    return name
+
+
+def _bind_saved_username(request: Request, session) -> None:
+    """After a password is set by email, sign-in with the username the account already has."""
+    svc = _svc(request)
+    try:
+        row = svc.store.one("SELECT login_name, password_hash FROM accounts WHERE id=?", (session.account_id,))
+    except Exception:
+        return
+    if not row or row["login_name"] or not row["password_hash"]:
+        return
+    name = _saved_username(request, session, legacy=False)
+    if name:
+        svc.bind_login_name(session.account_id, name)
+
+
+@router.post("/password/register")
+def password_register(request: Request, payload: dict = Body(...)):
+    _csrf(request); p = _dict(payload)
+    username = _checked_username(p.get("username"))
+    svc = _svc(request)
+    token, s, flags = _run(svc.password_register, p.get("display_name"), p.get("birth_date"), username,
+                           p.get("password"), p.get("email"), request.headers.get("user-agent"), _ip(request))
+    _signed_in(request, s)
+    body = {"signed_in": True, "display_name": svc.overview(s)["display_name"], **flags}
+    return _json(request, body, 201, token=token)
+
+
+@router.post("/password/login")
+def password_login(request: Request, payload: dict = Body(...)):
+    _csrf(request); p = _dict(payload)
+    token, s = _run(_svc(request).password_login, p.get("identifier"), p.get("password"),
+                    request.headers.get("user-agent"), _ip(request))
+    _signed_in(request, s)
+    return _json(request, {"signed_in": True}, token=token)
+
+
+@router.post("/password/add")
+def password_add(request: Request, payload: dict = Body(...)):
+    """First password on an existing account (passkey, email, or old cookie). Does not remove the passkey."""
+    _csrf(request); p = _dict(payload)
+    s, legacy = _session_or_legacy(request)
+    name = _saved_username(request, s, legacy)
+    if not name and p.get("username"):
+        name = _checked_username(p.get("username"))
+    svc = _svc(request)
+    out = _run(svc.password_add, s, p.get("password"), name)
+    if legacy:
+        token, real = svc.session_for_legacy(s.account_id, request.headers.get("user-agent"))
+        _signed_in(request, real)
+        return _json(request, out, token=token, clear_legacy_too=True, legacy_session=s)
+    return _json(request, out)
+
+
+@router.post("/password/change")
+def password_change(request: Request, payload: dict = Body(...)):
+    _csrf(request); p = _dict(payload); s = _need_session(request)
+    return _json(request, _run(_svc(request).password_change, s, p.get("current_password"), p.get("password")))
+
+
+@router.post("/password/reset/request")
+def password_reset_request(request: Request, payload: dict = Body(...)):
+    _csrf(request); p = _dict(payload)
+    _run(_svc(request).password_reset_request, p.get("email"), _ip(request))
+    return _json(request, {"ok": True, "message": "If that email belongs to an account, we've sent a code. It works for 10 minutes."}, 202)
+
+
+@router.post("/password/reset/confirm")
+def password_reset_confirm(request: Request, payload: dict = Body(...)):
+    _csrf(request); p = _dict(payload)
+    svc = _svc(request)
+    token, s = _run(svc.password_reset_confirm, p.get("email"), p.get("code"), p.get("password"),
+                    request.headers.get("user-agent"), _ip(request))
+    _bind_saved_username(request, s)
+    _signed_in(request, s)
+    row = svc.store.one("SELECT login_name FROM accounts WHERE id=?", (s.account_id,))
+    return _json(request, {"signed_in": True, "login_name": row["login_name"] if row else None}, token=token)
+
+
 # ------------------------------------------------------------------ session + account
 @router.get("/session")
 def session_status(request: Request):
@@ -352,10 +468,11 @@ def zeim_signup_validator(cfg: AuthConfig, clock: Callable[[], float] = None):
     return validate
 
 
-def zeim_account_created(account_id: str, display_name: str, birth_date: Optional[str]) -> None:
-    """A passkey sign-up finished: make its ZEIM account record (owner id == auth account id)."""
+def zeim_account_created(account_id: str, display_name: str, birth_date: Optional[str],
+                         username: Optional[str] = None) -> None:
+    """A passkey or password sign-up finished: make its ZEIM account record (owner id == auth account id)."""
     from app.community import identity as idn
-    idn.link_auth_account(account_id, display_name or "", birth_date)
+    idn.link_auth_account(account_id, display_name or "", birth_date, username=username)
 
 
 def zeim_signed_in(request: Request, session) -> None:
@@ -414,7 +531,7 @@ def try_mount_auth(app: FastAPI) -> bool:
         app.state.auth_mounted = True
         from app.auth.mailer import NullMailer
         email_on = not isinstance(service.mailer, NullMailer)
-        log.info("passkey/email login is on (rp_id=%s, origins=%s, email_codes=%s)",
+        log.info("passkey/email/password login is on (rp_id=%s, origins=%s, email_codes=%s)",
                  cfg.rp_id, ",".join(cfg.origins), "on" if email_on else "off")
         return True
     except ConfigError as e:

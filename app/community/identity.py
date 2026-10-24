@@ -91,10 +91,13 @@ def _new_record(uid: str, display_name: str, dob: str | None) -> dict:
     return u
 
 
-def link_auth_account(account_id: str, display_name: str = "", dob: str | None = None) -> tuple[str, dict]:
-    """Give a passkey/email account (made through /api/auth sign-up, 18+ checked there) its ZEIM account record.
+def link_auth_account(account_id: str, display_name: str = "", dob: str | None = None,
+                      username: str | None = None) -> tuple[str, dict]:
+    """Give a passkey/email/password account (made through /api/auth sign-up, 18+ checked there) its ZEIM account record.
     Idempotent. The record lives under a fresh random account key that is never handed out as a cookie, so only a
-    live auth session reaches it (signing out of the session really signs out). Returns (key, user)."""
+    live auth session reaches it (signing out of the session really signs out). Returns (key, user).
+    `username`, when set, is the name they chose at password sign-up. A failure then undoes the new record
+    so a rejected name does not leave an account behind. Passkey sign-up leaves it empty and still gets a generated name."""
     if not isinstance(account_id, str) or not account_id:
         raise ValueError("account id required")
     if dob is not None:
@@ -117,8 +120,11 @@ def link_auth_account(account_id: str, display_name: str = "", dob: str | None =
     if made.get("new"):
         from . import usernames
         try:
-            usernames.assign_new(made["k"], made["u"], None)
+            usernames.assign_new(made["k"], made["u"], username)
         except Exception:
+            if username:
+                USERS.update(lambda d: d.pop(made["k"], None))
+                raise
             import logging
             logging.getLogger("zeim").exception("username for new passkey account failed")
     return made["k"], made["u"]
