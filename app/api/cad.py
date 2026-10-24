@@ -11,8 +11,11 @@ replay, delete, exports, slicing and the plate editor are the existing machinery
 """
 from __future__ import annotations
 
+import base64
 import re
 
+import numpy as np
+import trimesh
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -181,36 +184,92 @@ def appearance(bid: str, body: dict, actor: Actor = Depends(get_actor)):
 
 
 MAX_SCENE_FACES = 200_000
+MAX_SCENE_EDGE_SEGS = 80_000   # a lithophane crease set can be one segment per face; cap the display buffer
+
+
+def _too_big(n: int) -> HTTPException:
+    """Decimation failed: keep the undoable simplified-copy offer. The stored mesh is unchanged."""
+    return HTTPException(413, {"message": f"This model has {n:,} triangles, more than the CAD workspace can show ({MAX_SCENE_FACES:,}). "
+                                          "You can open a simplified copy here (the original stays in History), or edit it in the editor.",
+                               "triangles": n, "limit": MAX_SCENE_FACES,
+                               "keep_ratio": round(max(0.02, min(0.98, (MAX_SCENE_FACES * 0.95) / max(n, 1))), 4)})
+
+
+def _display_mesh(m: trimesh.Trimesh):
+    """A viewer copy at or under the face limit. Does not write history or replace the stored mesh."""
+    n = int(len(m.faces))
+    if n <= MAX_SCENE_FACES:
+        return m, False
+    target = max(1000, int(MAX_SCENE_FACES * 0.95))
+    try:
+        import fast_simplification  # optional accelerator; face subsample below is the fallback
+        v, f = fast_simplification.simplify(
+            np.ascontiguousarray(m.vertices, dtype=np.float32),
+            np.ascontiguousarray(m.faces, dtype=np.int32),
+            target_count=target)
+        dm = trimesh.Trimesh(np.asarray(v), np.asarray(f), process=False)
+        if 0 < len(dm.faces) <= MAX_SCENE_FACES:
+            return dm, True
+    except Exception:
+        pass
+    idx = np.linspace(0, n - 1, target).astype(int)
+    dm = trimesh.Trimesh(m.vertices, m.faces[idx], process=False)
+    if len(dm.faces) == 0 or len(dm.faces) > MAX_SCENE_FACES:
+        return None, False
+    return dm, True
+
+
+def _scene_body(i: int, b: trimesh.Trimesh) -> tuple[dict, int]:
+    b = b.copy()
+    b.merge_vertices()
+    try:
+        ang = b.face_adjacency_angles
+        e = b.face_adjacency_edges[ang > np.radians(25)]
+        segs = b.vertices[e].reshape(-1, 6)
+        if len(segs) > MAX_SCENE_EDGE_SEGS:
+            segs = segs[np.linspace(0, len(segs) - 1, MAX_SCENE_EDGE_SEGS).astype(int)]
+    except Exception:
+        segs = np.zeros((0, 6), np.float64)
+    nfaces = int(len(b.faces))
+    return {"index": i, "name": f"Body {i + 1}",
+            "positions": base64.b64encode(b.vertices.astype("<f4").tobytes()).decode(),
+            "indices": base64.b64encode(b.faces.astype("<u4").tobytes()).decode(),
+            "edges": base64.b64encode(np.asarray(segs).astype("<f4").tobytes()).decode(),
+            "size": np.round(b.extents, 3).tolist(), "center": np.round(b.bounds.mean(axis=0), 3).tolist()}, nfaces
 
 
 @router.get("/{bid}/scene")
 def scene(bid: str, actor: Actor = Depends(get_actor)):
     """Per-body geometry for the workspace viewer (base64 float32 positions / uint32 indices) plus the
-    sharp 'feature' edges (segments, for display and edge picking), the appearance and the history."""
-    import base64
+    sharp 'feature' edges (segments, for display and edge picking), the appearance and the history.
 
-    import numpy as np
+    Meshes over MAX_SCENE_FACES are shown from a display-only decimation. Downloads, the slicer and
+    history keep the full mesh. A 413 (simplified-copy offer) is only returned when that copy cannot be built.
+    """
     meta = _edit(bid, actor)
     m = editproj.mesh_at(bid, meta)
-    if len(m.faces) > MAX_SCENE_FACES:
-        # big imports: say how big, and let the workspace offer a simplified copy as a new (undoable) step
-        n = int(len(m.faces))
-        raise HTTPException(413, {"message": f"This model has {n:,} triangles, more than the CAD workspace can show ({MAX_SCENE_FACES:,}). "
-                                             "You can open a simplified copy here (the original stays in History), or edit it in the editor.",
-                                  "triangles": n, "limit": MAX_SCENE_FACES,
-                                  "keep_ratio": round(max(0.02, min(0.98, (MAX_SCENE_FACES * 0.95) / n)), 4)})
-    out = []
-    for i, b in enumerate(cadops.bodies(m)):
-        b = b.copy(); b.merge_vertices()
-        ang = b.face_adjacency_angles
-        e = b.face_adjacency_edges[ang > np.radians(25)]
-        segs = b.vertices[e].reshape(-1, 6)
-        out.append({"index": i, "name": f"Body {i + 1}",
-                    "positions": base64.b64encode(b.vertices.astype("<f4").tobytes()).decode(),
-                    "indices": base64.b64encode(b.faces.astype("<u4").tobytes()).decode(),
-                    "edges": base64.b64encode(segs.astype("<f4").tobytes()).decode(),
-                    "size": np.round(b.extents, 3).tolist(), "center": np.round(b.bounds.mean(axis=0), 3).tolist()})
+    real_n = int(len(m.faces))
+    view, simplified = _display_mesh(m)
+    if view is None:
+        raise _too_big(real_n)
+    try:
+        parts = cadops.bodies(view)
+    except Exception:
+        if not simplified:
+            raise
+        parts = []
+    if not parts and (simplified or real_n > MAX_SCENE_FACES):
+        raise _too_big(real_n)
+    out, shown = [], 0
+    for i, b in enumerate(parts):
+        packed, nfaces = _scene_body(i, b)
+        shown += nfaces
+        out.append(packed)
+    if simplified and shown > MAX_SCENE_FACES:
+        raise _too_big(real_n)
     p = editproj.payload(bid)
     return {"id": bid, "title": meta.get("title"), "bodies": out, "appearance": meta.get("appearance") or {},
             "ops": p["ops"], "head": p["head"], "can_undo": p["can_undo"], "can_redo": p["can_redo"],
-            "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode")}, "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")}}
+            "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode")},
+            "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")},
+            "display_simplified": simplified, "triangles": real_n, "display_triangles": shown}

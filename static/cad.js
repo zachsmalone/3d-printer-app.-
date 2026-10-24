@@ -627,6 +627,7 @@ async function load(keepCam) {
   try { S.scene = await api(`/api/cad/${S.bid}/scene`); }
   catch (e) { if (e.status === 413 && e.info?.keep_ratio) { bigModel(e); return; } throw e; }
   $("#cwBig")?.remove();
+  displayLite(S.scene);
   S.appearance = S.scene.appearance || {};
   $("#cwTitle").value = S.scene.title || "My design";
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
@@ -637,9 +638,19 @@ function updateTop() {
   $("#cwDlStl").href = d ? d.stl : "#"; $("#cwDl3mf").href = d ? d["3mf"] : "#";
   $("#cwToSlicer").href = S.bid ? `/?edit=${encodeURIComponent(S.bid)}#slicer` : "#";
 }
-/* Big imports (over the scene limit): offer a simplified copy as an undoable step. Never blocks: the editor link stays. */
+/* Over the face limit: the scene is a lighter view. Downloads and the Slicer still use the full mesh. */
+function commas(n) { return Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function displayLite(scene) {
+  $("#cwLite")?.remove();
+  if (!scene?.display_simplified) return;
+  const d = document.createElement("div"); d.id = "cwLite"; d.className = "cw-warn"; d.setAttribute("role", "status");
+  d.innerHTML = `<div><b>Lighter view</b><p>This model has ${commas(scene.triangles)} triangles. CAD is showing a lighter view (${commas(scene.display_triangles)}) so you can see and edit it. Downloads and the Slicer still use the full model.</p></div><button type="button" class="cw-btn" data-b="x" aria-label="Dismiss"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+  d.querySelector("[data-b=x]").onclick = () => d.remove();
+  $("#cwStage").append(d);
+}
+/* Decimation failed: offer a simplified copy as an undoable step. Never blocks: the editor link stays. */
 function bigModel(e) {
-  $("#cwBig")?.remove();
+  $("#cwBig")?.remove(); $("#cwLite")?.remove();
   const d = document.createElement("div"); d.id = "cwBig"; d.className = "cw-warn"; d.setAttribute("role", "status");
   d.innerHTML = `<div><b>Large model</b><p>${esc(e.message)}</p><div class="cw-row"><button type="button" class="cw-btn primary" data-b="simp">Open simplified copy</button><a class="cw-btn" href="/?edit=${encodeURIComponent(S.bid)}">Open in editor</a></div></div><button type="button" class="cw-btn" data-b="x" aria-label="Dismiss"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
   d.querySelector("[data-b=x]").onclick = () => d.remove();

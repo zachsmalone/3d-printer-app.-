@@ -948,11 +948,11 @@ main.zws>.zws-cust{position:absolute;top:8px;right:8px;z-index:11;min-height:44p
 main:not(.zws)>.zws-cust{display:none}
 main.zws .zws-p>.zws-body>*{margin:0;max-width:100%;box-sizing:border-box}
 main.zws .zws-p>.zws-body>.controls{position:static;max-height:none;width:340px;max-width:100%;border:0;box-shadow:none;background:none}
-main.zws .zws-p>.zws-body>.result{width:420px;max-width:100%;border:0;box-shadow:none;background:none}
+main.zws .zws-p>.zws-body>.result{width:100%;max-width:100%;min-width:0;border:0;box-shadow:none;background:none}
 main.zws .zws-p>.zws-body>.vtools,main.zws .zws-p>.zws-body>.vtools2{position:static;inset:auto;display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:none;border:0;box-shadow:none;transform:none}
 main.zws .zws-p>.zws-body>.history{width:320px;max-width:100%;padding:8px}
 main.zws .zws-p>.zws-body>#torchPanel,main.zws .zws-p>.zws-body>#torchOut{width:360px;max-width:100%;padding:10px}
-@media (max-width:820px){main.zws .zws-p>.zws-body>.controls,main.zws .zws-p>.zws-body>.result,main.zws .zws-p>.zws-body>#torchPanel,main.zws .zws-p>.zws-body>#torchOut{width:min(92vw,420px)}}
+@media (max-width:820px){main.zws .zws-p>.zws-body>.controls,main.zws .zws-p>.zws-body>#torchPanel,main.zws .zws-p>.zws-body>#torchOut{width:min(92vw,420px)}}
 main.zws .zws-p.bare.h>.zws-body>.vtools,main.zws .zws-p.bare.h>.zws-body>.vtools2{flex-wrap:nowrap;white-space:nowrap}
 main.zws .zws-p.bare.v>.zws-body>.vtools,main.zws .zws-p.bare.v>.zws-body>.vtools2{flex-direction:column;flex-wrap:nowrap}
 main.zws #zws-view.bare>.zws-body{overflow:auto;scrollbar-width:thin}
@@ -1022,9 +1022,9 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 .sendlist .btn.sendto small{color:var(--mut);font-weight:400}
 .sendtobtn{min-height:44px}
 /* Studio hand-off after generate: Save work | Send to Slicer | Send to CAD, side by side and phone-usable */
-.handoffrow{display:flex;gap:8px;align-items:stretch;flex-wrap:nowrap;width:100%;flex:1 1 100%;margin:0 0 4px}
-.handoffrow .btn{flex:1 1 0;min-width:0;min-height:44px;justify-content:center;padding:8px 10px;gap:6px;white-space:nowrap}
-.handoffrow .btn .i{flex:0 0 auto}
+.handoffrow{display:flex;gap:8px;align-items:stretch;flex-wrap:nowrap;width:100%;min-width:0;flex:1 1 100%;margin:0 0 4px}
+.handoffrow .btn{flex:1 1 0;min-width:0;min-height:44px;justify-content:center;padding:8px 6px;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.handoffrow .btn .i{flex:0 0 auto;width:16px;height:16px}
 @media (max-width:420px){
   .handoffrow .btn{padding:8px 6px;font-size:13px;gap:4px}
   .handoffrow .btn .i{width:16px;height:16px}
