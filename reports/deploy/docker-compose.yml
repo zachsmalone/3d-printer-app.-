@@ -22,6 +22,8 @@ services:
       PHOTO3D_ADMIN_TOKEN: ${PHOTO3D_ADMIN_TOKEN:-}
       PHOTO3D_SECRET_KEY: ${PHOTO3D_SECRET_KEY:-}
       PHOTO3D_PUBLIC_BASE_URL: ${PHOTO3D_PUBLIC_BASE_URL:-https://${ZEIM_DOMAIN:-zeim.example.org}}
+      ZEIM_PLANS_ENABLED: ${ZEIM_PLANS_ENABLED:-0}          # 0 = Semi Pro / Pro cannot start checkout
+      ZEIM_COMING_SOON: ${ZEIM_COMING_SOON:-0}              # 0 = full app; 1 = holding page except /healthz
     volumes:
       - ${ZEIM_HOST_DIR:-/srv/zeim}/data:/data
       - ${ZEIM_HOST_DIR:-/srv/zeim}/outputs:/outputs
@@ -55,6 +57,8 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    # The image's entrypoint is `caddy`. Override it so the shell can choose the site file.
+    entrypoint: ["/bin/sh", "/usr/local/bin/caddy-run.sh"]
     ports:
       - "80:80"
       - "443:443"
@@ -62,8 +66,12 @@ services:
     environment:
       ZEIM_DOMAIN: ${ZEIM_DOMAIN:-zeim.example.org}
       ACME_EMAIL: ${ACME_EMAIL:-ops@example.org}
+      ZEIM_COMING_SOON: ${ZEIM_COMING_SOON:-0}             # 0 proxies the app; 1 serves the static page
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.coming-soon:/etc/caddy/Caddyfile.coming-soon:ro
+      - ./caddy-run.sh:/usr/local/bin/caddy-run.sh:ro
+      - ../../static/coming-soon.html:/srv/zeim-coming-soon/index.html:ro
       - caddy_data:/data                   # certificates - keep this volume or you will re-issue (rate limits)
       - caddy_config:/config
     cap_drop: [ALL]

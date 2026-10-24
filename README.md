@@ -23,7 +23,7 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **Learn** | Guided lessons inside the app. On phones (≤420px wide) Learn leaves the bottom tab bar but stays reachable from Showcase / home. |
 | **Bust mode** | Photo → printable bust: thicker rounded-back body with photo relief on a clean round / rect / outline pedestal. Auto head & shoulders (editable starting mask) or manual Select trace; whole photo still works, with a tip. Separate from AI 2D→3D Bust — not figure-scan quality. |
 | **Live Sculpt** | CAD sculpt brushes (draw, carve, smooth, inflate, pinch, flatten, grab) show live on the model as you drag; each stroke saves in the background without a blocking spinner. |
-| **Subscriptions** | Core stays free forever. Optional Semi Pro (~$3.50) and Pro (~$5.50) are listed in Account → Plans. **Payment is not live yet** — choosing a paid plan says Coming; nothing is charged. ZEIM never takes a cut of creator tips or Showcase sales. |
+| **Subscriptions** | Core stays free forever. Account → Plans lists optional Semi Pro (~$3.50) and Pro (~$5.50) as **Coming later**. **ZEIM_PLANS_ENABLED=0** (the default) does not start checkout, and missing Stripe keys are not an error. ZEIM never takes a cut of creator tips or Showcase sales. |
 | **Themes** | Japanese-inspired theme per section, with quiet CSS motion that turns off under prefers-reduced-motion. |
 
 ## In progress
@@ -46,6 +46,15 @@ docker run -d --name zeim -p 8765:8765 --env-file .env `
 Open <http://localhost:8765>. Health check: <http://localhost:8765/healthz> returns 200 when the app is up.
 
 **Testing mode:** add `-e ZEIM_TESTING_MODE=1` to lift usage quotas and cooldowns while testing. It is off by default; do not use it in production.
+
+## Site and plans flags
+
+| Flag | Default | What it does |
+|---|---|---|
+| `ZEIM_COMING_SOON` | off (`0` or unset) | `1` serves a short coming-soon page for every path except `/healthz`. Off, a normal visit gets the full app. Caddy uses the same flag (`reports/deploy/caddy-run.sh`). |
+| `ZEIM_PLANS_ENABLED` | off (`0` or unset) | `0` keeps Semi Pro and Pro visible as Coming later and refuses checkout. `1` still does not charge until a processor is wired, and it does not error when Stripe keys are missing. |
+
+Testers use the main site, [https://zeimapp.com](https://zeimapp.com). On GCP **zeim-prod**, set both flags to `0`, deploy `reports/deploy/Caddyfile` (the file that proxies every path to the app), and reload Caddy. Steps are in [`reports/deploy/README.md`](reports/deploy/README.md). Do not put live Stripe keys on the server for this release.
 
 ## Optional: 2D→3D worker
 
@@ -85,7 +94,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2589 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and Subscriptions Coming stubs).
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2677 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and Subscriptions with paid checkout closed by default).
 
 ## Layout
 

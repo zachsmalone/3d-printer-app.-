@@ -1,0 +1,39 @@
+# Soft-launch gate. Used only when ZEIM_COMING_SOON=1 (see caddy-run.sh).
+# /healthz still reaches the app. Every other path is the static coming-soon page.
+# Humble copy only — the page lives at static/coming-soon.html (mounted beside this file).
+{
+	email {$ACME_EMAIL}
+	# Use the staging CA while testing to avoid rate limits:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$ZEIM_DOMAIN:zeim.example.org} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	handle /healthz {
+		reverse_proxy app:8765 {
+			health_uri /healthz
+			health_interval 30s
+		}
+	}
+
+	handle {
+		root * /srv/zeim-coming-soon
+		header Cache-Control "no-store"
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

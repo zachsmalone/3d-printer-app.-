@@ -68,7 +68,7 @@ addEventListener("hashchange", route);
 /* ---------- account ---------- */
 $("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
 
-/* ---------- Optional Semi Pro / Pro (payment not live — honest Coming) ---------- */
+/* ---------- Optional Semi Pro / Pro. Checkout only if the server marks a plan purchasable. ---------- */
 async function renderPlans() {
   const box = $("#accPlans"); if (!box) return;
   let data;
@@ -78,11 +78,12 @@ async function renderPlans() {
   const note = `<p class="help">${esc(data.payment_note || "")}</p><p class="help">${esc(data.tip_note || "")}</p>`;
   const cards = (data.catalog || []).map(p => {
     const on = p.id === cur;
-    const coming = !!p.coming || !data.payment_live;
     const price = esc(p.price_label || "");
     const go = p.id === "free"
       ? `<span class="pill">${on ? "Your plan" : "Always free"}</span>`
-      : `<button type="button" class="btn small" data-plan="${esc(p.id)}" ${on ? "disabled" : ""}>${on ? "Your plan" : (coming ? "Coming" : "Choose " + esc(p.name))}</button>`;
+      : (p.purchasable
+        ? `<button type="button" class="btn small" data-plan="${esc(p.id)}" ${on ? "disabled" : ""}>${on ? "Your plan" : "Choose " + esc(p.name)}</button>`
+        : `<span class="pill" role="status">Coming later</span>`);
     return `<div class="plan-card ${on ? "on" : ""}" data-plan-id="${esc(p.id)}">
       <b>${esc(p.name)}</b> <span class="help">${price}</span>
       <p class="help">${esc(p.summary || "")}</p>
@@ -90,11 +91,13 @@ async function renderPlans() {
       ${go}</div>`;
   }).join("");
   box.innerHTML = note + `<div class="plan-grid">${cards}</div>`;
-  box.querySelectorAll("[data-plan]").forEach(b => b.onclick = async () => {
+  // No button unless the server set purchasable (plans flag on and a processor live). Default: Coming later.
+  box.querySelectorAll("button[data-plan]").forEach(b => b.onclick = async () => {
+    if (!b.dataset.plan) return;
     b.disabled = true;
     try {
       const r = await api("/api/subscriptions/checkout", J("POST", { plan: b.dataset.plan }));
-      if (r.coming || !r.ok) toast(r.message || "Coming — payment is not live yet.", "ok");
+      if (r.coming || r.checkout === false || !r.ok) toast(r.message || "Coming later. Nothing was charged.", "ok");
       else { toast(r.message || "Plan updated", "ok"); await refreshMe(); renderAccount(); }
     } catch (e) { toast(e.message, "err"); b.disabled = false; }
   });

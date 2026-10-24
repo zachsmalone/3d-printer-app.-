@@ -190,6 +190,40 @@ async def ensure_session_cookie(request: Request, call_next):
     return resp
 
 
+def _coming_soon_page() -> HTMLResponse:
+    """Humble holding page. No product claims. Inline styles only, no scripts."""
+    path = STATIC / "coming-soon.html"
+    try:
+        body = path.read_text(encoding="utf-8")
+    except OSError:
+        body = (
+            "<!DOCTYPE html><html lang=en><meta charset=utf-8>"
+            "<title>ZEIM — coming soon</title>"
+            "<h1>ZEIM is almost ready</h1>"
+            "<p>We're finishing a careful build. The site is private for now — thanks for your patience.</p>"
+        )
+    return HTMLResponse(body, headers={
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "no-referrer",
+        "Permissions-Policy": "camera=(self), microphone=(), geolocation=(), payment=()",
+        "Content-Security-Policy": (
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        ),
+        "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store",
+    })
+
+
+@app.middleware("http")
+async def public_coming_soon_gate(request: Request, call_next):
+    """ZEIM_COMING_SOON=1 (default off). /healthz stays open so the load balancer can probe."""
+    if config.coming_soon_enabled() and request.url.path != "/healthz":
+        return _coming_soon_page()
+    return await call_next(request)
+
+
 from .community.safety import ChatBlocked as _ChatBlocked
 
 
@@ -224,7 +258,7 @@ def index():
     html = (STATIC / "index.html").read_text(encoding="utf-8")
     if not config.AGE_GATE:                    # test-only switch (PHOTO3D_AGE_GATE=0): the 18+ overlay script sees this and stands down
         html = html.replace('<html lang="en">', '<html lang="en" data-agegate="off">', 1)
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/workbench", include_in_schema=False)
