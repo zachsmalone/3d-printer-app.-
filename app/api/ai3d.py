@@ -31,9 +31,16 @@ ENGINE = {"name": "TripoSR", "by": "Stability AI and Tripo AI", "licence": "MIT 
           "links": ["https://github.com/VAST-AI-Research/TripoSR/blob/main/LICENSE", "https://huggingface.co/stabilityai/TripoSR"]}
 
 
+def _closed():
+    raise HTTPException(403, {"code": "unavailable", "message": "2D to 3D is not available yet. Nothing was started."})
+
+
 @router.get("/status")
 def status(actor: Actor = Depends(get_actor)):
-    return {"engine": {**ai3d.engine_status(), **ENGINE}, "plan": ai3d.plan(actor), "ai_label": AI_LABEL,
+    enabled = config.ai3d_enabled()
+    engine = {**ai3d.engine_status(), **ENGINE} if enabled else {
+        "installed": False, "ready": False, "device": None, "engine": "TripoSR", "test_double": False, **ENGINE}
+    return {"enabled": enabled, "engine": engine, "plan": ai3d.plan(actor), "ai_label": AI_LABEL,
             "modes": {k: {"label": v["label"], "height_mm": v["height_mm"]} for k, v in ai3d_mesh.MODES.items()}}
 
 
@@ -50,6 +57,8 @@ def _refuse(p: dict):
 def start(actor: Actor = Depends(get_actor), file: UploadFile = File(...), mode: str = Form("figure"),
           photo_ack: bool = Form(False), title: str = Form(""), height_mm: float = Form(0),
           auto_delete_oldest: bool = Form(False)):
+    if not config.ai3d_enabled():
+        _closed()
     if mode not in ai3d_mesh.MODES:
         raise HTTPException(400, "Pick Figure or Bust.")
     try:

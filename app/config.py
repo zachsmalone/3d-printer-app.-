@@ -134,6 +134,35 @@ UPLOADS_PER_HOUR = _int("PHOTO3D_UPLOADS_PER_HOUR", 10)
 # Security limits (sign-in, admin token, signup-per-IP, reports, recovery codes, age gate), the malware scan
 # and file-size / memory / disk caps stay on.
 TESTING_MODE = _flag("ZEIM_TESTING_MODE", False)
+
+
+def coming_soon_enabled() -> bool:
+    """Public soft-launch page. Default off: a normal visit gets the full app.
+
+    ZEIM_COMING_SOON=1 serves static/coming-soon.html for every path except /healthz.
+    Read on each request so a process restart (or a test) picks up the env value.
+    """
+    return _flag("ZEIM_COMING_SOON", False)
+
+
+def plans_enabled() -> bool:
+    """Paid Semi Pro / Pro checkout. Default off. Core ZEIM stays free either way.
+
+    ZEIM_PLANS_ENABLED=1 only re-opens the honest "not live yet" stub. It does not
+    start a payment. A processor, if one is added later, must check this flag.
+    """
+    return _flag("ZEIM_PLANS_ENABLED", False)
+
+
+def ai3d_enabled() -> bool:
+    """Photo-to-3D (TripoSR) tab and jobs. Default off for the soft launch.
+
+    ZEIM_2D3D_ENABLED=1 turns the tab and POST /api/ai3d/jobs back on.
+    It does not start a payment. Core tools stay available either way.
+    """
+    return _flag("ZEIM_2D3D_ENABLED", False)
+
+
 EDIT_UPLOADS_PER_HOUR = _int("PHOTO3D_EDIT_UPLOADS_PER_HOUR", 120)   # editor / CAD mesh imports (own budget)
 # Optional local malware scan of uploads via clamd (INSTREAM). Nothing is ever sent anywhere
 # else; if clamd is unreachable, uploads are allowed and the miss is logged.

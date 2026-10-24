@@ -9,7 +9,9 @@ backup, restore-drill, retention and checksum-failure test on a fake tree (incl.
 |---|---|
 | `../../Dockerfile` (repo root; Engineering moved and edited it, history in git) | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker |
 | `docker-compose.yml` | `app` (internal port 8765 only) + `caddy` (80/443); bind-mounted `data/` and `outputs/`; read-only rootfs, caps dropped, mem/CPU limits |
-| `Caddyfile` | Automatic HTTPS, 55 MB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing |
+| `Caddyfile` | Full app: automatic HTTPS, 55 MB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing. This is the file zeim-prod should run. |
+| `Caddyfile.coming-soon` | Optional holding page for every path except `/healthz`. Used only when `ZEIM_COMING_SOON=1`. |
+| `caddy-run.sh` | Selects `Caddyfile` (default) or `Caddyfile.coming-soon` from `ZEIM_COMING_SOON`. |
 | `backup.sh` | Archives `data/` + `outputs/`, safe SQLite copies (`.backup`), sha256 sums, 14 daily + 8 weekly retention, optional `age` encryption and `rclone` off-site copy |
 | `restore.sh` | Verifies checksums, extracts to a scratch dir (the **restore drill**), `--apply` swaps it in and keeps the old dirs as `*.pre-restore-<ts>` |
 | `../../.env.example`, `../../.dockerignore` | Config template and a build context that excludes data, keys, tests, reports |
@@ -25,6 +27,23 @@ docker compose -f reports/deploy/docker-compose.yml ps        # app should becom
 ```
 
 First test with Let's Encrypt **staging** (uncomment `acme_ca` in the Caddyfile) to avoid rate limits.
+
+## GCP zeim-prod (zeimapp.com)
+
+Testers use the main site, https://zeimapp.com. As of 2026-10-24 the live Caddy in front of the app serves a static coming-soon page for every path except `/healthz` (that path is proxied and returns `{"status":"ok"}`). The holding page is not the app. Replace it with the open `Caddyfile` in this directory.
+
+On the zeim-prod host, from a checkout of this repo:
+
+1. In the host `.env` (never commit it):
+   - `ZEIM_DOMAIN=zeimapp.com`
+   - `ZEIM_COMING_SOON=0` — full app for a normal visit. `1` puts the static page back; `/healthz` still reaches the app.
+   - `ZEIM_PLANS_ENABLED=0` — Account → Plans may list Semi Pro and Pro as Coming later. Checkout does not start. Leave Stripe keys unset.
+   - `ZEIM_2D3D_ENABLED=0` — the 2D→3D tab stays hidden and photo-to-3D jobs do not run. Lithophanes, slicers, CAD and Showcase stay on.
+2. Point Caddy at `reports/deploy/Caddyfile` (it proxies every path to the app). With Compose, `caddy-run.sh` does that when the flag is `0`.
+3. Reload Caddy, and recreate the app container so it reads `.env`.
+4. Check: `https://zeimapp.com/` is the ZEIM app (18+ gate, then the maker UI). `https://zeimapp.com/healthz` is still `{"status":"ok"}`. Account → Plans shows Free and Coming later, and does not open a payment page. The 2D→3D tab is not in the nav. Lithophane, FDM Slicer, TorchC0, CAD and Showcase are. If a browser still shows the old page, reload once — the holding page is `Cache-Control: no-store` when that flag is on, and the app page is `no-cache`.
+
+Do not put Stripe secret keys on the server for this release. `ZEIM_PLANS_ENABLED=1` only restores the honest "payment is not live" stub. It still does not charge, and a missing Stripe key is not an error.
 
 Backups (host cron, as a user that can read `/srv/zeim`):
 

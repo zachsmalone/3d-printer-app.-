@@ -1,8 +1,8 @@
 """Optional Semi Pro / Pro plans. Core ZEIM stays free forever.
 
-Payment is not live yet: the UI and API are real stubs that return honest "coming"
-status. ZEIM never takes a cut of creator tips or Showcase sales — it earns only
-from its own optional Semi Pro / Pro features when payment ships.
+ZEIM_PLANS_ENABLED defaults off. Paid plans stay visible as "coming later" and
+checkout does not start a payment. Missing Stripe keys are normal and never an error.
+ZEIM never takes a cut of creator tips or Showcase sales.
 
 Prices (USD / month, subject to change before launch):
   Semi Pro  ~ $3.50
@@ -10,6 +10,7 @@ Prices (USD / month, subject to change before launch):
 """
 from __future__ import annotations
 
+from .. import config
 from ..community.store import USERS
 
 # Honest catalog. payment_live=False until a real processor is wired.
@@ -58,24 +59,56 @@ PLANS = (
 PLAN_IDS = {p["id"] for p in PLANS}
 PAID_IDS = {"semi_pro", "pro"}
 
-# Payment processor is not wired. Do not claim checkout works.
-PAYMENT_LIVE = False
-PAYMENT_NOTE = (
-    "Payment is not live yet. You can look at the plans below; "
-    "choosing Semi Pro or Pro will say Coming until checkout is ready."
-)
+# No payment processor is wired. Do not treat Stripe env vars as checkout:
+# missing keys stay quiet, and a key sitting in the environment must not charge.
 TIP_NOTE = (
     "ZEIM never takes a cut of creator tips or Showcase sales. "
     "It only earns from its own optional Semi Pro and Pro features."
 )
+CLOSED_NOTE = (
+    "Paid plans are not available yet. Free stays free forever. "
+    "Nothing on this page starts a payment."
+)
+OPEN_STUB_NOTE = (
+    "Payment is not live yet. You can look at the plans below; "
+    "choosing Semi Pro or Pro will say Coming until checkout is ready."
+)
+
+
+def plans_enabled() -> bool:
+    return config.plans_enabled()
+
+
+def payment_live() -> bool:
+    """Always false in this build. Stripe keys, present or missing, do not flip this."""
+    return False
+
+
+def payment_note() -> str:
+    if not plans_enabled():
+        return CLOSED_NOTE
+    return OPEN_STUB_NOTE
+
+
+def _plan_public(plan: dict) -> dict:
+    row = dict(plan)
+    paid = plan["id"] in PAID_IDS
+    # A buy button exists only when the flag is on AND a processor is actually live.
+    row["purchasable"] = bool(paid and plans_enabled() and payment_live())
+    if paid:
+        row["coming"] = not row["purchasable"]
+    else:
+        row["coming"] = False
+    return row
 
 
 def catalog() -> dict:
     return {
-        "payment_live": PAYMENT_LIVE,
-        "payment_note": PAYMENT_NOTE,
+        "payment_live": payment_live(),
+        "plans_enabled": plans_enabled(),
+        "payment_note": payment_note(),
         "tip_note": TIP_NOTE,
-        "plans": list(PLANS),
+        "plans": [_plan_public(p) for p in PLANS],
         "currency": "USD",
     }
 
@@ -100,7 +133,8 @@ def public_plan(user: dict | None) -> dict:
         "id": pid,
         "name": meta["name"],
         "price_label": meta["price_label"],
-        "payment_live": PAYMENT_LIVE,
+        "payment_live": payment_live(),
+        "plans_enabled": plans_enabled(),
     }
 
 
@@ -123,20 +157,48 @@ def set_plan(sid: str, plan_id: str) -> dict:
     return public_plan(out["user"])
 
 
+def _plan_name(plan_id: str) -> str:
+    return next(p["name"] for p in PLANS if p["id"] == plan_id)
+
+
 def start_checkout(actor, plan_id: str) -> dict:
-    """Stub checkout. Always honest: payment is not live."""
+    """Paid checkout is closed unless plans are enabled AND a processor is live.
+
+    This build has no processor. The return value never includes a payment URL,
+    and it never reads Stripe keys. `blocked` asks the route to answer 403.
+    """
     plan_id = normalize_plan(plan_id)
     if plan_id == "free":
-        return {"ok": True, "plan": "free", "message": "You're on Free. Core ZEIM stays free forever."}
-    if not PAYMENT_LIVE:
+        return {
+            "ok": True,
+            "checkout": False,
+            "plan": "free",
+            "message": "You're on Free. Core ZEIM stays free forever.",
+        }
+    name = _plan_name(plan_id)
+    if not plans_enabled():
         return {
             "ok": False,
             "coming": True,
+            "checkout": False,
+            "blocked": True,
             "plan": plan_id,
-            "message": (
-                f"{next(p['name'] for p in PLANS if p['id'] == plan_id)} is coming. "
-                "Payment is not live yet — nothing was charged."
-            ),
+            "message": f"{name} is coming later. Payment is not available yet — nothing was charged.",
         }
-    # Future: hand off to Stripe (or similar). Never claim success without a real session.
-    return {"ok": False, "coming": True, "plan": plan_id, "message": "Checkout is not available yet."}
+    if not payment_live():
+        return {
+            "ok": False,
+            "coming": True,
+            "checkout": False,
+            "plan": plan_id,
+            "message": f"{name} is coming. Payment is not live yet — nothing was charged.",
+        }
+    # A future processor belongs here and must still require plans_enabled().
+    # Do not report success without a real checkout session. Never store card data.
+    return {
+        "ok": False,
+        "coming": True,
+        "checkout": False,
+        "plan": plan_id,
+        "message": "Checkout is not available yet. Nothing was charged.",
+    }

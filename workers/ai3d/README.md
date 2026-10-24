@@ -1,6 +1,6 @@
 # ZEIM 2D→3D worker (optional)
 
-Turns one photo into a rough 3D figure or bust for the **2D→3D** tab. It is a separate container, so the main ZEIM image stays small. Without it the tab shows "engine not installed" and the rest of ZEIM works as usual.
+Turns one photo into a rough 3D figure or bust for the **2D→3D** tab. It is a separate container, so the main ZEIM image stays small. The app also has to set `ZEIM_2D3D_ENABLED=1` or the tab stays hidden and `POST /api/ai3d/jobs` does not run (the default is off). Without the worker, and with the flag on, the tab shows "engine not installed". The rest of ZEIM works as usual.
 
 ## Model and licences
 - **TripoSR** (Stability AI + Tripo AI). Code: MIT, https://github.com/VAST-AI-Research/TripoSR/blob/main/LICENSE (pinned commit `107cefdc244c39106fa830359024f6a2f1c78871`). Weights: MIT, https://huggingface.co/stabilityai/TripoSR

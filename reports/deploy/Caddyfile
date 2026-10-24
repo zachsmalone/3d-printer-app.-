@@ -1,4 +1,7 @@
-# PROPOSAL - Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# Caddy reverse proxy with automatic HTTPS (Let's Encrypt).
+# This file serves the full ZEIM app. Testers use the main site (https://zeimapp.com).
+# The static coming-soon page is Caddyfile.coming-soon, selected only when ZEIM_COMING_SOON=1
+# (reports/deploy/caddy-run.sh). Leave that flag unset or 0 on GCP zeim-prod.
 # Replace the placeholder domain (ZEIM_DOMAIN in .env). DNS A/AAAA must point at this host and 80/443 must be open.
 {
 	email {$ACME_EMAIL}

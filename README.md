@@ -19,11 +19,11 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **Showcase** | Community feed. Remix Yes / No switch per upload, credited remixes, and re-upload protection using a shape fingerprint plus **Report a copy**. **AI-made** label set by the creator (automatic and locked for 2D→3D models, and carried through edit / remix / 3MF re-upload lineage), with a Show / Hide / Only filter that remembers the choice. Filters for printer, material, supports, licence, and mature content (mature defaults to hide; missing metadata is Not stated). A **Printed by the community** yes/no badge appears once a model has an approved **I printed this** photo (no counts or ranking). Optional creator tip link (https only, hardened against private hosts / shorteners / personal info); the tip line shows the destination domain; moderators can clear a tip; ZEIM takes no cut. **Collections:** creators group their own Showcase models into named lists (public or private), manage them from Account, add or remove from a project page, and show public collections on the profile strip for other adults to browse (no ranking or boosting). **Print settings** on each model (layer height, infill, supports, material, etc.). **Ask the creator:** public Q&A on a model page (no DMs). **I printed this** can carry the printer settings and notes used. **Remix challenges** are prize-free (no money, prizes, or ranking). Makes can be shot straight from a **phone camera**. |
 | **Export** | One format picker with file naming: STL, 3MF, OBJ, SVG, PLY, GLB, AMF, and G-code from the slicer. |
 | **Smart Fix** | Mesh repair and auto-orient. |
-| **2D→3D** | Makes a rough Figure or Bust from one photo using TripoSR (MIT-licensed open model) in an optional separate worker container (GPU or CPU). Results are labelled **AI-made**, auto-repaired, and private by default. 5 min cooldown between models and a daily cap of 5 per account during testing. Without the worker the tab says the engine is not installed. Results are rough guesses of the hidden sides and have not been test-printed. |
+| **2D→3D** | Off for this soft launch (`ZEIM_2D3D_ENABLED=0`). The nav tab is hidden and photo-to-3D jobs do not run. When the flag is on, it makes a rough Figure or Bust from one photo using TripoSR (MIT-licensed open model) in an optional separate worker. Results are labelled **AI-made**, auto-repaired, and private by default. |
 | **Learn** | Guided lessons inside the app. On phones (≤420px wide) Learn leaves the bottom tab bar but stays reachable from Showcase / home. |
 | **Bust mode** | Photo → printable bust: thicker rounded-back body with photo relief on a clean round / rect / outline pedestal. Auto head & shoulders (editable starting mask) or manual Select trace; whole photo still works, with a tip. Separate from AI 2D→3D Bust — not figure-scan quality. |
 | **Live Sculpt** | CAD sculpt brushes (draw, carve, smooth, inflate, pinch, flatten, grab) show live on the model as you drag; each stroke saves in the background without a blocking spinner. |
-| **Subscriptions** | Core stays free forever. Optional Semi Pro (~$3.50) and Pro (~$5.50) are listed in Account → Plans. **Payment is not live yet** — choosing a paid plan says Coming; nothing is charged. ZEIM never takes a cut of creator tips or Showcase sales. |
+| **Subscriptions** | Core stays free forever. Account → Plans lists optional Semi Pro (~$3.50) and Pro (~$5.50) as **Coming later**. **ZEIM_PLANS_ENABLED=0** (the default) does not start checkout, and missing Stripe keys are not an error. ZEIM never takes a cut of creator tips or Showcase sales. |
 | **Themes** | Japanese-inspired theme per section, with quiet CSS motion that turns off under prefers-reduced-motion. |
 
 ## In progress
@@ -47,9 +47,19 @@ Open <http://localhost:8765>. Health check: <http://localhost:8765/healthz> retu
 
 **Testing mode:** add `-e ZEIM_TESTING_MODE=1` to lift usage quotas and cooldowns while testing. It is off by default; do not use it in production.
 
+## Site and plans flags
+
+| Flag | Default | What it does |
+|---|---|---|
+| `ZEIM_COMING_SOON` | off (`0` or unset) | `1` serves a short coming-soon page for every path except `/healthz`. Off, a normal visit gets the full app. Caddy uses the same flag (`reports/deploy/caddy-run.sh`). |
+| `ZEIM_PLANS_ENABLED` | off (`0` or unset) | `0` keeps Semi Pro and Pro visible as Coming later and refuses checkout. `1` still does not charge until a processor is wired, and it does not error when Stripe keys are missing. |
+| `ZEIM_2D3D_ENABLED` | off (`0` or unset) | `0` hides the 2D→3D tab and refuses `POST /api/ai3d/jobs` (the TripoSR worker is not called). `1` turns that tab back on. Lithophanes, slicers, CAD and Showcase stay available either way. |
+
+Testers use the main site, [https://zeimapp.com](https://zeimapp.com). On GCP **zeim-prod**, set both flags to `0`, deploy `reports/deploy/Caddyfile` (the file that proxies every path to the app), and reload Caddy. Steps are in [`reports/deploy/README.md`](reports/deploy/README.md). Do not put live Stripe keys on the server for this release.
+
 ## Optional: 2D→3D worker
 
-The 2D→3D tab needs a separate worker container (TripoSR). It is not part of the main image; the rest of ZEIM works without it. Model weights (about 1.7 GB + 176 MB) are downloaded into the worker's volume on first start, not stored in the repo. CPU-only works but is slow and needs about 3-4 GB free RAM.
+The 2D→3D tab needs `ZEIM_2D3D_ENABLED=1` and a separate worker container (TripoSR). The flag defaults off, so the tab is hidden and jobs do not run. The rest of ZEIM works without the worker. Model weights (about 1.7 GB + 176 MB) are downloaded into the worker's volume on first start, not stored in the repo. CPU-only works but is slow and needs about 3-4 GB free RAM.
 
 ```powershell
 docker network create zeim
@@ -85,7 +95,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2589 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and Subscriptions Coming stubs).
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2691 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 (Moonraker/OctoPrint Live API; Bambu Simulated), Bust mode, Live Sculpt, and Subscriptions with paid checkout closed by default).
 
 ## Layout
 

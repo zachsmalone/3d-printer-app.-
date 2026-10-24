@@ -50,8 +50,25 @@ function paintPlan() {
   ready();
 }
 
+function paintClosed() {
+  const nav = document.querySelector('[data-view="ai3d"]');
+  if (nav) { nav.hidden = true; nav.disabled = true; }
+  const grid = document.querySelector("#viewAi3d .a3grid");
+  if (grid) grid.hidden = true;
+  const goBtn = $("#a3Go");
+  if (goBtn) { goBtn.disabled = true; goBtn.hidden = true; }
+  const cool = $("#a3Cool");
+  if (cool) cool.hidden = true;
+  const el = $("#a3Engine");
+  if (el) {
+    el.className = "a3note";
+    el.innerHTML = "<div><b>2D to 3D is coming later.</b><p>Lithophanes, the slicers, CAD and Showcase stay available. Nothing here starts a model.</p></div>";
+  }
+}
+
 async function refresh() {
   try { status = await api("/api/ai3d/status"); } catch (e) { $("#a3Engine").textContent = e.message; return; }
+  if (status.enabled === false) { paintClosed(); return; }
   paintEngine(); paintPlan();
 }
 
@@ -77,6 +94,7 @@ function showResult(r) {
 }
 
 async function go() {
+  if (!status || status.enabled === false) return;
   const fd = new FormData();
   fd.append("file", file); fd.append("mode", mode()); fd.append("photo_ack", $("#a3Ack").checked ? "true" : "false");
   fd.append("title", ($("#a3Title").value.trim() || $("#a3Title").placeholder));   // what the field shows is what gets saved if ($("#a3H").value) fd.append("height_mm", $("#a3H").value);
