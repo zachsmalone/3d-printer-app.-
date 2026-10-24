@@ -58,7 +58,10 @@ function route() {
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
   if (h[0] === "u" && h[1]) setTimeout(() => openProfile(h[1]), 50);
   else if ($("#dlgProfile")?.open) $("#dlgProfile").close();          // leaving a profile link by tab closes the profile
-  if (v === "account") loadFavorites();
+  if (!(h[0] === "c" && h[1]) && $("#dlgCollection")?.open) $("#dlgCollection").close();
+  if (h[0] === "c" && h[1]) setTimeout(() => openCollection(h[1]), 50);
+  if (v === "account") { loadFavorites(); loadCollections(); }
+  else if ($("#dlgCollection")?.open) $("#dlgCollection").close();
 }
 addEventListener("hashchange", route);
 
@@ -379,6 +382,7 @@ async function openItem(id) {
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.first_posted && !i.example ? `<p class="help first-posted">First posted on ${esc(new Date(i.first_posted + "T12:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</p>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itViewOnly">Downloads</label><select id="itViewOnly"><option value="no" ${i.view_only ? "" : "selected"}>Anyone who can see it may download it</option><option value="yes" ${i.view_only ? "selected" : ""}>View only, no download</option></select></div>` : ""}
+    ${i.owned && !i.original && !i.example ? `<div class="itcols" id="itCols" data-iid="${i.id}"></div>` : ""}
     ${i.owned && !i.original && !i.example ? `<div class="field"><label for="itTip">Tip link <em>optional</em></label><div class="row"><input id="itTip" type="url" maxlength="300" placeholder="https://…" value="${esc(i.tip_url || "")}"><button type="button" class="btn small ghost" id="itTipSave">Save</button></div><small class="help">One https link. Leave it empty to remove it.</small></div>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itRemixSw">Allow remixes</label><select id="itRemixSw"><option value="yes" ${i.allow_remixes ? "selected" : ""}>Yes</option><option value="no" ${i.allow_remixes ? "" : "selected"}>No</option></select><small class="help">Remixes already posted keep their credit either way.</small></div>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "Private — only me", followers: "Followers only", public: "Public" }[v]}</option>`).join("")}</select></div>` : ""}
@@ -408,6 +412,7 @@ async function openItem(id) {
         <div class="row"><button class="btn primary" id="prSend" type="button">Share photo</button></div></details>` : ""}</section>`;
   if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
   loadPrints(id);
+  if ($("#itCols")) mountItemCollections($("#itCols"), id);
   if ($("#prSend")) $("#prSend").onclick = async () => {
     const f = $("#prFile").files[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo first.");
     const nv = $("[name=prNsfw]:checked")?.value; if (!nv) return inlineMsg($("#prSend"), "Please answer: Is this NSFW (mild nudity / mature art)?");
@@ -651,11 +656,99 @@ async function openProfile(uid) {
   let u; try { u = await api("/api/users/" + uid); } catch (e) { toast(e.message, "err"); return; }
   $("#pfName").textContent = u.display_name;
   const n = (v, w) => v == null ? "" : `<span class="stat"><b>${v}</b> ${w}</span>`;
+  let cols = []; try { cols = (await api("/api/users/" + uid + "/collections")).collections || []; } catch { cols = []; }
+  const colStrip = cols.length ? `<h4><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> Collections</h4>
+    <div class="colstrip">${cols.map(c => `<button type="button" class="colchip" data-col="${esc(c.id)}"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> ${esc(c.name)} <span class="help">${c.count}</span></button>`).join("")}</div>` : "";
   $("#pfBody").innerHTML = `<p class="counts">${n(u.followers, u.followers === 1 ? "follower" : "followers")} ${n(u.following, "following")}</p>
     ${u.can_follow ? `<button type="button" class="btn ${u.following_creator ? "" : "primary"}" id="pfFollow" aria-pressed="${!!u.following_creator}">${u.following_creator ? "✔ Following" : "＋ Follow"}</button>` : ""}
     <p class="help">Following shows their new projects in the Following tab. There are no messages in ZEIM.</p>
+    ${colStrip}
     <h4>Projects</h4><ul class="plist">${u.projects.map(i => `<li><a href="#" data-open-item="${i.id}">${esc(i.title)}</a></li>`).join("") || "<li class='help'>None yet</li>"}</ul>`;
   if ($("#pfFollow")) $("#pfFollow").onclick = async () => { try { await api("/api/follow/" + uid, { method: u.following_creator ? "DELETE" : "POST" }); openProfile(uid); } catch (e) { toast(e.message, "err"); } };
+  $("#pfBody").querySelectorAll("[data-col]").forEach(b => b.onclick = () => openCollection(b.dataset.col));
   if (!$("#dlgProfile").open) $("#dlgProfile").showModal();
 }
 document.addEventListener("click", e => { const a = e.target.closest("a.creator-link"); if (a) { e.preventDefault(); openProfile(a.getAttribute("href").split("/").pop()); } });
+
+/* ---------- Showcase collections: group your own models; public adults browse ---------- */
+async function loadCollections() {
+  const host = $("#colHost"), row = $("#colNewRow"); if (!host) return;
+  if (!ME?.signed_up) {
+    host.innerHTML = `<p class="help">Make a free account to group your Showcase projects into collections.</p>`;
+    if (row) row.hidden = true;
+    return;
+  }
+  if (row) row.hidden = false;
+  let r; try { r = await api("/api/me/collections"); } catch (e) { host.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
+  host.innerHTML = r.collections.length
+    ? `<ul class="collist">${r.collections.map(c => `<li><details data-cid="${esc(c.id)}"><summary><b>${esc(c.name)}</b> <span class="help">${c.count} project${c.count === 1 ? "" : "s"} · ${c.public ? "public" : "private"}</span></summary><div class="colbody"></div></details></li>`).join("")}</ul>`
+    : `<p class="help">No collections yet. Create one below, then add your projects from a project page.</p>`;
+  host.querySelectorAll("details[data-cid]").forEach(d => d.addEventListener("toggle", async () => {
+    if (!d.open || d.dataset.loaded) return; d.dataset.loaded = "1";
+    const body = d.querySelector(".colbody");
+    try {
+      const c = await api(`/api/collections/${d.dataset.cid}`);
+      body.innerHTML = `${c.items.length ? `<ul class="plist">${c.items.map(i => `<li><a href="#" data-open-item="${esc(i.id)}">${esc(i.title)}</a></li>`).join("")}</ul>` : `<p class="help">Empty — open one of your projects and add it here.</p>`}
+        <div class="field"><label for="colRn_${esc(c.id)}">Rename</label><div class="row"><input id="colRn_${esc(c.id)}" maxlength="60" value="${esc(c.name)}"><button type="button" class="btn small colrn">Save name</button></div></div>
+        <div class="row"><label class="inl"><input type="checkbox" class="colpub" ${c.public ? "checked" : ""}> Public on my profile</label>
+          <button type="button" class="btn ghost danger small coldel">Delete collection</button>
+          <button type="button" class="btn ghost small colopen">Open</button></div>`;
+      body.querySelector(".colrn").onclick = async () => {
+        try { await api(`/api/me/collections/${c.id}`, J("PUT", { name: body.querySelector("input").value.trim() })); toast("Renamed", "ok"); loadCollections(); }
+        catch (er) { toast(er.message, "err"); }
+      };
+      body.querySelector(".colpub").onchange = async e => {
+        try { await api(`/api/me/collections/${c.id}`, J("PUT", { public: e.target.checked })); toast("Collection updated", "ok"); }
+        catch (er) { e.target.checked = !e.target.checked; toast(er.message, "err"); }
+      };
+      body.querySelector(".coldel").onclick = async () => {
+        if (!(await askConfirm({ title: "Delete this collection?", message: `Delete “${c.name}”? Your projects stay in Showcase.`, okLabel: "Delete", danger: true }))) return;
+        try { await api(`/api/me/collections/${c.id}`, { method: "DELETE" }); toast("Collection deleted", "ok"); loadCollections(); }
+        catch (er) { toast(er.message, "err"); }
+      };
+      body.querySelector(".colopen").onclick = () => openCollection(c.id);
+    } catch (er) { body.innerHTML = `<p class="help">${esc(er.message)}</p>`; }
+  }));
+}
+$("#colNewGo")?.addEventListener("click", async () => {
+  const name = $("#colNewName")?.value.trim(), btn = $("#colNewGo");
+  if (!name) return inlineMsg(btn, "Give the collection a name.");
+  try {
+    await api("/api/me/collections", J("POST", { name, public: $("#colNewPub")?.checked !== false }));
+    $("#colNewName").value = ""; clearInline(btn); toast("Collection created", "ok"); loadCollections();
+  } catch (e) { inlineMsg(btn, e.message); }
+});
+
+async function openCollection(cid) {
+  let c; try { c = await api("/api/collections/" + cid); } catch (e) { toast(e.message, "err"); return; }
+  $("#colDlgName").textContent = c.name;
+  $("#colDlgBody").innerHTML = `<p class="help">by ${esc(c.by || "a ZEIM maker")} · ${c.count} project${c.count === 1 ? "" : "s"}${c.public ? "" : " · private"}</p>
+    <ul class="plist">${(c.items || []).map(i => `<li><a href="#" data-open-item="${esc(i.id)}">${esc(i.title)}</a></li>`).join("") || "<li class='help'>No projects visible here.</li>"}</ul>`;
+  if (!$("#dlgCollection").open) $("#dlgCollection").showModal();
+}
+
+async function mountItemCollections(host, id) {
+  let r; try { r = await api(`/api/me/collections?item=${encodeURIComponent(id)}`); } catch { return; }
+  const on = new Set(r.holding || []);
+  host.innerHTML = `<details class="itcol"><summary class="btn ghost"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> Add to a collection${on.size ? ` (${on.size})` : ""}</summary>
+    <fieldset class="reasons"><legend>Your collections</legend>${r.collections.length ? r.collections.map(c =>
+      `<label class="inl"><input type="checkbox" data-col="${esc(c.id)}" ${on.has(c.id) ? "checked" : ""}> ${esc(c.name)} <em class="help">${c.public ? "public" : "private"}</em></label>`).join("")
+      : `<p class="help">No collections yet. Name one below.</p>`}</fieldset>
+    <div class="field"><label for="itColNew">New collection</label><input id="itColNew" maxlength="60" placeholder="Desk organizers"></div>
+    <label class="inl"><input type="checkbox" id="itColPub" checked> Public on my profile</label>
+    <div class="row"><button type="button" class="btn" id="itColGo">Create and add</button></div></details>`;
+  host.querySelectorAll("[data-col]").forEach(cb => cb.onchange = async () => {
+    try { await api(`/api/me/collections/${cb.dataset.col}/items`, J("POST", { item_id: id, on: cb.checked })); toast(cb.checked ? "Added to collection" : "Removed from collection", "ok"); if (document.body.dataset.view === "account") loadCollections(); }
+    catch (e) { cb.checked = !cb.checked; toast(e.message, "err"); }
+  });
+  host.querySelector("#itColGo").onclick = async () => {
+    const name = host.querySelector("#itColNew").value.trim(), btn = host.querySelector("#itColGo");
+    if (!name) return inlineMsg(btn, "Give the collection a name.");
+    try {
+      const c = await api("/api/me/collections", J("POST", { name, public: host.querySelector("#itColPub").checked }));
+      await api(`/api/me/collections/${c.id}/items`, J("POST", { item_id: id, on: true }));
+      toast(`Added to “${c.name}”`, "ok"); mountItemCollections(host, id); host.querySelector("details").open = true;
+      if (document.body.dataset.view === "account") loadCollections();
+    } catch (e) { inlineMsg(btn, e.message); }
+  };
+}

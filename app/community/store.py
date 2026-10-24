@@ -112,3 +112,5 @@ AGE_BLOCKS = JsonFile("age_blocks", {})   # sha256(sid)[:24] -> unix time the lo
 FAVORITES = JsonFile("favorites", {})      # sid -> [item ids], newest first (private bookmark list, never shown to others)
 ACTIVITY = JsonFile("activity", [])        # [{"k": fav|download|printed|nozzle, "i": item id, "s": sha(sid), "t": unix}] for Trending decay
 PRINTS = JsonFile("prints", [])            # "I printed this" photo records (photo files live in data/prints/)
+# Showcase collections: creator-named groups of their own models (docs/specs/showcase-gaps.md #2)
+COLLECTIONS = JsonFile("collections", [])   # [{id, owner_sid, uid, name, public, items: [iid], created, updated}]

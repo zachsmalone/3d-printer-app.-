@@ -70,17 +70,12 @@ options, and related items** (print photos are already rendered on the listing p
   the license is visible on the public listing; an invalid value is a 400; remixing an
   ND-licensed project is rejected server-side.
 
-### 2. Collections (public or private curated lists)
+### 2. Collections (public or private curated lists) — shipped (show-collections)
 
-- **Smallest addition:** a `COLLECTIONS` JsonFile (`{"collections.json": []}` rows:
-  `{id, sid, title, visibility, items: [iid]}`) + endpoints to create/rename, add/remove an
-  item, and view one; a "Collections" strip on profile pages.
-- **Store + API:** new `COLLECTIONS` store; `POST /collections`, `POST /collections/{id}/items`,
-  `DELETE /collections/{id}/items/{iid}`, `GET /collections/{id}`; reuse the visibility +
-  moderation guards used by showcase.
-- **Effort:** ~1-2 days.
-- **Acceptance:** a user can curate 5 projects into a list, share it publicly, and another
-  adult can view it; hidden/removed projects drop out of the list automatically.
+- Own-models only. `COLLECTIONS` JsonFile + `/api/me/collections` CRUD, item add/remove,
+  `GET /api/collections/{id}`, `GET /api/users/{uid}/collections`. Account section + profile
+  strip + owned-item picker in `static/community.js`. No featured/boosted/ranking.
+- Acceptance covered by `tests/test_show_collections.py`.
 
 ### 3. Comments on listings
 

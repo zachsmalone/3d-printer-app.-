@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from . import branding
 from .api import builds, community, edit, learn, printing
 from .api import showcase_extras
+from .api import collections as collections_api
 from .api import social as social_api
 from .api import settings as settings_api
 from .api import slice as slice_api
@@ -64,7 +65,7 @@ from .api import repair as repair_api
 from .api import resin as resin_api
 from .api import ai3d as ai3d_api
 for r in (builds.router, edit.router, parts_api.router, cad_api.router, printing.router, printing.files_router, settings_api.router,
-          showcase_extras.router,
+          showcase_extras.router, collections_api.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
           export_api.router, export_api.me_router, calibration_api.router, doctor_api.router, repair_api.router, resin_api.router, ai3d_api.router):
     app.include_router(r)

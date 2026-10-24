@@ -1103,3 +1103,21 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .shfilters select{min-height:44px}
 .shfilters .btn{min-height:44px}
 .shfilters small.help{flex-basis:100%;margin:0}
+
+/* Showcase collections — calm strip matching .shfilters / .prov (cherry-blossom vars) */
+.cols{margin:16px 0 24px}
+.cols h2{display:flex;align-items:center;gap:8px;font-size:1.05rem;margin:0 0 4px}
+.cols h2 .i{width:18px;height:18px}
+.collist{list-style:none;padding:0;margin:8px 0;display:grid;gap:8px}
+.collist li{border:1px solid var(--line);border-radius:var(--r,10px);padding:10px 12px;background:var(--panel)}
+.collist summary{cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:44px}
+.collist .colbody{margin-top:8px}
+.colchip{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--txt);text-decoration:none;font:inherit;cursor:pointer}
+.colchip:hover{border-color:var(--acc)}
+.colchip .i{width:16px;height:16px}
+.colstrip{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.itcols{margin:10px 0;padding:8px 0;border-top:1px solid var(--line)}
+.itcols fieldset{border:0;padding:0;margin:0}
+.itcols label.inl{display:flex;gap:8px;align-items:center;min-height:44px}
+#colNewRow{gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+#colNewRow input[type=text],#colNewRow input:not([type]){min-height:44px;flex:1;min-width:160px}
