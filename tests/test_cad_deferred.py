@@ -104,16 +104,21 @@ def test_smart_split_pieces_are_saved_in_history_for_smart_merge():
     assert len(c.get(f"/api/cad/{bid}/scene").json()["bodies"]) == 1
 
 
-def test_big_model_scene_offers_a_simplified_copy():
+def test_big_model_scene_shows_a_lighter_view_and_keeps_the_full_mesh():
+    """Over the CAD face cap: open a display copy. The stored mesh is not rewritten until Simplify."""
     big = trimesh.creation.icosphere(subdivisions=7, radius=30)
     up = c.post("/api/edit/new", files={"file": ("big.stl", io.BytesIO(big.export(file_type="stl")), "model/stl")}).json()
     bid = up.get("id") or up["project"]["id"]
     r = c.get(f"/api/cad/{bid}/scene")
-    assert r.status_code == 413
-    d = r.json()["detail"]
-    assert d["triangles"] == 327680 and 0 < d["keep_ratio"] < 1 and "simplified copy" in d["message"]
-    r = c.post(f"/api/edit/{bid}/op", json={"op": "simplify", "params": {"keep_ratio": d["keep_ratio"]}}); assert r.status_code == 200, r.text
-    assert c.get(f"/api/cad/{bid}/scene").status_code == 200
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["display_simplified"] is True and d["triangles"] == 327680
+    assert 0 < d["display_triangles"] <= 200_000 and d["bodies"]
+    assert all(o.get("op") != "simplify" for o in d["ops"])
+    keep = round(max(0.02, min(0.98, (200_000 * 0.95) / 327680)), 4)
+    r = c.post(f"/api/edit/{bid}/op", json={"op": "simplify", "params": {"keep_ratio": keep}}); assert r.status_code == 200, r.text
+    s = c.get(f"/api/cad/{bid}/scene").json()
+    assert any(o["op"] == "simplify" for o in s["ops"]) and s["display_triangles"] <= 200_000
 
 
 def test_deferred_items_in_a_real_browser_1280_390():

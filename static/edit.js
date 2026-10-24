@@ -143,13 +143,30 @@ function fillBuildSelect() {
   $("#editFromBuild").innerHTML = S.history.length ? S.history.slice().reverse().map(b => `<option value="${b.id}">${esc(b.title)} (${b.kind === "edit" ? "edited" : b.mode})</option>`).join("") : `<option value="">No builds yet — make one in the Studio</option>`;
   $("#editFromBuildGo").disabled = !S.history.length;
 }
+/* Send to Slicer sets the hash (which restores zeim.edit.last) and then opens the new project.
+   Whichever request finishes last used to win, so a previous slicer model could replace the lithophane. */
+let editLoadGen = 0;
 document.addEventListener("zeim:edit-shown", async () => {
+  const gen = editLoadGen;
   try { await loadHistory(); } catch { } fillBuildSelect(); ensureViewer(); setTimeout(() => viewer?.resize(), 50);
+  if (gen !== editLoadGen || E.p) return;
   // returning from CAD (Back) reloads the page: reopen the model that was loaded (CAD edits are saved server-side on the same project)
   let last = null; try { last = sessionStorage.getItem("zeim.edit.last"); } catch { }
-  if (!E.p && last) { try { loadProject(await api("/api/edit/" + encodeURIComponent(last))); } catch { try { sessionStorage.removeItem("zeim.edit.last"); } catch { } } }
+  if (!last) return;
+  try {
+    const p = await api("/api/edit/" + encodeURIComponent(last));
+    if (gen !== editLoadGen || E.p) return;
+    loadProject(p);
+  } catch { try { sessionStorage.removeItem("zeim.edit.last"); } catch { } }
 });
-document.addEventListener("zeim:open-edit", async e => { try { loadProject(await api("/api/edit/" + e.detail)); } catch (er) { toast(er.message, "err"); } });
+document.addEventListener("zeim:open-edit", async e => {
+  const gen = ++editLoadGen;
+  try {
+    const p = await api("/api/edit/" + encodeURIComponent(e.detail));
+    if (gen !== editLoadGen) return;
+    loadProject(p);
+  } catch (er) { if (gen === editLoadGen) toast(er.message, "err"); }
+});
 document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
 /* ---------- applying a project payload ---------- */

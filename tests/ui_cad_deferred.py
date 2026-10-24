@@ -1,5 +1,5 @@
 """Deferred CAD items in Chromium at 1280 and 390 px: Hinges/Joints, Merge (snap + fuse, non-blocking warning),
-Measure face angle, and the big-model "Open simplified copy" banner.   python tests/ui_cad_deferred.py URL [SHOTS_DIR]"""
+Measure face angle, and a big model opening as a lighter view (full mesh kept).   python tests/ui_cad_deferred.py URL [SHOTS_DIR]"""
 import os, sys, time
 import trimesh
 from playwright.sync_api import sync_playwright
@@ -89,19 +89,16 @@ with sync_playwright() as p:
         if pg.locator("#cwWarn").count(): pg.click("#cwWarn button")
         a = pg.evaluate("[window.__measAngle([0,0,1],[0,0,1]), window.__measAngle([0,0,1],[1,0,0]), window.__measAngle([0,0,1],[0,0,-1])]")
         ok(f"{tag}: measure face angle 0/90/180", [round(x, 6) for x in a] == [0, 90, 180], a)
-        # big model banner
+        # big model: display-only lighter view, full triangle count kept for downloads
         r = pg.request.post(URL + "/api/edit/new", multipart={"file": {"name": "big.stl", "mimeType": "model/stl", "buffer": BIG}})
         j = r.json(); bid = j.get("id") or j["project"]["id"]
         pg.goto(URL + f"/static/cad.html?bid={bid}"); pg.wait_for_timeout(500)
-        wait(pg, "() => document.querySelector('#cwBig')")
-        btxt = pg.inner_text("#cwBig")
-        ok(f"{tag}: big-model banner offers a simplified copy", "Open simplified copy" in btxt and "327,680" in btxt, btxt)
-        ok(f"{tag}: banner inside the viewport", pg.evaluate("document.querySelector('#cwBig').getBoundingClientRect().right <= innerWidth + 0.5"))
-        shot(pg, f"bigmodel-banner-{w}.png")
-        pg.click("#cwBig [data-b=simp]")
-        wait(pg, "() => window.__cad.S.scene && window.__cad.S.scene.bodies.length === 1", 180000)
-        ok(f"{tag}: simplified copy opens in CAD", pg.locator("#cwBig").count() == 0)
-        shot(pg, f"bigmodel-simplified-{w}.png")
+        wait(pg, "() => window.__cad.S.scene && window.__cad.S.scene.bodies.length >= 1 && window.__cad.S.scene.display_simplified === true", 120000)
+        ok(f"{tag}: large model opens in CAD", pg.evaluate("window.__cad.S.scene.triangles === 327680 && window.__cad.S.scene.display_triangles <= 200000 && window.__cad.S.scene.display_triangles > 0"))
+        btxt = pg.inner_text("#cwLite")
+        ok(f"{tag}: lighter-view note names the real triangle count", "327,680" in btxt and "full model" in btxt.lower(), btxt)
+        ok(f"{tag}: note inside the viewport", pg.evaluate("document.querySelector('#cwLite').getBoundingClientRect().right <= innerWidth + 0.5"))
+        shot(pg, f"bigmodel-lite-{w}.png")
         ok(f"{tag}: no page errors", not errs, errs)
         ctx.close()
     b.close()
