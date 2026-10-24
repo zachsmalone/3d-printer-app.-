@@ -35,7 +35,9 @@ def effective_slicer(s: dict, phone: bool = False, user_printer: str | None = No
             return "prusaslicer"
     k1 = any(p.get("profile") == "creality_k1" for p in s.get("printers", []))
     return "creality" if (phone or k1) else "prusaslicer"
-PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y", "profile")
+PRINTER_FIELDS = ("name", "type", "url", "api_key", "bed_x", "bed_y", "profile",
+                  "serial", "spool_remaining_g", "alert_done", "alert_failed",
+                  "watch_failures", "timelapse")
 
 
 def _fernet():
@@ -137,6 +139,9 @@ def public(s: dict | None = None, redact: bool = False) -> dict:
     if config.PUBLIC_BASE_URL:
         s["public_base_url"] = config.PUBLIC_BASE_URL
     s["public_base_url_locked"] = bool(config.PUBLIC_BASE_URL)
+    s["direct_control"] = printers_mod.direct_control_enabled()
+    s["printer_verification"] = printers_mod.verification_tag()
+    s["bambu_limits"] = printers_mod.bambu_limits()
     return s
 
 
@@ -183,6 +188,17 @@ def save_from_client(incoming: dict) -> dict:
             raise ValueError(f"The preset '{printers_mod.PROFILES[q['profile']]['label']}' works with {printers_mod.PROFILES[q['profile']]['type']} printers.")
         bx, by = printers_mod.bed_of({**q, "bed_x": q.get("bed_x") or None, "bed_y": q.get("bed_y") or None})
         q["bed_x"], q["bed_y"] = float(bx), float(by)
+        q["serial"] = (q.get("serial") or "")[:40]
+        try:
+            sg = q.get("spool_remaining_g")
+            q["spool_remaining_g"] = float(sg) if sg not in (None, "") else None
+        except (TypeError, ValueError):
+            q["spool_remaining_g"] = None
+        for flag in ("alert_done", "alert_failed", "watch_failures", "timelapse"):
+            q[flag] = bool(q.get(flag))
+        # Keep prior URL when the browser omits it (direct control off / redacted UI).
+        if not q.get("url"):
+            q["url"] = old.get(pid, {}).get("url", "")
         printers.append(q)
     new = {"public_base_url": cur.get("public_base_url", "") if config.PUBLIC_BASE_URL else clean_base_url(incoming.get("public_base_url")),
            "default_slicer": incoming.get("default_slicer") if incoming.get("default_slicer") in SLICER_CHOICES else "auto",
