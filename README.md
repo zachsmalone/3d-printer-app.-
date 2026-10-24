@@ -85,7 +85,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q tests
 ```
 
-Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2577 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, and printer-sending upgrades 1–10, all Simulated).
+Tests use temporary data folders; slicer and printer tests use mocks. `pytest --collect-only` currently counts 2589 tests (includes Showcase Collections, lithophane batch 1, slicer plate-drag, Lithophane Save work / Send to Slicer / Send to CAD handoff, FDM multi-head filament slots with unused-head strip, lithophane batch 2: tone/tile/LED fits/plate sizes/panel-or-stand export, Edit upgrades 1–10, Showcase print settings / Ask the creator / make notes / Remix challenges, printer-sending upgrades 1–10 all Simulated, Bust mode, Live Sculpt, and Subscriptions Coming stubs).
 
 ## Layout
 
