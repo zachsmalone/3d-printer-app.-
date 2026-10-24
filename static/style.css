@@ -1142,3 +1142,22 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .backingCustom input[type=color]{width:48px;height:44px;padding:2px}
 .backingCustom input[type=text]{width:9ch;min-height:44px;font-family:ui-monospace,monospace}
 .backingCustom input[aria-invalid=true]{outline:2px solid var(--bad,#c33)}
+
+
+/* Showcase rest (task 4): print settings, Q&A, prize-free challenges — cherry-blossom harmony */
+.psettings,.pubps{margin:10px 0;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r,10px);background:var(--panel)}
+.psettings .psline,.psline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0;font-size:var(--fs-sm);color:var(--ink)}
+.pubps summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;list-style:none}
+.pubps summary em,.itps summary em{font-style:normal;opacity:.7;font-size:var(--fs-sm)}
+.qa{margin:16px 0;padding-top:8px;border-top:1px solid var(--line)}
+.qalist{list-style:none;padding:0;margin:8px 0;display:grid;gap:10px}
+.qaitem{border:1px solid var(--line);border-radius:var(--r,10px);padding:10px 12px;background:var(--panel)}
+.qaitem .q{margin:0 0 4px}.qaitem .a{margin:4px 0 0;color:var(--acc2,#C24D6B)}
+.challenges{margin:14px 0 18px;padding:12px 14px;border:1px solid color-mix(in srgb, var(--acc2,#C24D6B) 35%, var(--line));border-radius:var(--r,12px);background:color-mix(in srgb, var(--acc2,#C24D6B) 6%, var(--panel))}
+.challenges h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:1.05rem;color:var(--acc2,#C24D6B)}
+#chHost{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px}
+.chcard{border:1px solid var(--line);border-radius:var(--r,10px);padding:12px;background:var(--panel)}
+.chcard h3{margin:0 0 6px;font-size:1rem;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pill.prizefree{background:color-mix(in srgb, var(--acc2,#C24D6B) 14%, transparent);border:1px solid color-mix(in srgb, var(--acc2,#C24D6B) 40%, var(--line));color:var(--acc2,#C24D6B);font-size:12px}
+.chrules{margin:8px 0 12px;padding-left:1.2em}
+.prform input[capture],.prform #prCam{min-height:44px}

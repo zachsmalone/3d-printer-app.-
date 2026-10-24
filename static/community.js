@@ -379,6 +379,7 @@ async function openItem(id) {
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
     ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · <svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}` : ""}</p>
     ${provHTML(i) ? `<p class="provrow">${provHTML(i)}</p>` : ""}${tipHTML(i)}
+    ${i.owned && !i.original && !i.example ? psHTML(i.print_settings, { editable: true, idPrefix: "itPs" }) : psHTML(i.print_settings)}
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
     ${i.first_posted && !i.example ? `<p class="help first-posted">First posted on ${esc(new Date(i.first_posted + "T12:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</p>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itViewOnly">Downloads</label><select id="itViewOnly"><option value="no" ${i.view_only ? "" : "selected"}>Anyone who can see it may download it</option><option value="yes" ${i.view_only ? "selected" : ""}>View only, no download</option></select></div>` : ""}
@@ -405,22 +406,47 @@ async function openItem(id) {
       ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Add a photo of your print</summary>
         <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo is checked by a moderator before anyone else can see it.</p>
         <div class="field"><label for="prFile">Photo</label><input type="file" id="prFile" accept="image/*"></div>
+        <div class="field"><label for="prCam">Or take one with your phone camera</label><input type="file" id="prCam" accept="image/*" capture="environment"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
+        <details class="pubps"><summary>Settings and notes <em>optional</em></summary>
+          <div class="grid2">
+            <div class="field"><label for="pr_printer">Printer</label><select id="pr_printer"><option value="">Not stated</option><option value="fdm">FDM</option><option value="resin">Resin</option></select></div>
+            <div class="field"><label for="pr_material">Material</label><select id="pr_material"><option value="">Not stated</option><option value="pla">PLA</option><option value="petg">PETG</option><option value="abs">ABS</option><option value="asa">ASA</option><option value="tpu">TPU</option><option value="nylon">Nylon</option><option value="resin">Resin</option></select></div>
+            <div class="field"><label for="pr_layer">Layer height <em>mm</em></label><input id="pr_layer" type="number" min="0.05" max="1" step="0.05"></div>
+            <div class="field"><label for="pr_infill">Infill <em>%</em></label><input id="pr_infill" type="number" min="0" max="100" step="1"></div>
+            <div class="field"><label for="pr_supports">Supports</label><select id="pr_supports"><option value="">Not stated</option><option value="no">No</option><option value="yes">Yes</option></select></div>
+            <div class="field"><label for="pr_nozzle">Nozzle <em>mm</em></label><input id="pr_nozzle" type="number" min="0.1" max="1.2" step="0.05"></div>
+          </div>
+          <div class="field"><label for="pr_name">Printer name</label><input id="pr_name" maxlength="60"></div>
+          <div class="field"><label for="pr_notes">Notes</label><input id="pr_notes" maxlength="400" placeholder="What settings worked"></div>
+        </details>
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
         <fieldset class="reasons"><legend>Is this NSFW (mild nudity / mature art)? <em>required</em></legend>
           <label class="choice"><input type="radio" name="prNsfw" value="no"> <span>No</span></label><label class="choice"><input type="radio" name="prNsfw" value="yes"> <span>Yes</span></label></fieldset>
-        <div class="row"><button class="btn primary" id="prSend" type="button">Share photo</button></div></details>` : ""}</section>`;
+        <div class="row"><button class="btn primary" id="prSend" type="button">Share photo</button></div></details>` : ""}
+    </section>
+    <section class="qa" aria-labelledby="qaH"><h4 id="qaH">Ask the creator</h4><p class="help">Public questions the creator can answer on this page. There are no private messages in ZEIM.</p><ul class="qalist" id="qaList"></ul><div id="qaAsk"></div></section>`;
   if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
   loadPrints(id);
   if ($("#itCols")) mountItemCollections($("#itCols"), id);
+  if ($("#prCam") && $("#prFile")) $("#prCam").onchange = () => { if ($("#prCam").files[0]) { const dt = new DataTransfer(); dt.items.add($("#prCam").files[0]); $("#prFile").files = dt.files; } };
   if ($("#prSend")) $("#prSend").onclick = async () => {
-    const f = $("#prFile").files[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo first.");
+    const f = $("#prFile").files[0] || $("#prCam")?.files?.[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo or take one with your camera.");
     const nv = $("[name=prNsfw]:checked")?.value; if (!nv) return inlineMsg($("#prSend"), "Please answer: Is this NSFW (mild nudity / mature art)?");
     const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked); fd.append("nsfw", nv);
+    ["printer", "material", "supports", "notes", "printer_name"].forEach(k => { const el = $("#pr_" + (k === "printer_name" ? "name" : k)); if (el?.value) fd.append(k === "printer_name" ? "printer_name" : k, el.value); });
+    if ($("#pr_layer")?.value) fd.append("layer_height_mm", $("#pr_layer").value);
+    if ($("#pr_infill")?.value) fd.append("infill_pct", $("#pr_infill").value);
+    if ($("#pr_nozzle")?.value) fd.append("nozzle_mm", $("#pr_nozzle").value);
     $("#prSend").disabled = true;
-    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; $("#prCap").value = ""; loadPrints(id); }
+    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; if ($("#prCam")) $("#prCam").value = ""; $("#prCap").value = ""; loadPrints(id); }
     catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
   };
+  if ($("#itPsSave")) $("#itPsSave").onclick = async () => {
+    try { await api(`/api/showcase/${id}/print-settings`, J("PUT", { print_settings: psRead("itPs") })); toast("Print settings saved", "ok"); openItem(id); }
+    catch (er) { toast(er.message, "err"); }
+  };
+  loadQuestions(id, i);
   if ($("#itVis")) $("#itVis").onchange = async e => { const v = e.target.value; try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: v })); toast("Visibility updated", "ok"); loadShowcase(); } catch (er) {
     if (er.status === 409 && er.body?.code === "remix_offer" && confirm(er.message + "\n\nShare it as a credited remix?")) {
       try { await api(`/api/showcase/${id}/visibility`, J("PUT", { visibility: v, remix_of: er.body.original.id })); toast("Shared as a credited remix", "ok"); loadShowcase(); return openItem(id); } catch (e2) { toast(e2.message, "err"); }
@@ -473,6 +499,53 @@ async function openItem(id) {
   if (!$("#dlgItem").open) $("#dlgItem").showModal();
 }
 
+
+/* ---------- print settings (model + "I printed this") ---------- */
+const psFields = () => ({
+  printer: $("#pub_ps_printer")?.value || "", material: $("#pub_ps_material")?.value || "",
+  layer_height_mm: $("#pub_ps_layer")?.value || "", infill_pct: $("#pub_ps_infill")?.value || "",
+  supports: $("#pub_ps_supports")?.value || "", nozzle_mm: $("#pub_ps_nozzle")?.value || "",
+  printer_name: $("#pub_ps_name")?.value || "", notes: $("#pub_ps_notes")?.value || ""
+});
+const psAny = s => s && Object.values(s).some(v => v !== "" && v != null);
+function psHTML(s, { editable = false, idPrefix = "itPs" } = {}) {
+  s = s || {};
+  if (!editable && !psAny(s)) return "";
+  const line = [];
+  if (s.printer) line.push(String(s.printer).toUpperCase());
+  if (s.printer_name) line.push(String(s.printer_name));
+  if (s.material) line.push(String(s.material).toUpperCase());
+  if (s.layer_height_mm != null && s.layer_height_mm !== "") line.push(s.layer_height_mm + " mm layers");
+  if (s.infill_pct != null && s.infill_pct !== "") line.push(s.infill_pct + "% infill");
+  if (s.nozzle_mm != null && s.nozzle_mm !== "") line.push(s.nozzle_mm + " mm nozzle");
+  if (s.supports === "yes") line.push("needs supports");
+  if (s.supports === "no") line.push("no supports");
+  const summary = line.length ? line.join(" · ") : "Not stated yet";
+  if (!editable) {
+    return `<div class="psettings"><p class="psline"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-printer"></use></svg> ${esc(summary)}</p>${s.notes ? `<p class="help">${esc(s.notes)}</p>` : ""}</div>`;
+  }
+  const sel = (id, opts, cur) => `<select id="${id}">${opts.map(([v, l]) => `<option value="${v}" ${cur === v ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+  return `<details class="pubps itps" open><summary>Print settings <em>optional</em></summary>
+    <p class="help">What worked for you. Feeds the Showcase printer / material / supports filters.</p>
+    <div class="grid2">
+      <div class="field"><label for="${idPrefix}_printer">Printer</label>${sel(idPrefix + "_printer", [["", "Not stated"], ["fdm", "FDM (filament)"], ["resin", "Resin"]], s.printer || "")}</div>
+      <div class="field"><label for="${idPrefix}_material">Material</label>${sel(idPrefix + "_material", [["", "Not stated"], ["pla", "PLA"], ["petg", "PETG"], ["abs", "ABS"], ["asa", "ASA"], ["tpu", "TPU"], ["nylon", "Nylon"], ["resin", "Resin"]], s.material || "")}</div>
+      <div class="field"><label for="${idPrefix}_layer">Layer height <em>mm</em></label><input id="${idPrefix}_layer" type="number" min="0.05" max="1" step="0.05" value="${esc(String(s.layer_height_mm ?? ""))}"></div>
+      <div class="field"><label for="${idPrefix}_infill">Infill <em>%</em></label><input id="${idPrefix}_infill" type="number" min="0" max="100" step="1" value="${esc(String(s.infill_pct ?? ""))}"></div>
+      <div class="field"><label for="${idPrefix}_supports">Supports</label>${sel(idPrefix + "_supports", [["", "Not stated"], ["no", "No supports needed"], ["yes", "Needs supports"]], s.supports || "")}</div>
+      <div class="field"><label for="${idPrefix}_nozzle">Nozzle <em>mm</em></label><input id="${idPrefix}_nozzle" type="number" min="0.1" max="1.2" step="0.05" value="${esc(String(s.nozzle_mm ?? ""))}"></div>
+    </div>
+    <div class="field"><label for="${idPrefix}_name">Printer name <em>optional</em></label><input id="${idPrefix}_name" maxlength="60" value="${esc(s.printer_name || "")}" placeholder="Bambu A1, Prusa MK4…"></div>
+    <div class="field"><label for="${idPrefix}_notes">Notes <em>optional</em></label><input id="${idPrefix}_notes" maxlength="400" value="${esc(s.notes || "")}" placeholder="0.2 mm, 15% gyroid, brim helped"></div>
+    <div class="row"><button type="button" class="btn small" id="${idPrefix}Save">Save print settings</button></div></details>`;
+}
+function psRead(prefix) {
+  return { printer: $(`#${prefix}_printer`)?.value || "", material: $(`#${prefix}_material`)?.value || "",
+    layer_height_mm: $(`#${prefix}_layer`)?.value || "", infill_pct: $(`#${prefix}_infill`)?.value || "",
+    supports: $(`#${prefix}_supports`)?.value || "", nozzle_mm: $(`#${prefix}_nozzle`)?.value || "",
+    printer_name: $(`#${prefix}_name`)?.value || "", notes: $(`#${prefix}_notes`)?.value || "" };
+}
+
 /* publish */
 $("#btnPublish").onclick = () => {
   if (!ME.signed_up) { toast("Create an account first to share projects.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
@@ -503,7 +576,8 @@ $("#btnDoPublish").onclick = async () => {
     const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
       tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim(), nsfw: nsfw === "yes",
       allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
-      ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim() }));
+      ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
+      print_settings: psFields() }));
     if ($("#pub_remix").value.trim()) sessionStorage.removeItem("zeim_remix_of");
     clearInline($("#btnDoPublish")); $("#dlgPublish").close();
     (i.warnings || []).forEach(w => toast(w, "ok"));
@@ -638,7 +712,9 @@ document.addEventListener("click", e => { const a = e.target.closest("a[data-ope
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
   let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
+  const psLine = s => { if (!s || !Object.keys(s).length) return ""; const bits = []; if (s.printer) bits.push(String(s.printer).toUpperCase()); if (s.material) bits.push(String(s.material).toUpperCase()); if (s.layer_height_mm != null) bits.push(s.layer_height_mm + " mm"); if (s.infill_pct != null) bits.push(s.infill_pct + "%"); if (s.supports === "yes") bits.push("supports"); if (s.supports === "no") bits.push("no supports"); if (s.notes) bits.push(s.notes); return bits.length ? `<p class="help psline">${esc(bits.join(" · "))}</p>` : ""; };
   g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure${p.nsfw && !p.mine ? ' class="prmature"' : ""}><img src="${p.url}" alt="${p.nsfw ? "Photo of a print (mature content)" : `Photo of a print${p.caption ? ": " + esc(p.caption) : ""}`}" loading="lazy">${p.nsfw && !p.mine ? `<button type="button" class="btn small mature-label" data-prshow="${p.id}">Mature content: show</button>` : ""}<figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
+      ${psLine(p.settings)}
       ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>`}</figcaption></figure></li>`).join("")
     : `<li class="help">No print photos yet.</li>`;
   g.onclick = async e => {
@@ -752,3 +828,78 @@ async function mountItemCollections(host, id) {
     } catch (e) { inlineMsg(btn, e.message); }
   };
 }
+
+
+/* ---------- creator-answered project questions (no DMs) ---------- */
+async function loadQuestions(id, item) {
+  const list = $("#qaList"), ask = $("#qaAsk"); if (!list) return;
+  let r; try { r = await api(`/api/showcase/${id}/questions`); } catch { list.innerHTML = ""; return; }
+  list.innerHTML = r.questions.length ? r.questions.map(q => `<li class="qaitem" data-qid="${esc(q.id)}">
+      <p class="q"><b>Q.</b> ${esc(q.text)} <span class="help">${esc(q.by)}</span></p>
+      ${q.answer ? `<p class="a"><b>A.</b> ${esc(q.answer)}</p>` : `<p class="help">${q.status === "open" ? "Waiting for the creator" : ""}</p>`}
+      ${q.can_answer ? `<div class="field row"><input id="qaAns_${esc(q.id)}" maxlength="1000" placeholder="Your answer"><button type="button" class="btn small" data-qaans="${esc(q.id)}">Answer</button></div>` : ""}
+      ${(q.mine && !q.answer) || item.owned ? `<button type="button" class="btn small ghost danger" data-qadel="${esc(q.id)}">Delete</button>` : ""}
+    </li>`).join("") : `<li class="help">No questions yet.</li>`;
+  if (ask) {
+    ask.innerHTML = r.can_ask
+      ? `<div class="field"><label for="qaText">Your question</label><input id="qaText" maxlength="280" placeholder="Will this print without supports?"></div>
+         <button type="button" class="btn" id="qaSend">Ask</button>`
+      : (item.owned ? `<p class="help">You see unanswered questions here so you can reply. Answers are public on this page.</p>` : "");
+  }
+  if ($("#qaSend")) $("#qaSend").onclick = async () => {
+    const text = $("#qaText").value.trim(); if (!text) return inlineMsg($("#qaSend"), "Write a question first.");
+    $("#qaSend").disabled = true;
+    try { await api(`/api/showcase/${id}/questions`, J("POST", { text })); toast("Question posted", "ok"); loadQuestions(id, item); }
+    catch (e) { inlineMsg($("#qaSend"), e.message); } finally { $("#qaSend").disabled = false; }
+  };
+  list.onclick = async e => {
+    const ans = e.target.closest("[data-qaans]"), del = e.target.closest("[data-qadel]");
+    try {
+      if (ans) {
+        const text = $(`#qaAns_${ans.dataset.qaans}`)?.value?.trim(); if (!text) return toast("Write an answer first.", "err");
+        await api(`/api/showcase/${id}/questions/${ans.dataset.qaans}/answer`, J("POST", { text })); toast("Answered", "ok"); loadQuestions(id, item);
+      }
+      if (del) { await api(`/api/showcase/${id}/questions/${del.dataset.qadel}`, { method: "DELETE" }); toast("Question removed", "ok"); loadQuestions(id, item); }
+    } catch (er) { toast(er.message, "err"); }
+  };
+}
+
+/* ---------- prize-free themed challenges ---------- */
+async function loadChallenges() {
+  const host = $("#chHost"); if (!host) return;
+  let r; try { r = await api("/api/challenges"); } catch (e) { host.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
+  host.innerHTML = (r.challenges || []).map(c => `<article class="chcard" data-cid="${esc(c.id)}">
+      <h3>${esc(c.title)} <span class="pill prizefree">Prize-free</span></h3>
+      <p>${esc(c.blurb)}</p>
+      <p class="help">${c.entry_count} ${c.entry_count === 1 ? "entry" : "entries"} · ${esc(c.status)}</p>
+      <button type="button" class="btn small" data-chopen="${esc(c.id)}">Open</button>
+    </article>`).join("") || `<p class="help">No challenges right now.</p>`;
+  host.querySelectorAll("[data-chopen]").forEach(b => b.onclick = () => openChallenge(b.dataset.chopen));
+}
+async function openChallenge(cid) {
+  let c; try { c = await api("/api/challenges/" + cid); } catch (e) { return toast(e.message, "err"); }
+  $("#chDlgH").textContent = c.title;
+  const rules = (c.rules || []).map(r => `<li>${esc(r)}</li>`).join("");
+  const entries = (c.entries || []).map(e => `<li><a href="#" data-open-item="${esc(e.id)}">${esc(e.title)}</a> <span class="help">by ${esc(e.creator)}</span></li>`).join("")
+    || `<li class="help">No entries yet. Publish a credited remix, then enter it here.</li>`;
+  $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
+    <p>${esc(c.blurb)}</p>
+    <ul class="help chrules">${rules}</ul>
+    <p class="help">ZEIM takes no cut of tips. Tip links stay optional with no nags.</p>
+    ${c.can_enter ? `<div class="field"><label for="chEnterId">Your remix project id or /p/… link</label><input id="chEnterId" maxlength="200" placeholder="abc123 or https://…/p/abc123"></div>
+      <button type="button" class="btn primary" id="chEnterGo">Enter my remix</button>` : ""}
+    <h4>Entries</h4><ul class="plist" id="chEntries">${entries}</ul>`;
+  if ($("#chEnterGo")) $("#chEnterGo").onclick = async () => {
+    let raw = ($("#chEnterId").value || "").trim(); const m = raw.match(/\/p\/([A-Za-z0-9]+)/); const item_id = m ? m[1] : raw;
+    if (!item_id) return inlineMsg($("#chEnterGo"), "Paste your remix's Showcase link or id.");
+    $("#chEnterGo").disabled = true;
+    try { const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id })); toast(r.message || "Entered", "ok"); openChallenge(cid); }
+    catch (e) { inlineMsg($("#chEnterGo"), e.message); } finally { $("#chEnterGo").disabled = false; }
+  };
+  if (!$("#dlgChallenge").open) $("#dlgChallenge").showModal();
+}
+document.addEventListener("DOMContentLoaded", () => { try { loadChallenges(); } catch { } });
+// also refresh when Showcase view is shown
+const _chObs = new MutationObserver(() => { if (document.body.dataset.view === "showcase") loadChallenges(); });
+try { _chObs.observe(document.body, { attributes: true, attributeFilter: ["data-view"] }); } catch { }
+
