@@ -122,12 +122,28 @@ def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)
         raise HTTPException(401, "Create an account first.")
     if not config.TESTING_MODE and (not ratelimit.hit("username:" + actor.sid, 20, 3600) or not ratelimit.hit("usernameip:" + _ip(request), 200, 3600)):
         raise HTTPException(429, "Too many tries. Please wait a while.")
+    chosen = str(body.get("username", ""))[:60]
+    svc = getattr(request.app.state, "auth_service", None)
+    auth_id = actor.auth_session.account_id if actor.auth_session is not None else None
+    if svc is not None and auth_id:
+        from ..auth.errors import AuthError
+        try:
+            svc.prepare_login_rename(auth_id, chosen)
+        except AuthError as e:
+            raise HTTPException(e.status, e.message)
     try:
-        return {"username": usernames.change(actor.sid, str(body.get("username", ""))[:60])}
+        name = usernames.change(actor.sid, chosen)
     except usernames.UsernameWait as e:
         raise HTTPException(429, str(e))
     except usernames.UsernameError as e:
         raise HTTPException(409 if "taken" in str(e) else 400, str(e))
+    if svc is not None and auth_id:
+        from ..auth.errors import AuthError
+        try:
+            svc.sync_login_name(auth_id, name)
+        except AuthError as e:
+            raise HTTPException(e.status, e.message)
+    return {"username": name}
 
 
 @router.post("/me/username/suggest")

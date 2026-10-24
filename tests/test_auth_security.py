@@ -40,6 +40,7 @@ def signin(c, key):
 
 # ---- CSRF ----------------------------------------------------------------------------------------------------------
 @pytest.mark.parametrize("method,path", [("post", "/api/auth/signup/begin"), ("post", "/api/auth/email/request"),
+                                         ("post", "/api/auth/password/login"), ("post", "/api/auth/password/register"),
                                          ("post", "/api/auth/logout"), ("post", "/api/auth/sessions/revoke-all"),
                                          ("delete", "/api/auth/email"), ("delete", "/api/auth/sessions/abc")])
 def test_state_changing_routes_need_the_csrf_header(method, path):

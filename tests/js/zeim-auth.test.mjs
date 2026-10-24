@@ -54,6 +54,26 @@ test("API errors become AuthApiError with the friendly message, code and Retry-A
   await assert.rejects(() => A.requestEmailCode("a@b.co"), e => e instanceof A.AuthApiError && e.code === "rate_limited" && e.retryAfter === 42 && /wait a bit/.test(e.message));
 });
 
+test("password sign-in posts JSON and does not put the password in the URL", async () => {
+  const calls = fakeFetch(200, { signed_in: true });
+  await A.signInWithPassword("ZeimApp", "correct horse battery");
+  assert.equal(calls[0].url, "/api/auth/password/login");
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(calls[0].init.headers["X-Requested-With"], "zeim");
+  assert.ok(!calls[0].url.includes("correct"));
+  assert.deepEqual(JSON.parse(calls[0].init.body), { identifier: "ZeimApp", password: "correct horse battery" });
+});
+
+test("add-password and reset helpers hit the password routes", async () => {
+  const calls = fakeFetch(200, { ok: true, login_name: "zeimapp" });
+  await A.addPassword("correct horse");
+  await A.requestPasswordReset("a@b.co");
+  await A.confirmPasswordReset("a@b.co", "123456", "correct horse");
+  assert.deepEqual(calls.map(c => c.url), [
+    "/api/auth/password/add", "/api/auth/password/reset/request", "/api/auth/password/reset/confirm"]);
+  assert.deepEqual(JSON.parse(calls[0].init.body), { password: "correct horse" });
+});
+
 test("ids are URL-encoded in paths", async () => {
   const calls = fakeFetch(200, { ok: true });
   await A.revokeDevice("a/b c");
@@ -80,6 +100,22 @@ test("device labels and passkey names render as text, not HTML", async () => {
   const text = box.textContent;
   assert.ok(text.includes(evil));                       // present only as literal text
   assert.ok(text.includes("Sign out everywhere") && text.includes("(this device)"));
+});
+
+test("a passkey account without a password is offered Add a password, as text", async () => {
+  const evil = '<script>alert(1)</script>';
+  fakeFetch(200, { display_name: "S", email: null, has_password: false, login_name: null,
+    passkeys: [], devices: [] });
+  const box = new El("div"); box.ownerDocument = fakeDoc;
+  await A.mountSecurityPanel(box);
+  assert.match(box.textContent, /Add a password/);
+  assert.ok(box.textContent.includes("another phone"));
+  assert.ok(!box.textContent.includes("<script>"));
+  fakeFetch(200, { display_name: "S", email: null, has_password: true, login_name: evil, passkeys: [], devices: [] });
+  const box2 = new El("div"); box2.ownerDocument = fakeDoc;
+  await A.mountSecurityPanel(box2);
+  assert.ok(box2.textContent.includes(evil));
+  assert.match(box2.textContent, /Change password/);
 });
 
 test("signed-out visitors see a prompt instead of an error", async () => {
