@@ -14,7 +14,7 @@ from . import cadops as C
 
 FONTS = ("sans", "sans-bold", "serif", "mono")
 KEYS = {"text", "font", "size", "depth", "style", "target", "point", "normal", "rotation",
-        "nozzle", "plate_thickness", "margin", "replace"}
+        "nozzle", "plate_thickness", "margin", "replace", "fit"}
 
 
 def _frame(n):
@@ -44,6 +44,41 @@ def warnings_for(poly, depth, nozzle):
     if depth < 2 * 0.2:
         out.append(f"Depth {depth:g} mm is only a layer or two; the text may barely show. 0.6 mm or more reads better.")
     return out
+
+
+def _face_span(m, pt, nrm):
+    """Span and centre of the coplanar face region under the tap. None when no flat face is there."""
+    mm = m.copy()
+    mm.merge_vertices()
+    nrm = np.asarray(nrm, float)
+    nrm = nrm / np.linalg.norm(nrm)
+    pt = np.asarray(pt, float)
+    fn = mm.face_normals
+    cent = mm.triangles_center
+    ok = (fn @ nrm > 0.999) & (np.abs((cent - pt) @ nrm) < 1e-3 * max(1.0, float(mm.scale)))
+    if not np.any(ok):
+        return None
+    cand = np.nonzero(ok)[0]
+    seed = int(cand[np.argmin(np.linalg.norm(cent[cand] - pt, axis=1))])
+    nb: dict[int, list[int]] = {}
+    for a, b in mm.face_adjacency:
+        if ok[a] and ok[b]:
+            nb.setdefault(int(a), []).append(int(b))
+            nb.setdefault(int(b), []).append(int(a))
+    region, stack = {seed}, [seed]
+    while stack:
+        f = stack.pop()
+        for g in nb.get(f, []):
+            if g not in region:
+                region.add(g)
+                stack.append(g)
+    verts = mm.vertices[np.unique(mm.faces[list(region)])]
+    uu, vv, nn = _frame(nrm)
+    rel = verts - pt
+    us, vs = rel @ uu, rel @ vv
+    center = pt + uu * float((us.min() + us.max()) / 2) + vv * float((vs.min() + vs.max()) / 2)
+    center = center - nn * float((center - pt) @ nn)
+    return float(us.max() - us.min()), float(vs.max() - vs.min()), center
 
 
 def op_cad_text(m, p):
@@ -90,8 +125,24 @@ def op_cad_text(m, p):
         if np.linalg.norm(nrm) < 1e-9:
             raise OpError("normal can't be zero.")
         u, v, n = _frame(nrm)
+        origin = pt
+        fitted = False
+        if p.get("fit"):
+            span = _face_span(m, pt, nrm)
+            if span is not None:
+                su, sv, origin = span
+                minx, miny, maxx, maxy = poly.bounds
+                gw, gh = max(maxx - minx, 1e-6), max(maxy - miny, 1e-6)
+                if su > 1 and sv > 1:
+                    factor = min((su * 0.85) / gw, (sv * 0.85) / gh)
+                    new_size = float(max(1.0, min(300.0, size * factor)))
+                    if abs(new_size - size) >= 0.05:
+                        size = new_size
+                        poly = text_polygon(txt, font, size)
+                        warns = warnings_for(poly, depth, nozzle)
+                fitted = True
         sink = 0.3 + 0.15 * size          # bites into gently curved surfaces so raised text doesn't float
-        tool = _solid(poly, -sink, depth, pt, u, v, n, rot) if style == "raised" else _solid(poly, -depth, sink, pt, u, v, n, rot)
+        tool = _solid(poly, -sink, depth, origin, u, v, n, rot) if style == "raised" else _solid(poly, -depth, sink, origin, u, v, n, rot)
         a, b = C._to_manifold(m), C._to_manifold(tool)
         r = a + b if style == "raised" else a - b
         if r.is_empty():
@@ -103,6 +154,8 @@ def op_cad_text(m, p):
         if style == "raised" and len(C.bodies(out)) > len(C.bodies(m)):
             warns.append("Part of the text doesn't touch the model (floating). Move it onto a flatter spot or lower the size.")
         what = f"{'Raised' if style == 'raised' else 'Cut-in'} text '{txt}' {depth:g} mm"
+        if fitted:
+            what += ". Centered and fitted on this face"
     mm = out.copy(); mm.merge_vertices()
     if not mm.is_watertight:
         raise OpError("The text didn't make a clean closed solid here. Try another spot, size or font.")

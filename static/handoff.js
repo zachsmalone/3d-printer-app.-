@@ -72,6 +72,27 @@ function remember(src) {
 }
 const units = () => { try { return localStorage.getItem("zeim.cad.units") || localStorage.getItem("eunit") || "mm"; } catch { return "mm"; } };
 
+async function sendToShowcase(src) {
+  try {
+    document.dispatchEvent(new CustomEvent("zeim:save-now"));
+    let build;
+    if (src === "lithophane") {
+      if (!S.current?.id) throw new Error("Make a model first, then send it.");
+      const named = ($("#designName")?.value || "").trim();
+      build = { id: S.current.id, title: named || S.current.title, ai: S.current.ai, mode: S.current.mode, base: S.current.base };
+    } else if (src === "slicer") {
+      const id = window.__zeimEdit?.p?.id || ss.get("zeim.edit.last");
+      if (!id) throw new Error("Open a model in the Slicer first.");
+      build = { id, title: window.__zeimEdit?.p?.title || "Slicer model" };
+    } else if (src === "torchc0") {
+      build = { id: await editIdFrom("torchc0"), title: "Resin model" };
+    } else throw new Error("Nothing to send.");
+    if (typeof window.zeimOpenShowcase === "function") { window.zeimOpenShowcase(build); return true; }
+    location.href = "/?publish=" + encodeURIComponent(build.id);
+    return true;
+  } catch (e) { toast(e.message, "err"); return false; }
+}
+
 export async function sendTo(target, src = sourceNow()) {
   if (!targetsFor(src).includes(target)) { toast(`${NAMES[target]} doesn't match your printer type. Change it with My printer at the top.`); return false; }
   document.dispatchEvent(new CustomEvent("zeim:save-now"));                    // nothing is lost
@@ -103,10 +124,20 @@ function menu(src, anchor) {
   const ts = targetsFor(src), other = kind() === "resin" ? "FDM Slicer" : "TorchC0";
   d.innerHTML = `<div class="dlg"><div class="dh"><h3 id="sendToH">Send to…</h3><button type="button" class="x" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
     <div class="body"><p class="help">The same model goes over with its size, units and orientation. Your work here is saved first.</p>
-    <ul class="sendlist">${ts.map(t => `<li><button type="button" class="btn sendto" data-to="${t}"><b>${NAMES[t]}</b><small>${DESC[t]}</small></button></li>`).join("")}</ul>
+    <ul class="sendlist">${ts.map(t => `<li><button type="button" class="btn sendto" data-to="${t}"><b>${NAMES[t]}</b><small>${DESC[t]}</small></button></li>`).join("")}
+    <li><button type="button" class="btn sendto" data-to="showcase"><b>Showcase</b><small>Send this model to Showcase. Free to share. ZEIM doesn't take a cut.</small></button></li></ul>
     <p class="help" id="sendToKind">Printer type: ${kind() === "resin" ? "Resin" : "FDM"}. ${esc(other)} is hidden; change it with My printer at the top.</p></div></div>`;
   d.querySelector("[data-close]").onclick = () => d.close();
-  d.querySelectorAll("[data-to]").forEach(b => b.onclick = async () => { b.disabled = true; b.setAttribute("aria-busy", "true"); const ok = await sendTo(b.dataset.to, src); if (d.open) d.close(); if (!ok) anchor?.focus(); });
+  d.querySelectorAll("[data-to]").forEach(b => b.onclick = async () => {
+    b.disabled = true; b.setAttribute("aria-busy", "true");
+    let ok = false;
+    try {
+      if (b.dataset.to === "showcase") ok = await sendToShowcase(src);
+      else ok = await sendTo(b.dataset.to, src);
+    } finally { b.disabled = false; b.removeAttribute("aria-busy"); }
+    if (ok && d.open) d.close();
+    if (!ok) anchor?.focus();
+  });
   d.addEventListener("close", () => anchor?.focus(), { once: true });
   d.showModal(); d.querySelector("[data-to]")?.focus();
 }

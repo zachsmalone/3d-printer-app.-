@@ -400,7 +400,8 @@ def op_face_offset(m, p):
     out = _new(v, mm.faces)
     if mm.is_watertight and out.volume <= 0:
         raise OpError("That offset turns the body inside out.")
-    return out, {"message": f"Face moved {d:g} mm ({len(region)} triangles)."}
+    side = "inward" if d < 0 else "outward"
+    return out, {"message": f"Face moved {abs(d):g} mm {side} ({len(region)} triangles)."}
 
 
 def _xform_matrix(p, center):

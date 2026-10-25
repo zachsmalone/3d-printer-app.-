@@ -16,6 +16,28 @@ const FALLBACK = [
 let FORMATS = null, STEPNOTE = "STEP is not offered: it needs a true solid (B-rep), and ZEIM models are triangle meshes.";
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } };
+async function saveBlob(url, filename, statusEl) {
+  if (!url || url === "#") { if (statusEl) statusEl.textContent = "Download failed. The file was not saved."; return; }
+  if (statusEl) statusEl.textContent = "Downloading…";
+  try {
+    const r = await fetch(url, { credentials: "same-origin" });
+    if (!r.ok) {
+      let msg = "Download failed. The file was not saved.";
+      try { const j = await r.json(); if (typeof j.detail === "string" && j.detail) msg = j.detail; } catch { }
+      if (statusEl) statusEl.textContent = msg;
+      return;
+    }
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || "model";
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+    if (statusEl) statusEl.textContent = "Saved. Look in your Files or Downloads.";
+  } catch {
+    if (statusEl) statusEl.textContent = "Download failed. The file was not saved.";
+  }
+}
 export function safeName(n) {
   let s = String(n ?? "").normalize("NFC").replace(/[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, " ")
     .replace(/\s+/g, " ").trim().replace(/^\.+/, "").replace(/[. ]+$/, "");
@@ -124,7 +146,12 @@ export async function open(o) {
   $("#expSlotList").onchange = () => { warnOff = false; slotWarn(); paint(); };
   $("#expList").onchange = e => { if (e.target.name === "expFmt") { ls("zeim.exportfmt." + ws, e.target.value); paint(); } };
   $("#expPartList").onchange = () => paint();
-  $("#expGo").onclick = () => { ls("zeim.exportfmt." + ws, d.querySelector("input[name=expFmt]:checked")?.value || "3mf"); $("#expMsg").textContent = "Downloading…"; };
+  $("#expGo").onclick = (e) => {
+    e.preventDefault();
+    ls("zeim.exportfmt." + ws, d.querySelector("input[name=expFmt]:checked")?.value || "3mf");
+    const go = $("#expGo");
+    saveBlob(go.getAttribute("href") || go.href, go.getAttribute("download") || "model", $("#expMsg"));
+  };
   editing(false); slotWarn(); paint();
   if (!d.open) d.showModal();
   return d;

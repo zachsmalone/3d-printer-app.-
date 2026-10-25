@@ -33,7 +33,7 @@
     function load() { var a = rd(K()) || {}, b = rd(KP()) || {}; P.forEach(function (p) { state[p.id] = Object.assign({}, p.def, b[p.id] || {}, { hidden: !p.core && !!(a[p.id] ? a[p.id].hidden : p.def.hidden), min: !!(a[p.id] ? a[p.id].min : p.def.min) }); }); }
     function save() {
       var a = {}, b = {};
-      P.forEach(function (p) { var s = state[p.id]; a[p.id] = { hidden: !!s.hidden, min: !!s.min }; b[p.id] = { edge: s.edge || null, t: s.t, x: s.x, y: s.y, w: s.w, h: s.h }; });
+      P.forEach(function (p) { var s = state[p.id]; a[p.id] = { hidden: !!s.hidden, min: !!s.min }; b[p.id] = { edge: s.userSize ? null : (s.edge || null), t: s.t, x: s.x, y: s.y, w: s.w, h: s.h, userSize: !!s.userSize }; });
       wr(K(), a); wr(KP(), b);
     }
     function wrap(p) {
@@ -41,37 +41,58 @@
       w.innerHTML = '<div class="zws-head"><button type="button" class="zws-grip" aria-label="Move ' + p.label + ': drag it anywhere or to a side; Enter sends it to the next side">' + ICON.grip + '</button>' +
         '<button type="button" class="zws-chip" aria-label="' + p.label + ' (minimised): tap to open" title="' + p.label + '">' + p.label + '</button>' +
         '<span class="zws-t">' + p.label + '</span><button type="button" class="zws-min" aria-label="Minimise ' + p.label + '" title="Minimise">' + ICON.min + '</button>' +
-        (p.core ? "" : '<button type="button" class="zws-hide" aria-label="Hide ' + p.label + ' (bring it back from Customise workspace)" title="Hide">' + ICON.hide + '</button>') + "</div>" +
-        '<div class="zws-body"></div>' + (p.resize === false ? "" : '<div class="zws-rs" aria-hidden="true"></div>');
+        (p.core ? "" : '<button type="button" class="zws-hide" aria-label="Remove ' + p.label + ' (bring it back from Customise workspace)" title="Remove">' + ICON.hide + '</button>') + "</div>" +
+        '<div class="zws-body"></div>' + (p.resize === false ? "" : '<div class="zws-rs" data-dir="se" aria-hidden="true"></div><div class="zws-edge" data-dir="e" aria-hidden="true"></div><div class="zws-edge" data-dir="s" aria-hidden="true"></div><div class="zws-edge" data-dir="w" aria-hidden="true"></div><div class="zws-edge" data-dir="n" aria-hidden="true"></div>');
       p.w = w; p.body = w.querySelector(".zws-body"); p.home = p.el.parentElement; p.next = p.el.nextSibling;
       var g = w.querySelector(".zws-grip"), drag = null;
-      g.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); try { g.setPointerCapture(e.pointerId); } catch (er) {} drag = { x: e.clientX, y: e.clientY, moved: false }; });
+      g.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); try { g.setPointerCapture(e.pointerId); } catch (er) {} interacting = true; drag = { x: e.clientX, y: e.clientY, moved: false }; });
       g.addEventListener("pointermove", function (e) { if (!drag) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 6) return; drag.moved = true; w.classList.add("drag"); w.style.transform = "translate(" + dx + "px," + dy + "px)"; });
       function end(e) {
-        if (!drag) return; var moved = drag.moved; drag = null; if (!moved) return; p.justDragged = true;
+        if (!drag) { interacting = false; return; } var moved = drag.moved; drag = null; if (!moved) { interacting = false; return; } p.justDragged = true; interacting = false;
         var rr = root.getBoundingClientRect(), r = w.getBoundingClientRect(); w.style.transform = ""; w.classList.remove("drag");
         var bx = lastBox || { x: 0, y: 0, w: rr.width, h: rr.height }, px = e.clientX - rr.left, py = e.clientY - rr.top;
         var d = { left: px - bx.x, right: bx.x + bx.w - px, top: py - bx.y, bottom: bx.y + bx.h - py };
         var edge = Object.keys(d).sort(function (a, b) { return d[a] - d[b]; })[0], s = state[p.id];
-        if (d[edge] < SNAP) { s.edge = edge; var vert = edge === "left" || edge === "right"; s.t = Math.max(0, Math.min(1, vert ? (py - bx.y) / bx.h : (px - bx.x) / bx.w)); }
-        else { s.edge = null; s.x = Math.max(0, (r.left - rr.left) / rr.width); s.y = Math.max(0, (r.top - rr.top) / rr.height); }
+        if (d[edge] < SNAP) { s.edge = edge; s.userSize = false; var vert = edge === "left" || edge === "right"; s.t = Math.max(0, Math.min(1, vert ? (py - bx.y) / bx.h : (px - bx.x) / bx.w)); }
+        else { s.edge = null; s.x = Math.max(0, (r.left - rr.left) / rr.width); s.y = Math.max(0, (r.top - rr.top) / rr.height); if (s.userSize) { s.w = Math.round(r.width); s.h = Math.round(r.height); } }
         save(); layout();
       }
       g.addEventListener("pointerup", end); g.addEventListener("pointercancel", end);
-      g.addEventListener("click", function () { if (p.justDragged) { p.justDragged = false; return; } var s = state[p.id]; s.edge = EDGES[(EDGES.indexOf(s.edge || "top") + 1) % 4]; s.t = s.t || 0; save(); layout(); g.focus(); });
+      g.addEventListener("click", function () { if (p.justDragged) { p.justDragged = false; return; } var s = state[p.id]; s.userSize = false; s.edge = EDGES[(EDGES.indexOf(s.edge || "top") + 1) % 4]; s.t = s.t || 0; save(); layout(); g.focus(); });
       w.querySelector(".zws-min").onclick = function () { state[p.id].min = true; save(); layout(); w.querySelector(".zws-chip").focus(); };
       w.querySelector(".zws-chip").onclick = function () { if (p.justDragged) { p.justDragged = false; return; } p.pri = p.chipPri = Date.now(); state[p.id].min = false; save(); layout(); };
       var hb = w.querySelector(".zws-hide"); if (hb) hb.onclick = function () { setHidden(p.id, true); };
-      var rs = w.querySelector(".zws-rs");
-      if (rs) { var rz = null;
-        rs.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); rs.setPointerCapture(e.pointerId); var r = w.getBoundingClientRect(); rz = { x: e.clientX, y: e.clientY, w: r.width, h: r.height }; });
-        rs.addEventListener("pointermove", function (e) { if (!rz) return; w.style.width = Math.max(120, rz.w + e.clientX - rz.x) + "px"; w.style.maxHeight = w.style.height = Math.max(64, rz.h + e.clientY - rz.y) + "px"; });
-        var re = function () { if (!rz) return; rz = null; var r = w.getBoundingClientRect(), s = state[p.id]; s.w = Math.round(r.width); s.h = Math.round(r.height); save(); layout(); };
-        rs.addEventListener("pointerup", re); rs.addEventListener("pointercancel", re); }
+      w.querySelectorAll("[data-dir]").forEach(function (el) {
+        var dir = el.dataset.dir, rz = null;
+        el.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); try { el.setPointerCapture(e.pointerId); } catch (er) {} interacting = true; var r = w.getBoundingClientRect(); rz = { x: e.clientX, y: e.clientY, l: r.left, t: r.top, w: r.width, h: r.height }; });
+        el.addEventListener("pointermove", function (e) {
+          if (!rz) return;
+          var dx = e.clientX - rz.x, dy = e.clientY - rz.y, L = rz.l, T = rz.t, W = rz.w, H = rz.h, rr = root.getBoundingClientRect();
+          if (dir.indexOf("e") >= 0) W = rz.w + dx;
+          if (dir.indexOf("s") >= 0) H = rz.h + dy;
+          if (dir.indexOf("w") >= 0) { W = rz.w - dx; L = rz.l + rz.w - W; }
+          if (dir.indexOf("n") >= 0) { H = rz.h - dy; T = rz.t + rz.h - H; }
+          W = Math.max(160, W); H = Math.max(120, H);
+          if (L < rr.left) { W -= rr.left - L; L = rr.left; }
+          if (T < rr.top) { H -= rr.top - T; T = rr.top; }
+          if (L + W > rr.right) W = Math.max(160, rr.right - L);
+          if (T + H > rr.bottom) H = Math.max(120, rr.bottom - T);
+          w.style.left = (L - rr.left) + "px"; w.style.top = (T - rr.top) + "px";
+          w.style.width = W + "px"; w.style.height = H + "px"; w.style.maxWidth = W + "px"; w.style.maxHeight = H + "px";
+        });
+        var re = function () {
+          if (!rz) return; rz = null; interacting = false;
+          var r = w.getBoundingClientRect(), rr = root.getBoundingClientRect(), s = state[p.id];
+          s.userSize = true; s.edge = null; s.w = Math.round(r.width); s.h = Math.round(r.height);
+          s.x = Math.max(0, (r.left - rr.left) / Math.max(1, rr.width)); s.y = Math.max(0, (r.top - rr.top) / Math.max(1, rr.height));
+          save(); layout();
+        };
+        el.addEventListener("pointerup", re); el.addEventListener("pointercancel", re);
+      });
     }
     function rekey() { load(); layout(); }
-    function setHidden(id, h) { var p = P.find(function (x) { return x.id === id; }); if (!p || p.core && h) return false; state[id].hidden = !!h; if (!h) { state[id].min = false; p.pri = Date.now(); } save(); layout(); return true; }
+    function setHidden(id, h) { var p = P.find(function (x) { return x.id === id; }); if (!p || p.core && h) return false; state[id].hidden = !!h; if (p.w) p.w.hidden = !!h || !!p.el.hidden; if (!h) { state[id].min = false; p.pri = Date.now(); } save(); layout(); return true; }
     function home(p) { if (p.el.parentElement === p.body) { p.home.insertBefore(p.el, p.next && p.next.parentNode === p.home ? p.next : null); p.w.remove(); } }
     function mount() { var fa = document.activeElement; P.forEach(function (p) { if (p.skip && p.skip()) return home(p); if (p.el.parentElement !== p.body) { p.body.append(p.el); root.append(p.w); } }); if (!on) root.classList.add("zws"); on = true; refocus(fa); }
     function unmount() { var fa = document.activeElement; P.forEach(function (p) { if (p.el.parentElement === p.body) { p.home.insertBefore(p.el, p.next && p.next.parentNode === p.home ? p.next : null); p.w.remove(); } }); root.classList.remove("zws"); on = false; refocus(fa); }
@@ -83,6 +104,16 @@
     }
     function place(p, s, box, obs) {
       var w = p.w, vert = s.edge === "left" || s.edge === "right";
+      if (s.userSize && !s.min) {
+        var Wu = Math.max(160, Math.min(s.w || 220, box.w)), Hu = Math.max(120, Math.min(s.h || 180, box.h));
+        var xu = box.x + Math.min(Math.max(0, box.w - Wu), Math.max(0, (s.x || 0) * box.w));
+        var yu = box.y + Math.min(Math.max(0, box.h - Hu), Math.max(0, (s.y || 0) * box.h));
+        w.classList.add("user-size", "free"); w.classList.remove("v", "h", "auto-off", "auto-min"); w.dataset.edge = "free";
+        w.style.left = xu + "px"; w.style.top = yu + "px"; w.style.width = Wu + "px"; w.style.height = Hu + "px";
+        w.style.maxWidth = box.w + "px"; w.style.maxHeight = box.h + "px";
+        return { x: xu, y: yu, w: Wu, h: Hu };
+      }
+      w.classList.remove("user-size");
       w.classList.toggle("v", !!s.edge && vert); w.classList.toggle("h", !!s.edge && !vert); w.dataset.edge = s.edge || "free"; w.classList.toggle("free", !s.edge);
       w.style.left = w.style.top = "0px"; w.style.width = s.w && !s.min ? Math.min(s.w, box.w) + "px" : ""; w.style.height = "";
       w.style.maxWidth = box.w + "px"; w.style.maxHeight = (s.h && !s.min ? Math.min(s.h, box.h) : box.h) + "px";
@@ -120,8 +151,8 @@
       w.classList.toggle("v", !!s.edge && vert); w.classList.toggle("h", !!s.edge && !vert); w.dataset.edge = s.edge || "free";   // undo the trial edges' classes
       var f = cands(s.edge, s.t, W, H)[0] || { x: box.x, y: box.y, w: W, h: H }; w.style.left = f.x + "px"; w.style.top = f.y + "px"; w.dataset.crowded = "1"; return f;
     }
-    var queued = false, lastBox = null, api_watch = null;
-    function layout() { if (queued) return; queued = true; Promise.resolve().then(function () { queued = false; doLayout(); }); }   // before the next paint: no frame with a panel on top of another
+    var queued = false, lastBox = null, api_watch = null, interacting = false;
+    function layout() { if (interacting) return; if (queued) return; queued = true; Promise.resolve().then(function () { queued = false; if (!interacting) doLayout(); }); }   // before the next paint: no frame with a panel on top of another
     function doLayout() {
       var want = !o.active || o.active(); if (want) mount(); else if (on) unmount(); if (!on) return;
       if (o.before) o.before(); if (api_watch) api_watch();
@@ -143,10 +174,11 @@
     /* Customise workspace */
     var dlg = document.createElement("dialog"); dlg.className = "zws-dlg"; dlg.id = "zwsDlg-" + o.id; dlg.setAttribute("aria-label", "Customise workspace");
     function fillDlg() {
-      dlg.innerHTML = '<form method="dialog"><h2>Customise workspace' + (o.title ? ": " + (typeof o.title === "function" ? o.title() : o.title) : "") + '</h2><p class="help">Show or hide each panel here. Drag a panel by its grip to move it or dock it to any side.</p><ul class="zws-list">' +
-        P.map(function (p) { return '<li><label><input type="checkbox" data-zws="' + p.id + '"' + (state[p.id].hidden ? "" : " checked") + (p.core ? " disabled" : "") + "> " + p.label + (p.core ? ' <small>(always shown)</small>' : "") + "</label></li>"; }).join("") +
+      dlg.innerHTML = '<form method="dialog"><h2>Customise workspace' + (o.title ? ": " + (typeof o.title === "function" ? o.title() : o.title) : "") + '</h2><p class="help">Show or hide each panel here. Drag a panel by its grip to move it or dock it to any side. Drag an edge to resize left, right, up or down.</p><ul class="zws-list">' +
+        P.map(function (p) { return '<li><label><input type="checkbox" data-zws="' + p.id + '"' + (state[p.id].hidden ? "" : " checked") + (p.core ? " disabled" : "") + "> " + p.label + (p.core ? ' <small>(always shown)</small>' : "") + "</label>" + (p.core ? "" : '<button type="button" class="btn small" data-zws-remove="' + p.id + '">Remove</button>') + "</li>"; }).join("") +
         '</ul><div class="zws-row"><button type="button" class="btn" data-zws-reset>Reset layout</button><button class="btn primary" value="ok">Done</button></div></form>';
       dlg.querySelectorAll("input[data-zws]").forEach(function (c) { c.onchange = function () { setHidden(c.dataset.zws, !c.checked); }; });
+      dlg.querySelectorAll("[data-zws-remove]").forEach(function (b) { b.onclick = function () { setHidden(b.getAttribute("data-zws-remove"), true); fillDlg(); }; });
       dlg.querySelector("[data-zws-reset]").onclick = function () { reset(); fillDlg(); };
     }
     document.body.append(dlg);

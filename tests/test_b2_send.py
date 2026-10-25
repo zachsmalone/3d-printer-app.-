@@ -103,10 +103,21 @@ def test_share_rows_ship_off_until_the_device_spike_passed(monkeypatch):
 
 def test_printer_ui_only_in_local_mode_for_adults(monkeypatch):
     monkeypatch.setattr(config, "MODE", "shared")
+    monkeypatch.setattr(config, "LAN_PRINTERS", False)
     a = client(ADULT); assert a.get("/api/me").json()["send"]["printer_ui"] is False
     monkeypatch.setattr(config, "MODE", "local")
     assert a.get("/api/me").json()["send"]["printer_ui"] is True
     assert client(SUSPENDED).get("/api/me").json()["send"]["printer_ui"] is False
+
+
+def test_printer_ui_on_shared_when_lan_and_direct(monkeypatch):
+    monkeypatch.setattr(config, "MODE", "shared")
+    monkeypatch.setattr(config, "LAN_PRINTERS", True)
+    monkeypatch.setenv("ZEIM_PRINTER_DIRECT", "1")
+    a = client(ADULT)
+    assert a.get("/api/me").json()["send"]["printer_ui"] is True
+    monkeypatch.setattr(config, "LAN_PRINTERS", False)
+    assert a.get("/api/me").json()["send"]["printer_ui"] is False
 
 
 

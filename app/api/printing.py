@@ -34,7 +34,10 @@ def _send_file(bid: str, name: str):
     p = store.dir(bid) / name
     if not p.exists():
         raise HTTPException(404)
-    return FileResponse(p, filename=f"photo3d_{bid}.{name.split('.')[-1]}" if name != "thumb.png" else None, headers={"Cache-Control": "no-store"})
+    ext = name.rsplit(".", 1)[-1].lower()
+    media = {"stl": "model/stl", "obj": "model/obj", "3mf": "model/3mf", "gcode": "text/plain; charset=utf-8", "png": "image/png"}.get(ext)
+    fname = None if name == "thumb.png" else f"photo3d_{bid}.{ext}"
+    return FileResponse(p, media_type=media, filename=fname, headers={"Cache-Control": "no-store"})
 
 
 @files_router.get("/files/{bid}/{name}")
@@ -175,7 +178,7 @@ def test_printer(printer_id: str, request: Request, actor: Actor = Depends(get_a
     guards.require_send(request, actor)
     if not printers.direct_control_enabled():
         raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
-    if not guards.can_see_printer_urls(request, actor):
+    if not guards.can_manage_printers(request, actor):
         raise HTTPException(403, "Only the person who manages this server can test printers.")
     pr = settings.get_printer(printer_id)
     if not pr:
@@ -209,7 +212,7 @@ def _require_printer(printer_id: str, request: Request, actor: Actor) -> dict:
     guards.require_send(request, actor)
     if not printers.direct_control_enabled():
         raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
-    if not guards.can_see_printer_urls(request, actor):
+    if not guards.can_manage_printers(request, actor):
         raise HTTPException(403, "Only the person who manages this server can control printers.")
     pr = settings.get_printer(printer_id)
     if not pr:

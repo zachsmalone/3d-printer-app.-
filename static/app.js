@@ -790,6 +790,9 @@ $("#btnSend").onclick = async () => {
 async function openSettings() {
   S.settings = await api("/api/settings");
   $("#set_slicer").value = S.settings.default_slicer; $("#set_base").value = S.settings.public_base_url || "";
+  const edit = !!S.settings.can_edit;
+  $("#set_slicer").disabled = !edit; $("#set_base").disabled = !edit;
+  if ($("#setLock")) $("#setLock").hidden = edit || !S.settings.printer_manage;
   renderPrinters(); await renderAccounts(); $("#dlgSettings").showModal();
 }
 function renderPrinters() {
@@ -852,9 +855,19 @@ $("#printerList").addEventListener("change", e => {
 });
 $("#btnAddPrinter").onclick = () => { S.settings.printers = readPrinters(); S.settings.printers.push({ name: "My printer", type: "octoprint", url: "", bed_x: 250, bed_y: 210 }); renderPrinters(); };
 $("#btnSaveSettings").onclick = async () => {
-  const body = { default_slicer: $("#set_slicer").value, public_base_url: $("#set_base").value.trim(), printers: readPrinters() };
-  await api("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  toast("Settings saved", "ok"); $("#dlgSettings").close();
+  const printers = readPrinters();
+  try {
+    if (S.settings?.can_edit) {
+      const body = { default_slicer: $("#set_slicer").value, public_base_url: $("#set_base").value.trim(), printers };
+      await api("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    } else if (S.settings?.printer_manage) {
+      await api("/api/settings/printers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ printers }) });
+    } else {
+      toast("Server settings can only be changed by the server admin.", "err");
+      return;
+    }
+    toast("Settings saved", "ok"); $("#dlgSettings").close();
+  } catch (e) { toast(e.message, "err"); }
 };
 const PLAT = { tiktok: "TikTok", instagram: "Instagram", reddit: "Reddit", patreon: "Patreon" };
 async function renderLinkInputs() {

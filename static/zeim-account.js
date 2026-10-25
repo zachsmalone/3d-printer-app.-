@@ -285,12 +285,23 @@
     return !!(root.ZeimAuth && me && me.auth && me.auth.available);
   }
 
-  async function render(me) {
+  function focusGuest(which) {
+    const el = document.getElementById(which === "signup" ? "au_name" : "au_id");
+    if (!el) return;
+    try { el.scrollIntoView({ block: "center" }); } catch (e) { /* dialog may not be open yet */ }
+    try { el.focus(); } catch (e2) { /* ignore */ }
+  }
+
+  async function render(me, opts) {
     if (!handles(me)) return false;
+    const focus = opts && opts.focus;
     try {
       if (me.auth.session) renderSignedIn(me);
       else if (me.signed_up) renderLegacy(me);       // cookie account: offer the upgrade
-      else renderGuest(me, !!me.auth.email_codes);
+      else {
+        renderGuest(me, !!me.auth.email_codes);
+        if (focus === "signin" || focus === "signup") focusGuest(focus);
+      }
       return true;
     } catch (e) {
       /* Auth is available but rendering failed: show the failure — never silently

@@ -74,7 +74,9 @@ def test_export_named_rename_and_download():
     assert c.get(f"/api/export/{bid}/download", params={"format": "step"}).status_code == 422
     # one-tap rename is remembered for every export and for Back up all
     j = c.put(f"/api/export/{bid}/name", json={"name": "Desk lamp: v2.3mf"}).json()
-    assert j == {"name": "Desk lamp v2", "custom": True}
+    assert j["name"] == "Desk lamp v2" and j["custom"] is True and isinstance(j.get("title"), str)
+    card = next(b for b in c.get("/api/builds").json()["builds"] if b["id"] == bid)
+    assert card["file_name"] == "Desk lamp v2"
     r = c.get(f"/api/export/{bid}/download", params={"format": "obj"})
     assert 'filename="Desk lamp v2.obj"' in r.headers["content-disposition"]
     z = zipfile.ZipFile(io.BytesIO(c.get("/api/me/backup.zip").content))

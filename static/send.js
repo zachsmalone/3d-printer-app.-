@@ -12,6 +12,10 @@ let lastCaps = null;
 let X = null;                                   // the open sheet: bound to ONE build, never to "whatever is current later"
 
 const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+function saveFileName(b, fmt) {
+  const stem = String(b?.file_name || "").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return (stem || "ZEIM-build") + "." + fmt;
+}
 const getFmt = () => { const f = localStorage.sendFmt; return FMTS.includes(f) ? f : "3mf"; };
 const shareLabel = () => /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iPad" : "iPhone";
 
@@ -43,15 +47,16 @@ function render() {
   const fileLine = !adult ? "" : !isExpert()
     ? `<div class="help">File: 3D print file (3MF)<details class="inl"><summary>Different file type?</summary>${chooser}</details></div>` : chooser;
   const save = [], other = [], print = [];
-  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Save to this device" : "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download my model"}</b>
-    <small>${adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
+  const dlName = saveFileName(b, fmt);
+  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="${esc(dlName)}"><b>${adult ? "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Save to this device" : "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download my model"}</b>
+    <small>${b.file_name ? "Saves as " + esc(dlName) + "." : adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
   if (b.original) save.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Your original file</b><small>The file you opened, unchanged.</small></a>`);
   if (adult && shareAllowed()) {
     other.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-upload></use></svg> Share… <span class="untested">untested</span></b><small>Opens the ${shareLabel()} share sheet, where you pick the app (Files, Mail and more). Not tried on a real iPhone or iPad yet.</small></button>`);
     other.push(`<button type="button" class="btn sheet-row" id="ssEmail" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-mail></use></svg> Email it to myself <span class="untested">untested</span></b><small>Your Mail app sends it. ZEIM doesn't. Not tried on a real iPhone or iPad yet.</small></button>`);
     other.push(`<button type="button" class="btn sheet-row" id="ssShapr" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg> Share as STL for Shapr3D… <span class="untested">untested</span></b><small>Opens as a reference shape, not editable. When Shapr3D asks, choose <b>millimetres</b>. Pick Shapr3D on the next screen. Not tried with the real app yet.</small></button>`);
   }
-  if (caps.printer_ui) print.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Send to my printer</b><small>Opens the printer step in Print. Tested with a pretend printer only.</small></button>`);
+  if (caps.printer_ui) print.push(`<button type="button" class="btn sheet-row" id="ssPrinter"><b><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Send to my printer</b><small>Opens the printer step in Print. Moonraker and OctoPrint are Live API, not Hardware-tested. Bambu stays Simulated. Test connection never starts a print.</small></button>`);
   const group = (title, items, id) => items.length ? `<h3 class="group" id="${id}">${title}</h3><ul class="rows" aria-labelledby="${id}">${items.map(h => `<li>${h}</li>`).join("")}</ul>` : "";
   const notes = [];
   if (caps.role !== "adult") notes.push("Sending to other apps isn't available for your account. You can download your build.");
@@ -120,7 +125,28 @@ document.addEventListener("click", async e => {
   const t = e.target.closest("button,a"); if (!t) return;
   if (t.hasAttribute("data-close-sheet")) return $("#dlgSendSheet").close();
   if (t.dataset.fmt) { X.fmt = t.dataset.fmt; localStorage.sendFmt = X.fmt; render(); prepare(); $(`#ssBody [data-fmt="${X.fmt}"]`)?.focus(); return; }
-  if (t.id === "ssSave") { $("#ssStatus").textContent = "Saved! Look in your Files or Downloads."; return; }
+  if (t.id === "ssSave") {
+    e.preventDefault();
+    const name = t.getAttribute("download") || ("ZEIM-build." + (X.fmt || "3mf"));
+    const href = t.getAttribute("href");
+    $("#ssAlert").textContent = "";
+    $("#ssStatus").textContent = "Downloading…";
+    try {
+      const r = await fetch(href, { credentials: "same-origin" });
+      if (!r.ok) { $("#ssAlert").textContent = "That file could not be saved."; $("#ssStatus").textContent = ""; return; }
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      $("#ssStatus").textContent = "Saved! Look in your Files or Downloads.";
+    } catch {
+      $("#ssAlert").textContent = "That file could not be saved.";
+      $("#ssStatus").textContent = "";
+    }
+    return;
+  }
   if (t.id === "ssShare" || t.id === "ssEmail") { if (X.file) doShare(X.file, t); return; }
   if (t.id === "ssShapr") {
     if (X.fmt !== "stl") { X.fmt = "stl"; localStorage.sendFmt = "stl"; render(); await prepare(); $("#ssAlert").textContent = "Now STL is chosen. Tap the Shapr3D button again."; return; }

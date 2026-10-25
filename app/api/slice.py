@@ -1,6 +1,7 @@
 """POST /api/slice  (upload an STL or give a model id)  ->  G-code + print time + filament grams."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -11,11 +12,14 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
+import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 
 from app import config
 from app.community.identity import Actor, get_actor
+from app.core.exporters import mesh_3mf
+from app.services import filament_slots as fslots
 from app.services import slice_engine as eng
 
 router = APIRouter(prefix="/api/slice", tags=["slice"])
@@ -351,12 +355,10 @@ def download_model(slice_id: str, ext: str):
         return FileResponse(stl, media_type="model/stl", filename="zeim-model.stl")
     out = stl.with_suffix(".3mf")
     if not out.is_file():
-        import trimesh
-        import json as _j
-        from app.services import filament_slots as fslots
         sj = stl.parent / "slots.json"
-        plan = _j.loads(sj.read_text()) if sj.is_file() else fslots.plan([], None)
-        out.write_bytes(fslots.annotate_3mf(trimesh.load(str(stl), force="mesh").export(file_type="3mf"), plan))
+        plan = json.loads(sj.read_text()) if sj.is_file() else fslots.plan([], None)
+        loaded = trimesh.load(str(stl), force="mesh")
+        out.write_bytes(fslots.annotate_3mf(mesh_3mf(loaded.vertices, loaded.faces), plan))
     return FileResponse(out, media_type="model/3mf", filename="zeim-model.3mf")
 
 

@@ -288,7 +288,7 @@ const MODEL_TOOLS = [
   { id: "boolean", key: "B", label: "Boolean", sub: "union · subtract · intersect", tip: "Combine two bodies, cut one from another or keep only the overlap." },
   { id: "fillet", key: "F", label: "Fillet/Chamfer", sub: "approximate", tip: "Round or bevel outside edges. Tap edges first to limit it; otherwise all outside edges. Approximate (mesh based)." },
   { id: "shell", key: "H", label: "Shell", sub: "wall thickness", tip: "Make the body hollow with walls of the thickness you choose (closed shell)." },
-  { id: "faceoffset", key: "O", label: "Face offset", sub: "push / pull", tip: "Tap a flat face, then move it in or out along its direction." },
+  { id: "faceoffset", key: "O", label: "Face extrude", sub: "in / out", tip: "Tap a flat face, then extrude it outward or inward." },
   { id: "move", key: "M", label: "Move/Rotate", sub: "body or all", tip: "Move and rotate a body you tapped (or everything)." },
   { id: "scale", key: "S", label: "Scale", sub: "uniform · per axis", tip: "Resize a body evenly or per axis." },
   { id: "pattern", key: "P", label: "Pattern", sub: "linear · circular", tip: "Repeat a body in a row or around a centre." },
@@ -364,7 +364,7 @@ const HINTS = {
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
   revolve: ["Revolve", "Choose the axis and angle, then Apply."], boolean: ["Boolean", "Choose the target and tool bodies."],
   fillet: ["Fillet/Chamfer", "Tap edges to round only those (none = all outside edges)."], shell: ["Shell", "Hollow the model with this wall thickness."],
-  faceoffset: ["Face offset", "Tap a flat face, then set how far to move it."], move: ["Move/Rotate", "Tap a body (or keep All), then enter the move and rotation."],
+  faceoffset: ["Face extrude", "Tap a flat face, then choose outward or inward and a distance."], move: ["Move/Rotate", "Tap a body (or keep All), then enter the move and rotation."],
   scale: ["Scale", "Uniform or per axis, about the body's centre."], pattern: ["Pattern", "Linear: step between copies. Circular: centre + axis."],
   align: ["Align", "Line up a body's side with a value or another body."], mirror: ["Mirror", "Across X, Y or Z through a point; keep the original for a pair."],
   visualize: ["Visualize", "Pick a colour and finish for each body."],
@@ -523,8 +523,15 @@ const TOOL_PANELS = {
       () => addOp("hollow", { wall: val("tW"), drain_diameter: val("tD") }));
   },
   faceoffset() {
-    panel("Face offset", `<p class="help">${S.selFace ? "Face picked." : "Tap a flat face on the model."}</p><div class="f"><label for="tDist">Distance (mm, − = inward)</label>${num("tDist", 2)}</div>`,
-      () => { if (!S.selFace) return msg("Tap a flat face first."); addOp("face_offset", { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray(), distance: val("tDist") }); });
+    panel("Face extrude", `<p class="help">${S.selFace ? "Face picked." : "Tap a flat face on the model."}</p>
+      ${seg("tDir", [["out", "Outward"], ["in", "Inward"]], "out")}
+      <div class="f"><label for="tDist">Distance (mm)</label>${num("tDist", 2)}</div>
+      <p class="help">Outward grows the face. Inward pushes it into the solid. The distance here is always positive.</p>`,
+      () => {
+        if (!S.selFace) return msg("Tap a flat face first.");
+        const d = Math.abs(val("tDist"));
+        addOp("face_offset", { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray(), distance: segVal("tDir") === "in" ? -d : d });
+      });
   },
   move() {
     panel("Move / Rotate", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${v3("tMv:Move", [0, 0, 0])}${v3("tRo:Rotate°", [0, 0, 0])}<p class="help">Rotation is about the body's centre.</p>`,
@@ -581,6 +588,7 @@ const TOOL_PANELS = {
       ${seg("tStyle", [["raised", "Raised"], ["cut", "Cut in"]], T.style)}
       <div class="f"><label>Where</label>${seg("tTarget", [...(bodyCount() ? [["surface", "On model"]] : []), ["plate", "Text plate"]], T.target)}</div>
       <p class="help" id="tWhere">${T.target === "plate" ? (bodyCount() ? "A new plate is placed beside the model." : "A standalone plate with your text.") : face ? "Spot picked: tap again to move it." : "Tap the model where the text should be centred."}</p>
+      ${T.target === "surface" ? `<label class="cw-toggle"><span>Center and fit on this face</span><input type="checkbox" id="tFit" checked></label>` : ""}
       ${bodyCount() ? `<div class="cw-row"><button type="button" id="tPick">${face ? "Move spot" : "Pick spot on model"}</button></div>` : ""}
       <div class="f"><label for="tFont">Font</label><select id="tFont">${[["sans-bold", "Sans bold (recommended)"], ["sans", "Sans"], ["serif", "Serif"], ["mono", "Mono"]].map(([v, l]) => `<option value="${v}" ${v === T.font ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div class="f"><label for="tSize">Letter height (mm)</label>${num("tSize", T.size)}</div>
@@ -597,7 +605,7 @@ const TOOL_PANELS = {
         if (!T.text.trim()) return msg("Type some text first.");
         const p = { text: T.text, font: T.font, size: T.size, depth: T.depth, style: T.style, target: T.target, rotation: T.rotation, nozzle: T.nozzle };
         if (T.target === "plate") Object.assign(p, { plate_thickness: T.plate_thickness, margin: T.margin });
-        else { if (!S.selFace) return msg("Tap the model where the text should go."); Object.assign(p, { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray() }); }
+        else { if (!S.selFace) return msg("Tap the model where the text should go."); Object.assign(p, { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray() }); if ($("#tFit")?.checked) p.fit = true; }
         addOp("cad_text", p);
       });
     const sync = () => Object.assign(T, { text: $("#tTxt").value, font: $("#tFont").value, size: val("tSize"), depth: val("tDepth"), style: segVal("tStyle"), target: segVal("tTarget"),
@@ -1481,7 +1489,7 @@ function modelTap(ev) {
   if (!h) { if (!S.tool) deselect(); return; }
   if (S.selFace && !S.selFace.point.equals(h.point)) S.prevFace = S.selFace;
   S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal };
-  hint("Selected", `Body ${h.body + 1} and a face. Sketch (K) draws on this face; Face offset (O) moves it.`);
+  hint("Selected", `Body ${h.body + 1} and a face. Sketch (K) draws on this face; Face extrude (O) moves it in or out.`);
   drawSelection();
   if (S.tool && TOOL_PANELS[S.tool] && !["extrude", "revolve", "visualize"].includes(S.tool)) TOOL_PANELS[S.tool]();
 }
@@ -1538,7 +1546,12 @@ document.addEventListener("keydown", e => {
   }
   const t = MODEL_TOOLS.find(t => t.key.toLowerCase() === k); if (t) setTool(t.id);
 });
-$("#cwTitle").addEventListener("change", () => { /* the name is used when the project is first saved */ });
+$("#cwTitle").addEventListener("change", () => {
+  const t = ($("#cwTitle").value || "").trim();
+  if (!S.bid || !t) return;
+  api(`/api/export/${encodeURIComponent(S.bid)}/name`, { method: "PUT", json: { name: t, save_title: true } })
+    .then(r => { if (S.scene) S.scene.title = t; msg("Saved as " + (r.name || t) + ".", true); }, e => msg(e.message));
+});
 
 /* ---------------------------------------------------------------- open / import a user's own file or build */
 function openProject(id) { S.bid = id; S.openStep = 0; S.hidden.clear(); history.replaceState(null, "", `?bid=${id}`); return load(); }
@@ -1658,6 +1671,13 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
   document.addEventListener("click", e => { if (!e.target.closest("#cwSendTo, #cwSendToMenu")) close(); });
   sl.onclick = e => { e.preventDefault(); leave(`/?edit=${encodeURIComponent(S.bid || "")}#slicer`, "FDM Slicer"); };
   tc.onclick = e => { e.preventDefault(); leave(`/?resin=${encodeURIComponent(S.bid || "")}#torchc0`, "TorchC0"); };
+  $("#cwSendShowcase").onclick = e => {
+    e.preventDefault(); close();
+    if (!S.bid) { msg("Make a solid first: nothing to send yet."); return; }
+    document.dispatchEvent(new CustomEvent("zeim:save-now"));
+    const title = ($("#cwTitle").value || "").trim();
+    location.href = `/?publish=${encodeURIComponent(S.bid)}&title=${encodeURIComponent(title)}`;
+  };
   $("#cwToSlicer").addEventListener("click", () => { if (S.bid) { document.dispatchEvent(new CustomEvent("zeim:save-now")); mark("FDM Slicer"); } });
   const q = new URLSearchParams(location.search), from = q.get("from"), back = q.get("back");
   if (from && back && back.startsWith("/") && !back.startsWith("//")) {

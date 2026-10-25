@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from .. import config
 from ..community import catalog, moderation, personalization, privacy, safety, social
+from ..services import showoff
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import PREFS, USERS
@@ -98,10 +99,65 @@ def _print_public(p: dict, actor: Actor) -> dict:
     tu = next((u for u in users.values() if u.get("id") == p["uid"]), None)
     name = (tu or {}).get("username") or p.get("username")
     from ..community import print_settings as ps
-    return {"id": p["id"], "url": f"/api/prints/{p['id']}/photo", "caption": p.get("caption", ""),
+    return {"id": p["id"], "url": f"/api/prints/{p['id']}/photo", "name": p.get("name") or "", "caption": p.get("caption", ""),
             "by": "@" + name if name else "a ZEIM maker", "created": p["created"], "mine": p["owner_sid"] == actor.sid,
             "status": social.status(p), "pending": social.status(p) != "approved", "nsfw": bool(p.get("nsfw")),
             "settings": ps.public(p.get("settings"))}
+
+
+_SHOWOFF_NOTE = "ZEIM draws the model from the front, right, back and left. These are not photos of a finished print."
+
+
+def _item_mesh(item: dict):
+    """STL first, then 3MF, so the four side drawings still appear when only a 3MF was stored."""
+    files = item.get("files") or []
+    for ext in (".stl", ".3mf"):
+        for f in files:
+            name = f.get("name") or ""
+            if not name.lower().endswith(ext):
+                continue
+            p = catalog.file_path(item, name)
+            if p is not None and p.is_file():
+                return p
+    return None
+
+
+@router.get("/showcase/{iid}/sides")
+def showcase_sides(iid: str, actor: Actor = Depends(get_actor)):
+    try:
+        item = catalog.get(iid, actor)
+    except catalog.Denied as e:
+        raise HTTPException(e.status, e.msg)
+    views = []
+    stl = _item_mesh(item)
+    if stl is not None:
+        try:
+            for vid, label, _path in showoff.ensure(item["id"], stl):
+                views.append({"id": vid, "label": label, "url": f"/api/showcase/{iid}/sides/{vid}.png"})
+        except Exception:
+            views = []
+    return {"views": views, "note": _SHOWOFF_NOTE}
+
+
+@router.get("/showcase/{iid}/sides/{view}.png")
+def showcase_side_png(iid: str, view: str, actor: Actor = Depends(get_actor)):
+    if view not in showoff.VIEW_IDS:
+        raise HTTPException(404)
+    try:
+        item = catalog.get(iid, actor)
+    except catalog.Denied as e:
+        raise HTTPException(e.status, e.msg)
+    stl = _item_mesh(item)
+    if stl is None:
+        raise HTTPException(404)
+    try:
+        made = {vid: path for vid, _label, path in showoff.ensure(item["id"], stl)}
+    except Exception:
+        raise HTTPException(404)
+    path = made.get(view)
+    if path is None or not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.get("/showcase/{iid}/prints")
@@ -119,7 +175,7 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
               caption: str = Form(""), photo_ack: bool = Form(False), nsfw: str = Form(""),
               printer: str = Form(""), material: str = Form(""), layer_height_mm: str = Form(""),
               infill_pct: str = Form(""), supports: str = Form(""), nozzle_mm: str = Form(""),
-              printer_name: str = Form(""), notes: str = Form("")):
+              printer_name: str = Form(""), notes: str = Form(""), print_name: str = Form("")):
     """Same pipeline as every other photo: permission box (CR-5), content sniffing, EXIF/GPS stripped by re-encoding, size caps;
     the caption goes through the chat filter; the image-moderation hook runs (default: needs human review, never auto-approves);
     every photo can be reported (minor_safety hides it at once) and reviewed in the queue."""
@@ -143,7 +199,9 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
         clean, ext, _ = imagesafe.sanitize(data)
         is_nsfw = safety.parse_nsfw(nsfw)
         cap = text_in(caption, 140, "Caption")
+        pname = text_in(print_name, 80, "Name")
         cap = safety.gate(actor, cap, "prints:caption", is_nsfw) if cap else ""
+        pname = safety.gate(actor, pname, "prints:name", is_nsfw) if pname else ""
     except imagesafe.ImageRefused as e:
         raise HTTPException(415, str(e))
     except safety.ChatBlocked as e:
@@ -162,7 +220,7 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
         raise HTTPException(400, str(e))
     try:
         rec = social.add_print(iid, actor.sid, actor.user["id"], actor.user.get("username"), clean, ext, cap, ack,
-                               nsfw=is_nsfw, settings=settings)
+                               nsfw=is_nsfw, settings=settings, name=pname)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return _print_public(rec, actor)

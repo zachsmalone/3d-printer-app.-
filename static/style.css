@@ -570,6 +570,9 @@ input,select,textarea{color-scheme:light}html[data-theme=dark] :is(input,select,
 .toolcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:var(--s5);box-shadow:var(--sh-1);display:flex;flex-direction:column;gap:var(--s2);transition:transform var(--dur) var(--ease),box-shadow var(--dur) var(--ease)}
 .toolcard:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
 .toolcard h2{margin:0;font-size:var(--fs-lg)}.toolcard .btn{margin-top:auto;align-self:flex-start;text-decoration:none;display:inline-flex;align-items:center;gap:var(--s2);color:inherit}
+.acctbtns{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto}
+.acctbtns .btn{margin-top:0}
+.acctbtns #btnLogin[hidden]{display:none}
 .toolcard .btn.primary{color:var(--on-acc)}
 .toolcard .btn .lbl{display:inline!important}
 @media (prefers-reduced-motion:reduce){.toolcard:hover{transform:none}}
@@ -839,10 +842,11 @@ body{background:var(--bg)!important}
 
 /* FDM / Resin switch ("My printer") + header must never be wider than the viewport */
 .topbar{max-width:100%;box-sizing:border-box;min-width:0}.topbar>*{min-width:0}.topbar .brand,.topbar .themetoggle,.topbar #lookBtn{flex-shrink:0}
-.kindpick{display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill,999px);background:var(--sunk,var(--panel2));flex-shrink:0}
+.kindpick{position:relative;z-index:6;display:inline-flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:var(--r-pill,999px);background:var(--sunk,var(--panel2));flex-shrink:0}
 .kindpick .kp-lbl{font-size:var(--fs-xs,12px);color:var(--mut);padding:0 6px 0 8px;white-space:nowrap}
 .kindpick button{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:44px;min-width:44px;padding:0 10px;border:0;border-radius:var(--r-pill,999px);background:none;color:var(--mut);font:inherit;font-weight:600;cursor:pointer}
-.kindpick button[aria-pressed=true]{background:var(--tint,var(--panel));color:var(--accink,var(--txt));box-shadow:0 0 0 1px var(--acc2,var(--acc)) inset}
+.kindpick button[aria-pressed=true],.kindpick button.on{background:var(--acc,#0066FF);color:#fff;box-shadow:none}
+.kindpick svg,.kindpick .i,.kindpick button span{pointer-events:none}
 .kindpick .i{width:18px;height:18px}
 /* nav order is fixed (P7): the printer type only changes the highlight */
 @media (max-width:1100px) and (min-width:769px){.kindpick .kp-lbl{display:none}}
@@ -919,11 +923,18 @@ html:not([data-theme=dark]) .agegate .logo-dark,html[data-theme=dark] .agegate .
 .zws-grip:focus-visible,.zws-min:focus-visible,.zws-hide:focus-visible,.zws-chip:focus-visible{outline:3px solid var(--focus);outline-offset:-2px}
 .zws-chip{display:none;padding:0 12px;color:var(--txt);font-weight:600;font-size:13px;white-space:nowrap}
 .zws-p.min .zws-chip{display:inline-flex}
-.zws-p.min .zws-t,.zws-p.min .zws-min,.zws-p.min .zws-hide,.zws-p.min .zws-body,.zws-p.min .zws-rs{display:none}
+.zws-p.min .zws-t,.zws-p.min .zws-min,.zws-p.min .zws-hide,.zws-p.min .zws-body,.zws-p.min .zws-rs,.zws-p.min .zws-edge{display:none}
 .zws-p.min{flex-direction:row}
 .zws-p.min>.zws-head{flex-direction:row}
 .zws-body{flex:1 1 auto;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain}
-.zws-rs{position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 55%,var(--mut) 55% 62%,transparent 62% 72%,var(--mut) 72% 79%,transparent 79%)}
+.zws-rs{position:absolute;right:0;bottom:0;width:22px;height:22px;z-index:5;cursor:nwse-resize;touch-action:none;background:linear-gradient(135deg,transparent 55%,var(--mut) 55% 62%,transparent 62% 72%,var(--mut) 72% 79%,transparent 79%)}
+.zws-edge{position:absolute;z-index:4;touch-action:none;background:transparent}
+.zws-edge[data-dir="e"]{top:44px;right:0;width:10px;bottom:10px;cursor:ew-resize}
+.zws-edge[data-dir="w"]{top:44px;left:0;width:10px;bottom:10px;cursor:ew-resize}
+.zws-edge[data-dir="s"]{left:10px;right:22px;bottom:0;height:10px;cursor:ns-resize}
+.zws-edge[data-dir="n"]{left:10px;right:10px;top:44px;height:10px;cursor:ns-resize}
+.zws-p.user-size{touch-action:auto}
+.zws-p.user-size>.zws-body{overflow:auto;touch-action:auto}
 .zws-dlg{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--txt);padding:16px;width:min(420px,92vw);box-sizing:border-box}
 .zws-dlg::backdrop{background:rgba(0,0,0,.4)}
 .zws-dlg h2{margin:0 0 6px;font-size:18px}
@@ -948,6 +959,7 @@ main.zws>.zws-cust{position:absolute;top:8px;right:8px;z-index:11;min-height:44p
 main:not(.zws)>.zws-cust{display:none}
 main.zws .zws-p>.zws-body>*{margin:0;max-width:100%;box-sizing:border-box}
 main.zws .zws-p>.zws-body>.controls{position:static;max-height:none;width:340px;max-width:100%;border:0;box-shadow:none;background:none}
+main.zws .zws-p.user-size>.zws-body>.controls,main.zws .zws-p.user-size>.zws-body>.result,main.zws .zws-p.user-size>.zws-body>.history,main.zws .zws-p.user-size>.zws-body>#torchPanel,main.zws .zws-p.user-size>.zws-body>#torchOut{width:100%;max-width:100%;min-width:0}
 main.zws .zws-p>.zws-body>.result{width:100%;max-width:100%;min-width:0;border:0;box-shadow:none;background:none}
 main.zws .zws-p>.zws-body>.vtools,main.zws .zws-p>.zws-body>.vtools2{position:static;inset:auto;display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:none;border:0;box-shadow:none;transform:none}
 main.zws .zws-p>.zws-body>.history{width:320px;max-width:100%;padding:8px}
@@ -1022,6 +1034,10 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 .sendlist .btn.sendto small{color:var(--mut);font-weight:400}
 .sendtobtn{min-height:44px}
 /* Studio hand-off after generate: Save work | Send to Slicer | Send to CAD, side by side and phone-usable */
+.designname{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;margin:0 0 8px}
+.designname label{font-weight:600}
+.designname input{flex:1 1 160px;min-height:44px;font:inherit;padding:0 10px}
+.designname .help{flex:1 1 100%;margin:0}
 .handoffrow{display:flex;gap:8px;align-items:stretch;flex-wrap:nowrap;width:100%;min-width:0;flex:1 1 100%;margin:0 0 4px}
 .handoffrow .btn{flex:1 1 0;min-width:0;min-height:44px;justify-content:center;padding:8px 6px;gap:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .handoffrow .btn .i{flex:0 0 auto;width:16px;height:16px}
@@ -1161,6 +1177,16 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .pill.prizefree{background:color-mix(in srgb, var(--acc2,#C24D6B) 14%, transparent);border:1px solid color-mix(in srgb, var(--acc2,#C24D6B) 40%, var(--line));color:var(--acc2,#C24D6B);font-size:12px}
 .chrules{margin:8px 0 12px;padding-left:1.2em}
 .prform input[capture],.prform #prCam{min-height:44px}
+.print-notes{margin:.25rem 0 0;white-space:pre-wrap}
+.showoff-stage{margin:0 0 8px;max-width:280px}
+.showoff-stage img{width:100%;height:auto;border-radius:10px;background:#eee}
+.showoff-row{display:flex;flex-wrap:wrap;gap:8px}
+.showoff-row figure{margin:0;width:140px}
+.showoff-row img{width:100%;height:auto;border-radius:8px;background:#eee}
+.showoff-row figcaption{font-size:13px}
+.showoff-pick{display:flex;flex-direction:column;align-items:center;gap:2px;width:88px;padding:4px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.showoff-pick[aria-pressed=true]{border-color:var(--acc, var(--brand, #0a7))}
+.print-name{display:block}
 
 
 /* Optional Semi Pro / Pro (Account → Plans) */

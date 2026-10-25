@@ -11,6 +11,7 @@ from fastapi import HTTPException, Request
 
 from .. import config
 from ..community.identity import Actor
+from ..services import printers as printer_svc
 
 
 _PROXY_HEADERS = ("x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "forwarded", "x-real-ip", "cf-connecting-ip", "cf-ray", "via")
@@ -51,6 +52,16 @@ def can_see_printer_urls(request: Request, actor: Actor) -> bool:
     return is_owner(request) or is_admin(request)
 
 
+def can_manage_printers(request: Request, actor: Actor) -> bool:
+    """Owner/admin, or an adult on a self-host that opted into LAN printers and direct control.
+
+    This does not open the public base URL or the default slicer. Those stay on the admin settings route.
+    """
+    if can_see_printer_urls(request, actor):
+        return True
+    return _role(request, actor) == "adult" and config.LAN_PRINTERS and printer_svc.direct_control_enabled()
+
+
 def require_settings_admin(request: Request, actor: Actor):
     if is_owner(request):
         origin = request.headers.get("origin")                     # S-01 local mode: another web page open in the owner's browser must not change settings
@@ -85,10 +96,12 @@ def send_caps(request: Request, actor: Actor) -> dict:
         caps.update(share=True, printer=True, links=True)
     # What the PAGE may draw (the policy above is what the server enforces):
     #  share_ui   - the share-sheet rows exist only after the device spike passed (flag PHOTO3D_SEND_SHARE)
-    #  printer_ui - direct-to-printer only where it can really work: ZEIM running on the user's own computer (local mode).
-    #               A hosted https page cannot call an http:// printer on someone's LAN, so hosted ZEIM does not promise it.
+    #  printer_ui - local mode, or a self-host with LAN printers and direct control both on.
+    #               Hosted zeimapp.com leaves those flags off, so it does not promise a LAN send.
     caps["share_ui"] = bool(caps["share"] and config.SEND_SHARE_UI)
-    caps["printer_ui"] = bool(caps["printer"] and config.MODE == "local")
+    lan_direct = config.LAN_PRINTERS and printer_svc.direct_control_enabled()
+    caps["printer_ui"] = bool(caps["printer"] and (config.MODE == "local" or lan_direct))
+    caps["printer_manage"] = can_manage_printers(request, actor)
     caps["mode"] = config.MODE
     return caps
 

@@ -14,7 +14,11 @@ export const printKind = () => kind;
 
 function apply() {
   document.body.dataset.printKind = kind;
-  document.querySelectorAll("#kindPick [data-kind]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.kind === kind)));
+  document.querySelectorAll("#kindPick [data-kind]").forEach(b => {
+    const on = b.dataset.kind === kind;
+    b.setAttribute("aria-pressed", String(on));
+    b.classList.toggle("on", on);
+  });
   document.querySelectorAll("#mainNav [data-view=slicer],#mainNav [data-view=torchc0]").forEach(b => {
     const on = b.dataset.view === VIEW[kind];
     b.classList.toggle("kind-primary", on);
@@ -30,13 +34,13 @@ function apply() {
 
 function note() {   // one small dismissible hint on the non-primary slicer tab
   document.querySelectorAll(".kindnote").forEach(n => n.remove());
-  if (localStorage.getItem(NOTE) === "1") return;
+  try { if (localStorage.getItem(NOTE) === "1") return; } catch { return; }
   const other = kind === "resin" ? "#viewEdit" : "#viewTorch", host = document.querySelector(other);
   if (!host) return;
   const d = document.createElement("div");
   d.className = "kindnote"; d.setAttribute("role", "note");
   d.innerHTML = `<svg class="i" aria-hidden="true" focusable="false"><use href="#i-printer"/></svg><span>You picked <b>${kind === "resin" ? "Resin" : "FDM"}</b> as your printer type. ${kind === "resin" ? "Resin prints are prepared in <a href=\"#torchc0\">TorchC0</a>; this FDM Slicer is for filament printers." : "Filament prints are sliced in the <a href=\"#slicer\">FDM Slicer</a>; TorchC0 is for resin printers."}</span><button type="button" class="btn small ghost x" aria-label="Dismiss this note">Dismiss</button>`;
-  d.querySelector(".x").onclick = () => { localStorage.setItem(NOTE, "1"); d.remove(); };
+  d.querySelector(".x").onclick = () => { try { localStorage.setItem(NOTE, "1"); } catch { } d.remove(); };
   host.prepend(d);
 }
 
@@ -54,25 +58,46 @@ async function matchPrinter() {   // keep the chosen printer (used by "Will it p
   } catch { }
 }
 
-export async function setKind(k, { save = true } = {}) {
+function remember(k) {
+  try { localStorage.setItem(KEY, k); } catch { /* private mode: the choice still applies this visit */ }
+}
+let userPick = 0;
+
+export async function setKind(k, { save = true, gen = null } = {}) {
   if (k !== "fdm" && k !== "resin") return;
+  if (gen != null && gen !== userPick) return;   // a click during startup wins over the saved/account value
   const changed = kind && kind !== k;
-  kind = k; localStorage.setItem(KEY, k); apply();
-  if (save) { api("/api/me/printer-kind", J({ kind: k })).catch(() => { }); await matchPrinter(); }
+  kind = k;
+  apply();          // paint first: a storage failure must not leave the buttons looking stuck
+  remember(k);
+  const mine = userPick;
+  if (save) { api("/api/me/printer-kind", J({ kind: k })).catch(() => { }); await matchPrinter(); if (mine !== userPick) return; }
   document.dispatchEvent(new CustomEvent("zeim:printkind", { detail: k }));
   if (changed && (location.hash === "#slicer" || location.hash === "#torchc0")) location.hash = VIEW[k];
 }
 
-document.querySelectorAll("#kindPick [data-kind]").forEach(b => b.onclick = () => setKind(b.dataset.kind));
+function pickFrom(el) {
+  const b = el && el.closest ? el.closest("#kindPick [data-kind]") : null;
+  if (!b) return;
+  userPick += 1;
+  setKind(b.dataset.kind, { gen: userPick });
+}
+const kindPick = document.querySelector("#kindPick");
+if (kindPick) kindPick.addEventListener("click", e => pickFrom(e.target), true);
 addEventListener("hashchange", () => { if (location.hash === "#print") location.replace("#" + VIEW[kind || "fdm"]); });
 
 (async function init() {
-  let k = localStorage.getItem(KEY);
+  let k = null;
+  try { k = localStorage.getItem(KEY); } catch { }
   if (k !== "fdm" && k !== "resin") k = null;
   kind = k || "fdm"; apply();   // instant paint, then refine
-  try { const r = await api("/api/me/printer-kind"); if (r.signed_up && r.kind) k = r.kind; } catch { }
-  if (!k) { try { await loadCatalog(); k = printerOf(P.pref.printer_id)?.technology === "Resin" ? "resin" : "fdm"; } catch { k = "fdm"; } }
-  await setKind(k, { save: false });
+  const seen = userPick;
+  try { const r = await api("/api/me/printer-kind"); if (seen !== userPick) return; if (r.signed_up && r.kind) k = r.kind; } catch { }
+  if (seen !== userPick) return;
+  if (!k) { try { await loadCatalog(); if (seen !== userPick) return; k = printerOf(P.pref.printer_id)?.technology === "Resin" ? "resin" : "fdm"; } catch { k = "fdm"; } }
+  if (seen !== userPick) return;
+  await setKind(k, { save: false, gen: seen });
+  if (seen !== userPick) return;
   if (location.hash === "#print") location.replace("#" + VIEW[kind]);
 })();
 
