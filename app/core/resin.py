@@ -61,6 +61,83 @@ DEFAULT_PRICE_UNIT = "l"
 RESIN_DENSITY_G_ML = 1.1
 TEST_NOTE = "Starting values only. Run an exposure test with your resin (most resin makers publish one) and adjust in your slicer."
 
+# Materials are separate from the quality presets above. "standard" keeps using detail/standard/fast.
+# "silicone" is a flexible / silicone-like photopolymer. Its starting exposure and lift are one published
+# profile, not a universal silicone number: Liqcreate Flexible-X on the original Elegoo Saturn at 50 µm
+# (10 s normal, 40 s bottom, lift 10 mm at 60 mm/min).
+# https://www.liqcreate.com/supportarticles/resin-settings-elegoo-saturn/
+# Bottom layers stay at 5 (the usual count in this program). That page uses 2 bottom layers plus 6
+# transition layers, which TorchC0 cannot set separately. No price: nothing here is a silicone price.
+# No single density either. Published liquid densities we checked:
+#   Resione F69 1.079 g/cm³ (ASTM D4052) — https://www.resione.com/products/f69-black-flexible-rubber-like-3d-printer-resin-1kg
+#   Siraya Tech Tenacious Flex Black 1.1 — https://siraya.tech/pages/70a-flexible-resin-tenacious-flex-black-tds
+#   Liqcreate Flexible-X 1.18 g/cm³ — https://www.liqcreate.com/product/flexible-x/
+DEFAULT_MATERIAL = "standard"
+MATERIALS = {
+    "standard": {
+        "label": "Standard resin",
+        "help": "Rigid photopolymer. The fine, standard, and fast presets set the starting layer and exposure.",
+        "settings": None,
+        "density_g_ml": RESIN_DENSITY_G_ML,
+        "price_per_l": None,
+        "notes": [],
+        "safety": [],
+        "sources": [],
+    },
+    "silicone": {
+        "label": "Silicone resin",
+        "help": "Flexible, silicone-like photopolymer. Start at 0.05 mm layers, 10 s exposure, 40 s bottom exposure, "
+                 "lift 10 mm at 60 mm/min. Those figures are Liqcreate's published Flexible-X profile for the original "
+                 "Elegoo Saturn at 50 µm, not a tuned profile for every bottle or newer printer. "
+                 "The fine / standard / fast presets are for standard resin.",
+        "settings": {"layer_mm": 0.05, "exposure_s": 10.0, "bottom_exposure_s": 40.0, "bottom_layers": 5,
+                     "lift_mm": 10.0, "lift_speed_mm_min": 60.0},
+        "density_g_ml": None,
+        "price_per_l": None,
+        "notes": [
+            "Other published profiles sit far from these numbers. Resione F69 uses 0.05 mm layers and about 1.2 times that printer's standard exposure. Liqcreate Elastomer-X is 16 s normal and 50 s bottom on the original Saturn, and 14 s and 60 s bottom on a Saturn 4 Ultra (both at 50 µm; on the Ultra they say to use the printer's Slow movement, because lift speed is limited). Siraya Tech publishes a profile per printer for its flexible resins instead of one exposure for every machine.",
+            "Wash with the solvent named on the bottle, then let the print dry before UV curing. Liqcreate's flexible-resin guide uses IPA or ethanol: about 2 minutes in used solvent, then 3 minutes in fresh, then dry about 30 minutes. Siraya Tech's Tenacious Flex Black guide uses ethanol or IPA for 2-3 minutes, then dries the print and cures about 10 minutes for a thin part or up to 25 for a thick one. Formlabs Silicone 40A (their own printers) is washed in IPA mixed with n-butyl acetate, or in two IPA sonications of 2-3 minutes, then dried; they pull supports off before curing and post-cure in water.",
+            "A soft print tears easily before it is fully cured. Liqcreate asks for heavy supports for Flexible-X and extra-heavy supports for Elastomer-X. Resione asks for thicker, denser supports than for rigid resin, and cures F69 parts thicker than 3 mm for more than 30 minutes per side in a 40 W UV box. Bottom layers stay at 5 here; Liqcreate's Flexible-X profile is 2 bottom layers plus 6 transition layers, which this program cannot set separately.",
+        ],
+        "safety": [
+            "Soft and silicone-like resin irritates skin and eyes too. Wear nitrile gloves and eye protection while washing the print and pulling supports, and use only the wash the resin maker names. A long soak can swell a soft print.",
+        ],
+        "sources": [
+            {"label": "Liqcreate Flexible-X on the original Elegoo Saturn, 50 µm (10 s, 40 s bottom, lift 10 mm at 60 mm/min)",
+             "url": "https://www.liqcreate.com/supportarticles/resin-settings-elegoo-saturn/"},
+            {"label": "Liqcreate Elastomer-X on the Saturn 4 Ultra, 50 µm (14 s, 60 s bottom, Slow movement)",
+             "url": "https://www.liqcreate.com/supportarticles/elegoo-saturn4-ultra-flexible-resin/"},
+            {"label": "Resione F69 printing settings (0.05 mm, about 1.2 times standard exposure) and liquid density 1.079 g/cm³",
+             "url": "https://www.resione.com/products/f69-black-flexible-rubber-like-3d-printer-resin-1kg"},
+            {"label": "Siraya Tech Tenacious Flex Black TDS (liquid density 1.1; ethanol or IPA wash; cure 10-25 min)",
+             "url": "https://siraya.tech/pages/70a-flexible-resin-tenacious-flex-black-tds"},
+            {"label": "Siraya Tech Rebound 55A: slower lift and a longer light-off for high viscosity",
+             "url": "https://siraya.tech/pages/siraya-tech-rebound-55a-black-tds"},
+            {"label": "Liqcreate flexible and elastomer resin guide (wash, dry, supports)",
+             "url": "https://www.liqcreate.com/supportarticles/instructions-3dprinted-flexible-resin/"},
+            {"label": "Liqcreate Flexible-X liquid density 1.18 g/cm³",
+             "url": "https://www.liqcreate.com/product/flexible-x/"},
+            {"label": "Formlabs: using Silicone 40A (wash, dry, supports before cure, post-cure in water)",
+             "url": "https://formlabs.com/support/Using-Silicone-40A-Resin/"},
+        ],
+    },
+}
+
+
+def public_materials():
+    """Catalog rows for the resin material picker. Prices stay null unless a profile actually carries one."""
+    rows = []
+    for mid, m in MATERIALS.items():
+        st = m.get("settings")
+        rows.append({
+            "id": mid, "label": m["label"], "help": m["help"],
+            "settings": dict(st) if st else None,
+            "notes": list(m["notes"]), "safety": list(m["safety"]),
+            "sources": [dict(s) for s in m["sources"]],
+            "density_g_ml": m["density_g_ml"], "price_per_l": m.get("price_per_l"),
+        })
+    return rows
+
 
 class ResinError(ValueError):
     """Bad TorchC0 input; message is safe to show."""
@@ -80,23 +157,40 @@ def _num(o, key, default, cast=float):
     return x
 
 
+def _material_price(o, material):
+    """User-typed price wins. A saved price applies only to standard resin, and only when data/resin/resin.json has one.
+    Silicone has no sourced price, so an empty field stays empty."""
+    fallback = MATERIALS[material].get("price_per_l")
+    if fallback is None and material == "standard":
+        fallback = DEFAULT_PRICE
+    if o.get("price") in (None, "") and fallback is None:
+        return None
+    return _num(o, "price", 0 if fallback is None else fallback)
+
+
 def settings(opts: dict | None = None) -> dict:
-    """Preset first, then explicit values. Defaults: 30° tilt, 2 mm hollow wall, 3 mm drain + vent holes, supports on."""
+    """Material, then preset, then explicit values. A silicone profile replaces the quality preset's exposure and lift.
+    Defaults: 30° tilt, 2 mm hollow wall, 3 mm drain + vent holes, supports on."""
     o = dict(opts or {})
+    material = o.get("material") or DEFAULT_MATERIAL
+    if material not in MATERIALS:
+        raise ResinError("Unknown resin material.")
     preset = o.get("preset") or DEFAULT_PRESET
     if preset not in PRESETS:
         raise ResinError("Unknown TorchC0 preset.")
-    pr = PRESETS[preset]
-    s = {"preset": preset}
+    mat = MATERIALS[material]
+    base = mat["settings"] if mat.get("settings") else PRESETS[preset]
+    s = {"preset": preset, "material": material}
     for k in ("layer_mm", "exposure_s", "bottom_exposure_s", "lift_mm", "lift_speed_mm_min"):
-        s[k] = _num(o, k, pr[k])
-    s["bottom_layers"] = _num(o, "bottom_layers", pr["bottom_layers"], int)
+        s[k] = _num(o, k, base[k])
+    s["bottom_layers"] = _num(o, "bottom_layers", base["bottom_layers"], int)
     s["tilt_deg"] = _num(o, "tilt_deg", 30.0)
     s["wall_mm"] = _num(o, "wall_mm", 2.0)
     s["drain_mm"] = _num(o, "drain_mm", 3.0)
     s["support_spacing_mm"] = _num(o, "support_spacing_mm", 4.0)
     s["base_lift_mm"] = _num(o, "base_lift_mm", 5.0)
-    s["price"] = None if o.get("price") in (None, "") and DEFAULT_PRICE is None else _num(o, "price", DEFAULT_PRICE)
+    s["density_g_ml"] = mat["density_g_ml"]
+    s["price"] = _material_price(o, material)
     s["price_unit"] = o.get("price_unit") or DEFAULT_PRICE_UNIT
     if s["price_unit"] not in ("l", "kg"):
         raise ResinError("Price unit must be per litre (l) or per kg.")
@@ -419,13 +513,19 @@ def thin_wall_note(thin: float, asked: float) -> str:
             "Thin spots can crack or leak resin; try a thicker wall if this part must be strong.")
 
 
-def cost_of(ml: float, price, unit: str = "l") -> dict:
-    """Resin cost estimate for `ml` millilitres at the user's price per litre (or per kg). No price -> no cost."""
+def cost_of(ml: float, price, unit: str = "l", density: float | None = RESIN_DENSITY_G_ML) -> dict:
+    """Resin cost estimate for `ml` millilitres at the user's price per litre (or per kg). No price -> no cost.
+    Per-kg needs a density. Silicone passes None: published liquid densities differ, so no cost is invented."""
     if price is None:
         return {"cost": None, "cost_note": "Enter your resin's price (per litre or kg) to see a cost estimate."}
-    cost = ml / 1000.0 * price if unit == "l" else ml * RESIN_DENSITY_G_ML / 1000.0 * price
+    if unit == "kg" and density is None:
+        return {"cost": None, "cost_note": "No silicone density is applied here. Published liquid densities differ "
+                "(Resione F69 lists 1.079 g/cm³, Siraya Tech Tenacious Flex Black lists 1.1, Liqcreate Flexible-X lists 1.18). "
+                "Enter a price per litre."}
+    dens = RESIN_DENSITY_G_ML if density is None else density
+    cost = ml / 1000.0 * price if unit == "l" else ml * dens / 1000.0 * price
     return {"cost": round(cost, 2), "cost_note": f"Estimate: resin only, at {price:g} per {'litre' if unit == 'l' else 'kg'}"
-            + (f" (density {RESIN_DENSITY_G_ML:g} g/ml)" if unit == "kg" else "") + "; leaves out spills, IPA, gloves and failed prints."}
+            + (f" (density {dens:g} g/ml)" if unit == "kg" else "") + "; leaves out spills, IPA, gloves and failed prints."}
 
 
 def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
@@ -434,7 +534,7 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
     move = 2 * s["lift_mm"] / s["lift_speed_mm_min"] * 60 + 0.5          # up + down + settle
     secs = bottom * s["bottom_exposure_s"] + (layers - bottom) * s["exposure_s"] + layers * move
     ml = volume_mm3 / 1000.0
-    return {**cost_of(ml, s.get("price", DEFAULT_PRICE), s.get("price_unit", DEFAULT_PRICE_UNIT)),
+    return {**cost_of(ml, s.get("price", DEFAULT_PRICE), s.get("price_unit", DEFAULT_PRICE_UNIT), s.get("density_g_ml", RESIN_DENSITY_G_ML)),
             "layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
             "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film."}
 
@@ -442,7 +542,10 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
 def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None) -> tuple[trimesh.Trimesh, dict]:
     """The TorchC0 pipeline: tilt -> hollow -> drain + vent holes -> supports + raft -> layer check (islands, suction cups).
     Warnings never block: they are notes; the files are always made."""
-    rep = {"program": NAME, "settings": s, "notes": [], "safety": SAFETY, "test_note": TEST_NOTE}
+    mat = MATERIALS[s.get("material") or DEFAULT_MATERIAL]
+    rep = {"program": NAME, "settings": s, "notes": [], "safety": list(SAFETY) + list(mat["safety"]), "test_note": TEST_NOTE,
+           "material": {"id": s.get("material") or DEFAULT_MATERIAL, "label": mat["label"]},
+           "material_notes": list(mat["notes"])}
     work = orient(m, s["tilt_deg"])
     shells = work.split(only_watertight=False)
     if len(shells) > 1:

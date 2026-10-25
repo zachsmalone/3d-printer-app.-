@@ -25,12 +25,39 @@ def c():
 
 def test_settings_presets_and_limits():
     s = resin.settings()
-    assert s["preset"] == "standard" and s["layer_mm"] == 0.05 and s["hollow"] and s["supports"] and s["drain_mm"] > 0
-    assert resin.settings({"preset": "detail"})["layer_mm"] == 0.03
+    assert s["preset"] == "standard" and s["material"] == "standard" and s["layer_mm"] == 0.05 and s["hollow"] and s["supports"] and s["drain_mm"] > 0
+    assert s["exposure_s"] == resin.PRESETS["standard"]["exposure_s"] and s["lift_mm"] == resin.PRESETS["standard"]["lift_mm"]
+    detail = resin.settings({"preset": "detail"})
+    assert detail["layer_mm"] == 0.03 and detail["exposure_s"] == 2.0 and detail["material"] == "standard"
     assert resin.settings({"layer_mm": "0.04", "hollow": "false"})["layer_mm"] == 0.04
-    for bad in ({"preset": "x"}, {"layer_mm": 1}, {"exposure_s": "abc"}, {"tilt_deg": 90}):
+    for bad in ({"preset": "x"}, {"material": "x"}, {"layer_mm": 1}, {"exposure_s": "abc"}, {"tilt_deg": 90}):
         with pytest.raises(resin.ResinError):
             resin.settings(bad)
+
+
+def test_silicone_material_is_distinct_and_has_no_invented_price():
+    """Starting exposure and lift follow Liqcreate Flexible-X on the original Saturn at 50 µm (10 s, 40 s, 10 mm, 60 mm/min)."""
+    std = resin.settings()
+    sil = resin.settings({"material": "silicone"})
+    published = resin.MATERIALS["silicone"]["settings"]
+    assert sil["material"] == "silicone" and sil["exposure_s"] == published["exposure_s"] == 10.0
+    assert sil["bottom_exposure_s"] == 40.0 and sil["lift_mm"] == 10.0 and sil["lift_speed_mm_min"] == 60.0
+    assert sil["exposure_s"] > std["exposure_s"] and sil["lift_mm"] > std["lift_mm"] and sil["lift_speed_mm_min"] < std["lift_speed_mm_min"]
+    # quality presets stay on the standard resin; they do not overwrite the silicone profile
+    mixed = resin.settings({"material": "silicone", "preset": "detail"})
+    assert mixed["preset"] == "detail" and mixed["layer_mm"] == published["layer_mm"] and mixed["exposure_s"] == published["exposure_s"]
+    assert resin.settings({"material": "silicone", "exposure_s": "12"})["exposure_s"] == 12.0
+    assert sil["price"] is None and sil["density_g_ml"] is None and resin.MATERIALS["silicone"]["price_per_l"] is None
+    per_l = resin.estimate(10.0, 100000, resin.settings({"material": "silicone", "price": 40, "price_unit": "l"}))
+    assert per_l["cost"] == 4.0
+    per_kg = resin.estimate(10.0, 100000, resin.settings({"material": "silicone", "price": 40, "price_unit": "kg"}))
+    assert per_kg["cost"] is None and "per litre" in per_kg["cost_note"]
+    urls = " ".join(src["url"] for src in resin.MATERIALS["silicone"]["sources"])
+    assert "liqcreate.com" in urls and "resione.com" in urls and "siraya.tech" in urls and "formlabs.com" in urls
+    assert any("glove" in line.lower() for line in resin.MATERIALS["silicone"]["safety"])
+    _, rep = resin.prepare(trimesh.creation.box(extents=[10, 10, 10]), resin.settings({"material": "silicone", **FLAT}))
+    assert rep["material"]["label"] == "Silicone resin" and rep["material_notes"]
+    assert len(rep["safety"]) == len(resin.SAFETY) + len(resin.MATERIALS["silicone"]["safety"])
 
 
 def test_orient_tilts_and_sits_on_plate():
@@ -70,6 +97,10 @@ def test_api_catalog_and_prepare_upload(c):
     cat = c.get("/api/resin/catalog").json()
     assert cat["program"] == "TorchC0" and cat["printers"] and all(p["technology"] == "Resin" for p in cat["printers"])
     assert any(p["id"] == "elegoo_saturn4_ultra" for p in cat["printers"]) and {p["id"] for p in cat["presets"]} == set(resin.PRESETS)
+    assert cat["default_material"] == "standard" and {m["id"] for m in cat["materials"]} == set(resin.MATERIALS)
+    sil = next(m for m in cat["materials"] if m["id"] == "silicone")
+    assert sil["label"] == "Silicone resin" and sil["settings"]["exposure_s"] > resin.PRESETS["standard"]["exposure_s"]
+    assert sil["price_per_l"] is None and sil["density_g_ml"] is None and sil["sources"] and sil["safety"]
     m = trimesh.creation.box(extents=[20, 15, 10])
     r = c.post("/api/resin/prepare", data={"printer_id": "elegoo_saturn4_ultra", "hollow": "false"},
                files={"file": ("cube.stl", _stl(m), "model/stl")})
@@ -78,6 +109,25 @@ def test_api_catalog_and_prepare_upload(c):
     stl = c.get(j["downloads"]["stl"]); assert stl.status_code == 200 and len(stl.content) > 84
     tmf = c.get(j["downloads"]["3mf"]); assert tmf.status_code == 200 and zipfile.is_zipfile(io.BytesIO(tmf.content))
     assert client(ADULT).get(j["downloads"]["stl"]).status_code in (200, 404)   # same-user client may share sid; never a 500
+
+
+def test_api_silicone_material_and_standard_preset_still_work(c):
+    m = _stl(trimesh.creation.box(extents=[10, 10, 10]))
+    sil = c.post("/api/resin/prepare", data={"material": "silicone", "hollow": "false", "supports": "false", "tilt_deg": "0"},
+                 files={"file": ("cube.stl", m, "model/stl")})
+    assert sil.status_code == 200, sil.text
+    body = sil.json()
+    assert body["settings"]["material"] == "silicone"
+    assert body["settings"]["exposure_s"] == resin.MATERIALS["silicone"]["settings"]["exposure_s"]
+    assert body["settings"]["lift_mm"] == resin.MATERIALS["silicone"]["settings"]["lift_mm"]
+    assert body["estimate"]["cost"] is None
+    std = c.post("/api/resin/prepare", data={"preset": "fast", "hollow": "false", "supports": "false", "tilt_deg": "0"},
+                 files={"file": ("cube.stl", m, "model/stl")})
+    assert std.status_code == 200, std.text
+    assert std.json()["settings"]["material"] == "standard" and std.json()["settings"]["layer_mm"] == resin.PRESETS["fast"]["layer_mm"]
+    assert std.json()["settings"]["exposure_s"] == resin.PRESETS["fast"]["exposure_s"]
+    bad = c.post("/api/resin/prepare", data={"material": "nope"}, files={"file": ("cube.stl", m, "model/stl")})
+    assert bad.status_code == 400 and "material" in bad.json()["detail"].lower()
 
 
 def test_api_rejects_filament_printer_and_bad_input(c):
@@ -92,6 +142,7 @@ def test_api_rejects_filament_printer_and_bad_input(c):
 def test_ui_uses_torchc0_name_and_no_tester_handles():
     js = (ROOT / "static" / "torchc0.js").read_text()
     assert "TorchC0" in js and "/api/resin/prepare" in js and 'id="rzGo"' in js
+    assert 'id="rzMaterial"' in js and "material: $(\"#rzMaterial\").value" in js and "mat.settings" in js
     for f in ("printer.js", "index.html", "app.js", "torchc0.js", "community.js"):
         assert "cc0hort" not in (ROOT / "static" / f).read_text().lower()
 
