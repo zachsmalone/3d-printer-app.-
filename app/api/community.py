@@ -143,7 +143,8 @@ def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)
             svc.sync_login_name(auth_id, name)
         except AuthError as e:
             raise HTTPException(e.status, e.message)
-    return {"username": name}
+    u = USERS.read().get(actor.sid) or {}
+    return {"username": name, "username_next_change": usernames.next_change(u), "username_starter": usernames.is_starter(u)}
 
 
 @router.post("/me/username/suggest")

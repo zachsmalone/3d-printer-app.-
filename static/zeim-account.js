@@ -15,11 +15,10 @@
     el.className = "help" + (bad ? " roleHole" : "");
   }
 
-  const esc = t => {
-    const d = document.createElement("div");
-    d.textContent = String(t == null ? "" : t);
-    return d.innerHTML;                               /* safe by construction: no markup survives */
-  };
+  function esc(t) {
+    return String(t == null ? "" : t)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
 
   function afterIdentityChange() {
     /* Both the account state AND everything account-scoped (builds, Showcase, share
@@ -225,6 +224,7 @@
           as they are.</p>
       </div>
       <div id="accMsg" class="help" style="min-height:1.2em"></div>
+      ${usernameSection(me)}
       <div class="auth-stack">
         <div class="field"><label for="au_leg_pw">Password</label>
           <input id="au_leg_pw" type="password" maxlength="128" autocomplete="new-password">
@@ -234,6 +234,7 @@
       </div>
       <p class="mini" style="margin-top:10px">Or keep using the cookie account for now — everything keeps working.</p>
       <h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>`;
+    wireUsername(me, DIALOG_UN, next => { renderLegacy(next); publishUsername(next, "dialog"); });
     $("#au_leg_go").onclick = async () => {
       const pw = $("#au_leg_pw").value;
       if (!pw) { say("Choose a password of at least 10 characters.", true); return; }
@@ -255,6 +256,150 @@
     };
   }
 
+  /* Username editor. Same rules as the server: 3–18, unique ignoring case, the chat filter,
+     one real rename every 90 days. The first rename is free, including a starter nickname
+     ZEIM made (HappyDolphin126). Old names stay reserved so Showcase credits keep pointing
+     at this account. ids let the dialog and the Account page each have their own fields. */
+  const DIALOG_UN = { now: "un_now", neu: "un_new", save: "un_save", suggest: "un_suggest", help: "un_help", sugg: "un_sugg", msg: "un_msg" };
+  const PAGE_UN = { now: "pg_un_now", neu: "pg_un_new", save: "pg_un_save", suggest: "pg_un_suggest", help: "pg_un_help", sugg: "pg_un_sugg", msg: "pg_un_msg" };
+
+  function usernameWhen(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10);
+    try { return d.toLocaleDateString(); } catch (e) { return String(iso).slice(0, 10); }
+  }
+
+  function usernameIsStarter(me) {
+    if (!me || me.username_next_change) return false;
+    if (me.username_starter === true) return true;
+    if (me.username_starter === false) return false;
+    return /^[A-Z][a-z]+[A-Z][a-z]+\d{3}$/.test(me.username || "");
+  }
+
+  function usernameSection(me, ids, opts) {
+    ids = ids || DIALOG_UN;
+    opts = opts || {};
+    const locked = !!(me && me.username_next_change);
+    const starter = usernameIsStarter(me || {});
+    const when = usernameWhen(me && me.username_next_change);
+    const help = locked
+      ? "You can change your username again on " + when + "."
+      : (starter
+        ? "ZEIM made this starter name. Set your own @ now — that first change is free. After that, once every 90 days. The name you leave stays saved for you, so nobody else can take it. Showcase uses your current @ on every project, including ones you already posted."
+        : "3 to 18 letters, numbers or underscores. The first change is free. After that, once every 90 days. The name you leave stays saved for you, so nobody else can take it. Please don't use your real name.");
+    const heading = opts.heading === false ? "" : "<h4>Your username</h4>";
+    const email = opts.email === false ? "" : " Your email is never shown to anyone.";
+    const dis = locked ? "disabled" : "";
+    const label = starter && !locked ? "Your username" : "New username";
+    const save = starter && !locked ? "Set username" : "Change username";
+    return `${heading}
+      <p>Credit for what you share goes to <b id="${ids.now}">@${esc((me && me.username) || "")}</b>.${email}</p>
+      <div class="field"><label for="${ids.neu}">${label}</label>
+        <input id="${ids.neu}" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false" ${dis}>
+        <small class="help" id="${ids.help}">${esc(help)}</small></div>
+      <p id="${ids.msg}" class="help" role="status"></p>
+      <div class="row"><button class="btn small" type="button" id="${ids.save}" ${dis}>${save}</button>
+        <button class="btn small ghost" type="button" id="${ids.suggest}" ${dis}>Suggest names</button></div>
+      <div class="row" id="${ids.sugg}"></div>`;
+  }
+
+  function usernameErrorText(data) {
+    const d = data && data.detail;
+    if (typeof d === "string" && d) return d;
+    if (d && typeof d.message === "string" && d.message) return d.message;
+    if (data && typeof data.message === "string" && data.message) return data.message;
+    return "That name isn't available. Please pick another.";
+  }
+
+  async function communityJson(method, path, body) {
+    const res = await fetch(path, {
+      method: method, credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "zeim" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      const err = new Error(usernameErrorText(data));
+      err.status = res.status;
+      throw err;
+    }
+    return data || {};
+  }
+
+  function showUsernameError(ids, message) {
+    const btn = $("#" + ids.save);
+    const near = btn && btn.parentElement;
+    if (near && typeof near.before === "function") {
+      let p = near.previousElementSibling;
+      if (!(p && p.classList && p.classList.contains("inline-msg"))) {
+        p = document.createElement("p");
+        p.setAttribute("role", "alert");
+        near.before(p);
+      }
+      p.className = "inline-msg err";
+      p.textContent = message;
+      return;
+    }
+    const slot = $("#" + ids.msg);
+    if (slot) { slot.className = "inline-msg err"; slot.textContent = message; }
+  }
+
+  function clearUsernameError(ids) {
+    const btn = $("#" + ids.save);
+    const near = btn && btn.parentElement;
+    const prev = near && near.previousElementSibling;
+    if (prev && prev.classList && prev.classList.contains("inline-msg") && typeof prev.remove === "function") prev.remove();
+    const slot = $("#" + ids.msg);
+    if (slot) { slot.className = "help"; slot.textContent = ""; }
+  }
+
+  function wireUsername(me, ids, onSaved) {
+    ids = ids || DIALOG_UN;
+    const save = $("#" + ids.save);
+    const suggest = $("#" + ids.suggest);
+    if (!save) return;
+    save.onclick = async () => {
+      if (save.disabled) return;
+      clearUsernameError(ids);
+      const typed = ($("#" + ids.neu).value || "").trim();
+      if (!typed) { showUsernameError(ids, "Type a username first."); return; }
+      try {
+        const r = await communityJson("PUT", "/api/me/username", { username: typed });
+        const next = Object.assign({}, me, {
+          username: r.username, username_next_change: r.username_next_change || null, username_starter: !!r.username_starter,
+        });
+        if (onSaved) onSaved(next);
+      } catch (e) { showUsernameError(ids, e.message || "That name isn't available. Please pick another."); }
+    };
+    if (suggest) suggest.onclick = async () => {
+      if (suggest.disabled) return;
+      clearUsernameError(ids);
+      try {
+        const r = await communityJson("POST", "/api/me/username/suggest", {});
+        const box = $("#" + ids.sugg);
+        const names = r.suggestions || [];
+        box.innerHTML = names.map(n => `<button type="button" class="btn small ghost" data-un="${esc(n)}">${esc(n)}</button>`).join("");
+        if (typeof box.querySelectorAll === "function") {
+          box.querySelectorAll("[data-un]").forEach(b => {
+            b.onclick = () => {
+              const input = $("#" + ids.neu);
+              input.value = b.getAttribute("data-un") || "";
+              if (input.focus) input.focus();
+            };
+          });
+        }
+      } catch (e) { showUsernameError(ids, e.message || "Couldn't suggest names just now."); }
+    };
+  }
+
+  function publishUsername(next, source) {
+    try {
+      document.dispatchEvent(new CustomEvent("zeim:username", { detail: { me: next, source: source || "dialog" } }));
+    } catch (e) { /* tests may use a document without events */ }
+  }
+
   /* ---------- state 3: signed in with a real auth session ---------- */
   function renderSignedIn(me) {
     const body = $("#accBody");
@@ -263,9 +408,11 @@
         <p>Signed in as <b>${esc(me.display_name)}</b>${me.username ? ` (@${esc(me.username)})` : ""}.</p>
       </div>
       <div id="accMsg" class="help" style="min-height:1.2em"></div>
+      ${usernameSection(me)}
       <div id="accSecurity"></div>
       <button class="btn" id="au_out" style="margin-top:10px">Sign out</button>
       <h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>`;
+    wireUsername(me, DIALOG_UN, next => { renderSignedIn(next); publishUsername(next, "dialog"); });
     root.ZeimAuth.mountSecurityPanel($("#accSecurity"), {
       onSignedOut: afterIdentityChange,
       emailAvailable: !!(me.auth && me.auth.email_codes),   /* do not offer email adding when the server cannot send codes */
@@ -314,5 +461,5 @@
     }
   }
 
-  root.ZeimAccount = { handles, render };
+  root.ZeimAccount = { handles, render, usernameSection, wireUsername, DIALOG_UN, PAGE_UN, publishUsername };
 })(window);

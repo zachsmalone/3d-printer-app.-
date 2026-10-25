@@ -17,6 +17,8 @@ from . import safety
 from .store import USERS
 
 NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{2,17}$")
+# Nicknames from generate(): Happy + Dolphin + 100–999, with no separator.
+GENERATED_RE = re.compile(r"^[A-Z][a-z]+[A-Z][a-z]+\d{3}$")
 RESERVED = {"admin", "administrator", "moderator", "mod", "staff", "support", "system", "zeim", "teacher", "official", "root", "owner", "help",
             "anonymous", "null", "undefined", "nasa", "creality", "prusa", "bambu"}
 ADJ = ["Sunny", "Bright", "Happy", "Brave", "Calm", "Clever", "Cosmic", "Gentle", "Jolly", "Kind", "Lucky", "Merry", "Nimble", "Quick", "Quiet", "Shiny",
@@ -65,6 +67,22 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def is_starter(u: dict) -> bool:
+    """True when the account still wears the nickname ZEIM made and has not used its free rename.
+
+    Choosing a username at sign-up is not a starter, even though that first rename is still free.
+    Records from before this flag: a never-changed HappyDolphin126-style name counts as a starter.
+    """
+    if not u or u.get("username_changed"):
+        return False
+    flag = u.get("username_generated")
+    if flag is True:
+        return True
+    if flag is False:
+        return False
+    return bool(GENERATED_RE.match(u.get("username") or ""))
+
+
 def next_change(u: dict) -> str | None:
     """ISO time when this account may rename itself again, or None if it may do so now (a first rename is always free)."""
     last = u.get("username_changed")
@@ -102,18 +120,22 @@ def suggestions(n: int = 3) -> list[str]:
 def assign_new(sid: str, user: dict, chosen: str | None) -> str:
     """At sign-up. The person may supply their own username (it must pass every check); otherwise a nickname is generated."""
     name = None
+    generated = not bool(chosen)
     if chosen:
         name = check_shape(chosen)
+        generated = False
 
     def f(d):
-        nonlocal name
+        nonlocal name, generated
         if name is not None:
             if _taken(d, name, sid):
                 raise UsernameError("That name is taken. Please pick another.")
         else:
             name = generate(d)
+            generated = True
         d[sid]["username"] = name
         d[sid]["username_changed"] = None
+        d[sid]["username_generated"] = generated
     USERS.update(f)
     user["username"] = name
     return name
@@ -140,6 +162,7 @@ def change(sid: str, new: str) -> str:
         if cur and cur.lower() not in u.setdefault("username_history", []):
             u["username_history"].append(cur.lower())
         u["username"] = n
+        u["username_generated"] = False
         u["username_changed"] = _now().isoformat()
     USERS.update(f)
     return n
@@ -167,6 +190,7 @@ def migrate() -> int:
                     pass
             u["username"] = ok or generate(d)
             u["username_changed"] = None
+            u["username_generated"] = ok is None
             changed.append(sid)
     USERS.update(f)
     return len(changed)

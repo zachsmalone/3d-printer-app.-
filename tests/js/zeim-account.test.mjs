@@ -176,6 +176,70 @@ test("a mismatched password on sign-up does not call the server", async () => {
   assert.match(d.el("accMsg").textContent, /don't match/i);
 });
 
+test("a signed-in account with a starter name can set a username; the page does not reload and the form then locks", async () => {
+  reset(); const d = makeDoc();
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, init });
+    return { ok: true, status: 200, json: async () => ({ username: "StudioBenchy", username_next_change: "2099-01-01T00:00:00+00:00", username_starter: false }) };
+  };
+  stubAuth();
+  require("../../static/zeim-account.js");
+  const me = { ...SIGNED_IN, display_name: "Zach", username: "HappyDolphin126", username_starter: true };
+  await globalThis.ZeimAccount.render(me);
+  assert.match(d.html("accBody"), /starter name/);
+  assert.match(d.html("accBody"), /Set username/);
+  assert.match(d.html("accBody"), /email is never shown/);
+  d.el("un_new").value = "StudioBenchy";
+  await d.el("un_save").onclick();
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "/api/me/username");
+  assert.equal(calls[0].init.method, "PUT");
+  assert.equal(calls[0].init.headers["X-Requested-With"], "zeim");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { username: "StudioBenchy" });
+  assert.match(d.html("accBody"), /@StudioBenchy/);
+  assert.match(d.html("accBody"), /again on/);
+  assert.match(d.html("accBody"), /id="un_save"[^>]*disabled/);
+  assert.equal(reloaded, 0);
+});
+
+test("a refused username stays typed and the server's reason is shown", async () => {
+  reset(); const d = makeDoc();
+  globalThis.fetch = async () => ({ ok: false, status: 400, json: async () => ({ detail: "Please don't use an email address or a link as a username." }) });
+  stubAuth();
+  require("../../static/zeim-account.js");
+  await globalThis.ZeimAccount.render(SIGNED_IN);
+  d.el("un_new").value = "me@example.com";
+  await d.el("un_save").onclick();
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(d.el("un_new").value, "me@example.com");
+  assert.match(d.el("un_msg").textContent, /email/i);
+  assert.equal(reloaded, 0);
+});
+
+test("suggest names fills the suggestion row", async () => {
+  reset(); const d = makeDoc();
+  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ suggestions: ["SunnyOtter101", "BraveFox102", "CalmKiwi103"] }) });
+  stubAuth();
+  require("../../static/zeim-account.js");
+  await globalThis.ZeimAccount.render({ ...SIGNED_IN, username_next_change: "2099-06-01T00:00:00+00:00" });
+  assert.match(d.html("accBody"), /again on/);
+  assert.match(d.html("accBody"), /id="un_new"[^>]*disabled/);
+  await globalThis.ZeimAccount.render(SIGNED_IN);
+  await d.el("un_suggest").onclick();
+  await new Promise(r => setTimeout(r, 0));
+  assert.match(d.el("un_sugg").innerHTML, /data-un="SunnyOtter101"/);
+});
+
+test("a legacy cookie account still gets the username editor", async () => {
+  reset(); const d = makeDoc(); stubAuth();
+  require("../../static/zeim-account.js");
+  await globalThis.ZeimAccount.render(LEGACY);
+  assert.match(d.html("accBody"), /id="un_save"/);
+  assert.match(d.html("accBody"), /Secure my account with a passkey/);
+});
+
 test("the recovery code goes to /api/me/recover with the CSRF header", async () => {
   reset(); const d = makeDoc(); stubAuth();
   require("../../static/zeim-account.js");
