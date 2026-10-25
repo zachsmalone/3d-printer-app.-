@@ -1136,6 +1136,14 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .shfilters small.help{flex-basis:100%;margin:0}
 
 /* Showcase collections — calm strip matching .shfilters / .prov (cherry-blossom vars) */
+/* My Studio: its own block on Account (Me), under the calligraphy band, in normal flow */
+#viewAccount .mestudio{margin:0 0 var(--s4,16px);padding:var(--s5,20px);border:1px solid var(--line);border-left:3px solid var(--zt-a,#A3241C);border-radius:var(--r-lg,14px);background:var(--panel);box-shadow:var(--sh-1);max-width:100%}
+#viewAccount .mestudio h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:1.05rem}
+#viewAccount .mestudio h2 .i{width:20px;height:20px;color:var(--zt-a,#A3241C)}
+#viewAccount .mestudio .btn{min-height:44px;margin-top:10px;text-decoration:none}
+@media (max-width:768px){#viewAccount .mestudio .btn{width:100%;justify-content:center}}
+.studio-crumb{margin:0 0 8px;font-size:13px;color:var(--mut)}
+.studio-crumb a{font-weight:650}
 .cols{margin:16px 0 24px}
 .cols h2{display:flex;align-items:center;gap:8px;font-size:1.05rem;margin:0 0 4px}
 .cols h2 .i{width:18px;height:18px}

@@ -48,9 +48,10 @@ async function refreshMe() {
 /* ---------- views ---------- */
 const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn" };
 const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", studio: "lithophane", "2d3d": "ai3d" };
-function show(view) {
-  const tab = view;   // P10: Learn has its own nav button
-  $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === tab); if (b.dataset.view === tab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+const STUDIO_FROM_ME = { studio: 1, create: 1 };
+function show(view, tab) {
+  const navTab = tab || view;   // #studio / #create keep the Studio page and light Me; Lithophane stays its own tab
+  $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === navTab); if (b.dataset.view === navTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
   document.body.dataset.view = view;
   if (view === "slicer") document.dispatchEvent(new CustomEvent("zeim:edit-shown"));
@@ -69,11 +70,23 @@ function openTool(t) {   // Smart Fix / CAD shortcuts: open the matching tool in
 }
 let toolDone = "";
 document.addEventListener("zeim:edit-loaded", () => { const h = location.hash.split("/"); if (h[1] && toolDone !== location.hash) { toolDone = location.hash; openTool(h[1]); } });
+function paintStudioHome(raw) {
+  const fromMe = !!STUDIO_FROM_ME[raw];
+  const crumb = $("#studioFromMe");
+  if (crumb) crumb.hidden = !fromMe;
+  const note = $("#lithoStudioNote");
+  if (note) note.hidden = raw !== "lithophane";
+  const expert = document.querySelector("#h1 [data-lvl=expert]");
+  if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : "Studio";
+}
 function route() {
   const h = location.hash.replace("#", "").split("/");
-  const v = ALIAS[h[0]] ?? (VIEWS[h[0]] ? h[0] : "showcase");
-  show(v);
-  if (v === "lithophane" && h[0] === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
+  const raw = h[0];
+  const v = ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase");
+  const fromMe = !!STUDIO_FROM_ME[raw];
+  show(v, fromMe ? "account" : undefined);
+  paintStudioHome(raw);
+  if (v === "lithophane" && raw === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
   if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
   if (h[0] === "u" && h[1]) setTimeout(() => openProfile(h[1]), 50);
