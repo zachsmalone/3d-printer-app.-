@@ -8,13 +8,13 @@ backup, restore-drill, retention and checksum-failure test on a fake tree (incl.
 | File | Purpose |
 |---|---|
 | `../../Dockerfile` (repo root; Engineering moved and edited it, history in git) | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker |
-| `docker-compose.yml` | `app` (internal port 8765 only) + `caddy` (80/443); bind-mounted `data/` and `outputs/`; read-only rootfs, caps dropped, mem/CPU limits |
+| `docker-compose.yml` | `app` (internal port 8765 only) + `caddy` (80/443); runtime `data/` and `outputs/` volumes, plus a read-only repo-catalog mount at `/app/data`; read-only rootfs, caps dropped, mem/CPU limits |
 | `Caddyfile` | Full app: automatic HTTPS, 55 MB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing. This is the file zeim-prod should run. |
 | `Caddyfile.coming-soon` | Optional holding page for every path except `/healthz`. Used only when `ZEIM_COMING_SOON=1`. |
 | `caddy-run.sh` | Selects `Caddyfile` (default) or `Caddyfile.coming-soon` from `ZEIM_COMING_SOON`. |
 | `backup.sh` | Archives `data/` + `outputs/`, safe SQLite copies (`.backup`), sha256 sums, 14 daily + 8 weekly retention, optional `age` encryption and `rclone` off-site copy |
 | `restore.sh` | Verifies checksums, extracts to a scratch dir (the **restore drill**), `--apply` swaps it in and keeps the old dirs as `*.pre-restore-<ts>` |
-| `../../.env.example`, `../../.dockerignore` | Config template and a build context that excludes data, keys, tests, reports |
+| `../../.env.example`, `../../.dockerignore` | Config template. The build context excludes runtime `data/` (accounts, uploads, keys), tests, and reports. Tracked catalogs are re-included and copied to `/app/data`. |
 
 ## Usage
 
@@ -76,6 +76,7 @@ See `local-https/README.md` (for trying the share sheet from an iPhone/iPad).
 - Single VPS (Option A), >= 2 vCPU / 4 GB RAM; app limited to 3 GB / 2 CPUs so Caddy and the OS keep headroom.
 - **One uvicorn worker only.** State is JSON files guarded by in-process locks; two workers could corrupt them.
 - State dirs come from the existing env vars `PHOTO3D_DATA` and `PHOTO3D_OUT` (`app/config.py`), pointed at `/data` and `/outputs`.
+- Repo catalogs (nozzle specs, resin, filaments, smartfix, split, troubleshooting, and the other tracked JSON under `data/`) are a different tree. The image copies them to `/app/data`. Compose also mounts the checkout's `data/` read-only on `/app/data` so a git pull can refresh them without a rebuild. That mount is not `ZEIM_HOST_DIR/data`.
 - The app has **no SQLite today**. `backup.sh` detects any SQLite file under `data/` and copies it with the backup API
   (`sqlite3 .backup`, or Python's `sqlite3` module if the CLI is missing), then runs `integrity_check`. Once Engineering moves to
   SQLite (WAL) this is already handled; if they pick Postgres, replace that step with `pg_dump`.

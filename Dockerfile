@@ -36,16 +36,20 @@ WORKDIR /app
 COPY requirements.txt constraints.txt ./
 RUN pip install -r requirements.txt -c constraints.txt
 
-# Application code only (tests/, reports/, data/, outputs/, previews/ are excluded via .dockerignore).
+# Application code, plus the repo's read-only catalogs. tests/, reports/, outputs/, previews/,
+# and runtime files under data/ (accounts, uploads, keys) stay out via .dockerignore.
+# Modules load catalogs with Path(__file__).parents[2] / "data" / ..., which is /app/data here.
+# PHOTO3D_DATA=/data is user state and is a different tree. Do not copy that volume into the image.
 COPY app ./app
 COPY static ./static
+COPY data ./data
 
 # State lives OUTSIDE the image. config.py reads PHOTO3D_DATA / PHOTO3D_OUT.
 ENV PHOTO3D_DATA=/data \
     PHOTO3D_OUT=/outputs \
     HOME=/tmp \
     PORT=8765
-RUN mkdir -p /data /outputs && chown zeim:zeim /data /outputs
+RUN mkdir -p /data /outputs && chown -R zeim:zeim /data /outputs /app/data
 VOLUME ["/data", "/outputs"]
 
 USER zeim
