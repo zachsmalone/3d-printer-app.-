@@ -1178,10 +1178,15 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .chrules{margin:8px 0 12px;padding-left:1.2em}
 .prform input[capture],.prform #prCam{min-height:44px}
 .print-notes{margin:.25rem 0 0;white-space:pre-wrap}
+.showoff-stage{margin:0 0 8px;max-width:280px}
+.showoff-stage img{width:100%;height:auto;border-radius:10px;background:#eee}
 .showoff-row{display:flex;flex-wrap:wrap;gap:8px}
 .showoff-row figure{margin:0;width:140px}
 .showoff-row img{width:100%;height:auto;border-radius:8px;background:#eee}
 .showoff-row figcaption{font-size:13px}
+.showoff-pick{display:flex;flex-direction:column;align-items:center;gap:2px;width:88px;padding:4px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.showoff-pick[aria-pressed=true]{border-color:var(--acc, var(--brand, #0a7))}
+.print-name{display:block}
 
 
 /* Optional Semi Pro / Pro (Account → Plans) */

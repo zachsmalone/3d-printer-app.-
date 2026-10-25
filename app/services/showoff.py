@@ -126,7 +126,8 @@ def ensure(item_id: str, stl: Path) -> list[tuple[str, str, Path]]:
         png = folder / f"{vid}.png"
         if not png.is_file() or png.stat().st_mtime < stamp:
             if mesh is None:
-                mesh = trimesh.load(str(stl), force="mesh")
+                loaded = trimesh.load(str(stl), force="mesh")
+                mesh = loaded.dump(concatenate=True) if isinstance(loaded, trimesh.Scene) else loaded
             png.write_bytes(render_png(mesh, look))
         out.append((vid, label, png))
     return out

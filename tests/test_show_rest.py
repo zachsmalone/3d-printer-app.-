@@ -111,14 +111,20 @@ def test_print_photo_settings_and_notes():
                data={"caption": "Solid", "photo_ack": "true", "nsfw": "no",
                      "printer": "fdm", "material": "pla", "layer_height_mm": "0.2",
                      "infill_pct": "20", "supports": "no", "notes": "0.2 mm, 20% gyroid",
-                     "printer_name": "A1"})
+                     "printer_name": "A1", "print_name": "First lamp"})
     assert r.status_code == 200, r.text
-    s = r.json()["settings"]
+    body = r.json()
+    s = body["settings"]
     assert s["printer"] == "fdm" and s["material"] == "pla" and s["infill_pct"] == 20
     assert "gyroid" in s["notes"]
+    assert body["name"] == "First lamp" and s["printer_name"] == "A1" and "print_name" not in s
+    long = b.post(f"/api/showcase/{iid}/prints",
+                  files={"photo": ("p.png", _png(), "image/png")},
+                  data={"photo_ack": "true", "nsfw": "no", "print_name": "x" * 81})
+    assert long.status_code == 400
     # owner of photo sees it in list (pending)
     mine = b.get(f"/api/showcase/{iid}/prints").json()["prints"]
-    assert mine and mine[0]["settings"]["material"] == "pla"
+    assert mine and mine[0]["settings"]["material"] == "pla" and mine[0]["name"] == "First lamp"
 
 
 # ---------- 4. prize-free remix challenge ----------
@@ -153,6 +159,8 @@ def test_camera_capture_in_community_js():
     js = open("static/community.js").read()
     assert 'capture="environment"' in js
     assert "prCam" in js
+    assert 'id="prName"' in js and 'accept="image/*" multiple' in js
+    assert "Print notes" in js and "showoff-pick" in js
     assert "Ask the creator" in js
     assert "Prize-free" in js or "prize-free" in js.lower()
     html = open("static/index.html").read()

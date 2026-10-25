@@ -12,6 +12,10 @@ let lastCaps = null;
 let X = null;                                   // the open sheet: bound to ONE build, never to "whatever is current later"
 
 const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+function saveFileName(b, fmt) {
+  const stem = String(b?.file_name || "").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+  return (stem || "ZEIM-build") + "." + fmt;
+}
 const getFmt = () => { const f = localStorage.sendFmt; return FMTS.includes(f) ? f : "3mf"; };
 const shareLabel = () => /iPad/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ? "iPad" : "iPhone";
 
@@ -43,8 +47,9 @@ function render() {
   const fileLine = !adult ? "" : !isExpert()
     ? `<div class="help">File: 3D print file (3MF)<details class="inl"><summary>Different file type?</summary>${chooser}</details></div>` : chooser;
   const save = [], other = [], print = [];
-  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="ZEIM-build.${fmt}"><b>${adult ? "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Save to this device" : "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download my model"}</b>
-    <small>${adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
+  const dlName = saveFileName(b, fmt);
+  save.push(`<a class="btn primary sheet-row" id="ssSave" href="/files/${b.id}/model.${fmt}" download="${esc(dlName)}"><b>${adult ? "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Save to this device" : "<svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Download my model"}</b>
+    <small>${b.file_name ? "Saves as " + esc(dlName) + "." : adult ? "Goes to your Files or Downloads." : "Saves a file on this device."}</small></a>`);
   if (b.original) save.push(`<a class="btn ghost sheet-row" href="${b.original}" download><b><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Your original file</b><small>The file you opened, unchanged.</small></a>`);
   if (adult && shareAllowed()) {
     other.push(`<button type="button" class="btn sheet-row" id="ssShare" disabled><b><svg class=i aria-hidden=true focusable=false><use href=#i-upload></use></svg> Share… <span class="untested">untested</span></b><small>Opens the ${shareLabel()} share sheet, where you pick the app (Files, Mail and more). Not tried on a real iPhone or iPad yet.</small></button>`);

@@ -57,6 +57,7 @@ def summary(meta: dict) -> dict:
     return {**{k: meta[k] for k in ("id", "created", "mode", "beginner", "title", "stats")},
             "kind": meta.get("kind", "photo"), "visibility": meta.get("visibility", "private"),
             "favorite": bool(meta.get("favorite")), "ai": bool(meta.get("ai")), "expires": retention.expires_at(meta),
+            "file_name": meta.get("file_name") or "",
             "thumb": f"/files/{bid}/thumb.png",
             "downloads": {e: f"/files/{bid}/model.{e}" for e in exporters.WRITERS},
             "sizes": _sizes(bid)}

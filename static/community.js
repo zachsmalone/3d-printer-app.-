@@ -498,11 +498,13 @@ async function openItem(id) {
     ${!i.example && !i.allow_remixes ? `<p class="help remix-off" id="itRemixOff"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Remixes off${i.owned ? "" : `: ${esc(i.remix_off_reason)}`}</p>` : !i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
-    <section class="showoff" aria-labelledby="soH"><h4 id="soH">Four sides of the model</h4><div id="soViews"><p class="help">ZEIM draws the model from the front, right, back and left. These are not photos of a finished print.</p></div></section>
-    <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4><ul class="pgallery" id="prGallery"></ul>
-      ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Add a photo of your print</summary>
-        <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo is checked by a moderator before anyone else can see it.</p>
-        <div class="field"><label for="prFile">Photo</label><input type="file" id="prFile" accept="image/*"></div>
+    <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4>
+    <section class="showoff" aria-labelledby="soH"><h4 id="soH">Four sides</h4><div id="soViews"><p class="help">ZEIM draws the model from the front, right, back and left. These are not photos of a finished print.</p></div></section>
+    <ul class="pgallery" id="prGallery"></ul>
+      ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Add photos of your print</summary>
+        <p class="help">Name this print, add print notes, and add photos of the finished object. Photos of the object only, please: no people, faces, names or addresses. Location data is removed. Each photo is checked by a moderator before anyone else can see it.</p>
+        <div class="field"><label for="prName">Name this print</label><input id="prName" maxlength="80" placeholder="Desk lamp, first try"></div>
+        <div class="field"><label for="prFile">Photos</label><input type="file" id="prFile" accept="image/*" multiple></div>
         <div class="field"><label for="prCam">Or take one with your phone camera</label><input type="file" id="prCam" accept="image/*" capture="environment"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
         <details class="pubps"><summary>Settings and notes <em>optional</em></summary>
@@ -515,12 +517,12 @@ async function openItem(id) {
             <div class="field"><label for="pr_nozzle">Nozzle <em>mm</em></label><input id="pr_nozzle" type="number" min="0.1" max="1.2" step="0.05"></div>
           </div>
           <div class="field"><label for="pr_name">Printer name</label><input id="pr_name" maxlength="60"></div>
-          <div class="field"><label for="pr_notes">Notes</label><input id="pr_notes" maxlength="400" placeholder="What settings worked"></div>
+          <div class="field"><label for="pr_notes">Print notes</label><input id="pr_notes" maxlength="400" placeholder="What settings worked"></div>
         </details>
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
         <fieldset class="reasons"><legend>Is this NSFW (mild nudity / mature art)? <em>required</em></legend>
           <label class="choice"><input type="radio" name="prNsfw" value="no"> <span>No</span></label><label class="choice"><input type="radio" name="prNsfw" value="yes"> <span>Yes</span></label></fieldset>
-        <div class="row"><button class="btn primary" id="prSend" type="button">Share photo</button></div></details>` : ""}
+        <div class="row"><button class="btn primary" id="prSend" type="button">Share photos</button></div></details>` : ""}
     </section>
     <section class="qa" aria-labelledby="qaH"><h4 id="qaH">Ask the creator</h4><p class="help">Public questions the creator can answer on this page. There are no private messages in ZEIM.</p><ul class="qalist" id="qaList"></ul><div id="qaAsk"></div></section>`;
   if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
@@ -529,16 +531,29 @@ async function openItem(id) {
   if ($("#itCols")) mountItemCollections($("#itCols"), id);
   if ($("#prCam") && $("#prFile")) $("#prCam").onchange = () => { if ($("#prCam").files[0]) { const dt = new DataTransfer(); dt.items.add($("#prCam").files[0]); $("#prFile").files = dt.files; } };
   if ($("#prSend")) $("#prSend").onclick = async () => {
-    const f = $("#prFile").files[0] || $("#prCam")?.files?.[0]; if (!f) return inlineMsg($("#prSend"), "Choose a photo or take one with your camera.");
+    const files = [...($("#prFile").files || [])];
+    if (!files.length && $("#prCam")?.files?.[0]) files.push($("#prCam").files[0]);
+    if (!files.length) return inlineMsg($("#prSend"), "Choose a photo or take one with your camera.");
     const nv = $("[name=prNsfw]:checked")?.value; if (!nv) return inlineMsg($("#prSend"), "Please answer: Is this NSFW (mild nudity / mature art)?");
-    const fd = new FormData(); fd.append("photo", f); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked); fd.append("nsfw", nv);
-    ["printer", "material", "supports", "notes", "printer_name"].forEach(k => { const el = $("#pr_" + (k === "printer_name" ? "name" : k)); if (el?.value) fd.append(k === "printer_name" ? "printer_name" : k, el.value); });
-    if ($("#pr_layer")?.value) fd.append("layer_height_mm", $("#pr_layer").value);
-    if ($("#pr_infill")?.value) fd.append("infill_pct", $("#pr_infill").value);
-    if ($("#pr_nozzle")?.value) fd.append("nozzle_mm", $("#pr_nozzle").value);
+    const name = ($("#prName")?.value || "").trim();
     $("#prSend").disabled = true;
-    try { await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }); clearInline($("#prSend")); toast("Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok"); $("#prFile").value = ""; if ($("#prCam")) $("#prCam").value = ""; $("#prCap").value = ""; loadPrints(id); }
-    catch (e) { inlineMsg($("#prSend"), e.message); } finally { $("#prSend").disabled = false; }
+    let sent = 0;
+    try {
+      for (const f of files) {
+        const fd = new FormData(); fd.append("photo", f); fd.append("print_name", name); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked); fd.append("nsfw", nv);
+        ["printer", "material", "supports", "notes", "printer_name"].forEach(k => { const el = $("#pr_" + (k === "printer_name" ? "name" : k)); if (el?.value) fd.append(k === "printer_name" ? "printer_name" : k, el.value); });
+        if ($("#pr_layer")?.value) fd.append("layer_height_mm", $("#pr_layer").value);
+        if ($("#pr_infill")?.value) fd.append("infill_pct", $("#pr_infill").value);
+        if ($("#pr_nozzle")?.value) fd.append("nozzle_mm", $("#pr_nozzle").value);
+        await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd });
+        sent++;
+      }
+      clearInline($("#prSend"));
+      toast(sent > 1 ? sent + " photos are waiting for review. Only you can see them until a moderator approves them." : "Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok");
+      $("#prFile").value = ""; if ($("#prCam")) $("#prCam").value = ""; $("#prCap").value = ""; if ($("#prName")) $("#prName").value = "";
+      loadPrints(id);
+    } catch (e) { inlineMsg($("#prSend"), sent ? sent + " saved. " + e.message : e.message); if (sent) loadPrints(id); }
+    finally { $("#prSend").disabled = false; }
   };
   if ($("#itPsSave")) $("#itPsSave").onclick = async () => {
     try { await api(`/api/showcase/${id}/print-settings`, J("PUT", { print_settings: psRead("itPs") })); toast("Print settings saved", "ok"); openItem(id); }
@@ -682,6 +697,7 @@ $("#designNameSave") && ($("#designNameSave").onclick = async () => {
   try {
     const r = await api(`/api/export/${encodeURIComponent(b.id)}/name`, J("PUT", { name, save_title: true }));
     b.title = name; b.file_name = r.name;
+    const hist = S.history?.find(x => x.id === b.id); if (hist) { hist.title = name; hist.file_name = r.name; }
     if ($("#designName")) $("#designName").value = r.name || name;
     toast("Saved as " + (r.name || name) + ". Showcase files use this name when you send it.", "ok");
   } catch (e) { toast(e.message, "err"); }
@@ -845,15 +861,25 @@ async function loadShowoff(id) {
   let r; try { r = await api(`/api/showcase/${id}/sides`); } catch { return; }
   const note = r.note || "ZEIM draws the model from the front, right, back and left. These are not photos of a finished print.";
   if (!r.views || !r.views.length) { host.innerHTML = `<p class="help">${esc(note)}</p>`; return; }
-  host.innerHTML = `<p class="help">${esc(note)}</p><div class="showoff-row">${r.views.map(v => `<figure><img src="${esc(v.url)}" alt="${esc(v.label)} view of the model, drawn by ZEIM, not a photo of a print"><figcaption>${esc(v.label)}</figcaption></figure>`).join("")}</div>`;
+  host.innerHTML = `<p class="help">${esc(note)} Tap a side to bring it forward.</p>
+    <figure class="showoff-stage"><img id="soMain" alt=""></figure>
+    <div class="showoff-row" role="group" aria-label="Four sides of the model">${r.views.map(v => `<button type="button" class="showoff-pick" data-side="${esc(v.id)}" data-src="${esc(v.url)}" data-label="${esc(v.label)}" aria-pressed="false"><img src="${esc(v.url)}" alt=""><span>${esc(v.label)}</span></button>`).join("")}</div>`;
+  const show = btn => {
+    const img = $("#soMain"); if (!img) return;
+    img.src = btn.dataset.src;
+    img.alt = `${btn.dataset.label} view of the model, drawn by ZEIM, not a photo of a print`;
+    host.querySelectorAll(".showoff-pick").forEach(b => b.setAttribute("aria-pressed", b === btn ? "true" : "false"));
+  };
+  host.querySelectorAll(".showoff-pick").forEach(b => { b.onclick = () => show(b); });
+  const first = host.querySelector(".showoff-pick"); if (first) show(first);
 }
 
 /* ---------- 'I printed this' gallery ---------- */
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
   let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
-  const psLine = s => { if (!s || !Object.keys(s).length) return ""; const bits = []; if (s.printer_name) bits.push(String(s.printer_name)); if (s.printer) bits.push(String(s.printer).toUpperCase()); if (s.material) bits.push(String(s.material).toUpperCase()); if (s.layer_height_mm != null) bits.push(s.layer_height_mm + " mm"); if (s.infill_pct != null) bits.push(s.infill_pct + "%"); if (s.supports === "yes") bits.push("supports"); if (s.supports === "no") bits.push("no supports"); const line = bits.length ? `<p class="help psline">${esc(bits.join(" · "))}</p>` : ""; const notes = s.notes ? `<p class="print-notes">${esc(s.notes)}</p>` : ""; return line + notes; };
-  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure${p.nsfw && !p.mine ? ' class="prmature"' : ""}><img src="${p.url}" alt="${p.nsfw ? "Photo of a print (mature content)" : `Photo of a print${p.caption ? ": " + esc(p.caption) : ""}`}" loading="lazy">${p.nsfw && !p.mine ? `<button type="button" class="btn small mature-label" data-prshow="${p.id}">Mature content: show</button>` : ""}<figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
+  const psLine = s => { if (!s || !Object.keys(s).length) return ""; const bits = []; if (s.printer_name) bits.push(String(s.printer_name)); if (s.printer) bits.push(String(s.printer).toUpperCase()); if (s.material) bits.push(String(s.material).toUpperCase()); if (s.layer_height_mm != null) bits.push(s.layer_height_mm + " mm"); if (s.infill_pct != null) bits.push(s.infill_pct + "%"); if (s.supports === "yes") bits.push("supports"); if (s.supports === "no") bits.push("no supports"); const line = bits.length ? `<p class="help psline">${esc(bits.join(" · "))}</p>` : ""; const notes = s.notes ? `<p class="print-notes"><span class="help">Print notes</span> ${esc(s.notes)}</p>` : ""; return line + notes; };
+  g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure${p.nsfw && !p.mine ? ' class="prmature"' : ""}><img src="${p.url}" alt="${p.nsfw ? "Photo of a print (mature content)" : `Photo of a print${p.name ? ": " + esc(p.name) : p.caption ? ": " + esc(p.caption) : ""}`}" loading="lazy">${p.nsfw && !p.mine ? `<button type="button" class="btn small mature-label" data-prshow="${p.id}">Mature content: show</button>` : ""}<figcaption>${p.name ? `<strong class="print-name">${esc(p.name)}</strong>` : ""}${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${p.caption && p.caption !== p.name ? esc(p.caption) + " " : ""}<span class="help">${esc(p.by)}</span>
       ${psLine(p.settings)}
       ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>`}</figcaption></figure></li>`).join("")
     : `<li class="help">No print photos yet.</li>`;
