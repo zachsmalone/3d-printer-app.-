@@ -252,8 +252,8 @@ def _set_username(account_id, username):
 
 
 def test_zeimapp_passkey_account_adds_a_password_and_passkey_still_works(caplog, community_users):
-    """The live account already has username ZeimApp. New sign-ups cannot take that
-    name (it starts with the reserved word "zeim"), but the saved name must still
+    """The live account already has username ZeimApp. That name is allowed
+    (only the bare word zeim is reserved), and the saved name must still
     become the password sign-in name. Nothing about the account is deleted."""
     caplog.set_level("DEBUG")
     cfg = AuthConfig(rp_id="zeim.test", origins=("https://zeim.test",), pepper=b"p" * 40, mail_async=False)
@@ -292,7 +292,7 @@ def test_http_register_login_wrong_password_and_zeimapp_add(caplog, community_us
     assert kid.status_code == 403 and kid.json()["detail"]["code"] == "too_young"
 
     reserved = c.post("/api/auth/password/register", json={"display_name": "Zach", "birth_date": "1990-01-01",
-                      "username": "ZeimApp", "password": PW}, headers=H)
+                      "username": "adminx", "password": PW}, headers=H)
     assert reserved.status_code == 422 and reserved.json()["detail"]["code"] == "bad_username"
 
     made = c.post("/api/auth/password/register", json={"display_name": "Pat", "birth_date": "1990-05-01",
