@@ -6,7 +6,29 @@ venv
 .env.*
 !.env.example
 *.key
-data
+# Runtime user state (accounts, uploads, keys, projects) lives under data/ and is mounted at
+# /data (PHOTO3D_DATA). Exclude that tree, then re-include the tracked catalogs copied to /app/data.
+data/**
+!data/birdcall
+!data/birdcall/**
+!data/litho-color
+!data/litho-color/**
+!data/litho
+!data/litho/**
+!data/materials
+!data/materials/**
+!data/nozzles
+!data/nozzles/**
+!data/research
+!data/research/**
+!data/resin
+!data/resin/**
+!data/smartfix
+!data/smartfix/**
+!data/split
+!data/split/**
+!data/troubleshooting
+!data/troubleshooting/**
 outputs
 previews
 reports
