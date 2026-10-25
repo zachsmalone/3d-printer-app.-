@@ -32,7 +32,8 @@
     return ws;
   }
   var ph = PHONE.matches;
-  /* Studio and Lithophane share a view: the lithophane light box tells them apart, and each keeps its own layout */
+  /* Studio and Lithophane share a view: the lithophane light box tells them apart, and each keeps its own layout.
+     Recent builds (#recentBuilds) are shown only for My Studio; this panel follows that hidden flag. */
   var litho = function () { var b = $("#litLightBox"); return !!b && !b.hidden; };
   var studio = make({ id: "studio", key: function () { return litho() ? "litho" : "studio"; }, title: function () { return litho() ? "Lithophane" : "Studio"; },
     root: "#viewCreate", active: function () { return vis($("#result")); },

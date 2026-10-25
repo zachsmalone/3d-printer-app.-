@@ -78,6 +78,9 @@ function paintStudioHome(raw) {
   if (note) note.hidden = raw !== "lithophane";
   const expert = document.querySelector("#h1 [data-lvl=expert]");
   if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : "Studio";
+  /* #studio and #lithophane share #viewCreate. Recent builds belong to My Studio only. */
+  const recent = $("#recentBuilds");
+  if (recent) recent.hidden = !fromMe;
 }
 function route() {
   const h = location.hash.replace("#", "").split("/");
