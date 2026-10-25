@@ -93,4 +93,32 @@ def to_3mf(model: Model, title: str = "photo3d", slots=None) -> bytes:
     return fs.annotate_3mf(buf.getvalue(), p, lambda oid: ext.get(oid, 1))
 
 
+def mesh_3mf(vertices, faces, title: str = "ZEIM") -> bytes:
+    """One-object 3MF from arrays. Used on the download path so a save does not go through trimesh's 3MF writer."""
+    v = np.asarray(vertices, dtype=np.float64)
+    f = np.asarray(faces, dtype=np.int64)
+    if v.ndim != 2 or v.shape[1] != 3 or f.ndim != 2 or f.shape[1] != 3 or len(f) == 0:
+        raise ValueError("3MF needs a triangle mesh")
+    x = io.StringIO()
+    x.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+    x.write('<model unit="millimeter" xml:lang="en-US" '
+            'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">')
+    x.write(f'<metadata name="Title">{escape(title)}</metadata>'
+            '<metadata name="Application">ZEIM</metadata><resources>')
+    x.write('<object id="2" type="model" name="model"><mesh><vertices>')
+    np.savetxt(x, v, fmt='<vertex x="%.5f" y="%.5f" z="%.5f"/>', newline="")
+    x.write('</vertices><triangles>')
+    np.savetxt(x, f, fmt='<triangle v1="%d" v2="%d" v3="%d"/>', newline="")
+    x.write('</triangles></mesh></object></resources><build><item objectid="2"/></build></model>')
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", CT)
+        z.writestr("_rels/.rels", RELS)
+        z.writestr("3D/3dmodel.model", x.getvalue())
+    data = buf.getvalue()
+    if not data.startswith(b"PK"):
+        raise ValueError("3MF generation did not produce a valid package")
+    return data
+
+
 WRITERS = {"stl": to_stl, "obj": to_obj, "3mf": to_3mf}

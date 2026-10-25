@@ -19,9 +19,10 @@ _base = settings.base_url
 @router.get("/settings")
 def get_settings(request: Request, actor: Actor = Depends(get_actor)):
     from .. import config
-    return {**settings.public(redact=not guards.can_see_printer_urls(request, actor)), "printer_types": printers.TYPES,
+    manage = guards.can_manage_printers(request, actor)
+    return {**settings.public(redact=not manage), "printer_types": printers.TYPES,
             "printer_presets": [{"id": k, "label": v["label"], "type": v["type"], "bed": list(v["bed"]), "hint": v["hint"]} for k, v in printers.PROFILES.items()],
-            "mode": config.MODE, "can_edit": _can_edit(request, actor)}
+            "mode": config.MODE, "can_edit": _can_edit(request, actor), "printer_manage": manage}
 
 
 def _can_edit(request, actor) -> bool:
@@ -40,6 +41,18 @@ def put_settings(body: dict, request: Request, actor: Actor = Depends(get_actor)
     except (ValueError, TypeError) as e:
         raise HTTPException(400, str(e))
     return settings.public()
+
+
+@router.put("/settings/printers")
+def put_printers(body: dict, request: Request, actor: Actor = Depends(get_actor)):
+    """Printer rows only. The public base URL and default slicer stay as they are."""
+    if not guards.can_manage_printers(request, actor):
+        raise HTTPException(403, "Only the person who manages this server can change printers.")
+    try:
+        settings.save_printers(body.get("printers") or [])
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, str(e))
+    return settings.public(redact=False)
 
 
 @router.get("/accounts")

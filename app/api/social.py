@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from .. import config
 from ..community import catalog, moderation, personalization, privacy, safety, social
+from ..services import showoff
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import PREFS, USERS
@@ -102,6 +103,58 @@ def _print_public(p: dict, actor: Actor) -> dict:
             "by": "@" + name if name else "a ZEIM maker", "created": p["created"], "mine": p["owner_sid"] == actor.sid,
             "status": social.status(p), "pending": social.status(p) != "approved", "nsfw": bool(p.get("nsfw")),
             "settings": ps.public(p.get("settings"))}
+
+
+_SHOWOFF_NOTE = "ZEIM draws the model from the front, right, back and left. These are not photos of a finished print."
+
+
+def _item_stl(item: dict):
+    for f in item.get("files") or []:
+        name = f.get("name") or ""
+        if not name.lower().endswith(".stl"):
+            continue
+        p = catalog.file_path(item, name)
+        if p is not None and p.is_file():
+            return p
+    return None
+
+
+@router.get("/showcase/{iid}/sides")
+def showcase_sides(iid: str, actor: Actor = Depends(get_actor)):
+    try:
+        item = catalog.get(iid, actor)
+    except catalog.Denied as e:
+        raise HTTPException(e.status, e.msg)
+    views = []
+    stl = _item_stl(item)
+    if stl is not None:
+        try:
+            for vid, label, _path in showoff.ensure(item["id"], stl):
+                views.append({"id": vid, "label": label, "url": f"/api/showcase/{iid}/sides/{vid}.png"})
+        except Exception:
+            views = []
+    return {"views": views, "note": _SHOWOFF_NOTE}
+
+
+@router.get("/showcase/{iid}/sides/{view}.png")
+def showcase_side_png(iid: str, view: str, actor: Actor = Depends(get_actor)):
+    if view not in showoff.VIEW_IDS:
+        raise HTTPException(404)
+    try:
+        item = catalog.get(iid, actor)
+    except catalog.Denied as e:
+        raise HTTPException(e.status, e.msg)
+    stl = _item_stl(item)
+    if stl is None:
+        raise HTTPException(404)
+    try:
+        made = {vid: path for vid, _label, path in showoff.ensure(item["id"], stl)}
+    except Exception:
+        raise HTTPException(404)
+    path = made.get(view)
+    if path is None or not path.is_file():
+        raise HTTPException(404)
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
 
 
 @router.get("/showcase/{iid}/prints")

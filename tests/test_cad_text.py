@@ -54,6 +54,14 @@ def test_plate_standalone_and_beside_model():
         meshedit.apply(trimesh.Trimesh(), "cad_text", {"text": "x", "target": "plate", "style": "cut", "plate_thickness": 1, "depth": 1})
 
 
+def test_fit_is_opt_in_and_makes_text_larger_on_the_face():
+    b = box()
+    plain, _ = meshedit.apply(b, "cad_text", {"text": "HI", "size": 4, "point": [10, 0, 20], "normal": [0, 0, 1], "depth": 1})
+    fitted, rep = meshedit.apply(b, "cad_text", {"text": "HI", "size": 4, "fit": True, "point": [10, 0, 20], "normal": [0, 0, 1], "depth": 1})
+    assert solid(fitted) and fitted.volume > plain.volume + 20
+    assert "fitted" in rep["message"].lower()
+
+
 def test_thin_text_warns_but_still_applies():
     m, rep = meshedit.apply(box(), "cad_text", {"text": "tiny", "size": 2, "depth": 0.2, "point": [0, 0, 20], "normal": [0, 0, 1]})
     assert solid(m) and len(rep["warnings"]) == 2 and "nozzle" in rep["warnings"][0]

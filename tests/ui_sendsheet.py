@@ -71,7 +71,7 @@ with sync_playwright() as p:
         pg.click("#zwsCust-studio"); pg.uncheck("#zwsDlg-studio input[data-zws=history]"); pg.click("#zwsDlg-studio button[value=ok]"); pg.wait_for_timeout(400)
     # print dialog: Send… shortcut; local mode shows the honest label and Start print unchecked
     pg.click("#btnPrint"); pg.wait_for_selector("#dlgPrint[open]"); pt = pg.inner_text("#dlgPrint")
-    ok("Print dialog: local mode keeps the printer block with the honest label", pg.is_visible("#printerBlock") and "Tested with a pretend printer only" in pt and not pg.is_checked("#startNow") and "stay nearby" in pt)
+    ok("Print dialog: local mode keeps the printer block with the honest label", pg.is_visible("#printerBlock") and "Live API" in pt and not pg.is_checked("#startNow") and "stay nearby" in pt)
     ok("Print dialog: live status / pause controls present", pg.locator("#liveStatus").count() == 1 and pg.locator("#btnPause").count() == 1 and pg.locator("#btnOpenBoard").count() == 1)
     pg.click("#printToSend"); pg.wait_for_selector("#dlgSendSheet[open]"); ok("Print: 'Just need the file? Send…' opens the sheet", "Send or save your model" in sheet_text(pg)); pg.keyboard.press("Escape")
     pg.keyboard.press("Escape")
@@ -80,7 +80,7 @@ with sync_playwright() as p:
     pg.select_option("#printerList [data-f=profile]", "creality_k1"); pg.wait_for_timeout(200)
     st = pg.inner_text("#printerList")
     ok("K1 preset: Experimental text + 220x220 + type Moonraker (no new type)", "Experimental" in st and pg.input_value("#printerList [data-f=bed_x]") == "220" and pg.input_value("#printerList [data-f=bed_y]") == "220" and pg.input_value("#printerList [data-f=type]") == "moonraker" and "Creality" not in pg.inner_text("#printerList [data-f=type]"))
-    ok("K1 preset: honest 'pretend printer only' + Test disabled before saving", "Tested with a pretend printer only" in st and pg.is_disabled("#printerList [data-test]"))
+    ok("K1 preset: honest Live API label + Test disabled before saving", "Live API" in st and pg.is_disabled("#printerList [data-test]"))
     # Direct control is on in local / non-production: URL field returns (still SSRF-checked server-side). Production keeps it off.
     ok("local: printer URL field shown when direct control is on; SSRF still mentioned", pg.locator("#printerList [data-f=url]").count() >= 1 and "Direct control is on" in st and "SSRF" in st)
     ok("settings: alert / failure-watch / timelapse opt-ins present", all(pg.locator(f"#printerList [data-f={f}]").count() >= 1 for f in ("alert_done", "alert_failed", "watch_failures", "timelapse")))

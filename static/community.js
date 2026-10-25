@@ -14,6 +14,7 @@ async function init() {
   $("#logoImg").alt = CFG.product;
   $("#shTabs").innerHTML = Object.entries(CFG.showcase_tabs).map(([k, v]) => `<button type="button" data-tab="${k}" class="${k === shTab ? "on" : ""}" aria-pressed="${k === shTab}">${esc(v)}</button>`).join("");
   await refreshMe();
+  openPublishFromQuery();
   route();
   window.__zeimStarted = true;                 // static/boot.js shows a visible error if this never happens
 }
@@ -36,6 +37,8 @@ async function refreshMe() {
   ME = await api("/api/me");
   $("#btnAccount .lbl").textContent = ME.signed_up ? ME.display_name : "Sign up";
   $("#btnAccount").setAttribute("aria-label", ME.signed_up ? "Account: " + ME.display_name : "Account: sign up");
+  const login = $("#btnLogin");
+  if (login) { login.hidden = !!ME.signed_up; login.disabled = !!ME.signed_up; }
   document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
   document.body.dataset.role = ME.send?.role || "";
   document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
@@ -82,7 +85,30 @@ function route() {
 addEventListener("hashchange", route);
 
 /* ---------- account ---------- */
-$("#btnAccount").onclick = () => { renderAccount(); $("#dlgAccount").showModal(); };
+function openAccount(focus) {
+  window.__zeimAccountFocus = focus || "";
+  renderAccount();
+  $("#dlgAccount").showModal();
+  if (focus === "signin" || focus === "signup") {
+    const id = focus === "signup" ? "#au_name" : "#au_id";
+    const el = $(id);
+    if (el) { try { el.focus(); } catch { } }
+  }
+}
+$("#btnAccount").onclick = () => openAccount(ME?.signed_up ? "" : "signup");
+$("#btnLogin") && ($("#btnLogin").onclick = () => openAccount("signin"));
+$("#btnFeedback") && ($("#btnFeedback").onclick = () => { if ($("#fbMsg")) $("#fbMsg").textContent = ""; $("#dlgFeedback").showModal(); $("#fbText")?.focus(); });
+$("#fbSend") && ($("#fbSend").onclick = async () => {
+  const text = ($("#fbText")?.value || "").trim();
+  if (!text) { $("#fbMsg").textContent = "Write a message first."; return; }
+  $("#fbSend").disabled = true;
+  try {
+    const r = await api("/api/feedback", J("POST", { message: text }));
+    $("#fbMsg").textContent = r.message || "Sent. Thank you.";
+    if (r.emailed) $("#fbText").value = "";
+  } catch (e) { $("#fbMsg").textContent = e.message; }
+  finally { $("#fbSend").disabled = false; }
+});
 
 /* ---------- Optional Semi Pro / Pro. Checkout only if the server marks a plan purchasable. ---------- */
 async function renderPlans() {
@@ -124,7 +150,9 @@ function renderAccount() {
      legacy cookie UI below is the fallback for when it is not. handles() is synchronous
      so a Promise can never hide the fallback. */
   if (window.ZeimAccount && window.ZeimAccount.handles(ME)) {
-    const done = window.ZeimAccount.render(ME);
+    const focus = window.__zeimAccountFocus || "";
+    window.__zeimAccountFocus = "";
+    const done = window.ZeimAccount.render(ME, focus ? { focus } : undefined);
     const showPlans = () => {
       if (!$("#accPlans")) {
         const body = $("#accBody"); if (!body) return;
@@ -470,6 +498,7 @@ async function openItem(id) {
     ${!i.example && !i.allow_remixes ? `<p class="help remix-off" id="itRemixOff"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Remixes off${i.owned ? "" : `: ${esc(i.remix_off_reason)}`}</p>` : !i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
+    <section class="showoff" aria-labelledby="soH"><h4 id="soH">Four sides of the model</h4><div id="soViews"><p class="help">ZEIM draws the model from the front, right, back and left. These are not photos of a finished print.</p></div></section>
     <section class="prints" aria-labelledby="prH"><h4 id="prH">I printed this</h4><ul class="pgallery" id="prGallery"></ul>
       ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Add a photo of your print</summary>
         <p class="help">A photo of the printed object only, please: no people, faces, names or addresses. Location data is removed. Every photo is checked by a moderator before anyone else can see it.</p>
@@ -496,6 +525,7 @@ async function openItem(id) {
     <section class="qa" aria-labelledby="qaH"><h4 id="qaH">Ask the creator</h4><p class="help">Public questions the creator can answer on this page. There are no private messages in ZEIM.</p><ul class="qalist" id="qaList"></ul><div id="qaAsk"></div></section>`;
   if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
   loadPrints(id);
+  loadShowoff(id);
   if ($("#itCols")) mountItemCollections($("#itCols"), id);
   if ($("#prCam") && $("#prFile")) $("#prCam").onchange = () => { if ($("#prCam").files[0]) { const dt = new DataTransfer(); dt.items.add($("#prCam").files[0]); $("#prFile").files = dt.files; } };
   if ($("#prSend")) $("#prSend").onclick = async () => {
@@ -614,17 +644,48 @@ function psRead(prefix) {
     printer_name: $(`#${prefix}_name`)?.value || "", notes: $(`#${prefix}_notes`)?.value || "" };
 }
 
-/* publish */
-$("#btnPublish").onclick = () => {
-  if (!ME.signed_up) { toast("Create an account first to share projects.", "err"); renderAccount(); return $("#dlgAccount").showModal(); }
-  $("#pub_title").value = S.current.title; $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $$("[name=pub_nsfw]").forEach(r => r.checked = false);
+/* publish — one Showcase path, opened from Studio, the Slicer, TorchC0 and CAD */
+let publishBuild = null;
+function openShowcase(build) {
+  if (!build?.id) { toast("Make a model first, then send it to Showcase.", "err"); return; }
+  if (!ME?.signed_up) { toast("Create an account first to share projects.", "err"); openAccount("signup"); return; }
+  publishBuild = build;
+  const named = ($("#designName")?.value || "").trim();
+  $("#pub_title").value = named || build.title || "";
+  $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $$("[name=pub_nsfw]").forEach(r => r.checked = false);
   // 2D to 3D builds are always saved as AI-made by the server, so show that honestly instead of a box that can be unticked
-  const aiForced = !!(S.current?.ai || S.current?.mode === "ai3d" || S.current?.base?.from_mode === "ai3d"), aiBox = $("#pub_ai");
+  const src = publishBuild || S.current;
+  const aiForced = !!(src?.ai || src?.mode === "ai3d" || src?.base?.from_mode === "ai3d"), aiBox = $("#pub_ai");
   if (aiBox) { aiBox.checked = aiForced || aiBox.checked && !aiBox.disabled; aiBox.disabled = aiForced; }
   if ($("#pub_ai_note")) $("#pub_ai_note").hidden = !aiForced;
   $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no"; if (!$("#pub_remix").value && sessionStorage.getItem("zeim_remix_of")) $("#pub_remix").value = sessionStorage.getItem("zeim_remix_of");
   $("#dlgPublish").showModal();
-};
+}
+$("#btnPublish").onclick = () => openShowcase(S.current);
+window.zeimOpenShowcase = openShowcase;
+function openPublishFromQuery() {
+  const q = new URLSearchParams(location.search);
+  const pub = q.get("publish") || "";
+  if (!/^[0-9a-f]{12}$/.test(pub)) return;
+  const title = (q.get("title") || "").slice(0, 80);
+  history.replaceState(null, "", location.pathname + location.hash);
+  openShowcase({ id: pub, title });
+}
+document.addEventListener("zeim:build", e => {
+  const n = $("#designName");
+  if (n && e.detail && document.activeElement !== n) n.value = e.detail.file_name || e.detail.title || "";
+});
+$("#designNameSave") && ($("#designNameSave").onclick = async () => {
+  const b = S.current, name = ($("#designName")?.value || "").trim();
+  if (!b?.id) return toast("Make a model first.", "err");
+  if (!name) return toast("Type a name first.", "err");
+  try {
+    const r = await api(`/api/export/${encodeURIComponent(b.id)}/name`, J("PUT", { name, save_title: true }));
+    b.title = name; b.file_name = r.name;
+    if ($("#designName")) $("#designName").value = r.name || name;
+    toast("Saved as " + (r.name || name) + ". Showcase files use this name when you send it.", "ok");
+  } catch (e) { toast(e.message, "err"); }
+});
 function showConflict(c) {
   const box = $("#pubConflict"), o = c.original || {};
   const offer = c.code === "remix_offer";
@@ -641,7 +702,9 @@ $("#btnDoPublish").onclick = async () => {
   const nsfw = $("[name=pub_nsfw]:checked")?.value;
   if (!nsfw) return inlineMsg($("#btnDoPublish"), "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.");
   try {
-    const i = await api("/api/showcase", J("POST", { build_id: S.current.id, title: $("#pub_title").value, description: $("#pub_desc").value,
+    const build = publishBuild || S.current;
+    if (!build?.id) return inlineMsg($("#btnDoPublish"), "Make a model first, then send it to Showcase.");
+    const i = await api("/api/showcase", J("POST", { build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
       tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim(), nsfw: nsfw === "yes",
       allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
       ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
@@ -776,11 +839,20 @@ function remixHTML(chain) {
 }
 document.addEventListener("click", e => { const a = e.target.closest("a[data-open-item]"); if (a) { e.preventDefault(); openItem(a.dataset.openItem); } });
 
+/* ---------- four-side drawing of the model (not photos of a print) ---------- */
+async function loadShowoff(id) {
+  const host = $("#soViews"); if (!host) return;
+  let r; try { r = await api(`/api/showcase/${id}/sides`); } catch { return; }
+  const note = r.note || "ZEIM draws the model from the front, right, back and left. These are not photos of a finished print.";
+  if (!r.views || !r.views.length) { host.innerHTML = `<p class="help">${esc(note)}</p>`; return; }
+  host.innerHTML = `<p class="help">${esc(note)}</p><div class="showoff-row">${r.views.map(v => `<figure><img src="${esc(v.url)}" alt="${esc(v.label)} view of the model, drawn by ZEIM, not a photo of a print"><figcaption>${esc(v.label)}</figcaption></figure>`).join("")}</div>`;
+}
+
 /* ---------- 'I printed this' gallery ---------- */
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
   let r; try { r = await api(`/api/showcase/${id}/prints`); } catch { return; }
-  const psLine = s => { if (!s || !Object.keys(s).length) return ""; const bits = []; if (s.printer) bits.push(String(s.printer).toUpperCase()); if (s.material) bits.push(String(s.material).toUpperCase()); if (s.layer_height_mm != null) bits.push(s.layer_height_mm + " mm"); if (s.infill_pct != null) bits.push(s.infill_pct + "%"); if (s.supports === "yes") bits.push("supports"); if (s.supports === "no") bits.push("no supports"); if (s.notes) bits.push(s.notes); return bits.length ? `<p class="help psline">${esc(bits.join(" · "))}</p>` : ""; };
+  const psLine = s => { if (!s || !Object.keys(s).length) return ""; const bits = []; if (s.printer_name) bits.push(String(s.printer_name)); if (s.printer) bits.push(String(s.printer).toUpperCase()); if (s.material) bits.push(String(s.material).toUpperCase()); if (s.layer_height_mm != null) bits.push(s.layer_height_mm + " mm"); if (s.infill_pct != null) bits.push(s.infill_pct + "%"); if (s.supports === "yes") bits.push("supports"); if (s.supports === "no") bits.push("no supports"); const line = bits.length ? `<p class="help psline">${esc(bits.join(" · "))}</p>` : ""; const notes = s.notes ? `<p class="print-notes">${esc(s.notes)}</p>` : ""; return line + notes; };
   g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure${p.nsfw && !p.mine ? ' class="prmature"' : ""}><img src="${p.url}" alt="${p.nsfw ? "Photo of a print (mature content)" : `Photo of a print${p.caption ? ": " + esc(p.caption) : ""}`}" loading="lazy">${p.nsfw && !p.mine ? `<button type="button" class="btn small mature-label" data-prshow="${p.id}">Mature content: show</button>` : ""}<figcaption>${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${esc(p.caption)} <span class="help">${esc(p.by)}</span>
       ${psLine(p.settings)}
       ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>`}</figcaption></figure></li>`).join("")

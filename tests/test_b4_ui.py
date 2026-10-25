@@ -39,7 +39,8 @@ def test_send_sheet_labels_untested_rows_and_never_claims_they_work():
         i = js.index(f'id="{row}"'); chunk = js[i:i + 700]
         assert "untested" in chunk and ("Not tried" in chunk), row
     assert "ZEIM does not connect to Creality" in js and "have not tested" in js
-    assert "Tested with a pretend printer only" in js
+    assert "Live API" in js and "not Hardware-tested" in js and "never starts a print" in js
+    assert "Tested with a pretend printer only" not in js
 
 
 def test_nozzle_it_buttons_states_keyboard_sync_rollback_and_axe_in_chrome_and_webkit():

@@ -209,5 +209,15 @@ def save_from_client(incoming: dict) -> dict:
     return new
 
 
+def save_printers(printers_in) -> dict:
+    """Replace the printer list and keep the current public base URL and default slicer."""
+    cur = load()
+    return save_from_client({
+        "public_base_url": cur.get("public_base_url", ""),
+        "default_slicer": cur.get("default_slicer", "auto"),
+        "printers": printers_in or [],
+    })
+
+
 def get_printer(pid: str) -> dict | None:
     return next((p for p in load()["printers"] if p["id"] == pid), None)

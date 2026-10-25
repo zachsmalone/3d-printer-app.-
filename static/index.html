@@ -389,6 +389,12 @@
       <div class="resbar">
         <div class="stats" id="stats"></div>
         <div class="actions">
+          <div class="designname">
+            <label for="designName">Name this design</label>
+            <input id="designName" maxlength="80" autocomplete="off" placeholder="My lithophane" aria-describedby="designNameHelp">
+            <button type="button" class="btn small" id="designNameSave">Save name</button>
+            <p class="help" id="designNameHelp">Saved on this design and used as the file name. Showcase files use it when you send the model.</p>
+          </div>
           <div class="handoffrow" id="studioHandoff" role="group" aria-label="Save or send this model">
             <button type="button" class="btn" id="btnSaveWork" title="Save your work in this browser (and on your account when signed in)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-check"/></svg> Save work</button>
             <button type="button" class="btn primary" id="btnSendSlicer" title="Save first, then open this model in the matching slicer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-send"/></svg> <span id="btnSendSlicerL">Send to Slicer</span></button>
@@ -397,7 +403,7 @@
           <button class="btn" id="btnSendSheet" aria-haspopup="dialog" title="Save this model or send it somewhere"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg> Send or save</button>
           <label class="inl" title="Who can open this build's files"><select id="resVis"><option value="private">Private</option><option value="followers">Followers</option><option value="public">Public</option></select></label>
           <button class="btn" id="btnEditThis" title="Open this model in the Edit workspace"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg> Edit this</button>
-          <button class="btn" id="btnPublish"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-globe"/></svg> Share to Showcase</button>
+          <button class="btn" id="btnPublish"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-globe"/></svg> Send to Showcase</button>
           <button class="btn" id="btnPrint"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-printer"/></svg> Print…</button>
         </div>
       </div>
@@ -569,6 +575,7 @@
         <div class="field"><label for="set_slicer">Default slicer</label><select id="set_slicer"><option value="auto">Automatic (Creality on phones and with a K1)</option><option value="creality">Creality Print / Creality Cloud</option><option value="prusaslicer">PrusaSlicer</option><option value="bambustudio">Bambu Studio</option><option value="orcaslicer">OrcaSlicer</option><option value="cura">Cura</option></select></div>
         <div class="field"><label for="set_base">Public base URL <em>optional</em></label><input id="set_base" placeholder="http://192.168.1.20:8765"></div>
       </div>
+      <p class="help" id="setLock" hidden>Printers can be saved here. The public address and default slicer stay with the server admin.</p>
       <h4>Printers</h4><div id="printerList"></div>
       <button class="btn small" id="btnAddPrinter">+ Add printer</button>
       <p class="help">OctoPrint and Moonraker (Creality K1 / Klipper) use a real HTTP send path labelled <b>Live API</b> (mock-tested; not yet confirmed on Zach's K1 hardware). Bambu LAN stays <b>Simulated</b> until a hardware pass — needs LAN Only + Developer Mode; keep Open in Bambu Studio as fallback. Other types are Coming soon. API keys are stored encrypted in <code>data/settings.json</code>.</p>
@@ -705,7 +712,8 @@
 <div class="zt-band" data-zt="account" aria-hidden="true"><img class="zt-art" src="/static/zt/account.webp" srcset="/static/zt/account.webp 1x, /static/zt/account@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-ink"></i><i class="zt-ink"></i><i class="zt-ink"></i></div>
   <div class="pagehead"><div><h1>Account</h1><p class="help" id="accSummary">Your page: profile, sign-in and your printers.</p><p class="help" id="accTestingMode" hidden><strong>Testing mode: limits off</strong></p></div></div>
   <ul class="grid toolgrid">
-    <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><button class="btn big primary" id="btnAccount" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></li>
+    <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><div class="acctbtns"><button class="btn big" id="btnLogin" type="button" aria-label="Log in">Log in</button><button class="btn big primary" id="btnAccount" type="button" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></div></li>
+    <li class="toolcard"><h2>ZeimFeedback</h2><p class="help">Tell ZEIM what should be better. You don't need an email address. ZEIM sends this for you.</p><button type="button" class="btn" id="btnFeedback">Send feedback</button></li>
     <li class="toolcard"><h2>Your printer</h2><p class="help">Pick your printer and nozzle. The Slicer, exports and "Will it print?" use it.</p><div id="accPrinter"></div></li>
     <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
     <li class="toolcard"><h2 id="savePrefsH">Saving your work</h2><p class="help">For CAD, the FDM Slicer, TorchC0 and Lithophane. Projects are also saved after every step.</p>
@@ -739,6 +747,15 @@
   <div class="dh"><h3 id="chDlgH">Challenge</h3><button class="x" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="body" id="chDlgBody"></div>
 </div></dialog>
+<dialog id="dlgFeedback"><div class="dlg">
+  <div class="dh"><h3>Send feedback</h3><button class="x" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="body">
+    <p class="help">You don't need an email address. Write what happened and ZEIM sends it for you.</p>
+    <div class="field"><label for="fbText">Message</label><textarea id="fbText" maxlength="4000" rows="5"></textarea></div>
+    <p class="help" id="fbMsg" role="status"></p>
+    <div class="row end"><button type="button" class="btn primary" id="fbSend">Send</button></div>
+  </div>
+</div></dialog>
 <dialog id="dlgAccount"><div class="dlg">
   <div class="dh"><h3><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-user"/></svg> Your profile</h3><button class="x" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
   <div class="body" id="accBody"></div>
@@ -752,7 +769,7 @@
       <label class="choice"><input type="radio" name="pub_nsfw" value="no"> <span>No</span></label>
       <label class="choice"><input type="radio" name="pub_nsfw" value="yes"> <span>Yes: it is shown blurred with a "Mature content" label</span></label></fieldset>
     <div class="field"><label for="pub_vis">Who can see this</label><select id="pub_vis"><option value="private">Private — only me (default)</option><option value="followers">Followers only</option><option value="public">Public — anyone, listed in Showcase</option></select></div>
-    <div class="field"><label for="pub_title">Title</label><input id="pub_title" maxlength="80"><small class="help">Don't use real names, phone numbers or addresses.</small></div>
+    <div class="field"><label for="pub_title">Title</label><input id="pub_title" maxlength="80"><small class="help">This is the name of the Showcase files. Don't use real names, phone numbers or addresses.</small></div>
     <div class="field"><label for="pub_desc">Description</label><input id="pub_desc" maxlength="500"></div>
     <div class="field"><label for="pub_remix">Remixed from <em>optional: paste the Showcase link</em></label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
     <div class="field"><label for="pub_allow_remix">Allow remixes</label><select id="pub_allow_remix"><option value="yes">Yes: others may post remixes that credit this (default)</option><option value="no">No: nobody can post this as the source of a remix</option></select><small class="help">You can change this later. The licence you pick also has to allow remixes.</small></div>

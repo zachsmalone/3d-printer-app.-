@@ -15,6 +15,7 @@ import numpy as np
 import trimesh
 
 from app.community.identity import Actor
+from app.core.exporters import mesh_3mf
 from app.services import print_setup as ps
 from app.services.history import store
 
@@ -172,9 +173,9 @@ def amf_bytes(mesh: trimesh.Trimesh) -> bytes:
 
 
 def export_mesh_data(mesh: trimesh.Trimesh, force_format: Optional[str] = None) -> tuple[bytes, str, str]:
-    """Export a mesh. Default is 3MF with automatic STL fallback; any FORMATS key can be forced.
+    """Export a mesh. Default is 3MF (a zip package). Any FORMATS key can be forced.
 
-    Returns (bytes, extension, mime_type).
+    Returns (bytes, extension, mime_type). A 3MF failure raises; it is not replaced with STL.
     """
     f = (force_format or "3mf").lower()
     if f not in FORMATS:
@@ -188,15 +189,7 @@ def export_mesh_data(mesh: trimesh.Trimesh, force_format: Optional[str] = None) 
         if isinstance(data, str):
             data = data.encode()
         return data, f, FORMATS[f]["mime"]
-    try:
-        data = mesh.export(file_type="3mf")
-        if not data or not data.startswith(b"PK"):
-            raise ValueError("3MF generation did not produce a valid package")
-        return data, "3mf", "model/3mf"
-    except Exception:
-        # Graceful fallback to binary STL
-        data = mesh.export(file_type="stl")
-        return data, "stl", "model/stl"
+    return mesh_3mf(mesh.vertices, mesh.faces), "3mf", "model/3mf"
 
 
 def name_parts(meta: dict, printer_id: str, nozzle: Optional[float] = None) -> tuple[str, str, Optional[float]]:

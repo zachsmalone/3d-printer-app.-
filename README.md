@@ -129,6 +129,10 @@ Per-path honesty labels (`verification` on API/UI responses):
 
 Point a Creality K1 at ZEIM: type Moonraker, address `http://<printer-ip>:7125` (not 4408), optional API key if Moonraker auth is on, preset Creality K1. Enable direct control with `ZEIM_PRINTER_DIRECT=1` (or `ZEIM_ENV=dev`). Use **Test connection** before Send — a test never starts a print.
 
+### Windows Docker: send to a printer on your LAN
+
+https://zeimapp.com does not turn these on. On your own PC, recreate the container with `PHOTO3D_MODE=shared`, `PHOTO3D_LAN_PRINTERS=1` and `ZEIM_PRINTER_DIRECT=1`. Sign in as an adult. For a Creality K1 use type Moonraker, preset Creality K1, and address `http://<printer-ip>:7125` (not 4408). Press Test connection (it never starts a print), then Send. The label is Live API, not Hardware-tested. Bambu stays Simulated. Link-local addresses, including cloud metadata `169.254.169.254`, stay blocked. Do not put those three flags in the default compose file.
+
 Direct printer control stays off in production (`ZEIM_ENV=production`) unless `ZEIM_PRINTER_DIRECT=1`. Addresses are SSRF-checked. Never copies GPL/AGPL printer UIs. Never claims a successful send when the printer was not reached.
 
 ## Community rules

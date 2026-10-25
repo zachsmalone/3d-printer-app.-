@@ -9,9 +9,7 @@
 	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
 }
 
-{$ZEIM_DOMAIN:zeim.example.org} {
-	encode zstd gzip
-
+(zeim_proxy) {
 	# Largest legit upload is a 50 MB mesh (MAX_UPLOAD_EDIT) plus multipart overhead.
 	# Caddy rejects larger bodies with 413 before they reach the Python process.
 	request_body {
@@ -38,6 +36,19 @@
 		}
 		health_uri /healthz
 		health_interval 30s
+	}
+}
+
+{$ZEIM_DOMAIN:zeim.example.org} {
+	# Model downloads are already zip/binary. Skipping encode lets the first bytes leave immediately
+	# so a slow 3MF is a file save, not a browser "site unavailable" page.
+	@downloads path /files/* /files/*/* /api/download/* /api/download/*/* /api/export/*/download /api/slice/*/model.* /api/resin/*/torchc0.*
+	handle @downloads {
+		import zeim_proxy
+	}
+	handle {
+		encode zstd gzip
+		import zeim_proxy
 	}
 
 	log {

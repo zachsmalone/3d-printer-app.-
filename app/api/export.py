@@ -6,6 +6,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.builds import meta_for
+from app.api.textcap import plain_text
+from app.community import safety
 from app.community.identity import Actor, get_actor
 from app.services import filenames as fnames
 from app.services import print_setup as ps
@@ -135,16 +137,18 @@ def rename(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     if len(raw) > 400:
         raise HTTPException(400, "That name is too long.")
     if raw:
-        from app.community import safety
         if safety.scan(raw):
             raise HTTPException(400, "Please pick a different name.")
         for ext in ue.FORMATS:
             raw = fnames.strip_ext(raw, ext)
         meta["file_name"] = fnames.safe_name(raw)
+        if body.get("save_title"):
+            meta["title"] = (plain_text(raw[:80], "Name") or meta.get("title") or "ZEIM model")[:80]
     else:
         meta.pop("file_name", None)
     store.save(meta)
     return {"name": meta.get("file_name") or fnames.default_stem(*ue.name_parts(meta, _pid(actor, ""))),
+            "title": meta.get("title") or "",
             "custom": bool(meta.get("file_name"))}
 
 
@@ -160,7 +164,7 @@ def download_export(
     part: str = Query("", max_length=40, description="Optional body name: lithophane | stand (empty = whole model)"),
     actor: Actor = Depends(get_actor),
 ):
-    """Download in the picked format, sized and named for the printer (3MF falls back to STL if it cannot be made)."""
+    """Download in the picked format, sized and named for the printer. A 3MF that cannot be built returns an error, not a different file."""
     from ..services import quarantine
     quarantine.guard(bid)                        # quarantined builds are not served
     pref_pid = _pid(actor, printer_id)

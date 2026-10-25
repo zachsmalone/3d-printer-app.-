@@ -57,6 +57,8 @@ with sync_playwright() as p:
         tap(*scr(pg, [0, 0, 2.5])); pg.wait_for_timeout(400)
         ok(f"{tag}: tapping the model picks the spot", pg.evaluate("!!window.__cad.S.selFace") and "Spot picked" in pg.inner_text("#tWhere") and pg.is_visible("#tApply"))
         ok(f"{tag}: typed text kept after the tap re-renders the panel", pg.input_value("#tTxt") == "ZEIM")
+        ok(f"{tag}: center and fit starts on", pg.is_checked("#tFit"))
+        pg.uncheck("#tFit")
         pg.fill("#tTxt", "ab"); pg.fill("#tSize", "2"); pg.fill("#tDepth", "0.2")
         pg.click("#tApply")
         wait(pg, "() => !!document.querySelector('#cwWarn')", 30000)
