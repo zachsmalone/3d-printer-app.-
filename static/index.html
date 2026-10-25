@@ -43,10 +43,10 @@
     <button data-view="torchc0" title="TorchC0: prepare models for resin printers"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 15h10"/></svg><span class="nl">TorchC0</span><span class="ns" aria-hidden="true">Resin</span></button>
     <button data-view="cad" title="Design and edit 3D parts"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><span class="nl">CAD</span><span class="ns" aria-hidden="true">CAD</span></button>
     <button data-view="ai3d" title="2D to 3D: an AI figure or bust from one photo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="8" height="11" rx="1.5"/><path d="M3 13l3-3 3 3 2-2"/><path d="M14 10.5l3.5-2 3.5 2v4l-3.5 2-3.5-2z"/><path d="M14 10.5l3.5 2 3.5-2M17.5 12.5v4"/></svg><span class="nl">2D→3D</span><span class="ns" aria-hidden="true">2D→3D</span></button>
-    <button data-view="lithophane" title="Turn a photo into a lithophane or relief"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span class="nl">Lithophane</span><span class="ns" aria-hidden="true">Litho</span></button>
+    <button data-view="lithophane" title="Turn a photo into a lithophane"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span class="nl">Lithophane</span><span class="ns" aria-hidden="true">Litho</span></button>
     <button data-view="smartfix" title="Find and fix print problems"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span class="nl">Smart Fix</span><span class="ns" aria-hidden="true">Fix</span></button>
     <button data-view="learn" title="Short, practical lessons"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/></svg><span class="nl">Learn</span><span class="ns" aria-hidden="true">Learn</span></button>
-    <button data-view="account" title="Your account, printer and preferences"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg><span class="nl">Account</span><span class="ns" aria-hidden="true">Me</span></button>
+    <button data-view="account" title="Your account, printer, My Studio and preferences"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg><span class="nl">Account</span><span class="ns" aria-hidden="true">Me</span></button>
   </nav>
   <div class="modepick">
     <label for="modeSel">Mode</label>
@@ -69,8 +69,10 @@
 <main class="layout" id="viewCreate" hidden>
 <div class="zt-band" data-zt="lithophane"><div class="zt-litho" aria-hidden="true"><i class="zt-glow"></i><img src="/static/zt/lithophane-cat.jpg" width="440" height="440" alt="" loading="lazy" decoding="async"></div><p class="zt-cap">Example lithophane: Tango the cat, lit from behind.</p></div>
   <section class="hero" aria-labelledby="h1">
+    <p class="studio-crumb" id="studioFromMe" hidden><a href="#account">Me</a> <span aria-hidden="true">·</span> My Studio</p>
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
     <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
+    <p class="help" id="lithoStudioNote" hidden>Lithophane is this tab. <a href="#studio">My Studio</a> is its own section in Me.</p>
     <div id="studioPhoto"></div>
     <p class="have3d"><button type="button" class="linkbtn" id="btnHave3d">Already have a 3D file (STL, OBJ or 3MF)? Open it in Edit</button></p>
   </section>
@@ -711,6 +713,11 @@
 <main class="page" id="viewAccount" hidden>
 <div class="zt-band" data-zt="account" aria-hidden="true"><img class="zt-art" src="/static/zt/account.webp" srcset="/static/zt/account.webp 1x, /static/zt/account@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-ink"></i><i class="zt-ink"></i><i class="zt-ink"></i></div>
   <div class="pagehead"><div><h1>Account</h1><p class="help" id="accSummary">Your page: profile, sign-in and your printers.</p><p class="help" id="accTestingMode" hidden><strong>Testing mode: limits off</strong></p></div></div>
+  <section class="mestudio" id="meStudio" aria-labelledby="meStudioH">
+    <h2 id="meStudioH"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-camera"/></svg> My Studio</h2>
+    <p class="help">Turn a photo into a lithophane, relief, pop-art, bust, or a logo in 3D. Same Studio as before — it opens from here.</p>
+    <a class="btn big primary" href="#studio" id="btnMyStudio">Open Studio</a>
+  </section>
   <ul class="grid toolgrid">
     <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><div class="acctbtns"><button class="btn big" id="btnLogin" type="button" aria-label="Log in">Log in</button><button class="btn big primary" id="btnAccount" type="button" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></div></li>
     <li class="toolcard" id="accHandleCard"><h2>Your @</h2><p class="help">The name Showcase puts on your projects. Not your real name, and never your email.</p><div id="accHandle"><p class="help">Sign in, then set the @ Showcase uses. A starter name can be changed once for free.</p></div></li>
