@@ -2,6 +2,9 @@
 ownership use the auth owner_id on every device; the old p3d_sid cookie login keeps working alongside it."""
 from __future__ import annotations
 
+import re
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -218,6 +221,104 @@ def test_link_auth_account_is_idempotent():
     k1, u1 = idn.link_auth_account("acc_idem_test", "Idem", "1990-01-01")
     k2, u2 = idn.link_auth_account("acc_idem_test", "Other name", None)
     assert k1 == k2 and u2["display_name"] == "Idem" and u1["id"] == "acc_idem_test"
+
+
+def _age_username(uid, days):
+    when = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    USERS.update(lambda d: [u.__setitem__("username_changed", when) for u in d.values() if u.get("id") == uid])
+
+
+def _publish(c, build_id, title, remix_of=""):
+    body = {"build_id": build_id, "title": title, "accept_guidelines": True, "nsfw": False,
+            "visibility": "public", "license_id": "cc-by-4.0"}
+    if remix_of:
+        body["remix_of"] = remix_of
+    r = c.post("/api/showcase", json=body)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_passkey_starter_name_can_be_set_and_showcase_follows(zapp):
+    """A passkey sign-up gets a generated @. The first change is free. Showcase, the model
+    page and a remix chain then show the new @. The old name stays reserved."""
+    app, svc, sample = zapp
+    a = browser(app)
+    passkey_signup(a, name="Benchy Zach")
+    me = a.get("/api/me").json()
+    starter = me["username"]
+    assert me["username_starter"] is True and me["username_next_change"] is None
+    assert re.fullmatch(r"[A-Z][a-z]+[A-Z][a-z]+\d{3}", starter)
+    assert me["display_name"] == "Benchy Zach"
+    item = _publish(a, build(a, sample), "Benchy plate")
+    friend = browser(app)
+    assert friend.post("/api/me/signup", json={"display_name": "Remix Pal", "dob": "1991-02-02", "username": "RemixPal9"}).status_code == 200
+    remix = _publish(friend, build(friend, sample), "Benchy remix", item["id"])
+    visitor = browser(app)
+    before = visitor.get(f"/api/showcase/{item['id']}").json()
+    assert before["creator"] == "@" + starter and before["credit"]["creator"] == "@" + starter
+    assert "Benchy Zach" not in before["creator"]
+
+    too_long = a.put("/api/me/username", json={"username": "A" + "b" * 18})
+    assert too_long.status_code == 400 and "3 to 18" in too_long.json()["detail"]
+    blocked = a.put("/api/me/username", json={"username": "fuck_you"})
+    assert blocked.status_code in (400, 409, 422)
+    taken = a.put("/api/me/username", json={"username": "remixpal9"})
+    assert taken.status_code == 409 and "taken" in taken.json()["detail"]
+    assert a.get("/api/me").json()["username"] == starter
+
+    renamed = a.put("/api/me/username", json={"username": "StudioBenchy"})
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["username"] == "StudioBenchy"
+    assert renamed.json()["username_starter"] is False and renamed.json()["username_next_change"]
+    got = visitor.get(f"/api/showcase/{item['id']}").json()
+    assert got["creator_username"] == "StudioBenchy" and got["creator"] == "@StudioBenchy"
+    assert got["credit"]["creator"] == "@StudioBenchy"
+    page = visitor.get(f"/p/{item['id']}").text
+    assert "@StudioBenchy" in page and "@" + starter not in page and "Benchy Zach" not in page
+    listed = next(x for x in visitor.get("/api/showcase?tab=free").json()["items"] if x["id"] == item["id"])
+    assert listed["creator"] == "@StudioBenchy" and listed["credit"]["creator"] == "@StudioBenchy"
+    chain = visitor.get(f"/api/showcase/{remix['id']}").json()["remix_chain"]
+    assert chain and chain[0]["creator"] == "@StudioBenchy" and chain[0]["id"] == item["id"]
+    assert visitor.get(f"/api/users/{me['id']}").json()["display_name"] == "@StudioBenchy"
+    assert visitor.get(f"/u/{me['id']}").text.count("@StudioBenchy") >= 1
+    assert "@" + starter not in visitor.get(f"/u/{me['id']}").text
+
+    again = a.put("/api/me/username", json={"username": "StudioBenchy2"})
+    assert again.status_code == 429 and a.get("/api/me").json()["username"] == "StudioBenchy"
+    newbie = browser(app)
+    reserved = newbie.post("/api/me/signup", json={"display_name": "New Pal", "dob": "1992-03-03", "username": starter})
+    assert reserved.status_code == 400 and "taken" in reserved.json()["detail"]
+    _age_username(me["id"], 91)
+    second = a.put("/api/me/username", json={"username": "StudioBenchy2"})
+    assert second.status_code == 200 and second.json()["username"] == "StudioBenchy2"
+    assert visitor.get(f"/api/showcase/{item['id']}").json()["creator"] == "@StudioBenchy2"
+    hist = next(u["username_history"] for u in USERS.read().values() if u.get("id") == me["id"])
+    assert starter.lower() in hist and "studiobenchy" in hist
+
+
+def test_password_username_is_what_showcase_shows_and_sign_in_follows_a_rename(zapp):
+    app, svc, sample = zapp
+    a = browser(app)
+    made = a.post("/api/auth/password/register", json={
+        "display_name": "Zach Display", "birth_date": "1990-04-04",
+        "username": "ChosenHandle99", "password": "correct horse battery"}, headers=H)
+    assert made.status_code == 201, made.text
+    me = a.get("/api/me").json()
+    assert me["username"] == "ChosenHandle99" and me["username_starter"] is False
+    assert me["username_next_change"] is None
+    item = _publish(a, build(a, sample), "Chosen plate")
+    visitor = browser(app)
+    got = visitor.get(f"/api/showcase/{item['id']}").json()
+    assert got["creator"] == "@ChosenHandle99" and "Zach Display" not in got["creator"]
+    renamed = a.put("/api/me/username", json={"username": "RenamedHandle9"})
+    assert renamed.status_code == 200, renamed.text
+    assert visitor.get(f"/api/showcase/{item['id']}").json()["creator"] == "@RenamedHandle9"
+    fresh = browser(app)
+    ok = fresh.post("/api/auth/password/login", json={"identifier": "RenamedHandle9", "password": "correct horse battery"}, headers=H)
+    assert ok.status_code == 200, ok.text
+    other = browser(app)
+    bad = other.post("/api/auth/password/login", json={"identifier": "ChosenHandle99", "password": "correct horse battery"}, headers=H)
+    assert bad.status_code == 401
 
 
 def test_mount_wires_zeim_hooks():

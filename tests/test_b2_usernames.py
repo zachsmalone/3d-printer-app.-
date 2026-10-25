@@ -13,7 +13,9 @@ def me(c): return c.get("/api/me").json()
 
 def test_adult_can_choose_a_valid_free_name_or_gets_a_generated_one():
     a = client(); r = a.post("/api/me/signup", json={**ADULT, "username": "ada_makes"}); assert r.json()["username"] == "ada_makes"
+    assert a.get("/api/me").json()["username_starter"] is False          # they chose it; the first rename is still free
     b = client(); r = b.post("/api/me/signup", json=ADULT); assert re.match(r"^[A-Z][a-z]+[A-Z][a-z]+\d{3}$", r.json()["username"])
+    assert b.get("/api/me").json()["username_starter"] is True and b.get("/api/me").json()["username_next_change"] is None
     c = client(); r = c.post("/api/me/signup", json={**ADULT, "username": "ADA_MAKES"})        # taken ignoring case
     assert r.status_code == 400 and "taken" in r.json()["detail"] and c.get("/api/me").json()["signed_up"] is False
 

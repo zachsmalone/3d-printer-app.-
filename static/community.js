@@ -42,6 +42,7 @@ async function refreshMe() {
   document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
   document.body.dataset.role = ME.send?.role || "";
   document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
+  paintAccountHandle();
 }
 
 /* ---------- views ---------- */
@@ -79,7 +80,7 @@ function route() {
   else if ($("#dlgProfile")?.open) $("#dlgProfile").close();          // leaving a profile link by tab closes the profile
   if (!(h[0] === "c" && h[1]) && $("#dlgCollection")?.open) $("#dlgCollection").close();
   if (h[0] === "c" && h[1]) setTimeout(() => openCollection(h[1]), 50);
-  if (v === "account") { loadFavorites(); loadCollections(); }
+  if (v === "account") { loadFavorites(); loadCollections(); paintAccountHandle(); }
   else if ($("#dlgCollection")?.open) $("#dlgCollection").close();
 }
 addEventListener("hashchange", route);
@@ -197,14 +198,11 @@ function renderAccount() {
     };
   } else {
     const r = ME.restrictions, pv = ME.privacy;
-    const nextUn = ME.username_next_change ? new Date(ME.username_next_change).toLocaleDateString() : null;
+    const unBlock = (window.ZeimAccount && ZeimAccount.usernameSection)
+      ? ZeimAccount.usernameSection(ME)
+      : `<h4>Your username</h4><p>Credit for what you share goes to <b id="un_now">@${esc(ME.username || "")}</b>. Your email is never shown to anyone.</p>`;
     $("#accBody").innerHTML = `<p><b>${esc(ME.display_name)}</b> ${ME.suspended ? '<span class="pill">suspended</span>' : ""}</p>
-      <h4>Your username</h4>
-      <p>Credit for what you share goes to <b id="un_now">@${esc(ME.username || "")}</b>. Your email is never shown to anyone.</p>
-      <div class="field"><label for="un_new">New username</label><input id="un_new" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false" ${nextUn ? "disabled" : ""}>
-        <small class="help" id="un_help">${nextUn ? "You can change your username again on " + esc(nextUn) + "." : "3 to 18 letters, numbers or underscores. You can change it once every 90 days. The old name stays saved for you, so nobody else can take it. Please don't use your real name."}</small></div>
-      <div class="row"><button class="btn small" id="un_save" ${nextUn ? "disabled" : ""}>Change username</button><button class="btn small ghost" id="un_suggest" ${nextUn ? "disabled" : ""}>Suggest names</button></div>
-      <div class="row" id="un_sugg"></div>
+      ${unBlock}
       <p class="help">Public page: <a href="/u/${ME.id}" target="_blank">/u/${ME.id}</a> (only if your profile is visible to the viewer)</p>
       <h4><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Privacy</h4>
       <div class="field"><label>Profile page</label><select id="pv_profile">${[["public", "Public"], ["followers", "Followers only"], ["private", "Private — only me"]].map(([v, t]) => `<option value="${v}" ${pv.profile === v ? "selected" : ""}${v !== "private" && ME.suspended ? " disabled" : ""}>${t}</option>`).join("")}</select></div>
@@ -223,15 +221,9 @@ function renderAccount() {
       <button class="btn small" id="so_open">Sign out…</button>`;
     renderPlans();
     $("#so_open").onclick = () => openSignout();
-    $("#un_save").onclick = async () => {
-      try { const r = await api("/api/me/username", J("PUT", { username: $("#un_new").value.trim() })); await refreshMe(); renderAccount(); toast("Your username is now @" + r.username, "ok"); }
-      catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
-    };
-    $("#un_suggest").onclick = async () => {
-      try { const r = await api("/api/me/username/suggest", J("POST", {})); $("#un_sugg").innerHTML = r.suggestions.map(n => `<button class="btn small ghost" data-un="${esc(n)}">${esc(n)}</button>`).join("");
-        $("#un_sugg").querySelectorAll("[data-un]").forEach(b => b.onclick = () => { $("#un_new").value = b.dataset.un; $("#un_new").focus(); }); }
-      catch (e) { inlineMsg($("#un_save").parentElement, e.message); }
-    };
+    if (window.ZeimAccount && ZeimAccount.wireUsername) {
+      ZeimAccount.wireUsername(ME, ZeimAccount.DIALOG_UN, (next) => { ZeimAccount.publishUsername(next, "legacy"); });
+    }
     $("#pv_save").onclick = async () => { try { await api("/api/me/privacy", J("PUT", { profile: $("#pv_profile").value, default_visibility: $("#pv_def").value, social: $("#pv_social").checked ? "on" : "off" })); await refreshMe(); renderAccount(); toast("Privacy saved", "ok"); } catch (e) { toast(e.message, "err"); } };
     // People I follow: only you see this list; Unfollow works even for an account that has since gone away
     const drawFollowing = async () => {
@@ -248,6 +240,42 @@ function renderAccount() {
     $("#pv_followers").onclick = async () => { const f = await api("/api/me/followers"); toast(!f.enabled ? "Following is off, so there are no followers." : f.followers.length ? "Followers: " + f.followers.map(x => x.display_name).join(", ") : "No followers yet."); };
   }
 }
+
+function paintAccountHandle(force) {
+  const box = $("#accHandle");
+  if (!box) return;
+  if (!force && document.activeElement && document.activeElement.id === "pg_un_new") return;
+  const sum = $("#accSummary");
+  if (!ME || !ME.signed_up) {
+    box.innerHTML = `<p class="help">Sign in, then set the @ Showcase uses. If ZEIM made a starter name for you, the first change is free.</p>`;
+    if (sum) sum.textContent = "Your page: profile, sign-in and your printers.";
+    return;
+  }
+  if (sum) sum.textContent = "Signed in as " + ME.display_name + ". Showcase credits you as @" + (ME.username || "") + ".";
+  if (!(window.ZeimAccount && ZeimAccount.usernameSection)) {
+    box.innerHTML = `<p>Your @ is <b>@${esc(ME.username || "")}</b>.</p>`;
+    return;
+  }
+  box.innerHTML = ZeimAccount.usernameSection(ME, ZeimAccount.PAGE_UN, { heading: false });
+  ZeimAccount.wireUsername(ME, ZeimAccount.PAGE_UN, (next) => { ZeimAccount.publishUsername(next, "page"); });
+}
+
+document.addEventListener("zeim:username", (ev) => {
+  const next = ev.detail && ev.detail.me;
+  if (!next || !next.username) return;
+  ME = next;
+  const lbl = $("#btnAccount .lbl");
+  if (lbl) lbl.textContent = ME.display_name || "Account";
+  if ($("#btnAccount") && $("#btnAccount").setAttribute) $("#btnAccount").setAttribute("aria-label", "Account: " + (ME.display_name || ""));
+  paintAccountHandle(true);
+  const source = ev.detail.source;
+  if (source === "legacy") renderAccount();
+  else if (source === "page" && $("#dlgAccount") && $("#dlgAccount").open && window.ZeimAccount && ZeimAccount.handles(ME)) ZeimAccount.render(ME);
+  if ($("#accPlans")) renderPlans();
+  if (document.body.dataset.view === "showcase") loadShowcase();
+  if ($("#dlgItem") && $("#dlgItem").open && shownItem) openItem(shownItem);
+  toast("Your username is now @" + ME.username, "ok");
+});
 
 /* ---------- Sign out (there are no passwords yet, so say plainly how to get back in before anyone presses it) ---------- */
 function openSignout() {
@@ -466,7 +494,9 @@ function confirmMature() {
     d.showModal(); $("#matNo").focus();
   });
 }
+let shownItem = "";
 async function openItem(id) {
+  shownItem = id;
   const i = await api("/api/showcase/" + id);
   if (i.nsfw && !i.owned && !(await confirmMature())) return;
   $("#itTitle").textContent = i.title;

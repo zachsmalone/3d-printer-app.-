@@ -316,6 +316,11 @@ def _next_username_change(u: dict):
     return usernames.next_change(u)
 
 
+def _username_starter(u: dict) -> bool:
+    from . import usernames
+    return usernames.is_starter(u)
+
+
 def public_profile(actor: Actor) -> dict:
     u = actor.user
     if not u:
@@ -323,6 +328,7 @@ def public_profile(actor: Actor) -> dict:
     from ..services import subscriptions as _subs
     return {"signed_up": True, "id": u["id"], "display_name": u["display_name"], "username": u.get("username"),
             "username_next_change": _next_username_change(u),
+            "username_starter": _username_starter(u),
             "suspended": suspended(u), "links": u.get("links", {}),
             "following": u.get("following", []), "privacy": _priv(u), "printer": u.get("printer"), "restrictions": restrictions(actor),
             "plan": _subs.public_plan(u),
