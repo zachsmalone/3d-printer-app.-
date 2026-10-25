@@ -31,7 +31,6 @@ const CURS = ["$", "€", "£", "¥", "₹", "R$", "kr"];
 const loadP = () => { try { return JSON.parse(localStorage.getItem(PKEY)) || {}; } catch { return {}; } };
 const saveP = v => { try { localStorage.setItem(PKEY, JSON.stringify(v)); } catch { } };
 
-const RZ_PRESETS = { detail: [0.03, 2.0, 25, 5], standard: [0.05, 2.5, 30, 5], fast: [0.08, 3.2, 30, 4] };   // keep in step with app/core/resin.py PRESETS
 let cat = null;
 const num = (id, label, v, min, max, step, unit) => `<div class="field"><label for="${id}">${label} <em>${unit}</em></label><input type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" inputmode="decimal"></div>`;
 
@@ -42,7 +41,9 @@ function panelHTML() {
     <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn" accept=".stl,.3mf,.obj"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p></div></div>
     <p class="help" id="rzInfo"></p>
-    <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div>
+    <div class="grid2"><div class="field"><label for="rzMaterial">Resin</label><select id="rzMaterial">${(cat.materials || []).map(m => `<option value="${m.id}" ${m.id === cat.default_material ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
+    <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div></div>
+    <p class="help" id="rzMatNote"></p><div id="rzMatExtra"></div>
     <details class="rzAdv" id="rzAdv"${document.body.dataset.level === "expert" ? " open" : ""}><summary>Advanced resin settings</summary><div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
       ${num("rzBL", "Bottom layers", 5, 1, 15, 1, "")}${num("rzLift", "Lift distance", 6, 1, 15, 0.5, "mm")}${num("rzLiftS", "Lift speed", 65, 10, 300, 5, "mm/min")}
       ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
@@ -51,17 +52,37 @@ function panelHTML() {
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
       ${num("rzCost", "Resin price", loadP().price ?? cat.default_price ?? "", 0, 10000, 0.5, "")}
       <div class="field"><label for="rzCostU">Price per</label><select id="rzCostU"><option value="l" ${(loadP().unit || cat.default_price_unit) === "l" ? "selected" : ""}>litre</option><option value="kg" ${loadP().unit === "kg" ? "selected" : ""}>kg</option></select></div></div>
+    <p class="help" id="rzPriceNote"></p>
     <label class="inl chk"><input type="checkbox" id="rzHollow" checked> Hollow (saves resin; needs a drain hole)</label>
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
     <p class="help">${esc(cat.test_note)} ${esc(cat.formats_note)}</p>
-    <details><summary>Resin safety</summary><ul>${cat.safety.map(s => `<li>${esc(s)}</li>`).join("")}</ul></details>
+    <details><summary>Resin safety</summary><ul id="rzSafety">${cat.safety.map(s => `<li>${esc(s)}</li>`).join("")}</ul></details>
     <div class="row"><button class="btn primary big" id="rzGo">Prepare for resin</button></div>`;
 }
 
 function wire() {
   const pr = $("#rzPreset"), info = () => { const p = cat.printers.find(x => x.id === $("#rzPrinter").value); $("#rzInfo").textContent = p ? `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. Make the layer file in ${p.official_slicer || "the printer's own resin slicer"}.` : ""; };
+  const matOf = () => (cat.materials || []).find(m => m.id === $("#rzMaterial").value) || (cat.materials || [])[0];
+  const applyPrint = n => { if (!n) return; $("#rzLayer").value = n.layer_mm; $("#rzExp").value = n.exposure_s; $("#rzBExp").value = n.bottom_exposure_s; $("#rzBL").value = n.bottom_layers; $("#rzLift").value = n.lift_mm; $("#rzLiftS").value = n.lift_speed_mm_min; };
+  const paintMaterial = apply => {
+    const mat = matOf(); if (!mat) return;
+    const own = mat.settings;
+    pr.disabled = !!own;
+    pr.title = own ? "Quality presets apply to standard resin. Silicone uses its own starting profile." : "";
+    if (apply) applyPrint(own || cat.presets.find(x => x.id === pr.value));
+    $("#rzMatNote").textContent = mat.help || "";
+    const src = mat.sources || [];
+    $("#rzMatExtra").innerHTML = (mat.notes || []).map(t => `<p class="help">${esc(t)}</p>`).join("")
+      + (src.length ? `<details><summary>Sources for these starting values</summary><ul>${src.map(s => `<li><a href="${esc(s.url)}">${esc(s.label)}</a></li>`).join("")}</ul></details>` : "");
+    $("#rzSafety").innerHTML = cat.safety.concat(mat.safety || []).map(s => `<li>${esc(s)}</li>`).join("");
+    const kg = mat.density_g_ml == null && $("#rzCostU").value === "kg";
+    $("#rzPriceNote").textContent = kg ? "Silicone has no single density here, so a per-kg price cannot be turned into a cost. Enter a price per litre." : "";
+  };
   $("#rzPrinter").onchange = info; info();
-  pr.onchange = () => { const [l, e, b, bl] = RZ_PRESETS[pr.value]; $("#rzLayer").value = l; $("#rzExp").value = e; $("#rzBExp").value = b; $("#rzBL").value = bl; };
+  pr.onchange = () => { const mat = matOf(); if (mat && mat.settings) return; applyPrint(cat.presets.find(x => x.id === pr.value)); };
+  $("#rzMaterial").onchange = () => paintMaterial(true);
+  $("#rzCostU").onchange = () => paintMaterial(false);
+  paintMaterial(false);
   // thin hollow wall: a dismissable warning, never a block (Prepare stays enabled; "Prepare anyway" just runs it)
   let wallOk = false;
   const wallWarn = () => { $("#rzWallWarn").hidden = wallOk || !($("#rzHollow").checked && +$("#rzWall").value > 0 && +$("#rzWall").value < 1); };
@@ -92,7 +113,7 @@ function wire() {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
     if (!f) { out.innerHTML = `<p class="help warn rzNeedFile" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
     const fd = new FormData();
-    const v = { printer_id: $("#rzPrinter").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
+    const v = { printer_id: $("#rzPrinter").value, material: $("#rzMaterial").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,
       tilt_deg: $("#rzTilt").value, wall_mm: $("#rzWall").value, drain_mm: $("#rzDrain").value, hollow: $("#rzHollow").checked, supports: $("#rzSup").checked,
       price: $("#rzCost").value, price_unit: $("#rzCostU").value };
@@ -126,8 +147,9 @@ function wire() {
           ${nI ? `<button type="button" class="btn small" id="rzFixIsl" style="min-height:44px">Add supports to islands</button> <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss the island warning">Dismiss</button>` : ""}</p>
         <p class="help ${nS ? "warn rzWarn" : ""}" id="rzCups"><span class="pill"><svg class=i i-amber aria-hidden=true focusable=false><use href=#i-dot></use></svg> ${nS} suction cup${nS === 1 ? "" : "s"}</span> ${nS ? "Hollows sealed on the plate side trap resin and pull a vacuum (orange dots)." : "No suction cups found."}
           ${nS ? `<button type="button" class="btn small" id="rzFixCup" style="min-height:44px">Add drain hole${nS === 1 ? "" : "s"}</button> <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss the suction cup warning">Dismiss</button>` : ""}</p></div>
-        <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers</span>${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
+        <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers</span>${r.material && r.material.id !== "standard" ? `<span class="pill">${esc(r.material.label)}</span>` : ""}${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
         ${r.hollow ? `<p class="help">${esc(r.hollow.message)}</p>` : ""}
+        ${(r.material_notes || []).map(n => `<p class="help">${esc(n)}</p>`).join("")}
         ${r.notes.filter(n => !/ island\(s\)| suction cup\(s\)/.test(n)).map(n => `<p class="help warn rzWarn">${esc(n)} <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss this warning">Dismiss</button></p>`).join("")}
         <p class="help">${esc(e.resin_note)} ${esc(e.cost_note)}</p>
         <div class="row"><button type="button" class="btn primary" id="rzExport" data-export-rid="${esc(r.export?.rid || "")}" data-export-name="${esc(r.export?.name || "")}" aria-haspopup="dialog"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Export…</button><a class="btn" href="${r.downloads.stl}" download id="rzQuickStl">Quick STL</a></div>`;

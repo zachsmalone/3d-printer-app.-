@@ -17,6 +17,14 @@ def run(name, launch, stl):
     pg.goto(URL + "/#torchc0"); pg.wait_for_selector("#rzGo", timeout=20000)
     ok(f"{name}: Beginner hides expert resin settings", not pg.is_visible("#rzLayer"))
     pg.click("#rzAdv > summary")                       # S9: expert settings live behind Advanced
+    ok(f"{name}: silicone is a resin choice", "Silicone" in pg.inner_text("#rzMaterial"))
+    pg.select_option("#rzMaterial", "silicone")
+    ok(f"{name}: silicone exposure is longer", float(pg.input_value("#rzExp")) > 2.5, pg.input_value("#rzExp"))
+    ok(f"{name}: silicone lift is higher", float(pg.input_value("#rzLift")) > 6, pg.input_value("#rzLift"))
+    ok(f"{name}: silicone note shown", "exposure" in pg.inner_text("#rzMatNote").lower())
+    pg.select_option("#rzMaterial", "standard")
+    pg.select_option("#rzPreset", "standard")
+    ok(f"{name}: standard exposure restored", float(pg.input_value("#rzExp")) == 2.5, pg.input_value("#rzExp"))
     for sel in ("#rzPrinter", "#rzDrop label.btn", "#rzLayer", "#rzHollow", "#rzSup", "#rzCost"):
         box = pg.locator(sel).bounding_box()
         ok(f"{name}: {sel} visible and sized", pg.is_visible(sel) and box and box["width"] > 8 and box["height"] > 8, box)
