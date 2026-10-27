@@ -1,4 +1,5 @@
-"""My Studio is a section on Me. #studio still opens the existing Studio page."""
+"""My Studio is a section on Me. #studio still opens the existing Studio page.
+Recent builds ("Pick up where you left off") stay on that Studio page, not on Lithophane."""
 import re
 from pathlib import Path
 
@@ -33,3 +34,14 @@ def test_lithophane_tab_points_at_me_and_studio_routes_stay():
     assert 'show(v, fromMe ? "account"' in JS
     assert 'raw === "lithophane"' in JS
     assert "ai3d_enabled" in JS and "/api/subscriptions/me" in JS
+
+
+def test_recent_builds_belong_to_studio_not_the_shared_lithophane_page():
+    create = _slice(HTML, 'id="viewCreate"', 'id="viewEdit"')
+    assert 'id="recentBuilds"' in create
+    assert 'Pick up where you left off' in create
+    assert re.search(r'<section class="history" id="recentBuilds" hidden>', create)
+    fn = JS[JS.index("function paintStudioHome"):JS.index("function route")]
+    assert '$("#recentBuilds")' in fn
+    assert "recent.hidden = !fromMe" in fn
+    assert "STUDIO_FROM_ME" in JS and 'studio: "lithophane"' in JS
