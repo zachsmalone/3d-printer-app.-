@@ -159,6 +159,13 @@ document.addEventListener("zeim:edit-shown", async () => {
     loadProject(p);
   } catch { try { sessionStorage.removeItem("zeim.edit.last"); } catch { } }
 });
+document.addEventListener("zeim:edit-from-build", e => {
+  const id = e.detail;
+  if (id && /^[0-9a-f]{12}$/.test(id)) {
+    editLoadGen++; // hash restore of zeim.edit.last must not replace this Edit
+    fromBuild(id);
+  }
+});
 document.addEventListener("zeim:open-edit", async e => {
   const gen = ++editLoadGen;
   try {

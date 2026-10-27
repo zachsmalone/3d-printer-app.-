@@ -1,11 +1,15 @@
-"""My Studio is a section on Me. #studio still opens the existing Studio page.
-Recent builds ("Pick up where you left off") stay on that Studio page, not on Lithophane."""
+"""My Studio is the saved-project library on Account.
+
+#account/studio and the old #studio bookmark stay on that library.
+They do not open Lithophane. #create still opens the photo workspace.
+"""
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 JS = (ROOT / "static" / "community.js").read_text(encoding="utf-8")
+LIB = (ROOT / "static" / "studio-library.js").read_text(encoding="utf-8")
 
 
 def _slice(text, start, end):
@@ -13,35 +17,45 @@ def _slice(text, start, end):
     return text[i:text.index(end, i)]
 
 
-def test_studio_is_a_me_section_and_not_a_new_tab():
+def test_studio_library_lives_on_account_and_is_not_a_new_tab():
     nav = _slice(HTML, 'id="mainNav"', "</nav>")
     views = re.findall(r'data-view="(\w+)"', nav)
     assert "studio" not in views
     assert "lithophane" in views and "account" in views
-    acc = _slice(HTML, 'id="viewAccount"', "</main>")
+    acc = _slice(HTML, 'id="viewAccount"', 'id="viewLearn"')
     studio = _slice(acc, 'id="meStudio"', "</section>")
-    assert "My Studio" in studio and 'href="#studio"' in studio and 'id="btnMyStudio"' in studio
-    assert "Open Studio" in studio
-    assert "btnSettings" not in studio
+    assert "My Studio" in studio
+    assert 'href="#account/studio"' in studio
+    assert 'id="btnMyStudio"' in studio
+    assert 'id="studioLib"' in studio
+    assert 'href="#studio"' not in studio
+    assert 'href="#lithophane"' not in studio
+    assert "Open Studio" not in studio
     assert 'id="btnSettings"' in acc and 'id="dlgSettings"' not in acc
 
 
-def test_lithophane_tab_points_at_me_and_studio_routes_stay():
-    create = _slice(HTML, 'id="viewCreate"', 'id="viewShowcase"')
-    assert 'id="studioFromMe"' in create and 'href="#account"' in create
-    assert 'id="lithoStudioNote"' in create and 'href="#studio"' in create
-    assert 'studio: "lithophane"' in JS and 'create: "lithophane"' in JS
-    assert 'show(v, fromMe ? "account"' in JS
+def test_selecting_the_library_is_not_the_lithophane_alias():
+    assert 'studio: "lithophane"' not in JS
+    assert 'create: "lithophane"' in JS
+    assert "routeIntent" in JS and "arriveLibrary" in JS and "openFromLibrary" in JS
+    assert "visitLibrary" in LIB
     assert 'raw === "lithophane"' in JS
-    assert "ai3d_enabled" in JS and "/api/subscriptions/me" in JS
+    assert "LIBRARY_HASH" in LIB and '"#account/studio"' in LIB
+    assert 'head === "studio"' in LIB
+    create = _slice(HTML, 'id="viewCreate"', 'id="viewShowcase"')
+    assert 'id="studioFromMe"' in create and 'href="#account/studio"' in create
+    assert 'id="lithoStudioNote"' in create and 'href="#account/studio"' in create
+    assert 'id="btnCreatePhoto"' in HTML
+    photo = HTML[HTML.index('id="btnCreatePhoto"') - 120:HTML.index('id="btnCreatePhoto"')]
+    assert 'href="#create"' in photo
+    assert "#studio" not in photo
 
 
-def test_recent_builds_belong_to_studio_not_the_shared_lithophane_page():
+def test_recent_builds_block_stays_off_the_lithophane_page():
     create = _slice(HTML, 'id="viewCreate"', 'id="viewEdit"')
     assert 'id="recentBuilds"' in create
-    assert 'Pick up where you left off' in create
     assert re.search(r'<section class="history" id="recentBuilds" hidden>', create)
-    fn = JS[JS.index("function paintStudioHome"):JS.index("function route")]
+    fn = JS[JS.index("function paintStudioHome"):JS.index("function paintStudioLibrary")]
     assert '$("#recentBuilds")' in fn
-    assert "recent.hidden = !fromMe" in fn
-    assert "STUDIO_FROM_ME" in JS and 'studio: "lithophane"' in JS
+    assert "recent.hidden = true" in fn
+    assert "STUDIO_FROM_ME" not in JS

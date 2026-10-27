@@ -162,3 +162,4 @@ $("#histList").addEventListener("click", async e => {
   const t = e.target.closest("[data-send]"); if (!t) return;
   openSend(S.history.find(x => x.id === t.dataset.send));
 });
+document.addEventListener("zeim:send-build", e => { if (e.detail) openSend(e.detail); });

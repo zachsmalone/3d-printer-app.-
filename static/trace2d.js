@@ -74,6 +74,6 @@ document.addEventListener("zeim:file", schedule);
 document.addEventListener("zeim:mode", e => { if (e.detail === "trace2d") { applyOut(); schedule(); } });
 applyOut();
 $("#cadTrace")?.addEventListener("click", () => {          // CAD tab shortcut: same tool, in the Create flow
-  S.mode = "trace2d"; location.hash = "studio"; applyMode();
+  S.mode = "trace2d"; location.hash = "create"; applyMode();
   setTimeout(() => $("#modeCards input[value=trace2d]")?.focus(), 300);
 });

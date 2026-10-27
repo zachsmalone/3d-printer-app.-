@@ -1,6 +1,6 @@
-"""Recent builds show on My Studio only. Lithophane and the other tool tabs do not get that block.
+"""Saved projects are the Account → My Studio library. Lithophane does not get that block.
 
-Studio and Lithophane share #viewCreate. The block used to ride along onto #lithophane.
+#studio and #account/studio stay on Account. #create and #lithophane are workspaces.
 """
 import os, socket, subprocess, sys, tempfile, time
 import pytest
@@ -119,15 +119,6 @@ def _assert_off(pg, where):
     assert got["section"] is False and got["heading"] is False and got["list"] is False, (where, got)
 
 
-def _assert_on(pg, where):
-    got = _pickup(pg)
-    assert got["hidden"] is False, (where, got)
-    assert got["section"] and got["heading"] and got["list"], (where, got)
-    assert "Pick up where you left off" in got["text"], (where, got["text"])
-    assert "Tap the star" in got["text"], (where, got["text"])
-    assert pg.locator("#histList li").count() >= 1, where
-
-
 @pytest.mark.parametrize("w", [390, 1280])
 def test_pickup_is_on_studio_and_absent_from_lithophane_and_other_tools(base, w):
     with sync_playwright() as p:
@@ -157,15 +148,18 @@ def test_pickup_is_on_studio_and_absent_from_lithophane_and_other_tools(base, w)
             if view == "account":
                 assert pg.locator("#meStudio").is_visible()
                 assert pg.locator("#btnMyStudio").is_visible()
-                assert "Open Studio" in pg.locator("#btnMyStudio").inner_text()
+                assert "My Studio" in pg.locator("#btnMyStudio").inner_text()
+                assert pg.locator("#btnMyStudio").get_attribute("href") == "#account/studio"
+                assert pg.locator("#studioLib").count() == 1
 
         pg.locator("#btnMyStudio").click()
-        _wait_route(pg, "#studio", "lithophane", "#viewCreate", False)
-        assert pg.locator("#viewCreate").is_visible()
-        assert pg.locator("#studioFromMe").is_visible()
-        assert not pg.locator("#lithoStudioNote").is_visible()
+        _wait_route(pg, "#account/studio", "account", "#viewAccount", True)
+        assert pg.locator("#viewAccount").is_visible()
+        assert pg.locator("#viewCreate").is_hidden()
+        assert pg.locator("#meStudio").is_visible()
         assert pg.locator("#mainNav button[data-view=account]").get_attribute("aria-current") == "page"
-        _assert_on(pg, f"{w} Me → Open Studio")
+        assert pg.locator("#mainNav button[data-view=lithophane]").get_attribute("aria-current") != "page"
+        _assert_off(pg, f"{w} Account → My Studio")
 
         pg.locator("#mainNav button[data-view=lithophane]").click()
         _wait_route(pg, "#lithophane", "lithophane", "#viewCreate", True)
@@ -173,10 +167,19 @@ def test_pickup_is_on_studio_and_absent_from_lithophane_and_other_tools(base, w)
         _assert_off(pg, f"{w} back to Lithophane")
 
         _ready(pg, base, "#studio")
-        _assert_on(pg, f"{w} direct #studio")
+        pg.wait_for_function("() => location.hash === '#account/studio' && document.body.dataset.view === 'account' && document.querySelector('#viewCreate').hidden")
+        _assert_off(pg, f"{w} direct #studio stays in the library")
+        pg.reload()
+        pg.wait_for_function(READY, timeout=25000)
+        pg.wait_for_function("() => location.hash === '#account/studio' && document.body.dataset.view === 'account'")
+        assert pg.locator("#viewCreate").is_hidden()
+        _assert_off(pg, f"{w} refresh #account/studio")
+
         _ready(pg, base, "#create")
-        _assert_on(pg, f"{w} #create alias")
-        assert pg.locator("#mainNav button[data-view=account]").get_attribute("aria-current") == "page"
+        assert pg.locator("#viewCreate").is_visible()
+        assert pg.evaluate("() => location.hash") == "#create"
+        assert pg.locator("#mainNav button[data-view=lithophane]").get_attribute("aria-current") == "page"
+        _assert_off(pg, f"{w} #create is the photo workspace")
         _ready(pg, base, "#lithophane")
         _assert_off(pg, f"{w} reload #lithophane")
 

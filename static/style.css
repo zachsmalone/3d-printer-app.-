@@ -1142,7 +1142,15 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 #viewAccount .mestudio h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:1.05rem}
 #viewAccount .mestudio h2 .i{width:20px;height:20px;color:var(--zt-a,#A3241C)}
 #viewAccount .mestudio .btn{min-height:44px;margin-top:10px;text-decoration:none}
-@media (max-width:768px){#viewAccount .mestudio .btn{width:100%;justify-content:center}}
+#viewAccount .mestudio a#btnMyStudio{color:inherit;text-decoration:none;font:inherit}
+#viewAccount .studio-lib{display:flex;flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+#viewAccount .studio-lib .hcard{flex-direction:row;align-items:center;gap:10px;padding:8px}
+#viewAccount .studio-lib .meta{flex:1;min-width:0;padding:0}
+#viewAccount .studio-lib .meta b{white-space:normal}
+#viewAccount .studio-lib .row2{padding:0;margin-left:auto}
+#viewAccount .studio-lib .btn{margin-top:0;width:auto}
+#viewAccount .studio-lib img{width:72px;height:72px;aspect-ratio:1;object-fit:cover;flex:0 0 72px}
+@media (max-width:768px){#viewAccount .mestudio .btn{width:100%;justify-content:center}#viewAccount .studio-lib .hcard{flex-wrap:wrap}#viewAccount .studio-lib .row2{width:100%;margin-left:0}#viewAccount .studio-lib .btn{width:auto;flex:1 1 44px}}
 .studio-crumb{margin:0 0 8px;font-size:13px;color:var(--mut)}
 .studio-crumb a{font-weight:650}
 .cols{margin:16px 0 24px}
