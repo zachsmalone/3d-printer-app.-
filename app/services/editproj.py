@@ -10,6 +10,8 @@ The current mesh = replay of ops[:head] on the original. Undo/redo move `head`; 
 from __future__ import annotations
 
 import base64
+import hashlib
+import json
 import threading
 import uuid
 from collections import OrderedDict
@@ -59,25 +61,66 @@ def _apply(meta: dict, m, o: dict):
     return meshedit.apply(m, o["op"], params)
 
 
+def geometry_revision(meta: dict, head: int | None = None) -> str:
+    """Identity of the derived printable mesh.
+
+    The step index is not enough: undo then a different edit can reuse the same head, and named
+    dimensions change the mesh without moving head. Skipped text steps are part of the identity so
+    a warm process cannot keep a mesh that a cold replay would leave out.
+    """
+    head = int(meta["head"] if head is None else head)
+    ops = (meta.get("ops") or [])[:head]
+    skipped = [i for i, o in enumerate(ops) if not _replay_safe(o)]
+    plate = (meta.get("plate_layouts") or {}).get(str(head))
+    blob = json.dumps(
+        {"v": 1, "ops": ops, "dims": meta.get("dims") or {}, "plate": plate, "skipped": skipped},
+        sort_keys=True, separators=(",", ":"), default=str,
+    )
+    return hashlib.sha256(blob.encode()).hexdigest()[:20]
+
+
+def _cache_put(bid: str, head: int, mesh, meta: dict) -> None:
+    slot = _STATES.setdefault(bid, OrderedDict())
+    slot[head] = (geometry_revision(meta, head), mesh)
+    slot.move_to_end(head)
+    while len(slot) > 6:
+        slot.popitem(last=False)
+
+
+def _cache_hit(bid: str, head: int, meta: dict):
+    slot = _STATES.get(bid)
+    if not slot or head not in slot:
+        return None
+    entry = slot[head]
+    if not (isinstance(entry, tuple) and len(entry) == 2):
+        return None
+    rev, mesh = entry
+    if rev != geometry_revision(meta, head):
+        return None
+    slot.move_to_end(head)
+    return mesh
+
+
 def mesh_at(bid: str, meta: dict | None = None, head: int | None = None) -> trimesh.Trimesh:
     meta = meta or store.get(bid)
     head = meta["head"] if head is None else head
     with _lock:
-        cache = _STATES.setdefault(bid, OrderedDict())
-        if head in cache:
-            cache.move_to_end(head)
-            return cache[head]
-        # resume from the nearest cached earlier state
-        start = max([h for h in cache if h <= head], default=None)
-        m = cache[start] if start is not None else _base(bid, meta)
+        hit = _cache_hit(bid, head, meta)
+        if hit is not None:
+            return hit
+        slot = _STATES.get(bid) or {}
+        start = None
+        for h in sorted((h for h in slot if isinstance(h, int) and h <= head), reverse=True):
+            if _cache_hit(bid, h, meta) is not None:
+                start = h
+                break
+        m = slot[start][1] if start is not None else _base(bid, meta)
         for k in range(start or 0, head):
             o = meta["ops"][k]
             if not _replay_safe(o):
                 continue
             m, _ = _apply(meta, m, o)
-        cache[head] = m
-        while len(cache) > 6:
-            cache.popitem(last=False)
+        _cache_put(bid, head, m, meta)
         return m
 
 
@@ -106,23 +149,32 @@ def ensure_exports(bid: str):
     if meta.get("kind") != "edit":
         return
     d = store.dir(bid)
-    if meta.get("exports_head") == meta["head"] and all((d / f"model.{e}").exists() for e in exporters.WRITERS):
+    rev = geometry_revision(meta)
+    if meta.get("exports_rev") == rev and all((d / f"model.{e}").exists() for e in exporters.WRITERS):
         return
     with _lock:
         meta = store.get(bid)
+        if meta.get("kind") != "edit":
+            return
+        d = store.dir(bid)
+        rev = geometry_revision(meta)
+        if meta.get("exports_rev") == rev and all((d / f"model.{e}").exists() for e in exporters.WRITERS):
+            return
         m = printable_at(bid, meta)
         quality = export_quality(m)
         meta["quality_gate"] = quality
         # N2: the export-gate warning describes the CURRENT mesh, so drop the old one (e.g. "not watertight" from import)
-        # once Fix mesh makes it print-safe, and put the current one back if a later step / undo breaks it again
-        kept = [w for w in (meta.get("warnings") or []) if not w.startswith(_GATE_PREFIX)]
-        meta["warnings"] = list(dict.fromkeys(kept + ([] if quality["ok"] else [quality["message"]])))
+        # once Fix mesh makes it print-safe, and put the current one back if a later step / undo breaks it again.
+        # Replay omissions are the same kind of derived note: they describe this mesh, not an older one.
+        kept = [w for w in (meta.get("warnings") or []) if not w.startswith(_GATE_PREFIX) and not w.startswith(_REPLAY_PREFIX)]
+        meta["warnings"] = list(dict.fromkeys(kept + replay_omissions(meta) + ([] if quality["ok"] else [quality["message"]])))
         mdl = as_model(m, meta["title"])
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(mdl))
         (d / "model.gcode").unlink(missing_ok=True)       # stale slice
         Image.fromarray(meshthumb.render(m.vertices, m.faces)).save(d / "thumb.png")
-        meta["exports_head"] = meta["head"]
+        meta["exports_rev"] = rev
+        meta.pop("exports_head", None)
         store.save(meta)
 
 
@@ -230,7 +282,8 @@ def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner
         with _lock:                                          # reuse the source's parsed base + current state: no replay
             _BASES[bid] = _base(src_bid, src).copy()
             cur = mesh_at(src_bid, src).copy()
-            _STATES[bid] = OrderedDict([(head, cur)])
+            _STATES[bid] = OrderedDict()
+            _cache_put(bid, head, cur, meta)
         meta["stats"] = _stats(cur, meta["title"])
     except Exception:
         _BASES.pop(bid, None); _STATES.pop(bid, None)
@@ -309,13 +362,25 @@ def check_op_text(op: str, params: dict) -> dict:
 
 
 def _replay_safe(o: dict) -> bool:
-    """Ops stored before the filter existed (or by an older word list) are re-checked when a project is replayed:
-    a text step that no longer passes is skipped instead of being rendered into the mesh and its exports."""
+    """Ops stored before the filter existed (or by an older word list) are re-checked when a project is replayed.
+    A text step that no longer passes is left out of the mesh. mesh_at, the preview and ensure_exports all use
+    this same check, and geometry_revision includes the skipped steps so a cached mesh cannot keep the text."""
     if o.get("op") not in ("text", "cad_text") and not (o.get("op") == "plate" and (o.get("params") or {}).get("action") == "text"):
         return True
     from ..community import safety
     t = o.get("params", {}).get("text", "")
     return isinstance(t, str) and len(t) <= TEXT_MAX and not safety.scan(t)
+
+
+def replay_omissions(meta: dict, head: int | None = None) -> list[str]:
+    """User-visible note when a stored text step is left out of the current mesh. Empty when every step replays."""
+    head = int(meta["head"] if head is None else head)
+    skipped = [i + 1 for i, o in enumerate((meta.get("ops") or [])[:head]) if not _replay_safe(o)]
+    if not skipped:
+        return []
+    nums = ", ".join(str(i) for i in skipped)
+    noun = "step" if len(skipped) == 1 else "steps"
+    return [_REPLAY_PREFIX + f"text {noun} {nums} no longer passes the text check, so it is not in the preview or the export."]
 
 
 def bed_of(meta: dict) -> list:
@@ -401,9 +466,8 @@ def add_op(bid: str, op: str, params: dict) -> dict:
         ops.append({"op": op, "params": params, "label": meshedit.label(op, params)})
         meta["ops"] = ops
         meta["head"] = len(ops)
-        for h in [h for h in _STATES.get(bid, {}) if h > meta["head"] - 1]:
+        for h in [h for h in list(_STATES.get(bid, {})) if h >= meta["head"]]:
             _STATES[bid].pop(h, None)
-        _STATES.setdefault(bid, OrderedDict())[meta["head"]] = new
         meta["stats"] = _stats(new, meta["title"])
         meta["last_report"] = rep
         pl = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < meta["head"]}
@@ -412,6 +476,7 @@ def add_op(bid: str, op: str, params: dict) -> dict:
         elif pl.get(str(meta["head"] - 1)) and len(new.faces) == len(cur.faces):   # move/rotate/scale keep the objects
             pl[str(meta["head"])] = pl[str(meta["head"] - 1)]
         meta["plate_layouts"] = pl
+        _cache_put(bid, meta["head"], new, meta)
         store.save(meta)
         store.cache.pop(bid, None)
     return rep
@@ -438,14 +503,13 @@ def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
                 raise meshedit.OpError(f"Step {k} ({o['label']}) would fail after this change: {e}")
         meta["ops"] = new_ops
         meta["head"] = len(new_ops)
-        _STATES[bid] = OrderedDict([(meta["head"], m)])
         meta["plate_layouts"] = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < i}
+        _STATES[bid] = OrderedDict()
+        _cache_put(bid, meta["head"], m, meta)
         meta["stats"] = _stats(m, meta["title"])
         meta["last_report"] = None
-        # a re-edited step changes the mesh WITHOUT changing head — the exports-staleness
-        # marker (exports_head == head) would otherwise think the files are fresh and
-        # downloads would serve the OLD model. Invalidate it: ensure_exports rewrites.
-        meta["exports_head"] = -1
+        # Freshness is geometry_revision() (the steps, dimensions, plate and skipped text),
+        # not the step index. A rewritten step changes that identity even when head stays put.
         store.save(meta)
         store.cache.pop(bid, None)
     return {"rewritten": i, "steps": len(new_ops)}
@@ -591,6 +655,7 @@ def preview_objects(m: trimesh.Trimesh, layout: dict) -> dict:
 
 
 _GATE_PREFIX = "Fix the model before export: "
+_REPLAY_PREFIX = "Left out of the model: "
 
 
 def export_quality(m: trimesh.Trimesh) -> dict:
