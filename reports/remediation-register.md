@@ -6,6 +6,15 @@ Unmerged work checked before editing: no remote branch named Perplexity (merged 
 
 Batch 1 only. Status values follow the owner brief.
 
+Verification log (this branch, Python 3.12 venv, Playwright not installed):
+
+- `node --test tests/js/worksave.test.mjs` — 7 passed, 0 failed.
+- `python -m pytest -q tests/test_batch1_outputs.py tests/test_worksave_js.py tests/test_b1_edit_text.py tests/test_cad_b8_b9_b12.py tests/test_export_d.py tests/test_plate_editor.py` — 58 passed, 0 failed.
+- `python -m pytest -q` on the CI file list plus `tests/test_cad_workspace.py`, `tests/test_cad_beginner.py`, `tests/test_cad_text.py`, `tests/test_cad_n3.py`, `tests/test_cad_qa_kobi.py`, `tests/test_universal_export.py`, `tests/test_3mf_download.py`, `tests/test_3mf_import.py`, `tests/test_sculpt.py`, `tests/test_parts.py` — 271 passed, 2 skipped, 2 failed. Both failures are `ModuleNotFoundError: playwright` inside `tests/ui_cad_beginner.py` and `tests/ui_cad_text.py`. They were not run as browser tests.
+- Body-index repro: one-off script, described on row B1-6. Not a committed test.
+
+No browser, visual, external-viewer, or printer run.
+
 | ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | B1-1 | Functional / false save | Verified fixed for the storage decision. No browser paint of the indicator. | `ls()` swallowed `setItem` failures and `saveSection` still cleared dirty and returned success. | A full or dropped browser store looked like “Saved”, and the unsaved flag was cleared, so a later reminder or exit would not retry. | `71f4bc5`: `writeRaw` requires the read-back to match. Failure keeps the section dirty and the label is “Not saved”. | `node --test tests/js/worksave.test.mjs`: 7 passed, 0 failed. Includes a thrown `setItem` and a write that does not read back. | No browser pass of the on-screen indicator. |
