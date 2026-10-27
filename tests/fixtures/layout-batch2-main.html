@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>layout batch 2 main</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  #viewCreate { position: relative; width: 900px; height: 700px; }
+  #out { white-space: pre-wrap; font: 14px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<main id="viewCreate">
+  <aside class="controls" id="photoSettings"></aside>
+  <section class="stage">
+    <div id="vtools"><span id="litLightBox" hidden>light</span></div>
+    <div id="result"></div>
+    <section class="history" id="recentBuilds"></section>
+  </section>
+</main>
+<pre id="out">WAIT</pre>
+<script src="/static/wslayout.js"></script>
+<script src="/static/ws-main.js"></script>
+<script>
+setTimeout(function () {
+  var st = window.ZWS && ZWS.all.studio;
+  var extra = {};
+  if (st && (location.hash || "").indexOf("#lithophane") === 0) {
+    st.setHidden("settings", true);
+    var box = document.querySelector("#litLightBox");
+    if (box) box.hidden = false;
+    st.setHidden("history", true);
+    extra = { keys: Object.keys(localStorage), settingsHidden: !!st.state().settings.hidden, historyHidden: !!st.state().history.hidden };
+  }
+  document.querySelector("#out").textContent = JSON.stringify({
+    hash: location.hash,
+    phone: matchMedia("(max-width:820px), (max-height:500px) and (pointer:coarse)").matches,
+    width: innerWidth,
+    height: innerHeight,
+    state: st ? st.state() : null,
+    extra: extra
+  });
+}, 150);
+</script>
+</body>
+</html>
