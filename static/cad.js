@@ -187,11 +187,14 @@ function viewAlong(dir, up = new THREE.Vector3(0, 0, 1)) {
   camera.position.copy(controls.target).addScaledVector(dir.clone().normalize(), d); camera.lookAt(controls.target); controls.update(); invalidate();
 }
 
-/* ---------------------------------------------------------------- back button */
+/* ---------------------------------------------------------------- exit workspace (save the browser draft first; the design itself is already on the server) */
 $("#cwBack")?.addEventListener("click", ev => {
   ev.preventDefault(); ev.stopPropagation();
-  let same = false; try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch {}
-  if (same && history.length > 1) history.back(); else location.href = "/";
+  const go = () => {
+    let same = false; try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch {}
+    if (same && history.length > 1) history.back(); else location.href = "/";
+  };
+  if (window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(go); else go();
 });
 
 /* ---------------------------------------------------------------- view cube (CSS 3D, own design) */
@@ -1683,7 +1686,12 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
   if (from && back && back.startsWith("/") && !back.startsWith("//")) {
     const a = document.createElement("a"); a.className = "backchip cad"; a.id = "backChip"; a.href = back;
     a.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg> Back to ${esc(from)}`;
-    a.addEventListener("click", () => document.dispatchEvent(new CustomEvent("zeim:save-now")));
+    a.addEventListener("click", ev => {
+      ev.preventDefault();
+      const href = a.getAttribute("href");
+      const go = () => { location.href = href; };
+      if (window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(go); else go();
+    });
     document.body.append(a);
   }
 }

@@ -198,7 +198,9 @@ async function renderSlicePanel() {
   const id = E.p.id;
   try { await loadCatalog(); } catch { return; }
   const lithoHint = (E.p.mode === "lithophane" || E.p.base?.photo_mode === "lithophane" || E.p.base?.from_mode === "lithophane") ? "lithophane" : "";
+  if (window.zeimSave && window.zeimSave.hold) window.zeimSave.hold("slicer");
   $("#slicePanel").innerHTML = panelHTML(lithoHint); wirePanel(() => E.p.id);
+  if (window.zeimSave && window.zeimSave.setProject) window.zeimSave.setProject("slicer", id, { restore: true });
   $("#editWill").innerHTML = "";
   try { const r = await checkBuild(id); if (E.p?.id === id) $("#editWill").innerHTML = badgeHTML(r, { detail: true }); } catch { }
 }

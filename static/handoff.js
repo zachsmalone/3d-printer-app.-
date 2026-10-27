@@ -165,7 +165,8 @@ function wireStudioHandoff() {
   };
   save.onclick = () => {
     const ok = window.zeimSave ? !!window.zeimSave.saveNow() : (document.dispatchEvent(new CustomEvent("zeim:save-now")), true);
-    toast(ok ? "Work saved." : "Nothing new to save yet.", ok ? undefined : "err");
+    const why = window.zeimSave && window.zeimSave.lastResult ? window.zeimSave.lastResult() : "";
+    toast(ok ? "Draft saved in this browser." : (why === "failed" ? "Could not store the draft in this browser." : "Nothing new to save yet."), ok ? undefined : "err");
   };
   const go = async (btn, target) => {
     if (btn.disabled) return;
@@ -237,7 +238,12 @@ function backChip() {
   if (!info || Date.now() - (info.t || 0) > 6 * 3600e3 || info.hash === here || !here) { if (c) c.hidden = true; return; }
   if (!c) {
     c = document.createElement("a"); c.id = "backChip"; c.className = "backchip"; document.body.append(c);
-    c.addEventListener("click", () => { document.dispatchEvent(new CustomEvent("zeim:save-now")); ss.del("zeim.back"); });
+    c.addEventListener("click", ev => {
+      const href = c.getAttribute("href");
+      const go = () => { ss.del("zeim.back"); if (href) location.href = href; };
+      if (window.zeimSave && typeof window.zeimSave.leave === "function") { ev.preventDefault(); window.zeimSave.leave(go); }
+      else { document.dispatchEvent(new CustomEvent("zeim:save-now")); ss.del("zeim.back"); }
+    });
   }
   const url = info.url && info.url.startsWith("/") && !info.url.startsWith("//") ? info.url : "#" + info.hash;
   c.href = url; c.hidden = false;

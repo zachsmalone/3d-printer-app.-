@@ -1027,6 +1027,7 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 .safarinote{width:min(560px,calc(100vw - 16px))}
 @media (max-width:768px){.safarinote{top:auto;bottom:calc(var(--tabbar-h,64px) + 44px + env(safe-area-inset-bottom))}}
 .saveind.inline{position:static;opacity:.8;white-space:nowrap}
+.saveind.bad{color:var(--bad,#9a3412);opacity:1;border-color:var(--bad,#9a3412)}
 @media (max-width:768px){.saveslot{display:none}}
 /* E: Send to… */
 .sendlist{list-style:none;margin:8px 0;padding:0;display:grid;gap:8px}
