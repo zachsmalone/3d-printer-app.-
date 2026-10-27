@@ -569,6 +569,7 @@ function renderHistory() {
   while (cards.length < Math.min(S.max, 5)) cards.push(`<li class="hslot">Empty slot</li>`);
   const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap the star to keep one.`;
   $("#histList").innerHTML = cards.join("");
+  document.dispatchEvent(new CustomEvent("zeim:history"));
 }
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 $("#histList").onclick = async e => {
@@ -914,7 +915,7 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert };
+export { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert, showBuild };
 
 /* ---------- Look: Warm (default) or Dark. Remembered on this device; nothing is sent anywhere. ---------- */
 (() => {

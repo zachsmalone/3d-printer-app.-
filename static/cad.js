@@ -5,6 +5,7 @@ import * as THREE from "three";
 import { OrbitControls } from "/static/vendor/OrbitControls.js";
 import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/cad-planes.js";
 import { initLessons } from "/static/cad-lessons.js";
+import { takeExit } from "/static/studio-library.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -191,6 +192,8 @@ function viewAlong(dir, up = new THREE.Vector3(0, 0, 1)) {
 $("#cwBack")?.addEventListener("click", ev => {
   ev.preventDefault(); ev.stopPropagation();
   const go = () => {
+    const home = takeExit(sessionStorage);
+    if (home.url) { location.href = home.url; return; }
     let same = false; try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch {}
     if (same && history.length > 1) history.back(); else location.href = "/";
   };

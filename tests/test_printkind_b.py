@@ -88,7 +88,7 @@ def test_torchc0_beginner_is_simple_and_error_clears(base, w):
 def test_photo_tips_line_and_expander(base, w):
     with sync_playwright() as p:
         b, pg, errs = _page(p, base, w, "fdm")
-        for h in ("#studio", "#lithophane"):
+        for h in ("#create", "#lithophane"):
             pg.goto(base + "/" + h); pg.wait_for_timeout(400)
             t = pg.locator("#viewCreate .phototips:not(#selPanel .phototips)")   # E adds a second tip inside the select-mode panel
             assert t.count() == 1 and t.is_visible()

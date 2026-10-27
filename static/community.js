@@ -1,5 +1,6 @@
-import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showBuild } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
+import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary } from "/static/studio-library.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -47,10 +48,9 @@ async function refreshMe() {
 
 /* ---------- views ---------- */
 const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn" };
-const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", studio: "lithophane", "2d3d": "ai3d" };
-const STUDIO_FROM_ME = { studio: 1, create: 1 };
+const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", "2d3d": "ai3d" };
 function show(view, tab) {
-  const navTab = tab || view;   // #studio / #create keep the Studio page and light Me; Lithophane stays its own tab
+  const navTab = tab || view;
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === navTab); if (b.dataset.view === navTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
   document.body.dataset.view = view;
@@ -71,24 +71,46 @@ function openTool(t) {   // Smart Fix / CAD shortcuts: open the matching tool in
 let toolDone = "";
 document.addEventListener("zeim:edit-loaded", () => { const h = location.hash.split("/"); if (h[1] && toolDone !== location.hash) { toolDone = location.hash; openTool(h[1]); } });
 function paintStudioHome(raw) {
-  const fromMe = !!STUDIO_FROM_ME[raw];
+  let back = null;
+  try { back = JSON.parse(sessionStorage.getItem("zeim.back") || "null"); } catch { back = null; }
+  const fromLib = !!(back && back.from === "mystudio");
   const crumb = $("#studioFromMe");
-  if (crumb) crumb.hidden = !fromMe;
+  if (crumb) crumb.hidden = !(fromLib && (raw === "lithophane" || raw === "create"));
   const note = $("#lithoStudioNote");
   if (note) note.hidden = raw !== "lithophane";
   const expert = document.querySelector("#h1 [data-lvl=expert]");
   if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : "Studio";
-  /* #studio and #lithophane share #viewCreate. Recent builds belong to My Studio only. */
+  /* Saved projects are listed on Account. This block stays hidden so the photo page does not become the library. */
   const recent = $("#recentBuilds");
-  if (recent) recent.hidden = !fromMe;
+  if (recent) recent.hidden = true;
 }
+function paintStudioLibrary() {
+  const host = $("#studioLib");
+  if (!host) return;
+  host.innerHTML = libraryHTML(S.history || [], { currentId: S.current && S.current.id });
+}
+function markLibrary(on) {
+  const link = $("#btnMyStudio");
+  const sec = $("#meStudio");
+  if (link) { if (on) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current"); }
+  if (sec) sec.classList.toggle("on", !!on);
+}
+async function refreshStudioLibrary() {
+  try { await loadHistory(); } catch { paintStudioLibrary(); }
+}
+document.addEventListener("zeim:history", () => paintStudioLibrary());
 function route() {
+  const intent = routeIntent(location.hash);
+  if (intent.library && intent.rewrite && location.hash !== intent.hash) {
+    history.replaceState(null, "", location.pathname + location.search + intent.hash);
+  }
   const h = location.hash.replace("#", "").split("/");
   const raw = h[0];
-  const v = ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase");
-  const fromMe = !!STUDIO_FROM_ME[raw];
-  show(v, fromMe ? "account" : undefined);
-  paintStudioHome(raw);
+  const v = intent.library ? "account" : (ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase"));
+  show(v);
+  paintStudioHome(intent.library ? "account" : raw);
+  markLibrary(!!intent.library);
+  if (intent.library) arriveLibrary(sessionStorage);
   if (v === "lithophane" && raw === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
   if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);
   if (h[0] === "learn" && h[1]) setTimeout(() => openLesson(h[1]), 150);
@@ -96,10 +118,63 @@ function route() {
   else if ($("#dlgProfile")?.open) $("#dlgProfile").close();          // leaving a profile link by tab closes the profile
   if (!(h[0] === "c" && h[1]) && $("#dlgCollection")?.open) $("#dlgCollection").close();
   if (h[0] === "c" && h[1]) setTimeout(() => openCollection(h[1]), 50);
-  if (v === "account") { loadFavorites(); loadCollections(); paintAccountHandle(); }
+  if (v === "account") {
+    loadFavorites(); loadCollections(); paintAccountHandle();
+    refreshStudioLibrary();
+    if (intent.library) {
+      const sec = $("#meStudio");
+      if (sec) setTimeout(() => { try { sec.scrollIntoView({ block: "nearest" }); } catch { /* older browsers */ } }, 0);
+    }
+  }
   else if ($("#dlgCollection")?.open) $("#dlgCollection").close();
 }
 addEventListener("hashchange", route);
+$("#studioLib")?.addEventListener("click", async e => {
+  const b = e.target.closest("[data-lib]");
+  if (!b) return;
+  const id = b.dataset.id;
+  const action = b.dataset.lib;
+  const build = (S.history || []).find(x => x.id === id);
+  if (!build) return;
+  if (action === "send") {
+    document.dispatchEvent(new CustomEvent("zeim:send-build", { detail: build }));
+    return;
+  }
+  if (action === "star") {
+    try {
+      await api(`/api/builds/${id}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: !build.favorite }) });
+      await loadHistory();
+    } catch (err) { toast(err.message, "err"); }
+    return;
+  }
+  if (action === "delete") {
+    const yes = await askConfirm({
+      title: "Delete this project?",
+      message: "This permanently removes the project and its files. This cannot be undone.",
+      okLabel: "Delete this project",
+    });
+    if (!yes) return;
+    try { await api("/api/builds/" + id, { method: "DELETE" }); await loadHistory(); }
+    catch (err) { toast(err.message, "err"); }
+    return;
+  }
+  if (action !== "open" && action !== "edit") return;
+  const opened = openFromLibrary(build, action, sessionStorage);
+  const plan = opened.plan;
+  if (!plan) return;
+  if (plan.view === "cad") { location.href = plan.url; return; }
+  if (plan.hash) location.hash = plan.hash.replace(/^#/, "");
+  if (plan.open === "edit") document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: plan.id }));
+  else if (plan.open === "from-build") document.dispatchEvent(new CustomEvent("zeim:edit-from-build", { detail: plan.id }));
+  else if (plan.open === "build") {
+    try {
+      const r = await api("/api/builds/" + plan.id);
+      S.mode = r.mode;
+      applyMode();
+      showBuild(r);
+    } catch (err) { toast(err.message, "err"); }
+  }
+});
 
 /* ---------- account ---------- */
 function openAccount(focus) {
@@ -847,7 +922,7 @@ async function openLesson(id) {
   $("#lsClose").onclick = () => { box.hidden = true; loadLearn(); };
   $("#lsCopy").onclick = () => { navigator.clipboard?.writeText(location.origin + l.share_url); toast("Link copied", "ok"); };
   $$("[data-step]", box).forEach(c => c.onchange = async () => { await api(`/api/learn/lessons/${id}/steps/${c.dataset.step}`, J("POST", { done: c.checked })); openLesson(id); });
-  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = "studio"; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
+  $("#lsTry").onclick = () => { S.mode = l.try.mode; S.preset = l.try.preset; location.hash = "create"; $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); }); applyMode(); $("#sSample").click(); toast("Sample photo loaded", "ok"); };
 }
 
 
