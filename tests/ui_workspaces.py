@@ -77,7 +77,10 @@ with sync_playwright() as p:
             pg.wait_for_selector("#sSample", timeout=20000); pg.click("#sSample"); pg.wait_for_selector("#result:not([hidden])", state="attached", timeout=90000); pg.wait_for_timeout(800)
         pg.goto(U + "/#studio"); studio()
         pg.evaluate("localStorage.clear()"); pg.reload(); studio()
-        ws_key = pg.evaluate("ZWS.all.studio && (document.querySelector('#litLightBox').hidden ? 'studio' : 'litho')")
+        ws_key = pg.evaluate("""() => {
+          var raw = (location.hash || "").replace(/^#/, "").split(/[/?]/)[0];
+          return raw === "lithophane" ? "litho" : "studio";
+        }""")
         g = check_geom(pg, f"{sz} {ws_key}", "#viewCreate", "#viewer")
         if SHOT: pg.screenshot(path=os.path.join(SHOT, f"ws_{ws_key}_{sz}.png"))
         ok(f"{sz} {ws_key}: Send or save and Print are on screen", pg.is_visible("#btnSendSheet") or pg.is_visible("#zws-result .zws-chip"))

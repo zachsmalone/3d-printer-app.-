@@ -48,17 +48,17 @@
   /* ---------- every panel floats over the full-size view (wslayout.js) */
   var fit = $("#cwHome"), chips = $(".cw-chips"), tool = $("#cwTool");
   function stageInset() { var m = main.getBoundingClientRect(), r = stage.getBoundingClientRect(); return { l: r.left - m.left, t: r.top - m.top, r: m.right - r.right, b: m.bottom - r.bottom }; }
-  var ph = PHONE.matches;
+  function phone() { return PHONE.matches; }
   var ws = window.ZWS && ZWS.create({ id: "cad", root: main, btnClass: "cw-btn zws-cw",
     customise: $(".cw-top"), inset: function () { return PHONE.matches ? stageInset() : { l: 0, t: 0, r: 0, b: 0 }; },
     obstacles: ["#cwStage .cw-cubewrap", "#cwSectionBar", "#cwStage > .cw-lesson", "#cwStage > .cw-hint", "#cwEmpty", ".cw-warn", ".cw-modepop", ".cw-phone #cwSide", ".cw-phone #cwSide[data-sheet=peek] > #cwLesson", ".cw-phone #cwSide > .cw-msg:not(:empty)"],
     watch: ["#cwSectionBar", "#cwHint", "#cwLesson", "#cwSide", "#cwEmpty"],
     panels: [
-      { id: "tools", el: rail, label: "Tools", core: true, def: { edge: "left", t: 0 }, resize: false, bare: true },
-      { id: "tool", el: tool, core: true, label: "Tool options", def: { edge: ph ? "bottom" : "left", t: ph ? 0 : 0.2 } },
-      { id: "quick", el: bl, label: "Quick buttons", def: { edge: "bottom", t: 0 }, resize: false, bare: true },
-      { id: "view", el: chips, label: "Grid & snap", def: { edge: "right", t: 0.35, hidden: ph }, resize: false, bare: true },
-      { id: "side", el: side, label: "History & items", def: { edge: "right", t: 1 }, skip: function () { return PHONE.matches; } }
+      { id: "tools", el: rail, label: "Tools", core: true, def: function () { return { edge: "left", t: 0 }; }, resize: false, bare: true },
+      { id: "tool", el: tool, core: true, label: "Tool options", def: function () { return phone() ? { edge: "bottom", t: 0 } : { edge: "left", t: 0.2 }; } },
+      { id: "quick", el: bl, label: "Quick buttons", def: function () { return { edge: "bottom", t: 0 }; }, resize: false, bare: true },
+      { id: "view", el: chips, label: "Grid & snap", def: function () { return { edge: "right", t: 0.35, hidden: phone() }; }, resize: false, bare: true },
+      { id: "side", el: side, label: "History & items", def: function () { return { edge: "right", t: 1 }; }, skip: function () { return PHONE.matches; } }
     ] });
   function layout() { if (ws) ws.layout(); }
 

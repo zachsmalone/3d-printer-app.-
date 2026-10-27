@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>layout batch 2</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  html, body { margin: 0; }
+  #root { position: relative; width: 800px; height: 600px; background: #111; }
+  #settings .fill { width: 300px; height: 900px; background: #345; }
+  #result .fill { width: 280px; height: 320px; background: #543; }
+  #undo { display: flex; gap: 4px; width: max-content; }
+  .zws-p.v #undo { flex-direction: column; }
+  #undo button { width: 72px; height: 36px; }
+  #obstacle { position: absolute; left: 40px; top: 80px; width: 220px; height: 200px; background: rgba(255,40,40,.45); }
+  #out { white-space: pre-wrap; font: 14px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="obstacle" hidden></div>
+  <div id="settings"><div class="fill"></div></div>
+  <div id="result"><div class="fill"></div></div>
+  <div id="undo"><button type="button">Turn</button><button type="button">Light</button><button type="button">Reset</button></div>
+</div>
+<pre id="out">WAIT</pre>
+<script src="/static/wslayout.js"></script>
+<script>
+(async function () {
+  const fails = [];
+  const notes = [];
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  function check(ok, msg) { (ok ? notes : fails).push(msg); }
+  function box(el) {
+    const r = el.getBoundingClientRect();
+    return { x: r.left, y: r.top, r: r.right, b: r.bottom, w: r.width, h: r.height };
+  }
+  function hit(a, b) { return a.x < b.r - 1 && b.x < a.r - 1 && a.y < b.b - 1 && b.y < a.b - 1; }
+  function panels() {
+    return [...document.querySelectorAll("#root > .zws-p")].filter((el) => !el.hidden && el.offsetWidth);
+  }
+  function report(list) {
+    return list.map((el) => ({
+      id: el.id,
+      edge: el.dataset.edge,
+      fit: el.dataset.fit || "",
+      blocked: el.dataset.blocked || "",
+      min: el.classList.contains("min"),
+      autoMin: el.classList.contains("auto-min"),
+      autoOff: el.classList.contains("auto-off"),
+      crowded: el.dataset.crowded || "",
+      h: Math.round(el.getBoundingClientRect().height),
+      w: Math.round(el.getBoundingClientRect().width),
+    }));
+  }
+  function overlaps(list) {
+    const bad = [];
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      if (hit(box(list[i]), box(list[j]))) bad.push(list[i].id + "/" + list[j].id);
+    }
+    return bad;
+  }
+  const root = document.querySelector("#root");
+  const ws = ZWS.create({
+    id: "geom",
+    root: root,
+    customise: root,
+    obstacles: ["#obstacle", "#root > .zws-cust"],
+    panels: [
+      { id: "settings", el: document.querySelector("#settings"), label: "Photo & settings", def: { edge: "left", t: 0 } },
+      { id: "result", el: document.querySelector("#result"), label: "Export & print", core: true, def: { edge: "right", t: 0.2 } },
+      { id: "undo", el: document.querySelector("#undo"), label: "Undo & view", core: true, def: { edge: "top", t: 0 }, resize: false, bare: true },
+    ],
+  });
+  await sleep(80);
+  let ps = panels();
+  check(ps.length === 3, "desktop shows 3 panels " + report(ps).map((p) => p.id).join(","));
+  check(ps.every((el) => !el.classList.contains("auto-min") && !el.classList.contains("auto-off") && el.dataset.crowded !== "1"), "desktop does not auto-min, auto-off, or crowd " + JSON.stringify(report(ps)));
+  check(!overlaps(ps).length, "desktop panels do not overlap " + overlaps(ps).join(","));
+  const settingsEl = document.querySelector("#zws-settings");
+  check(settingsEl.getBoundingClientRect().height > 500, "desktop settings keep a tall band " + Math.round(settingsEl.getBoundingClientRect().height));
+  check(document.querySelector("#zws-undo").dataset.edge === "top", "desktop undo stays on the top edge");
+  check(!ws.state().result.min && !ws.state().settings.min, "desktop defaults stay expanded");
+
+  document.querySelector("#obstacle").hidden = false;
+  ws.layout();
+  await sleep(80);
+  ps = panels();
+  const ob = box(document.querySelector("#obstacle"));
+  const covered = ps.filter((el) => hit(box(el), ob)).map((el) => el.id);
+  check(!covered.length, "panels move off the obstacle " + covered.join(","));
+  check(!overlaps(ps).length, "obstacle pass does not overlap panels " + overlaps(ps).join(","));
+  check(ps.every((el) => !el.classList.contains("auto-min") && !el.classList.contains("auto-off")), "obstacle pass does not hide panels " + JSON.stringify(report(ps)));
+  check(ps.some((el) => el.id === "zws-result") && ps.some((el) => el.id === "zws-settings"), "export and settings stay on screen");
+
+  const handle = document.querySelector("#zws-settings .zws-rs");
+  const before = box(settingsEl);
+  handle.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: before.r - 4, clientY: before.b - 4, pointerId: 1 }));
+  handle.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: before.r + 80, clientY: before.b - 200, pointerId: 1 }));
+  handle.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: before.r + 80, clientY: before.b - 200, pointerId: 1 }));
+  const sized = ws.state().settings;
+  await sleep(80);
+  check(sized.userSize === true, "resize stores a user size");
+  check(!hit(box(document.querySelector("#zws-settings")), ob), "user-sized panel is not left on the obstacle");
+  check(ws.state().settings.userSize === true && ws.state().settings.w === sized.w && ws.state().settings.h === sized.h, "moving off the obstacle keeps the saved user size " + JSON.stringify(ws.state().settings));
+
+  const edge0 = ws.state().undo.edge;
+  document.querySelector("#zws-undo .zws-grip").click();
+  await sleep(40);
+  check(ws.state().undo.edge !== edge0, "grip docks the undo bar to another side");
+  ws.reset();
+  await sleep(40);
+  check(ws.state().undo.edge === "top", "reset restores the undo side (" + ws.state().undo.edge + ")");
+  check(ws.state().settings.edge === "left" && !ws.state().settings.userSize, "reset clears the user size and the settings side");
+  check(ws.state().result.edge === "right" && !ws.state().result.min, "reset keeps export expanded on the right");
+  const leftover = Object.keys(localStorage).filter((k) => k.indexOf("zeim.ws.") === 0);
+  check(!leftover.length, "reset removes saved layout keys " + leftover.join(","));
+
+  document.querySelector("#zws-result .zws-min").click();
+  await sleep(40);
+  check(document.querySelector("#zws-result").classList.contains("min"), "minimise is explicit");
+  document.querySelector("#zws-result .zws-chip").click();
+  await sleep(40);
+  check(!document.querySelector("#zws-result").classList.contains("min"), "opening the chip restores export");
+  check(!document.querySelector("#zws-settings").classList.contains("min") && !document.querySelector("#zws-settings").classList.contains("auto-min"), "opening export does not minimise settings");
+  check(!document.querySelector("#zws-undo").classList.contains("auto-min") && !document.querySelector("#zws-undo").classList.contains("auto-off"), "opening export does not hide undo");
+
+  ws.reset();
+  await sleep(20);
+  root.style.width = "360px";
+  root.style.height = "640px";
+  document.querySelector("#obstacle").hidden = true;
+  ws.layout();
+  await sleep(80);
+  ps = panels();
+  check(ps.length === 3, "narrow root keeps every panel " + report(ps).map((p) => p.id + ":" + p.h).join(","));
+  check(!overlaps(ps).length, "narrow root panels do not overlap " + overlaps(ps).join(",") + " " + JSON.stringify(report(ps)));
+  check(ps.every((el) => !el.classList.contains("auto-min") && !el.classList.contains("auto-off") && el.dataset.crowded !== "1"), "narrow root does not auto-hide " + JSON.stringify(report(ps)));
+  const narrowResult = document.querySelector("#zws-result").getBoundingClientRect();
+  check(narrowResult.height >= 120, "export keeps a usable height on a narrow root " + Math.round(narrowResult.height));
+
+  ws.destroy();
+  await sleep(30);
+  check(!root.classList.contains("zws"), "destroy removes the workspace");
+  window.dispatchEvent(new Event("resize"));
+  await sleep(40);
+  check(!root.classList.contains("zws"), "a resize after destroy does not bring the workspace back");
+
+  document.querySelector("#out").textContent = JSON.stringify({ fails: fails, notes: notes });
+})().catch((e) => {
+  document.querySelector("#out").textContent = JSON.stringify({ fails: [String(e && e.stack || e)], notes: [] });
+});
+</script>
+</body>
+</html>

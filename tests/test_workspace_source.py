@@ -9,8 +9,11 @@ def test_wslayout_keeps_layout_strings_and_adds_remove_resize():
         "watchObstacles();",
         "undo the trial edges' classes",
         "chipPri",
-        "a core panel only yields to a panel the user just opened from its chip",
+        "layout does not minimise or hide another panel",
         "a core panel never steps aside",
     ):
         assert s in js
     assert "userSize" in js and 'data-dir="n"' in js and "Remove" in js and "interacting" in js
+    assert 'classList.add("min", "auto-min")' not in js
+    assert 'classList.add("auto-off")' not in js
+    assert 'dataset.crowded = "1"' not in js

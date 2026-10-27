@@ -31,27 +31,34 @@
     root.addEventListener("zws:layout", function () { document.body.classList.toggle("zws-on", !!document.querySelector("main.zws:not([hidden])")); });
     return ws;
   }
-  var ph = PHONE.matches;
-  /* Studio and Lithophane share a view: the lithophane light box tells them apart, and each keeps its own layout.
-     Recent builds (#recentBuilds) are shown only for My Studio; this panel follows that hidden flag. */
-  var litho = function () { var b = $("#litLightBox"); return !!b && !b.hidden; };
-  var studio = make({ id: "studio", key: function () { return litho() ? "litho" : "studio"; }, title: function () { return litho() ? "Lithophane" : "Studio"; },
+  function phone() { return PHONE.matches; }
+  /* Studio (#studio / #create) and Lithophane (#lithophane) share #viewCreate and each keep a layout.
+     The route is the identity. The light box only shows lithophane preview controls; opening it must not
+     swap the saved layout. Recent builds (#recentBuilds) stay on My Studio via that element's hidden flag.
+     Defaults are read at layout time so a resize across the phone breakpoint is not stuck on the first paint. */
+  function studioRoute() {
+    var raw = (location.hash || "").replace(/^#/, "").split(/[/?]/)[0];
+    return raw === "lithophane" ? "litho" : "studio";
+  }
+  var lastKey = studioRoute();
+  var studio = make({ id: "studio", key: function () { return studioRoute(); }, title: function () { return studioRoute() === "litho" ? "Lithophane" : "Studio"; },
     root: "#viewCreate", active: function () { return vis($("#result")); },
     watch: ["#result", "#litLightBox", "#viewCreate"], obstacles: ["#busy:not([hidden])"],
     panels: [
-      { id: "result", el: "#result", label: "Export & print", core: true, def: ph ? { edge: "bottom", t: 0.5, h: Math.round(innerHeight * 0.42) } : { edge: "right", t: 0.3 } },
-      { id: "view", el: "#vtools", label: "View & light", def: { edge: "top", t: 0 }, resize: false, bare: true },
-      { id: "settings", el: "#viewCreate > aside.controls", label: "Photo & settings", def: { edge: "left", t: 0, min: ph } },
-      { id: "history", el: "#viewCreate .stage > .history", label: "Recent builds", def: { edge: "right", t: 0, hidden: ph, min: !ph } }
+      { id: "result", el: "#result", label: "Export & print", core: true, def: function () { return phone() ? { edge: "bottom", t: 0.5, h: Math.round(innerHeight * 0.42) } : { edge: "right", t: 0.3 }; } },
+      { id: "view", el: "#vtools", label: "View & light", def: function () { return { edge: "top", t: 0 }; }, resize: false, bare: true },
+      { id: "settings", el: "#viewCreate > aside.controls", label: "Photo & settings", def: function () { return { edge: "left", t: 0, min: phone() }; } },
+      { id: "history", el: "#viewCreate .stage > .history", label: "Recent builds", def: function () { return { edge: "right", t: 0, hidden: phone(), min: !phone() }; } }
     ] });
-  var lastKey = null;
-  if (studio) { var lb = $("#litLightBox"); if (lb) new MutationObserver(function () { var k = litho(); if (k !== lastKey) { lastKey = k; studio.rekey(); } }).observe(lb, { attributes: true, attributeFilter: ["hidden"] }); }
+  if (studio) window.addEventListener("hashchange", function () {
+    var k = studioRoute(); if (k === lastKey) return; lastKey = k; studio.rekey();
+  });
   make({ id: "slicer", title: "FDM Slicer", root: "#viewEdit", active: function () { return vis($("#editResult")); },
     watch: ["#editResult", "#viewEdit"], obstacles: ["#editBusy:not([hidden])", "#eMeasureOut:not([hidden])"],
     panels: [
-      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, def: { edge: "top", t: 0 }, resize: false, bare: true },
-      { id: "tools", el: "#editSide", label: "Tools", core: true, def: { edge: "left", t: 0, min: ph } },
-      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, def: { edge: "right", t: 0, min: ph } }
+      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, def: function () { return { edge: "top", t: 0 }; }, resize: false, bare: true },
+      { id: "tools", el: "#editSide", label: "Tools", core: true, def: function () { return { edge: "left", t: 0, min: phone() }; } },
+      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, def: function () { return { edge: "right", t: 0, min: phone() }; } }
     ] });
   /* TorchC0: the result view moves out of the results card to become the background */
   var tRoot = $("#viewTorch"), tOut = $("#torchOut");
@@ -61,8 +68,8 @@
   var torch = make({ id: "torchc0", title: "TorchC0", root: "#viewTorch", active: function () { return !!tRoot && !tRoot.hidden && !!$("#rzView"); },
     watch: ["#torchOut"], watchChildren: true,
     panels: [
-      { id: "out", el: "#torchOut", label: "Result & downloads", core: true, def: { edge: "right", t: 0, min: ph } },
-      { id: "settings", el: "#torchPanel", label: "Resin settings", def: { edge: "left", t: 0, min: ph } }
+      { id: "out", el: "#torchOut", label: "Result & downloads", core: true, def: function () { return { edge: "right", t: 0, min: phone() }; } },
+      { id: "settings", el: "#torchPanel", label: "Resin settings", def: function () { return { edge: "left", t: 0, min: phone() }; } }
     ] });
   if (torch && tOut) new MutationObserver(function () { var v = $("#rzView"); if (v && v.parentElement === tOut) { torch.setHidden("out", false); requestAnimationFrame(torchView); } }).observe(tOut, { childList: true });
   if (tRoot) tRoot.addEventListener("zws:layout", torchView);
