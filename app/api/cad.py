@@ -136,7 +136,9 @@ def _edit(bid, actor, owner_only=False):
 @router.get("/{bid}/bodies")
 def bodies(bid: str, actor: Actor = Depends(get_actor)):
     meta = _edit(bid, actor)
-    return {"bodies": cadops.body_info(editproj.mesh_at(bid, meta)), "appearance": meta.get("appearance") or {}}
+    mesh = editproj.mesh_at(bid, meta)
+    return {"bodies": cadops.body_info(mesh),
+            "appearance": cadops.appearance_for_viewer(meta.get("appearance") or {}, mesh)}
 
 
 @router.put("/{bid}/step/{i}/name")
@@ -169,18 +171,24 @@ def appearance(bid: str, body: dict, actor: Actor = Depends(get_actor)):
         raise HTTPException(400, "bodies must be an object of up to 64 entries.")
     out = {}
     for k, v in raw.items():
-        if not str(k).isdigit() or not isinstance(v, dict):
-            raise HTTPException(400, "Use body numbers as keys.")
+        key = str(k)
+        if not (key.isdigit() or cadops._BODY_ID.match(key)) or not isinstance(v, dict):
+            raise HTTPException(400, "Use a body id or a body number.")
         c, f = v.get("color", "#9aa4b8"), v.get("finish", "satin")
         if not isinstance(c, str) or not _HEX.match(c) or f not in FINISHES:
             raise HTTPException(400, f"color must be #rrggbb and finish one of {list(FINISHES)}.")
-        out[str(int(k))] = {"color": c.lower(), "finish": f}
+        out[key if not key.isdigit() else str(int(key))] = {"color": c.lower(), "finish": f}
     with store.lock:
         meta = store.get(bid)
-        meta["appearance"] = out
+        mesh = editproj.mesh_at(bid, meta)
+        try:
+            stored = cadops.bind_appearance(out, mesh, strict=True)
+        except meshedit.OpError as e:
+            raise HTTPException(400, str(e))
+        meta["appearance"] = stored
         store.save(meta)
         store.cache.pop(bid, None)
-    return {"appearance": out}
+    return {"appearance": cadops.appearance_for_viewer(stored, mesh)}
 
 
 MAX_SCENE_FACES = 200_000
@@ -269,7 +277,8 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
     if simplified and shown > MAX_SCENE_FACES:
         raise _too_big(real_n)
     p = editproj.payload(bid)
-    return {"id": bid, "title": meta.get("title"), "bodies": out, "appearance": meta.get("appearance") or {},
+    return {"id": bid, "title": meta.get("title"), "bodies": out,
+            "appearance": cadops.appearance_for_viewer(meta.get("appearance") or {}, m),
             "ops": p["ops"], "head": p["head"], "can_undo": p["can_undo"], "can_redo": p["can_redo"],
             "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode")},
             "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")},

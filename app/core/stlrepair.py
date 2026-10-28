@@ -2,7 +2,8 @@
 
 Built on meshedit (trimesh / numpy, MIT; hole fill = meshedit's minimum-area patch, QA B7). No GPL code: nothing
 here is taken from admesh, MeshLab or PrusaSlicer. Pure function of the bytes, so it can run in core/guard.py's
-memory-capped child. CAD behaviour is untouched (only meshedit.op_repair / load_mesh are *called*).
+memory-capped child. Geometry is the same repair as before. Body ids already on the mesh are kept
+for shells that remain (cadops.preserve_body_ids); a file with no ids is unchanged aside from the fix.
 Duplicates are matched on sorted vertex ids, so a back-to-back (double-sided) copy counts as a duplicate."""
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ import io
 import numpy as np
 import trimesh
 
-from . import exporters, meshedit
+from . import cadops, exporters, meshedit
 from .geometry import Body, Model
 from .meshedit import OpError
 
@@ -84,8 +85,12 @@ def overlapping_shells(m: trimesh.Trimesh) -> bool:
 def repair_mesh(m: trimesh.Trimesh) -> tuple[trimesh.Trimesh, dict]:
     if len(m.faces) == 0:
         raise OpError("The file has no triangles.")
+    source = m
     before = _health(m)
+    src_ids = cadops._face_ids(m)
     m = trimesh.Trimesh(np.asarray(m.vertices, float), np.asarray(m.faces, np.int64), process=False)
+    if src_ids is not None and len(src_ids) == len(m.faces):
+        m.face_attributes[cadops.BODY_ATTR] = np.array(src_ids, np.int64, copy=True)
     m.merge_vertices()
     n0 = len(m.faces)
     m.update_faces(m.unique_faces()); dup = n0 - len(m.faces)
@@ -126,6 +131,8 @@ def repair_mesh(m: trimesh.Trimesh) -> tuple[trimesh.Trimesh, dict]:
     report["notes"] = []                                  # informational, dismissible, never block
     if overlapping_shells(out):
         report["notes"].append({"code": "overlapping_bodies", "text": OVERLAP_NOTE, "dismissible": True})
+    # Face ids ride through the filters above. New patch faces pick up the id of the body they closed.
+    out = cadops.preserve_body_ids(source, out)
     return out, report
 
 
