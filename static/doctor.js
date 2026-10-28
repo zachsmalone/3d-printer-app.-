@@ -2,7 +2,7 @@
    plain words with the real PrusaSlicer setting names. Nothing changes by itself: "Use in my next slice" asks first
    (before -> after), then the Slicer panel shows the change with an Undo. */
 import { api, esc, $, $$, askConfirm, toast } from "/static/app.js";
-import { P, loadCatalog, prefLabel } from "/static/printer.js";
+import { P, loadCatalog, troubleshootingPrinterLabel } from "/static/printer.js";
 
 const KEY = "zeim.smartfix.apply";
 let PROBS = null;
@@ -16,7 +16,7 @@ function fixHTML(f, pi, fi) {
 function render(r) {
   const out = $("#docOut");
   if (!r.matched) { out.innerHTML = `<p role="status">${esc(r.help)}</p>`; return; }
-  out.innerHTML = `<p class="help" role="status">${esc(r.estimate_note)}${r.photo?.note ? " " + esc(r.photo.note) : ""}</p>` +
+  out.innerHTML = `<p class="help" role="status">${esc(r.printer_honesty || "")} ${esc(r.estimate_note)}${r.photo?.note ? " " + esc(r.photo.note) : ""}</p>` +
     r.problems.map((p, pi) => `<section class="docfix" aria-labelledby="dp_${pi}"><h3 id="dp_${pi}">${esc(p.name)}</h3>
       <p class="help">Looks like: ${esc(p.symptoms.join(", "))}.</p>${p.printer_note ? `<p class="help">Your printer: ${esc(p.printer_note)}</p>` : ""}
       <ul>${p.fixes.map((f, fi) => fixHTML(f, pi, fi)).join("")}</ul></section>`).join("") +
@@ -39,7 +39,8 @@ async function go() {
   const fd = new FormData(), picked = $$("#docSyms input:checked").map(x => x.value), f = $("#docPhoto").files[0];
   fd.append("problems", picked.join(",")); fd.append("text", $("#docText").value);
   if (f) { fd.append("photo", f); fd.append("photo_ack", $("#docAck").checked); }
-  fd.append("printer_id", P.pref.printer_id); if (P.pref.nozzle) fd.append("nozzle", P.pref.nozzle); fd.append("material", $("#docMat").value);
+  if (P.chosen) { fd.append("printer_id", P.pref.printer_id); if (P.pref.nozzle) fd.append("nozzle", P.pref.nozzle); }
+  fd.append("material", $("#docMat").value);
   $("#docOut").innerHTML = `<p class="help">Looking…</p>`;
   try { render(await api("/api/doctor/diagnose", { method: "POST", body: fd })); }
   catch (e) { $("#docOut").innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`; }
@@ -53,7 +54,7 @@ async function openDoctor() {
     $("#docSyms").innerHTML = `<legend>What went wrong? <em>pick any</em></legend>` +
       PROBS.map(p => `<label title="${esc(p.symptoms.join(", "))}"><input type="checkbox" value="${esc(p.id)}"> ${esc(p.name)}</label>`).join("");
     $("#docMat").innerHTML = Object.keys(P.cat.materials).map(m => `<option>${esc(m)}</option>`).join("");
-    $("#docPrinter").textContent = prefLabel();
+    $("#docPrinter").textContent = troubleshootingPrinterLabel();
     $("#docPhoto").onchange = () => {
       const f = $("#docPhoto").files[0], img = $("#docPrev");
       if (img.src) URL.revokeObjectURL(img.src);
@@ -69,4 +70,4 @@ const b = $("#docOpen");
 if (b) b.onclick = openDoctor;
 if (location.hash === "#smartfix/doctor") setTimeout(openDoctor, 300);
 addEventListener("hashchange", () => { if (location.hash === "#smartfix/doctor") openDoctor(); });
-document.addEventListener("zeim:printer", () => { if ($("#docPrinter")) $("#docPrinter").textContent = prefLabel(); });
+document.addEventListener("zeim:printer", () => { if ($("#docPrinter")) $("#docPrinter").textContent = troubleshootingPrinterLabel(); });

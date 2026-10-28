@@ -193,6 +193,13 @@ def diagnose(picked: list[str], text: str, printer_id=None, nozzle=None, materia
             note = notes.get(fam) if fam else None
         res.append({"id": p["id"], "name": p["name"], "symptoms": p["symptoms"], "printer_note": note,
                     "fixes": [_fix(f, ctx) for f in p["fixes"]], "sources": p.get("sources", [])})
+    if ctx:
+        printer_honesty = (f"Printer notes use the catalog profile for {ctx['printer']['name']}. "
+                           "ZEIM is not connected to that printer, and it does not read a failure photo.")
+    else:
+        printer_honesty = ("No saved printer was included, so these fixes are general. "
+                           "They are not for one machine, and ZEIM does not read a failure photo.")
     return {"problems": res, "matched": bool(res), "estimate_note": ESTIMATE,
             "printer": ctx["printer"]["name"] if ctx else None,
+            "printer_honesty": printer_honesty,
             "help": None if res else "We couldn't match that yet. Pick the closest problem from the list, or describe what you see (for example 'strings between parts' or 'corners lift')."}

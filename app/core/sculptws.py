@@ -5,15 +5,17 @@ apps are documented to behave (e.g. Nomad Sculpt, Blender sculpt mode); no code 
 A stroke = the dab centres the user dragged over (surface points), the surface normal at the start,
 brush, radius, strength, optional X symmetry and (grab) a move vector. Replaying the step re-applies
 the same dabs, so strokes stay in History with undo/redo/delete like every other step.
-Limits: the brush is a sphere in space (thin walls: the back side moves too); "remesh" is uniform
-subdivision to a target edge length (no dynamic topology while stroking).
+Limits: the brush is a sphere, but only vertices facing the stroke normal move. The back
+of a thin wall stays put. A stroke that would fold a touched face, or move a vertex outside
+the brush, is refused and the model is left unchanged. "remesh" is uniform subdivision to a
+target edge length (no dynamic topology while stroking). It does not build a new surface.
 """
 from __future__ import annotations
 
 import numpy as np
 import trimesh
 
-from .meshedit import OpError, _new
+from .meshedit import OpError, _check, _new
 
 BRUSHES = ("draw", "carve", "smooth", "inflate", "pinch", "flatten", "grab")
 MAX_VERTS = 400_000
@@ -50,6 +52,71 @@ def _neighbours(m):
     return A, deg
 
 
+def _outside_brush(pts, dabs, radius, sym, cx):
+    """Vertices farther than the brush from every dab (and from the mirrored dabs)."""
+    d = np.linalg.norm(pts[:, None, :] - dabs[None, :, :], axis=2).min(axis=1)
+    inside = d <= radius + 1e-4
+    if sym:
+        mir = pts.copy()
+        mir[:, 0] = 2 * cx - mir[:, 0]
+        d2 = np.linalg.norm(mir[:, None, :] - dabs[None, :, :], axis=2).min(axis=1)
+        inside |= d2 <= radius + 1e-4
+    return ~inside
+
+
+def _clamp_thin_wall(v, v0, vn, n_stroke, min_wall=0.4, reach=8.0):
+    """Hold a move that would pinch a nearby back face below min_wall mm. Returns how many were held."""
+    moved = np.nonzero(np.linalg.norm(v - v0, axis=1) > 1e-8)[0]
+    if not len(moved):
+        return 0
+    back = np.nonzero(vn @ n_stroke < -0.2)[0]
+    if not len(back):
+        return 0
+    from scipy.spatial import cKDTree
+    dist, j = cKDTree(v0[back]).query(v0[moved])
+    near = dist < reach
+    partner = v0[back][j]
+    sep = np.linalg.norm(v[moved] - partner, axis=1)
+    bad = near & (dist + 1e-9 >= min_wall) & (sep < min_wall)
+    if not bad.any():
+        return 0
+    p0 = v0[moved][bad]
+    delta = v[moved][bad] - p0
+    q = partner[bad]
+    a = np.einsum("ij,ij->i", delta, delta)
+    b = 2 * np.einsum("ij,ij->i", p0 - q, delta)
+    c = np.einsum("ij,ij->i", p0 - q, p0 - q) - min_wall ** 2
+    disc = b * b - 4 * a * c
+    ok = (a > 1e-12) & (disc >= 0)
+    root = np.sqrt(np.maximum(disc, 0.0))
+    denom = 2 * np.maximum(a, 1e-12)
+    s1 = np.where(ok, (-b - root) / denom, np.nan)
+    s2 = np.where(ok, (-b + root) / denom, np.nan)
+    s1 = np.where((s1 >= 0) & (s1 <= 1), s1, np.nan)
+    s2 = np.where((s2 >= 0) & (s2 <= 1), s2, np.nan)
+    s = np.nanmin(np.vstack([s1, s2]), axis=0)
+    s = np.where(np.isfinite(s), s, 0.0)
+    v[moved[np.nonzero(bad)[0]]] = p0 + s[:, None] * delta
+    return int(bad.sum())
+
+
+def _folded(v, faces, old_fn, touched):
+    """Degenerate or flipped faces among faces the stroke touched."""
+    if not touched.any():
+        return 0
+    sel = touched[faces].any(axis=1)
+    if not sel.any():
+        return 0
+    f = faces[sel]
+    tri = v[f]
+    new_fn = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+    area = np.linalg.norm(new_fn, axis=1)
+    degenerate = area < 1e-12
+    live = ~degenerate
+    flipped = live & (np.einsum("ij,ij->i", new_fn, old_fn[sel]) < 0)
+    return int(degenerate.sum() + flipped.sum())
+
+
 def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
     brush = p.get("brush")
     if brush not in BRUSHES:
@@ -71,6 +138,10 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
     cx = float(p["sym_x"]) if isinstance(p.get("sym_x"), (int, float)) and np.isfinite(p["sym_x"]) else float(mm.bounds.mean(axis=0)[0])
     M = np.array([-1.0, 1, 1])
     nb = {}
+    base_vn = trimesh.Trimesh(v0, mm.faces, process=False).vertex_normals
+    touched = np.zeros(len(v0), dtype=bool)
+    tri0 = v0[mm.faces]
+    old_fn = np.cross(tri0[:, 1] - tri0[:, 0], tri0[:, 2] - tri0[:, 0])
 
     def run(D, n, g):
         v = v0.copy()
@@ -78,8 +149,12 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
         for c in D:
             d = np.linalg.norm(v - c, axis=1)
             idx = np.nonzero(d < r)[0]
+            # Front of the stroke only. A thin wall's back face points the other way and stays put.
+            if len(idx):
+                idx = idx[(base_vn[idx] @ n) > 0.2]
             if not len(idx):
                 continue
+            touched[idx] = True
             w = (1 - (d[idx] / r) ** 2) ** 2 * s
             if brush in ("draw", "carve"):
                 v[idx] += np.outer(w, n) * (0.15 * r) * (1 if brush == "draw" else -1)
@@ -116,8 +191,31 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
         dm[ok] = d1[j[ok]] * M
         d1 = d1 + dm
     v = v0 + d1
-    out = _new(v, mm.faces)
-    return out, {"message": f"{brush.title()} stroke ({len(dabs)} dabs, {r:g} mm brush{', X symmetry' if p.get('symmetry_x') else ''})."}
+    clamped = _clamp_thin_wall(v, v0, base_vn, n0)
+    # A small margin: a symmetry partner can sit just past the brush radius on a curved mesh.
+    outside = _outside_brush(v0, dabs, r + max(0.5, 0.02 * r), bool(p.get("symmetry_x")), cx)
+    if outside.any() and float(np.max(np.linalg.norm(v[outside] - v0[outside], axis=1))) > 1e-5:
+        raise OpError("the stroke would change dimensions outside the brush — refused; the model was left unchanged.")
+    folded = _folded(v, mm.faces, old_fn, touched)
+    if folded:
+        raise OpError(
+            f"the sculpt stroke folded {folded} face(s) — refused; the model was left unchanged. "
+            "Lower the strength or the brush size and try again.")
+    moved_n = int(np.count_nonzero(np.linalg.norm(v - v0, axis=1) > 1e-8))
+    if moved_n == 0:
+        in_radius = np.linalg.norm(v0[:, None, :] - dabs[None, :, :], axis=2).min(axis=1) <= r
+        if in_radius.any():
+            raise OpError(
+                "the brush only reached the back of the surface, so nothing was changed. "
+                "Turn the model and sculpt the side you can see. The back of a thin wall stays put.")
+        return m, {"message": f"{brush.title()} stroke was outside the model: nothing changed.",
+                   "vertices_moved": 0, "thin_wall_protected": True}
+    out = _check(_new(v, mm.faces))
+    note = " Front of the brush only; the back of a thin wall stays. Size outside the brush is unchanged."
+    if clamped:
+        note += f" {clamped} move(s) were held so the wall stayed at least 0.4 mm."
+    return out, {"message": f"{brush.title()} stroke ({len(dabs)} dabs, {r:g} mm brush{', X symmetry' if p.get('symmetry_x') else ''})." + note,
+                 "vertices_moved": moved_n, "thin_wall_protected": True, "thin_wall_clamped": clamped}
 
 
 MAX_REMESH_FACES = 200_000      # = what the CAD workspace can show and sculpt (api/cad.MAX_SCENE_FACES)
@@ -142,7 +240,8 @@ def op_remesh(m: trimesh.Trimesh, p: dict):
     out = _new(v, f); out.merge_vertices()
     if len(out.faces) > MAX_REMESH_FACES:
         raise OpError(f"Remesh made {len(out.faces):,} triangles (limit {MAX_REMESH_FACES:,}); left unchanged. Use a larger edge length.")
-    return out, {"message": f"Remeshed to ≤ {e:g} mm edges ({len(out.faces):,} triangles)."}
+    return out, {"message": f"Uniform subdivision: edges at most {e:g} mm ({len(out.faces):,} triangles). "
+                            "This splits long edges. It does not build a new surface."}
 
 
 OPS = {"sculpt_stroke": op_sculpt_stroke, "remesh": op_remesh}
@@ -150,7 +249,7 @@ OPS = {"sculpt_stroke": op_sculpt_stroke, "remesh": op_remesh}
 
 def label(op, p):
     if op == "remesh":
-        return f"Remesh ≤ {p.get('edge', 1)} mm"
+        return f"Uniform subdivision ≤ {p.get('edge', 1)} mm"
     if op == "sculpt_stroke":
         return f"Sculpt {str(p.get('brush', '')).title()} ({float(p.get('radius', 5)):g} mm)" + (" · X sym" if p.get("symmetry_x") else "")
     return None

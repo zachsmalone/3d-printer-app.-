@@ -58,6 +58,7 @@ body.cadws{margin:0;height:100dvh;display:flex;flex-direction:column;overflow:hi
 .cw-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .cw-row button,.cw-seg button{min-height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font:inherit;cursor:pointer}
 .cw-row button.primary{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+.cw-row button:disabled{opacity:.4;cursor:default}
 .cw-seg{display:flex;gap:4px;flex-wrap:wrap}
 .cw-seg button[aria-pressed=true]{background:var(--tint);color:var(--accink);border-color:var(--accink)}
 .cw-side{display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);min-height:0}

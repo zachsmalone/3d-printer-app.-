@@ -45,11 +45,13 @@ def printer_catalog():
 def _pref(actor: Actor) -> dict:
     u = actor.user or {}
     pr = u.get("printer") or {}
+    saved = bool(pr.get("printer_id"))
     try:
         pid, n = ps.resolve(pr.get("printer_id"), pr.get("nozzle"))
     except ps.SetupError:
         pid, n = ps.resolve()
-    return {"printer_id": pid, "nozzle": n}
+        saved = False
+    return {"printer_id": pid, "nozzle": n, "saved": saved}
 
 
 def save_pref(sid: str, printer_id, nozzle) -> dict:

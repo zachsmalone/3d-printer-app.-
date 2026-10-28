@@ -474,7 +474,7 @@
   <section class="stage">
     <div class="viewer" id="editViewer">
       <div class="empty" id="editEmpty"><svg class="i big" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg><b>Your model appears here</b><span>Drag to rotate · scroll to zoom · right-drag to pan</span></div>
-      <div class="busy" id="editBusy" hidden><div class="spin"></div><span id="editBusyText">Working…</span></div>
+      <div class="busy" id="editBusy" hidden><div class="spin"></div><span id="editBusyText">Working…</span><button type="button" class="btn small" id="editBusyCancel" hidden>Cancel</button></div>
       <div class="vtools" id="editVtools" hidden>
         <button class="btn small ghost" id="eUndo" title="Undo (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></svg> Undo</button>
         <button class="btn small ghost" id="eRedo" title="Redo (Ctrl+Y)"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3"/></svg> Redo</button>
@@ -638,9 +638,9 @@
 
 <main class="page" id="viewCad" hidden>
 <div class="zt-band" data-zt="cad" aria-hidden="true"><img class="zt-art" src="/static/zt/cad.webp" srcset="/static/zt/cad.webp 1x, /static/zt/cad@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-mist far"></i><i class="zt-mist"></i></div>
-  <div class="pagehead"><div><h1>CAD</h1><p class="help"><span class="pill">New · early</span> Design from scratch in the CAD workspace: sketch with dimensions and constraints, then extrude, revolve, fillet, pattern and more. Every step stays editable in History. These tools also work on any STL, OBJ or 3MF:</p></div></div>
+  <div class="pagehead"><div><h1>CAD</h1><p class="help"><span class="pill">New · early</span> Design from scratch in the CAD workspace: sketch with dimensions and constraints, then extrude, revolve, pattern and more. Fillets, chamfers and face pushes are mesh approximations, not precise solid geometry. Every step stays editable in History. These tools also work on any STL, OBJ or 3MF:</p></div></div>
   <ul class="grid toolgrid">
-    <li class="toolcard"><h2>CAD workspace</h2><p class="help">Sketch on a plane or face, type exact sizes, then build solids step by step. Exports STL/3MF to the Slicer.</p><a class="btn primary" href="/static/cad.html">Open the CAD workspace</a></li>
+    <li class="toolcard"><h2>CAD workspace</h2><p class="help">Sketch on a plane or face and type sizes for sketches and extrudes. Fillets, chamfers and face pushes are approximate meshes, not a precise solid modeller. Exports STL/3MF to the Slicer.</p><a class="btn primary" href="/static/cad.html">Open the CAD workspace</a></li>
     <li class="toolcard"><h2>Cut &amp; split</h2><p class="help">Slice a model with a plane into parts that fit your printer.</p><a class="btn" href="#slicer/cut">Cut a model in the Slicer</a></li>
     <li class="toolcard"><h2>Orient &amp; place</h2><p class="help">Drop to the bed, centre, mirror, rotate and scale.</p><a class="btn" href="#slicer/orient">Orient a model in the Slicer</a></li>
     <li class="toolcard"><h2>Text &amp; base</h2><p class="help">Add raised text or a text plate in CAD.</p><a class="btn" href="/static/cad.html?tool=text" id="cadOpenText">Add text in CAD</a></li>

@@ -401,7 +401,8 @@ def op_face_offset(m, p):
     if mm.is_watertight and out.volume <= 0:
         raise OpError("That offset turns the body inside out.")
     side = "inward" if d < 0 else "outward"
-    return out, {"message": f"Face moved {abs(d):g} mm {side} ({len(region)} triangles)."}
+    return out, {"message": f"Face moved {abs(d):g} mm {side} ({len(region)} triangles). "
+                            "Mesh push of one flat region, not a precise solid offset."}
 
 
 def _xform_matrix(p, center):
@@ -581,8 +582,8 @@ def label(op: str, p: dict) -> str | None:
             "sketch_extrude": lambda: f"Extrude {float(g('distance', 10)):g} mm {g('direction', 'up')} ({g('mode', 'new')})",
             "revolve": lambda: f"Revolve {float(g('angle', 360)):g}° ({g('mode', 'new')})",
             "body_boolean": lambda: f"Boolean {g('kind', 'union')} Body {int(g('target', 0)) + 1} / Body {int(g('tool', 1)) + 1}",
-            "round_edges": lambda: f"{str(g('style', 'fillet')).title()} {float(g('radius', 1)):g} mm" + (f" ({len(g('edges'))} edges)" if g("edges") else " (all convex edges)") + b(),
-            "face_offset": lambda: f"Face offset {float(g('distance', 1)):g} mm",
+            "round_edges": lambda: f"{str(g('style', 'fillet')).title()} {float(g('radius', 1)):g} mm" + (f" ({len(g('edges'))} edges)" if g("edges") else " (all convex edges)") + b() + " · approximate mesh",
+            "face_offset": lambda: f"Face offset {float(g('distance', 1)):g} mm · mesh push, not a solid offset",
             "body_transform": lambda: ("Mirror copy" if g("copy") and g("mirror") else "Mirror" if g("mirror") else "Move/Rotate/Scale") + b(),
             "pattern": lambda: f"{str(g('kind', 'linear')).title()} pattern ×{int(float(g('count', 3)))}" + b(),
             "align": lambda: f"Align {g('side', 'min')} {str(g('axis', 'z')).upper()}" + b(),

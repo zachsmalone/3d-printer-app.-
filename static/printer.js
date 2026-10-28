@@ -10,15 +10,21 @@ import { costHTML, wireCost } from "/static/cost.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const KEY = "zeim.printer";
-export const P = { cat: null, pref: { printer_id: "creality_k1", nozzle: 0.4 }, signedUp: false };
+export const P = { cat: null, pref: { printer_id: "creality_k1", nozzle: 0.4 }, signedUp: false, chosen: false };
 
 export async function loadCatalog() {
   if (!P.cat) P.cat = await api("/api/printers/catalog");
   try {
     const me = await api("/api/me/printer");
     P.signedUp = me.signed_up;
-    if (me.signed_up) P.pref = { printer_id: me.printer_id, nozzle: me.nozzle };
-    else { const l = JSON.parse(localStorage.getItem(KEY) || "null"); if (l && P.cat.printers.some(p => p.id === l.printer_id)) P.pref = l; }
+    P.chosen = false;
+    if (me.signed_up && me.saved) {
+      P.pref = { printer_id: me.printer_id, nozzle: me.nozzle };
+      P.chosen = true;
+    } else {
+      const l = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (l && P.cat.printers.some(p => p.id === l.printer_id)) { P.pref = l; P.chosen = true; }
+    }
   } catch { /* offline: keep defaults */ }
   return P.cat;
 }
@@ -82,12 +88,16 @@ export function readPicker(uid) {
   return { printer_id: id, nozzle: isResin(id) ? null : +$(`#${uid}_nz`).value };
 }
 export async function savePref(pref) {
-  P.pref = pref; localStorage.setItem(KEY, JSON.stringify(pref));
+  P.pref = pref; P.chosen = true; localStorage.setItem(KEY, JSON.stringify(pref));
   const r = await api("/api/me/printer", J("PUT", pref));
   document.dispatchEvent(new CustomEvent("zeim:printer", { detail: pref }));
   return r;
 }
 export const prefLabel = (pref = P.pref) => { const p = printerOf(pref.printer_id); return p ? p.name + (pref.nozzle ? ` · ${pref.nozzle} mm` : "") : ""; };
+export function troubleshootingPrinterLabel() {
+  if (!P.chosen) return "No printer saved yet. Fixes stay general until you save one in Account.";
+  return prefLabel() || "No printer saved yet. Fixes stay general until you save one in Account.";
+}
 
 /* ---------- "Will it print?" badge ---------- */
 const VERDICT = { yes: ["ok", "✔"], likely: ["ok", "✔"], maybe: ["warn", "!"], unchecked: ["warn", "!"], no: ["bad", "✖"], unknown: ["", "?"] };

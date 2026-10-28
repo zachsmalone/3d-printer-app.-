@@ -795,12 +795,20 @@ $("#btnSlice").onclick = async () => {
     }
   } catch (e) { $("#sliceOut").textContent = e.message; }
 };
+function transferLead(r) {
+  if (!r || !r.ok) return "";
+  if (r.transfer === "simulated" || r.start === "not_confirmed") return "Simulated. Not confirmed on a real printer. ";
+  if (r.start === "confirmed") return "Print confirmed by the printer. ";
+  if (r.start === "requested") return "File accepted. Start requested, not confirmed. ";
+  if (r.start === "not_requested") return "File accepted. Print was not started. ";
+  return "";
+}
 $("#btnSend").onclick = async () => {
   const fd = sliceOpts(); fd.set("printer_id", $("#printerSel").value); fd.append("start", $("#startNow").checked);
   $("#sendOut").textContent = "Slicing and uploading…";
   try {
     const r = await api(`/api/send/${printId}`, { method: "POST", body: fd });
-    $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + (r.message || r.log || "failed") + (r.verification ? ` · ${r.verification}` : "");
+    $("#sendOut").textContent = (r.ok ? "✔ " : "✖ ") + transferLead(r) + (r.message || r.log || "failed") + (r.verification ? ` · ${r.verification}` : "");
     if ($("#spoolOut")) $("#spoolOut").textContent = r.spool?.message || (r.stage === "spool" ? (r.message || "") : "");
     if (r.ok) refreshLiveStatus();
   } catch (e) { $("#sendOut").textContent = "✖ " + e.message; }
