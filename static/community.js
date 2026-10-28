@@ -1,4 +1,4 @@
-import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showBuild } from "/static/app.js";
+import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showPhotoBuild } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
 import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
 import { bindFlow, readFlow, reuseCopy } from "/static/project-flow.js";
@@ -170,9 +170,7 @@ $("#studioLib")?.addEventListener("click", async e => {
   else if (plan.open === "build") {
     try {
       const r = await api("/api/builds/" + plan.id);
-      S.mode = r.mode;
-      applyMode();
-      showBuild(r);
+      showPhotoBuild(r);
     } catch (err) { toast(err.message, "err"); }
   }
 });

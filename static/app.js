@@ -63,7 +63,7 @@ const api = async (url, opt) => {
 };
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(iso).toLocaleDateString(); };
 window.zeimPhotoAck = () => (typeof pick !== "undefined" && pick.acked ? pick.acked() : "true");
-const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", bust: "Bust", popart: "Pop-art", trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model" };
+const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", bust: "Bust", popart: "Pop-art", trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model", memorybox: "Memory box" };
 
 let viewer;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
@@ -91,6 +91,7 @@ $("#modeSel").onchange = e => {
 /* Who is signed in. community.js tells us; the server still decides every real permission. */
 document.addEventListener("zeim:me", e => { S.me = e.detail; });
 function applyMode() {
+  if (S.mode === "memorybox") S.mode = "lithophane";   // the box lives on the Lithophane page; the saved build keeps mode memorybox
   $$("#modeCards input").forEach(i => { i.checked = i.value === S.mode; i.closest(".card").classList.toggle("on", i.checked); });
   $$("#presetSeg input").forEach(i => { i.checked = i.value === S.preset; i.closest("label").classList.toggle("on", i.checked); });
   $$("#expertOpts [data-modes]").forEach(e => e.hidden = !e.dataset.modes.split(" ").includes(S.mode));
@@ -99,7 +100,8 @@ function applyMode() {
   const tr = S.mode === "trace2d";               // 'Logo & Drawing to 3D' has its own settings panel at both levels
   $("#traceOpts").hidden = !tr;
   $("#beginnerOpts").hidden = tr || isExpert(); $("#expertOpts").hidden = tr || !isExpert();
-  if (!tr) $("#presetHelp").textContent = PRESET_HELP[S.mode][S.preset];
+  const help = PRESET_HELP[S.mode];
+  if (!tr && help) $("#presetHelp").textContent = help[S.preset] || "";
   document.dispatchEvent(new CustomEvent("zeim:mode", { detail: S.mode }));
 }
 /* lithophane shape picker: flat outlines + curved shells (globe / night-light); curved ones take diameter + height instead of width */
@@ -363,9 +365,12 @@ function showBuild(r) {
   document.dispatchEvent(new CustomEvent("zeim:build", { detail: r }));   // Select mode keeps the saved selection (selectmode.js)
   r.visibility = r.visibility || "private";
   $("#viewerEmpty").hidden = true; $("#vtools").hidden = false; $("#result").hidden = false;
-  viewer?.load(r.preview, r.mode);
+  const glow = r.mode === "lithophane" || r.mode === "memorybox";
+  viewer?.load(r.preview, glow ? "lithophane" : r.mode);
   if (r.mode === "lithophane" && r.params) setBacking(r.params.backing || "");   // the build's own backing (none if it had none)
-  S.lightOn = r.mode === "lithophane" && !!backingVal(); syncLight();
+  S.lightOn = r.mode === "lithophane" && !!backingVal();
+  if (r.mode === "memorybox") S.lightOn = false;
+  syncLight();
   const st = r.stats, sz = st.size_mm.map(x => x.toFixed(1)).join(" × ");
   const nb = st.bodies?.length || 1;
   $("#viewer").setAttribute("aria-label", `3D preview: ${MODE_LABEL[r.mode] || "model"}, ${sz.replace(/ × /g, " by ")} millimetres, ${nb} ${nb > 1 ? "pieces" : "piece"}` +
@@ -379,6 +384,22 @@ function showBuild(r) {
   $("#autoTable").innerHTML = notes.map(n => `<tr><td>${n.label}</td><td><b>${n.value}</b></td><td>${n.why}</td></tr>`).join("");
   $$("#histList .hcard").forEach(c => c.classList.toggle("cur", c.dataset.id === r.id));
   $("#resVis").value = r.visibility || "private";
+}
+/* Open a saved photo build. A memory box stays on Lithophane and uses the same result row (name, Send to Slicer, Print). */
+function showPhotoBuild(r) {
+  if (!r) return;
+  const box = r.mode === "memorybox" || r.info?.shape === "memorybox" || r.params?.shape === "memorybox";
+  S.mode = box ? "lithophane" : (r.mode || S.mode);
+  applyMode();
+  if (box) { const el = $("#mboxBox"); if (el) el.open = true; }
+  showBuild(r);
+  if (!box) return;
+  window.zeimMembox?.dims(r.info, $("#mbDims"));
+  const exp = $("#mbExport"); if (exp) exp.disabled = !r.id;
+  const st = $("#mbStatus"); if (!st) return;
+  const parts = (r.info?.parts || []).join(", ");
+  const note = r.info?.note || "The picture is the box together. The file is the separate parts.";
+  st.textContent = note + (parts ? " Parts: " + parts + "." : "") + (r.save_note ? " " + r.save_note : "");
 }
 $("#resVis").onchange = async e => {
   try { await api(`/api/builds/${S.current.id}/visibility`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ visibility: e.target.value }) }); toast("Who can see this build: " + e.target.value, "ok"); loadHistory(); }
@@ -401,7 +422,7 @@ function fillLithMat() {
   set("min_thickness", mn); set("max_thickness", mx); set("resolution", d.resolution);
 }
 $("#lithMaterial").onchange = fillLithMat; $("#lithThk").onchange = fillLithMat;
-/* Memory box: 4 photos round a light (stateless API; preview is the assembled cube, downloads are the print parts) */
+/* Memory box: four lithophane sides. The preview is the box together. Downloads and Send to Slicer are the separate parts. */
 $("#lithMaterial").addEventListener("change", () => { $("#mbClear").value = $("#lithMaterial").value === "resin" ? 0.1 : 0.2; });
 $("#mbHole").onchange = () => { $("#mbCustom").hidden = $("#mbHole").value !== "custom"; $("#mbLightH").value = $("#mbHole").value === "puck" ? 22 : 24; };
 /* One photo per side. Choosing files fills sides 1..n; "Try the sample box" loads the 4 rose photos; any side can be replaced. */
@@ -436,6 +457,12 @@ document.addEventListener("zeim:new-build", e => {
 $("#mbFiles").addEventListener("change", () => {
   const fs = [...$("#mbFiles").files].slice(0, 4); mbSlots.fill(null); fs.forEach((f, i) => { mbSlots[i] = f; }); mbShowSides();
 });
+$("#mbUsePhoto").onclick = () => {
+  const st = $("#mbStatus");
+  if (!S.file) { st.textContent = "Choose a photo above first, or add photos on the sides."; return; }
+  mbSlots[0] = S.file; mbShowSides();
+  st.textContent = "Side 1 uses the photo above. The other sides stay as they are. The box is its own print.";
+};
 $("#mbTrySample").onclick = async () => {
   const st = $("#mbStatus");
   try {
@@ -477,12 +504,9 @@ async function mbRun(fmt) {
       st.textContent = "Downloaded. Every part is its own object."; return;
     }
     const j = await r.json();
-    S.current = { id: j.id, mode: "lithophane", info: j.info, params: { shape: "memorybox" }, preview: j.preview, stats: j.stats };
-    $("#mbExport").disabled = !j.id; window.zeimMembox?.dims(j.info, $("#mbDims"));
-    $("#viewerEmpty").hidden = true; $("#vtools").hidden = false;
-    viewer?.load(j.preview, "lithophane"); S.lightOn = false; syncLight();
-    const w = j.info.warnings || [];
-    st.textContent = `Parts: ${j.info.parts.join(", ")}.` + (w.length ? " " + w.join(" ") : "") + " Tap Light on to see it lit.";
+    showPhotoBuild(j);
+    const w = j.info?.warnings || [];
+    if (w.length && $("#mbStatus")) $("#mbStatus").textContent += " " + w.join(" ");
   } catch (e) { st.textContent = "Couldn't make the box: " + (e.message || "something went wrong"); }
 }
 $("#mbPreview").onclick = () => mbRun("preview"); $("#mbZip").onclick = () => mbRun("zip");
@@ -510,7 +534,7 @@ $("#backingRGB").oninput = () => { $("#backingHex").value = $("#backingRGB").val
 $("#backingHex").oninput = () => { const h = $("#backingHex").value.trim(), ok = HEX6.test(h);
   if (ok) { $("#backingRGB").value = h.toLowerCase(); $("#backingHex").removeAttribute("aria-invalid"); backingChanged(); } else $("#backingHex").setAttribute("aria-invalid", "true"); };
 function syncLight() {
-  const lit = S.current?.mode === "lithophane";
+  const lit = S.current?.mode === "lithophane" || S.current?.mode === "memorybox";
   $("#litLightBox").hidden = !lit;
   if (!lit) S.lightOn = false;
   $("#vLight").setAttribute("aria-pressed", S.lightOn ? "true" : "false");
@@ -597,7 +621,7 @@ $("#histList").onclick = async e => {
   if (o) { try {
     const hb = S.history.find(x => x.id === o.dataset.open);
     if (hb?.kind === "edit") { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: hb.id })); location.hash = "slicer"; return; }
-    const r = await api("/api/builds/" + o.dataset.open); S.mode = r.mode; applyMode(); showBuild(r); } catch (er) { toast(er.message, "err"); } }
+    const r = await api("/api/builds/" + o.dataset.open); showPhotoBuild(r); } catch (er) { toast(er.message, "err"); } }
   if (d) {
     const yes = await askConfirm({
       title: "Delete this build?",
@@ -698,11 +722,13 @@ async function openPrint(b) {
   $("#s_up").checked = b.mode === "lithophane";
   // Honest lithophane print defaults on the quick Print dialog (99% — PrusaSlicer refuses 100% on grid/line).
   // Edit → Slice has the full Lithophane preset (100% rectilinear, first layer = layer height).
-  if (b.mode === "lithophane") {
+  if (b.mode === "lithophane" || b.mode === "memorybox") {
     $("#s_layer").value = "0.12";
     $("#s_fill").value = "99";
-    $("#sliceOut").textContent = (bs.available ? "" : bs.message + " ") +
-      "Lithophane tip: ~0.12 mm layers and near-solid fill. For the full Lithophane preset (100% rectilinear), open Edit → Slice.";
+    const tip = b.mode === "memorybox"
+      ? "Memory box: the file is the separate parts, already laid flat. Leave Stand upright off. ~0.12 mm layers and near-solid fill suit the lithophane walls. Sizes are starting points."
+      : "Lithophane tip: ~0.12 mm layers and near-solid fill. For the full Lithophane preset (100% rectilinear), open Edit → Slice.";
+    $("#sliceOut").textContent = (bs.available ? "" : bs.message + " ") + tip;
   } else {
     $("#sliceOut").textContent = bs.available ? "" : bs.message;
   }
@@ -942,7 +968,7 @@ const q = new URLSearchParams(location.search);
 if (q.get("connected")) { toast("Connected " + q.get("connected"), "ok"); history.replaceState({}, "", "/"); }
 window.__photo3d = S;  // debugging / tests
 
-export { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert, showBuild };
+export { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, openPrint, printBuild, loadHistory, renderHistory, openFull, applyLevel, applyMode, isExpert, showBuild, showPhotoBuild };
 
 /* ---------- Look: Warm (default) or Dark. Remembered on this device; nothing is sent anywhere. ---------- */
 (() => {
@@ -978,6 +1004,6 @@ document.getElementById("skipLink")?.addEventListener("click", e => {
 });
 window.__errText = errText;   // tests
 /* E: Send to… / Back from CAD reopens the Studio model (static/handoff.js) */
-document.addEventListener("zeim:open-build", async e => { try { const r = await api("/api/builds/" + encodeURIComponent(e.detail)); if (S.current?.id) return; S.mode = r.mode; applyMode(); showBuild(r); } catch { } });
+document.addEventListener("zeim:open-build", async e => { try { const r = await api("/api/builds/" + encodeURIComponent(e.detail)); if (S.current?.id) return; showPhotoBuild(r); } catch { } });
 
 $("#btnOpenBoardFromSettings")?.addEventListener("click", () => window.ZEIM_openPrinterBoard?.());

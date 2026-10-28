@@ -1,4 +1,5 @@
 """Memory box lithophane: 4 photo walls round a light, snap / frame / enclosed styles."""
+import base64
 import io
 import zipfile
 
@@ -102,6 +103,42 @@ def test_api_memorybox_preview_3mf_and_refusals():
     assert c.post("/api/memorybox", files=files[:3], data={"photo_ack": "true", "fill_sample": "false"}).status_code == 400
 
 
+def _zspan(preview):
+    cols = [np.frombuffer(base64.b64decode(b["positions"]), dtype="<f4").reshape(-1, 3)[:, 2] for b in preview["bodies"]]
+    z = np.concatenate(cols)
+    return float(z.max() - z.min())
+
+
+def test_saved_box_reopens_assembled_and_hands_off_to_slicer():
+    """The viewer keeps the box together. Send to Slicer uses the existing build copy, which is the separate parts."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    c = TestClient(app)
+
+    def png(i):
+        b = io.BytesIO()
+        IMS[i].save(b, "PNG")
+        return ("p%d.png" % i, b.getvalue(), "image/png")
+
+    files = [("files", png(i)) for i in range(4)]
+    r = c.post("/api/memorybox", files=files, data={"style": "frame", "panel_mm": "60", "photo_ack": "true"})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["mode"] == "memorybox" and j["saved"] and j["id"]
+    assert "separate parts" in j["info"]["note"]
+    made = _zspan(j["preview"])
+    assert made > 70
+    g = c.get("/api/builds/" + j["id"])
+    assert g.status_code == 200, g.text
+    again = g.json()
+    assert again["mode"] == "memorybox" and again["params"]["shape"] == "memorybox"
+    assert _zspan(again["preview"]) == pytest.approx(made, abs=0.6)
+    e = c.post("/api/edit/new", data={"from_build": j["id"], "beginner": "true"})
+    assert e.status_code == 200, e.text
+    body = e.json()
+    assert body["id"] and body["base"]["from_mode"] == "memorybox" and body["stats"]["triangles"] > 100
+
+
 def test_backlit_thickness_for_box_walls_and_ui_wiring():
     import json, shutil, subprocess
     from pathlib import Path
@@ -118,12 +155,14 @@ def test_backlit_thickness_for_box_walls_and_ui_wiring():
         out = json.loads(subprocess.run(["node", "--input-type=module", "-e", code], capture_output=True, text=True, check=True).stdout)
         assert out == pytest.approx(list(t), abs=1e-6)
     html = (root / "static" / "index.html").read_text()
-    for i in ("mbFiles", "mbStyle", "mbSize", "mbHole", "mbNotch", "mbClear", "mbAck", "mbPreview", "mbExport", "mbZip", "mbSample", "mbBase", "mbLightH", "mbBaseNotch"):
+    for i in ("mbFiles", "mbStyle", "mbSize", "mbHole", "mbNotch", "mbClear", "mbAck", "mbPreview", "mbExport", "mbZip", "mbSample", "mbBase", "mbLightH", "mbBaseNotch", "mbUsePhoto", "mbIntro"):
         assert f'id="{i}"' in html
+    assert "separate parts, laid out to print" in html
     for v in ("frame", "snap", "enclosed", "tealight", "puck", "custom"):
         assert f'value="{v}"' in html
     app = (root / "static" / "app.js").read_text()
-    assert 'fetch("/api/memorybox"' in app and 'shape: "memorybox"' in app and "syncLight()" in app
+    assert 'fetch("/api/memorybox"' in app and "showPhotoBuild" in app and 'mode === "memorybox"' in app and "syncLight()" in app
+    assert "separate parts, already laid flat" in app
     css = (root / "static" / "style.css").read_text()
     assert "#mboxBox .btn, #mboxBox select" in css and "min-height: 44px" in css
 

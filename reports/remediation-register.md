@@ -294,3 +294,20 @@ Not run: Playwright `tests/ui_remix_switch.py` and `tests/ui_reupload.py`. No si
 | RP-1 | Showcase / owner tag | Verified by the API tests. The import button was not clicked. | The tag was written on download and never read on the next share. | A re-upload of a downloaded 3MF could pass when the shape check missed. | This change. `original.3mf` is read at publish and again when a private project is made public. | The tag tests in `tests/test_reupload_protect.py` passed. | A slicer that saves a new 3MF drops the tag. A heavy edit can also miss the shape check. A repair that replaces the file with an STL drops the tag. |
 | RP-2 | Showcase / view only page | Verified on `GET /p/{id}` through the test client. Not opened in a browser. | The share page always listed file links. The file route already returned 403. | A view-only project still showed download links that failed. | This change. Other people see “View only” and no file links. The owner still gets the files. The page shows the first-posted date. | `test_share_page_hides_view_only_downloads_and_shows_first_posted` passed. | The Showcase dialog was not clicked. |
 | RP-3 | Copy / no cut | Verified by the challenge API test, including a one-time replacement of the old sentence. | Tip copy said ZEIM takes no cut of tips and did not mention sales from the maker’s own link. | The standing line was easy to miss, and an already-seeded challenge kept the old sentence. | This change. Publish, the model page, challenges, and the Remix challenge rule use the same sentence. Showcase downloads stay free. There is no ZEIM checkout in this change. | `test_old_tip_rule_is_replaced_once` and the prize-free enter test passed. | No browser read of the publish dialog. |
+
+## Lithophane memory box
+
+Branch `cursor/lithophane-memory-box-7937`, off `zeim` @ `66d46ae` (remix/theft #62). No deploy. Saved projects stay. Exit does not publish. My Studio stays on Account. A memory box opened from My Studio goes to Lithophane.
+
+The box was already a four-side lithophane (frame, snap, or enclosed) plus a light base. The preview stopped before the result row, and opening the saved build set the page mode to `memorybox`, which had no thickness help and hid the Lithophane form. Reopen also showed the print layout, not the box together.
+
+The picture is the assembled box (`assembled.3mf`, viewer only). Send to Slicer, Export, Print, and the STL zip use the existing build files: the separate parts, laid out to print. They fit each other. Sizes are starting points. Stand upright stays off for this file. Side 1 can use the photo already chosen above. That does not change a lithophane already made.
+
+Verification (this branch, Python 3.12, Playwright not installed):
+
+- `node --check` on `static/app.js`, `static/community.js`, and `static/studio-library.js` — syntax ok.
+- `node --test tests/js/studio-library.test.mjs` — 7 passed. A memory box opens `#lithophane`.
+- `python3 -m pytest -q tests/test_memorybox.py tests/test_membox_fit.py` — 21 passed. Reopen keeps the assembled height. Send to Slicer (`/api/edit/new` from the build) returns a project whose base mode is `memorybox`.
+- `python3 -m pytest -q` on the CI file list — 196 passed, 2 skipped. The skips are `tests/test_app.py` “no slicer” and `tests/test_slice_api.py` “PrusaSlicer not installed”. They were not run and are not counted as passed.
+
+Not run: Playwright `tests/ui_membox.py` and `tests/test_membox_ui.py`. No signed-in click of Preview, Send to Slicer, or Exit. No printer. Not deployed. GitHub CI on the PR is the check that still has to go green; this note does not mark that job passed. The CI job does not run the memory-box modules; those 21 were run locally.
