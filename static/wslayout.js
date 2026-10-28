@@ -1,6 +1,6 @@
 /* ZEIM workspace layout (original code). The 3D view is the full background of a workspace; panels sit over
    it, docked to a side. A panel marked dock slides along its edge and cannot be left floating. Exit, Done,
-   New build, Return to My Studio, and the primary action stay in a top strip that layout will not use, and a
+   New build, Return to Projects, and the primary action stay in a top strip that layout will not use, and a
    drag cannot move a panel into that strip. "Customise workspace" lists every panel with a checkbox and has
    "Reset layout". Core panels (Undo, the tool menu, Export/Print) can't be hidden. The Customise button
    sits in the top strip when that strip is there, and is never inside a panel, so it stays reachable.

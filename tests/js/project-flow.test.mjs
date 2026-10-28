@@ -92,7 +92,7 @@ test("resin prepare names the TorchC0 copy, and slice points at the printer slic
 
 test("with no project, the next stage opens Projects", () => {
   const plan = planHop("repair", { view: "slicer", kind: "fdm" });
-  assert.equal(plan.hash, "#account/studio");
+  assert.equal(plan.hash, "#projects");
   assert.match(plan.note, /Projects/);
 });
 
@@ -141,7 +141,7 @@ test("the repair page stays on Check & Repair, and a kept project is the same id
   const design = planHop("design", { view: "repair", editId: EDIT, kind: "fdm" });
   assert.equal(design.url, "/static/cad.html?bid=" + EDIT);
   const none = planHop("slice", { view: "repair", kind: "fdm" });
-  assert.equal(none.hash, "#account/studio");
+  assert.equal(none.hash, "#projects");
 });
 
 test("a repair hand-off is remembered beside photo copies and dropped with that project", () => {

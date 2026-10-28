@@ -1,6 +1,7 @@
-"""My Studio is the saved-project library on Account.
+"""Me owns My Studio. Projects owns the saved-work list.
 
-#account/studio and the old #studio bookmark stay on that library.
+#account/studio stays on Account and does not render the list.
+#projects and the old #studio bookmark open that list.
 They do not open Lithophane. #create still opens the photo workspace.
 """
 import re
@@ -17,20 +18,30 @@ def _slice(text, start, end):
     return text[i:text.index(end, i)]
 
 
-def test_studio_library_lives_on_account_and_is_not_a_new_tab():
+def test_me_owns_studio_and_projects_owns_the_list():
     nav = _slice(HTML, 'id="mainNav"', "</nav>")
     views = re.findall(r'data-view="(\w+)"', nav)
     assert "studio" not in views
-    assert "lithophane" in views and "account" in views
+    assert "projects" in views and "lithophane" in views and "account" in views
     acc = _slice(HTML, 'id="viewAccount"', 'id="viewLearn"')
     studio = _slice(acc, 'id="meStudio"', "</section>")
     assert "My Studio" in studio
-    assert 'href="#account/studio"' in studio
-    assert 'id="btnMyStudio"' in studio
-    assert 'id="studioLib"' in studio
+    assert 'href="#projects"' in studio
+    assert 'id="btnOpenProjects"' in studio
+    assert "Open in Projects" in studio
+    assert 'id="studioLib"' not in acc
+    assert 'data-lib="open"' not in acc
+    assert "This is Projects" not in acc
     assert 'href="#studio"' not in studio
     assert 'href="#lithophane"' not in studio
     assert "Open Studio" not in studio
+    projects = _slice(HTML, 'id="viewProjects"', 'id="viewAccount"')
+    assert 'id="studioLib"' in projects
+    assert 'id="studioLibHelp"' in projects
+    assert 'id="btnViewStudio"' in projects
+    assert 'href="#account/studio"' in projects
+    assert "View in My Studio" in projects
+    assert 'id="btnLogin"' not in projects
     assert 'id="btnSettings"' in acc and 'id="dlgSettings"' not in acc
 
 
@@ -40,11 +51,13 @@ def test_selecting_the_library_is_not_the_lithophane_alias():
     assert "routeIntent" in JS and "arriveLibrary" in JS and "openFromLibrary" in JS
     assert "visitLibrary" in LIB
     assert 'raw === "lithophane"' in JS
-    assert "LIBRARY_HASH" in LIB and '"#account/studio"' in LIB
+    assert "LIBRARY_HASH" in LIB and '"#projects"' in LIB
     assert 'head === "studio"' in LIB
+    assert 'head === "projects"' in LIB
     create = _slice(HTML, 'id="viewCreate"', 'id="viewShowcase"')
-    assert 'id="studioFromMe"' in create and 'href="#account/studio"' in create
-    assert 'id="lithoStudioNote"' in create and 'href="#account/studio"' in create
+    assert 'id="studioFromMe"' in create and 'href="#projects"' in create
+    assert 'id="lithoStudioNote"' in create and 'href="#projects"' in create
+    assert "#account/studio" not in create
     assert 'id="btnCreatePhoto"' in HTML
     photo = HTML[HTML.index('id="btnCreatePhoto"') - 120:HTML.index('id="btnCreatePhoto"')]
     assert 'href="#create"' in photo

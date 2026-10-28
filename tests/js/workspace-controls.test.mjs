@@ -40,9 +40,10 @@ test("Done returns to My Studio only when the project was opened from there", ()
   assert.equal(stay.publish, false);
 });
 
-test("Return to My Studio is not a publish and does not clear the screen", () => {
+test("Return to Projects is not a publish and does not clear the screen", () => {
   const plan = leavePlan("return-studio", studio);
   assert.equal(plan.navigate, true);
+  assert.equal(LIBRARY_URL, "/#projects");
   assert.equal(plan.url, LIBRARY_URL);
   assert.equal(plan.clear, false);
   assert.equal(plan.publish, false);

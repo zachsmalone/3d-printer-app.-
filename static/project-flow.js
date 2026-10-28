@@ -1,10 +1,11 @@
 /* One project across Design → Check & Repair → Prepare → Slice & Export.
-   My Studio stays at #account/studio. Projects in the top bar is that same list.
+   Projects (#projects) is the saved-work list. My Studio on Account does not list projects.
    A photo design and its slicer copy are different records. The copy is remembered
    for this browser tab (zeim.flow) so the next stage does not import the photo again.
    A repaired file that is not a project yet is remembered the same way: one slicer
    project per repair id. Resin layer files are made in the printer's own slicer.
    TorchC0 only prepares. */
+import { LIBRARY_HASH } from "./studio-library.js";
 export const FLOW_KEY = "zeim.flow";
 export const STAGES = [
   { id: "design", label: "Design" },
@@ -162,7 +163,7 @@ function slicerPlan(stage, ctx, tool) {
   if (photoId) {
     return { stage, stay: false, hash, open: "send", target: "slicer", src: "lithophane", tool, derived: true, note: willCopyNote(stage) };
   }
-  return { stage, stay: false, hash: "#account/studio", open: "", note: "Open a saved project in Projects, then continue." };
+  return { stage, stay: false, hash: LIBRARY_HASH, open: "", note: "Open a saved project in Projects, then continue." };
 }
 
 function torchPlan(ctx, note, editId) {

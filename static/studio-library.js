@@ -1,11 +1,13 @@
-/* My Studio is the saved-project library on Account (#account/studio).
-   Choosing that route stays on Account. Open and Edit are the actions that enter a workspace.
-   #studio used to alias to the shared Lithophane page; it now resolves to this library.
-   #projects is the top-bar name for this same list. It rewrites to #account/studio.
+/* Projects (#projects) is the saved-work list. Open and Edit are the actions that enter a workspace.
+   My Studio (#account/studio) is the ownership note on Account (Me). It does not list projects.
+   #studio used to alias to the shared Lithophane page, then to that Account list. It now opens Projects.
+   A return marker still uses from: "mystudio". Older markers stored /#account/studio; Exit follows Projects.
    #create remains the photo workspace (it does not force the Lithophane style).
    Return uses the existing sessionStorage key zeim.back. Project and draft keys are not renamed. */
-export const LIBRARY_HASH = "#account/studio";
-export const LIBRARY_URL = "/#account/studio";
+export const LIBRARY_HASH = "#projects";
+export const LIBRARY_URL = "/#projects";
+export const STUDIO_HASH = "#account/studio";
+const LEGACY_LIBRARY_URL = "/#account/studio";
 const BACK_KEY = "zeim.back";
 const BACK_MS = 6 * 3600e3;
 
@@ -18,23 +20,30 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+function blankIntent(hash) {
+  return { library: false, ownership: false, view: null, hash: String(hash || ""), rewrite: false, nav: null };
+}
+
 export function routeIntent(hash) {
   const full = String(hash || "").replace(/^#/, "");
   const head = full.split("/")[0].split("?")[0];
   const sub = (full.split("/")[1] || "").split("?")[0];
-  if (head === "account" && sub === "studio") {
-    return { library: true, view: "account", hash: LIBRARY_HASH, rewrite: full !== "account/studio", nav: "projects" };
+  if (head === "projects") {
+    return { library: true, ownership: false, view: "projects", hash: LIBRARY_HASH, rewrite: full !== "projects", nav: "projects" };
   }
-  if (head === "studio" || head === "projects") {
-    return { library: true, view: "account", hash: LIBRARY_HASH, rewrite: true, nav: "projects" };
+  if (head === "studio") {
+    return { library: true, ownership: false, view: "projects", hash: LIBRARY_HASH, rewrite: true, nav: "projects" };
+  }
+  if (head === "account" && sub === "studio") {
+    return { library: false, ownership: true, view: "account", hash: STUDIO_HASH, rewrite: full !== "account/studio", nav: "account" };
   }
   if (head === "lithophane") {
-    return { library: false, view: "lithophane", hash: "#lithophane", rewrite: false, nav: "lithophane" };
+    return { library: false, ownership: false, view: "lithophane", hash: "#lithophane", rewrite: false, nav: "lithophane" };
   }
   if (head === "create") {
-    return { library: false, view: "lithophane", hash: "#create", rewrite: false, nav: "lithophane" };
+    return { library: false, ownership: false, view: "lithophane", hash: "#create", rewrite: false, nav: "lithophane" };
   }
-  return { library: false, view: null, hash: String(hash || ""), rewrite: false, nav: null };
+  return blankIntent(hash);
 }
 
 function dump(storage) {
@@ -82,13 +91,18 @@ export function readBack(storage, now) {
   return info;
 }
 
+function isLibraryUrl(url) {
+  const u = String(url || "");
+  return u === LIBRARY_URL || u === LEGACY_LIBRARY_URL || u === STUDIO_HASH;
+}
+
 function studioMark(info, now) {
-  if (!info || info.from !== "mystudio" || info.url !== LIBRARY_URL) return null;
+  if (!info || info.from !== "mystudio" || !isLibraryUrl(info.url)) return null;
   if (typeof info.t === "number" && (now == null ? Date.now() : now) - info.t > BACK_MS) return null;
   return info;
 }
 
-/* Once the library is on screen, drop a My Studio return marker.
+/* Once Projects is on screen, drop the library return marker.
    A section hand-off may keep that return nested on zeim.back. Other keys stay. */
 export function arriveLibrary(storage, now) {
   const before = dump(storage);
@@ -101,7 +115,7 @@ export function arriveLibrary(storage, now) {
 }
 
 function marker() {
-  return { label: "My Studio", hash: "account", url: LIBRARY_URL, from: "mystudio" };
+  return { label: "Projects", hash: "projects", url: LIBRARY_URL, from: "mystudio" };
 }
 
 export function workspaceFor(build, action) {
@@ -127,7 +141,7 @@ export function workspaceFor(build, action) {
   return { action, view: "photo", hash: "#create", open: "build", id, back };
 }
 
-/* Records the return to Account → My Studio. Does not remove draft or project keys. */
+/* Records the return to Projects. Does not remove draft or project keys. */
 export function openFromLibrary(build, action, storage) {
   const before = dump(storage);
   const plan = workspaceFor(build, action);
@@ -143,9 +157,9 @@ export function openFromLibrary(build, action, storage) {
 export function exitTarget(storage, now) {
   const info = readBack(storage, now);
   const top = studioMark(info, now);
-  if (top) return top.url;
+  if (top) return LIBRARY_URL;
   const nested = info && studioMark(info.studio, now);
-  return nested ? nested.url : null;
+  return nested ? LIBRARY_URL : null;
 }
 
 export function takeExit(storage, now) {

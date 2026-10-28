@@ -1,6 +1,6 @@
 """Batch 3: Projects is the saved-project list, and the stage bar keeps one project.
 
-My Studio stays on Account at #account/studio. The top-bar name is Projects.
+The list lives on Projects. My Studio on Account is the ownership note, not a second list.
 """
 import re
 from pathlib import Path
@@ -22,18 +22,26 @@ def _slice(text, start, end):
     return text[i:text.index(end, i)]
 
 
-def test_projects_opens_the_existing_library_and_does_not_move_it():
+def test_projects_owns_the_list_and_me_does_not_clone_it():
     nav = _slice(HTML, 'id="mainNav"', "</nav>")
     assert 'data-view="projects"' in nav
     assert nav.index('data-view="projects"') < nav.index('data-view="account"')
     assert "studio" not in re.findall(r'data-view="(\w+)"', nav)
+    projects = _slice(HTML, 'id="viewProjects"', 'id="viewAccount"')
+    assert 'id="studioLib"' in projects and 'id="studioLibHelp"' in projects
+    assert "Open continues that project" in projects
+    assert 'id="btnViewStudio"' in projects and "View in My Studio" in projects
+    assert 'id="btnLogin"' not in projects and 'id="btnAccount"' not in projects
     acc = _slice(HTML, 'id="viewAccount"', 'id="viewLearn"')
     studio = _slice(acc, 'id="meStudio"', "</section>")
-    assert "My Studio" in studio and 'href="#account/studio"' in studio and 'id="studioLib"' in studio
+    assert "My Studio" in studio and 'href="#projects"' in studio and "Open in Projects" in studio
+    assert 'id="studioLib"' not in acc and 'data-lib="open"' not in acc
+    assert "This is Projects" not in HTML
     assert 'head === "projects"' in LIB
+    assert 'view: "projects"' in LIB
     assert 'nav: "projects"' in LIB
-    assert '"#account/studio"' in LIB
-    assert "Projects" in _slice(HTML, 'id="studioLibHelp"', "</p>")
+    assert '"#projects"' in LIB
+    assert "ownership: true" in LIB
 
 
 def test_photo_and_slicer_are_not_named_studio_or_edit():

@@ -1,4 +1,4 @@
-/* Exit, Done, New build, and Return to My Studio on Lithophane, the Slicer, TorchC0, and 2D→3D.
+/* Exit, Done, New build, and Return to Projects on Lithophane, the Slicer, TorchC0, and 2D→3D.
    Save uses the same leave / saveNow path as CAD. None of these actions publish to Showcase. */
 import { S, askConfirm, toast } from "/static/app.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
@@ -125,7 +125,7 @@ export function guardNewBuild(section) {
   if (plan.publish || plan.navigate || isPublishUrl(plan.url)) return;
   if (plan.ask) {
     const message = plan.reason === "unsaved"
-      ? "This browser could not store the workspace draft. Start a new build anyway? A project already on your account stays in My Studio. This does not send it to Showcase."
+      ? "This browser could not store the workspace draft. Start a new build anyway? A project already on your account stays in Projects. This does not send it to Showcase."
       : "This screen has work that is not a saved project yet. Start a new build anyway? This does not send it to Showcase.";
     askConfirm({ title: "New build", message, okLabel: "New build anyway", danger: true }).then(yes => {
       if (!yes) return;
