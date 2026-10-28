@@ -1,9 +1,10 @@
-/* ZEIM workspace layout (original code). The 3D view is the full background of a workspace; every panel and
-   toolbar floats over it. Each one can be dragged anywhere, docked to any side, resized, minimised to a chip or
-   hidden, per workspace, saved per user (local for guests; positions per orientation). "Customise workspace" lists
-   every panel with a checkbox and has "Reset layout". Core panels (Undo, the tool menu, Export/Print) can't be hidden,
-   and the Customise button itself is never inside a panel, so it stays reachable. Layout code only runs on
-   change (drop / resize / rotate / keyboard), and a drag only moves the panel with a transform.
+/* ZEIM workspace layout (original code). The 3D view is the full background of a workspace; panels sit over
+   it, docked to a side. A panel marked dock slides along its edge and cannot be left floating. Exit, Done,
+   New build, Return to My Studio, and the primary action stay in a top strip that layout will not use, and a
+   drag cannot move a panel into that strip. "Customise workspace" lists every panel with a checkbox and has
+   "Reset layout". Core panels (Undo, the tool menu, Export/Print) can't be hidden, and the Customise button
+   itself is never inside a panel, so it stays reachable. Layout code only runs on change (drop / resize /
+   rotate / keyboard), and a drag only moves the panel with a transform.
    Open panels stay at their real size. Layout moves them off obstacles and off each other. It does not walk a
    ladder of smaller sizes, minimise, or hide a panel to make room. If a full-size slot does not exist, one
    shared height cap gives every open panel a usable band (the saved size is left alone). Reset drops every
@@ -144,9 +145,21 @@
         '<div class="zws-body"></div>' + (p.resize === false ? "" : '<div class="zws-rs" data-dir="se" aria-hidden="true"></div><div class="zws-edge" data-dir="e" aria-hidden="true"></div><div class="zws-edge" data-dir="s" aria-hidden="true"></div><div class="zws-edge" data-dir="w" aria-hidden="true"></div><div class="zws-edge" data-dir="n" aria-hidden="true"></div>');
       p.w = w; p.body = w.querySelector(".zws-body"); p.home = p.el.parentElement; p.next = p.el.nextSibling;
       var g = w.querySelector(".zws-grip"), drag = null;
-      g.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); try { g.setPointerCapture(e.pointerId); } catch (er) {} interacting = true; drag = { x: e.clientX, y: e.clientY, moved: false, g: gesture }; });
-      g.addEventListener("pointermove", function (e) { if (!drag) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-        if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 6) return; drag.moved = true; w.classList.add("drag"); w.style.transform = "translate(" + dx + "px," + dy + "px)"; });
+      if (p.dock) g.setAttribute("aria-label", "Move " + p.label + ": drag along its edge. It stays off Exit. Enter sends it to the next side");
+      g.addEventListener("pointerdown", function (e) { e.preventDefault(); e.stopPropagation(); try { g.setPointerCapture(e.pointerId); } catch (er) {} interacting = true; drag = { x: e.clientX, y: e.clientY, moved: false, g: gesture, l: w.offsetLeft, t: w.offsetTop, w: w.offsetWidth, h: w.offsetHeight }; });
+      g.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+        if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 6) return;
+        drag.moved = true; w.classList.add("drag");
+        var rr = root.getBoundingClientRect(), box = lastBox || { x: 0, y: 0, w: rr.width, h: rr.height };
+        var nx = drag.l + dx, ny = drag.t + dy, edgeNow = (state[p.id] && state[p.id].edge) || "";
+        if (p.dock && (edgeNow === "left" || edgeNow === "right")) nx = drag.l;
+        else if (p.dock && (edgeNow === "top" || edgeNow === "bottom")) ny = drag.t;
+        var maxX = box.x + Math.max(0, box.w - drag.w), maxY = box.y + Math.max(0, box.h - drag.h);
+        nx = Math.max(box.x, Math.min(maxX, nx)); ny = Math.max(box.y, Math.min(maxY, ny));
+        w.style.transform = "translate(" + (nx - drag.l) + "px," + (ny - drag.t) + "px)";
+      });
       function end(e) {
         if (!drag) { interacting = false; return; }
         var moved = drag.moved, token = drag.g; drag = null; interacting = false;
@@ -156,7 +169,8 @@
         var bx = lastBox || { x: 0, y: 0, w: rr.width, h: rr.height }, px = e.clientX - rr.left, py = e.clientY - rr.top;
         var d = { left: px - bx.x, right: bx.x + bx.w - px, top: py - bx.y, bottom: bx.y + bx.h - py };
         var edge = Object.keys(d).sort(function (a, b) { return d[a] - d[b]; })[0], s = state[p.id];
-        if (d[edge] < SNAP) { s.edge = edge; dockSize(p, s); var vert = edge === "left" || edge === "right"; s.t = Math.max(0, Math.min(1, vert ? (py - bx.y) / bx.h : (px - bx.x) / bx.w)); }
+        if (p.dock && d[edge] >= SNAP) edge = s.edge || edge;
+        if (p.dock || d[edge] < SNAP) { s.edge = edge; dockSize(p, s); var vert = edge === "left" || edge === "right"; s.t = Math.max(0, Math.min(1, vert ? (py - bx.y) / Math.max(1, bx.h) : (px - bx.x) / Math.max(1, bx.w))); }
         else { s.edge = null; s.x = Math.max(0, (r.left - rr.left) / rr.width); s.y = Math.max(0, (r.top - rr.top) / rr.height); if (s.userSize) { s.w = Math.round(r.width); s.h = Math.round(r.height); } else dockSize(p, s); }
         save(); layout();
       }
@@ -171,22 +185,26 @@
         el.addEventListener("pointermove", function (e) {
           if (!rz) return;
           var dx = e.clientX - rz.x, dy = e.clientY - rz.y, L = rz.l, T = rz.t, W = rz.w, H = rz.h, rr = root.getBoundingClientRect();
+          var box = lastBox || { x: 0, y: 0, w: rr.width, h: rr.height };
+          var minL = rr.left + box.x, minT = rr.top + box.y, maxR = minL + box.w, maxB = minT + box.h;
           if (dir.indexOf("e") >= 0) W = rz.w + dx;
           if (dir.indexOf("s") >= 0) H = rz.h + dy;
           if (dir.indexOf("w") >= 0) { W = rz.w - dx; L = rz.l + rz.w - W; }
           if (dir.indexOf("n") >= 0) { H = rz.h - dy; T = rz.t + rz.h - H; }
           W = Math.max(160, W); H = Math.max(120, H);
-          if (L < rr.left) { W -= rr.left - L; L = rr.left; }
-          if (T < rr.top) { H -= rr.top - T; T = rr.top; }
-          if (L + W > rr.right) W = Math.max(160, rr.right - L);
-          if (T + H > rr.bottom) H = Math.max(120, rr.bottom - T);
+          if (L < minL) { W -= minL - L; L = minL; }
+          if (T < minT) { H -= minT - T; T = minT; }
+          if (L + W > maxR) W = Math.max(160, maxR - L);
+          if (T + H > maxB) H = Math.max(120, maxB - T);
           w.style.left = (L - rr.left) + "px"; w.style.top = (T - rr.top) + "px";
           w.style.width = W + "px"; w.style.height = H + "px"; w.style.maxWidth = W + "px"; w.style.maxHeight = H + "px";
         });
         var re = function () {
           if (!rz) return; var token = rz.g; rz = null; interacting = false; if (token !== gesture) return;
           var r = w.getBoundingClientRect(), rr = root.getBoundingClientRect(), s = state[p.id];
-          s.userSize = true; s.edge = null; s.w = Math.round(r.width); s.h = Math.round(r.height);
+          s.userSize = true; s.w = Math.round(r.width); s.h = Math.round(r.height);
+          if (p.dock) s.edge = s.edge || currentDef(p).edge || "left";
+          else s.edge = null;
           s.x = Math.max(0, (r.left - rr.left) / Math.max(1, rr.width)); s.y = Math.max(0, (r.top - rr.top) / Math.max(1, rr.height));
           save(); layout();
         };
@@ -204,7 +222,21 @@
         if (el.hidden || !el.getClientRects().length || el.closest(".zws-p")) return; var r = rel(el, rr); if (r.w && r.h) out.push({ x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 }); }); });
       return out;
     }
+    /* Top strip: Exit and the primary action. Bottom strip: the object-tool dock and the process sheet.
+       Only elements already sitting in that band count, so a mid-right view control is not treated as a header. */
+    function chromeBand(rr, sel, top) {
+      var edge = 0;
+      root.querySelectorAll(sel).forEach(function (el) {
+        if (el.hidden || !el.getClientRects().length) return;
+        var r = rel(el, rr);
+        if (r.w < 1 || r.h < 1) return;
+        if (top) { if (r.y < 140) edge = Math.max(edge, r.y + r.h); }
+        else if (r.y > rr.height * 0.25) edge = Math.max(edge, rr.height - r.y);
+      });
+      return edge;
+    }
     function place(p, s, box, obs, share, openCount) {
+      if (p.dock && !s.edge) s.edge = currentDef(p).edge || "left";
       var w = p.w;
       w.dataset.crowded = ""; w.dataset.fit = ""; w.dataset.blocked = "";
       w.classList.remove("auto-min", "auto-off");
@@ -213,7 +245,7 @@
         return Math.min(total, Math.max(floor, usable));
       }
       function applyEdge(edge) {
-        if (s.userSize && !s.min) {
+        if (s.userSize && !s.min && !p.dock) {
           w.classList.add("user-size", "free"); w.classList.remove("v", "h", "auto-min", "auto-off"); w.dataset.edge = "free"; return;
         }
         var vert = edge === "left" || edge === "right";
@@ -292,7 +324,7 @@
         markFit(rect, sz);
         return { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
       }
-      var order = [], prefer = s.userSize ? null : (s.edge || null);
+      var order = [], prefer = (s.userSize && !p.dock) ? null : (s.edge || null);
       function pushE(e) { if (order.indexOf(e) < 0) order.push(e); }
       pushE(prefer); EDGES.forEach(pushE); if (prefer !== null) pushE(null);
       var chosen = null, chosenEdge = null, chosenSize = null;
@@ -337,7 +369,7 @@
     function rank(p) { return Math.max(p.pri || 0, p.chipPri || 0); }   // chipPri records the panel the user just opened so it is placed first; layout does not minimise or hide another panel
     function placeAll(box, share, openCount, rr) {
       var obs = obstacles(rr), tight = false;
-      P.slice().sort(function (a, b) { return rank(b) - rank(a) || (b.core ? 1 : 0) - (a.core ? 1 : 0); }).forEach(function (p) {
+      P.slice().sort(function (a, b) { return rank(b) - rank(a) || (b.lead ? 1 : 0) - (a.lead ? 1 : 0) || (b.core ? 1 : 0) - (a.core ? 1 : 0); }).forEach(function (p) {
         if (p.skip && p.skip()) return;
         var s = state[p.id];
         p.w.hidden = !!s.hidden || p.el.hidden;
@@ -362,7 +394,13 @@
         var bottom = vv ? Math.min(rr.height, vv.height + vv.offsetTop - rr.top) : rr.height;   // keyboard open: stay above it
         var box = { x: M + sa.l, y: M + Math.max(0, sa.t - rr.top), w: rr.width - 2 * M - sa.l - sa.r, h: Math.max(120, bottom - 2 * M - Math.max(0, sa.t - rr.top) - (rr.bottom >= innerHeight - 1 ? sa.b : 0)) };
         if (o.inset) { var ins = o.inset(); box.x += ins.l || 0; box.y += ins.t || 0; box.w -= (ins.l || 0) + (ins.r || 0); box.h -= (ins.t || 0) + (ins.b || 0); }
-        if (box.w < 1) box.w = 1; if (box.h < 1) box.h = 1;
+        var topChrome = chromeBand(rr, ":scope > .wsbar", true);
+        var botChrome = chromeBand(rr, ":scope > .objdock, :scope > .proc-sheet", false);
+        if (topChrome + 4 > box.y) { var cut = topChrome + 4 - box.y; box.y += cut; box.h -= cut; }
+        if (botChrome > 0) box.h -= botChrome + 4;
+        if (box.w < 1) box.w = 1; if (box.h < 80) box.h = 80;
+        var chromeH = Math.round(topChrome) + "px";
+        if (root.style.getPropertyValue("--chrome-h") !== chromeH) root.style.setProperty("--chrome-h", chromeH);
         lastBox = box;
         var openCount = P.filter(function (q) { return !(q.skip && q.skip()) && state[q.id] && !state[q.id].hidden && !state[q.id].min && !q.el.hidden; }).length;
         var tight = placeAll(box, false, openCount, rr);
@@ -407,7 +445,7 @@
     /* Customise workspace */
     var dlg = document.createElement("dialog"); dlg.className = "zws-dlg"; dlg.id = "zwsDlg-" + o.id; dlg.setAttribute("aria-label", "Customise workspace");
     function fillDlg() {
-      dlg.innerHTML = '<form method="dialog"><h2>Customise workspace' + (o.title ? ": " + (typeof o.title === "function" ? o.title() : o.title) : "") + '</h2><p class="help">Show or hide each panel here. Drag a panel by its grip to move it or dock it to any side. Drag an edge to resize left, right, up or down.</p><ul class="zws-list">' +
+      dlg.innerHTML = '<form method="dialog"><h2>Customise workspace' + (o.title ? ": " + (typeof o.title === "function" ? o.title() : o.title) : "") + '</h2><p class="help">Show or hide each panel here. Drag a panel by its grip to move it or dock it to any side. Drag an edge to resize left, right, up or down. Exit stays in front of every panel.</p><ul class="zws-list">' +
         P.map(function (p) { return '<li><label><input type="checkbox" data-zws="' + p.id + '"' + (state[p.id].hidden ? "" : " checked") + (p.core ? " disabled" : "") + "> " + p.label + (p.core ? ' <small>(always shown)</small>' : "") + "</label>" + (p.core ? "" : '<button type="button" class="btn small" data-zws-remove="' + p.id + '">Remove</button>') + "</li>"; }).join("") +
         '</ul><div class="zws-row"><button type="button" class="btn" data-zws-reset>Reset layout</button><button class="btn primary" value="ok">Done</button></div></form>';
       dlg.querySelectorAll("input[data-zws]").forEach(function (c) { c.onchange = function () { setHidden(c.dataset.zws, !c.checked); }; });

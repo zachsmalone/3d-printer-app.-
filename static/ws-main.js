@@ -28,10 +28,13 @@
   function make(o) {
     var root = $(o.root); if (!root) return null;
     o.root = root; o.before = fill(root); o.btnClass = "btn small zws-cw";
-    o.customise = root; o.obstacles = (o.obstacles || []).concat(["#" + root.id + " > .zws-cust"]);
+    o.customise = root; o.obstacles = (o.obstacles || []).concat(["#" + root.id + " > .zws-cust", "#" + root.id + " > .wsbar", "#" + root.id + " > .objdock:not([hidden])", "#" + root.id + " > .proc-sheet:not([hidden])"]);
     o.panels = o.panels.map(function (p) { p.el = typeof p.el === "string" ? $(p.el) : p.el; return p; }).filter(function (p) { return p.el; });
     var ws = ZWS.create(o);
-    root.addEventListener("zws:layout", function () { document.body.classList.toggle("zws-on", !!document.querySelector("main.zws:not([hidden])")); });
+    root.addEventListener("zws:layout", function () {
+      document.body.classList.toggle("zws-on", !!document.querySelector("main.zws:not([hidden])"));
+      syncSlicerDock();
+    });
     return ws;
   }
   function phone() { return PHONE.matches; }
@@ -48,20 +51,20 @@
     root: "#viewCreate", active: function () { return vis($("#result")); },
     watch: ["#result", "#litLightBox", "#viewCreate"], obstacles: ["#busy:not([hidden])"],
     panels: [
-      { id: "result", el: "#result", label: "Export & print", core: true, def: function () { return phone() ? { edge: "bottom", t: 0.5, h: Math.round(innerHeight * 0.42) } : { edge: "right", t: 0.3 }; } },
-      { id: "view", el: "#vtools", label: "View & light", def: function () { return { edge: "top", t: 0 }; }, resize: false, bare: true },
-      { id: "settings", el: "#viewCreate > aside.controls", label: "Photo & settings", def: function () { return { edge: "left", t: 0, min: phone() }; } },
-      { id: "history", el: "#viewCreate .stage > .history", label: "Recent builds", def: function () { return { edge: "right", t: 0, hidden: phone(), min: !phone() }; } }
+      { id: "result", el: "#result", label: "Export & print", core: true, dock: true, def: function () { return phone() ? { edge: "bottom", t: 0.5, h: Math.round(innerHeight * 0.42) } : { edge: "right", t: 0.3 }; } },
+      { id: "view", el: "#vtools", label: "View & light", dock: true, lead: true, def: function () { return { edge: "right", t: 0.42 }; }, resize: false, bare: true },
+      { id: "settings", el: "#viewCreate > aside.controls", label: "Photo & settings", dock: true, def: function () { return { edge: "left", t: 0, min: phone() }; } },
+      { id: "history", el: "#viewCreate .stage > .history", label: "Recent builds", dock: true, def: function () { return { edge: "right", t: 0, hidden: phone(), min: !phone() }; } }
     ] });
   if (studio) window.addEventListener("hashchange", function () {
     var k = studioRoute(); if (k === lastKey) return; lastKey = k; studio.rekey();
   });
   make({ id: "slicer", title: "FDM Slicer", root: "#viewEdit", active: function () { return vis($("#editResult")); },
-    watch: ["#editResult", "#viewEdit"], obstacles: ["#editBusy:not([hidden])", "#eMeasureOut:not([hidden])"],
+    watch: ["#editResult", "#viewEdit", "#processSheet", "#slicerDock"], obstacles: ["#editBusy:not([hidden])", "#eMeasureOut:not([hidden])"],
     panels: [
-      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, def: function () { return { edge: "top", t: 0 }; }, resize: false, bare: true },
-      { id: "tools", el: "#editSide", label: "Tools", core: true, def: function () { return { edge: "left", t: 0, min: phone() }; } },
-      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, def: function () { return { edge: "right", t: 0, min: phone() }; } }
+      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, dock: true, lead: true, def: function () { return { edge: "right", t: 0.36 }; }, resize: false, bare: true },
+      { id: "tools", el: "#editSide", label: "Tools", core: true, dock: true, def: function () { return { edge: "left", t: 0, min: phone() }; } },
+      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, dock: true, def: function () { return { edge: "right", t: 0, min: phone() }; } }
     ] });
   /* TorchC0: the result view moves out of the results card to become the background */
   var tRoot = $("#viewTorch"), tOut = $("#torchOut");
@@ -71,10 +74,59 @@
   var torch = make({ id: "torchc0", title: "TorchC0", root: "#viewTorch", active: function () { return !!tRoot && !tRoot.hidden && !!$("#rzView"); },
     watch: ["#torchOut"], watchChildren: true,
     panels: [
-      { id: "out", el: "#torchOut", label: "Result & downloads", core: true, def: function () { return { edge: "right", t: 0, min: phone() }; } },
-      { id: "settings", el: "#torchPanel", label: "Resin settings", def: function () { return { edge: "left", t: 0, min: phone() }; } }
+      { id: "out", el: "#torchOut", label: "Result & downloads", core: true, dock: true, def: function () { return { edge: "right", t: 0, min: phone() }; } },
+      { id: "settings", el: "#torchPanel", label: "Resin settings", dock: true, def: function () { return { edge: "left", t: 0, min: phone() }; } }
     ] });
   if (torch && tOut) new MutationObserver(function () { var v = $("#rzView"); if (v && v.parentElement === tOut) { torch.setHidden("out", false); requestAnimationFrame(torchView); } }).observe(tOut, { childList: true });
   if (tRoot) tRoot.addEventListener("zws:layout", torchView);
+  /* The plate dock follows the open model. Process is a half-height sheet; Close does not leave the workspace. */
+  function syncSlicerDock() {
+    var res = document.getElementById("editResult"), dock = document.getElementById("slicerDock");
+    if (!dock || !res) return;
+    var show = !res.hidden;
+    if (dock.hidden !== !show) dock.hidden = !show;
+    if (!show) { var sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = true; }
+  }
+  function setDockTab(which) {
+    var dock = document.getElementById("slicerDock"); if (!dock) return;
+    dock.querySelectorAll("[data-docktab]").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-docktab") === which ? "true" : "false"); });
+    var sheet = document.getElementById("processSheet");
+    if (sheet) sheet.hidden = which !== "process";
+  }
+  function focusXform(kind) {
+    var plate = document.getElementById("plateTool"); if (plate) plate.open = true;
+    var sel = document.getElementById("plateSel");
+    var map = { move: ["#pX", "[data-form=translate]"], rotate: ["#pRz", "[data-form=rotate]"], scale: ["#pPct", "[data-form=scale]"] };
+    var pair = map[kind] || map.move;
+    var field = sel && !sel.hidden ? document.querySelector(pair[0]) : null;
+    var form = document.querySelector(pair[1]);
+    if (field) { field.focus(); return; }
+    if (form) { var det = form.closest("details"); if (det) det.open = true; var input = form.querySelector("input,button"); if (input) input.focus(); return; }
+    var big = kind === "scale" ? document.querySelector("[data-big=scale]") : null;
+    if (big) big.click();
+  }
+  document.addEventListener("click", function (e) {
+    var go = e.target.closest && e.target.closest(".ws-go");
+    if (go) {
+      e.preventDefault();
+      if (go.id === "slicerSlice") setDockTab("process");
+      var target = document.getElementById(go.getAttribute("data-go") || "");
+      if (target && !target.disabled) target.click();
+      return;
+    }
+    var xform = e.target.closest && e.target.closest("#slicerDock [data-xform]");
+    if (xform) {
+      e.preventDefault();
+      document.querySelectorAll("#slicerDock [data-xform]").forEach(function (b) { b.setAttribute("aria-pressed", b === xform ? "true" : "false"); });
+      focusXform(xform.getAttribute("data-xform"));
+      return;
+    }
+    var tab = e.target.closest && e.target.closest("#slicerDock [data-docktab]");
+    if (tab) { e.preventDefault(); setDockTab(tab.getAttribute("data-docktab")); return; }
+    if (e.target.closest && e.target.closest("#processClose")) {
+      e.preventDefault();
+      setDockTab("plate");
+    }
+  });
   window.zeimWorkspaces = ZWS.all;
 })();

@@ -188,3 +188,27 @@ Remaining risks, stated as they are:
 - Smart merge still matches Smart Split pieces to a recorded point. That matcher was not part of this bug and was not changed.
 - Whole-mesh moves keep ids when the face list is unchanged. A body step on a mesh large enough to run in the forked memory guard was not measured. The guard returns the mesh through pickle; ids are applied again in the parent when the faces still line up, or when one body stays one body.
 - The CAD page was not clicked. The history field for a body id is text. A maker can still pick a body for a new step; the server stores the id.
+
+## Build chrome polish — Exit stays clear, process sheet
+
+Branch `cursor/build-chrome-polish-4f8f`, off `zeim` @ `44367d9`. No merge and no deploy. My Studio stays on Account. Exit, Done, New build, Return to My Studio, and Send to Showcase keep their existing jobs. B1-6 was not edited.
+
+Before: a floating panel could be dragged over Exit. On the main workspaces the drag layer sat above the workspace bar. On CAD, a drag could paint out of the view and over the header. Slicer settings lived in the right-hand result card, so opening them covered the model.
+
+After: the workspace bar is a top strip that layout will not use, and it paints above a drag. Docked tool rails slide along an edge and cannot be left floating over that strip. View controls (Fit, turn, wire) dock mid-right. Move / Rotate / Scale sit in a bottom row on the FDM plate, with Plate and Process tabs under them. Process opens a half-height sheet (Quality, Support, Infill, Adhesion) using the patterns and support modes ZEIM already slices. Close hides the sheet and does not leave the workspace. Slice in the top-right runs the same Slice button.
+
+Verification (this branch, Python 3.12, Playwright not installed):
+
+- `node --check` on `static/wslayout.js`, `static/ws-main.js`, `static/cad-phone.js`, `static/printer.js` — syntax ok.
+- `python3 -m pytest -q tests/test_build_chrome.py tests/test_workspace_source.py tests/test_workspace_controls.py tests/test_c8_slicer_presets.py tests/test_print_core.py::test_panel_ui_has_beginner_and_advanced tests/test_litho_up1.py::test_layout_watches_obstacles_so_panels_come_back tests/test_litho_up1.py::test_core_panel_is_not_minimised_to_make_room` — 17 passed.
+- `python3 -m pytest -q tests/test_c12_lithophane_preset.py::test_panel_ui_defaults_to_lithophane_preset_when_hinted tests/test_c8_slicer_presets.py` — 7 passed.
+- `node --test tests/js/layout-batch2.test.mjs tests/js/build-chrome.test.mjs` — 10 passed. The new Chrome check (1280×800 and 390×844) drags a docked tool and a free panel at Exit and reads `elementFromPoint`. Exit stays the hit. The process sheet stays about half the view, and Close and Move stay hittable.
+- Live `cad.html` on `127.0.0.1:8765` (headless Chrome): Exit stayed the hit target while the tool grip was dragged at it, at 1280px and on the phone layout (44px Exit).
+
+Not run: Playwright UI scripts (`tests/ui_*.py`). No signed-in browser pass of Lithophane, TorchC0, or a sliced plate. No printer.
+
+| ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| UI-1 | Layout / Exit covered | Verified in the headless Chrome fixture and on live CAD. Not a full app click-through. | Free-drag used a higher layer than the workspace bar, and the layout box included that bar. CAD drags could paint over the header. | Exit, Done, or New build could sit under a tool panel. | `f017a25`. The bar is reserved and paints above a drag. Docked rails cannot be dropped over it. CAD header stacks above the view, and the view clips overflow. | Chrome fixture and live CAD, above. | A saved free panel can still sit in the open area under the bar. It cannot take the Exit hit. |
+| UI-2 | Layout / docked tools | Verified for the dock flag and the plate row markup. Not dragged on a real plate. | View and undo bars defaulted to the top edge, in the same band as Exit. | Tools felt dropped on the model instead of part of the workspace. | `f017a25`. View docks mid-right. Plate Move / Rotate / Scale dock at the bottom and focus the fields ZEIM already has. | Source test and the fixture’s Move hit. | There is no new on-model gizmo. Move still uses the plate fields or the existing forms. |
+| UI-3 | Slicer / process sheet | Verified by source and by the sheet’s box in the Chrome fixture. The live slicer was not given a model. | Settings were inside the floating result card. | Choosing quality or supports covered the model. | `f017a25`. Process is a bottom sheet, about half the view, with Quality, Support, Infill, and Adhesion. Icons only for patterns ZEIM already slices. | `test_build_chrome.py` and the fixture height check. Preset tests passed. | Beginner still sends the preset’s walls and temperatures. Pattern and brim are sent from the visible choices. A 100% fill with a pattern other than solid lines can still be refused, and the sheet says so. |

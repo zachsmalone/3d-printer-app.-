@@ -54,11 +54,11 @@
     obstacles: ["#cwStage .cw-cubewrap", "#cwSectionBar", "#cwStage > .cw-lesson", "#cwStage > .cw-hint", "#cwEmpty", ".cw-warn", ".cw-modepop", ".cw-phone #cwSide", ".cw-phone #cwSide[data-sheet=peek] > #cwLesson", ".cw-phone #cwSide > .cw-msg:not(:empty)"],
     watch: ["#cwSectionBar", "#cwHint", "#cwLesson", "#cwSide", "#cwEmpty"],
     panels: [
-      { id: "tools", el: rail, label: "Tools", core: true, def: function () { return { edge: "left", t: 0 }; }, resize: false, bare: true },
-      { id: "tool", el: tool, core: true, label: "Tool options", def: function () { return phone() ? { edge: "bottom", t: 0 } : { edge: "left", t: 0.2 }; } },
-      { id: "quick", el: bl, label: "Quick buttons", def: function () { return { edge: "bottom", t: 0 }; }, resize: false, bare: true },
-      { id: "view", el: chips, label: "Grid & snap", def: function () { return { edge: "right", t: 0.35, hidden: phone() }; }, resize: false, bare: true },
-      { id: "side", el: side, label: "History & items", def: function () { return { edge: "right", t: 1 }; }, skip: function () { return PHONE.matches; } }
+      { id: "tools", el: rail, label: "Tools", core: true, dock: true, def: function () { return { edge: "left", t: 0 }; }, resize: false, bare: true },
+      { id: "tool", el: tool, core: true, dock: true, label: "Tool options", def: function () { return phone() ? { edge: "bottom", t: 0 } : { edge: "left", t: 0.2 }; } },
+      { id: "quick", el: bl, label: "Quick buttons", dock: true, def: function () { return { edge: "bottom", t: 0 }; }, resize: false, bare: true },
+      { id: "view", el: chips, label: "Grid & snap", dock: true, lead: true, def: function () { return { edge: "right", t: 0.46, hidden: phone() }; }, resize: false, bare: true },
+      { id: "side", el: side, label: "History & items", dock: true, def: function () { return { edge: "right", t: 1 }; }, skip: function () { return PHONE.matches; } }
     ] });
   function layout() { if (ws) ws.layout(); }
 
