@@ -639,8 +639,11 @@ def build(im: Image.Image, mode: str, params: dict) -> Model:
         m.info = {**(m.info or {}), "select": selectmask.summary(sel)}
     elif mode == "bust":
         warnings = warnings + [
-            "Tip: Auto-select head & shoulders (or trace them) for a cleaner bust cut. Auto is a starting mask you can edit."
+            "Tip: Auto-select head and shoulders (or trace them) for a cleaner bust cut. Auto is a starting mask you can edit. The whole photo is still a photo bust on a pedestal, not an AI figure."
         ]
+        ped = (m.info or {}).get("pedestal") or {}
+        if ped.get("skipped") and ped.get("message"):
+            warnings.append(str(ped["message"]))
     if warnings:
         m.info = {**(m.info or {}), "warnings": warnings}
     return m

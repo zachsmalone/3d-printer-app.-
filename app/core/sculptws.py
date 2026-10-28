@@ -1,9 +1,9 @@
 """Workspace sculpting: brush strokes recorded as history steps (original ZEIM code).
 
-Workflow ideas (brush set, size/strength, X symmetry, remesh for detail) follow how public sculpting
-apps are documented to behave (e.g. Nomad Sculpt, Blender sculpt mode); no code from them is used.
+Workflow ideas (brush set, size/strength, a centre mirror, subdivision for detail) follow how public
+sculpting apps are documented to behave; no code from them is used.
 A stroke = the dab centres the user dragged over (surface points), the surface normal at the start,
-brush, radius, strength, optional X symmetry and (grab) a move vector. Replaying the step re-applies
+brush, radius, strength, optional mirror across the model's centre and (grab) a move vector. Replaying the step re-applies
 the same dabs, so strokes stay in History with undo/redo/delete like every other step.
 Limits: the brush is a sphere, but only vertices facing the stroke normal move. The back
 of a thin wall stays put. A stroke that would fold a touched face, or move a vertex outside
@@ -203,18 +203,28 @@ def op_sculpt_stroke(m: trimesh.Trimesh, p: dict):
             "Lower the strength or the brush size and try again.")
     moved_n = int(np.count_nonzero(np.linalg.norm(v - v0, axis=1) > 1e-8))
     if moved_n == 0:
+        if s <= 1e-9:
+            raise OpError("Strength is 0, so the stroke changed nothing. The model was left unchanged.")
+        if clamped:
+            raise OpError(
+                "The stroke was held so the wall stayed at least 0.4 mm, and nothing else moved. "
+                "The model was left unchanged.")
         in_radius = np.linalg.norm(v0[:, None, :] - dabs[None, :, :], axis=2).min(axis=1) <= r
-        if in_radius.any():
+        facing = bool(in_radius.any() and np.any((base_vn[in_radius] @ n0) > 0.2))
+        if in_radius.any() and not facing:
             raise OpError(
                 "the brush only reached the back of the surface, so nothing was changed. "
                 "Turn the model and sculpt the side you can see. The back of a thin wall stays put.")
+        if in_radius.any():
+            return m, {"message": f"{brush.title()} stroke was too light to move the surface. Nothing changed.",
+                       "vertices_moved": 0, "thin_wall_protected": True}
         return m, {"message": f"{brush.title()} stroke was outside the model: nothing changed.",
                    "vertices_moved": 0, "thin_wall_protected": True}
     out = _check(_new(v, mm.faces))
     note = " Front of the brush only; the back of a thin wall stays. Size outside the brush is unchanged."
     if clamped:
         note += f" {clamped} move(s) were held so the wall stayed at least 0.4 mm."
-    return out, {"message": f"{brush.title()} stroke ({len(dabs)} dabs, {r:g} mm brush{', X symmetry' if p.get('symmetry_x') else ''})." + note,
+    return out, {"message": f"{brush.title()} stroke ({len(dabs)} dabs, {r:g} mm brush{', mirror across the centre' if p.get('symmetry_x') else ''})." + note,
                  "vertices_moved": moved_n, "thin_wall_protected": True, "thin_wall_clamped": clamped}
 
 
@@ -251,7 +261,7 @@ def label(op, p):
     if op == "remesh":
         return f"Uniform subdivision ≤ {p.get('edge', 1)} mm"
     if op == "sculpt_stroke":
-        return f"Sculpt {str(p.get('brush', '')).title()} ({float(p.get('radius', 5)):g} mm)" + (" · X sym" if p.get("symmetry_x") else "")
+        return f"Sculpt {str(p.get('brush', '')).title()} ({float(p.get('radius', 5)):g} mm)" + (" · mirror" if p.get("symmetry_x") else "")
     return None
 
 

@@ -9,10 +9,11 @@ import { takeExit } from "/static/studio-library.js";
 import { bindFlow } from "/static/project-flow.js";
 import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, chainStraight, closestSample, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
 import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
-import { createGizmo } from "/static/gizmo-view.js";
+import { createGizmo, chromeRects } from "/static/gizmo-view.js";
+import { applyPrepared, brushTitle, prepareStroke, sculptIdle } from "/static/sculptbrush.js";
 import {
   PAINT, pickChoice, edgeKey, curvePaint, bodyGlow, constraintBlock, constraintSummary,
-  filletBlock, faceOffsetBlock, extrudeBlock, revolveBlock, measureBlock, jointBlock, mergeFeel, boxesOverlap, facePair, measureLine, anchorClear,
+  filletBlock, faceOffsetBlock, extrudeBlock, revolveBlock, measureBlock, jointBlock, mergeFeel, boxesOverlap, facePair, measureLine, anchorClear, subdivideBlock,
 } from "/static/cad-feel.js";
 
 const $ = s => document.querySelector(s);
@@ -200,8 +201,13 @@ function buildWorld(keepCam) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(b64(b.positions, Float32Array), 3));
     g.setIndex(new THREE.BufferAttribute(b64(b.indices, Uint32Array), 1));
+    const sculptSrc = {
+      pos: new Float32Array(g.attributes.position.array),
+      indices: new Uint32Array(g.index.array),
+    };
     const ng = g.toNonIndexed(); g.dispose(); ng.computeVertexNormals();
     const mesh = new THREE.Mesh(ng, bodyMaterial(b.index)); mesh.userData.body = b.index;
+    mesh.userData.sculptSrc = sculptSrc;
     const eg = new THREE.BufferGeometry(); eg.setAttribute("position", new THREE.BufferAttribute(b64(b.edges, Float32Array), 3));
     const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x10131a, clippingPlanes: S.section ? [clipPlane] : [] }));
     lines.userData.edges = true; lines.userData.body = b.index;
@@ -370,7 +376,7 @@ const MODEL_TOOLS = [
   { id: "pattern", key: "P", label: "Pattern", sub: "linear · circular", tip: "Repeat a body in a row or around a centre." },
   { id: "align", key: "A", label: "Align", sub: "to value or body", tip: "Line up a body's side or centre with a value or another body." },
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
-  { id: "sculpt", key: "U", label: "Live Sculpt", sub: "brushes · remesh", tip: "Live Sculpt: every brush shows as you drag; strokes save in the background. Draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts; two fingers (or drag off the model) orbit." },
+  { id: "sculpt", key: "U", label: "Live Sculpt", sub: "brushes · subdivide", tip: "Live Sculpt: the brush on the model is the stroke that will be saved. Draw, carve, smooth, inflate, pinch, flatten, grab. One finger or the mouse sculpts. Two fingers, or a drag off the model, orbit." },
   { id: "joints", key: "J", label: "Hinges/Joints", sub: "print-in-place", tip: "Add a hinge, ball joint, pin joint or chain as new parts with a clearance gap. Fit is simulated. They are not attached to a body you already have." },
   { id: "merge", key: "G", label: "Merge", sub: "snap · fuse · rejoin", tip: "Drag bodies on the bed (they snap to each other), then fuse them into one. Smart merge puts Smart Split pieces back along their cuts." },
   { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
@@ -468,7 +474,7 @@ function panel(title, html, onApply, applyLabel = "Apply") {
 }
 const HINTS = {
   repair: ["Fix mesh", "Repair an imported mesh."],
-  sculpt: ["Live Sculpt", "Drag on the model — the shape updates live. Two fingers or drag off the model to orbit. Each stroke saves in the background (undo works)."],
+  sculpt: ["Live Sculpt", "Drag the side you can see. The brush is the stroke that will be saved. Two fingers, or a drag off the model, orbit. A folded stroke is not kept."],
   null: ["Select", "Tap a body to select it, or pick a tool on the left."],
   shapes: ["Shapes", "Tap a shape to drop it. Pick New, Join or Cut first."],
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
@@ -719,14 +725,21 @@ const TOOL_PANELS = {
       ${seg("tBrush", [["draw", "Draw"], ["carve", "Carve"], ["smooth", "Smooth"], ["inflate", "Inflate"], ["pinch", "Pinch"], ["flatten", "Flatten"], ["grab", "Grab"]], B.brush)}
       <div class="f"><label for="tRad">Size <b id="tRadV">${B.radius} mm</b></label><input id="tRad" type="range" min="0.5" max="40" step="0.5" value="${B.radius}"></div>
       <div class="f"><label for="tStr">Strength <b id="tStrV">${Math.round(B.strength * 100)}%</b></label><input id="tStr" type="range" min="0.05" max="1" step="0.05" value="${B.strength}"></div>
-      <label class="cw-toggle"><span>Symmetry X (mirror across X = 0)</span><input type="checkbox" id="tSym" ${B.sym ? "checked" : ""}></label>
+      <label class="cw-toggle"><span>Mirror left and right</span><input type="checkbox" id="tSym" ${B.sym ? "checked" : ""}></label>
       <div class="f"><label for="tEdge">Longest edge after subdivision (mm)</label>${num("tEdge", B.edge)}</div>
-      <p class="help">Every brush shows live on the model as you drag. Strokes save in the background (no waiting spinner). Undo waits until the stroke has saved. The brush follows the surface you are looking at: the back of a thin wall stays put. A stroke that would fold the mesh or change size outside the brush is refused. Subdivide evenly splits long edges. It does not build a new surface.</p>`,
+      <p class="help">The brush on the model is the stroke that will be saved. It follows the side you are looking at. The back of a thin wall stays put. Mirror uses the model's centre. A stroke that would fold the mesh, or change size outside the brush, is not kept. Grab follows your drag at full strength in the centre. Subdivide evenly splits long edges. It does not build a new surface.</p>`,
       () => addOp("remesh", { edge: val("tEdge") }).then(() => setTool("sculpt")), "Subdivide evenly");
-    const sync = () => { B.brush = segVal("tBrush"); B.radius = val("tRad"); B.strength = val("tStr"); B.sym = $("#tSym").checked; B.edge = val("tEdge");
-      $("#tRadV").textContent = B.radius + " mm"; $("#tStrV").textContent = Math.round(B.strength * 100) + "%"; };
+    const sync = () => {
+      B.brush = segVal("tBrush"); B.radius = val("tRad"); B.strength = val("tStr"); B.sym = $("#tSym").checked; B.edge = val("tEdge");
+      $("#tRadV").textContent = B.radius + " mm"; $("#tStrV").textContent = Math.round(B.strength * 100) + "%";
+      const str = $("#tStr");
+      if (str) { str.disabled = B.brush === "grab"; str.title = B.brush === "grab" ? "Grab uses full strength at the centre. This slider does not change it." : ""; }
+      lockApply(subdivideBlock(B.edge));
+      if (!sculptSaving && !stroke) setLiveSculptStatus(sculptIdle(B.brush, B.radius, B.strength, B.sym, bodyCount() > 0));
+    };
     $("#cwTool").querySelectorAll("input").forEach(i => i.oninput = sync); $("#tBrush").addEventListener("change", sync);
     $("#tCancel").textContent = "Done";
+    sync();
   },
   repair() { panel("Fix mesh", `<p class="help">Repairs holes, flipped and duplicate faces. Imported files that aren't closed solids need this before Boolean, Fillet or Extrude join/cut.</p>`, () => addOp("repair", {})); },
   text() {
@@ -1513,67 +1526,106 @@ function pickRegion(ev) {
 let stroke = null; const pointers = new Set();
 const ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: 0xffb26b, depthTest: false, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }));
 ring.visible = false; scene.add(ring);
-function previewDab(c, n, k) {   // Live Sculpt: approximate feedback for every brush; server result replaces it on release
-  const B = S.brush, r = B.radius, brush = B.brush;
-  const dir = brush === "carve" ? -1 : 1;
+const SCULPT_CHROME = ".cw-panel, .cw-top, .cw-chips, .cw-bl, .cw-cubewrap, .cw-hint, .cw-section, .cw-side, .cw-lesson, .cw-rail, .zws-p, .wsbar, .cw-search, button, a, input, select, label, textarea";
+function eventOnChrome(ev) {
+  const t = ev.target;
+  if (t && t.closest && t.closest(SCULPT_CHROME)) return true;
+  return overlapsChrome(ev.clientX, ev.clientY, chromeRects(), 0);
+}
+function ringBlocked(point) {
+  const [x, y, z] = toScreen(point);
+  if (!(z <= 1)) return true;
+  const rect = renderer.domElement.getBoundingClientRect();
+  return overlapsChrome(rect.left + x, rect.top + y, chromeRects(), 8);
+}
+function placeRing(point, normal) {
+  if (!point || ringBlocked(point)) { ring.visible = false; return; }
+  ring.visible = true;
+  ring.position.copy(point);
+  ring.scale.setScalar(S.brush.radius);
+  ring.lookAt(point.clone().add(normal));
+}
+function captureSculptBodies() {
+  const bodies = [];
   for (const g of world.children) {
-    const geo = g.children[0].geometry, pos = geo.attributes.position, a = pos.array;
-    // Flatten uses a plane through the first dab (stored on stroke); fall back to camera-facing
-    const planeN = (brush === "flatten" && stroke?.flatN) ? stroke.flatN : n;
-    const planeC = (brush === "flatten" && stroke?.flatC) ? stroke.flatC : c;
-    const facing = n || stroke?.n;
-    if (facing && !geo.attributes.normal) geo.computeVertexNormals();
-    const na = geo.attributes.normal?.array;
-    for (let i = 0; i < a.length; i += 3) {
-      const dx = a[i] - c.x, dy = a[i + 1] - c.y, dz = a[i + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 >= r * r) continue;
-      if (facing && na && na[i] * facing.x + na[i + 1] * facing.y + na[i + 2] * facing.z <= 0.2) continue;
-      const fall = (1 - d2 / (r * r)) ** 2, s = B.strength;
-      if (brush === "grab") {
-        a[i] += k.x * fall; a[i + 1] += k.y * fall; a[i + 2] += k.z * fall;
-      } else if (brush === "smooth") {
-        // Pull toward the brush centre (cheap Laplacian stand-in)
-        const t = fall * s * 0.35;
-        a[i] += (c.x - a[i]) * t; a[i + 1] += (c.y - a[i + 1]) * t; a[i + 2] += (c.z - a[i + 2]) * t;
-      } else if (brush === "pinch") {
-        const t = fall * s * 0.25;
-        a[i] += (c.x - a[i]) * t; a[i + 1] += (c.y - a[i + 1]) * t; a[i + 2] += (c.z - a[i + 2]) * t;
-      } else if (brush === "flatten" && planeN) {
-        const px = a[i] - planeC.x, py = a[i + 1] - planeC.y, pz = a[i + 2] - planeC.z;
-        const d = px * planeN.x + py * planeN.y + pz * planeN.z;
-        const t = fall * s * 0.4;
-        a[i] -= planeN.x * d * t; a[i + 1] -= planeN.y * d * t; a[i + 2] -= planeN.z * d * t;
-      } else if (n) {
-        const w = fall * s * 0.15 * r * dir;
-        a[i] += n.x * w; a[i + 1] += n.y * w; a[i + 2] += n.z * w;
-      }
-    }
-    pos.needsUpdate = true; geo.computeVertexNormals();
+    const mesh = g.children[0];
+    const src = mesh?.userData?.sculptSrc;
+    if (!src) continue;
+    const live = mesh.userData.sculptLive;
+    const pos = live ? new Float64Array(live) : Float64Array.from(src.pos);
+    bodies.push({ prep: prepareStroke(pos, src.indices), indices: src.indices, mesh });
   }
+  return bodies;
+}
+function writeSculptDisplay(body, pos) {
+  const attr = body.mesh.geometry.attributes.position;
+  const a = attr.array, idx = body.indices;
+  for (let i = 0; i < idx.length; i++) {
+    const s = idx[i] * 3, d = i * 3;
+    a[d] = pos[s]; a[d + 1] = pos[s + 1]; a[d + 2] = pos[s + 2];
+  }
+  attr.needsUpdate = true;
+  body.mesh.geometry.computeVertexNormals();
+}
+function previewDab() {   // Live Sculpt: the same displacement the server keeps; a refusal leaves the mesh as it was
+  if (!stroke?.bodies?.length) return;
+  const B = S.brush;
+  let minX = Infinity, maxX = -Infinity;
+  for (const b of stroke.bodies) {
+    const p = b.prep.positions;
+    for (let i = 0; i < p.length; i += 3) { if (p[i] < minX) minX = p[i]; if (p[i] > maxX) maxX = p[i]; }
+  }
+  const params = {
+    brush: B.brush, radius: B.radius, strength: B.strength, symmetry: !!B.sym,
+    symX: Number.isFinite(minX) ? (minX + maxX) / 2 : 0,
+    points: stroke.pts.map(p => [p.x, p.y, p.z]),
+    normal: [stroke.n.x, stroke.n.y, stroke.n.z],
+    delta: stroke.delta ? [stroke.delta.x, stroke.delta.y, stroke.delta.z] : [0, 0, 0],
+  };
+  const results = stroke.bodies.map(b => applyPrepared(b.prep, params));
+  const bad = results.find(r => !r.kept);
+  if (bad) {
+    for (const b of stroke.bodies) {
+      writeSculptDisplay(b, b.prep.positions);
+      b.mesh.userData.sculptLive = new Float64Array(b.prep.positions);
+    }
+    stroke.previewKept = false;
+    setLiveSculptStatus(bad.reason);
+    return;
+  }
+  results.forEach((out, i) => {
+    const b = stroke.bodies[i];
+    writeSculptDisplay(b, out.positions);
+    b.mesh.userData.sculptLive = out.positions;
+  });
+  stroke.previewKept = true;
+  const note = results.find(r => r.reason)?.reason;
+  setLiveSculptStatus(note || `${brushTitle(B.brush)} · this is the stroke that will be saved`);
 }
 stage.addEventListener("pointerdown", ev => {
-  pointers.add(ev.pointerId);
   if (S.tool !== "sculpt" || S.mode !== "model") return;
+  if (eventOnChrome(ev)) { ring.visible = false; return; }
+  pointers.add(ev.pointerId);
   if (pointers.size > 1) { if (stroke) { stroke = null; load(true); } controls.enabled = true; return; }   // two fingers: orbit
   if (ev.button > 0) return;
   const h = pickBody(ev); if (!h) return;                                                                // off the model: orbit
   controls.enabled = false; ev.stopPropagation();
-  stroke = { pts: [h.point.clone()], n: h.normal.clone(), start: h.point.clone(), plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), h.point), last: h.point.clone() };
-  if (S.brush.brush === "flatten") { stroke.flatC = h.point.clone(); stroke.flatN = h.normal.clone(); }
-  if (S.brush.brush !== "grab") previewDab(h.point, h.normal);
+  stroke = { pts: [h.point.clone()], n: h.normal.clone(), start: h.point.clone(), plane: new THREE.Plane().setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), h.point), last: h.point.clone(), bodies: captureSculptBodies() };
+  if (S.brush.brush !== "grab") previewDab();
 }, true);
 const sculptMove = perFrame(ev => {
   if (S.tool !== "sculpt") { if (ring.visible) { ring.visible = false; invalidate(); } return; }
   invalidate();
+  if (eventOnChrome(ev)) { ring.visible = false; return; }
   const h = stroke && S.brush.brush === "grab" ? null : pickBody(ev);
-  if (h) { ring.visible = true; ring.position.copy(h.point); ring.scale.setScalar(S.brush.radius); ring.lookAt(h.point.clone().add(h.normal)); } else if (!stroke) ring.visible = false;
+  if (h) placeRing(h.point, h.normal); else if (!stroke) ring.visible = false;
   if (!stroke) return;
   if (S.brush.brush === "grab") {
     ray.setFromCamera(ndc(ev), camera); const q = new THREE.Vector3(); if (!ray.ray.intersectPlane(stroke.plane, q)) return;
-    const k = q.clone().sub(stroke.last); stroke.last = q; stroke.delta = q.clone().sub(stroke.start); previewDab(stroke.start.clone().add(stroke.delta).sub(k), null, k); return;
+    stroke.last = q; stroke.delta = q.clone().sub(stroke.start); previewDab(); return;
   }
   if (h && h.point.distanceTo(stroke.pts[stroke.pts.length - 1]) > S.brush.radius / 3 && stroke.pts.length < 400) {
-    stroke.pts.push(h.point.clone()); if (S.brush.brush !== "grab") previewDab(h.point, stroke.n);
+    stroke.pts.push(h.point.clone()); previewDab();
   }
 });
 stage.addEventListener("pointermove", sculptMove, { capture: true, passive: true });
@@ -1596,13 +1648,14 @@ async function pumpStrokes() {
         strokeQueue.length = 0;
         if (!stroke) await load(true);
         msg(e.message || "The stroke did not save. The model was put back. Redo that stroke.");
-        setLiveSculptStatus("Save failed — mesh restored");
+        setLiveSculptStatus((e.message || "The stroke did not save.") + " The model was put back.");
         return;
       }
     }
     if (!stroke) { try { await load(true); } catch (e) { msg(e.message); } }
-    setLiveSculptStatus("Live Sculpt · stroke saved");
-    setTimeout(() => { if (!sculptSaving) setLiveSculptStatus("Live Sculpt · drag to shape"); }, 1200);
+    const B = S.brush;
+    setLiveSculptStatus(B ? "Saved. " + sculptIdle(B.brush, B.radius, B.strength, B.sym, bodyCount() > 0) : "Saved.");
+    setTimeout(() => { if (!sculptSaving && !stroke && S.brush) setLiveSculptStatus(sculptIdle(S.brush.brush, S.brush.radius, S.brush.strength, S.brush.sym, bodyCount() > 0)); }, 1600);
   } finally { sculptSaving = false; updateTop(); if (strokeQueue.length) pumpStrokes(); }
 }
 async function endStroke(ev) {

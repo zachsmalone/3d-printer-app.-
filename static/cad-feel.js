@@ -115,6 +115,13 @@ export function measureBlock({ bodies }) {
   return "";
 }
 
+/* Uniform subdivision refuses an edge outside 0.05–100 mm. The button stays off until the length is one the server will keep. */
+export function subdivideBlock(edge) {
+  if (typeof edge !== "number" || !Number.isFinite(edge)) return "Type an edge length in millimetres.";
+  if (edge < 0.05 || edge > 100) return "Edge length must be between 0.05 and 100 mm.";
+  return "";
+}
+
 /* Knuckles, links, and clearance are the values the solid step already accepts. */
 export function jointBlock(state) {
   const kind = state.kind || "hinge";
