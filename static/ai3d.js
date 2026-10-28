@@ -34,7 +34,12 @@ function paintEngine() {
 function paintPlan() {
   const p = status.plan, el = $("#a3Plan"); clearInterval(timer);
   $("#a3Cool").hidden = true;
-  if (p.testing_mode) { el.textContent = "Testing mode: no limits or pauses."; ready(); return; }
+  if (p.testing_mode && p.reason !== "cap") {
+    el.textContent = p.allow_paid
+      ? "Testing mode is on for this server. The pause and the daily model cap are off. Sign-in checks still apply."
+      : (p.cap ? `Testing mode is on for this server. The pause between models is off. ${p.used_today} of ${p.cap} models today.` : "Testing mode is on for this server. The pause between models is off.");
+    ready(); return;
+  }
   if (p.reason === "pro") { el.textContent = "2D to 3D is part of Pro."; ready(); return; }
   const capTxt = p.cap ? `Testing period: ${p.used_today} of ${p.cap} models today.` : "";
   if (p.reason === "cap") { el.textContent = `That is today's ${p.cap} test models. More tomorrow.`; ready(); return; }

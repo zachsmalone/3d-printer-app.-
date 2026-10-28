@@ -311,3 +311,20 @@ Verification (this branch, Python 3.12, Playwright not installed):
 - `python3 -m pytest -q` on the CI file list — 196 passed, 2 skipped. The skips are `tests/test_app.py` “no slicer” and `tests/test_slice_api.py` “PrusaSlicer not installed”. They were not run and are not counted as passed.
 
 Not run: Playwright `tests/ui_membox.py` and `tests/test_membox_ui.py`. No signed-in click of Preview, Send to Slicer, or Exit. No printer. Not deployed. GitHub CI on the PR is the check that still has to go green; this note does not mark that job passed. The CI job does not run the memory-box modules; those 21 were run locally.
+
+## Testing mode switch
+
+Branch `cursor/testing-mode-switch-3e3b`, off `zeim` @ `1f4e5d7` (memory box #63). No deploy.
+
+One line in the server config, `ZEIM_TESTING_MODE=1`, lifts usage quotas and cooldowns (hourly uploads, the pause between local 2D→3D models, doctor checks, favorites, print photos, username tries, the rename wait, Showcase questions, collections, feedback notes, and tip / AI-label edits). Default is `0` in `.env.example`, `.env.production.example`, `.env.staging.example`, and the compose file. There is no public toggle. Account shows a short status line only when the flag is on, and the process log says the same.
+
+Left on: password guesses, auth rate limits, admin-token guesses, signup-per-IP, reports, recovery codes, the age gate, the malware scan, and file-size / memory / disk caps. Stripe checkout stays closed. The local 2D→3D daily model cap stays unless `ZEIM_TESTING_ALLOW_PAID=1` as well. That second line does not charge a card. There is no paid third-party AI client in this tree.
+
+Like routes still have no hourly cap in code (`LIKE_LIMIT_PER_HOUR` is unused). This change does not add one.
+
+Verification (this branch, Python 3.12 venv, Playwright not installed, PrusaSlicer not installed):
+
+- `python -m pytest -q tests/test_testing_mode.py` plus the CI file list and `tests/test_ai3d.py` / `tests/test_ai3d_off.py`, excluding `test_ui_tab_in_a_real_browser` — 232 passed, 2 skipped, 1 deselected. The skips are `tests/test_app.py` “no slicer” and `tests/test_slice_api.py` “PrusaSlicer not installed”. They were not run and are not counted as passed. The deselected test needs Playwright and was not run.
+- `node --check` on `static/ai3d.js` and `static/community.js` — syntax ok.
+
+Not run: a browser pass of the Account status line. No printer. Not deployed. GitHub CI on the PR is the check that still has to go green; this note does not mark that job passed. The CI job now includes `tests/test_testing_mode.py`.

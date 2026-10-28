@@ -28,6 +28,8 @@ services:
       ZEIM_PLANS_ENABLED: ${ZEIM_PLANS_ENABLED:-0}          # 0 = Semi Pro / Pro cannot start checkout
       ZEIM_COMING_SOON: ${ZEIM_COMING_SOON:-0}              # 0 = full app; 1 = holding page except /healthz
       ZEIM_2D3D_ENABLED: ${ZEIM_2D3D_ENABLED:-0}            # 0 = hide 2D→3D and refuse TripoSR jobs
+      ZEIM_TESTING_MODE: ${ZEIM_TESTING_MODE:-0}          # 0 = usage quotas stay on. 1 lifts them. Not a UI toggle.
+      ZEIM_TESTING_ALLOW_PAID: ${ZEIM_TESTING_ALLOW_PAID:-0}  # 0 = 2D→3D daily cap stays. Does not charge a card.
     volumes:
       - ${ZEIM_HOST_DIR:-/srv/zeim}/data:/data       # PHOTO3D_DATA: accounts, projects, settings. Not catalogs.
       - ${ZEIM_HOST_DIR:-/srv/zeim}/outputs:/outputs

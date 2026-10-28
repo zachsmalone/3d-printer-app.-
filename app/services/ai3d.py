@@ -5,7 +5,9 @@ the local Docker network and gets a mesh back. Nothing goes to any outside servi
 
 Plan: Pro after launch (ZEIM_AI3D_PRO_ONLY=1). While testing: unlocked for every adult account, capped per day.
 Cooldown (Zach, 2026-10-20): 5 minutes between models, starting when a model FINISHES (tweaks never count), plus 5 more
-after each paid model that day. ZEIM_TESTING_MODE=1 lifts the cap and the cooldown. Tests swap engine_call for a double.
+after each paid model that day. ZEIM_TESTING_MODE=1 lifts the cooldown (and the Pro-only gate).
+The daily model cap stays unless ZEIM_TESTING_ALLOW_PAID=1, because each model uses the worker's GPU.
+Neither flag starts a payment. Tests swap engine_call for a double.
 """
 from __future__ import annotations
 
@@ -89,22 +91,29 @@ def plan(actor) -> dict:
     """What this account may do right now (shown in the tab; enforced in start())."""
     if not config.ai3d_enabled():
         return {"allowed": False, "reason": "unavailable", "phase": "off", "wait_s": 0,
-                "cap": 0, "used_today": 0, "testing_mode": False}
+                "cap": 0, "used_today": 0, "testing_mode": False, "allow_paid": False}
     now = time.time()
     sid = actor.sid
-    if config.TESTING_MODE:
-        return {"allowed": True, "testing_mode": True, "cap": 0, "used_today": 0, "wait_s": 0, "phase": "testing"}
-    if config.AI3D_PRO_ONLY and not is_pro(actor):
-        return {"allowed": False, "reason": "pro", "phase": "pro", "wait_s": 0, "cap": 0, "used_today": 0, "testing_mode": False}
+    testing = bool(config.TESTING_MODE)
+    allow_paid = bool(testing and config.TESTING_ALLOW_PAID)
+    if config.AI3D_PRO_ONLY and not is_pro(actor) and not testing:
+        return {"allowed": False, "reason": "pro", "phase": "pro", "wait_s": 0, "cap": 0, "used_today": 0,
+                "testing_mode": False, "allow_paid": False}
     day = _day(now)
     used = _made_today.get(sid, ("", 0)); used = used[1] if used[0] == day else 0
     paid = _paid_today.get(sid, ("", 0)); paid = paid[1] if paid[0] == day else 0
-    cap = 0 if config.AI3D_PRO_ONLY else config.AI3D_DAILY_CAP
-    wait_min = config.AI3D_COOLDOWN_MIN + config.AI3D_COOLDOWN_STEP_MIN * paid
+    # Testing mode lifts the pause. The daily count stays, unless the separate paid flag is on,
+    # because each model uses GPU time on the worker. Pro-only with testing mode off still has no daily cap.
+    if allow_paid or (config.AI3D_PRO_ONLY and is_pro(actor) and not testing):
+        cap = 0
+    else:
+        cap = config.AI3D_DAILY_CAP
+    wait_min = 0 if testing else config.AI3D_COOLDOWN_MIN + config.AI3D_COOLDOWN_STEP_MIN * paid
     last = _last_done.get(sid)
-    wait_s = max(0, int(round(last + wait_min * 60 - now))) if last else 0
-    p = {"allowed": True, "testing_mode": False, "cap": cap, "used_today": used, "wait_s": wait_s,
-         "cooldown_min": wait_min, "phase": "pro" if config.AI3D_PRO_ONLY else "testing"}
+    wait_s = 0 if testing else (max(0, int(round(last + wait_min * 60 - now))) if last else 0)
+    p = {"allowed": True, "testing_mode": testing, "allow_paid": allow_paid, "cap": cap, "used_today": used,
+         "wait_s": wait_s, "cooldown_min": wait_min,
+         "phase": "testing" if testing or not config.AI3D_PRO_ONLY else "pro"}
     if cap and used >= cap:
         p.update(allowed=False, reason="cap")
     elif wait_s > 0:

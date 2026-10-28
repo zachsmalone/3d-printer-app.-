@@ -45,7 +45,7 @@ def post_feedback(body: dict, request: Request, actor: Actor = Depends(get_actor
         raise HTTPException(400, "Write a message first.")
     who = _who(actor)
     key = "feedback:" + (actor.sid or client_ip(request))
-    if not ratelimit.hit(key, 8, 3600):
+    if not config.TESTING_MODE and not ratelimit.hit(key, 8, 3600):
         raise HTTPException(429, "That's a lot of feedback for one hour. Please wait a while.")
     note = f"From: {who}\n\n{text}\n"
     emailed = False

@@ -129,11 +129,32 @@ COOKIE_SECURE = (os.environ.get("PHOTO3D_COOKIE_SECURE") or "auto").strip().lowe
 # Per-account upload limit per hour (0 = off). Enforced at /api/generate; the counter is
 # SQLite-backed in db mode (shared by all workers) and in-process in json mode.
 UPLOADS_PER_HOUR = _int("PHOTO3D_UPLOADS_PER_HOUR", 10)
-# Testing mode (ZEIM_TESTING_MODE=1, default off): lifts every USAGE quota and cooldown for everyone
-# (uploads/generate, editor imports, print photos, doctor checks, favorites, username tries and the rename wait).
-# Security limits (sign-in, admin token, signup-per-IP, reports, recovery codes, age gate), the malware scan
-# and file-size / memory / disk caps stay on.
+# Testing mode: one line in the server config (.env / the process environment). Default off.
+#   ZEIM_TESTING_MODE=1
+# Lifts usage quotas and cooldowns for this process: hourly upload and editor-import caps,
+# the pause between 2D→3D models, doctor checks, favorites, print photos, username tries,
+# the rename wait, Showcase questions / answers / challenges, collections, feedback notes,
+# and tip-link / AI-label edits.
+# Stays on: password-guess limits, auth rate limits, admin-token guesses, signup-per-IP,
+# reports, recovery codes, the age gate, the malware scan, and file-size / memory / disk caps.
+# Does not open Stripe or a paid API. The local 2D→3D worker still uses GPU time, so its
+# daily model cap stays unless the separate line ZEIM_TESTING_ALLOW_PAID=1 is also set.
+# That second flag only lifts that cap. It does not charge a card.
 TESTING_MODE = _flag("ZEIM_TESTING_MODE", False)
+TESTING_ALLOW_PAID = _flag("ZEIM_TESTING_ALLOW_PAID", False)
+
+
+def testing_mode_notice() -> str | None:
+    """One honest line for the process log when testing mode is on. None when it is off."""
+    if not TESTING_MODE:
+        return None
+    paid = "on" if TESTING_ALLOW_PAID else "off"
+    cap = "off" if TESTING_ALLOW_PAID else "still on"
+    return (
+        "ZEIM_TESTING_MODE is on. Usage quotas and cooldowns are lifted for this process. "
+        "Password guesses, sign-in limits, upload scanning, file-size caps, and payments stay on. "
+        f"ZEIM_TESTING_ALLOW_PAID is {paid}, so the 2D to 3D daily model cap is {cap}."
+    )
 
 
 def coming_soon_enabled() -> bool:

@@ -420,6 +420,8 @@ TIP_AI_CHANGES_PER_HOUR = 10
 
 def _label_limit(actor: Actor):
     """Tip link / AI label changes: 10 per hour per user (shared bucket, same limiter as the other write routes)."""
+    if config.TESTING_MODE:
+        return
     if not ratelimit.hit("tipai:" + ((actor.user or {}).get("id") or actor.sid), TIP_AI_CHANGES_PER_HOUR, 3600):
         raise HTTPException(429, "You've changed tip links or AI labels a lot just now. Please try again in an hour.")
 
@@ -922,6 +924,8 @@ def admin_metrics(request: Request, x_admin_token: str = Header("")):
         "storage": {"mode": config.STORAGE_MODE},
         "slicing": slicestats.snapshot(),               # synchronous design: totals + failures, no queue
         "disk_free_mb": round(retention.free_bytes() / (1024 * 1024)),
+        "testing_mode": config.TESTING_MODE,
+        "testing_allow_paid": config.TESTING_ALLOW_PAID,
     }
 
 
