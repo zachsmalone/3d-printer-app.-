@@ -123,6 +123,64 @@ export function distPointTris(p, flat) {
   return best;
 }
 
+/* Join collinear pieces of one straight edge. A corner (not parallel) stops the run.
+   flat is xyzxyz pairs, the same buffer the workspace draws. */
+export function chainStraight(a, b, flat, tol = 0.05) {
+  const segs = [];
+  for (let i = 0; i + 5 < (flat ? flat.length : 0); i += 6) {
+    segs.push([[flat[i], flat[i + 1], flat[i + 2]], [flat[i + 3], flat[i + 4], flat[i + 5]]]);
+  }
+  const near = (p, q) => {
+    const d = p[0] - q[0], e = p[1] - q[1], f = p[2] - q[2];
+    return d * d + e * e + f * f <= tol * tol;
+  };
+  const dirOf = (p, q) => {
+    const d = [q[0] - p[0], q[1] - p[1], q[2] - p[2]];
+    const L = Math.hypot(d[0], d[1], d[2]) || 1;
+    return [d[0] / L, d[1] / L, d[2] / L];
+  };
+  const parallel = (u, v) => Math.abs(u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) > 0.999;
+  let start = [a[0], a[1], a[2]], end = [b[0], b[1], b[2]];
+  const axis = dirOf(start, end);
+  const along = (p, q) => (q[0] - p[0]) * axis[0] + (q[1] - p[1]) * axis[1] + (q[2] - p[2]) * axis[2];
+  const used = new Set();
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (let i = 0; i < segs.length; i++) {
+      if (used.has(i)) continue;
+      const [p, q] = segs[i];
+      if (!parallel(dirOf(p, q), axis)) continue;
+      const pEnd = near(p, end), qEnd = near(q, end), pStart = near(p, start), qStart = near(q, start);
+      if ((pEnd || qEnd) && !(pStart && qStart)) {
+        const nxt = pEnd ? q : p;
+        if (along(end, nxt) <= tol) { used.add(i); continue; }
+        end = [nxt[0], nxt[1], nxt[2]];
+        used.add(i);
+        grew = true;
+      } else if (pStart || qStart) {
+        const nxt = pStart ? q : p;
+        if (along(start, nxt) >= -tol) { used.add(i); continue; }
+        start = [nxt[0], nxt[1], nxt[2]];
+        used.add(i);
+        grew = true;
+      }
+    }
+  }
+  return { a: start, b: end };
+}
+
+/* samples: {p, px, py, behind}. The nearest sample within maxPx, or null. */
+export function closestSample(px, py, samples, maxPx) {
+  let best = null, bd = maxPx;
+  for (const s of samples || []) {
+    if (!s || s.behind) continue;
+    const d = Math.hypot(s.px - px, s.py - py);
+    if (d < bd) { bd = d; best = s.p; }
+  }
+  return best;
+}
+
 /* Drop edges, a face, or a body that the current meshes no longer contain.
    bodies: [{ index, visible, edges: number[], tris: number[] }]. */
 export function reconcileSelection(sel, bodies, tol) {

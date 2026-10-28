@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {
   FEEL_MS, pickChoice, edgeKey, curvePaint, bodyGlow,
   constraintBlock, constraintSummary, filletBlock, faceOffsetBlock,
-  extrudeBlock, revolveBlock, measureBlock, anchorClear, barRect,
+  extrudeBlock, revolveBlock, measureBlock, jointBlock,
+  boxesOverlap, mergeFeel, facePair, measureLine, anchorClear, barRect,
 } from "../../static/cad-feel.js";
 
 test("hover follows the same pick a tap will keep", () => {
@@ -63,6 +64,41 @@ test("constraint reasons match the selection", () => {
   assert.match(constraintSummary([]), /Select curves first/);
   assert.equal(constraintSummary([line, circle]), "");
   assert.match(constraintSummary([line, line, line]), /exactly two/);
+});
+
+test("joints and merge say what they can do", () => {
+  assert.equal(jointBlock({ kind: "hinge", clearance: 0.3, knuckles: 5 }), "");
+  assert.equal(jointBlock({ kind: "snap_hinge", clearance: 0.3, knuckles: 4 }), "Knuckles must be 3, 5, 7, or 9.");
+  assert.equal(jointBlock({ kind: "chain", clearance: 0.3, links: 1 }), "A chain needs 2 to 30 links.");
+  assert.equal(jointBlock({ kind: "ball", clearance: 0, links: 5 }), "Clearance must be between 0.15 and 1 mm.");
+  assert.equal(jointBlock({ kind: "ball", clearance: 0.3 }), "");
+  const a = { min: [0, 0, 0], max: [10, 10, 10] };
+  const apart = { min: [20, 0, 0], max: [30, 10, 10] };
+  assert.equal(boxesOverlap(a, apart, 0.05), false);
+  assert.equal(boxesOverlap(a, { min: [9, 0, 0], max: [19, 10, 10] }, 0.05), true);
+  assert.match(mergeFeel({ count: 1, snap: "none", overlaps: false }), /at least two/);
+  assert.match(mergeFeel({ count: 2, snap: "none", overlaps: false }), /do not overlap/);
+  assert.match(mergeFeel({ count: 2, snap: "x+", overlaps: false }), /0\.2 mm/);
+  assert.match(mergeFeel({ count: 2, snap: "none", overlaps: true }), /overlap/);
+});
+
+test("parallel faces report the distance between them", () => {
+  const up = [0, 0, 1], down = [0, 0, -1], side = [1, 0, 0];
+  const same = facePair(up, [0, 0, 10], up, [5, 0, 10]);
+  assert.equal(same.gap, null);
+  assert.ok(same.angle < 0.01);
+  const thick = facePair(up, [0, 0, 10], down, [2, 0, 0]);
+  assert.ok(Math.abs(thick.gap - 10) < 1e-6);
+  assert.ok(thick.angle > 179);
+  const square = facePair(up, [0, 0, 0], side, [0, 0, 0]);
+  assert.equal(square.parallel, false);
+  assert.equal(square.gap, null);
+  const line = measureLine(20, [20, 0, 0], same);
+  assert.ok(line.startsWith("20 mm"));
+  assert.match(line, /faces 0/);
+  assert.equal(line.includes("between faces"), false);
+  const gap = measureLine(12, [0, 0, 10], thick);
+  assert.match(gap, /10 mm between faces/);
 });
 
 test("a context bar stays inside the stage and off the mid-right dock", () => {

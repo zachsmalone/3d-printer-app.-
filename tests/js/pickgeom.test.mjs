@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, edgeMatches, distPointTri, reconcileSelection,
+  clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, edgeMatches, distPointTri, chainStraight, closestSample, reconcileSelection,
 } from "../../static/pickgeom.js";
 
 test("a section cut drops the hidden side and keeps the visible part of a crossing edge", () => {
@@ -32,6 +32,30 @@ test("screen distance and occlusion", () => {
   assert.equal(inFrontOfHit(10, 12, 0.01), true);
   assert.equal(inFrontOfHit(30, 10, 0.01), false);
   assert.equal(inFrontOfHit(10, null, 0.01), true);
+});
+
+test("a straight edge split into pieces is one length, and a corner stops it", () => {
+  const flat = [
+    0, 0, 0, 10, 0, 0,
+    10, 0, 0, 20, 0, 0,
+    20, 0, 0, 20, 10, 0,
+  ];
+  const run = chainStraight([0, 0, 0], [10, 0, 0], flat);
+  assert.deepEqual(run.a, [0, 0, 0]);
+  assert.deepEqual(run.b, [20, 0, 0]);
+  const corner = chainStraight([10, 0, 0], [20, 0, 0], flat);
+  assert.deepEqual(corner.a, [0, 0, 0]);
+  assert.deepEqual(corner.b, [20, 0, 0]);
+  const turn = chainStraight([20, 0, 0], [20, 10, 0], flat);
+  assert.deepEqual(turn.a, [20, 0, 0]);
+  assert.deepEqual(turn.b, [20, 10, 0]);
+  const hit = closestSample(10, 10, [
+    { p: [0, 0, 0], px: 0, py: 0, behind: false },
+    { p: [1, 0, 0], px: 12, py: 9, behind: false },
+    { p: [2, 0, 0], px: 4, py: 4, behind: true },
+  ], 8);
+  assert.deepEqual(hit, [1, 0, 0]);
+  assert.equal(closestSample(0, 0, [{ p: [1, 1, 1], px: 40, py: 40, behind: false }], 8), null);
 });
 
 test("a lost edge or face is dropped and a real one stays", () => {

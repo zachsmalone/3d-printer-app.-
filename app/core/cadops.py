@@ -686,6 +686,224 @@ def op_body_boolean(m, p):
     return out, {"message": f"Boolean {kind}."}
 
 
+_SHARP_DEG = 25.0          # same cutoff as the edges drawn in the workspace
+_CHAIN_TURN_DEG = 20.0     # follow a straight run or a gentle curve; stop at a corner
+_SNAP_MM = 0.75            # a slightly off pick still means the edge under it
+_MAX_ROUND_SEGS = 400
+
+
+def _convex_flags(mm: trimesh.Trimesh) -> np.ndarray:
+    """True on a convex (outside) adjacency. Coplanar pairs are filtered by angle later."""
+    n = len(mm.face_adjacency)
+    try:
+        flags = np.asarray(mm.face_adjacency_convex, bool)
+        if len(flags) == n:
+            return flags
+    except (AttributeError, TypeError, ValueError):
+        pass
+    if n == 0:
+        return np.zeros(0, bool)
+    pairs = mm.face_adjacency
+    free = mm.vertices[mm.face_adjacency_unshared[:, 0]]
+    origin = mm.vertices[mm.faces[pairs[:, 1], 0]]
+    normal = mm.face_normals[pairs[:, 1]]
+    return np.einsum("ij,ij->i", free - origin, normal) < -1e-6
+
+
+def _feature_chains(mesh: trimesh.Trimesh) -> list[dict]:
+    """Sharp edges chained along a straight run or a gentle curve. A corner starts a new chain.
+
+    Each chain is {pts, convex, closed}. Closed means the last point joins the first (a hole rim).
+    """
+    mm = mesh.copy()
+    mm.merge_vertices()
+    if len(mm.faces) == 0 or len(mm.face_adjacency) == 0:
+        return []
+    ang = mm.face_adjacency_angles
+    keep = np.nonzero(ang > np.radians(_SHARP_DEG))[0]
+    if len(keep) == 0:
+        return []
+    edges = mm.face_adjacency_edges[keep]
+    convex = _convex_flags(mm)[keep]
+    v = mm.vertices
+    recs = []
+    buckets: dict[int, list[int]] = {}
+    for i, (a, b) in enumerate(edges):
+        a, b = int(a), int(b)
+        d = v[b] - v[a]
+        length = float(np.linalg.norm(d))
+        if length < 1e-8:
+            continue
+        recs.append({"a": a, "b": b, "dir": d / length, "convex": bool(convex[i])})
+        buckets.setdefault(a, []).append(len(recs) - 1)
+        buckets.setdefault(b, []).append(len(recs) - 1)
+    cos_turn = math.cos(math.radians(_CHAIN_TURN_DEG))
+    used: set[int] = set()
+
+    def other(rec, vid):
+        return rec["b"] if rec["a"] == vid else rec["a"]
+
+    def outgoing(rec, vid):
+        return rec["dir"] if rec["a"] == vid else -rec["dir"]
+
+    chains = []
+    for i, rec in enumerate(recs):
+        if i in used:
+            continue
+        used.add(i)
+        poly = [rec["a"], rec["b"]]
+        conv = rec["convex"]
+        closed = False
+        for side in (1, 0):
+            if closed:
+                break
+            while True:
+                vid = poly[-1] if side == 1 else poly[0]
+                prev = poly[-2] if side == 1 else poly[1]
+                inbound = v[vid] - v[prev]
+                il = float(np.linalg.norm(inbound))
+                if il < 1e-8:
+                    break
+                inbound = inbound / il
+                cands = []
+                for j in buckets.get(vid, []):
+                    if j in used or recs[j]["convex"] != conv:
+                        continue
+                    if float(np.dot(inbound, outgoing(recs[j], vid))) < cos_turn:
+                        continue
+                    cands.append(j)
+                    if len(cands) > 1:
+                        break
+                if len(cands) != 1:
+                    break
+                j = cands[0]
+                nxt = other(recs[j], vid)
+                far = poly[0] if side == 1 else poly[-1]
+                if nxt == far and len(poly) > 2:
+                    used.add(j)
+                    closed = True
+                    break
+                if nxt in poly:
+                    break
+                used.add(j)
+                if side == 1:
+                    poly.append(nxt)
+                else:
+                    poly.insert(0, nxt)
+        pts = [np.asarray(v[k], float).copy() for k in poly]
+        if len(pts) >= 2:
+            chains.append({"pts": pts, "convex": conv, "closed": closed})
+    return chains
+
+
+def _segment_distance(p, a, b) -> float:
+    ab = b - a
+    L2 = float(np.dot(ab, ab))
+    if L2 < 1e-18:
+        return float(np.linalg.norm(p - a))
+    t = float(np.clip(np.dot(p - a, ab) / L2, 0.0, 1.0))
+    return float(np.linalg.norm(p - (a + ab * t)))
+
+
+def _chain_segments(chain) -> list[tuple[np.ndarray, np.ndarray]]:
+    pts = chain["pts"]
+    if len(pts) < 2:
+        return []
+    if not chain["closed"] and len(pts) >= 2:
+        straight = True
+        for i in range(1, len(pts) - 1):
+            d0 = pts[i] - pts[i - 1]
+            d1 = pts[i + 1] - pts[i]
+            n0, n1 = float(np.linalg.norm(d0)), float(np.linalg.norm(d1))
+            if n0 < 1e-8 or n1 < 1e-8 or abs(float(np.dot(d0, d1)) / (n0 * n1)) < 0.999:
+                straight = False
+                break
+        if straight:
+            return [(pts[0], pts[-1])]
+    segs = [(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    if chain["closed"]:
+        segs.append((pts[-1], pts[0]))
+    return segs
+
+
+def _chain_polyline(chain):
+    pts = chain["pts"]
+    segs = [(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
+    if chain["closed"] and len(pts) > 2:
+        segs.append((pts[-1], pts[0]))
+    return segs
+
+
+def _nearest_dir(p, segs, tol):
+    best = None
+    best_d = tol + 1e-9
+    for pa, pb in segs:
+        d = _segment_distance(p, pa, pb)
+        if d <= tol and d < best_d:
+            best_d = d
+            best = pb - pa
+    return best
+
+
+def _chain_matches(chain, a, b, tol) -> bool:
+    """Both picks lie on this edge, and the pick runs along it. A corner is a different chain."""
+    segs = _chain_polyline(chain)
+    if not segs:
+        return False
+    da, db = _nearest_dir(a, segs, tol), _nearest_dir(b, segs, tol)
+    if da is None or db is None:
+        return False
+    req = b - a
+    rl = float(np.linalg.norm(req))
+    if rl < 1e-8:
+        return False
+    req = req / rl
+    cos = math.cos(math.radians(_CHAIN_TURN_DEG))
+    for direc in (da, db):
+        el = float(np.linalg.norm(direc))
+        if el >= 1e-8 and abs(float(np.dot(req, direc / el))) >= cos:
+            return True
+    return False
+
+
+def _match_feature_chains(chains, requested, tol):
+    """(chosen convex chains, inside-corner misses, not-on-this-body misses)."""
+    chosen = []
+    seen = set()
+    inside = missed = 0
+    for edge in requested:
+        a = np.asarray(edge[0], float)
+        b = np.asarray(edge[1], float)
+        hits = [i for i, c in enumerate(chains) if c["convex"] and _chain_matches(c, a, b, tol)]
+        if hits:
+            i = min(hits, key=lambda k: _chain_gap(chains[k], a, b))
+            if i not in seen:
+                seen.add(i)
+                chosen.append(chains[i])
+            continue
+        if any((not c["convex"]) and _chain_matches(c, a, b, tol) for c in chains):
+            inside += 1
+        else:
+            missed += 1
+    return chosen, inside, missed
+
+
+def _chain_gap(chain, a, b) -> float:
+    segs = _chain_polyline(chain)
+    if not segs:
+        return 1e9
+    nearest = lambda p: min(_segment_distance(p, pa, pb) for pa, pb in segs)
+    return nearest(a) + nearest(b)
+
+
+def _round_miss(inside: int, missed: int) -> OpError:
+    if inside and not missed:
+        return OpError("Those are inside corners. Fillet and chamfer only change outside edges, and only approximately.")
+    if missed and not inside:
+        return OpError("Those edges are not on this body. Pick an outside edge of the body you chose.")
+    return OpError("None of those edges could be rounded. Inside corners stay sharp, and an edge that is not on this body is left alone.")
+
+
 def _edge_capsules(edges, r):
     import manifold3d as mf
     caps = None
@@ -720,6 +938,32 @@ def op_round_edges(m, p):
         raise OpError("The radius is tiny compared with the body; use at least 1/400 of its size.")
     if 2 * r >= min(sel.extents):
         raise OpError(f"Radius {r:g} mm is too big for this body (thinnest side {min(sel.extents):.1f} mm).")
+    edges = p.get("edges") or []
+    caps_edges = None
+    n_features = 0
+    warns = []
+    if edges:
+        if not isinstance(edges, list) or len(edges) > 64:
+            raise OpError("edges must be a list of up to 64 [[x,y,z],[x,y,z]] pairs.")
+        try:
+            parsed = [[list(map(float, e[0]))[:3], list(map(float, e[1]))[:3]] for e in edges]
+        except (TypeError, ValueError, IndexError):
+            raise OpError("edges must be [[x,y,z],[x,y,z]] pairs.")
+        chosen, inside, missed = _match_feature_chains(_feature_chains(sel), parsed, _SNAP_MM)
+        if not chosen:
+            raise _round_miss(inside, missed)
+        caps_edges = []
+        for chain in chosen:
+            caps_edges.extend(_chain_segments(chain))
+        if not caps_edges:
+            raise _round_miss(inside, missed)
+        if len(caps_edges) > _MAX_ROUND_SEGS:
+            raise OpError("That outside edge is too detailed to round in one step. Simplify the body, or pick a shorter edge.")
+        n_features = len(chosen)
+        if inside:
+            warns.append(f"{inside} inside corner(s) stayed sharp. This only rounds outside edges.")
+        if missed:
+            warns.append(f"{missed} edge(s) were not on this body, so they were left alone.")
     A = _to_manifold(sel)
     if style == "fillet":
         tool = mf.Manifold.sphere(r, 24)
@@ -734,14 +978,8 @@ def op_round_edges(m, p):
         raise OpError("The radius removes the whole body.")
     opened_raw = opened
     opened = opened ^ A                       # never grow past the original faces
-    edges = p.get("edges") or []
-    if edges:
-        if not isinstance(edges, list) or len(edges) > 64:
-            raise OpError("edges must be a list of up to 64 [[x,y,z],[x,y,z]] pairs.")
-        try:
-            caps = _edge_capsules([[list(map(float, e[0]))[:3], list(map(float, e[1]))[:3]] for e in edges], r)
-        except (TypeError, ValueError, IndexError):
-            raise OpError("edges must be [[x,y,z],[x,y,z]] pairs.")
+    if caps_edges:
+        caps = _edge_capsules([[a.tolist(), b.tolist()] for a, b in caps_edges], r)
         if caps is not None:
             opened = A - ((A - opened) ^ caps)
     out = None
@@ -755,10 +993,23 @@ def op_round_edges(m, p):
         if out is not None:
             break
     if out is None:                           # QA B3: never hand back a non-manifold mesh
+        if caps_edges and len(caps_edges) > 1:
+            raise OpError("That curved outside edge could not be rounded cleanly. Try a smaller size, or a straight edge. "
+                          "Inside corners stay sharp.")
         raise OpError("The rounded result wouldn't be a clean closed solid on this shape, so it was not applied. "
                       "Try a smaller radius or pick fewer edges.")
+    if caps_edges and sel.is_watertight and out.is_watertight and abs(float(sel.volume) - float(out.volume)) < 1e-3 * r * r:
+        raise OpError("Those edges were not rounded. Pick an outside edge on this body. Inside corners stay sharp.")
     out = tag_result(out, body_id_of(sel), max_body_id(m))
-    return _join(out, rest), {"message": f"{style.title()} {r:g} mm (approximate, convex edges)."}
+    if n_features:
+        noun = "edge" if n_features == 1 else "edges"
+        msg = f"{style.title()} {r:g} mm on {n_features} outside {noun}. Approximate mesh: inside corners stay sharp."
+    else:
+        msg = f"{style.title()} {r:g} mm (approximate, convex edges)."
+    rep = {"message": msg}
+    if warns:
+        rep["warnings"] = warns
+    return _join(out, rest), rep
 
 
 def op_face_offset(m, p):

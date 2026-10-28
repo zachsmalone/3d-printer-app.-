@@ -220,6 +220,7 @@ def _display_mesh(m: trimesh.Trimesh):
 
 
 def _scene_body(i: int, b: trimesh.Trimesh) -> tuple[dict, int]:
+    pid = cadops.body_id_of(b)
     b = b.copy()
     b.merge_vertices()
     try:
@@ -231,7 +232,7 @@ def _scene_body(i: int, b: trimesh.Trimesh) -> tuple[dict, int]:
     except Exception:
         segs = np.zeros((0, 6), np.float64)
     nfaces = int(len(b.faces))
-    return {"index": i, "name": f"Body {i + 1}",
+    return {"index": i, "id": cadops.public_id(pid) if pid else None, "name": f"Body {i + 1}",
             "positions": base64.b64encode(b.vertices.astype("<f4").tobytes()).decode(),
             "indices": base64.b64encode(b.faces.astype("<u4").tobytes()).decode(),
             "edges": base64.b64encode(np.asarray(segs).astype("<f4").tobytes()).decode(),

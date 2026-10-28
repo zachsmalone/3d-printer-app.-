@@ -7,12 +7,12 @@ import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/ca
 import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
 import { bindFlow } from "/static/project-flow.js";
-import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
+import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, chainStraight, closestSample, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
 import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo } from "/static/gizmo-view.js";
 import {
   PAINT, pickChoice, edgeKey, curvePaint, bodyGlow, constraintBlock, constraintSummary,
-  filletBlock, faceOffsetBlock, extrudeBlock, revolveBlock, measureBlock, anchorClear,
+  filletBlock, faceOffsetBlock, extrudeBlock, revolveBlock, measureBlock, jointBlock, mergeFeel, boxesOverlap, facePair, measureLine, anchorClear,
 } from "/static/cad-feel.js";
 
 const $ = s => document.querySelector(s);
@@ -362,7 +362,7 @@ const MODEL_TOOLS = [
   { id: "extrude", key: "E", label: "Extrude", sub: "up · down · both · cut", tip: "Pull a closed sketch into a solid, or cut it into the model." },
   { id: "revolve", key: "R", label: "Revolve", sub: "axis + angle", tip: "Spin a sketch profile around an axis (vases, knobs, wheels)." },
   { id: "boolean", key: "B", label: "Boolean", sub: "union · subtract · intersect", tip: "Combine two bodies, cut one from another or keep only the overlap." },
-  { id: "fillet", key: "F", label: "Fillet/Chamfer", sub: "approximate", tip: "Round or bevel outside edges. Tap edges first to limit it; otherwise all outside edges. Approximate (mesh based)." },
+  { id: "fillet", key: "F", label: "Fillet/Chamfer", sub: "approximate", tip: "Round or bevel outside edges. A tap follows a straight edge or a gentle curve and stops at a corner. Inside corners stay sharp. Approximate (mesh based)." },
   { id: "shell", key: "H", label: "Shell", sub: "wall thickness", tip: "Make the body hollow with walls of the thickness you choose (closed shell)." },
   { id: "faceoffset", key: "O", label: "Face extrude", sub: "in / out", tip: "Tap a flat face, then extrude it outward or inward." },
   { id: "move", key: "M", label: "Move/Rotate", sub: "body or all", tip: "Move and rotate a body you tapped (or everything)." },
@@ -371,7 +371,7 @@ const MODEL_TOOLS = [
   { id: "align", key: "A", label: "Align", sub: "to value or body", tip: "Line up a body's side or centre with a value or another body." },
   { id: "mirror", key: "I", label: "Mirror", sub: "copy or flip", tip: "Mirror a body across X, Y or Z (keep the original for symmetric parts)." },
   { id: "sculpt", key: "U", label: "Live Sculpt", sub: "brushes · remesh", tip: "Live Sculpt: every brush shows as you drag; strokes save in the background. Draw, carve, smooth, inflate, pinch, flatten, grab. One finger or mouse sculpts; two fingers (or drag off the model) orbit." },
-  { id: "joints", key: "J", label: "Hinges/Joints", sub: "print-in-place", tip: "Add a hinge, ball joint, pin joint or chain whose parts move straight off the printer (a small clearance gap between them)." },
+  { id: "joints", key: "J", label: "Hinges/Joints", sub: "print-in-place", tip: "Add a hinge, ball joint, pin joint or chain as new parts with a clearance gap. Fit is simulated. They are not attached to a body you already have." },
   { id: "merge", key: "G", label: "Merge", sub: "snap · fuse · rejoin", tip: "Drag bodies on the bed (they snap to each other), then fuse them into one. Smart merge puts Smart Split pieces back along their cuts." },
   { id: "repair", key: "Y", label: "Fix mesh", sub: "for imported files", tip: "Close holes and fix flipped faces in an imported mesh so solid tools can use it." },
   { id: "text", key: "T", label: "Text", sub: "emboss · engrave · plate", tip: "Raised or cut-in text on a spot you tap, or a standalone text plate." },
@@ -473,13 +473,13 @@ const HINTS = {
   shapes: ["Shapes", "Tap a shape to drop it. Pick New, Join or Cut first."],
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
   revolve: ["Revolve", "Choose the axis and angle, then Apply."], boolean: ["Boolean", "Choose the target and tool bodies."],
-  fillet: ["Fillet/Chamfer", "Tap edges to round only those (none = all outside edges)."], shell: ["Shell", "Hollow the model with this wall thickness."],
+  fillet: ["Fillet/Chamfer", "Tap outside edges to round only those. A tap follows the straight edge or a gentle curve and stops at a corner. None means every outside edge."], shell: ["Shell", "Hollow the model with this wall thickness."],
   faceoffset: ["Face extrude", "Tap a flat face, then choose outward or inward and a distance."],   move: ["Move/Rotate", "Drag a bead on the model, or type a move and a rotation. Turn is about the body's centre."],
   scale: ["Scale", "Drag a bead, or type a factor. Scale is about the body's centre."], pattern: ["Pattern", "Linear: step between copies. Circular: centre + axis."],
   align: ["Align", "Line up a body's side with a value or another body."], mirror: ["Mirror", "Across X, Y or Z through a point; keep the original for a pair."],
   visualize: ["Visualize", "Pick a colour and finish for each body."],
-  joints: ["Hinges/Joints", "Pick a joint and its size, then Add. It lands beside your model as new bodies."],
-  merge: ["Merge", "Drag a body on the bed: it snaps to the grid and to other bodies' sides. Then pick bodies and Fuse."],
+  joints: ["Hinges/Joints", "Pick a joint and its size, then Add. It lands beside the model as new parts. The gap stays open."],
+  merge: ["Merge", "Drag a body on the bed. It snaps to the grid and to other bodies. Then Fuse. A clearance gap, such as a hinge, is not closed."],
   text: ["Text", "Tap the model where the text should go (its centre), then Apply. Or choose Text plate."],
 };
 function setTool(id) {
@@ -536,19 +536,29 @@ const TOOL_PANELS = {
       pin: `<div class="f"><label for="jL">Arm length (mm)</label>${num("jL", 40)}</div><div class="f"><label for="jW">Arm width (mm)</label>${num("jW", 10)}</div><div class="f"><label for="jT">Arm thickness (mm)</label>${num("jT", 3)}</div>`,
       chain: `<div class="f"><label for="jK">Links</label>${num("jK", 5, 1)}</div><div class="f"><label for="jS">Link length (mm)</label>${num("jS", 16)}</div>`,
     })[k === "snap_hinge" ? "hinge" : k];
-    const tips = { hinge: "Prints flat and assembled: the knuckles turn around a pin inside them. For box lids, Move it to the back edge and Join each leaf.", snap_hinge: "Two separate leaves: the C-shaped knuckles clip onto the other leaf's pin after printing.",
-      ball: "A ball trapped in a socket with an open top; the stem comes out through the opening.", pin: "Two arms turning on a capped pin. The upper arm steps down to the bed, so it needs no supports.", chain: "Flat and standing links that print already linked. The flat links bridge a small gap." };
+    const tips = {
+      hinge: "Prints flat and already assembled, with a gap around the pin. New parts, placed beside the model. To use one on a lid, move a leaf and Fuse or Union it on. The gap stays open.",
+      snap_hinge: "Two separate leaves. The open knuckles clip onto the pin after printing.",
+      ball: "A ball held in a socket with an open top. The stem leaves through that opening, which is narrower than the ball in this model.",
+      pin: "Two arms on a capped pin. The upper arm steps down toward the bed. A small face can still bridge a gap; add supports if your printer sags there.",
+      chain: "Flat and standing links that print already linked. The flat links bridge a small gap.",
+    };
     const draw = () => {
       panel("Hinges & joints", `${seg("jKind", JOINTS, J.kind)}<div id="jRows">${rows(J.kind)}</div>
         <div class="f"><label for="jC">Clearance (mm)</label>${num("jC", 0.3)}</div>
-        <p class="help">${esc(tips[J.kind])} 0.3 mm suits most FDM printers; use more if parts fuse. Fit is simulated, so print a small one first.</p>`,
+        <p class="help">${esc(tips[J.kind])} Clearance starts at 0.3 mm for many FDM printers; use more if the parts fuse. Fit is simulated, so print a small one first. Merge does not close this gap.</p>`,
         () => {
+          const reason = jointBlock({ kind: J.kind, clearance: val("jC"), knuckles: $("#jN") ? val("jN") : 5, links: $("#jK") ? val("jK") : 5 });
+          if (reason) return status("Hinges/Joints", reason);
           const p = { kind: J.kind, clearance: val("jC") }, g = id => $("#" + id) ? val(id) : undefined;
           for (const [k, id] of [["length", "jL"], ["width", "jW"], ["thickness", "jT"], ["knuckles", "jN"], ["size", "jS"], ["links", "jK"]]) { const v = g(id); if (v !== undefined && !Number.isNaN(v)) p[k] = v; }
           const B = modelBox(true); if (B) p.position = [B[1][0] + 10 + (p.length || p.size || 20) / 2, (B[0][1] + B[1][1]) / 2, 0];
           addOp("cad_joint", p);
         }, "Add");
+      const syncJ = () => lockApply(jointBlock({ kind: segVal("jKind") || J.kind, clearance: $("#jC") ? val("jC") : 0.3, knuckles: $("#jN") ? val("jN") : 5, links: $("#jK") ? val("jK") : 5 }));
+      $("#cwTool").querySelectorAll("input").forEach(el => el.addEventListener("input", syncJ));
       $("#jKind").addEventListener("change", () => { J.kind = segVal("jKind"); draw(); });
+      syncJ();
     };
     draw();
   },
@@ -556,17 +566,33 @@ const TOOL_PANELS = {
     const n = bodyCount(), pcs = smartPieces();
     if (n < 2 && !pcs) { msg("Merge needs two bodies. Add a shape or a joint, or Smart Split a model first."); return setTool(null); }
     const sel = S.mergeSel || (S.mergeSel = new Set());
-    panel("Merge", `${pcs ? `<div class="f"><button type="button" class="cw-btn" id="mSmart">Smart merge: rejoin ${pcs.length} split pieces</button><p class="help">Puts the pieces back where Smart Split cut them, then fuses them. Pieces you moved since are left alone.</p></div>` : ""}
-      ${n >= 2 ? `<div class="f"><label>Bodies to fuse (first = stays put)</label><div class="cw-checks" id="mBodies">${S.scene.bodies.map(b => `<label class="cw-toggle"><span>${esc(b.name)}</span><input type="checkbox" value="${b.index}" ${sel.has(b.index) || (!sel.size && b.index < 2) ? "checked" : ""}></label>`).join("")}</div></div>
+    const key = b => b.id || ("i" + b.index);
+    const on = b => S.mergeTouched ? sel.has(key(b)) : b.index < 2;
+    panel("Merge", `${pcs ? `<div class="f"><button type="button" class="cw-btn" id="mSmart">Smart merge: rejoin ${pcs.length} split pieces</button><p class="help">Moves the pieces back to where Smart Split cut them, then fuses the ones that still sit there. A piece you moved is left where it is. This does not close a hinge gap.</p></div>` : ""}
+      ${n >= 2 ? `<div class="f"><label>Bodies to fuse (first = stays put)</label><div class="cw-checks" id="mBodies">${S.scene.bodies.map(b => `<label class="cw-toggle"><span>${esc(b.name)}</span><input type="checkbox" value="${esc(key(b))}" ${on(b) ? "checked" : ""}></label>`).join("")}</div></div>
       <div class="f"><label>Snap the others to the first</label>${seg("mSnap", [["none", "As placed"], ["x+", "+X side"], ["x-", "−X side"], ["y+", "+Y side"], ["y-", "−Y side"], ["z+", "On top"]], "none")}</div>
-      <p class="help">Drag a body on the bed to place it by hand: it snaps to the grid and to the other bodies' sides. Snapped pieces overlap 0.2 mm so they fuse.</p>` : ""}`,
+      <p class="help">Drag a body on the bed to place it by hand: it snaps to the grid and to the other bodies' sides. Snapped pieces overlap 0.2 mm so they fuse.</p>
+      <p class="help" id="mFeel"></p>` : ""}`,
       () => {
-        const ids = [...$("#cwTool").querySelectorAll("#mBodies input:checked")].map(i => +i.value);
+        const ids = [...$("#cwTool").querySelectorAll("#mBodies input:checked")].map(i => bodyRef(i.value));
         if (ids.length < 2) return msg("Pick at least two bodies to fuse.");
         addOp("merge_bodies", { bodies: ids, snap: segVal("mSnap") || "none" });
       }, "Fuse");
     if (n < 2) $("#tApply").hidden = true;
-    $("#cwTool").querySelectorAll("#mBodies input").forEach(i => i.onchange = () => { i.checked ? sel.add(+i.value) : sel.delete(+i.value); });
+    const refresh = () => {
+      const el = $("#mFeel"); if (!el) return;
+      const picked = [...$("#cwTool").querySelectorAll("#mBodies input:checked")].map(i => (S.scene.bodies || []).find(b => key(b) === i.value)).filter(Boolean);
+      const box = b => ({ min: [0, 1, 2].map(k => b.center[k] - b.size[k] / 2), max: [0, 1, 2].map(k => b.center[k] + b.size[k] / 2) });
+      const overlaps = picked.length >= 2 && picked.slice(1).every(b => boxesOverlap(box(picked[0]), box(b), 0.05));
+      el.textContent = mergeFeel({ count: picked.length, snap: segVal("mSnap") || "none", overlaps });
+    };
+    $("#cwTool").querySelectorAll("#mBodies input").forEach(i => i.onchange = () => {
+      S.mergeTouched = true;
+      i.checked ? sel.add(i.value) : sel.delete(i.value);
+      refresh();
+    });
+    $("#mSnap")?.addEventListener("change", refresh);
+    refresh();
     if (pcs) $("#mSmart").onclick = () => addOp("smart_merge", { pieces: pcs });
   },
   shapes() {
@@ -624,7 +650,7 @@ const TOOL_PANELS = {
     panel("Fillet / Chamfer", `${seg("tStyle", [["fillet", "Fillet (round)"], ["chamfer", "Chamfer (bevel)"]], "fillet")}
       <div class="f"><label for="tR">Radius / size (mm)</label>${num("tR", 1)}</div>
       <div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>
-      <p class="help" id="tEdges">${S.selEdges.length ? `${S.selEdges.length} edge(s) picked.` : "No edges picked: every outside edge is rounded."} Approximate mesh, not a precise solid fillet or chamfer: inside corners stay sharp and corners at the ends of picked edges blend a little. Can take a few seconds.</p>`,
+      <p class="help" id="tEdges">${S.selEdges.length ? `${S.selEdges.length} edge(s) picked.` : "No edges picked: every outside edge is rounded."} A tap follows that outside edge, including a straight run or a gentle curve such as a round hole, and stops at a corner. Inside corners stay sharp. Approximate mesh, not a precise solid. Can take a few seconds.</p>`,
       () => {
         const reason = filletBlock({ bodies: bodyCount(), radius: val("tR") });
         if (reason) return status("Fillet/Chamfer", reason);
@@ -992,7 +1018,7 @@ function toggleMeasure(on = !S.measure) {
     if (reason) { status("Measure", reason); syncMeasure(); return; }
   }
   S.measure = on; S.measPts = []; $("#cwMeasure").setAttribute("aria-pressed", on); drawSelection();
-  if (on) { S.tool = null; renderRail(); $("#cwTool").hidden = true; hint("Measure", "Tap two points on the model, or tap an edge for its length."); } else hint(...HINTS.null);
+  if (on) { S.tool = null; renderRail(); $("#cwTool").hidden = true; hint("Measure", "Tap two points, or an edge for its length. A straight edge split into pieces is one length. A point near a corner snaps to the corner. Parallel faces also show the distance between them."); } else hint(...HINTS.null);
   syncMeasure();
 }
 $("#cwMeasure").onclick = () => toggleMeasure();
@@ -1010,8 +1036,35 @@ function onEdge(e, h) {   // the tap is on this edge, not just near it on a face
   const dq = q.distanceTo(camera.position), dh = h.point.distanceTo(camera.position);
   return dq <= dh + Math.max(0.5, 0.01 * dh);
 }
-function showEdgeLen(e) {   // B13: a picked edge shows its length on the model and in the polite live hint
-  const t = `${fmt(e.a.distanceTo(e.b))} mm`; setMeasLabel(t, e.a.clone().add(e.b).multiplyScalar(0.5)); renderSkLabels(); return t;
+function bodyRef(key) { return /^i\d+$/.test(String(key)) ? +String(key).slice(1) : key; }
+function featureEnds(e) {
+  const g = world.children.find(x => x.userData.body === e.body);
+  const flat = g?.children[1]?.geometry?.attributes?.position?.array;
+  if (!flat) return [e.a.clone(), e.b.clone()];
+  const c = chainStraight([e.a.x, e.a.y, e.a.z], [e.b.x, e.b.y, e.b.z], flat);
+  return [new THREE.Vector3(...c.a), new THREE.Vector3(...c.b)];
+}
+function showEdgeLen(e) {   // B13: a picked edge shows its length; a straight run split into pieces is one length
+  const [a, b] = featureEnds(e);
+  const t = `${fmt(a.distanceTo(b))} mm`; setMeasLabel(t, a.clone().add(b).multiplyScalar(0.5)); renderSkLabels(); return t;
+}
+function measureSnap(h) {
+  const g = world.children.find(x => x.userData.body === h.body);
+  const edges = g?.children[1]?.geometry?.attributes?.position?.array;
+  if (!edges || edges.length > 20000 * 6) return h.point.clone();
+  const [hx, hy] = toScreen(h.point);
+  const samples = [];
+  const push = (x, y, z) => {
+    const s = toScreen(new THREE.Vector3(x, y, z));
+    samples.push({ p: [x, y, z], px: s[0], py: s[1], behind: s[2] > 1 });
+  };
+  for (let i = 0; i < edges.length; i += 6) {
+    push(edges[i], edges[i + 1], edges[i + 2]);
+    push(edges[i + 3], edges[i + 4], edges[i + 5]);
+    push((edges[i] + edges[i + 3]) / 2, (edges[i + 1] + edges[i + 4]) / 2, (edges[i + 2] + edges[i + 5]) / 2);
+  }
+  const hit = closestSample(hx, hy, samples, SNAP_PX);
+  return hit ? new THREE.Vector3(...hit) : h.point.clone();
 }
 
 /* ---------------------------------------------------------------- Sketch mode */
@@ -1595,9 +1648,13 @@ function samePick(a, b) {
   if (a.kind === "edge") return edgeKey(a.edge.a.toArray(), a.edge.b.toArray()) === edgeKey(b.edge.a.toArray(), b.edge.b.toArray());
   return a.body === b.body;
 }
+function featureKey(e) {
+  const [a, b] = featureEnds(e);
+  return edgeKey(a.toArray(), b.toArray());
+}
 function listedEdge(e) {
-  const key = edgeKey(e.a.toArray(), e.b.toArray());
-  return S.selEdges.some(x => edgeKey(x.a.toArray(), x.b.toArray()) === key);
+  const key = featureKey(e);
+  return S.selEdges.some(x => featureKey(x) === key);
 }
 function visibleSeg(a, b) {
   if (!S.section) return [a, b];
@@ -1609,7 +1666,8 @@ function placePicks() {
   const svg = $("#cwMarks"); if (!svg) return;
   const parts = [];
   const addEdge = (e, cls) => {
-    const seg = visibleSeg(e.a, e.b); if (!seg) return;
+    const [ea, eb] = featureEnds(e);
+    const seg = visibleSeg(ea, eb); if (!seg) return;
     const A = stagePoint(seg[0]), B = stagePoint(seg[1]);
     if (A.behind || B.behind) return;
     parts.push(`<line class="${cls}" x1="${A.x.toFixed(1)}" y1="${A.y.toFixed(1)}" x2="${B.x.toFixed(1)}" y2="${B.y.toFixed(1)}" />`);
@@ -1732,7 +1790,7 @@ async function ctxRun(c) {
   if (c === "fa") { S.selEdges = []; return setTool("fillet"); }
   if (c === "sc") return setTool("sculpt");
   if (c === "fi" || c === "ch") return addOp("round_edges", { style: c === "fi" ? "fillet" : "chamfer", radius: v, body: e.body, edges: [[e.a.toArray(), e.b.toArray()]] });
-  if (c === "ms") { S.measPts = [e.a, e.b]; status("Edge length", showEdgeLen(e)); drawSelection(); }
+  if (c === "ms") { const [a, b] = featureEnds(e); S.measPts = [a, b]; status("Edge length", showEdgeLen(e)); drawSelection(); }
 }
 
 /* On-model beads for Move / Rotate and Scale. They post body_transform, the same step as Apply. */
@@ -1847,7 +1905,7 @@ async function endMergeDrag() {
   const { g, b, d } = mdrag; mdrag = null; controls.enabled = true;
   if (Math.hypot(d[0], d[1]) < 1e-3) { g.position.set(0, 0, 0); return; }
   const r = v => Math.round(v * 1e4) / 1e4;
-  const ok = await run(async () => { await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "body_transform", params: { body: b.index, move: [r(d[0]), r(d[1]), 0] } } }); await load(true); });
+  const ok = await run(async () => { await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "body_transform", params: { body: b.id || b.index, move: [r(d[0]), r(d[1]), 0] } } }); await load(true); });
   if (!ok) { g.position.set(0, 0, 0); invalidate(); }
   if (S.tool === "merge") setTool("merge");
 }
@@ -1921,11 +1979,14 @@ function modelTap(ev) {
   }
   if (S.measure) {
     const e = pickEdge(ev), h = pickBody(ev);
-    if (onEdge(e, h)) { S.measPts = [e.a, e.b]; S.measN = []; }
-    else if (h) { if (S.measPts.length >= 2) { S.measPts = []; S.measN = []; } S.measPts.push(h.point); (S.measN ||= []).push(h.normal); }
-    if (S.measPts.length === 2) { const [a, b] = S.measPts, d = a.distanceTo(b), dv = b.clone().sub(a);
-      const ang = S.measN?.length === 2 ? measAngle(S.measN[0], S.measN[1]) : null;
-      setMeasLabel(`${fmt(d)} mm  (ΔX ${fmt(Math.abs(dv.x))} · ΔY ${fmt(Math.abs(dv.y))} · ΔZ ${fmt(Math.abs(dv.z))})${ang === null ? "" : ` · faces ${fmt(ang)}°`}`, a.clone().add(b).multiplyScalar(0.5)); status("Measure", measLabel.text); }
+    if (onEdge(e, h)) { const [a, b] = featureEnds(e); S.measPts = [a, b]; S.measN = []; }
+    else if (h) { if (S.measPts.length >= 2) { S.measPts = []; S.measN = []; } S.measPts.push(measureSnap(h)); (S.measN ||= []).push(h.normal); }
+    if (S.measPts.length === 2) {
+      const [a, b] = S.measPts, dv = b.clone().sub(a);
+      const pair = S.measN?.length === 2 ? facePair(S.measN[0].toArray(), a.toArray(), S.measN[1].toArray(), b.toArray()) : null;
+      const text = measureLine(a.distanceTo(b), dv.toArray(), pair);
+      setMeasLabel(text, a.clone().add(b).multiplyScalar(0.5)); status("Measure", text);
+    }
     else setMeasLabel(null);
     drawSelection(); renderSkLabels(); return;
   }
@@ -1933,7 +1994,8 @@ function modelTap(ev) {
   if (S.tool === "fillet") {
     const e = pickEdge(ev);
     if (!e) { status("Fillet/Chamfer", "No edge under the pointer."); return; }
-    const k = S.selEdges.findIndex(x => x.a.equals(e.a) && x.b.equals(e.b));
+    const fk = featureKey(e);
+    const k = S.selEdges.findIndex(x => featureKey(x) === fk);
     k >= 0 ? S.selEdges.splice(k, 1) : S.selEdges.push(e);
     const el = $("#tEdges"); if (el) el.firstChild.textContent = `${S.selEdges.length || "No"} edge(s) picked. `;
     drawSelection(); syncFilletGate(); return;
