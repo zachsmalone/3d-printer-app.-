@@ -22,7 +22,7 @@ REMIX = {
     "rules": [
         "Your entry must be a credited remix of a public Showcase project.",
         "Prize-free: ZEIM offers no cash or prizes for this challenge.",
-        "Tip links stay optional; ZEIM never nags and takes no cut of tips.",
+        "Tip links stay optional. ZEIM never nags, and never takes a cut of tips or of sales a maker makes from their own link. Showcase downloads stay free.",
         "18+ only. Keep it within the Community Guidelines.",
     ],
     "prize_free": True,
@@ -35,17 +35,30 @@ class Bad(ValueError):
     pass
 
 
-def _ensure_seed():
-    """Idempotent: the Remix challenge always exists."""
-    if any(c.get("id") == REMIX_ID for c in CHALLENGES.read()):
-        return
+_OLD_TIP_RULE = "Tip links stay optional; ZEIM never nags and takes no cut of tips."
 
-    def f(l):
-        if not any(c.get("id") == REMIX_ID for c in l):
-            seed = dict(REMIX)
-            seed["created"] = time.time()
-            l.insert(0, seed)
-    CHALLENGES.update(f)
+
+def _ensure_seed():
+    """Idempotent: the Remix challenge always exists, and the old tip sentence is replaced once."""
+    rows = CHALLENGES.read()
+    hit = next((c for c in rows if c.get("id") == REMIX_ID), None)
+    if hit is None:
+        def f(l):
+            if not any(c.get("id") == REMIX_ID for c in l):
+                seed = dict(REMIX)
+                seed["created"] = time.time()
+                l.insert(0, seed)
+        CHALLENGES.update(f)
+        return
+    if _OLD_TIP_RULE not in (hit.get("rules") or []):
+        return
+    new_rule = REMIX["rules"][2]
+
+    def g(l):
+        for c in l:
+            if c.get("id") == REMIX_ID and _OLD_TIP_RULE in (c.get("rules") or []):
+                c["rules"] = [new_rule if r == _OLD_TIP_RULE else r for r in c["rules"]]
+    CHALLENGES.update(g)
 
 
 def list_all() -> list[dict]:

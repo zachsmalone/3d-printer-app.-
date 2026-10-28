@@ -1,23 +1,33 @@
-"""Theft protection for Showcase uploads: duplicate hold, owner tag in 3MF downloads, 'Report as stolen'.
+"""Theft protection for Showcase uploads.
 
-Nothing here deletes anything. A near-duplicate of ANOTHER maker's model is held (hidden) for a moderator, who
-restores it (moderation 'restore') or acts on it. Owners re-uploading their own model, and credited remixes of a
-project that allows remixes, pass. See app/community/fingerprint.py for what the fingerprint can and can't catch.
+Sharing a near-duplicate of another maker's public project is not published as-is. If that project allows
+remixes, the maker gets a credited-remix offer. If remixes are off, the share is refused. Keeping it Private
+is always allowed, and a later flip to public is checked again. Nothing is deleted.
+
+Downloaded 3MF files carry a hidden owner tag (model id, maker, first-posted date). Importing that file and
+sharing it again is treated like a shape match, including when the shape check misses. A tag for a project
+this maker cannot already see is ignored, so a guessed id cannot reveal private work.
+
+The maker's own re-upload, and a remix that credits the source, pass. 'Report as stolen' and 'Report a copy'
+go to moderators and do not hide a project by themselves. See fingerprint.py for the shape check's limits.
 """
 from __future__ import annotations
 
 import io
+import json
 import re
 import zipfile
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape, quoteattr
 
 from .. import config
+from ..services.history import store as _builds
 from . import fingerprint
 from .store import JsonFile, MODERATION
 
 FINGERPRINTS = JsonFile("fingerprints", {})      # item id -> {"fp": {...}, "key": cache key for Originals}
 DMCA_URL = "/legal/takedown"
+_MODEL_ID = re.compile(r"^[A-Za-z0-9_-]{4,40}$")
 HOLD_MESSAGE = ("Thanks! This model looks very close to one another maker already posted on ZEIM, so a moderator will "
                 "take a quick look before it goes live. Nothing has been deleted. If it is your own work or a credited "
                 "remix, you don't need to do anything; you can also add a note with the Appeal button.")
@@ -94,6 +104,125 @@ REMIX_OFFER_MESSAGE = ("This looks very close to \u201c{title}\u201d by {creator
 REFUSED_MESSAGE = ("Sorry, this can't be shared to the Showcase: it looks very close to \u201c{title}\u201d by {creator}, "
                    "and its maker has turned remixes off. It is still saved in your library, and you can keep it Private. "
                    "This check compares shapes, so it can be wrong; if you think it is, please contact the ZEIM team.")
+TAG_OFFER_MESSAGE = ("This file still carries \u201c{title}\u201d by {creator}, which is already in the Showcase. "
+                     "Its maker allows remixes, so you can share yours as a credited remix that links back to it. "
+                     "You can also keep it Private in your library.")
+TAG_REFUSED_MESSAGE = ("Sorry, this can't be shared to the Showcase: this file still carries \u201c{title}\u201d by {creator}, "
+                       "and its maker has turned remixes off. It is still saved in your library, and you can keep it Private. "
+                       "If you made this yourself and the tag is leftover from an earlier download, please contact the ZEIM team.")
+
+
+def read_owner_tag(source) -> dict | None:
+    """Model id from a ZEIM-tagged 3MF (Metadata/zeim_owner.json or 3D/3dmodel.model). None if absent."""
+    try:
+        z = zipfile.ZipFile(io.BytesIO(source) if isinstance(source, (bytes, bytearray)) else source)
+    except (zipfile.BadZipFile, OSError, ValueError):
+        return None
+    meta: dict[str, str] = {}
+    try:
+        names = {n.lower(): n for n in z.namelist()}
+        if "metadata/zeim_owner.json" in names:
+            try:
+                raw = json.loads(z.read(names["metadata/zeim_owner.json"])[:65536])
+            except (json.JSONDecodeError, UnicodeDecodeError, KeyError, OSError, TypeError):
+                raw = None
+            if isinstance(raw, dict):
+                for k, v in raw.items():
+                    if isinstance(k, str) and isinstance(v, (str, int, float, bool)):
+                        meta[k] = str(v)
+        if "3d/3dmodel.model" in names:
+            try:
+                xml = z.read(names["3d/3dmodel.model"])[:4 * 2**20]
+            except (KeyError, OSError):
+                xml = b""
+            for m in re.finditer(br'<metadata\s+name=(["\'])([^"\']+)\1[^>]*>([^<]*)</metadata>', xml):
+                key = m.group(2).decode("utf-8", "replace")
+                val = m.group(3).decode("utf-8", "replace").strip()
+                meta.setdefault(key, val)
+                if key.startswith("zeim:"):
+                    meta.setdefault(key[5:], val)
+    finally:
+        z.close()
+    mid = (meta.get("ModelId") or "").strip()
+    if not _MODEL_ID.match(mid):
+        return None
+    return {"model_id": mid}
+
+
+def build_owner_tag(build_id: str) -> dict | None:
+    """The tag on the untouched import (original.3mf). Re-exported model.3mf files are not tagged."""
+    if not build_id:
+        return None
+    try:
+        p = _builds.dir(build_id) / "original.3mf"
+    except KeyError:
+        return None
+    if not p.is_file():
+        return None
+    return read_owner_tag(p)
+
+
+def _visible_item(model_id: str, actor):
+    # catalog imports this module inside publish, so the lookup stays in the function.
+    from .catalog import Denied, get
+    try:
+        return get(model_id, actor)
+    except Denied:
+        return None
+
+
+def tag_match(model_id: str, actor, creator_id: str, remix_of: str = "", exclude: str = "") -> dict | None:
+    """Another maker's project named by an owner tag, when this maker can already see it and it is not the credit chain."""
+    if not model_id:
+        return None
+    from .catalog import _all
+    by_id = {x["id"]: x for x in _all()}
+    credited = _chain_ids(remix_of, by_id) if remix_of else set()
+    if model_id == exclude or model_id in credited:
+        return None
+    i = _visible_item(model_id, actor)
+    if not i or i.get("example") or i.get("creator_id") == creator_id:
+        return None
+    return {"exact": True, "score": 1.0, "item": i, "via": "owner_tag"}
+
+
+def own_tagged(model_id: str, actor, creator_id: str) -> dict | None:
+    i = _visible_item(model_id, actor) if model_id else None
+    if i and i.get("creator_id") == creator_id and not i.get("example"):
+        return i
+    return None
+
+
+def _remix_blocked(item: dict) -> bool:
+    from .catalog import remix_status
+    return not remix_status(item)["can_remix"]
+
+
+def choose_match(shape: dict | None, tagged: dict | None) -> dict | None:
+    """Prefer a remix-off project. When both sides agree, the file's owner tag names the download source."""
+    if not tagged:
+        return shape
+    if not shape or shape["item"]["id"] == tagged["item"]["id"]:
+        return tagged
+    shape_off, tag_off = _remix_blocked(shape["item"]), _remix_blocked(tagged["item"])
+    if tag_off and not shape_off:
+        return tagged
+    if shape_off and not tag_off:
+        return shape
+    return tagged
+
+
+def review_upload(fp, *, actor, creator_id: str, remix_of: str = "", build_id: str = "",
+                  source_model_id: str = "", exclude: str = "") -> dict:
+    """Shape match plus the owner tag on an imported 3MF. `source_model_id` is remembered for a later public flip."""
+    tag = build_owner_tag(build_id) if build_id else None
+    mid = (tag or {}).get("model_id") or (source_model_id or "")
+    if mid and not _MODEL_ID.match(mid):
+        mid = ""
+    shape = find_match(fp, creator_id, remix_of, exclude)
+    tagged = tag_match(mid, actor, creator_id, remix_of, exclude) if mid else None
+    return {"match": choose_match(shape, tagged), "source_model_id": mid,
+            "own": own_tagged(mid, actor, creator_id) if mid else None}
 
 
 def share_conflict(match: dict) -> dict:
@@ -102,10 +231,13 @@ def share_conflict(match: dict) -> dict:
     m = match["item"]
     orig = {"id": m["id"], "title": m.get("title", ""), "creator": m.get("creator", ""), "share_url": f"/p/{m['id']}"}
     fill = {"title": orig["title"][:60] or "a project", "creator": orig["creator"] or "another maker"}
+    tagged = match.get("via") == "owner_tag"
     if remix_status(m)["can_remix"]:
-        return {"code": "remix_offer", "message": REMIX_OFFER_MESSAGE.format(**fill), "original": orig,
+        msg = TAG_OFFER_MESSAGE if tagged else REMIX_OFFER_MESSAGE
+        return {"code": "remix_offer", "message": msg.format(**fill), "original": orig,
                 "exact": bool(match["exact"]), "can_keep_private": True}
-    return {"code": "copy_refused", "message": REFUSED_MESSAGE.format(**fill), "original": orig,
+    msg = TAG_REFUSED_MESSAGE if tagged else REFUSED_MESSAGE
+    return {"code": "copy_refused", "message": msg.format(**fill), "original": orig,
             "exact": bool(match["exact"]), "can_keep_private": True}
 
 
@@ -179,7 +311,6 @@ _MODEL_RE = re.compile(rb"<model\b[^>]*>", re.S)
 def tag_3mf(data: bytes, meta: dict) -> bytes:
     """Return the 3MF with ZEIM owner metadata in 3D/3dmodel.model (3MF core <metadata> elements; custom names
     use a declared 'zeim' namespace) plus a small Metadata/zeim_owner.json. Unparseable input is returned unchanged."""
-    import json
     try:
         zin = zipfile.ZipFile(io.BytesIO(data))
         names = zin.namelist()
@@ -190,7 +321,6 @@ def tag_3mf(data: bytes, meta: dict) -> bytes:
         mo = _MODEL_RE.search(xml)
         if not mo:
             return data
-        head = mo.group(0)
         for k in meta:                                   # drop any earlier copy of the same metadata names
             xml = re.sub(rb"<metadata\s+name=" + re.escape(quoteattr(k).encode()) + rb"[^>]*?(/>|>.*?</metadata>)", b"", xml, flags=re.S)
         mo = _MODEL_RE.search(xml)

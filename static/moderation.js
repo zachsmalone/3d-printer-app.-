@@ -30,6 +30,8 @@ async function load() {
       card.append(el("b", {}, `${p.title || r.item_id} `), el("span", { className: "pill" }, r.reason), el("span", { className: "help" }, ` · ${p.kind || ""}${p.creator ? " · by " + p.creator : ""} · filed ${r.created}`));
       if (p.text) card.append(el("p", {}, p.text));
       if (r.details) card.append(el("p", { className: "help" }, "Reporter said: " + r.details));
+      if (typeof r.original_url === "string" && (r.original_url.startsWith("/p/") || r.original_url.startsWith("https://")))
+        card.append(el("p", { className: "help" }, "Original: ", el("a", { href: r.original_url, rel: "noopener noreferrer", target: "_blank" }, r.original_url)));
       if (p.hidden) card.append(el("p", { className: "help" }, "Currently hidden."));
       const row = el("div", { className: "row" });
       if (p.suspended) card.append(el("p", { className: "help" }, "Account suspended."));

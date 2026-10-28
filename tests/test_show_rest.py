@@ -141,6 +141,7 @@ def test_remix_challenge_prize_free_enter():
     detail = b.get(f"/api/challenges/{cid}").json()
     assert detail["prize_free"] is True
     assert "no cash" in detail["blurb"].lower() or any("prize" in r.lower() for r in detail["rules"])
+    assert any("never takes a cut" in r for r in detail["rules"])
     # enter
     r = b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem["id"]})
     assert r.status_code == 200, r.text
@@ -152,6 +153,17 @@ def test_remix_challenge_prize_free_enter():
     # one entry per person
     rem2 = publish(b, "Second remix", remix_of=src, license_id="cc-by-4.0")["id"]
     assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem2}).status_code == 400
+
+
+def test_old_tip_rule_is_replaced_once():
+    CHALLENGES.write([{"id": challenges.REMIX_ID, "slug": "remix", "prize_free": True, "created": 1,
+                       "rules": ["Prize-free: ZEIM offers no cash or prizes for this challenge.", challenges._OLD_TIP_RULE]}])
+    challenges._ensure_seed()
+    rules = CHALLENGES.read()[0]["rules"]
+    assert challenges._OLD_TIP_RULE not in rules
+    assert any("never takes a cut" in r for r in rules)
+    challenges._ensure_seed()
+    assert CHALLENGES.read()[0]["rules"] == rules
 
 
 # ---------- 5. phone camera capture attribute in shipped UI ----------
