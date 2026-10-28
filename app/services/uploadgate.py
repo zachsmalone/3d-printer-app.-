@@ -121,7 +121,7 @@ def scan_bytes(data: bytes) -> tuple[bool, str, str]:
 
 def gate(data: bytes, actor_sid: str, source: str = "generate", **limits) -> uploadsafe.Checked:
     """Check one upload before anything parses it. Raises GateError; returns uploadsafe's Checked.
-    `limits` are passed to uploadsafe.check (e.g. max_bytes for the 50 MB editor upload)."""
+    `limits` are passed to uploadsafe.check (e.g. max_bytes for the 500 MB editor upload)."""
     now = time.time()
     if not _allowed(actor_sid, now, source):
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "rate_limited"})

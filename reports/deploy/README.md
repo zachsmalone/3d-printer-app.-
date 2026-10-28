@@ -9,7 +9,7 @@ backup, restore-drill, retention and checksum-failure test on a fake tree (incl.
 |---|---|
 | `../../Dockerfile` (repo root; Engineering moved and edited it, history in git) | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker |
 | `docker-compose.yml` | `app` (internal port 8765 only) + `caddy` (80/443); runtime `data/` and `outputs/` volumes, plus a read-only repo-catalog mount at `/app/data`; read-only rootfs, caps dropped, mem/CPU limits |
-| `Caddyfile` | Full app: automatic HTTPS, 55 MB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing. This is the file zeim-prod should run. |
+| `Caddyfile` | Full app: automatic HTTPS, 550 MiB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing. This is the file zeim-prod should run. |
 | `Caddyfile.coming-soon` | Optional holding page for every path except `/healthz`. Used only when `ZEIM_COMING_SOON=1`. |
 | `caddy-run.sh` | Selects `Caddyfile` (default) or `Caddyfile.coming-soon` from `ZEIM_COMING_SOON`. |
 | `backup.sh` | Archives `data/` + `outputs/`, safe SQLite copies (`.backup`), sha256 sums, 14 daily + 8 weekly retention, optional `age` encryption and `rclone` off-site copy |
@@ -91,7 +91,7 @@ See `local-https/README.md` (for trying the share sheet from an iPhone/iPad).
 2. ~~`/healthz`~~ now exists (`app/main.py`, answers `{"status":"ok"}`, no cookie). The Dockerfile, compose file and Caddy health check all use it.
 3. **Pinned dependencies**: `requirements.txt` is unpinned (today: fastapi 0.142, numpy 2.5, trimesh 5.1...). Builds are not reproducible and a new numpy/skimage can break things (tests already emit NumPy 2.5 deprecation warnings from scikit-image).
 4. **PrusaSlicer AGPL**: legal should confirm hosting obligations. The apt package adds roughly 1 GB (GUI libs); an alternative is a slimmer separate "slicer worker" image or the AppImage CLI.
-5. **Uploads and worker limits**: Caddy caps bodies at 55 MB; per-job memory/time caps and a queue still need Engineering (blocker #5). Compose limits are a stopgap.
+5. **Uploads and worker limits**: Caddy caps bodies at 550 MiB; per-job memory/time caps and a queue still need Engineering (blocker #5). Compose limits are a stopgap.
 6. **Off-site target and retention**: Backblaze B2 + `rclone` assumed; who holds the `age` private key? (Store it offline, not on the server.)
 7. **CSP**: report-only until tested in a browser against the UI (importmap + module scripts + `blob:` previews). Promote to enforcing after.
 8. **Staging**: reuse this compose file with a different `ZEIM_HOST_DIR`, domain and seed data. Never copy production data there.

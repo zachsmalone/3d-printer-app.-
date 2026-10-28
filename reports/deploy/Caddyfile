@@ -10,10 +10,12 @@
 }
 
 (zeim_proxy) {
-	# Largest legit upload is a 50 MB mesh (MAX_UPLOAD_EDIT) plus multipart overhead.
+	# Largest legit upload is a 500 MiB mesh (MAX_UPLOAD_EDIT) plus multipart overhead.
+	# 550MiB keeps the old 50 → 55 gap in the same binary units as the app.
+	# Caddy's "MB" is decimal (550MB = 550,000,000), which is under a 550 MiB multi-file sum.
 	# Caddy rejects larger bodies with 413 before they reach the Python process.
 	request_body {
-		max_size 55MB
+		max_size 550MiB
 	}
 
 	header {

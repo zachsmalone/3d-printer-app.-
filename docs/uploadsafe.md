@@ -21,7 +21,9 @@ builds a mesh:
   ASCII STL counting is case-insensitive and whitespace-tolerant (the downstream
   loader accepts any case — verified with trimesh — so an uppercase file must
   not report zero complexity).
-- **Size cap** — 25 MB default, matching `config.MAX_UPLOAD`.
+- **Size cap** — 25 MB default, matching `config.MAX_UPLOAD`. Mesh imports
+  (`/api/edit`, repair, TorchC0) pass `max_bytes=editproj.MAX_UPLOAD_EDIT`
+  (500 MiB). Photo uploads stay on the 25 MB default.
 - **Mesh complexity caps** — 3,000,000 faces (matching `meshedit.MAX_FACES`) and
   3,000,000 vertices. Counts come from the binary STL header, the ASCII
   facets, the OBJ records (a face with n corners counts as n−2 triangles, the

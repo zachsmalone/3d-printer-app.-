@@ -62,3 +62,37 @@ Verification log (this branch):
 ## Exit, Done, and New build outside CAD
 
 Lithophane, the FDM Slicer, TorchC0, and 2D→3D now have Exit, Done, New build, and Return to My Studio. Exit and Return save through `zeimSave.leave`, then go to Account → My Studio when the project was opened from that library. Otherwise Exit opens the Showcase list (`#showcase`) and does not publish. Done saves and stays, unless the project came from My Studio, in which case it returns to the library. New build saves a dirty draft first and asks before clearing a photo, TorchC0 file, or prepared resin result that is not a saved project. Send to Showcase is still only the existing publish button and the Send to… menu. CAD’s Exit control was not rebuilt. B1-6 was not edited. A Send to… hand-off keeps the My Studio return nested on `zeim.back`, so Exit can still find the library.
+
+## PR #53 — Exit, Done, and New build outside CAD
+
+Merged and deployed to zeimapp.com at `f33cd1b3f36aaf553c5aeab90d887b9a3e8e63e9`. Healthz and home returned 200. Live browser check 2026-10-27: Lithophane Exit went to `#showcase` and did not publish. New build on an empty Lithophane stayed on `#lithophane`. Temporary work `yami-temp-exit-check` was cleaned from My Studio. This closes the “still missing outside CAD” note on MS-2. B1-6 is still open. This row records that deploy check; it was not re-run for the 500 MB import change.
+
+## Model import limit — 500 MB
+
+The mesh byte ceiling was 50 MiB (`MAX_UPLOAD_EDIT`), Caddy `max_size 55MB` (decimal), and `MAX_MULTIPART_BODY` 56 MiB. A legitimate mesh above that was refused before parse. Photos stay at 25 MB.
+
+| Gate | Was | Now |
+| --- | --- | --- |
+| `editproj.MAX_UPLOAD_EDIT` (edit, repair, TorchC0, `max_upload_mb`) | 50 MiB | 500 MiB |
+| Caddy `request_body` (`reports/deploy/Caddyfile`, `local-https/Caddyfile.local`) | `55MB` | `550MiB` |
+| `MAX_MULTIPART_BODY` | 56 MiB | 560 MiB |
+| Editor client (one file / several files together) | 50 MB / 55 MB | 500 MB / 550 MB |
+| Drop copy, repair page, CAD / repair / TorchC0 pre-check | 50 MB, or none | 500 MB |
+
+`550MiB` is the old 50 → 55 gap in binary units. Caddy’s `MB` is decimal, so `550MB` (550,000,000 bytes) would sit under a 550 MiB multi-file sum. The app body cap stays one step above Caddy (560 MiB), same as 55 → 56. A small STL still imports. A payload just over 50 MiB is no longer a size 413. Photos over 25 MB are still 413.
+
+Tests (Python 3.12 venv, pytest):
+
+- `python -m pytest -q tests/test_upload_limit.py tests/test_b3_filter2.py tests/test_uploadsafe.py tests/test_uploadgate.py tests/test_b1_upload.py` — 114 passed.
+- `python -m pytest -q tests/test_3mf_import.py tests/test_slice_api.py tests/test_cad_workspace.py::test_cadrt4_5_zip_bomb_3mf_refused_and_gate_used` — 50 passed, 1 skipped.
+
+Not deployed. No browser pass of a real 500 MB file.
+
+Still in force, and not raised here:
+
+- Triangle cap `MAX_FACES` 3,000,000 (a binary STL of that size is about 143 MiB). Larger triangle counts are still refused.
+- 3MF expansion: upload gate 64 MiB per member, 128 MiB uncompressed, 32 MiB model XML; `meshedit.sniff` still refuses uncompressed totals over 128 MiB or non-model members over 16 MiB.
+- `POST /api/slice` with a file stays at 50 MB (`MAX_UPLOAD_BYTES`). Slicing an imported project uses the saved mesh, not this direct-upload cap.
+- Photo uploads stay at 25 MB. Share-sheet hide in `static/send.js` stays at 50 MB (separate from import).
+- iPhone-test Caddy template stays at `30MB`.
+- B1-6 body identity is still open and was not edited.

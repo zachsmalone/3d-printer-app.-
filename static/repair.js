@@ -4,7 +4,9 @@ const yn = b => b ? "yes" : "no";
 $("#rpFile").onchange = () => { const f = $("#rpFile").files[0]; $("#rpName").textContent = f ? `${f.name} · ${(f.size / 2 ** 20).toFixed(1)} MB` : ""; $("#rpGo").disabled = !f; };
 $("#rpForm").onsubmit = async e => {
   e.preventDefault(); const f = $("#rpFile").files[0]; if (!f) return;
-  const out = $("#rpOut"); out.innerHTML = "<p>Repairing… big files can take a minute.</p>"; $("#rpGo").disabled = true;
+  const out = $("#rpOut");
+  if (f.size > 500 * 1024 * 1024) { out.innerHTML = `<p class="bad">That file is over 500 MB. Try a smaller one, or simplify it first.</p>`; return; }
+  out.innerHTML = "<p>Repairing… big files can take a minute.</p>"; $("#rpGo").disabled = true;
   try {
     const fd = new FormData(); fd.append("file", f);
     const r = await fetch("/api/repair", { method: "POST", body: fd }); const j = await r.json().catch(() => ({}));
