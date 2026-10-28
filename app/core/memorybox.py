@@ -334,6 +334,10 @@ def build(images: list, params: dict):
     view_m = Model([Body(n, np.asarray(m.vertices, float), np.asarray(m.faces, np.int64)) for n, m in view.items()], "memorybox")
     info["parts"] = list(parts)
     info["warnings"] = warn
+    info["note"] = (
+        "The picture is the box together. Send to Slicer, Export, and the STL zip "
+        "are the separate parts, laid out to print. They fit each other. Sizes are starting points."
+    )
     pm.info = view_m.info = info
     return pm, view_m
 

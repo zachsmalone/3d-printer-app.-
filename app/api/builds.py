@@ -69,6 +69,15 @@ def _sizes(bid: str) -> dict:
     return {e: (d / f"model.{e}").stat().st_size for e in exporters.WRITERS if (d / f"model.{e}").exists()}
 
 
+def model_from_3mf(path, mode: str) -> geometry.Model:
+    """One body per 3MF object. Vertex positions are the ones written (parts stay where they were laid out)."""
+    sc = trimesh.load(str(path), force="scene")
+    return geometry.Model([
+        geometry.Body(str(n), np.asarray(g.vertices, float), np.asarray(g.faces, np.int64))
+        for n, g in sc.geometry.items()
+    ], mode)
+
+
 def load_model(bid: str) -> geometry.Model:
     """Model for a stored build (cached; rebuilt from source image + params after a restart)."""
     m = store.cache.get(bid)
@@ -82,10 +91,8 @@ def load_model(bid: str) -> geometry.Model:
             from ..services import editproj
             m = store.cache[bid] = editproj.model(bid)
             return m
-        if meta.get("mode") == "memorybox":         # no photo kept: reload the written parts (one body per 3MF object)
-            sc = trimesh.load(str(store.dir(bid) / "model.3mf"), force="scene")
-            m = geometry.Model([geometry.Body(n, np.asarray(g.vertices, float), np.asarray(g.faces, np.int64))
-                                for n, g in sc.geometry.items()], "memorybox")
+        if meta.get("mode") == "memorybox":         # no photo kept: reload the print parts (one body per 3MF object)
+            m = model_from_3mf(store.dir(bid) / "model.3mf", "memorybox")
             m.info = meta.get("info") or {}
             store.cache[bid] = m
             return m
@@ -157,12 +164,28 @@ def build_visibility(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     return summary(meta)
 
 
+def memorybox_preview(bid: str, meta: dict) -> geometry.Model:
+    """Assembled box for the viewer. The print file stays the separate parts."""
+    path = store.dir(bid) / "assembled.3mf"
+    if path.exists():
+        m = model_from_3mf(path, "memorybox")
+    else:
+        m = load_model(bid)
+    m.info = meta.get("info") or {}
+    return m
+
+
 @router.get("/builds/{bid}")
 def get_build(bid: str, actor: Actor = Depends(get_actor)):
     meta = meta_for(bid, actor)
     if meta.get("kind") == "edit":
         from ..services import editproj
         return editproj.payload(bid)
+    if meta.get("mode") == "memorybox":
+        params = dict(meta.get("params") or {})
+        params["shape"] = "memorybox"
+        return {**summary(meta), "params": params, "auto_notes": meta.get("auto_notes", []),
+                "info": meta.get("info", {}), "preview": preview_payload(memorybox_preview(bid, meta))}
     model = load_model(bid)
     prev = model
     if meta["params"].get("resolution", 0) > PREVIEW_RES:
@@ -734,25 +757,34 @@ def memorybox_build(actor: Actor = Depends(get_actor), files: list[UploadFile] =
     except ValueError as e:
         raise HTTPException(400, str(e))
     pm.info["sample_sides"] = view.info["sample_sides"] = [i + 1 for i, s in enumerate(sample_sides) if s]
+    pm.info["shape"] = view.info["shape"] = "memorybox"
     if fmt == "3mf":
         return Response(exporters.to_3mf(pm, "memory-box"), media_type="model/3mf",
                         headers={"Content-Disposition": 'attachment; filename="memory-box.3mf"'})
     if fmt == "zip":
         return Response(memorybox.stl_zip(pm), media_type="application/zip",
                         headers={"Content-Disposition": 'attachment; filename="memory-box-stls.zip"'})
-    out = {"mode": "lithophane", "info": {**view.info, "shape": "memorybox"}, "preview": preview_payload(view),
-           "stats": mesh_stats(pm)}
     if save:
-        out.update(memorybox_save(actor, pm, params, photo_ack, ims[0]))
-    return out
+        saved = memorybox_save(actor, pm, view, params, photo_ack, ims[0])
+        if saved.get("id"):
+            meta = store.get(saved["id"])
+            return {**summary(meta), "params": {**params, "shape": "memorybox"},
+                    "auto_notes": meta.get("auto_notes", []), "info": meta.get("info") or view.info,
+                    "preview": preview_payload(view), "saved": True}
+        return {"mode": "memorybox", "saved": False, "save_note": saved.get("save_note", ""),
+                "params": {**params, "shape": "memorybox"}, "info": view.info,
+                "preview": preview_payload(view), "stats": mesh_stats(view)}
+    return {"mode": "memorybox", "saved": False, "params": {**params, "shape": "memorybox"},
+            "info": view.info, "preview": preview_payload(view), "stats": mesh_stats(view)}
 
 
 MEMORYBOX_TITLE = "Memory box"
 
 
-def memorybox_save(actor: Actor, pm, params: dict, ack: bool, thumb_im=None) -> dict:
+def memorybox_save(actor: Actor, pm, view, params: dict, ack: bool, thumb_im=None) -> dict:
     """Keep the memory box as a build so the normal export picker (STL, 3MF, OBJ, ...) and file names work.
-    The print parts are stored as written files (no photo kept); 3MF keeps one object per part."""
+    model.* is the separate parts, laid out to print. assembled.3mf is the box together, for the viewer only.
+    No photo is kept. 3MF keeps one object per part."""
     disk_guard()
     with store.lock:
         try:
@@ -764,6 +796,7 @@ def memorybox_save(actor: Actor, pm, params: dict, ack: bool, thumb_im=None) -> 
         d.mkdir(parents=True)
         for ext, fn in exporters.WRITERS.items():
             (d / f"model.{ext}").write_bytes(fn(pm) if ext != "3mf" else exporters.to_3mf(pm, MEMORYBOX_TITLE))
+        (d / "assembled.3mf").write_bytes(exporters.to_3mf(view, MEMORYBOX_TITLE))
         th = (thumb_im or Image.new("RGB", (8, 8), (200, 200, 200))).convert("L")
         th.thumbnail((256, 256)); th.save(d / "thumb.png")
         from ..services import filestore
@@ -771,9 +804,9 @@ def memorybox_save(actor: Actor, pm, params: dict, ack: bool, thumb_im=None) -> 
             for ext in exporters.WRITERS:
                 filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
             filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
-        stats = mesh_stats(pm)
+        stats = mesh_stats(view)
         meta = {"id": bid, "mode": "memorybox", "beginner": False, "preset": None, "title": MEMORYBOX_TITLE,
-                "source": None, "params": params, "auto_notes": [], "info": pm.info, "stats": stats,
+                "source": None, "params": {**params, "shape": "memorybox"}, "auto_notes": [], "info": pm.info, "stats": stats,
                 "owner_sid": actor.sid, "visibility": "private", "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = pm

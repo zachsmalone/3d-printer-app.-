@@ -273,11 +273,13 @@
         <div class="backingCustom" id="backingCustom" hidden><label for="backingRGB" class="sr-only">Pick a backing colour</label><input type="color" id="backingRGB" value="#fff4e0">
           <label for="backingHex" class="sr-only">Backing colour as hex, like #fff4e0</label><input type="text" id="backingHex" value="#fff4e0" maxlength="7" size="8" spellcheck="false" autocomplete="off" inputmode="text"></div>
         <p class="help" id="backingHelp">What sits behind the print, such as a white diffuser or a sheet of paper. The Light on preview uses this colour, and it is saved with the build.</p></div>
-      <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box (4 photos round a light)</summary>
+      <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box</summary>
+        <p class="help" id="mbIntro">A box for four lithophane sides and a light. The picture is the box together. Send to Slicer, Export, and the STL zip are the separate parts, laid out to print. They fit each other. Sizes are starting points.</p>
         <div class="grid2">
           <div class="field wide2"><label for="mbFiles">Up to 4 photos, one per side</label><input type="file" id="mbFiles" accept="image/*" multiple>
             <div class="mbsample"><button class="btn small ghost" type="button" id="mbTrySample"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-image"></use></svg> Try the sample box</button>
-              <span class="help" id="mbSampleHelp">Four rose photos, one per side. Replace any side after.</span></div>
+              <button class="btn small ghost" type="button" id="mbUsePhoto">Use the photo above on side 1</button>
+              <span class="help" id="mbSampleHelp">Four rose photos, one per side. Or use the photo you already chose. Replace any side after. This does not change a lithophane you already made.</span></div>
             <ol class="mbsides" id="mbSides" aria-label="Photos on each side">
               <li><img alt="" id="mbSideImg1"><span>Side 1</span><button class="btn small ghost" type="button" data-side="1" aria-label="Replace side 1">Replace</button></li>
               <li><img alt="" id="mbSideImg2"><span>Side 2</span><button class="btn small ghost" type="button" data-side="2" aria-label="Replace side 2">Replace</button></li>

@@ -102,6 +102,11 @@ test("Open and Edit reach the matching workspace and remember Account → My Stu
   assert.equal(back.label, "My Studio");
   for (const k of Object.keys(before)) assert.equal(storage.getItem(k), before[k], k);
 
+  const box = workspaceFor({ id: PHOTO, kind: "photo", mode: "memorybox" }, "open");
+  assert.equal(box.hash, "#lithophane");
+  assert.equal(box.view, "lithophane");
+  assert.equal(box.open, "build");
+
   const relief = workspaceFor({ id: RELIEF, kind: "photo", mode: "relief" }, "open");
   assert.equal(relief.hash, "#create");
   assert.notEqual(relief.hash, "#lithophane");

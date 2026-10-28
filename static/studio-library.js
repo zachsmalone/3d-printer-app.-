@@ -120,8 +120,8 @@ export function workspaceFor(build, action) {
   if (kind === "edit") {
     return { action, view: "slicer", hash: "#slicer", open: "edit", id, back };
   }
-  /* #lithophane selects the Lithophane style. Other photo projects use #create, the same page without that click. */
-  if (mode === "lithophane") {
+  /* #lithophane selects the Lithophane style. A memory box is made there too. Other photo projects use #create. */
+  if (mode === "lithophane" || mode === "memorybox") {
     return { action, view: "lithophane", hash: "#lithophane", open: "build", id, back };
   }
   return { action, view: "photo", hash: "#create", open: "build", id, back };
