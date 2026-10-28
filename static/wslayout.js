@@ -2,9 +2,10 @@
    it, docked to a side. A panel marked dock slides along its edge and cannot be left floating. Exit, Done,
    New build, Return to My Studio, and the primary action stay in a top strip that layout will not use, and a
    drag cannot move a panel into that strip. "Customise workspace" lists every panel with a checkbox and has
-   "Reset layout". Core panels (Undo, the tool menu, Export/Print) can't be hidden, and the Customise button
-   itself is never inside a panel, so it stays reachable. Layout code only runs on change (drop / resize /
-   rotate / keyboard), and a drag only moves the panel with a transform.
+   "Reset layout". Core panels (Undo, the tool menu, Export/Print) can't be hidden. The Customise button
+   sits in the top strip when that strip is there, and is never inside a panel, so it stays reachable.
+   Layout code only runs on change (drop / resize / rotate / keyboard), and a drag only moves the panel
+   with a transform.
    Open panels stay at their real size. Layout moves them off obstacles and off each other. It does not walk a
    ladder of smaller sizes, minimise, or hide a panel to make room. If a full-size slot does not exist, one
    shared height cap gives every open panel a usable band (the saved size is left alone). Reset drops every
@@ -458,7 +459,18 @@
     btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="lbl">Customise</span>';
     btn.onclick = function () { open(); };
     function open() { fillDlg(); dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", ""); }
-    if (o.customise) o.customise.append(btn);
+    /* In the top strip, after the primary action, so the label cannot sit over Slice. */
+    if (o.customise) {
+      var slot = o.customise, bar = slot.querySelector && slot.querySelector(":scope > .wsbar");
+      if (bar) {
+        var end = document.createElement("div");
+        end.className = "ws-end";
+        var go = bar.querySelector(":scope > .ws-go");
+        if (go) end.append(go);
+        end.append(btn);
+        bar.append(end);
+      } else slot.append(btn);
+    }
     if (o.title) dlg.dataset.title = o.title;
     (o.panels || []).forEach(function (p) { if (p.el) { P.push(p); wrap(p); } });
     load();

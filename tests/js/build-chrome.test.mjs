@@ -24,15 +24,15 @@ async function waitFor(fn, ms) {
   throw new Error(last || "timed out");
 }
 
-async function run(windowSize, port, debug) {
+async function run(port, debug, metrics) {
   const logs = [];
   const server = spawn("python3", ["-m", "http.server", String(port), "--bind", "127.0.0.1"], { cwd: root.pathname, stdio: ["ignore", "pipe", "pipe"] });
   listen(server, logs);
   const chrome = spawn("/usr/local/bin/google-chrome", [
     "--headless=new", "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
-    "--remote-debugging-port=" + debug, "--window-size=" + windowSize,
+    "--remote-debugging-port=" + debug, "--window-size=" + metrics.width + "," + metrics.height,
     "--user-data-dir=/tmp/chrome-build-chrome-" + debug,
-    "http://127.0.0.1:" + port + "/tests/fixtures/build-chrome.html",
+    "about:blank",
   ], { stdio: ["ignore", "pipe", "pipe"] });
   listen(chrome, logs);
   try {
@@ -40,7 +40,7 @@ async function run(windowSize, port, debug) {
       const r = await fetch("http://127.0.0.1:" + debug + "/json/list");
       if (!r.ok) return null;
       const pages = await r.json();
-      return pages.find((p) => (p.url || "").includes("build-chrome.html") && p.webSocketDebuggerUrl) || null;
+      return pages.find((p) => p.type === "page" && p.webSocketDebuggerUrl) || null;
     }, 15000);
     const ws = new WebSocket(page.webSocketDebuggerUrl);
     await once(ws, "open");
@@ -56,6 +56,11 @@ async function run(windowSize, port, debug) {
       pending.set(id, (msg) => (msg.error ? reject(new Error(JSON.stringify(msg.error))) : resolve(msg.result)));
       ws.send(JSON.stringify({ id, method, params }));
     });
+    // Headless Chrome will not open a window narrower than 500. Device metrics is the 390px phone width.
+    await send("Emulation.setDeviceMetricsOverride", {
+      width: metrics.width, height: metrics.height, deviceScaleFactor: 1, mobile: metrics.width < 500,
+    });
+    await send("Page.navigate", { url: "http://127.0.0.1:" + port + "/tests/fixtures/build-chrome.html" });
     const data = await waitFor(async () => {
       const ev = await send("Runtime.evaluate", { expression: "document.getElementById('out').textContent", returnByValue: true });
       const text = ev.result && ev.result.value;
@@ -75,8 +80,10 @@ test("headless chrome: Exit stays clickable with panels dragged at it", { timeou
     t.skip("environment blocker: google-chrome is not installed");
     return;
   }
-  const desk = await run("1280,800", 8941, 9341);
+  const desk = await run(8941, 9341, { width: 1280, height: 800 });
+  assert.equal(desk.width, 1280);
   assert.deepEqual(desk.fails, [], (desk.fails || []).join("\n"));
-  const phone = await run("390,844", 8942, 9342);
+  const phone = await run(8942, 9342, { width: 390, height: 844 });
+  assert.equal(phone.width, 390);
   assert.deepEqual(phone.fails, [], (phone.fails || []).join("\n"));
 });
