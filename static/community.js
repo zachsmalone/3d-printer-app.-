@@ -49,7 +49,7 @@ async function refreshMe() {
 }
 
 /* ---------- views ---------- */
-const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn" };
+const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", projects: "#viewProjects", account: "#viewAccount", learn: "#viewLearn" };
 const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", "2d3d": "ai3d" };
 function show(view, tab) {
   const navTab = tab || view;
@@ -81,7 +81,7 @@ function paintStudioHome(raw) {
   const expert = document.querySelector("#h1 [data-lvl=expert]");
   const photoName = (CFG && CFG.sections && CFG.sections.create) || "Photo";
   if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : photoName;
-  /* Saved projects are listed on Account. This block stays hidden so the photo page does not become the library. */
+  /* Saved projects are listed in Projects. This block stays hidden so the photo page does not become the library. */
   const recent = $("#recentBuilds");
   if (recent) recent.hidden = true;
 }
@@ -90,27 +90,36 @@ function paintStudioLibrary() {
   if (!host) return;
   host.innerHTML = libraryHTML(S.history || [], { currentId: S.current && S.current.id });
 }
-function markLibrary(on) {
-  const link = $("#btnMyStudio");
+function paintStudioOwn() {
+  const note = $("#studioOwnCount");
+  if (!note) return;
+  const n = (S.history || []).filter(b => /^[0-9a-f]{12}$/.test(String(b.id || ""))).length;
+  note.textContent = n === 0 ? "No saved projects yet." : (n === 1 ? "1 saved project." : n + " saved projects.");
+}
+function markStudioOwn(on) {
   const sec = $("#meStudio");
-  if (link) { if (on) link.setAttribute("aria-current", "page"); else link.removeAttribute("aria-current"); }
+  const head = $("#meStudioH");
   if (sec) sec.classList.toggle("on", !!on);
+  if (head) {
+    if (on) head.setAttribute("aria-current", "page");
+    else head.removeAttribute("aria-current");
+  }
 }
 async function refreshStudioLibrary() {
-  try { await loadHistory(); } catch { paintStudioLibrary(); }
+  try { await loadHistory(); } catch { paintStudioLibrary(); paintStudioOwn(); }
 }
-document.addEventListener("zeim:history", () => paintStudioLibrary());
+document.addEventListener("zeim:history", () => { paintStudioLibrary(); paintStudioOwn(); });
 function route() {
   const intent = routeIntent(location.hash);
-  if (intent.library && intent.rewrite && location.hash !== intent.hash) {
+  if (intent.rewrite && intent.hash && location.hash !== intent.hash) {
     history.replaceState(null, "", location.pathname + location.search + intent.hash);
   }
   const h = location.hash.replace("#", "").split("/");
   const raw = h[0];
-  const v = intent.library ? "account" : (ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase"));
-  show(v, intent.library ? (intent.nav || "projects") : v);
-  paintStudioHome(intent.library ? "account" : raw);
-  markLibrary(!!intent.library);
+  const v = intent.view || (ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase"));
+  show(v, intent.nav || v);
+  paintStudioHome(raw);
+  markStudioOwn(!!intent.ownership);
   if (intent.library) arriveLibrary(sessionStorage);
   if (v === "lithophane" && raw === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
   if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);
@@ -121,13 +130,16 @@ function route() {
   if (h[0] === "c" && h[1]) setTimeout(() => openCollection(h[1]), 50);
   if (v === "account") {
     loadFavorites(); loadCollections(); paintAccountHandle();
+    paintStudioOwn();
     refreshStudioLibrary();
-    if (intent.library) {
+    if (intent.ownership) {
       const sec = $("#meStudio");
       if (sec) setTimeout(() => { try { sec.scrollIntoView({ block: "nearest" }); } catch { /* older browsers */ } }, 0);
     }
+  } else {
+    if (intent.library) { paintStudioOwn(); refreshStudioLibrary(); }
+    if ($("#dlgCollection")?.open) $("#dlgCollection").close();
   }
-  else if ($("#dlgCollection")?.open) $("#dlgCollection").close();
 }
 addEventListener("hashchange", route);
 $("#studioLib")?.addEventListener("click", async e => {

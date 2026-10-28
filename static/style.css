@@ -887,8 +887,9 @@ html:not([data-theme=dark]) .agegate .logo-dark,html[data-theme=dark] .agegate .
 .toolgrid .toolcard{display:flex;flex-direction:column}
 .toolgrid .toolcard>.btn{margin-top:auto;width:100%;min-height:44px;justify-content:center;text-align:center}
 
-/* S5: 769–1279 px — the nav gets its own full-width row under the brand and controls, so every label fits */
-@media (min-width:769px) and (max-width:1279px){
+/* 769–1439 px — the nav gets its own full-width row under the brand and controls, so Projects and Me stay clickable.
+   At 1280 the mode menu covered Me when the tabs shared one row. */
+@media (min-width:769px) and (max-width:1439px){
   .topbar{flex-wrap:wrap;row-gap:6px}
   .topbar .nav{order:60;flex:1 0 100%;justify-content:space-between}
   .topbar .nav button{flex:1 1 0;justify-content:center;min-height:40px}
@@ -1142,20 +1143,20 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .shfilters small.help{flex-basis:100%;margin:0}
 
 /* Showcase collections — calm strip matching .shfilters / .prov (cherry-blossom vars) */
-/* My Studio: its own block on Account (Me), under the calligraphy band, in normal flow */
+/* My Studio: ownership note on Account (Me). The project list lives on Projects. */
 #viewAccount .mestudio{margin:0 0 var(--s4,16px);padding:var(--s5,20px);border:1px solid var(--line);border-left:3px solid var(--zt-a,#A3241C);border-radius:var(--r-lg,14px);background:var(--panel);box-shadow:var(--sh-1);max-width:100%}
+#viewAccount .mestudio.on{box-shadow:inset 0 0 0 1px var(--zt-a,#A3241C)}
 #viewAccount .mestudio h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:1.05rem}
 #viewAccount .mestudio h2 .i{width:20px;height:20px;color:var(--zt-a,#A3241C)}
 #viewAccount .mestudio .btn{min-height:44px;margin-top:10px;text-decoration:none}
-#viewAccount .mestudio a#btnMyStudio{color:inherit;text-decoration:none;font:inherit}
-#viewAccount .studio-lib{display:flex;flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none}
-#viewAccount .studio-lib .hcard{flex-direction:row;align-items:center;gap:10px;padding:8px}
-#viewAccount .studio-lib .meta{flex:1;min-width:0;padding:0}
-#viewAccount .studio-lib .meta b{white-space:normal}
-#viewAccount .studio-lib .row2{padding:0;margin-left:auto}
-#viewAccount .studio-lib .btn{margin-top:0;width:auto}
-#viewAccount .studio-lib img{width:72px;height:72px;aspect-ratio:1;object-fit:cover;flex:0 0 72px}
-@media (max-width:768px){#viewAccount .mestudio .btn{width:100%;justify-content:center}#viewAccount .studio-lib .hcard{flex-wrap:wrap}#viewAccount .studio-lib .row2{width:100%;margin-left:0}#viewAccount .studio-lib .btn{width:auto;flex:1 1 44px}}
+#viewProjects .studio-lib{display:flex;flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+#viewProjects .studio-lib .hcard{flex-direction:row;align-items:center;gap:10px;padding:8px}
+#viewProjects .studio-lib .meta{flex:1;min-width:0;padding:0}
+#viewProjects .studio-lib .meta b{white-space:normal}
+#viewProjects .studio-lib .row2{padding:0;margin-left:auto}
+#viewProjects .studio-lib .btn{margin-top:0;width:auto}
+#viewProjects .studio-lib img{width:72px;height:72px;aspect-ratio:1;object-fit:cover;flex:0 0 72px}
+@media (max-width:768px){#viewAccount .mestudio .btn{width:100%;justify-content:center}#viewProjects .studio-lib .hcard{flex-wrap:wrap}#viewProjects .studio-lib .row2{width:100%;margin-left:0}#viewProjects .studio-lib .btn{width:auto;flex:1 1 44px}}
 .studio-crumb{margin:0 0 8px;font-size:13px;color:var(--mut)}
 .studio-crumb a{font-weight:650}
 .wsbar{position:relative;z-index:40;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}

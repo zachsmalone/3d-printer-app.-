@@ -137,10 +137,12 @@ def test_exit_new_build_and_done_do_not_publish(base):
         assert pg.locator("#viewCreate .wsbar [data-ws-act=return-studio]").is_visible()
         assert pg.locator("#studioFromMe").is_visible()
         pg.locator("#viewCreate .wsbar [data-ws-act=exit]").click()
-        pg.wait_for_function("() => location.hash === '#account/studio' && document.body.dataset.view === 'account'")
+        pg.wait_for_function("() => location.hash === '#projects' && document.body.dataset.view === 'projects'")
         assert "publish" not in pg.url
         assert pg.evaluate("() => window.__published") == 0
         assert pg.locator("#viewCreate").is_hidden()
-        assert pg.locator("#meStudio").is_visible()
+        assert pg.locator("#viewAccount").is_hidden()
+        assert pg.locator("#viewProjects").is_visible()
+        assert pg.locator("#studioLib").is_visible()
         assert errs == [], errs
         browser.close()

@@ -46,8 +46,8 @@
     <button data-view="lithophane" title="Turn a photo into a lithophane"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 16l5-5 4 4 3-3 4 4"/><circle cx="15.5" cy="8.5" r="1.5"/></svg><span class="nl">Lithophane</span><span class="ns" aria-hidden="true">Litho</span></button>
     <button data-view="smartfix" title="Find and fix print problems"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg><span class="nl">Smart Fix</span><span class="ns" aria-hidden="true">Fix</span></button>
     <button data-view="learn" title="Short, practical lessons"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M8 7h7"/></svg><span class="nl">Learn</span><span class="ns" aria-hidden="true">Learn</span></button>
-    <button data-view="projects" title="Saved projects (My Studio)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="nl">Projects</span><span class="ns" aria-hidden="true">Projects</span></button>
-    <button data-view="account" title="Your account, printer, My Studio and preferences"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg><span class="nl">Account</span><span class="ns" aria-hidden="true">Me</span></button>
+    <button data-view="projects" title="Saved projects. Open or continue work."><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="nl">Projects</span><span class="ns" aria-hidden="true">Projects</span></button>
+    <button data-view="account" title="Your account, printer, and preferences"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg><span class="nl">Account</span><span class="ns" aria-hidden="true">Me</span></button>
   </nav>
   <div class="modepick">
     <label for="modeSel">Mode</label>
@@ -71,18 +71,18 @@
 <main class="layout" id="viewCreate" hidden>
 <div class="zt-band" data-zt="lithophane"><div class="zt-litho" aria-hidden="true"><i class="zt-glow"></i><img src="/static/zt/lithophane-cat.jpg" width="440" height="440" alt="" loading="lazy" decoding="async"></div><p class="zt-cap">Example lithophane: Tango the cat, lit from behind.</p></div>
   <section class="hero" aria-labelledby="h1">
-    <p class="studio-crumb" id="studioFromMe" hidden><a href="#account/studio" data-ws-act="return-studio" data-ws="lithophane">Return to My Studio</a></p>
+    <p class="studio-crumb" id="studioFromMe" hidden><a href="#projects" data-ws-act="return-studio" data-ws="lithophane">Return to Projects</a></p>
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
     <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
-    <p class="help" id="lithoStudioNote" hidden>Saved projects are in <a href="#account/studio">Projects</a> (My Studio), on Account. This page makes a model from a photo.</p>
+    <p class="help" id="lithoStudioNote" hidden>Saved projects are in <a href="#projects">Projects</a>. This page makes a model from a photo.</p>
     <div id="studioPhoto"></div>
     <p class="have3d"><button type="button" class="linkbtn" id="btnHave3d">Already have a 3D file (STL, OBJ or 3MF)? Open it in the FDM Slicer</button></p>
   </section>
   <div class="wsbar" data-ws="lithophane" role="group" aria-label="Lithophane workspace">
     <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
-    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
-    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A project already in My Studio stays there. This does not send the model to Showcase.">New build</button>
-    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Projects, go back to the list. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A project already in Projects stays there. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#projects" hidden aria-label="Return to Projects" title="Go back to saved projects. The draft is saved first. This does not send the model to Showcase.">Return to Projects</a>
     <button type="button" class="btn small primary ws-go" id="lithoGo" data-go="btnSendSlicer" title="Save first, then open this model in the FDM Slicer. This does not send it to Showcase.">Send to Slicer</button>
   </div>
   <nav class="pathnav" aria-label="Your progress">
@@ -447,9 +447,9 @@
   <h1 class="sr-only" data-sec="edit">FDM Slicer</h1>
   <div class="wsbar" data-ws="slicer" role="group" aria-label="Slicer workspace">
     <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
-    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
-    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. The project stays in My Studio. This does not send the model to Showcase.">New build</button>
-    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Projects, go back to the list. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. The project stays in Projects. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#projects" hidden aria-label="Return to Projects" title="Go back to saved projects. The draft is saved first. This does not send the model to Showcase.">Return to Projects</a>
     <button type="button" class="btn small primary ws-go" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace.">Slice</button>
   </div>
   <aside class="panel controls" id="editSide">
@@ -467,7 +467,7 @@
         <div class="field" hidden><label for="editPhotoMode">If it's a photo</label><select id="editPhotoMode"><option value="lithophane">Lithophane base</option><option value="relief">Relief base</option></select></div>
       </div>
       <div class="row"><button class="btn" id="editSample">Try a sample model</button></div>
-      <p class="help">Saved projects are in <a href="#account/studio">Projects</a> (My Studio).</p>
+      <p class="help">Saved projects are in <a href="#projects">Projects</a>.</p>
       <div hidden><label for="editFromBuild" class="sr-only">Saved project</label><select id="editFromBuild"></select><button type="button" class="btn" id="editFromBuildGo">Open in the slicer</button></div>
       <h2 style="margin-top:16px"><i>or</i> Build from primitives</h2>
       <div class="row"><a class="btn" href="/builder.html">Open the parts builder ▸</a><span class="help" style="align-self:center">Combine boxes, cylinders and more — solids add, holes cut, every size stays editable.</span></div>
@@ -676,9 +676,9 @@
   <div class="pagehead"><div><h1>TorchC0</h1><p class="help">ZEIM's resin program. Hollow your model with a drain hole, tilt it, add supports and a raft, then open the STL or 3MF in your resin printer's own slicer to make the layer file.</p></div></div>
   <div class="wsbar" data-ws="torchc0" role="group" aria-label="TorchC0 workspace">
     <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
-    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Projects, go back to the list. This does not send the model to Showcase.">Done</button>
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. This does not send the model to Showcase.">New build</button>
-    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <a class="btn small" data-ws-act="return-studio" href="#projects" hidden aria-label="Return to Projects" title="Go back to saved projects. The draft is saved first. This does not send the model to Showcase.">Return to Projects</a>
     <button type="button" class="btn small primary ws-go" id="torchGo" data-go="rzGo" title="Prepare this model for resin. This does not send it to Showcase.">Prepare</button>
   </div>
   <section class="slicepanel torchpanel" id="torchPanel" aria-label="TorchC0 resin settings"><p class="help">Loading resin printers…</p></section>
@@ -690,9 +690,9 @@
   <div class="pagehead"><div><h1>2D→3D</h1><p class="help">Turn one photo into a mesh with TripoSR, an open model. It guesses the sides the photo does not show. Figure or bust, then a mesh you can repair, edit, or slice. A starting point, not a scan.</p></div></div>
   <div class="wsbar" data-ws="ai3d" role="group" aria-label="2D to 3D workspace">
     <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
-    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
-    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A saved model stays in My Studio. This does not send the model to Showcase.">New build</button>
-    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Projects, go back to the list. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A saved model stays in Projects. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#projects" hidden aria-label="Return to Projects" title="Go back to saved projects. The draft is saved first. This does not send the model to Showcase.">Return to Projects</a>
   </div>
   <div id="a3Engine" class="a3note" role="status" aria-live="polite"></div>
   <div class="a3grid">
@@ -767,13 +767,23 @@
   </section>
 </main>
 
+<main class="page" id="viewProjects" hidden>
+  <div class="pagehead"><div>
+    <h1 id="projectsH">Projects</h1>
+    <p class="help" id="studioLibHelp">Saved work. Open continues that project. Edit on a photo design opens its slicer copy; the photo design stays here.</p>
+    <p class="help">These belong to your account. <a href="#account/studio" id="btnViewStudio">View in My Studio</a>.</p>
+  </div></div>
+  <ul class="hlist studio-lib" id="studioLib" aria-labelledby="projectsH"></ul>
+</main>
+
 <main class="page" id="viewAccount" hidden>
 <div class="zt-band" data-zt="account" aria-hidden="true"><img class="zt-art" src="/static/zt/account.webp" srcset="/static/zt/account.webp 1x, /static/zt/account@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-ink"></i><i class="zt-ink"></i><i class="zt-ink"></i></div>
   <div class="pagehead"><div><h1>Account</h1><p class="help" id="accSummary">Your page: profile, sign-in and your printers.</p><p class="help" id="accTestingMode" hidden><strong>Testing mode is on for this server.</strong> Hourly caps and pauses are off. Sign-in limits, upload scanning, and payments stay on.</p></div></div>
   <section class="mestudio" id="meStudio" aria-labelledby="meStudioH">
-    <h2 id="meStudioH"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-camera"/></svg> <a href="#account/studio" id="btnMyStudio">My Studio</a></h2>
-    <p class="help" id="studioLibHelp">This is Projects. My Studio is the list of saved work. Open continues that project. Edit on a photo design opens its slicer copy; the photo design stays here.</p>
-    <ul class="hlist studio-lib" id="studioLib"></ul>
+    <h2 id="meStudioH"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg> My Studio</h2>
+    <p class="help" id="studioOwnHelp">Saved projects belong to this account. Open and continue them in Projects.</p>
+    <p class="help" id="studioOwnCount" role="status">No saved projects yet.</p>
+    <a class="btn" id="btnOpenProjects" href="#projects">Open in Projects</a>
   </section>
   <ul class="grid toolgrid">
     <li class="toolcard"><h2>Profile</h2><p class="help">Sign up, sign in, your name and sign-out.</p><div class="acctbtns"><button class="btn big" id="btnLogin" type="button" aria-label="Log in">Log in</button><button class="btn big primary" id="btnAccount" type="button" aria-label="Account"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4.5-6 8-6s7 2 8 6"/></svg> <span class="lbl">Sign up</span></button></div></li>
