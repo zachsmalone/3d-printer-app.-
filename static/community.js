@@ -19,6 +19,7 @@ async function init() {
   await refreshMe();
   openPublishFromQuery();
   route();
+  noteCheckoutReturn();
   window.__zeimStarted = true;                 // static/boot.js shows a visible error if this never happens
 }
 function applyAi3dFlag() {
@@ -214,38 +215,75 @@ $("#fbSend") && ($("#fbSend").onclick = async () => {
 });
 
 /* ---------- Optional Semi Pro / Pro. Checkout only if the server marks a plan purchasable. ---------- */
+function stripeHostOk(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && (u.hostname === "checkout.stripe.com" || u.hostname === "billing.stripe.com");
+  } catch (e) { return false; }
+}
+function noteCheckoutReturn() {
+  const v = new URLSearchParams(location.search).get("checkout");
+  if (!v || noteCheckoutReturn.done) return;
+  noteCheckoutReturn.done = true;
+  if (v === "success") toast("Back from Stripe. Your plan updates when Stripe confirms the payment — this page does not mark you paid by itself.", "ok");
+  else if (v === "cancel") toast("Checkout canceled. Nothing was charged.", "ok");
+}
 async function renderPlans() {
   const box = $("#accPlans"); if (!box) return;
   let data;
   try { data = await api("/api/subscriptions/me"); }
   catch (e) { box.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
   const cur = (data.plan && data.plan.id) || "free";
-  const note = `<p class="help">${esc(data.payment_note || "")}</p><p class="help">${esc(data.tip_note || "")}</p>`;
+  const status = data.plan || {};
+  const extra = [];
+  if (status.status === "past_due" && cur !== "free") extra.push("A renewal payment failed. Stripe will retry. This plan stays until Stripe cancels it.");
+  if (status.cancel_at_period_end && cur !== "free") extra.push("This plan is set to cancel. It stays active until the period Stripe already billed ends.");
+  const note = [data.payment_note, data.fee_note, data.processing_note, data.renewal_note, data.tip_note, ...extra]
+    .filter(Boolean).map(t => `<p class="help">${esc(t)}</p>`).join("");
   const cards = (data.catalog || []).map(p => {
     const on = p.id === cur;
     const price = esc(p.price_label || "");
+    const fee = p.fee_cents ? ` <span class="help">plus ${esc(String(p.fee_cents))}¢ ZEIM service fee</span>` : "";
     const go = p.id === "free"
       ? `<span class="pill">${on ? "Your plan" : "Always free"}</span>`
       : (p.purchasable
         ? `<button type="button" class="btn small" data-plan="${esc(p.id)}" ${on ? "disabled" : ""}>${on ? "Your plan" : "Choose " + esc(p.name)}</button>`
         : `<span class="pill" role="status">Coming later</span>`);
     return `<div class="plan-card ${on ? "on" : ""}" data-plan-id="${esc(p.id)}">
-      <b>${esc(p.name)}</b> <span class="help">${price}</span>
+      <b>${esc(p.name)}</b> <span class="help">${price}</span>${fee}
       <p class="help">${esc(p.summary || "")}</p>
       <ul class="help">${(p.includes || []).map(i => `<li>${esc(i)}</li>`).join("")}</ul>
       ${go}</div>`;
   }).join("");
-  box.innerHTML = note + `<div class="plan-grid">${cards}</div>`;
-  // No button unless the server set purchasable (plans flag on and a processor live). Default: Coming later.
+  const manage = status.can_manage
+    ? `<p class="help"><button type="button" class="btn small" id="planManage">Manage billing in Stripe</button> Cancel, switch plan, or update the card there. ZEIM never sees the card.</p>`
+    : "";
+  box.innerHTML = note + `<div class="plan-grid">${cards}</div>` + manage;
+  // No button unless the server set purchasable (plans flag on and Stripe configured). Default: Coming later.
   box.querySelectorAll("button[data-plan]").forEach(b => b.onclick = async () => {
     if (!b.dataset.plan) return;
     b.disabled = true;
     try {
       const r = await api("/api/subscriptions/checkout", J("POST", { plan: b.dataset.plan }));
+      if (r.url) {
+        if (!stripeHostOk(r.url)) { toast("That was not a Stripe page. Nothing was charged.", "err"); b.disabled = false; return; }
+        location.href = r.url;
+        return;
+      }
       if (r.coming || r.checkout === false || !r.ok) toast(r.message || "Coming later. Nothing was charged.", "ok");
       else { toast(r.message || "Plan updated", "ok"); await refreshMe(); renderAccount(); }
     } catch (e) { toast(e.message, "err"); b.disabled = false; }
   });
+  const manageBtn = $("#planManage");
+  if (manageBtn) manageBtn.onclick = async () => {
+    manageBtn.disabled = true;
+    try {
+      const r = await api("/api/subscriptions/portal", J("POST", {}));
+      if (r.url && stripeHostOk(r.url)) { location.href = r.url; return; }
+      toast(r.message || "Billing portal is not available.", r.ok ? "ok" : "err");
+    } catch (e) { toast(e.message, "err"); }
+    manageBtn.disabled = false;
+  };
 }
 
 function renderAccount() {

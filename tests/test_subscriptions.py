@@ -1,4 +1,8 @@
-"""Paid plans stay closed unless ZEIM_PLANS_ENABLED is on, and even then nothing is charged."""
+"""Paid plans stay closed unless ZEIM_PLANS_ENABLED is on.
+
+The flag defaults off and refuses checkout. Turning it on without a full Stripe
+configuration still charges nothing. Hosted Checkout is covered in test_stripe_plans.py.
+"""
 from __future__ import annotations
 
 import pytest
@@ -6,11 +10,28 @@ import pytest
 from app.services import subscriptions as subs
 from tests.b1 import ADULT, client, gen
 
+_STRIPE_KEYS = (
+    "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_PRICE_SEMI_PRO", "STRIPE_PRICE_PRO",
+    "STRIPE_PRICE_FEE_SEMI_PRO", "STRIPE_PRICE_FEE_PRO",
+)
+
+
+@pytest.fixture(autouse=True)
+def _clear_stripe_env(monkeypatch):
+    for key in _STRIPE_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
 
 def test_catalog_is_honest():
     c = subs.catalog()
     assert c["payment_live"] is False
     assert c["plans_enabled"] is False
+    assert c["stripe_mode"] == "off"
+    assert c["stores_cards"] is False
+    assert "about 1%" in c["fee_note"]
+    assert "4¢" in c["fee_note"] and "6¢" in c["fee_note"]
+    assert "processing" in c["processing_note"].lower()
     assert "never takes a cut" in c["tip_note"].lower()
     assert "nothing on this page starts a payment" in c["payment_note"].lower()
     ids = {p["id"] for p in c["plans"]}
@@ -65,9 +86,9 @@ def test_disabled_plans_have_no_checkout_path():
 
 
 def test_enabling_the_flag_still_does_not_charge_without_stripe(monkeypatch):
-    """ZEIM_PLANS_ENABLED=1 is reversible, but this build has no processor.
+    """ZEIM_PLANS_ENABLED=1 without a full Stripe configuration does not charge.
 
-    A Stripe key, or the lack of one, must not raise and must not return a payment URL.
+    A partial key, or the lack of one, must not raise and must not return a payment URL.
     """
     monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
     monkeypatch.delenv("STRIPE_WEBHOOK_SECRET", raising=False)
@@ -97,6 +118,32 @@ def test_enabling_the_flag_still_does_not_charge_without_stripe(monkeypatch):
     assert "url" not in r.json()
     assert "sk_test" not in r.text
     assert "whsec" not in r.text
+    assert c.get("/api/subscriptions/me").json()["plan"]["id"] == "free"
+
+
+def test_stripe_keys_do_not_open_checkout_while_plans_are_off(monkeypatch):
+    """Soft launch: a full Stripe test or live key still refuses while the flag is off."""
+    monkeypatch.setenv("ZEIM_PLANS_ENABLED", "0")
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_live_zeim")
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", "whsec_test_secret")
+    monkeypatch.setenv("STRIPE_PRICE_SEMI_PRO", "price_semi123")
+    monkeypatch.setenv("STRIPE_PRICE_PRO", "price_pro123")
+    assert subs.plans_enabled() is False
+    assert subs.payment_live() is False
+    cat = subs.catalog()
+    assert cat["stripe_mode"] == "live"
+    assert cat["payment_live"] is False
+    assert all(p["purchasable"] is False for p in cat["plans"])
+    assert all(p["coming"] is True for p in cat["plans"] if p["id"] != "free")
+    c = client(ADULT)
+    r = c.post("/api/subscriptions/checkout", json={"plan": "pro"})
+    assert r.status_code == 403, r.text
+    body = r.json()
+    assert body["checkout"] is False and body["coming"] is True
+    assert "url" not in body
+    assert "sk_live" not in r.text and "whsec" not in r.text
+    assert "nothing was charged" in r.text.lower()
+    assert "stripe" not in r.text.lower()
     assert c.get("/api/subscriptions/me").json()["plan"]["id"] == "free"
 
 

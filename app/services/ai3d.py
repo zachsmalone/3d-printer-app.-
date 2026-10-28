@@ -23,6 +23,7 @@ import uuid
 
 from .. import config
 from ..core.ai3d_prep import prepare_image
+from .subscriptions import has_paid_plan
 
 _lock = threading.Lock()
 _last_done: dict[str, float] = {}           # sid -> time the last model finished
@@ -132,8 +133,8 @@ def engine_call(image: bytes, mode: str, resolution: int = 192, *, prepared: boo
 
 
 def is_pro(actor) -> bool:
-    u = actor.user or {}
-    return str(u.get("plan", "")).lower() == "pro"
+    """Pro gate. `plan` is written by Stripe webhooks, not by the browser."""
+    return has_paid_plan(actor.user, "pro")
 
 
 def plan(actor) -> dict:
