@@ -1,6 +1,6 @@
 import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showBuild } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
-import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary } from "/static/studio-library.js";
+import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -22,7 +22,7 @@ async function init() {
 function applyAi3dFlag() {
   /* ZEIM_2D3D_ENABLED=0: hide the nav tab. The view, if opened by a link, says Coming later. */
   const on = !!CFG.ai3d_enabled;
-  $$('[data-view="ai3d"]').forEach(b => { b.hidden = !on; b.disabled = !on; });
+  $$('#mainNav [data-view="ai3d"]').forEach(b => { b.hidden = !on; b.disabled = !on; });
   const grid = document.querySelector("#viewAi3d .a3grid");
   const go = document.getElementById("a3Go");
   const note = document.getElementById("a3Engine");
@@ -71,9 +71,7 @@ function openTool(t) {   // Smart Fix / CAD shortcuts: open the matching tool in
 let toolDone = "";
 document.addEventListener("zeim:edit-loaded", () => { const h = location.hash.split("/"); if (h[1] && toolDone !== location.hash) { toolDone = location.hash; openTool(h[1]); } });
 function paintStudioHome(raw) {
-  let back = null;
-  try { back = JSON.parse(sessionStorage.getItem("zeim.back") || "null"); } catch { back = null; }
-  const fromLib = !!(back && back.from === "mystudio");
+  const fromLib = exitTarget(sessionStorage) === LIBRARY_URL;
   const crumb = $("#studioFromMe");
   if (crumb) crumb.hidden = !(fromLib && (raw === "lithophane" || raw === "create"));
   const note = $("#lithoStudioNote");

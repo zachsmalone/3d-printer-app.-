@@ -161,6 +161,39 @@ test("arriving on the library clears only the My Studio return marker", () => {
   assert.equal(foreign.getItem("zeim.edit.last"), EDIT);
 });
 
+test("a section hand-off keeps Exit pointed at My Studio and does not drop project keys", () => {
+  const now = Date.now();
+  const nested = {
+    label: "Studio",
+    hash: "lithophane",
+    t: now,
+    studio: { label: "My Studio", hash: "account", url: LIBRARY_URL, from: "mystudio", t: now },
+  };
+  const storage = mem({ ...PROJECT, "zeim.back": JSON.stringify(nested) });
+  assert.equal(exitTarget(storage, now), LIBRARY_URL);
+  const left = takeExit(storage, now);
+  assert.equal(left.url, LIBRARY_URL);
+  assert.deepEqual(left.changed, ["zeim.back"]);
+  assert.equal(storage.getItem("zeim.back"), null);
+  for (const k of Object.keys(PROJECT)) assert.equal(storage.getItem(k), PROJECT[k], k);
+
+  const again = mem({ ...PROJECT, "zeim.back": JSON.stringify(nested) });
+  const arrived = arriveLibrary(again, now);
+  assert.equal(arrived.cleared, true);
+  assert.deepEqual(arrived.changed, ["zeim.back"]);
+  assert.equal(again.getItem("zeim.edit.last"), EDIT);
+
+  const stale = mem({
+    "zeim.back": JSON.stringify({
+      label: "Studio", hash: "lithophane", t: now,
+      studio: { label: "My Studio", hash: "account", url: LIBRARY_URL, from: "mystudio", t: now - 7 * 3600e3 },
+    }),
+  });
+  assert.equal(exitTarget(stale, now), null);
+  assert.equal(arriveLibrary(stale, now).cleared, false);
+  assert.equal(stale.getItem("zeim.back").includes("Studio"), true);
+});
+
 test("a refresh of the library route is still the library", () => {
   const again = routeIntent(LIBRARY_HASH);
   assert.equal(again.library, true);

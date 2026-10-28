@@ -171,4 +171,12 @@ async function load1() {
 document.addEventListener("zeim:torchc0-shown", load);
 document.addEventListener("zeim:level", () => { const d = $("#rzAdv"); if (d) d.open = document.body.dataset.level === "expert"; });   // S9: Beginner sees preset + Hollow/Supports
 document.addEventListener("zeim:torchc0-file", () => load());   // Send to… (static/handoff.js) fills the file once the panel exists
+document.addEventListener("zeim:new-build", e => {
+  if (!e.detail || e.detail.section !== "torchc0" || e.detail.publish) return;
+  const inp = $("#rzFile"); if (inp) inp.value = "";
+  const st = $("#rzFileStatus"); if (st) { st.textContent = ""; st.classList.remove("warn"); }
+  delete document.body.dataset.torchStl;
+  const out = $("#torchOut"); if (out) { out.innerHTML = ""; out.classList.remove("rzResult"); }
+  document.dispatchEvent(new CustomEvent("zeim:torchc0-forget"));
+});
 if (location.hash.startsWith("#torchc0") || location.hash.startsWith("#resin")) load();

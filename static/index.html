@@ -69,13 +69,19 @@
 <main class="layout" id="viewCreate" hidden>
 <div class="zt-band" data-zt="lithophane"><div class="zt-litho" aria-hidden="true"><i class="zt-glow"></i><img src="/static/zt/lithophane-cat.jpg" width="440" height="440" alt="" loading="lazy" decoding="async"></div><p class="zt-cap">Example lithophane: Tango the cat, lit from behind.</p></div>
   <section class="hero" aria-labelledby="h1">
-    <p class="studio-crumb" id="studioFromMe" hidden><a href="#account/studio">Account · My Studio</a></p>
+    <p class="studio-crumb" id="studioFromMe" hidden><a href="#account/studio" data-ws-act="return-studio" data-ws="lithophane">Return to My Studio</a></p>
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
     <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
     <p class="help" id="lithoStudioNote" hidden>This tab is Lithophane. <a href="#account/studio">My Studio</a> lists saved projects in Account.</p>
     <div id="studioPhoto"></div>
     <p class="have3d"><button type="button" class="linkbtn" id="btnHave3d">Already have a 3D file (STL, OBJ or 3MF)? Open it in Edit</button></p>
   </section>
+  <div class="wsbar" data-ws="lithophane" role="group" aria-label="Lithophane workspace">
+    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A project already in My Studio stays there. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+  </div>
   <nav class="pathnav" aria-label="Your progress">
     <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Print-ready</li></ol>
     <p class="help" id="pathSay" role="status" aria-live="polite">Step 1 of 3: choose a photo.</p>
@@ -433,6 +439,12 @@
 <main class="layout" id="viewEdit" hidden>
 <div class="zt-band" data-zt="slicer" aria-hidden="true"><img class="zt-art" src="/static/zt/slicer.webp" srcset="/static/zt/slicer.webp 1x, /static/zt/slicer@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-wave far"></i><i class="zt-wave"></i></div>
   <h1 class="sr-only">Edit a 3D model</h1>
+  <div class="wsbar" data-ws="slicer" role="group" aria-label="Slicer workspace">
+    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. The project stays in My Studio. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+  </div>
   <aside class="panel controls" id="editSide">
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
@@ -637,6 +649,12 @@
 <main class="page" id="viewTorch" hidden>
 <div class="zt-band" data-zt="torchc0" aria-hidden="true"><img class="zt-art" src="/static/zt/torchc0.webp" srcset="/static/zt/torchc0.webp 1x, /static/zt/torchc0@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-rain far"></i><i class="zt-rain"></i><svg class="zt-bolt" viewBox="0 0 60 110" focusable="false"><path d="M38 0L28 34L40 38L22 76L30 79L18 110"/><path d="M28 34L12 52" stroke-width="1.2"/></svg><i class="zt-ember"></i><i class="zt-ember"></i><i class="zt-ember"></i><i class="zt-ember"></i><i class="zt-ember"></i></div>
   <div class="pagehead"><div><h1>TorchC0</h1><p class="help">ZEIM's resin program. Hollow your model with a drain hole, tilt it, add supports and a raft, then open the STL or 3MF in your resin printer's own slicer to make the layer file.</p></div></div>
+  <div class="wsbar" data-ws="torchc0" role="group" aria-label="TorchC0 workspace">
+    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+  </div>
   <section class="slicepanel torchpanel" id="torchPanel" aria-label="TorchC0 resin settings"><p class="help">Loading resin printers…</p></section>
   <div id="torchOut" aria-live="polite"></div>
 </main>
@@ -644,6 +662,12 @@
 <main class="page" id="viewAi3d" hidden>
 <div class="zt-band" data-zt="ai3d" aria-hidden="true"><svg class="zt-ai3d" viewBox="0 0 1000 150" preserveAspectRatio="xMaxYMid slice" focusable="false"><path class="enso" d="M842 30c38-6 74 18 80 54s-20 66-58 68-70-22-72-56c-1-24 14-46 38-56"/><g class="wire"><path d="M640 120l30-52 30 52zM670 68l30 52 28-30zM700 120l28-30 26 30zM670 68l58 22"/><circle cx="670" cy="52" r="15"/><path d="M655 52h30M670 37c-8 8-8 22 0 30M670 37c8 8 8 22 0 30"/></g><path class="hill" d="M0 150c120-30 260-34 420-14s300 10 580-22v36z"/></svg></div>
   <div class="pagehead"><div><h1>2D→3D</h1><p class="help">Turn one photo into a figure or a bust to print. An open AI model guesses the sides it cannot see, so results are a starting point, not a scan.</p></div></div>
+  <div class="wsbar" data-ws="ai3d" role="group" aria-label="2D to 3D workspace">
+    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
+    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A saved model stays in My Studio. This does not send the model to Showcase.">New build</button>
+    <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+  </div>
   <div id="a3Engine" class="a3note" role="status" aria-live="polite"></div>
   <div class="a3grid">
     <section class="a3card" aria-labelledby="a3H1">
@@ -897,5 +921,6 @@
 <script type="module" src="/static/exportpick.js"></script>
 <script type="module" src="/static/membox.js"></script>
 <script type="module" src="/static/handoff.js"></script>
+<script type="module" src="/static/workspace-bar.js"></script>
 <script type="module" src="/static/ai3d.js"></script>
 </body></html>

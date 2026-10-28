@@ -5,6 +5,7 @@
    Kept models: Studio remembers the build it sent (sessionStorage zeim.studio.return) so Back from CAD reopens it; TorchC0 keeps
    its file in this browser (IndexedDB) so leaving and coming back, or a reload, does not lose it. */
 import { S, api, toast, $, esc } from "/static/app.js";
+import { isPublishUrl } from "/static/workspace-controls.js";
 
 const NAMES = { lithophane: "Studio", slicer: "FDM Slicer", torchc0: "TorchC0", cad: "CAD" };
 const DESC = { cad: "Design and edit it with exact sizes", slicer: "Slice it for your filament printer", torchc0: "Hollow, support and prepare it for resin" };
@@ -32,6 +33,7 @@ function torchInput(f) {
 }
 let pendingTorch = null;
 document.addEventListener("zeim:torchc0-file", e => { pendingTorch = e.detail; if (torchInput(e.detail)) pendingTorch = null; keepTorchFile(e.detail); });
+document.addEventListener("zeim:torchc0-forget", () => { idbDo("readwrite", s => s.delete("torchc0")).catch(() => { }); });
 document.addEventListener("zeim:torchc0-ready", async () => {      // the TorchC0 panel was just built
   const inp = $("#rzFile"); if (!inp) return;
   inp.addEventListener("change", () => { if (inp.files[0]) keepTorchFile(inp.files[0]); });
@@ -67,7 +69,13 @@ export async function fileFromEdit(id) {
 }
 
 function remember(src) {
-  ss.set("zeim.back", JSON.stringify({ label: NAMES[src], hash: src, t: Date.now() }));
+  let prev = null;
+  try { prev = JSON.parse(ss.get("zeim.back") || "null"); } catch { prev = null; }
+  const marker = { label: NAMES[src], hash: src, t: Date.now() };
+  const studio = prev && prev.from === "mystudio" ? { label: prev.label, hash: prev.hash, url: prev.url, from: prev.from, t: prev.t }
+    : (prev && prev.studio && prev.studio.from === "mystudio" ? prev.studio : null);
+  if (studio) marker.studio = studio;
+  ss.set("zeim.back", JSON.stringify(marker));
   if (src === "lithophane" && S.current?.id) ss.set("zeim.studio.return", S.current.id);   // reopened once when you come back
 }
 const units = () => { try { return localStorage.getItem("zeim.cad.units") || localStorage.getItem("eunit") || "mm"; } catch { return "mm"; } };
@@ -240,12 +248,21 @@ function backChip() {
     c = document.createElement("a"); c.id = "backChip"; c.className = "backchip"; document.body.append(c);
     c.addEventListener("click", ev => {
       const href = c.getAttribute("href");
-      const go = () => { ss.del("zeim.back"); if (href) location.href = href; };
-      if (window.zeimSave && typeof window.zeimSave.leave === "function") { ev.preventDefault(); window.zeimSave.leave(go); }
-      else { document.dispatchEvent(new CustomEvent("zeim:save-now")); ss.del("zeim.back"); }
+      const go = () => {
+        let cur = null;
+        try { cur = JSON.parse(ss.get("zeim.back") || "null"); } catch { cur = null; }
+        if (cur && cur.studio && cur.studio.from === "mystudio") ss.set("zeim.back", JSON.stringify(cur.studio));
+        else ss.del("zeim.back");
+        if (href && !isPublishUrl(href)) location.href = href;
+      };
+      ev.preventDefault();
+      if (window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(go);
+      else { document.dispatchEvent(new CustomEvent("zeim:save-now")); go(); }
     });
   }
-  const url = info.url && info.url.startsWith("/") && !info.url.startsWith("//") ? info.url : "#" + info.hash;
+  if (info.from === "mystudio") { c.hidden = true; return; }
+  const url = info.url && info.url.startsWith("/") && !info.url.startsWith("//") && !isPublishUrl(info.url) ? info.url : "#" + info.hash;
+  if (isPublishUrl(url)) { c.hidden = true; return; }
   c.href = url; c.hidden = false;
   c.innerHTML = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg> Back to ${esc(info.label || "")}`;
 }
