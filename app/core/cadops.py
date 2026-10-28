@@ -5,16 +5,22 @@ Minkowski; shapely (BSD) for sketch regions. Every op here is a pure function me
 registered in meshedit.OPS, so undo/redo, step editing with replay, exports, slicing and the
 plate editor work unchanged.
 
-"Bodies" are the connected pieces of the project mesh (numbered by their position: sorted by
-centre x, then y, then z, so numbering is predictable). Body references in a step are indices
-into that order at the time the step is replayed; editing an earlier step can renumber them.
+"Bodies" are the connected pieces of the project mesh. The list order is still sorted by
+centre (x, then y, then z) so the on-screen numbers stay predictable. That order is not
+identity. Each body carries a stable id on its faces (`b1`, `b2`, …). A step stores that id.
+Replay resolves the id. A stored id that is not on the mesh is an error — a different body
+is not chosen by centre. An older step that stored a list index is rewritten to the id it
+named at that point in the saved history, once, in order. If two bodies share a centre, that
+index is ambiguous and the step fails instead of guessing.
 """
 from __future__ import annotations
 
 import math
+import re
 
 import numpy as np
 import trimesh
+from trimesh.graph import connected_components
 
 from . import sketch as sk
 from .meshedit import OpError, _check, _new
@@ -23,6 +29,17 @@ MAX_PATTERN = 64
 MAX_PATTERN_FACES = 600_000      # refuse BEFORE fusing: input faces x count (memory grows with it)
 MAX_ROUND_FACES = 60_000         # Minkowski fillet/chamfer cost explodes on dense meshes
 LIM = 5000.0
+BODY_ATTR = "zeim_body"
+_BODY_ID = re.compile(r"^b([1-9][0-9]*)$")
+# Ops that store a body reference. Values are param keys. `bodies` is a list.
+_BODY_REF_KEYS = {
+    "body_transform": ("body",),
+    "round_edges": ("body",),
+    "pattern": ("body",),
+    "align": ("body", "to_body"),
+    "body_boolean": ("target", "tool"),
+    "merge_bodies": ("bodies",),
+}
 
 
 def _num(p, k, d, lo, hi):
@@ -82,23 +99,188 @@ def _from_manifold(x) -> trimesh.Trimesh:
     return _new(v, f)
 
 
-def bodies(m: trimesh.Trimesh) -> list[trimesh.Trimesh]:
-    if len(m.faces) == 0:
+def _face_ids(mesh):
+    if mesh is None or len(getattr(mesh, "faces", [])) == 0:
+        return None
+    raw = mesh.face_attributes.get(BODY_ATTR) if hasattr(mesh, "face_attributes") else None
+    if raw is None or len(raw) != len(mesh.faces):
+        return None
+    return np.asarray(raw, np.int64)
+
+
+def _stamp(mesh, body_id: int):
+    if mesh is None or len(getattr(mesh, "faces", [])) == 0:
+        return mesh
+    mesh.face_attributes[BODY_ATTR] = np.full(len(mesh.faces), int(body_id), dtype=np.int64)
+    return mesh
+
+
+def body_id_of(mesh) -> int | None:
+    """The single positive body id on every face, or None when the mesh is untagged or mixed."""
+    ids = _face_ids(mesh)
+    if ids is None or (ids <= 0).any():
+        return None
+    uniq = {int(x) for x in ids}
+    return uniq.pop() if len(uniq) == 1 else None
+
+
+def public_id(n: int) -> str:
+    return f"b{int(n)}"
+
+
+def max_body_id(mesh) -> int:
+    ids = _face_ids(mesh) if mesh is not None else None
+    if ids is None or len(ids) == 0:
+        return 0
+    return int(ids.max())
+
+
+def _as_index(ref):
+    """A legacy list index. Bool is rejected (it is a subclass of int). Strings are not indices."""
+    if isinstance(ref, bool) or isinstance(ref, str):
+        return None
+    if isinstance(ref, (int, np.integer)):
+        return int(ref)
+    if isinstance(ref, float) and math.isfinite(ref) and ref.is_integer():
+        return int(ref)
+    return None
+
+
+def _is_all(ref) -> bool:
+    if ref is None:
+        return True
+    idx = _as_index(ref)
+    return idx is not None and idx < 0
+
+
+def _centre_key(mesh):
+    return tuple(np.round(np.asarray(mesh.bounds.mean(axis=0), float), 3))
+
+
+def _component_faces(m: trimesh.Trimesh):
+    """(face indices into m, shell mesh) for each connected shell.
+
+    Face indices line up with m only when vertex merging does not drop or reorder faces.
+    None means they do not line up; callers must not invent ids from centres.
+    """
+    if m is None or len(m.faces) == 0:
         return []
-    mm = m.copy(); mm.merge_vertices()
-    shells = list(mm.split(only_watertight=False))
-    # an inside-out shell is a hollow (cavity) of the solid around it: keep it with that body
-    solid = [b for b in shells if not (b.is_watertight and b.volume < 0)]
-    voids = [b for b in shells if b.is_watertight and b.volume < 0]
-    groups = [[b] for b in solid]
+    mm = m.copy()
+    mm.merge_vertices()
+    if len(mm.faces) != len(m.faces):
+        return None
+    comps = connected_components(edges=mm.face_adjacency, nodes=np.arange(len(mm.faces)), min_len=1)
+    src = _face_ids(m)
+    out = []
+    for comp in comps:
+        fi = np.asarray(sorted(int(i) for i in comp), np.int64)
+        sub = mm.submesh([fi], only_watertight=False, repair=True, append=True)
+        if isinstance(sub, (list, tuple)):
+            sub = sub[0]
+        if src is not None and len(fi) and not (src[fi] <= 0).any():
+            uniq = {int(x) for x in src[fi]}
+            if len(uniq) == 1:
+                _stamp(sub, uniq.pop())
+        out.append((fi, sub))
+    return out
+
+
+def _group_components(recs):
+    """Solids, with an inside-out shell kept on the solid that contains its centre (a cavity)."""
+    solid = [r for r in recs if not (r[1].is_watertight and float(r[1].volume) < 0)]
+    voids = [r for r in recs if r[1].is_watertight and float(r[1].volume) < 0]
+    groups = [[r] for r in solid]
     for v in voids:
-        c = v.bounds.mean(axis=0)
-        host = [i for i, b in enumerate(solid) if (b.bounds[0] <= c).all() and (c <= b.bounds[1]).all()]
+        c = v[1].bounds.mean(axis=0)
+        host = [i for i, r in enumerate(solid) if (r[1].bounds[0] <= c).all() and (c <= r[1].bounds[1]).all()]
         if host:
-            groups[min(host, key=lambda i: np.prod(solid[i].extents))].append(v)
+            groups[min(host, key=lambda i: float(np.prod(solid[i][1].extents)))].append(v)
         else:
             groups.append([v])
-    parts = [g[0] if len(g) == 1 else _join_all(g) for g in groups]
+    return groups
+
+
+def _host_id(ids, group) -> int | None:
+    vals = ids[group[0][0]]
+    if len(vals) == 0 or (vals <= 0).any():
+        return None
+    uniq = {int(x) for x in vals}
+    return uniq.pop() if len(uniq) == 1 else None
+
+
+def ensure_body_ids(m: trimesh.Trimesh, start: int = 0):
+    """Give every untagged body a new id. Ids already on a body stay. New ids follow face order, not centre.
+
+    `start` is the highest id already used on an earlier mesh, so a rebuilt result does not reuse it.
+    """
+    if m is None or len(getattr(m, "faces", [])) == 0:
+        return m
+    recs = _component_faces(m)
+    if not recs:
+        return m
+    ids = _face_ids(m)
+    ids = np.zeros(len(m.faces), np.int64) if ids is None else ids.copy()
+    groups = _group_components(recs)
+    for g in groups:
+        hid = _host_id(ids, g)
+        if hid:
+            for fi, _sub in g:
+                ids[fi] = hid
+    # One id names one shell. A copied shell (same id, separate body) is a new body and gets its own id.
+    # The earliest faces keep the id. This is face order, not which centre is nearer.
+    seen = {}
+    for g in groups:
+        hid = _host_id(ids, g)
+        if not hid:
+            continue
+        seen.setdefault(hid, []).append(g)
+    for copies in seen.values():
+        if len(copies) < 2:
+            continue
+        copies.sort(key=lambda g: int(g[0][0].min()))
+        for extra in copies[1:]:
+            for fi, _sub in extra:
+                ids[fi] = 0
+    untagged = [g for g in groups if _host_id(ids, g) is None]
+    nxt = max(int(start), int(ids.max()) if len(ids) else 0)
+    for g in sorted(untagged, key=lambda g: int(g[0][0].min())):
+        nxt += 1
+        for fi, _sub in g:
+            ids[fi] = nxt
+    m.face_attributes[BODY_ATTR] = ids
+    return m
+
+
+def bodies(m: trimesh.Trimesh) -> list[trimesh.Trimesh]:
+    if m is None or len(getattr(m, "faces", [])) == 0:
+        return []
+    recs = _component_faces(m)
+    if recs is None:
+        mm = m.copy(); mm.merge_vertices()
+        shells = list(mm.split(only_watertight=False))
+        solid = [b for b in shells if not (b.is_watertight and b.volume < 0)]
+        voids = [b for b in shells if b.is_watertight and b.volume < 0]
+        groups = [[b] for b in solid]
+        for v in voids:
+            c = v.bounds.mean(axis=0)
+            host = [i for i, b in enumerate(solid) if (b.bounds[0] <= c).all() and (c <= b.bounds[1]).all()]
+            if host:
+                groups[min(host, key=lambda i: np.prod(solid[i].extents))].append(v)
+            else:
+                groups.append([v])
+        parts = [g[0] if len(g) == 1 else _join_all(g) for g in groups]
+        return sorted(parts, key=lambda b: tuple(np.round(b.bounds.mean(axis=0), 3)))
+    parts = []
+    for g in _group_components(recs):
+        if len(g) == 1:
+            part = g[0][1]
+        else:
+            part = _join_all([r[1] for r in g])
+            hid = body_id_of(g[0][1])
+            if hid:
+                _stamp(part, hid)
+        parts.append(part)
+    # Display order only. Stored steps do not use this index as identity.
     return sorted(parts, key=lambda b: tuple(np.round(b.bounds.mean(axis=0), 3)))
 
 
@@ -112,34 +294,243 @@ def _join_all(ms):
 def body_info(m: trimesh.Trimesh) -> list[dict]:
     out = []
     for i, b in enumerate(bodies(m)):
-        out.append({"index": i, "name": f"Body {i + 1}", "triangles": int(len(b.faces)),
+        pid = body_id_of(b)
+        out.append({"index": i, "id": public_id(pid) if pid else None, "name": f"Body {i + 1}",
+                    "triangles": int(len(b.faces)),
                     "center": np.round(b.bounds.mean(axis=0), 3).tolist(), "size": np.round(b.extents, 3).tolist(),
                     "volume_mm3": round(float(abs(b.volume)), 3) if b.is_watertight else None})
     return out
 
 
+def _broken_ref(ref) -> OpError:
+    return OpError(
+        f"Body reference {ref} does not match any body. The step was not applied to a different body."
+    )
+
+
+def _select_body(bs, ref, key="body"):
+    """One body from the current list. An id must match exactly. An index must be in range and unique by centre."""
+    if isinstance(ref, str):
+        matched = _BODY_ID.match(ref)
+        if not matched:
+            raise _broken_ref(ref)
+        want = int(matched.group(1))
+        hits = [b for b in bs if body_id_of(b) == want]
+        if len(hits) == 1:
+            return hits[0]
+        if not hits:
+            raise _broken_ref(ref)
+        raise OpError(
+            f"Body reference {ref} is ambiguous: {len(hits)} bodies have that id. The step was not applied."
+        )
+    idx = _as_index(ref)
+    if idx is None:
+        raise OpError(f"{key} must be a body id or a body number.")
+    if idx < 0:
+        raise OpError(f"{key} does not name one body.")
+    if idx >= len(bs):
+        raise OpError(f"There is no Body {idx + 1} (the model has {len(bs)}).")
+    ck = _centre_key(bs[idx])
+    tied = [b for b in bs if _centre_key(b) == ck]
+    if len(tied) > 1:
+        raise OpError(
+            f"Saved body number {idx + 1} is ambiguous: {len(tied)} bodies share the same centre, "
+            "so this index cannot be matched to one body."
+        )
+    chosen = bs[idx]
+    if body_id_of(chosen) is None:
+        raise OpError(f"Saved body number {idx + 1} cannot be given a stable id. The step was not applied.")
+    return chosen
+
+
+def resolve_body(mesh, ref, key="body"):
+    """The shell named by a stored id or a legacy index. Tags untagged shells first."""
+    ensure_body_ids(mesh)
+    return _select_body(bodies(mesh), ref, key)
+
+
 def _pick(m, p, key="body"):
-    """(selected mesh, the rest) for p[key] = body index, or -1 / missing = everything."""
-    i = p.get(key, -1)
-    try:
-        i = int(i)
-    except (TypeError, ValueError):
-        raise OpError(f"{key} must be a body number.")
-    if i < 0:
+    """(selected mesh, the rest). A missing reference or -1 is every body. An unknown id is an error."""
+    ref = p.get(key, -1)
+    if _is_all(ref):
         return m, None
+    chosen = resolve_body(m, ref, key)
+    cid = body_id_of(chosen)
     bs = bodies(m)
-    if i >= len(bs):
-        raise OpError(f"There is no Body {i + 1} (the model has {len(bs)}).")
-    rest = [b for k, b in enumerate(bs) if k != i]
-    return bs[i], (trimesh.util.concatenate(rest) if rest else None)
+    rest = [b for b in bs if body_id_of(b) != cid]
+    return chosen, (_join_all(rest) if rest else None)
+
+
+def _faces_aligned(before, after) -> bool:
+    """True when after's faces are the same triangles in the same order (winding may be flipped)."""
+    if before is None or after is None:
+        return False
+    if len(getattr(before, "faces", [])) == 0 or len(before.faces) != len(after.faces):
+        return False
+    fa = np.asarray(before.faces)
+    fb = np.asarray(after.faces)
+    if fa.shape != fb.shape:
+        return False
+    return bool(np.array_equal(fa, fb) or np.array_equal(fa, fb[:, ::-1]))
+
+
+def tag_result(mesh, kept_id, start: int = 0):
+    """Keep `kept_id` when the result is still one body. Otherwise give each shell a fresh id past `start`."""
+    if mesh is None or len(getattr(mesh, "faces", [])) == 0:
+        return mesh
+    if kept_id and len(bodies(mesh)) == 1:
+        return _stamp(mesh, int(kept_id))
+    return ensure_body_ids(mesh, start=max(int(start), int(kept_id or 0)))
+
+
+def preserve_body_ids(before, after):
+    """Carry body ids across an operation that built a new mesh.
+
+    A fully tagged result is kept. The same faces in the same order keep their ids (a move of the
+    whole mesh). One body in and one body out keeps that id. Anything still untagged gets a new id
+    above every id on the input, so a missing id cannot land on a different body.
+    """
+    if after is None or len(getattr(after, "faces", [])) == 0:
+        return after
+    if _fully_tagged(after):
+        return after
+    if _faces_aligned(before, after):
+        src = _face_ids(before)
+        if src is not None and (src > 0).any():
+            after.face_attributes[BODY_ATTR] = src.copy()
+            if _fully_tagged(after):
+                return after
+    if before is not None and len(getattr(before, "faces", [])) and len(bodies(before)) == 1 and len(bodies(after)) == 1:
+        hid = body_id_of(bodies(before)[0])
+        if hid:
+            return _stamp(after, hid)
+    return ensure_body_ids(after, start=max_body_id(before))
+
+
+def _fully_tagged(mesh) -> bool:
+    if mesh is None or len(getattr(mesh, "faces", [])) == 0:
+        return True
+    ids = _face_ids(mesh)
+    if ids is None or (ids <= 0).any():
+        return False
+    seen = []
+    parts = bodies(mesh)
+    if not parts:
+        return False
+    for part in parts:
+        pid = body_id_of(part)
+        if pid is None or pid in seen:
+            return False
+        seen.append(pid)
+    return True
+
+
+def _bind_scalar(bs, ref, key):
+    if _is_all(ref):
+        return ref, False
+    if isinstance(ref, str) and _BODY_ID.match(ref):
+        return ref, False
+    idx = _as_index(ref)
+    if idx is None or idx < 0:
+        return ref, False
+    chosen = _select_body(bs, idx, key)
+    return public_id(body_id_of(chosen)), True
+
+
+def _bind_value(bs, ref, key):
+    if isinstance(ref, list):
+        bound = []
+        changed = False
+        for item in ref:
+            nxt, did = _bind_scalar(bs, item, key)
+            bound.append(nxt)
+            changed = changed or did
+        return bound, changed
+    return _bind_scalar(bs, ref, key)
+
+
+def history_needs_body_migration(ops) -> bool:
+    for o in ops or []:
+        keys = _BODY_REF_KEYS.get(o.get("op") or "")
+        if not keys:
+            continue
+        params = o.get("params") or {}
+        if o.get("op") == "body_boolean" and ("target" not in params or "tool" not in params):
+            return True
+        for k in keys:
+            if k not in params:
+                continue
+            v = params[k]
+            if isinstance(v, list):
+                if any(_as_index(x) is not None and _as_index(x) >= 0 for x in v):
+                    return True
+            elif _as_index(v) is not None and _as_index(v) >= 0:
+                return True
+    return False
+
+
+def bind_legacy_body_refs(mesh, op: str, params: dict) -> tuple[dict, bool]:
+    """Rewrite index references to stable ids against `mesh` as it is now. Ids already stored stay.
+
+    Does not look for a nearby body. An index whose centre is shared, or an id that is not on the
+    mesh, raises OpError.
+    """
+    params = dict(params or {})
+    keys = _BODY_REF_KEYS.get(op)
+    if not keys:
+        return params, False
+    changed = False
+    if op == "body_boolean":
+        if "target" not in params:
+            params["target"] = 0
+            changed = True
+        if "tool" not in params:
+            params["tool"] = 1
+            changed = True
+    ensure_body_ids(mesh)
+    bs = bodies(mesh)
+    for k in keys:
+        if k not in params:
+            continue
+        nxt, did = _bind_value(bs, params[k], k)
+        if did:
+            params[k] = nxt
+            changed = True
+        elif isinstance(nxt, str) and _BODY_ID.match(nxt):
+            _select_body(bs, nxt, k)  # a stored id that is already gone fails here, before the op runs
+    return params, changed
+
+
+def combine_keeping_ids(cur, tool, mode, replace=False):
+    """_combine, with a fresh id on a new body and the previous ids kept on bodies that remain."""
+    mode = mode or "new"
+    if cur is not None and len(getattr(cur, "faces", [])):
+        ensure_body_ids(cur)
+    fresh = bool(replace or cur is None or len(getattr(cur, "faces", [])) == 0 or mode == "new")
+    if fresh:
+        ensure_body_ids(tool, start=max_body_id(cur))
+    out = _combine(cur if cur is not None else trimesh.Trimesh(), tool, mode, replace)
+    return preserve_body_ids(cur if cur is not None else trimesh.Trimesh(), out)
+
+
+def _with_ids(mesh):
+    if mesh is None or len(mesh.faces) == 0:
+        return mesh
+    if _face_ids(mesh) is None:
+        mesh = mesh.copy()
+        mesh.face_attributes[BODY_ATTR] = np.zeros(len(mesh.faces), np.int64)
+    return mesh
 
 
 def _join(a, b):
-    if a is None:
+    if a is None or len(getattr(a, "faces", [])) == 0:
         return b
-    if b is None:
+    if b is None or len(getattr(b, "faces", [])) == 0:
         return a
-    return _new(np.vstack([a.vertices, b.vertices]), np.vstack([a.faces, b.faces + len(a.vertices)]))
+    a, b = _with_ids(a), _with_ids(b)
+    out = _new(np.vstack([a.vertices, b.vertices]), np.vstack([a.faces, b.faces + len(a.vertices)]))
+    out.face_attributes[BODY_ATTR] = np.concatenate([_face_ids(a), _face_ids(b)])
+    return out
 
 
 def _touching(m) -> bool:
@@ -226,7 +617,7 @@ def op_sketch_extrude(m, p):
     solid = solid.translate((0, 0, z0))
     T = _frame(o, xd, yd, n)
     tool = _from_manifold(solid.transform(T[:3, :]))
-    out = _combine(m, tool, p.get("mode", "new"), bool(p.get("replace")))
+    out = combine_keeping_ids(m, tool, p.get("mode", "new"), bool(p.get("replace")))
     return out, {"message": f"Extruded {d:g} mm ({direction}, {p.get('mode', 'new')})."}
 
 
@@ -265,7 +656,7 @@ def op_revolve(m, p):
     origin = o + xd * ap[0] + yd * ap[1]
     T = np.eye(4); T[:3, 0], T[:3, 1], T[:3, 2], T[:3, 3] = perp3, -third, ax3, origin
     tool = _from_manifold(solid.transform(T[:3, :]))
-    out = _combine(m, tool, p.get("mode", "new"), bool(p.get("replace")))
+    out = combine_keeping_ids(m, tool, p.get("mode", "new"), bool(p.get("replace")))
     return out, {"message": f"Revolved {ang:g}°."}
 
 
@@ -274,17 +665,19 @@ def op_body_boolean(m, p):
     kind = p.get("kind", "union")
     if kind not in ("union", "subtract", "intersect"):
         raise OpError("kind must be union | subtract | intersect")
+    ensure_body_ids(m)
     bs = bodies(m)
-    try:
-        a, b = int(p.get("target", 0)), int(p.get("tool", 1))
-    except (TypeError, ValueError):
-        raise OpError("target/tool must be body numbers.")
-    if a == b or not (0 <= a < len(bs)) or not (0 <= b < len(bs)):
+    target = resolve_body(m, p.get("target", 0), "target")
+    tool = resolve_body(m, p.get("tool", 1), "tool")
+    tid, uid = body_id_of(target), body_id_of(tool)
+    if tid is None or uid is None or tid == uid:
         raise OpError(f"Pick two different bodies (the model has {len(bs)}).")
-    A, B = _to_manifold(bs[a]), _to_manifold(bs[b])
+    A, B = _to_manifold(target), _to_manifold(tool)
     r = {"union": A + B, "subtract": A - B, "intersect": A ^ B}[kind]
-    rest = [x for k, x in enumerate(bs) if k not in (a, b)]
+    rest = [x for x in bs if body_id_of(x) not in (tid, uid)]
     res = _from_manifold(r) if not r.is_empty() else None
+    if res is not None:
+        res = tag_result(res, tid, max_body_id(m))
     out = None
     for x in rest + ([res] if res is not None else []):
         out = _join(out, x)
@@ -364,6 +757,7 @@ def op_round_edges(m, p):
     if out is None:                           # QA B3: never hand back a non-manifold mesh
         raise OpError("The rounded result wouldn't be a clean closed solid on this shape, so it was not applied. "
                       "Try a smaller radius or pick fewer edges.")
+    out = tag_result(out, body_id_of(sel), max_body_id(m))
     return _join(out, rest), {"message": f"{style.title()} {r:g} mm (approximate, convex edges)."}
 
 
@@ -434,6 +828,9 @@ def op_body_transform(m, p):
     # trimesh's apply_transform already flips the winding for a mirror (det < 0); inverting again
     # made mirrored bodies inside-out (-volume). QA N1.
     moved = sel.copy(); moved.apply_transform(T)
+    if p.get("copy"):
+        # The copy is a new body. The original keeps its id. A shared id would make the next replay ambiguous.
+        _stamp(moved, max_body_id(m) + 1)
     out = _join_sep(_join(rest, sel) if p.get("copy") else rest, moved, "Move it slightly, or Union the bodies.")
     return out, {"message": "Transformed."}
 
@@ -448,10 +845,18 @@ def op_pattern(m, p):
         raise OpError(f"That pattern would make about {est:,} triangles (limit {MAX_PATTERN_FACES:,}). "
                       "Use fewer copies or simplify / remesh coarser first.")
     copies = []
+    kept = body_id_of(sel)
+    nxt = max_body_id(m)
     if kind == "linear":
         step = _vec(p, "step", (20, 0, 0))
         for k in range(count):
-            c = sel.copy(); c.apply_translation(step * k); copies.append(c)
+            c = sel.copy(); c.apply_translation(step * k)
+            if k > 0:
+                nxt += 1
+                _stamp(c, nxt)
+            elif kept:
+                _stamp(c, kept)
+            copies.append(c)
     elif kind == "circular":
         axis = _vec(p, "axis", (0, 0, 1), 10)
         if np.linalg.norm(axis) < 1e-9:
@@ -462,19 +867,24 @@ def op_pattern(m, p):
         stepa = tot / (count - 1 if tot < 360 - 1e-6 else count)
         for k in range(n):
             c = sel.copy()
-            c.apply_transform(trimesh.transformations.rotation_matrix(math.radians(stepa * k), axis, cen)); copies.append(c)
+            c.apply_transform(trimesh.transformations.rotation_matrix(math.radians(stepa * k), axis, cen))
+            if k > 0:
+                nxt += 1
+                _stamp(c, nxt)
+            elif kept:
+                _stamp(c, kept)
+            copies.append(c)
     else:
         raise OpError("kind must be linear | circular")
     if p.get("fuse", True):
         try:
-            acc = _to_manifold(copies[0])
             import manifold3d as mf
             acc = mf.Manifold.batch_boolean([_to_manifold(c) for c in copies], mf.OpType.Add)
-            pat = _from_manifold(acc)
+            pat = tag_result(_from_manifold(acc), kept, max_body_id(m))
         except OpError:
-            pat = trimesh.util.concatenate(copies)
+            pat = _join_all(copies)
     else:
-        pat = trimesh.util.concatenate(copies)
+        pat = _join_all(copies)
         if _touching(pat):
             raise OpError("The copies would touch face-to-face, which can't be kept as separate solids. Turn on Fuse, or use a slightly larger spacing.")
     return _join_sep(rest, pat, "Turn on Fuse, or use a slightly larger spacing."), {"message": f"{kind.title()} pattern ×{count}."}
@@ -491,11 +901,9 @@ def op_align(m, p):
     def at(b):
         lo, hi = b.bounds
         return {"min": lo[k], "max": hi[k], "center": (lo[k] + hi[k]) / 2}[side]
-    if p.get("to_body") is not None and int(p["to_body"]) >= 0:
-        bs = bodies(m); j = int(p["to_body"])
-        if j >= len(bs):
-            raise OpError("No such body to align to.")
-        target = at(bs[j])
+    to_body = p.get("to_body")
+    if to_body is not None and not _is_all(to_body):
+        target = at(resolve_body(m, to_body, "to_body"))
     else:
         target = _num(p, "value", 0, -LIM, LIM)
     mv = np.zeros(3); mv[k] = target - at(sel)
@@ -576,12 +984,26 @@ def label(op: str, p: dict) -> str | None:
     if op in ("cad_joint", "merge_bodies", "smart_merge"):
         return _cadjoint.label(op, p)
     g = lambda k, d="": p.get(k, d)
-    b = lambda: "" if int(p.get("body", -1) if p.get("body") is not None else -1) < 0 else f" · Body {int(p['body']) + 1}"
+
+    def _shown(v, default=None):
+        if v is None:
+            v = default
+        if isinstance(v, str) and _BODY_ID.match(v):
+            return f"Body {v}"
+        idx = _as_index(v)
+        if idx is None or idx < 0:
+            return ""
+        return f"Body {idx + 1}"
+
+    def b():
+        shown = _shown(p.get("body", -1))
+        return f" · {shown}" if shown else ""
+
     try:
         return {
             "sketch_extrude": lambda: f"Extrude {float(g('distance', 10)):g} mm {g('direction', 'up')} ({g('mode', 'new')})",
             "revolve": lambda: f"Revolve {float(g('angle', 360)):g}° ({g('mode', 'new')})",
-            "body_boolean": lambda: f"Boolean {g('kind', 'union')} Body {int(g('target', 0)) + 1} / Body {int(g('tool', 1)) + 1}",
+            "body_boolean": lambda: f"Boolean {g('kind', 'union')} {_shown(g('target', 0), 0)} / {_shown(g('tool', 1), 1)}",
             "round_edges": lambda: f"{str(g('style', 'fillet')).title()} {float(g('radius', 1)):g} mm" + (f" ({len(g('edges'))} edges)" if g("edges") else " (all convex edges)") + b() + " · approximate mesh",
             "face_offset": lambda: f"Face offset {float(g('distance', 1)):g} mm · mesh push, not a solid offset",
             "body_transform": lambda: ("Mirror copy" if g("copy") and g("mirror") else "Mirror" if g("mirror") else "Move/Rotate/Scale") + b(),

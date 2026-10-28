@@ -20,6 +20,7 @@ import numpy as np
 import trimesh
 from PIL import Image
 
+from ..core import cadops
 from ..core import dims as dimmod
 from ..core import exporters, geometry, meshedit, meshthumb
 from ..core.geometry import Body, Model
@@ -101,10 +102,52 @@ def _cache_hit(bid: str, head: int, meta: dict):
     return mesh
 
 
+def _migrate_body_refs(bid: str, meta: dict) -> dict:
+    """Rewrite saved body indices to stable ids, using the geometry those indices named.
+
+    Walks the stored steps in order, before any edit of an earlier step is applied. An index is
+    the centre-sorted list position at that step. If that position is shared by two bodies, or a
+    stored id is not on the mesh, this raises and does not save a guess. Caller holds `_lock`
+    when the project is already on disk; a project that is not saved yet is left unchanged.
+    """
+    if not cadops.history_needs_body_migration(meta.get("ops") or []):
+        return meta
+    try:
+        meta = store.get(bid)
+    except KeyError:
+        return meta
+    if not cadops.history_needs_body_migration(meta.get("ops") or []):
+        return meta
+    m = cadops.ensure_body_ids(_base(bid, meta))
+    new_ops = []
+    changed = False
+    for i, o in enumerate(meta.get("ops") or []):
+        params = dict(o.get("params") or {})
+        step_changed = False
+        if _replay_safe(o):
+            try:
+                params, step_changed = cadops.bind_legacy_body_refs(m, o.get("op") or "", params)
+                m, _ = _apply(meta, m, {"op": o.get("op"), "params": params})
+            except meshedit.OpError as e:
+                raise meshedit.OpError(f"Step {i + 1} ({o.get('label') or o.get('op')}): {e}")
+        if step_changed:
+            changed = True
+            new_ops.append({**o, "params": params})
+        else:
+            new_ops.append(o)
+    if changed:
+        meta["ops"] = new_ops
+        _STATES.pop(bid, None)
+        store.save(meta)
+        store.cache.pop(bid, None)
+    return meta
+
+
 def mesh_at(bid: str, meta: dict | None = None, head: int | None = None) -> trimesh.Trimesh:
     meta = meta or store.get(bid)
     head = meta["head"] if head is None else head
     with _lock:
+        meta = _migrate_body_refs(bid, meta)
         hit = _cache_hit(bid, head, meta)
         if hit is not None:
             return hit
@@ -449,8 +492,9 @@ def printable_at(bid: str, meta: dict) -> trimesh.Trimesh:
 def add_op(bid: str, op: str, params: dict) -> dict:
     params = check_op_text(op, params)
     with _lock:
-        meta = store.get(bid)
+        meta = _migrate_body_refs(bid, store.get(bid))
         cur = mesh_at(bid, meta)
+        params, _ = cadops.bind_legacy_body_refs(cur, op, params)
         if op == "plate":                                 # the server's own layout + bed, never the client's
             params = {**params, "layout": layout_at(meta, cur)}
             params = _plate_bed(params)
@@ -486,7 +530,8 @@ def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
     """Edit (new_op) or delete (None) step i (1-based), then replay every later step on top. All-or-nothing: if any step
     fails on the new result, nothing is stored. The history ends at the last step afterwards (the redo tail is dropped)."""
     with _lock:
-        meta = store.get(bid)
+        # Migrate index references against the saved history before this edit changes an earlier step.
+        meta = _migrate_body_refs(bid, store.get(bid))
         ops = meta["ops"][:meta["head"]]
         if not 1 <= i <= len(ops):
             raise meshedit.OpError("no such step")

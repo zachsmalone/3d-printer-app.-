@@ -185,17 +185,22 @@ def _fuse(ms):
 
 
 def op_merge_bodies(m, p):
+    C.ensure_body_ids(m)
     bs = C.bodies(m)
-    idx = p.get("bodies") or []
-    try:
-        idx = list(dict.fromkeys(int(i) for i in idx))
-    except (TypeError, ValueError):
-        raise OpError("bodies must be a list of body numbers.")
-    if len(idx) < 2:
+    refs = p.get("bodies") or []
+    if not isinstance(refs, (list, tuple)):
+        raise OpError("bodies must be a list of body references.")
+    pick = []
+    seen = []
+    for ref in refs:
+        part = C.resolve_body(m, ref, "bodies")
+        pid = C.body_id_of(part)
+        if pid in seen:
+            continue
+        seen.append(pid)
+        pick.append(part.copy())
+    if len(pick) < 2:
         raise OpError("Pick at least two bodies to merge.")
-    if any(i < 0 or i >= len(bs) for i in idx):
-        raise OpError(f"There are {len(bs)} bodies; pick from Body 1 to Body {len(bs)}.")
-    pick = [bs[i].copy() for i in idx]
     snap = p.get("snap") or "none"
     if snap != "none":
         if snap not in _SNAP:
@@ -211,14 +216,14 @@ def op_merge_bodies(m, p):
                     d[k] = (lo0[k] + hi0[k]) / 2 - (lo[k] + hi[k]) / 2 if k != 2 else lo0[2] - lo[2]
             d[ax] = (hi0[ax] - ov - lo[ax]) if sgn > 0 else (lo0[ax] + ov - hi[ax])
             q.apply_translation(d)
-    fused = _fuse(pick)
-    rest = [b for k, b in enumerate(bs) if k not in idx]
+    fused = C.tag_result(_fuse(pick), C.body_id_of(pick[0]), C.max_body_id(m))
+    rest = [b for b in bs if C.body_id_of(b) not in seen]
     n_out = len(C.bodies(fused))
     warns = []
     if n_out > 1:
         warns.append(f"{n_out} pieces still don't touch, so they stay separate. Move them so they overlap a little, then merge again.")
     out = C._join_sep(C._join_all(rest) if rest else None, fused, "Move it away from the other bodies a little first.")
-    return out, {"message": f"Merged {len(idx)} bodies." if n_out == 1 else f"Merged where they touch; {n_out} pieces remain.", "warnings": warns}
+    return out, {"message": f"Merged {len(pick)} bodies." if n_out == 1 else f"Merged where they touch; {n_out} pieces remain.", "warnings": warns}
 
 
 def op_smart_merge(m, p):
