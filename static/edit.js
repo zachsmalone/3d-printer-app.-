@@ -5,7 +5,9 @@ import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHisto
 import { guardNewBuild } from "/static/workspace-bar.js";
 import { rememberCopy, readFlow, reuseCopy, forgetCopy } from "/static/project-flow.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
-import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate } from "/static/plate.js";
+import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate, dropPlateGizmo } from "/static/plate.js";
+import { previewPlacement } from "/static/gizmo-math.js";
+import { createGizmo } from "/static/gizmo-view.js";
 import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -222,6 +224,7 @@ function loadProject(p, keepCamera = false) {
   renderTools();
   renderHistoryCard();
   renderSlicePanel();
+  syncMeshGizmo();
 }
 async function renderSlicePanel() {
   if (!E.p) return;
@@ -427,6 +430,83 @@ async function act(url, body, text = "Working…", near = null) {
   finally { busy(false); }
 }
 const doOp = (op, params, text, near) => act(`/api/edit/${E.p.id}/op`, { op, params }, text, near);
+
+/* Whole-model beads, only when this file is not a plate. Same translate / rotate / scale steps as the forms. */
+let meshMode = "move", meshGizmo = null;
+addEventListener("zeim:xform", e => {
+  const k = e.detail && e.detail.kind;
+  if (k === "move" || k === "rotate" || k === "scale") meshMode = k;
+});
+function meshFrame() {
+  if (!viewer || !E.p || E.p.plate || E.measure) return null;
+  const a = E.p.analysis;
+  if (!a?.min_mm || !a?.max_mm) return null;
+  const min = a.min_mm, max = a.max_mm;
+  const size = [0, 1, 2].map(i => max[i] - min[i]);
+  const center = [0, 1, 2].map(i => (min[i] + max[i]) / 2);
+  return { mode: meshMode, surface: "mesh", center, size, box: { min, max }, body: null };
+}
+function meshPivot(frame) {
+  if (frame.mode === "scale") return [(frame.box.min[0] + frame.box.max[0]) / 2, (frame.box.min[1] + frame.box.max[1]) / 2, frame.box.min[2]];
+  return frame.center;
+}
+function placeMesh(m, place) {
+  m.position.set(place.position[0], place.position[1], place.position[2]);
+  m.rotation.set(place.rotation[0] * Math.PI / 180, place.rotation[1] * Math.PI / 180, place.rotation[2] * Math.PI / 180);
+  m.scale.set(place.scale[0], place.scale[1], place.scale[2]);
+}
+function resetMeshPreview() {
+  viewer?.group.children.forEach(m => { m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1); });
+}
+function previewMesh(frame, axis, amount) {
+  if (!viewer || !frame) return;
+  const place = previewPlacement(meshPivot(frame), frame.mode, axis, amount);
+  viewer.group.children.forEach(m => placeMesh(m, place));
+}
+function projectMesh(pt) {
+  const w = new THREE.Vector3(pt[0], pt[1], pt[2]);
+  w.project(viewer.camera);
+  const canvas = viewer.renderer.domElement.getBoundingClientRect();
+  const host = viewer.el.getBoundingClientRect();
+  return {
+    x: (w.x * 0.5 + 0.5) * canvas.width + (canvas.left - host.left),
+    y: (-w.y * 0.5 + 0.5) * canvas.height + (canvas.top - host.top),
+    behind: w.z < -1 || w.z > 1,
+  };
+}
+function basisMesh(origin) {
+  viewer.camera.updateMatrixWorld();
+  const e = viewer.camera.matrixWorld.elements;
+  const right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]];
+  const a = projectMesh(origin), b = projectMesh(origin.map((n, i) => n + right[i]));
+  const px = a && b && !a.behind && !b.behind ? Math.hypot(b.x - a.x, b.y - a.y) : 1;
+  return { right, up, pxPerMm: Math.max(px, 0.05) };
+}
+function dropMeshGizmo() {
+  if (meshGizmo) { meshGizmo.destroy(); meshGizmo = null; }
+  resetMeshPreview();
+}
+function syncMeshGizmo() {
+  if (!viewer || !E.p || E.p.plate) { dropMeshGizmo(); return; }
+  if (meshGizmo) return;
+  meshGizmo = createGizmo(viewer.el, {
+    owner: "mesh",
+    frame: meshFrame,
+    project: projectMesh,
+    basis: basisMesh,
+    freeze: () => viewer.freezeControls?.(),
+    thaw: () => viewer.unfreezeControls?.(),
+    preview: previewMesh,
+    clearPreview: resetMeshPreview,
+    apply: spec => {
+      if (!spec || spec.op === "plate") return;
+      const label = spec.op === "translate" ? "Moving…" : spec.op === "rotate" ? "Turning…" : "Resizing…";
+      Promise.resolve(doOp(spec.op, spec.params, label)).then(() => {
+        if (viewer && viewer.group.children.some(m => Math.hypot(m.position.x, m.position.y, m.position.z) > 0.01 || Math.hypot(m.rotation.x, m.rotation.y, m.rotation.z) > 0.001)) resetMeshPreview();
+      });
+    },
+  });
+}
 $("#eUndo").onclick = () => act(`/api/edit/${E.p.id}/undo`, {});
 $("#eRedo").onclick = () => act(`/api/edit/${E.p.id}/redo`, {});
 $("#eReset").onclick = () => viewer?.reset();
@@ -638,6 +718,8 @@ function clearSlicerWork() {
   $("#editVtools").hidden = true;
   $("#editEmpty").hidden = false;
   viewer?.group.clear();
+  dropPlateGizmo();
+  dropMeshGizmo();
   clearGhost();
   clearFaceMark();
   fillBuildSelect();

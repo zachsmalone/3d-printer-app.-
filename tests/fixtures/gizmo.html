@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>gizmo beads</title>
+<style>
+  html,body{margin:0}
+  #host{position:relative;width:480px;height:320px;background:#223}
+  .wsbar{position:absolute;left:0;top:0;width:480px;height:44px;background:#fff}
+</style>
+</head>
+<body>
+<div class="wsbar" id="exit">Exit</div>
+<div id="host"></div>
+<pre id="out">WAIT</pre>
+<script type="module">
+import { createGizmo } from "/static/gizmo-view.js";
+
+const host = document.getElementById("host");
+const box = { min: [-10, -10, 0], max: [10, 10, 20] };
+const frame = { mode: "move", surface: "plate", center: [0, 0, 10], size: [20, 20, 20], box, body: null };
+const applied = [];
+function project(pt) { return { x: 240 + pt[0] * 4, y: 180 - pt[1] * 4, behind: false }; }
+createGizmo(host, {
+  owner: "plate",
+  frame: () => frame,
+  project,
+  basis: () => ({ right: [1, 0, 0], up: [0, 1, 0], pxPerMm: 4 }),
+  apply: spec => applied.push(spec),
+});
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+const fails = [];
+function check(ok, msg) { if (!ok) fails.push(msg); }
+
+await wait(80);
+const bead = host.querySelector('button[data-axis="x"]');
+check(!!bead, "X bead is on the model");
+check(bead && !bead.hidden, "X bead starts visible");
+check(bead && bead.getAttribute("aria-label") === "Move along X", "X bead says what it does");
+const y = host.querySelector('button[data-axis="y"]');
+check(!!y && !host.querySelector('button[data-axis="z"]'), "plate move has X and Y only");
+const exit = document.getElementById("exit").getBoundingClientRect();
+const br = bead.getBoundingClientRect();
+check(br.top >= exit.bottom - 1, "X bead starts below Exit, top " + Math.round(br.top) + " exit bottom " + Math.round(exit.bottom));
+
+const r = bead.getBoundingClientRect();
+const down = { bubbles: true, button: 0, pointerId: 1, clientX: r.left + 22, clientY: r.top + 22 };
+bead.dispatchEvent(new PointerEvent("pointerdown", down));
+bead.dispatchEvent(new PointerEvent("pointermove", { ...down, clientX: down.clientX + 40 }));
+bead.dispatchEvent(new PointerEvent("pointerup", { ...down, clientX: down.clientX + 40 }));
+await wait(40);
+check(applied.length === 1 && applied[0].op === "plate" && applied[0].params.action === "transform" && applied[0].params.dx === 10,
+  "drag writes a plate transform, got " + JSON.stringify(applied));
+
+const cover = document.createElement("div");
+cover.className = "wsbar";
+cover.textContent = "Exit";
+cover.style.cssText = "position:fixed;left:0;top:0;width:800px;height:800px;z-index:50";
+document.body.append(cover);
+await wait(80);
+const lifted = host.querySelector('button[data-axis="x"]');
+check(lifted && lifted.hidden, "a bead over Exit is not a hit target");
+
+document.getElementById("out").textContent = JSON.stringify({ fails });
+</script>
+</body>
+</html>
