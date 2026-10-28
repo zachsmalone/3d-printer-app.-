@@ -1238,7 +1238,7 @@ def apply(m: trimesh.Trimesh, op: str, params: dict) -> tuple[trimesh.Trimesh, d
                           "or Simplify first.")
     else:
         out, rep = fn(m, params or {})
-    return _check(out), rep
+    return _cadops.preserve_body_ids(m, _check(out)), rep
 
 
 # ------------------------------------------------------------------ import / validation

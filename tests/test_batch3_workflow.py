@@ -70,7 +70,9 @@ def test_repair_page_can_continue_into_the_slicer_as_a_copy():
     assert 'src="/static/repair.js"' in page
 
 
-def test_body_identity_is_unchanged():
-    """B1-6 stays open. Bodies are still numbered by centre, and a step still stores an index."""
-    assert "sorted by" in CADOPS and "centre x" in CADOPS
+def test_body_list_order_is_separate_from_stored_identity():
+    """The on-screen list is still centre-sorted. A step stores a stable id, and a missing id is an error."""
     assert "sorted(parts, key=lambda b: tuple(np.round(b.bounds.mean(axis=0), 3))" in CADOPS
+    assert "BODY_ATTR" in CADOPS
+    assert "does not match any body" in CADOPS
+    assert "share the same centre" in CADOPS

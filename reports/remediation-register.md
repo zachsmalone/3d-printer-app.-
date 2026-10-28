@@ -114,6 +114,8 @@ B1-6 is still open. `bodies()` in `app/core/cadops.py` still sorts shells by cen
 
 Branch `cursor/dependable-tools-batch4-ed74`, off `zeim` @ `01e4955`. No merge and no deploy.
 
+Update: Batch 4 is on `zeim` at `e9c2c03d2b8be6cfff65ebcfd921fb706b992a9b` (PR #56). The table below is the record from before that merge. B1-6 is handled in the section at the end of this file.
+
 Verification log (this branch, Python 3.12, packages under `/tmp/pydeps`, Playwright not installed):
 
 - `node --test tests/js/pickgeom.test.mjs tests/js/worksave.test.mjs` — 11 passed, 0 failed.
@@ -152,4 +154,37 @@ Verification (this branch):
 | B3-3 | Workflow / one project | Fixed for the stage decision and the remembered copy. No full generate → repair → slice click-through. | Design, repair, prepare, and slice were separate destinations. Sending a photo to the slicer created a new edit project every time, and the nav did not carry the open model. | The next stage asked for the file again, or made another copy with no sentence saying so. | This change. A stage bar on Lithophane, the FDM Slicer, TorchC0, CAD, and Smart Fix. The same edit id is reused. A photo design makes one slicer copy per id for this tab (`zeim.flow`), and the note says the photo design stays in Projects. Resin Slice & Export says the layer file is made in the printer's slicer. | Node file: 8 passed, including reuse, same-id hops, and the resin note. Chrome fixture: Check & Repair on a photo with no copy plans a derived send. | A rebuilt photo with the same id keeps the earlier slicer copy for this tab. A new build id gets a new copy. The bar was not exercised inside the running app. |
 | B3-4 | Workflow / duplicate actions | Fixed in the markup. The hidden controls remain for older tests. | The photo result had Edit this beside Send to Slicer. The slicer start had Edit a Studio build, a second list of the same projects. | Two controls opened the slicer, and one of them ignored the resin printer type. | This change. Edit this is hidden and uses Send to Slicer. The second project picker is hidden. The visible line points at Projects. | `tests/test_batch3_workflow.py` passed. `tests/ui_trace2d.py` now clicks Send to Slicer; it was not run. | Send to Slicer, Send to CAD, and Send to Showcase stay. They are the explicit hand-off, not a second project list. |
 | B3-5 | Workflow / repair dead end | Fixed in the repair page script. No repaired-file round trip was posted. | `/static/repair.html` ended at a download. The slicer link sent a broken file there with no return into a project. | After a repair, the maker had to download and import the file themselves. | This change. The page says the slicer project is a new project from the repaired file, and Open in the FDM Slicer posts that file to `/api/edit/new`. | `slicerUrlForNewProject` rejects a bad id (node). Source test passed. The POST was not executed. | A large repaired file is downloaded and uploaded again. There is no server hand-off from the repair id. |
-| B1-6 | Functional / body references | Not fixed. Left as recorded in Batch 1. | Bodies are still sorted by centre. A step still stores an index. | An upstream edit can renumber a later body. | None in this change. `tests/test_batch3_workflow.py::test_body_identity_is_unchanged` passed (the sort is still there). | Not retested as a geometry replay. | Still open. |
+| B1-6 | Functional / body references | Not fixed. Left as recorded in Batch 1. | Bodies are still sorted by centre. A step still stores an index. | An upstream edit can renumber a later body. | None in this change. `tests/test_batch3_workflow.py::test_body_identity_is_unchanged` passed (the sort is still there). | Not retested as a geometry replay. | Still open. That pin was replaced when B1-6 was fixed; see the section below. |
+
+## Batch 4 — shipped
+
+`zeim` @ `e9c2c03d2b8be6cfff65ebcfd921fb706b992a9b` (PR #56, “Keep existing tools honest about picks, failures, and limits”). Merged before this B1-6 work. This change does not deploy.
+
+## B1-6 — stable body identity
+
+The on-screen body list is still sorted by centre. That order is no longer the identity a step stores. Each body carries an id on its faces (`b1`, `b2`, …). A new step stores that id. Replay looks the id up. If the id is not on the mesh, the step fails and does not move a different body. A saved project that still has a list index is rewritten by replaying the saved steps in order and recording the id at that list position. If two bodies share a centre (rounded to 0.001 mm), the index is ambiguous and the step fails. A nearest body is not chosen.
+
+The box/sphere repro is `tests/test_b1_6_body_identity.py`. 10 mm box, sphere diameter 10 at x=40, scale ×2 on body 1. Before the upstream edit the sphere is about 20 mm and the box is 10 mm. Moving the sphere to x=−40 and replaying leaves the sphere at about 20 mm on x=−40 and the box at 10 mm. Volume stays about 5177 mm³. The old failure scaled the box and left the sphere near 10 mm, about 8522 mm³. The same edit is covered after the stored `body: 1` index is put back, which is the migration path, and after the in-memory mesh is dropped so replay reads the saved file. A stored `b999` raises `Body reference b999 does not match any body` and does not save the edit. Two boxes with the same centre refuse index 0 as ambiguous and do not scale either box.
+
+Verification (this branch, Python 3.12, packages under the user site, Playwright not installed):
+
+- `python3 -m pytest -q tests/test_b1_6_body_identity.py` — 5 passed.
+- `python3 -m pytest -q tests/test_cad_workspace.py tests/test_b1_6_body_identity.py tests/test_qa_n1_mirror.py tests/test_cad_deferred.py -k "not real_browser"` — 57 passed, 1 deselected.
+- `python3 -m pytest -q tests/test_cad_beginner.py tests/test_parts.py tests/test_batch3_workflow.py tests/test_batch4_tools.py tests/test_cad_qa_kobi.py tests/test_sculpt.py tests/test_batch1_outputs.py tests/test_cad_b8_b9_b12.py -k "not real_browser"` — 93 passed, 1 deselected.
+
+Not run: Playwright browser scripts (`tests/ui_cad_beginner.py`, `tests/ui_cad_text.py`, `tests/ui_cad_deferred.py`) because Playwright is not installed. No browser pass. No printer. Not deployed.
+
+| ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| B1-6 | Functional / body references | Fixed for separate bodies whose faces keep an id, including the box/sphere replay and a saved index. Not a browser pass. | `bodies()` sorted by centre and a step stored that index, then resolved it again on replay. | An upstream edit that changed body order applied a later transform to a different body, including the export after replay. | This change. Ids live on faces. Steps store the id. Legacy indices are rewritten in saved order. A missing or ambiguous reference raises. | `tests/test_b1_6_body_identity.py`: 5 passed. The moved sphere stays ~20 mm and the box stays 10 mm; volume ~5177 mm³. CAD workspace, mirror, beginner, parts, sculpt, batch 1 and batch 4 tests listed above passed. | See the risks below. |
+
+Remaining risks, stated as they are:
+
+- Migration replays the saved steps and records the id at the old index. That is the body the index named before any upstream edit. It cannot recover a project whose earlier step was already edited and re-saved under the old index behaviour; that file already points at the wrong body, and this change will keep pointing at that body.
+- Two bodies whose centres round to the same 0.001 mm cannot be told apart by an old index. The step fails. The project is unchanged. Opening or editing past that step raises.
+- A boolean, repair, simplify, or hollow that rebuilds faces and does not leave exactly one body in and one body out drops the old ids. Later steps that name those ids fail instead of moving another body. An unedited history still migrates each index once against that rebuilt mesh, so reopen of an unedited project can still replay.
+- If one id has been copied onto two separate shells, the earliest faces keep it and the other shell gets a new id. That follows face order, not which centre is closer.
+- Appearance colours and the body list numbers are still the centre-sorted index. A colour can follow the list slot after a move. Those keys were not migrated.
+- Smart merge still matches Smart Split pieces to a recorded point. That matcher was not part of this bug and was not changed.
+- Whole-mesh moves keep ids when the face list is unchanged. A body step on a mesh large enough to run in the forked memory guard was not measured. The guard returns the mesh through pickle; ids are applied again in the parent when the faces still line up, or when one body stays one body.
+- The CAD page was not clicked. The history field for a body id is text. A maker can still pick a body for a new step; the server stores the id.

@@ -55,7 +55,7 @@ def op_cad_shape(m, p):
     if mode not in MODES:
         raise OpError("mode must be new | join | cut")
     tool = shape_mesh(p)
-    out = C._combine(m, tool, mode, bool(p.get("replace")))
+    out = C.combine_keeping_ids(m, tool, mode, bool(p.get("replace")))
     word = {"new": "Added", "join": "Joined", "cut": "Cut a hole with"}[mode]
     return out, {"message": f"{word} a {NAMES[p.get('kind', 'box')].lower()}."}
 
