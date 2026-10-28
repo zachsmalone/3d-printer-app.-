@@ -1,16 +1,19 @@
 """2D->3D engine client, plan gate, daily cap and cooldown.
 
 The engine is a separate worker (workers/ai3d, TripoSR). ZEIM sends it the cleaned photo (EXIF/GPS already removed) over
-the local Docker network and gets a mesh back. Nothing goes to any outside service.
+the local Docker network and gets a mesh back. Nothing goes to any outside service. Photo prep runs first
+(workers/ai3d/prep.py). When the worker is up, prep uses its cut-out; otherwise ZEIM prepares the photo itself.
 
 Plan: Pro after launch (ZEIM_AI3D_PRO_ONLY=1). While testing: unlocked for every adult account, capped per day.
-Cooldown (Zach, 2026-10-20): 5 minutes between models, starting when a model FINISHES (tweaks never count), plus 5 more
-after each paid model that day. ZEIM_TESTING_MODE=1 lifts the cooldown (and the Pro-only gate).
-The daily model cap stays unless ZEIM_TESTING_ALLOW_PAID=1, because each model uses the worker's GPU.
+Cooldown (Zach, flat 5 minutes): 5 minutes between models, starting when a conversion FINISHES. Editing, exporting,
+or sending that mesh on does not start it again. ZEIM_AI3D_COOLDOWN_STEP_MIN stays 0 unless an operator sets it.
+ZEIM_TESTING_MODE=1 lifts the cooldown (and the Pro-only gate).
+The daily model cap stays unless ZEIM_TESTING_ALLOW_PAID=1, because each model uses the worker.
 Neither flag starts a payment. Tests swap engine_call for a double.
 """
 from __future__ import annotations
 
+import base64
 import json
 import threading
 import time
@@ -19,6 +22,7 @@ import urllib.request
 import uuid
 
 from .. import config
+from ..core.ai3d_prep import prepare_image
 
 _lock = threading.Lock()
 _last_done: dict[str, float] = {}           # sid -> time the last model finished
@@ -56,8 +60,53 @@ def engine_status() -> dict:
         return {"installed": True, "ready": False, "device": None, "engine": "TripoSR", "test_double": False, "unreachable": True}
 
 
-def engine_call(image: bytes, mode: str, resolution: int = 192) -> bytes:
-    """Photo bytes -> PLY bytes from the worker. Refuses while ZEIM_2D3D_ENABLED is off."""
+def _prep_headers(mode: str, *, crop: bool, tone: bool, grey: bool, prepared: bool = False, resolution: int | None = None) -> dict:
+    headers = {"Content-Type": "application/octet-stream", "X-Mode": mode, "X-Token": config.AI3D_TOKEN,
+               "X-Prep-Crop": "1" if crop else "0", "X-Prep-Tone": "1" if tone else "0",
+               "X-Prep-Bg": "grey" if grey else "keep", "X-Prepared": "1" if prepared else "0"}
+    if resolution is not None:
+        headers["X-Resolution"] = str(resolution)
+    return headers
+
+
+def prepare_photo(image: bytes, mode: str, *, crop: bool = True, tone: bool = True, grey: bool = True) -> tuple[bytes, list[str]]:
+    """Bytes the engine should see, plus short notes. Worker cut-out when it answers; local prep otherwise."""
+    if not config.AI3D_FAKE and config.AI3D_URL and config.ai3d_enabled():
+        try:
+            return _worker_prepare(image, mode, crop=crop, tone=tone, grey=grey)
+        except Exception:
+            png, notes = prepare_image(image, mode, crop=crop, tone=tone, grey=grey)
+            return png, list(notes) + ["The engine did not prepare the photo, so this crop and light were used."]
+    return prepare_image(image, mode, crop=crop, tone=tone, grey=grey)
+
+
+def _worker_prepare(image: bytes, mode: str, *, crop: bool, tone: bool, grey: bool) -> tuple[bytes, list[str]]:
+    req = urllib.request.Request(
+        config.AI3D_URL + "/prepare", data=image, method="POST",
+        headers=_prep_headers(mode, crop=crop, tone=tone, grey=grey))
+    try:
+        with urllib.request.urlopen(req, timeout=min(180, config.AI3D_TIMEOUT_S)) as r:
+            body = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        raise EngineError("The engine could not prepare this photo.") from e
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise EngineMissing("The 2D to 3D engine is not answering.") from e
+    try:
+        png = base64.b64decode(body.get("png_b64") or "")
+    except Exception as e:
+        raise EngineError("The engine could not prepare this photo.") from e
+    if not png:
+        raise EngineError("The engine could not prepare this photo.")
+    notes = [str(n) for n in (body.get("notes") or []) if str(n).strip()]
+    return png, notes
+
+
+def engine_call(image: bytes, mode: str, resolution: int = 192, *, prepared: bool = False,
+                crop: bool = True, tone: bool = True, grey: bool = True) -> bytes:
+    """Photo bytes -> PLY bytes from the worker. Refuses while ZEIM_2D3D_ENABLED is off.
+
+    prepared=True means ZEIM already ran photo prep, so the worker must not crop or cut the subject out again.
+    """
     if not config.ai3d_enabled():
         raise EngineMissing("2D to 3D is not available yet.")
     if config.AI3D_FAKE:
@@ -66,9 +115,9 @@ def engine_call(image: bytes, mode: str, resolution: int = 192) -> bytes:
         return fake_engine_mesh(mode)
     if not config.AI3D_URL:
         raise EngineMissing("The 2D to 3D engine is not installed on this server.")
-    req = urllib.request.Request(config.AI3D_URL + "/generate", data=image, method="POST",
-                                 headers={"Content-Type": "application/octet-stream", "X-Mode": mode,
-                                          "X-Resolution": str(resolution), "X-Token": config.AI3D_TOKEN})
+    req = urllib.request.Request(
+        config.AI3D_URL + "/generate", data=image, method="POST",
+        headers=_prep_headers(mode, crop=crop, tone=tone, grey=grey, prepared=prepared, resolution=resolution))
     try:
         with urllib.request.urlopen(req, timeout=config.AI3D_TIMEOUT_S) as r:
             return r.read()

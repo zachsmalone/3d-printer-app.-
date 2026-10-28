@@ -1102,8 +1102,13 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .a3busy{display:flex;gap:8px;align-items:center;margin:0}
 .a3spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--zt-a,#3E5C76);animation:a3spin 1s linear infinite}
 @keyframes a3spin{to{transform:rotate(360deg)}}
-.a3cool{display:flex;gap:10px;align-items:flex-start;margin-top:var(--s4,16px);padding:10px 14px;border-radius:var(--r,12px);background:var(--panel);border:1px solid var(--line)}
-.a3cool p{margin:0;flex:1}
+.a3prep{border:1px solid var(--line);border-radius:var(--r,12px);padding:4px 12px}
+.a3prep summary{min-height:44px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.a3prep summary small{color:var(--mut);font-weight:500}
+.a3prep label{align-items:flex-start}
+.a3tick{margin:0;font-variant-numeric:tabular-nums;font-weight:650}
+.a3handoff{display:flex;flex-wrap:wrap;gap:8px}
+.a3handoff .btn{min-height:44px}
 @media (max-width:1000px){.a3grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.a3out{grid-column:1/-1}}
 @media (max-width:640px){.a3grid{grid-template-columns:minmax(0,1fr)}.a3drop{min-height:140px}}
 @media (prefers-reduced-motion:reduce){.a3spin{animation:none}}

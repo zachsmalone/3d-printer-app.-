@@ -27,7 +27,8 @@ def shot(pg, n):
 
 
 with sync_playwright() as p:
-    b = p.chromium.launch()
+    exe = os.environ.get("ZEIM_CHROME", "")
+    b = p.chromium.launch(executable_path=exe, args=["--no-sandbox", "--disable-dev-shm-usage"]) if exe else p.chromium.launch()
     for w, h in ((1280, 900), (390, 844)):
         pg = b.new_page(viewport={"width": w, "height": h})
         errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
@@ -39,6 +40,19 @@ with sync_playwright() as p:
         pg.goto(U1[w] + "/#ai3d"); pg.wait_for_selector("#viewAi3d:not([hidden])"); pg.wait_for_timeout(800)
         ok(f"w{w}: nav tab present", pg.locator('[data-view="ai3d"]').first.is_visible() or w < 600)
         ok(f"w{w}: no overlaps (empty)", pg.evaluate(OVERLAP) == [], pg.evaluate(OVERLAP))
+        ok(f"w{w}: photo prep is on the page", "Photo prep" in pg.inner_text("#viewAi3d") and "TripoSR" in pg.inner_text("#viewAi3d"))
+        exit_hit = pg.evaluate("""() => {
+          const exit = document.querySelector('#viewAi3d [data-ws-act="exit"]');
+          const save = document.getElementById('saveInd');
+          if (!exit) return 'no-exit';
+          const b = exit.getBoundingClientRect();
+          if (b.width < 40 || b.height < 40 || b.bottom < 0 || b.top > innerHeight) return 'off';
+          if (!save || save.getBoundingClientRect().width < 1) return 'ok';
+          const s = save.getBoundingClientRect();
+          const overlap = b.left < s.right - 1 && s.left < b.right - 1 && b.top < s.bottom - 1 && s.top < b.bottom - 1;
+          return overlap ? 'overlap' : 'ok';
+        }""")
+        ok(f"w{w}: Exit stays clear of the auto-save pill", exit_hit == "ok", exit_hit)
         shot(pg, f"w{w}-empty.png")
         pg.click("#a3Sample"); pg.check('input[name=a3Mode][value=bust]', force=True)
         pg.wait_for_selector("#a3Go:not([disabled])", timeout=10000)
@@ -50,9 +64,10 @@ with sync_playwright() as p:
         ok(f"w{w}: no overlaps (result)", pg.evaluate(OVERLAP) == [], pg.evaluate(OVERLAP))
         shot(pg, f"w{w}-result.png")
         plan = pg.inner_text("#a3Plan")
-        ok(f"w{w}: cooldown countdown shown", ":" in plan, plan)
-        ok(f"w{w}: cooldown note visible + dismissible", pg.is_visible("#a3Cool"))
-        pg.click("#a3CoolX"); ok(f"w{w}: note dismissed", not pg.is_visible("#a3Cool"))
+        tick = pg.inner_text("#a3Tick")
+        ok(f"w{w}: cooldown is a status line", "photo to mesh" in plan.lower() and ":" in tick, plan + " | " + tick)
+        ok(f"w{w}: no cooldown popup", pg.locator("#a3Cool").count() == 0)
+        ok(f"w{w}: handoff stays in the page", "Send to CAD" in res and "Check" in res, res)
         pg.locator("#a3Res button", has_text="Export").first.click(); pg.wait_for_timeout(1500)
         dlg = pg.locator("dialog[open]")
         txt = dlg.first.inner_text() if dlg.count() else ""
