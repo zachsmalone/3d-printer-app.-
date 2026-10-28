@@ -615,7 +615,7 @@ async function openItem(id) {
       <ul class="reup-list" id="itCopyList"></ul>
       <div class="field"><label for="itCopyUrl">Link to the copy</label><input id="itCopyUrl" maxlength="200" placeholder="https://…/p/abc123"></div>
       <button type="button" class="btn" id="itCopySend">Send to moderators</button></div>` : ""}
-    ${i.example || i.owned || i.original ? "" : `<div class="field"><label for="itStolenUrl">Link to the original <em>optional</em></label><input id="itStolenUrl" maxlength="200" placeholder="https://…/p/… or a page on another site"><small class="help">Leave this empty and ZEIM looks for an earlier matching shape.</small></div>` : ""}
+    ${i.example || i.owned || i.original ? "" : `<div class="field"><label for="itStolenUrl">Link to the original <em>optional</em></label><input id="itStolenUrl" maxlength="200" placeholder="https://…/p/… or a page on another site"><small class="help">Leave this empty and ZEIM looks for an earlier matching shape.</small></div>`}
     ${!i.example && !i.allow_remixes ? `<p class="help remix-off" id="itRemixOff"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Remixes off${i.owned ? "" : `: ${esc(i.remix_off_reason)}`}</p>` : !i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>

@@ -50,6 +50,47 @@ def test_reduced_motion_rule_disables_theme_animation():
         assert props <= {"transform", "opacity"}, kf[0]
 
 
+def test_bands_fade_into_the_section_and_leave_workspace_chrome_alone():
+    """The spirit sits in the page. A full-screen workspace hides it so Exit, docks, and the process sheet stay clear.
+    Existing motion names stay. This pass does not add an entrance package."""
+    flat = CSS.replace(" ", "")
+    assert "mask-image:linear-gradient(#000 0 78%,transparent 100%)" in CSS
+    assert "border-radius:0" in flat
+    assert "main.zws>.zt-band{display:none}" in flat
+    assert "html[data-theme=dark]#viewShowcase.zws" in flat
+    for sel in ("#viewShowcase", "#viewEdit", "#viewTorch", "#viewCad", "#viewCreate", "#viewAccount"):
+        assert sel + "{" in flat
+        assert "background:linear-gradient" in flat
+    for sel in (".wsbar", ".objdock", ".proc-sheet", ".cw-top", "#cwBack"):
+        assert sel not in CSS
+    names = set(re.findall(r"@keyframes (zt-[a-z]+)", CSS))
+    assert names == {"zt-glow", "zt-rain", "zt-bolt", "zt-ember", "zt-fall", "zt-wave", "zt-ink", "zt-mist", "zt-in"}
+
+
+def test_approved_spirits_stay_with_their_sections():
+    expect = {
+        "torchc0": ("#C8321E", "zt-rain", "zt-bolt", "torchc0.webp"),
+        "showcase": ("#C24D6B", "zt-petal", "showcase.webp"),
+        "slicer": ("#0066FF", "zt-wave", "slicer.webp"),
+        "lithophane": ("zt-litho", "lithophane-cat.jpg", "Tango the cat"),
+        "account": ("#A3241C", "zt-ink", "account.webp"),
+        "cad": ("#B8792E", "zt-mist", "cad.webp"),
+    }
+    for sec, bits in expect.items():
+        i = HTML.find('data-zt="%s"' % sec)
+        assert i >= 0, sec
+        chunk = HTML[i:i + 900]
+        for bit in bits:
+            assert bit in chunk or bit in CSS, (sec, bit)
+
+
+def test_showcase_script_has_no_second_else_on_the_stolen_link():
+    """A second else after the nested template stopped community.js loading, so section themes never switched."""
+    js = open(os.path.join(ROOT, "static", "community.js"), encoding="utf-8").read()
+    assert 'matching shape.</small></div>`}' in js
+    assert 'matching shape.</small></div>` : ""}' not in js
+
+
 def test_cad_work_canvas_has_no_theme_band():
     """Ronin mist is for #viewCad home/empty/success landing only — never over the CAD workspace."""
     assert "zt-band" not in CAD and "zeim-themes" not in CAD and "zt-mist" not in CAD

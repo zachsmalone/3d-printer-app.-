@@ -24,7 +24,7 @@ ZEIM is a 3D-printing maker app and community for adults (**18+ only**). Turn a 
 | **Bust mode** | Photo → printable bust: thicker rounded-back body with photo relief on a clean round / rect / outline pedestal. Auto head & shoulders (editable starting mask) or manual Select trace; whole photo still works, with a tip. Separate from AI 2D→3D Bust — not figure-scan quality. |
 | **Live Sculpt** | CAD sculpt brushes (draw, carve, smooth, inflate, pinch, flatten, grab) show live on the model as you drag; each stroke saves in the background without a blocking spinner. |
 | **Subscriptions** | Core stays free forever. Account → Plans lists optional Semi Pro (~$3.50) and Pro (~$5.50) as **Coming later**. **ZEIM_PLANS_ENABLED=0** (the default) does not start checkout, and missing Stripe keys are not an error. ZEIM never takes a cut of creator tips or Showcase sales. |
-| **Themes** | Japanese-inspired theme per section, with quiet CSS motion that turns off under prefers-reduced-motion. |
+| **Themes** | Japanese-inspired theme per section. The art fades into that section. Quiet CSS motion already in the page turns off under prefers-reduced-motion. A heavier entrance package is not part of this. |
 
 ## In progress
 

@@ -363,3 +363,34 @@ Not run: Playwright `tests/ui_*.py`. No drag of a fillet on a saved project. No 
 | CAD-1 | Fillet / chamfer | Verified by mesh tests. Not dragged on a saved body in the page. | A picked edge that missed the solid was still saved. A split straight edge was only partly rounded. A hole rim did not come back as a clean solid. | A maker could think an outside edge was rounded when the mesh had not changed, or when only a short piece had. | This change. The pick follows the outside edge and stops at a corner. A miss, an inside corner, or a curve that is not a clean solid is refused. | `tests/test_cad_hard_surface.py` and the fillet test in `tests/test_cad_workspace.py` passed. | A round hole rim stays sharp. The opening is still an approximate mesh. |
 | CAD-2 | Measure | Verified by the length and face-distance math, and by the hint on the live page. Two points were not clicked on a box in the page. | A split edge reported one piece. A face tap did not snap to a corner. Parallel faces did not show the distance between the planes. | A 40 mm edge made of two pieces could read as 20 mm, and a thickness was only the slant between the taps. | This change. A straight run is one length. A tap within 10 px of a corner or an edge middle uses that point. Parallel faces add the plane distance. | Node tests for the chain and the face pair passed. The page hint was read in Chrome. | A cylinder diameter is not reported. The two-point line is still the tapped points. |
 | CAD-3 | Joints / merge | Verified by the joint solids that already existed, the id tests, and the live hinge and Merge panel. | Copy named a Join step and said the pin needs no supports. Smart merge dropped the body id. Merge remembered a list index, and a box overlap was worded as a weld. | A hinge looked attached, and a later step could lose the body it named. | This change. Copy matches the solids. Add states why it is off. Merge uses the id. Smart merge keeps one split id. The note says a clearance gap stays open. | The deferred joint tests, the new id test, and the Chrome hinge/merge checks passed. | A hinge is still a new pair of parts. It is not built onto an edge you already have. Fit is simulated. |
+
+## Section themes — spirits in the page
+
+Branch `cursor/section-themes-seamless-e917`, off `zeim` @ `5a83ce7` (CAD #65). No deploy. Exit, Done, New build, docks, and the process sheet were not restyled. `cad.html` still has no theme band. B1-6 was not edited.
+
+The art and the quiet CSS motion were already on `zeim`. This change makes each band sit flush in its section and fade into a short paper wash, and marks the open tab with that section’s accent. The label colour stays the existing accent ink. A full-screen workspace (`main.zws`) hides the band and the wash, so the model stays the ground.
+
+What each section shows:
+
+- TorchC0: the fire-red sky, rain, and lightning, fading into a warm page.
+- Showcase: cherry blossom on the right, fading into pale paper. The tab mark is the blossom red.
+- FDM Slicer: the original blue-and-white wave drawing, kept whole (not stretched). The page wash is the same warm paper. The wave band still hides once a model is open.
+- Lithophane: Tango in a square wooden frame on the section paper, with the line “Example lithophane: Tango the cat, lit from behind.”
+- Account: the calligraphy stroke and the red seal. My Studio keeps its red edge.
+- CAD: the ronin figure and the wireframe cube, on the landing page only (`#viewCad`). The work canvas is unchanged.
+
+Left for a later pass: a heavier theme-animation package. Entrances, section-to-section motion, and anything beyond the loops already in `zeim-themes.css` were not added. Those loops stay: rain, lightning, embers, petals, the wave, ink, ronin mist, the lithophane glow, and the short arrival of the art. They still turn off under `prefers-reduced-motion`.
+
+`static/community.js` had a second `: ""` after the stolen-link field. The module failed to parse, so the app never started and the sections could not be opened. That extra else is gone. The field still shows only when the project is not an example, not yours, and not an original.
+
+Verification (this branch, Python 3.12 venv, Playwright not installed, PrusaSlicer not installed, system Chrome present):
+
+- `python -m pytest -q` on the CI file list, which now includes `tests/test_section_themes_ui.py` — 232 passed, 3 skipped. The skips are `tests/test_app.py` “no slicer”, `tests/test_slice_api.py` “PrusaSlicer not installed”, and `tests/test_section_themes_ui.py` “needs playwright Chromium”. They were not run and are not counted as passed.
+- Headless Chrome on the live app (`127.0.0.1:8765`, age gate off): Showcase, FDM Slicer, TorchC0, CAD, Lithophane, and Account at 1280×900 and 390×844. Each open section had one band, the heading did not sit on the band, and the page did not scroll sideways. Desktop Exit on the FDM Slicer and TorchC0 stayed the hit. Adding `zws` hid the band and cleared the wash. Dark mode still showed the TorchC0 sky.
+
+Not run: Playwright `tests/ui_section_themes.py`. No signed-in pass. No printer. Not deployed. GitHub CI `test` on this PR passed (run 40711075486). The three skips in that job are the same environment skips as above. They are not counted as passed.
+
+| ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| TH-1 | Section themes | Verified in headless Chrome for the six sections, desktop and phone, plus a dark TorchC0 shot. The Playwright script was not run. | The art sat in a rounded card and stopped at the card edge. | A section read as a picture above a plain page. | This change. The band fades into a short wash of that section’s ground. The open tab carries the accent. | The source tests in `tests/test_section_themes_ui.py` passed inside the 232. Chrome, above. | A loaded model hides the band. The theme is the empty page and the landing, not the working view. |
+| TH-2 | App boot | Verified by `node --check` on the module and by the same Chrome session reaching each section. | The stolen-link line was `condition ? "" : template : ""`. | The main script did not parse, so the tabs did not open. | This change. One else remains. | The source assertion passed. Chrome opened every section above. | None for that line. |
