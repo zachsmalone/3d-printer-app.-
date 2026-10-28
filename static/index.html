@@ -83,6 +83,7 @@
     <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A project already in My Studio stays there. This does not send the model to Showcase.">New build</button>
     <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <button type="button" class="btn small primary ws-go" id="lithoGo" data-go="btnSendSlicer" title="Save first, then open this model in the FDM Slicer. This does not send it to Showcase.">Send to Slicer</button>
   </div>
   <nav class="pathnav" aria-label="Your progress">
     <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Print-ready</li></ol>
@@ -446,6 +447,7 @@
     <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. The project stays in My Studio. This does not send the model to Showcase.">New build</button>
     <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <button type="button" class="btn small primary ws-go" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace.">Slice</button>
   </div>
   <aside class="panel controls" id="editSide">
     <section id="editStart">
@@ -496,9 +498,27 @@
       </div>
       <p class="help" id="editMsg"></p>
       <div id="editWill" aria-live="polite"></div>
-      <section class="slicepanel" id="slicePanel" aria-label="Slicer settings"></section>
+      <p class="help" id="procHint">Quality, support, infill, and brim open under the model.</p>
       <details class="auto" open><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-list"/></svg> Steps <small id="editHeadNote"></small></summary><ol class="oplist" id="editOps"></ol></details>
     </div>
+  </section>
+  <div class="objdock" id="slicerDock" hidden>
+    <div class="objdock-tools" role="toolbar" aria-label="Object tools">
+      <button type="button" data-xform="move" aria-pressed="false">Move</button>
+      <button type="button" data-xform="rotate" aria-pressed="false">Rotate</button>
+      <button type="button" data-xform="scale" aria-pressed="false">Scale</button>
+    </div>
+    <div class="objdock-tabs" role="tablist" aria-label="Plate and process">
+      <button type="button" data-docktab="plate" aria-selected="true">Plate</button>
+      <button type="button" data-docktab="process" id="procOpen" aria-selected="false" aria-controls="processSheet">Process</button>
+    </div>
+  </div>
+  <section id="processSheet" class="proc-sheet" hidden aria-labelledby="procTitle">
+    <div class="proc-bar">
+      <h2 id="procTitle">Process</h2>
+      <button type="button" class="btn small" id="processClose">Close</button>
+    </div>
+    <section class="slicepanel" id="slicePanel" aria-label="Slicer settings"></section>
   </section>
 </main>
 
@@ -656,6 +676,7 @@
     <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from My Studio, go back to the library. This does not send the model to Showcase.">Done</button>
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. This does not send the model to Showcase.">New build</button>
     <a class="btn small" data-ws-act="return-studio" href="#account/studio" hidden aria-label="Return to My Studio" title="Go back to saved projects in Account. The draft is saved first. This does not send the model to Showcase.">Return to My Studio</a>
+    <button type="button" class="btn small primary ws-go" id="torchGo" data-go="rzGo" title="Prepare this model for resin. This does not send it to Showcase.">Prepare</button>
   </div>
   <section class="slicepanel torchpanel" id="torchPanel" aria-label="TorchC0 resin settings"><p class="help">Loading resin printers…</p></section>
   <div id="torchOut" aria-live="polite"></div>

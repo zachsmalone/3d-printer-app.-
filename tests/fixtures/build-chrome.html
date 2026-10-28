@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>build chrome</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  html, body { margin: 0; height: 100%; }
+  #root { position: relative; width: 100%; height: 100%; background: #eee; }
+  #tools, #float { width: 280px; height: 220px; background: #cde; }
+  #out { white-space: pre-wrap; font: 14px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<main id="root">
+  <div class="wsbar" data-ws="slicer" role="group" aria-label="Slicer workspace">
+    <button type="button" class="btn small" id="exit" data-ws-act="exit" aria-label="Exit workspace">Exit</button>
+    <button type="button" class="btn small primary ws-go" id="go">Slice</button>
+  </div>
+  <div id="tools">Tools</div>
+  <div id="float">Float</div>
+  <div class="objdock" id="slicerDock">
+    <div class="objdock-tools" role="toolbar"><button type="button" id="move">Move</button></div>
+    <div class="objdock-tabs" role="tablist"><button type="button" id="procTab" data-docktab="process">Process</button></div>
+  </div>
+  <section id="processSheet" class="proc-sheet">
+    <div class="proc-bar"><h2>Process</h2><button type="button" class="btn small" id="processClose">Close</button></div>
+    <section class="slicepanel"><p>Quality</p></section>
+  </section>
+</main>
+<pre id="out">WAIT</pre>
+<script src="/static/wslayout.js"></script>
+<script>
+(async function () {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const fails = [];
+  function check(ok, msg) { if (!ok) fails.push(msg); }
+  const root = document.getElementById("root");
+  ZWS.create({
+    id: "chrome",
+    root: root,
+    customise: root,
+    panels: [
+      { id: "tools", el: document.getElementById("tools"), label: "Tools", dock: true, core: true, def: { edge: "top", t: 0 } },
+      { id: "float", el: document.getElementById("float"), label: "Float", core: true, def: { x: 0, y: 0 } }
+    ]
+  });
+  await sleep(60);
+  const exit = document.getElementById("exit");
+  function hit() {
+    const r = exit.getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return el && (el.id === "exit" || exit.contains(el));
+  }
+  check(root.classList.contains("zws"), "workspace mounted");
+  check(hit(), "Exit is the top hit before a drag");
+  const tools = document.querySelector("#zws-tools");
+  const grip = tools.querySelector(".zws-grip");
+  const gr = grip.getBoundingClientRect();
+  grip.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: gr.left + 8, clientY: gr.top + 8, pointerId: 1 }));
+  grip.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: 12, clientY: 12, pointerId: 1 }));
+  check(hit(), "Exit stays the top hit while a docked tool is dragged");
+  grip.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: 12, clientY: 12, pointerId: 1 }));
+  await sleep(40);
+  check(hit(), "Exit stays the top hit after the drag");
+  check(tools.getBoundingClientRect().top >= exit.getBoundingClientRect().bottom - 1, "docked tool sits under Exit, top " + Math.round(tools.getBoundingClientRect().top) + " exit bottom " + Math.round(exit.getBoundingClientRect().bottom));
+  const fg = document.querySelector("#zws-float .zws-grip");
+  const fr = fg.getBoundingClientRect();
+  fg.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, clientX: fr.left + 8, clientY: fr.top + 8, pointerId: 2 }));
+  fg.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, cancelable: true, clientX: 20, clientY: 16, pointerId: 2 }));
+  check(hit(), "Exit stays the top hit while a free panel is dragged");
+  fg.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, clientX: 20, clientY: 16, pointerId: 2 }));
+  await sleep(40);
+  check(hit(), "Exit stays the top hit after a free drag");
+  function hitId(id) {
+    const el = document.getElementById(id);
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + Math.min(12, r.width / 2), r.top + r.height / 2);
+    return top && (top.id === id || el.contains(top));
+  }
+  const rootBox = root.getBoundingClientRect();
+  const sheet = document.getElementById("processSheet").getBoundingClientRect();
+  check(sheet.height <= rootBox.height * 0.6 + 1, "process sheet is about half the view " + Math.round(sheet.height) + "/" + Math.round(rootBox.height));
+  check(sheet.top >= rootBox.height * 0.3, "model space stays above the sheet");
+  check(hit(), "Exit stays the top hit with the process sheet open");
+  check(hitId("processClose"), "Close on the sheet is clickable and is not Exit");
+  check(hitId("move"), "Move stays clickable above the sheet");
+  document.getElementById("out").textContent = JSON.stringify({ fails: fails, width: innerWidth, height: innerHeight });
+})();
+</script>
+</body>
+</html>

@@ -906,7 +906,7 @@ html:not([data-theme=dark]) .agegate .logo-dark,html[data-theme=dark] .agegate .
 .zws-safe{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
 .zws-p{position:absolute;z-index:9;display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 95%,transparent);box-shadow:0 8px 24px rgba(0,0,0,.28);overflow:hidden;touch-action:none}
 .zws-p[hidden]{display:none}
-.zws-p.drag{opacity:.9;box-shadow:0 14px 34px rgba(0,0,0,.45);z-index:30;will-change:transform}
+.zws-p.drag{opacity:.9;box-shadow:0 14px 34px rgba(0,0,0,.45);z-index:16;will-change:transform}
 .zws-head{display:flex;align-items:center;gap:2px;flex:none;min-height:44px;padding:0 2px}
 .zws-p.v.bare,.zws-p.h.bare{flex-direction:row}
 .zws-p.v.bare{flex-direction:column}
@@ -955,7 +955,7 @@ main.zws #studioPhoto #sMsg:not([hidden]){visibility:visible;position:fixed;left
 main.zws>.stage{position:absolute;inset:0;display:block}
 main.zws .viewer,main.zws>.stage>.viewer{position:absolute;inset:0;height:auto;min-height:0;border-radius:0;border:0;box-shadow:none}
 main.zws>.zws-bg{position:absolute!important;inset:0;width:auto!important;height:auto!important;min-height:0!important;border-radius:0!important}
-main.zws>.zws-cust{position:absolute;top:8px;right:8px;z-index:11;min-height:44px}
+main.zws>.zws-cust{position:absolute;top:8px;right:8px;z-index:49;min-height:44px}
 main:not(.zws)>.zws-cust{display:none}
 main.zws .zws-p>.zws-body>*{margin:0;max-width:100%;box-sizing:border-box}
 main.zws .zws-p>.zws-body>.controls{position:static;max-height:none;width:340px;max-width:100%;border:0;box-shadow:none;background:none}
@@ -1156,7 +1156,41 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .wsbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
 .wsbar .btn{min-height:44px}
 .wsbar [hidden]{display:none !important}
-main.zws>.wsbar{position:absolute;z-index:12;top:8px;left:8px;max-width:min(calc(100% - 150px),720px);margin:0;padding:6px;border-radius:12px;background:color-mix(in srgb,var(--panel) 92%,transparent);box-shadow:0 4px 16px rgba(0,0,0,.18)}
+main.zws>.wsbar{position:absolute;z-index:48;top:0;left:0;right:0;max-width:none;margin:0;padding:8px 60px 8px max(8px,env(safe-area-inset-left));border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:none;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);pointer-events:none}
+main.zws>.wsbar .btn,main.zws>.wsbar a{pointer-events:auto}
+main.zws>.wsbar .ws-go{margin-left:auto}
+main:not(.zws)>.wsbar .ws-go{display:none}
+#viewEdit:not(.zws)>.objdock,#viewEdit:not(.zws)>.proc-sheet{display:none!important}
+main.zws>.objdock{position:absolute;z-index:24;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
+main.zws>.objdock[hidden]{display:none!important}
+main.zws>.objdock .objdock-tools,main.zws>.objdock .objdock-tabs{pointer-events:auto;display:flex;gap:6px;padding:4px;border-radius:14px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.16)}
+main.zws>.objdock button{min-height:44px;min-width:44px;padding:0 14px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--txt);font:inherit;cursor:pointer}
+main.zws>.objdock button[aria-pressed=true],main.zws>.objdock button[aria-selected=true]{background:color-mix(in srgb,#0066FF 14%,var(--panel));border-color:#0066FF;color:var(--txt)}
+main.zws:has(>.proc-sheet:not([hidden]))>.objdock{bottom:min(52dvh,560px)}
+main.zws>.proc-sheet{position:absolute;z-index:22;left:0;right:0;bottom:0;height:min(52dvh,560px);display:flex;flex-direction:column;box-sizing:border-box;padding:0 0 env(safe-area-inset-bottom);border-radius:18px 18px 0 0;border:1px solid color-mix(in srgb,#0066FF 35%,var(--line));border-bottom:0;background:color-mix(in srgb,#f7f4ee 94%,#fff);box-shadow:0 -10px 28px rgba(20,40,80,.12)}
+main.zws>.proc-sheet[hidden]{display:none!important}
+html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--panel) 92%,#0b1a33)}
+.proc-bar{display:flex;align-items:center;gap:8px;padding:8px 10px 6px;border-bottom:2px solid #0066FF}
+.proc-bar h2{flex:1;margin:0;font-size:16px;font-weight:650}
+.proc-sheet .slicepanel{margin:0;border:0;border-radius:0;background:transparent;box-shadow:none;flex:1;min-height:0;overflow:auto}
+.proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
+.proc-tabs button{min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;cursor:pointer;white-space:nowrap}
+.proc-tabs button[aria-selected=true]{border-color:#0066FF;background:color-mix(in srgb,#0066FF 12%,var(--panel))}
+.slicepanel .presets{display:flex;flex-wrap:wrap;gap:8px}
+.slicepanel .preset{border-radius:999px;padding:0 12px;align-items:center;min-height:44px}
+.slicepanel .preset small{display:none}
+.supgrid,.adhgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.supchoice{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:72px;padding:10px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;text-align:left;cursor:pointer}
+.supchoice small{color:var(--mut);font-size:12px}
+.supchoice[aria-pressed=true]{border-color:#0066FF;background:color-mix(in srgb,#0066FF 10%,var(--panel))}
+.patgrid{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity}
+.pat{flex:0 0 92px;min-height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;font-size:12px;cursor:pointer;scroll-snap-align:start}
+.pat svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.pat[aria-pressed=true]{border-color:#0066FF;background:color-mix(in srgb,#0066FF 10%,var(--panel))}
+.proc-tabs button:focus-visible,.supchoice:focus-visible,.pat:focus-visible,main.zws>.objdock button:focus-visible,.proc-bar .btn:focus-visible{outline:3px solid var(--focus,#6AA6FF);outline-offset:2px}
+.proc-sheet .slicepanel>.row{position:sticky;bottom:0;padding:8px 0;background:color-mix(in srgb,#f7f4ee 94%,#fff)}
+html[data-theme=dark] .proc-sheet .slicepanel>.row{background:color-mix(in srgb,var(--panel) 92%,#0b1a33)}
+@media (max-width:560px){.supgrid,.adhgrid{grid-template-columns:1fr}}
 .cols{margin:16px 0 24px}
 .cols h2{display:flex;align-items:center;gap:8px;font-size:1.05rem;margin:0 0 4px}
 .cols h2 .i{width:18px;height:18px}
