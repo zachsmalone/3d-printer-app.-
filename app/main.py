@@ -95,7 +95,7 @@ except Exception:
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
-MAX_MULTIPART_BODY = 56 * 1024 * 1024
+MAX_MULTIPART_BODY = 560 * 1024 * 1024
 
 
 @app.middleware("http")
@@ -121,7 +121,7 @@ async def limit_json_body(request: Request, call_next):
                 chunks.append(part)
             request._body = b"".join(chunks)
     if ct.startswith("multipart/"):
-        # uploads: the biggest legitimate one is a 50 MB 3D file, so nothing above MAX_MULTIPART_BODY is read; a body with no declared length is refused
+        # uploads: the biggest legitimate one is a 500 MB 3D file, so nothing above MAX_MULTIPART_BODY is read; a body with no declared length is refused
         try:
             n = int(request.headers.get("content-length", "-1"))
         except ValueError:

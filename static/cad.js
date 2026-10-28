@@ -1575,6 +1575,7 @@ function importTitle() {
   return (!S.bid && t && t !== "My design" ? t : "Imported model").slice(0, 60);
 }
 async function importFile(f) {
+  if (f && f.size > 500 * 1024 * 1024) return msg("That file is over 500 MB. Try a smaller one, or simplify it first.");
   let warn = []; $("#cwOpenMenu").hidden = true; $("#cwOpen").setAttribute("aria-expanded", false);
   const ok = await run(async () => {
     const fd = new FormData(); fd.append("file", f); fd.append("title", importTitle());

@@ -23,6 +23,6 @@ https://{$ZEIM_LAN_NAME:192.168.1.50}:8443 {
 	}
 
 	request_body {
-		max_size 55MB
+		max_size 550MiB
 	}
 }

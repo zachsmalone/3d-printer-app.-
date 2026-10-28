@@ -112,6 +112,7 @@ function wire() {
   $("#rzGo").onclick = async () => {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
     if (!f) { out.innerHTML = `<p class="help warn rzNeedFile" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
+    if (f.size > 500 * 1024 * 1024) { out.innerHTML = `<p class="help warn" role="alert">That file is over 500 MB. Try a smaller one, or simplify it first.</p>`; return; }
     const fd = new FormData();
     const v = { printer_id: $("#rzPrinter").value, material: $("#rzMaterial").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,

@@ -29,7 +29,7 @@ _lock = threading.RLock()
 _BASES: dict[str, trimesh.Trimesh] = {}
 _STATES: dict[str, OrderedDict] = {}
 MAX_PREVIEW_FACES = 150_000
-MAX_UPLOAD_EDIT = 50 * 1024 * 1024
+MAX_UPLOAD_EDIT = 500 * 1024 * 1024
 
 
 def is_edit(bid: str) -> bool:

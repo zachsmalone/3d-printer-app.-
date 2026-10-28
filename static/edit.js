@@ -61,7 +61,7 @@ function fromFile(file) {
   if (!file) return;
   E.photoTry = /^image\//.test(file.type) || PHOTO_RE.test(file.name || "");
   if (!E.photoTry && !isModel(file)) return modelMsg("That doesn't look like a 3D model. Choose an .stl, .obj or .3mf file, or start from a photo below.");
-  if (!E.photoTry && file.size > 50 * 1024 * 1024) return modelMsg("That file is over 50 MB. Try a smaller one, or simplify it first.");
+  if (!E.photoTry && file.size > 500 * 1024 * 1024) return modelMsg("That file is over 500 MB. Try a smaller one, or simplify it first.");
   if (!E.photoTry && !file.size) return modelMsg("That file is empty. Choose another .stl, .obj or .3mf file.");
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
@@ -97,7 +97,7 @@ viewEl.addEventListener("drop", e => { if (!e.dataTransfer?.files?.length) retur
 
 /* ---------- several files at once: 'Parts of one print' (one plate) or 'Separate prints' ---------- */
 let multiFiles = [];
-const MULTI_MAX_BYTES = 50 * 2 ** 20, MULTI_TOTAL_BYTES = 55 * 2 ** 20;   // server: 50 MB per file, 56 MB per request
+const MULTI_MAX_BYTES = 500 * 2 ** 20, MULTI_TOTAL_BYTES = 550 * 2 ** 20;   // server: 500 MB per file, 560 MB per request
 function fromFiles(files) {
   files = files.filter(Boolean);
   if (files.length <= 1) return fromFile(files[0]);
@@ -105,8 +105,8 @@ function fromFiles(files) {
   if (bad.length) return modelMsg("When you pick several files, they all need to be 3D models (.stl, .obj or .3mf).");
   if (files.length > 12) return modelMsg("Up to 12 files at a time.");
   const big = files.find(f => f.size > MULTI_MAX_BYTES);
-  if (big) return modelMsg(`${big.name} is over 50 MB. Try a smaller file.`);
-  if (files.reduce((t, f) => t + f.size, 0) > MULTI_TOTAL_BYTES) return modelMsg("Those files are over 55 MB together. Pick fewer files at a time.");
+  if (big) return modelMsg(`${big.name} is over 500 MB. Try a smaller file.`);
+  if (files.reduce((t, f) => t + f.size, 0) > MULTI_TOTAL_BYTES) return modelMsg("Those files are over 550 MB together. Pick fewer files at a time.");
   modelMsg(""); multiFiles = files;
   $("#multiWhich").textContent = `${files.length} files: ${files.map(f => f.name).join(", ")}`;
   $("#multiMsg").textContent = "";

@@ -1,5 +1,5 @@
 """POST /api/repair: upload a broken STL / 3MF / OBJ, get a before/after report and the fixed file in the same format.
-No account (the anonymous cookie session is enough), no paywall. Same 50 MB limit and upload gate as the editor;
+No account (the anonymous cookie session is enough), no paywall. Same 500 MB limit and upload gate as the editor;
 the repair itself runs in core/guard.py's memory-capped child, so a huge file is refused cleanly, never a 500."""
 from __future__ import annotations
 
