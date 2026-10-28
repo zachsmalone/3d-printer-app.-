@@ -356,7 +356,7 @@ Verification (this branch, Python 3.12 venv, Playwright not installed, PrusaSlic
 - The CI file list, which now includes `tests/test_cad_hard_surface.py` — 223 passed, 2 skipped. The skips are `tests/test_app.py` “no slicer” and `tests/test_slice_api.py` “PrusaSlicer not installed”. They were not run and are not counted as passed.
 - Headless Chrome on live `cad.html` (`127.0.0.1:8765`): Exit’s title still says it does not send the model to Showcase, and Exit stayed the hit. A default hinge added two bodies with ids. Knuckles 4 kept Add off and named the reason. Merge said a clearance gap stays open. Fillet at 0 mm stayed off. Measure’s hint names the corner snap and the distance between parallel faces.
 
-Not run: Playwright `tests/ui_*.py`. No drag of a fillet bead on a saved project. No printer. Not deployed. GitHub CI on the PR is the check that still has to go green; this note does not mark that job passed.
+Not run: Playwright `tests/ui_*.py`. No drag of a fillet on a saved project. No printer. Not deployed. GitHub CI `test` on the PR passed (run 40707688283). The two slicer skips in that job are the same environment skips as above. They are not counted as passed.
 
 | ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- |
