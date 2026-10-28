@@ -20,7 +20,7 @@ def test_adult_can_choose_a_valid_free_name_or_gets_a_generated_one():
     assert r.status_code == 400 and "taken" in r.json()["detail"] and c.get("/api/me").json()["signed_up"] is False
 
 
-@pytest.mark.parametrize("bad", ["ab", "a" * 19, "NightmareOpsStudio1", "1abc", "has space", "da-sh", "me@example.com", "ada.smith", "http://x", "a1234567b", "Zeim_team", "admin", "Teacher", "fuck_you", "<script>"])
+@pytest.mark.parametrize("bad", ["ab", "a" * 19, "NightmareOpsStudio1", "1abc", "has space", "da-sh", "me@example.com", "ada.smith", "http://x", "a1234567b", "adminx", "admin", "Teacher", "fuck_you", "<script>"])
 def test_change_refuses_bad_names_with_a_kind_message(bad):
     a = client(ADULT); before = me(a)["username"]
     r = a.put("/api/me/username", json={"username": bad})
@@ -167,6 +167,14 @@ def test_a_refused_username_is_refused_over_the_api_too():
     assert r.status_code == 400
 
 
+
+
+@pytest.mark.parametrize("ok", ["ZeimApp", "ZEIMapp", "zeimapp"])
+def test_zeimapp_is_allowed_but_bare_zeim_and_admin_prefixes_stay_reserved(ok):
+    assert usernames.check_shape(ok) == ok
+    for blocked in ("zeim", "ZEIM", "adminfoo", "adminx"):
+        with pytest.raises(usernames.UsernameError, match="saved for ZEIM"):
+            usernames.check_shape(blocked)
 
 
 def test_max_18_chars_zachs_name_fits_and_case_duplicate_refused():

@@ -48,7 +48,9 @@ def check_shape(name: str) -> str:
         raise UsernameError("Use 3 to 18 letters, numbers or underscores, starting with a letter.")
     if sum(ch.isdigit() for ch in n) >= 7:
         raise UsernameError("Please don't use a phone number as a username.")
-    if n.lower() in RESERVED or any(n.lower().startswith(r) and r in ("admin", "zeim", "staff", "moderator") for r in RESERVED):
+    # Exact reserved words stay blocked (bare "zeim" included). Prefix impersonation
+    # is only admin/staff/moderator — "ZeimApp" starts with "zeim" and must be allowed.
+    if n.lower() in RESERVED or any(n.lower().startswith(r) and r in ("admin", "staff", "moderator") for r in RESERVED):
         raise UsernameError("That name is saved for ZEIM. Please pick another.")
     try:
         safety.filter_only(n, "Username")
