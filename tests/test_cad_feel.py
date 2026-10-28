@@ -12,7 +12,7 @@ def test_cad_feel_js_suite():
     if not shutil.which("node"):
         pytest.skip("node not installed")
     r = subprocess.run(
-        ["node", "--test", str(ROOT / "tests/js/cad-feel.test.mjs")],
+        ["node", "--test", str(ROOT / "tests/js/cad-feel.test.mjs"), str(ROOT / "tests/js/pickgeom.test.mjs")],
         capture_output=True, text=True, timeout=120,
     )
     assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]

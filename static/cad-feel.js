@@ -115,6 +115,63 @@ export function measureBlock({ bodies }) {
   return "";
 }
 
+/* Knuckles, links, and clearance are the values the solid step already accepts. */
+export function jointBlock(state) {
+  const kind = state.kind || "hinge";
+  const clearance = state.clearance;
+  if (typeof clearance !== "number" || !Number.isFinite(clearance) || clearance < 0.15 || clearance > 1) {
+    return "Clearance must be between 0.15 and 1 mm.";
+  }
+  if (kind === "hinge" || kind === "snap_hinge") {
+    const n = state.knuckles;
+    if (typeof n !== "number" || !Number.isFinite(n) || n < 3 || n > 9 || Math.round(n) !== n || n % 2 === 0) {
+      return "Knuckles must be 3, 5, 7, or 9.";
+    }
+  }
+  if (kind === "chain") {
+    const n = state.links;
+    if (typeof n !== "number" || !Number.isFinite(n) || n < 2 || n > 30 || Math.round(n) !== n) {
+      return "A chain needs 2 to 30 links.";
+    }
+  }
+  return "";
+}
+
+export function boxesOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  for (let k = 0; k < 3; k++) {
+    if (a.max[k] + pad < b.min[k] || b.max[k] + pad < a.min[k]) return false;
+  }
+  return true;
+}
+
+export function mergeFeel({ count, snap, overlaps }) {
+  if (!count || count < 2) return "Pick at least two bodies. The first one stays put.";
+  if (snap && snap !== "none") return "The others move to that side of the first and overlap 0.2 mm so they can fuse. A clearance gap is not closed.";
+  if (!overlaps) return "These do not overlap. Fuse keeps them separate and leaves a tip. Snap a side, or move them so they touch.";
+  return "Their boxes overlap. Fuse joins them only where the solids touch. A clearance gap stays open.";
+}
+
+/* Angle between face normals, and the distance between parallel planes. Same plane has no gap. */
+export function facePair(n1, p1, n2, p2) {
+  if (!n1 || !p1 || !n2 || !p2) return null;
+  const dot = n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2];
+  const clamped = Math.max(-1, Math.min(1, dot));
+  const angle = Math.acos(clamped) * 180 / Math.PI;
+  const parallel = Math.abs(dot) >= Math.cos(3 * Math.PI / 180);
+  const gap = Math.abs((p2[0] - p1[0]) * n1[0] + (p2[1] - p1[1]) * n1[1] + (p2[2] - p1[2]) * n1[2]);
+  return { angle, parallel, gap: parallel && gap >= 0.05 ? gap : null };
+}
+
+export function measureLine(dist, delta, pair) {
+  const fmt = (v) => (Math.round(Number(v) * 100) / 100).toString();
+  const d = delta || [0, 0, 0];
+  let text = `${fmt(dist)} mm  (ΔX ${fmt(Math.abs(d[0]))} · ΔY ${fmt(Math.abs(d[1]))} · ΔZ ${fmt(Math.abs(d[2]))})`;
+  if (pair && Number.isFinite(pair.angle)) text += ` · faces ${fmt(pair.angle)}°`;
+  if (pair && pair.gap != null) text += ` · ${fmt(pair.gap)} mm between faces`;
+  return text;
+}
+
 export function barRect(anchor, bar) {
   const gap = bar.gap ?? 18;
   const w = bar.w, h = bar.h;

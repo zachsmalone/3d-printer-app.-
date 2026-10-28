@@ -246,7 +246,9 @@ def op_smart_merge(m, p):
         q = bs[best].copy(); q.apply_translation(-mv); moved.append(q)
     if len(moved) < 2:
         raise OpError("The split pieces have moved since the cut, so they can't be matched. Use Merge with snapping instead.")
-    fused = _fuse(moved)
+    # Keep the first matched piece's id when the pieces become one solid. A new id would
+    # orphan a later step that still names that body.
+    fused = C.tag_result(_fuse(moved), C.body_id_of(moved[0]), C.max_body_id(m))
     rest = [b for k, b in enumerate(bs) if k not in used]
     warns = []
     if len(moved) < len(pieces):

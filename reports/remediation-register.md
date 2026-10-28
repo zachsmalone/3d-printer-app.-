@@ -328,3 +328,38 @@ Verification (this branch, Python 3.12 venv, Playwright not installed, PrusaSlic
 - `node --check` on `static/ai3d.js` and `static/community.js` — syntax ok.
 
 Not run: a browser pass of the Account status line. No printer. Not deployed. GitHub CI on the PR is the check that still has to go green; this note does not mark that job passed. The CI job now includes `tests/test_testing_mode.py`.
+
+## Hard-surface CAD — measure, fillet, joints, merge
+
+Branch `cursor/cad-hard-surface-033f`, off `zeim` @ `da0d2f7` (testing mode #64). No deploy. Exit still leaves the workspace and does not send the model to Showcase. Body ids stay on the faces. Saved steps are the same history.
+
+Already built: print-in-place hinge, snap hinge, ball, pin, and chain; Merge with a side snap; Smart merge along a recorded Smart Split; Measure (an edge, two points, the angle between faces); fillet and chamfer by a mesh opening.
+
+Gaps this change closes:
+
+- A fillet pick that missed the body, or sat 2 mm off the edge, was stored as a success and did not change the solid.
+- A straight edge split into pieces was rounded only on the tapped piece.
+- An inside corner was left sharp under a success message.
+- A round hole rim could not be made into a clean solid. Following the whole curve now refuses, instead of saving a speck.
+- Smart merge gave the joined solid a new id.
+- The scene did not send the body id, so Merge remembered a list slot.
+- Hinge copy said to Join each leaf. Pin copy said the arm needs no supports. A box overlap could be read as “these will fuse,” including a hinge whose solids do not touch.
+
+Shipped: a pick follows the outside edge and stops at a corner. A miss or an inside corner is refused. Measure reads a split straight edge as one length, snaps a nearby corner, and adds the distance between parallel faces. Joint Add stays off for an even knuckle count or a clearance outside 0.15–1 mm. The parts are new, the fit is simulated, and Merge does not close the gap. Merge selects by id. Smart merge keeps one of the split ids when the pieces become one solid.
+
+Not in this change: attaching a hinge to an edge that is already on the model, a precise solid fillet, or a cylinder diameter in Measure.
+
+Verification (this branch, Python 3.12 venv, Playwright not installed, PrusaSlicer not installed, system Chrome present):
+
+- `node --test tests/js/cad-feel.test.mjs tests/js/pickgeom.test.mjs` — 12 passed.
+- `python3 -m pytest -q tests/test_cad_hard_surface.py tests/test_cad_workspace.py tests/test_cad_deferred.py tests/test_cad_feel.py tests/test_b1_6_body_identity.py tests/test_cad_qa_kobi.py::test_b3_fillet_boss_watertight_or_refused tests/test_batch4_tools.py::test_existing_tool_copy_is_honest_in_source -k "not real_browser"` — 45 passed, 1 deselected. The deselected test is the Playwright browser script. It was not run.
+- The CI file list, which now includes `tests/test_cad_hard_surface.py` — 223 passed, 2 skipped. The skips are `tests/test_app.py` “no slicer” and `tests/test_slice_api.py` “PrusaSlicer not installed”. They were not run and are not counted as passed.
+- Headless Chrome on live `cad.html` (`127.0.0.1:8765`): Exit’s title still says it does not send the model to Showcase, and Exit stayed the hit. A default hinge added two bodies with ids. Knuckles 4 kept Add off and named the reason. Merge said a clearance gap stays open. Fillet at 0 mm stayed off. Measure’s hint names the corner snap and the distance between parallel faces.
+
+Not run: Playwright `tests/ui_*.py`. No drag of a fillet bead on a saved project. No printer. Not deployed. GitHub CI on the PR is the check that still has to go green; this note does not mark that job passed.
+
+| ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| CAD-1 | Fillet / chamfer | Verified by mesh tests. Not dragged on a saved body in the page. | A picked edge that missed the solid was still saved. A split straight edge was only partly rounded. A hole rim did not come back as a clean solid. | A maker could think an outside edge was rounded when the mesh had not changed, or when only a short piece had. | This change. The pick follows the outside edge and stops at a corner. A miss, an inside corner, or a curve that is not a clean solid is refused. | `tests/test_cad_hard_surface.py` and the fillet test in `tests/test_cad_workspace.py` passed. | A round hole rim stays sharp. The opening is still an approximate mesh. |
+| CAD-2 | Measure | Verified by the length and face-distance math, and by the hint on the live page. Two points were not clicked on a box in the page. | A split edge reported one piece. A face tap did not snap to a corner. Parallel faces did not show the distance between the planes. | A 40 mm edge made of two pieces could read as 20 mm, and a thickness was only the slant between the taps. | This change. A straight run is one length. A tap within 10 px of a corner or an edge middle uses that point. Parallel faces add the plane distance. | Node tests for the chain and the face pair passed. The page hint was read in Chrome. | A cylinder diameter is not reported. The two-point line is still the tapped points. |
+| CAD-3 | Joints / merge | Verified by the joint solids that already existed, the id tests, and the live hinge and Merge panel. | Copy named a Join step and said the pin needs no supports. Smart merge dropped the body id. Merge remembered a list index, and a box overlap was worded as a weld. | A hinge looked attached, and a later step could lose the body it named. | This change. Copy matches the solids. Add states why it is off. Merge uses the id. Smart merge keeps one split id. The note says a clearance gap stays open. | The deferred joint tests, the new id test, and the Chrome hinge/merge checks passed. | A hinge is still a new pair of parts. It is not built onto an edge you already have. Fit is simulated. |
