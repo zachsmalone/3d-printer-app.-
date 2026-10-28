@@ -45,7 +45,7 @@ docker run -d --name zeim -p 8765:8765 --env-file .env `
 
 Open <http://localhost:8765>. Health check: <http://localhost:8765/healthz> returns 200 when the app is up.
 
-**Testing mode:** add `-e ZEIM_TESTING_MODE=1` to lift usage quotas and cooldowns while testing. It is off by default; do not use it in production.
+**Testing mode:** one line in `.env`, `ZEIM_TESTING_MODE=1`, lifts usage quotas and cooldowns while testing. The examples ship it as `0`. It does not turn off password limits, upload scanning, or payments. `ZEIM_TESTING_ALLOW_PAID=1` also lifts the local 2D→3D daily model cap (GPU time) and still does not charge a card.
 
 ## Site and plans flags
 
@@ -54,6 +54,8 @@ Open <http://localhost:8765>. Health check: <http://localhost:8765/healthz> retu
 | `ZEIM_COMING_SOON` | off (`0` or unset) | `1` serves a short coming-soon page for every path except `/healthz`. Off, a normal visit gets the full app. Caddy uses the same flag (`reports/deploy/caddy-run.sh`). |
 | `ZEIM_PLANS_ENABLED` | off (`0` or unset) | `0` keeps Semi Pro and Pro visible as Coming later and refuses checkout. `1` still does not charge until a processor is wired, and it does not error when Stripe keys are missing. |
 | `ZEIM_2D3D_ENABLED` | off (`0` or unset) | `0` hides the 2D→3D tab and refuses `POST /api/ai3d/jobs` (the TripoSR worker is not called). `1` turns that tab back on. Lithophanes, slicers, CAD and Showcase stay available either way. |
+| `ZEIM_TESTING_MODE` | off (`0`) | `1` lifts usage quotas and cooldowns for this server. Password guesses, sign-in limits, upload scanning, file-size caps, and payments stay on. Not a control in the app. |
+| `ZEIM_TESTING_ALLOW_PAID` | off (`0`) | With testing mode, `1` also lifts the local 2D→3D daily model cap. It does not open Stripe or start a charge. |
 
 Testers use the main site, [https://zeimapp.com](https://zeimapp.com). On GCP **zeim-prod**, set both flags to `0`, deploy `reports/deploy/Caddyfile` (the file that proxies every path to the app), and reload Caddy. Steps are in [`reports/deploy/README.md`](reports/deploy/README.md). Do not put live Stripe keys on the server for this release.
 

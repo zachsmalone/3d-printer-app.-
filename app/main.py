@@ -23,6 +23,9 @@ import logging as _logging
 _log = _logging.getLogger("uvicorn.error")
 if config.MODE == "local" and config.HOST not in config.LOOPBACK_HOSTS:
     _log.warning("PHOTO3D_MODE=local while listening beyond this computer: printer/settings changes are open to everyone who can connect.")
+_testing_notice = config.testing_mode_notice()
+if _testing_notice:
+    _log.warning("%s", _testing_notice)
 
 import re as _re
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
+from .. import config
 from ..community import catalog, collections as cols, privacy, safety
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
@@ -70,7 +71,7 @@ def my_collections(item: str = "", actor: Actor = Depends(get_actor)):
 def new_collection(body: dict, actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
     _member(actor)
-    if not ratelimit.hit("col:" + actor.sid, 60, 3600):
+    if not config.TESTING_MODE and not ratelimit.hit("col:" + actor.sid, 60, 3600):
         raise HTTPException(429, "That's a lot of new collections. Please wait a little.")
     try:
         name = _name(actor, body or {})
@@ -126,7 +127,7 @@ def collection_item(cid: str, body: dict, actor: Actor = Depends(get_actor)):
             raise HTTPException(e.status, e.msg)
         if i.get("owner_sid") != actor.sid or i.get("example"):
             raise HTTPException(403, "You can only add your own Showcase projects to a collection.")
-    if not ratelimit.hit("colitem:" + actor.sid, 600, 3600):
+    if not config.TESTING_MODE and not ratelimit.hit("colitem:" + actor.sid, 600, 3600):
         raise HTTPException(429, "That's a lot of taps. Please wait a little.")
     try:
         c = cols.set_item(actor.sid, cid, iid, on)
