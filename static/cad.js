@@ -8,6 +8,8 @@ import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
 import { bindFlow } from "/static/project-flow.js";
 import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
+import { previewPlacement } from "/static/gizmo-math.js";
+import { createGizmo } from "/static/gizmo-view.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -66,6 +68,8 @@ const S = {
   appearance: {}, section: false, measure: false, measPts: [],
   sk: null,   // sketch session: {plane, entities, constraints, sel:Set, tool, draft, editStep, auto, showCons}
 };
+let gzKind = "move";
+let mdrag = null;
 const msg = (t, ok) => { const m = $("#cwMsg"); m.textContent = t || ""; m.style.color = ok ? "var(--ok)" : ""; };
 const busy = (on, cancel) => {
   const el = $("#cwBusy"); if (!el) return;
@@ -455,8 +459,8 @@ const HINTS = {
   sketch: ["Sketch", "Tap a flat face for a sketch plane, or choose XY / XZ / YZ."], extrude: ["Extrude", "Tap sketch regions to pick them, set the distance, then Apply."],
   revolve: ["Revolve", "Choose the axis and angle, then Apply."], boolean: ["Boolean", "Choose the target and tool bodies."],
   fillet: ["Fillet/Chamfer", "Tap edges to round only those (none = all outside edges)."], shell: ["Shell", "Hollow the model with this wall thickness."],
-  faceoffset: ["Face extrude", "Tap a flat face, then choose outward or inward and a distance."], move: ["Move/Rotate", "Tap a body (or keep All), then enter the move and rotation."],
-  scale: ["Scale", "Uniform or per axis, about the body's centre."], pattern: ["Pattern", "Linear: step between copies. Circular: centre + axis."],
+  faceoffset: ["Face extrude", "Tap a flat face, then choose outward or inward and a distance."],   move: ["Move/Rotate", "Drag a bead on the model, or type a move and a rotation. Turn is about the body's centre."],
+  scale: ["Scale", "Drag a bead, or type a factor. Scale is about the body's centre."], pattern: ["Pattern", "Linear: step between copies. Circular: centre + axis."],
   align: ["Align", "Line up a body's side with a value or another body."], mirror: ["Mirror", "Across X, Y or Z through a point; keep the original for a pair."],
   visualize: ["Visualize", "Pick a colour and finish for each body."],
   joints: ["Hinges/Joints", "Pick a joint and its size, then Add. It lands beside your model as new bodies."],
@@ -626,12 +630,16 @@ const TOOL_PANELS = {
     if (!S.selFace) lockApply("Tap a flat face first");
   },
   move() {
-    panel("Move / Rotate", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${v3("tMv:Move", [0, 0, 0])}${v3("tRo:Rotate°", [0, 0, 0])}<p class="help">Rotation is about the body's centre.</p>`,
+    panel("Move / Rotate", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${v3("tMv:Move", [0, 0, 0])}${v3("tRo:Rotate°", [0, 0, 0])}
+      <div class="f"><span id="tGzLab">Handles on the model</span>${seg("tGz", [["move", "Slide"], ["rotate", "Turn"]], gzKind === "rotate" ? "rotate" : "move")}</div>
+      <p class="help">Drag a bead, or type the numbers. Slide moves one axis. Turn rotates about the body's centre. Both write the same step.</p>`,
       () => addOp("body_transform", { body: +$("#tBody").value, move: vec("tMv"), rotate: vec("tRo") }));
+    $("#tGz")?.addEventListener("change", () => { gzKind = segVal("tGz") === "rotate" ? "rotate" : "move"; });
   },
   scale() {
     panel("Scale", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${seg("tSm", [["u", "Uniform"], ["n", "Per axis"]], "u")}
-      <div class="f" id="tU"><label for="tF">Factor</label>${num("tF", 1.5)}</div><div id="tN" hidden>${v3("tSc:×", [1, 1, 1])}</div>`,
+      <div class="f" id="tU"><label for="tF">Factor</label>${num("tF", 1.5)}</div><div id="tN" hidden>${v3("tSc:×", [1, 1, 1])}</div>
+      <p class="help">Drag a bead on the model, or type a factor. The round bead keeps every side together. A square changes one side. Scale is about the body's centre.</p>`,
       () => { const u = segVal("tSm") === "u", f = val("tF"); addOp("body_transform", { body: +$("#tBody").value, scale: u ? [f, f, f] : vec("tSc") }); });
     $("#tSm").addEventListener("change", () => { const u = segVal("tSm") === "u"; $("#tU").hidden = !u; $("#tN").hidden = u; });
   },
@@ -1532,8 +1540,84 @@ async function ctxRun(c) {
   if (c === "ms") { S.measPts = [e.a, e.b]; status("Edge length", showEdgeLen(e)); drawSelection(); }
 }
 
+/* On-model beads for Move / Rotate and Scale. They post body_transform, the same step as Apply. */
+function cadBodyBox(body) {
+  const id = Number(body);
+  const bs = (S.scene?.bodies || []).filter(b => id < 0 || b.index === id);
+  if (!bs.length) return null;
+  const min = [0, 1, 2].map(k => Math.min(...bs.map(b => b.center[k] - b.size[k] / 2)));
+  const max = [0, 1, 2].map(k => Math.max(...bs.map(b => b.center[k] + b.size[k] / 2)));
+  return { min, max, size: min.map((v, i) => max[i] - v), center: min.map((v, i) => (v + max[i]) / 2) };
+}
+function cadFrame() {
+  if (S.mode !== "model" || (S.tool !== "move" && S.tool !== "scale") || S.measure || mdrag) return null;
+  const bodyEl = $("#tBody");
+  const body = bodyEl ? Number(bodyEl.value) : S.selBody;
+  if (!Number.isFinite(body)) return null;
+  const box = cadBodyBox(body);
+  if (!box) return null;
+  const mode = S.tool === "scale" ? "scale" : (gzKind === "rotate" ? "rotate" : "move");
+  return { mode, surface: "cad", center: box.center, size: box.size, box: { min: box.min, max: box.max }, body };
+}
+function placeCad(obj, place) {
+  obj.position.set(place.position[0], place.position[1], place.position[2]);
+  obj.rotation.set(place.rotation[0] * Math.PI / 180, place.rotation[1] * Math.PI / 180, place.rotation[2] * Math.PI / 180);
+  obj.scale.set(place.scale[0], place.scale[1], place.scale[2]);
+}
+function clearCadPreview() {
+  world.children.forEach(g => { if (g.userData && g.userData.body != null) { g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.scale.set(1, 1, 1); } });
+}
+function previewCad(frame, axis, amount) {
+  const place = previewPlacement(frame.center, frame.mode, axis, amount);
+  world.children.forEach(g => {
+    if (!g.userData || g.userData.body == null) return;
+    if (frame.body >= 0 && g.userData.body !== frame.body) return;
+    placeCad(g, place);
+  });
+}
+function projectCad(pt) {
+  const v = new THREE.Vector3(pt[0], pt[1], pt[2]);
+  v.project(camera);
+  const canvas = renderer.domElement.getBoundingClientRect();
+  const host = stage.getBoundingClientRect();
+  return {
+    x: (v.x * 0.5 + 0.5) * canvas.width + (canvas.left - host.left),
+    y: (-v.y * 0.5 + 0.5) * canvas.height + (canvas.top - host.top),
+    behind: v.z < -1 || v.z > 1,
+  };
+}
+function basisCad(origin) {
+  camera.updateMatrixWorld();
+  const e = camera.matrixWorld.elements;
+  const right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]];
+  const a = projectCad(origin), b = projectCad(origin.map((n, i) => n + right[i]));
+  const px = a && b && !a.behind && !b.behind ? Math.hypot(b.x - a.x, b.y - a.y) : 1;
+  return { right, up, pxPerMm: Math.max(px, 0.05) };
+}
+let cadGizmo = null;
+function ensureCadGizmo() {
+  if (cadGizmo || !stage) return;
+  cadGizmo = createGizmo(stage, {
+    owner: "cad",
+    frame: cadFrame,
+    project: projectCad,
+    basis: basisCad,
+    freeze() { controls.enabled = false; },
+    thaw() { controls.enabled = true; },
+    preview: previewCad,
+    clearPreview: clearCadPreview,
+    apply(spec) {
+      if (!spec || spec.op !== "body_transform" || !S.bid) { clearCadPreview(); return; }
+      run(async () => {
+        await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "body_transform", params: spec.params } });
+        await load(true);
+      }, "That's a step in History. Undo puts it back.").then(ok => { if (!ok) clearCadPreview(); });
+    },
+  });
+}
+ensureCadGizmo();
+
 /* ---------------------------------------------------------------- Merge: drag a body on the bed, snapping to grid + other bodies' sides */
-let mdrag = null;
 const MSNAP = 3, MOVERLAP = 0.2;   // mm: snap distance, and how far a snapped body overlaps so Fuse joins them
 function mergeSnap(b, d) {          // b = scene body, d = [dx, dy] proposed -> snapped [dx, dy] + what it snapped to
   const g = S.snap ? S.grid / 10 : 0, out = d.map(v => g ? Math.round(v / g) * g : v); let hit = null;

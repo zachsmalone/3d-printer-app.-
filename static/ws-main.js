@@ -118,7 +118,9 @@
     if (xform) {
       e.preventDefault();
       document.querySelectorAll("#slicerDock [data-xform]").forEach(function (b) { b.setAttribute("aria-pressed", b === xform ? "true" : "false"); });
-      focusXform(xform.getAttribute("data-xform"));
+      var kind = xform.getAttribute("data-xform");
+      focusXform(kind);
+      document.dispatchEvent(new CustomEvent("zeim:xform", { detail: { kind: kind } }));
       return;
     }
     var tab = e.target.closest && e.target.closest("#slicerDock [data-docktab]");

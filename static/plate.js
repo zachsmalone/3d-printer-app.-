@@ -2,6 +2,8 @@
    drag a selected object to move it. Every change is one server step ("plate" op), so Undo / Redo / the step list work. */
 import * as THREE from "three";
 import { $, $$, esc } from "/static/app.js";
+import { previewPlacement } from "/static/gizmo-math.js";
+import { createGizmo } from "/static/gizmo-view.js";
 
 const PL = { sel: new Set(), ctx: null, bed: null, drag: null, plane: null, gap: 5, rotate: true, copies: 2,
   txt: { open: false, text: "", mode: "emboss", face: "top", height: 8, depth: 1, font: "sans", rotation: 0, offset_u: 0, offset_v: 0 },
@@ -24,7 +26,7 @@ export function renderPlate(ctx) {
   const prevIds = PL.ctx?.p?.id;
   PL.ctx = ctx;
   const p = ctx.p, pl = p.plate;
-  if (!pl) return "";
+  if (!pl) { dropPlateGizmo(); return ""; }
   if (prevIds !== p.id) PL.sel.clear();
   PL.sel = new Set([...PL.sel].filter(i => i < pl.objects.length));
   const act = p.report?.action;
@@ -33,6 +35,7 @@ export function renderPlate(ctx) {
   paint();
   const html = panelHTML();
   setTimeout(drawCutPlane, 0);       // after the panel is in the page
+  ensurePlateGizmo();
   return html;
 }
 
@@ -59,7 +62,7 @@ function panelHTML() {
   }).join("");
   const sz = box ? box.size : [0, 0, 0];
   return `<details class="tool plate" open id="plateTool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-grid></use></svg> Plate (${n} object${n > 1 ? "s" : ""}${pl.visible < n ? `, ${n - pl.visible} hidden` : ""})</summary>
-    <p class="help">Click or tap an object to select it. Shift-click to select more. Drag a selected object to move it on the bed.</p>
+    <p class="help">Click or tap an object to select it. Shift-click to select more. Drag it on the bed, or drag a bead. Move stays on the bed. Rotate turns it flat. Scale changes its size. The numbers below do the same step.</p>
     ${pl.all_hidden ? `<p class="warn" role="alert">Every object is hidden. Show at least one to print.</p>` : ""}
     <ul class="plist" aria-label="Objects on the plate">${list}</ul>
     <div class="tool-row" role="group" aria-label="Whole plate">
@@ -281,6 +284,86 @@ function bedPoint(e, v, plane) {
   return rc.ray.intersectPlane(plane, new THREE.Vector3());
 }
 function resetDragOffsets(v) { v.group.children.forEach(m => m.position.set(0, 0, 0)); }
+
+/* On-model beads. They call the same plate "transform" step as the fields and the bed drag. */
+let xformMode = "move", plateGizmo = null;
+addEventListener("zeim:xform", e => {
+  const k = e.detail && e.detail.kind;
+  if (k === "move" || k === "rotate" || k === "scale") { xformMode = k; }
+});
+function plateFrame() {
+  if (!PL.ctx?.p?.plate || !PL.sel.size || PL.ctx.measuring?.() || !PL.ctx.viewer) return null;
+  const box = selBox();
+  return { mode: xformMode, surface: "plate", center: box.c, size: box.size, box: { min: box.min, max: box.max }, body: null };
+}
+function platePivot(frame, mode) {
+  if (mode === "scale") return [(frame.box.min[0] + frame.box.max[0]) / 2, (frame.box.min[1] + frame.box.max[1]) / 2, frame.box.min[2]];
+  return frame.center;
+}
+function placeObject(m, place) {
+  m.position.set(place.position[0], place.position[1], place.position[2]);
+  m.rotation.set(place.rotation[0] * Math.PI / 180, place.rotation[1] * Math.PI / 180, place.rotation[2] * Math.PI / 180);
+  m.scale.set(place.scale[0], place.scale[1], place.scale[2]);
+}
+function resetPlatePreview() {
+  const v = PL.ctx?.viewer; if (!v) return;
+  v.group.children.forEach(m => { m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1); });
+}
+function previewPlate(frame, axis, amount) {
+  const v = PL.ctx?.viewer; if (!v || !frame) return;
+  const place = previewPlacement(platePivot(frame, frame.mode), frame.mode, axis, amount);
+  v.group.children.forEach((m, k) => {
+    if (!PL.sel.has(m.userData.object ?? k)) { m.position.set(0, 0, 0); m.rotation.set(0, 0, 0); m.scale.set(1, 1, 1); return; }
+    placeObject(m, place);
+  });
+}
+function projectOn(v, pt) {
+  const w = new THREE.Vector3(pt[0], pt[1], pt[2]);
+  w.project(v.camera);
+  const canvas = v.renderer.domElement.getBoundingClientRect();
+  const host = v.el.getBoundingClientRect();
+  return {
+    x: (w.x * 0.5 + 0.5) * canvas.width + (canvas.left - host.left),
+    y: (-w.y * 0.5 + 0.5) * canvas.height + (canvas.top - host.top),
+    behind: w.z < -1 || w.z > 1,
+  };
+}
+function basisOn(v, origin) {
+  v.camera.updateMatrixWorld();
+  const e = v.camera.matrixWorld.elements;
+  const right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]];
+  const a = projectOn(v, origin), b = projectOn(v, origin.map((n, i) => n + right[i]));
+  const px = a && b && !a.behind && !b.behind ? Math.hypot(b.x - a.x, b.y - a.y) : 1;
+  return { right, up, pxPerMm: Math.max(px, 0.05) };
+}
+function ensurePlateGizmo() {
+  const v = PL.ctx?.viewer; if (!v) return;
+  if (plateGizmo) return;
+  plateGizmo = createGizmo(v.el, {
+    owner: "plate",
+    frame: plateFrame,
+    project: pt => projectOn(v, pt),
+    basis: origin => basisOn(v, origin),
+    freeze: () => v.freezeControls?.(),
+    thaw: () => v.unfreezeControls?.(),
+    preview: previewPlate,
+    clearPreview: resetPlatePreview,
+    apply: spec => {
+      if (!spec || spec.op !== "plate") return;
+      const { action, ...rest } = spec.params;
+      Promise.resolve(plateOp(action, rest)).then(() => {
+        const view = PL.ctx?.viewer;
+        if (view && view.group.children.some(m => Math.hypot(m.position.x, m.position.y, m.position.z) > 0.01 || Math.hypot(m.rotation.x, m.rotation.y, m.rotation.z) > 0.001 || Math.hypot(m.scale.x - 1, m.scale.y - 1, m.scale.z - 1) > 0.001)) resetPlatePreview();
+      });
+    },
+  });
+}
+export function dropPlateGizmo() {
+  if (!plateGizmo) return;
+  plateGizmo.destroy();
+  plateGizmo = null;
+  resetPlatePreview();
+}
 
 /* drag a selected object across the bed (plane z=0); one "transform" step on release.
    Capture-phase + stopPropagation so OrbitControls never starts the same gesture; freezeControls so
