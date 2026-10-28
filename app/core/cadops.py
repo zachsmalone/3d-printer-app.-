@@ -12,6 +12,9 @@ Replay resolves the id. A stored id that is not on the mesh is an error — a di
 is not chosen by centre. An older step that stored a list index is rewritten to the id it
 named at that point in the saved history, once, in order. If two bodies share a centre, that
 index is ambiguous and the step fails instead of guessing.
+
+Display colours are stored on that same id. The viewer still receives them under the current
+list number, so the colour stays on that body when a boolean or a repair changes the list.
 """
 from __future__ import annotations
 
@@ -201,17 +204,28 @@ def _group_components(recs):
 
 
 def _host_id(ids, group) -> int | None:
-    vals = ids[group[0][0]]
-    if len(vals) == 0 or (vals <= 0).any():
+    """The single positive id on this body.
+
+    Faces added by a repair (0 or negative) do not count, so a filled hole keeps the body's id.
+    Two different positive ids on one body are left unset: that body is not guessed.
+    """
+    if ids is None:
         return None
-    uniq = {int(x) for x in vals}
-    return uniq.pop() if len(uniq) == 1 else None
+    vals = np.asarray(ids[group[0][0]], np.int64)
+    pos = vals[vals > 0]
+    if len(pos) == 0:
+        return None
+    uniq = np.unique(pos)
+    if len(uniq) != 1:
+        return None
+    return int(uniq[0])
 
 
 def ensure_body_ids(m: trimesh.Trimesh, start: int = 0):
-    """Give every untagged body a new id. Ids already on a body stay. New ids follow face order, not centre.
+    """Give every untagged body a new id. Ids already on a body stay, including on faces a repair just added.
 
     `start` is the highest id already used on an earlier mesh, so a rebuilt result does not reuse it.
+    New ids follow face order, not centre.
     """
     if m is None or len(getattr(m, "faces", [])) == 0:
         return m
@@ -302,6 +316,82 @@ def body_info(m: trimesh.Trimesh) -> list[dict]:
     return out
 
 
+def _appearance_style(v) -> dict | None:
+    if not isinstance(v, dict):
+        return None
+    color = v.get("color")
+    finish = v.get("finish", "satin")
+    if not isinstance(color, str) or not isinstance(finish, str):
+        return None
+    return {"color": color, "finish": finish}
+
+
+def bind_appearance(stored, mesh, *, strict: bool = False) -> dict:
+    """Store colours by body id.
+
+    A list number is the body at that position on `mesh` now. An id that is already stored stays,
+    including when that body is absent, so undo can bring its colour back. With `strict`, a number
+    or id that is not on `mesh` is an error (saving a colour from the viewer).
+    """
+    if not isinstance(stored, dict) or not stored:
+        return {}
+    if mesh is not None and len(getattr(mesh, "faces", [])):
+        ensure_body_ids(mesh)
+    info = body_info(mesh) if mesh is not None else []
+    index_to_id = {str(b["index"]): b["id"] for b in info if b.get("id")}
+    known = {b["id"] for b in info if b.get("id")}
+    if strict:
+        for k in stored:
+            key = str(k)
+            if _BODY_ID.match(key):
+                if key not in known:
+                    raise OpError(f"Body {key} is not in this model.")
+            elif key.isdigit():
+                if str(int(key)) not in index_to_id:
+                    raise OpError(f"There is no Body {int(key) + 1}.")
+            else:
+                raise OpError("Use a body id or a body number.")
+    out = {}
+    for k, v in stored.items():
+        key = str(k)
+        if not _BODY_ID.match(key):
+            continue
+        style = _appearance_style(v)
+        if style:
+            out[key] = style
+    for k, v in stored.items():
+        key = str(k)
+        if not key.isdigit():
+            continue
+        pid = index_to_id.get(str(int(key)))
+        if not pid or pid in out:
+            continue
+        style = _appearance_style(v)
+        if style:
+            out[pid] = style
+    return out
+
+
+def appearance_for_viewer(stored, mesh) -> dict:
+    """Colours keyed by the current list number, for the workspace viewer.
+
+    Stored ids are looked up on `mesh`. A project that still has list-number keys is returned
+    as stored; the next boolean, repair, or save rewrites those keys to ids first.
+    """
+    if not isinstance(stored, dict) or not stored:
+        return {}
+    if not any(_BODY_ID.match(str(k)) for k in stored):
+        return {str(k): v for k, v in stored.items() if isinstance(v, dict)}
+    if mesh is not None and len(getattr(mesh, "faces", [])):
+        ensure_body_ids(mesh)
+    out = {}
+    for b in body_info(mesh) if mesh is not None else []:
+        style = stored.get(b["id"]) if b.get("id") else None
+        if isinstance(style, dict):
+            out[str(b["index"])] = style
+    return out
+
+
 def _broken_ref(ref) -> OpError:
     return OpError(
         f"Body reference {ref} does not match any body. The step was not applied to a different body."
@@ -387,8 +477,9 @@ def preserve_body_ids(before, after):
     """Carry body ids across an operation that built a new mesh.
 
     A fully tagged result is kept. The same faces in the same order keep their ids (a move of the
-    whole mesh). One body in and one body out keeps that id. Anything still untagged gets a new id
-    above every id on the input, so a missing id cannot land on a different body.
+    whole mesh). One body in and one body out keeps that id. A body that already has one id keeps
+    it on faces a repair added. Anything still untagged gets a new id above every id on the input,
+    so a missing id cannot land on a different body.
     """
     if after is None or len(getattr(after, "faces", [])) == 0:
         return after
@@ -660,8 +751,89 @@ def op_revolve(m, p):
     return out, {"message": f"Revolved {ang:g}°."}
 
 
+def _cover(shell, solid) -> float:
+    """Share of `shell` that still sits inside `solid` (1 when the shell is that body)."""
+    if shell is None or solid is None or len(getattr(shell, "vertices", [])) == 0:
+        return 0.0
+    if not getattr(solid, "is_watertight", False):
+        return 0.0
+    pts = np.asarray(shell.vertices, float)
+    if len(pts) > 800:
+        pts = pts[np.linspace(0, len(pts) - 1, 800).astype(int)]
+    centre = np.asarray(shell.bounds.mean(axis=0), float)
+    inward = pts + (centre - pts) * 0.02
+    inward = np.vstack([inward, centre])
+    try:
+        hit = np.asarray(solid.contains(inward), bool)
+    except Exception:
+        return 0.0
+    if len(hit) == 0:
+        return 0.0
+    return float(hit.mean())
+
+
+def _shell_rank(groups, target, tool, tid, uid):
+    """(group index -> id or None). One id is used once; the stronger shell keeps it."""
+    scored = []
+    for n, g in enumerate(groups):
+        shell = g[0][1]
+        ft, fu = _cover(shell, target), _cover(shell, tool)
+        vol = abs(float(shell.volume)) if shell.is_watertight else float(shell.area)
+        order = int(np.min(g[0][0])) if len(g[0][0]) else n
+        if ft >= 0.75 and ft >= fu:
+            scored.append((int(tid), ft, vol, order))
+        elif fu >= 0.75 and fu > ft:
+            scored.append((int(uid), fu, vol, order))
+        else:
+            scored.append((None, 0.0, vol, order))
+    chosen = {}
+    used = set()
+    rank = sorted(
+        range(len(scored)),
+        key=lambda i: (scored[i][0] is None, -scored[i][1], -scored[i][2], scored[i][3]),
+    )
+    for i in rank:
+        hid = scored[i][0]
+        if hid is None or hid in used:
+            chosen[i] = None
+            continue
+        used.add(hid)
+        chosen[i] = hid
+    return chosen
+
+
+def keep_boolean_ids(res, target, tool, tid, uid, start: int = 0):
+    """Ids on a boolean result.
+
+    One resulting body keeps the target id. When the bodies stay separate, a shell that is still
+    the target or the tool keeps that id. Anything else receives a new id past `start`.
+    """
+    if res is None or len(getattr(res, "faces", [])) == 0:
+        return res
+    recs = _component_faces(res)
+    if not recs:
+        return tag_result(res, tid, start)
+    groups = _group_components(recs)
+    if len(groups) == 1:
+        return _stamp(res, int(tid))
+    chosen = _shell_rank(groups, target, tool, tid, uid)
+    ids = np.zeros(len(res.faces), np.int64)
+    for i, g in enumerate(groups):
+        hid = chosen.get(i)
+        if not hid:
+            continue
+        for fi, _sub in g:
+            ids[fi] = hid
+    res.face_attributes[BODY_ATTR] = ids
+    return ensure_body_ids(res, start=max(int(start), int(tid or 0), int(uid or 0)))
+
+
 def op_body_boolean(m, p):
-    """Union / subtract / intersect two bodies (target keeps; tool is consumed)."""
+    """Union / subtract / intersect two bodies.
+
+    One resulting solid keeps the target id. Shells that are still the target or the tool keep
+    those ids, so a later step finds the same body. Other bodies are left as they are.
+    """
     kind = p.get("kind", "union")
     if kind not in ("union", "subtract", "intersect"):
         raise OpError("kind must be union | subtract | intersect")
@@ -677,7 +849,7 @@ def op_body_boolean(m, p):
     rest = [x for x in bs if body_id_of(x) not in (tid, uid)]
     res = _from_manifold(r) if not r.is_empty() else None
     if res is not None:
-        res = tag_result(res, tid, max_body_id(m))
+        res = keep_boolean_ids(res, target, tool, tid, uid, max_body_id(m))
     out = None
     for x in rest + ([res] if res is not None else []):
         out = _join(out, x)

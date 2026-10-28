@@ -494,6 +494,8 @@ def add_op(bid: str, op: str, params: dict) -> dict:
     with _lock:
         meta = _migrate_body_refs(bid, store.get(bid))
         cur = mesh_at(bid, meta)
+        if meta.get("appearance"):
+            meta["appearance"] = cadops.bind_appearance(meta["appearance"], cur)
         params, _ = cadops.bind_legacy_body_refs(cur, op, params)
         if op == "plate":                                 # the server's own layout + bed, never the client's
             params = {**params, "layout": layout_at(meta, cur)}
@@ -537,6 +539,8 @@ def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
             raise meshedit.OpError("no such step")
         if any(o["op"] == "plate" for o in ops[i - 1:]):
             raise meshedit.OpError("Steps from the plate editor (arrange/merge/etc.) and the steps before them can't be edited or deleted; undo to before them first.")
+        if meta.get("appearance"):
+            meta["appearance"] = cadops.bind_appearance(meta["appearance"], mesh_at(bid, meta))
         new_ops = ops[:i - 1] + ([new_op] if new_op else []) + ops[i:]
         m = mesh_at(bid, meta, head=i - 1)
         for k, o in enumerate(new_ops[i - 1:], start=i):
