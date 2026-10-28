@@ -43,6 +43,9 @@ RUN pip install -r requirements.txt -c constraints.txt
 COPY app ./app
 COPY static ./static
 COPY data ./data
+# Photo prep is imported at process start (app/core/ai3d_prep.py), even when ZEIM_2D3D_ENABLED=0.
+# Only this file. The TripoSR worker, weights, and torch stay in the separate workers/ai3d image.
+COPY workers/ai3d/prep.py ./workers/ai3d/prep.py
 
 # State lives OUTSIDE the image. config.py reads PHOTO3D_DATA / PHOTO3D_OUT.
 ENV PHOTO3D_DATA=/data \
