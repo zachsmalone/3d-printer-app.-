@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
+import { guardNewBuild } from "/static/workspace-bar.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate } from "/static/plate.js";
 import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
@@ -576,7 +577,7 @@ function renderTools() {
       <tr><td>Pieces</td><td>${a.components ?? "n/a"}</td></tr><tr><td>Bounds min</td><td>${a.min_mm.map(fmt).join(", ")}</td></tr><tr><td>Bounds max</td><td>${a.max_mm.map(fmt).join(", ")}</td></tr><tr><td>Centre of mass</td><td>${a.center_of_mass_mm.map(fmt).join(", ")}</td></tr></table></details>
   </div>`;
   const plateHTML = renderPlate({ p: E.p, viewer, doOp, measuring: () => E.measure });
-  $("#editPanel").innerHTML = unitSel + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px">＋ Open another model</button>`;
+  $("#editPanel").innerHTML = unitSel + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px" title="New build: save or ask before the screen clears. This does not send the model to Showcase.">New build</button>`;
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
   syncSmartSplit();
@@ -605,7 +606,23 @@ $("#editPanel").addEventListener("click", e => {
   if (ori) { e.preventDefault(); return doOp(ori.dataset.orient, {}).then(() => { const r = E.p?.report || {}; $$("[data-orient-out]").forEach(x => x.textContent = r.message || (ori.dataset.orient === "lay_flat" ? "Laid flat." : "Turned to the best position.")); }); }
   const rot = e.target.closest("[data-rot]"); if (rot) { e.preventDefault(); return doOp("rotate", { rx: 0, ry: 0, rz: 0, [rot.dataset.rot]: 90 }); }
   if (e.target.id === "toggleMeasure") toggleMeasure();
-  if (e.target.id === "editClose") { E.p = null; $("#editStart").hidden = false; $("#editPanel").hidden = true; $("#editResult").hidden = true; $("#editVtools").hidden = true; $("#editEmpty").hidden = false; viewer?.group.clear(); clearGhost(); clearFaceMark(); fillBuildSelect(); }
+  if (e.target.id === "editClose") { guardNewBuild("slicer"); }
+});
+function clearSlicerWork() {
+  E.p = null;
+  $("#editStart").hidden = false;
+  $("#editPanel").hidden = true;
+  $("#editResult").hidden = true;
+  $("#editVtools").hidden = true;
+  $("#editEmpty").hidden = false;
+  viewer?.group.clear();
+  clearGhost();
+  clearFaceMark();
+  fillBuildSelect();
+}
+document.addEventListener("zeim:new-build", e => {
+  if (!e.detail || e.detail.section !== "slicer" || e.detail.publish) return;
+  clearSlicerWork();
 });
 $("#editPanel").addEventListener("input", e => {
   const f = e.target.form; if (!f) return;

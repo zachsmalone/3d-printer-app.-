@@ -5,7 +5,7 @@ import { api, toast, loadHistory, $, esc } from "/static/app.js";
 import { Viewer } from "/static/viewer.js";
 import { open as openExport } from "/static/exportpick.js";
 
-let file = null, viewer = null, status = null, timer = null, poll = null, coolNoteOff = false;
+let file = null, viewer = null, status = null, timer = null, poll = null, coolNoteOff = false, jobGen = 0;
 try { coolNoteOff = sessionStorage.getItem("zeim.ai3d.coolnote") === "off"; } catch { }
 const ico = id => `<svg class="i" aria-hidden="true" focusable="false"><use href="#i-${id}"/></svg>`;
 const mmss = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -51,7 +51,7 @@ function paintPlan() {
 }
 
 function paintClosed() {
-  const nav = document.querySelector('[data-view="ai3d"]');
+  const nav = document.querySelector('#mainNav [data-view="ai3d"]');
   if (nav) { nav.hidden = true; nav.disabled = true; }
   const grid = document.querySelector("#viewAi3d .a3grid");
   if (grid) grid.hidden = true;
@@ -93,8 +93,28 @@ function showResult(r) {
   $("#a3Export").onclick = () => openExport({ ws: "ai3d", bid: r.id });
 }
 
+function clearAi3dWork() {
+  jobGen += 1;
+  if (poll) { clearInterval(poll); poll = null; }
+  file = null;
+  const inp = $("#a3File"); if (inp) inp.value = "";
+  const img = $("#a3Img"); if (img) { img.hidden = true; img.removeAttribute("src"); }
+  const drop = $("#a3DropTxt"); if (drop) drop.hidden = false;
+  const res = $("#a3Res"); if (res) { res.hidden = true; res.innerHTML = ""; }
+  const empty = $("#a3Empty"); if (empty) empty.hidden = false;
+  const st = $("#a3Status"); if (st) st.innerHTML = "";
+  const ack = $("#a3Ack"); if (ack) ack.checked = false;
+  if (viewer && viewer.group) viewer.group.clear();
+  ready();
+}
+document.addEventListener("zeim:new-build", e => {
+  if (!e.detail || e.detail.section !== "ai3d" || e.detail.publish) return;
+  clearAi3dWork();
+});
+
 async function go() {
   if (!status || status.enabled === false) return;
+  const gen = ++jobGen;
   const fd = new FormData();
   fd.append("file", file); fd.append("mode", mode()); fd.append("photo_ack", $("#a3Ack").checked ? "true" : "false");
   fd.append("title", ($("#a3Title").value.trim() || $("#a3Title").placeholder));   // what the field shows is what gets saved if ($("#a3H").value) fd.append("height_mm", $("#a3H").value);
@@ -104,14 +124,17 @@ async function go() {
   try { j = await api("/api/ai3d/jobs", { method: "POST", body: fd }); }
   catch (e) { st.innerHTML = `<p class="a3err" role="alert">${ico("alert")} ${esc(e.message)}</p>`; refresh(); return; }
   st.innerHTML = `<p class="a3busy"><span class="a3spin" aria-hidden="true"></span> Making your model… <span id="a3El">0:00</span></p><p class="help">You can keep using ZEIM; this tab will show the model when it is done.</p>`;
-  poll = setInterval(async () => {
+  const watch = setInterval(async () => {
+    if (gen !== jobGen) { clearInterval(watch); if (poll === watch) poll = null; return; }
     let s; try { s = await api("/api/ai3d/jobs/" + j.job); } catch (e) { return; }
+    if (gen !== jobGen) { clearInterval(watch); if (poll === watch) poll = null; return; }
     const el = $("#a3El"); if (el) el.textContent = mmss(s.elapsed_s || 0);
     if (s.state === "running") return;
-    clearInterval(poll); poll = null;
+    clearInterval(watch); if (poll === watch) poll = null;
     if (s.state === "done") { st.innerHTML = ""; showResult(s.result); toast("Your model is ready", "ok"); loadHistory?.(); if (s.plan) { status.plan = s.plan; paintPlan(); } }
     else { st.innerHTML = `<p class="a3err" role="alert">${ico("alert")} ${esc(s.error || "That did not work.")} Your photo is still here, so you can try again.</p>`; refresh(); }
   }, 1500);
+  poll = watch;
 }
 
 $("#a3File").onchange = e => { const f = e.target.files?.[0]; if (f) { delete $("#a3Title").dataset.sample; $("#a3Title").placeholder = mode() === "bust" ? "My bust" : "My figure"; setFile(f); } };

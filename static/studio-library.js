@@ -81,14 +81,22 @@ export function readBack(storage, now) {
   return info;
 }
 
-/* Once the library is on screen, drop only a My Studio return marker. Other keys stay. */
+function studioMark(info, now) {
+  if (!info || info.from !== "mystudio" || info.url !== LIBRARY_URL) return null;
+  if (typeof info.t === "number" && (now == null ? Date.now() : now) - info.t > BACK_MS) return null;
+  return info;
+}
+
+/* Once the library is on screen, drop a My Studio return marker.
+   A section hand-off may keep that return nested on zeim.back. Other keys stay. */
 export function arriveLibrary(storage, now) {
   const before = dump(storage);
   const info = readBack(storage, now);
-  if (info && info.from === "mystudio" && storage && typeof storage.removeItem === "function") {
+  const mine = !!(studioMark(info, now) || (info && studioMark(info.studio, now)));
+  if (mine && storage && typeof storage.removeItem === "function") {
     try { storage.removeItem(BACK_KEY); } catch (e) { /* leave the marker if storage refuses */ }
   }
-  return { cleared: info && info.from === "mystudio", changed: changedKeys(before, dump(storage)) };
+  return { cleared: mine, changed: changedKeys(before, dump(storage)) };
 }
 
 function marker() {
@@ -133,8 +141,10 @@ export function openFromLibrary(build, action, storage) {
 
 export function exitTarget(storage, now) {
   const info = readBack(storage, now);
-  if (!info || info.from !== "mystudio" || info.url !== LIBRARY_URL) return null;
-  return info.url;
+  const top = studioMark(info, now);
+  if (top) return top.url;
+  const nested = info && studioMark(info.studio, now);
+  return nested ? nested.url : null;
 }
 
 export function takeExit(storage, now) {

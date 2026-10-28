@@ -1,0 +1,55 @@
+/* Exit, Done, New build, and Return to My Studio outside CAD.
+   Showcase publishing is never a side effect of these actions.
+   The library URL matches studio-library.js. #showcase is the app home, not a publish. */
+export const LIBRARY_URL = "/#account/studio";
+export const SHOWCASE_BROWSE = "#showcase";
+
+const ACTIONS = ["exit", "done", "return-studio"];
+
+export function isPublishUrl(url) {
+  return /(?:^|[?&#])publish(?:=|&|#|$)/.test(String(url || ""));
+}
+
+export function leavePlan(action, state) {
+  const fromStudio = !!(state && state.fromStudio);
+  const libraryUrl = (state && state.libraryUrl) || LIBRARY_URL;
+  const save = true;
+  const publish = false;
+  const clear = false;
+  switch (action) {
+    case "exit":
+      return { action, publish, clear, save, navigate: true, url: fromStudio ? libraryUrl : SHOWCASE_BROWSE };
+    case "done":
+      return { action, publish, clear, save, navigate: fromStudio, url: fromStudio ? libraryUrl : null };
+    case "return-studio":
+      return { action, publish, clear, save, navigate: true, url: libraryUrl };
+    default: {
+      const unknown = action;
+      return { action: unknown, publish: false, clear: false, save: false, navigate: false, url: null };
+    }
+  }
+}
+
+/* New build stays on the workspace. A stored draft can clear. Unsaved or not-yet-stored work asks first. */
+export function newBuildPlan(state) {
+  const dirty = !!(state && state.dirty);
+  const saveOk = !!(state && state.saveOk);
+  const unstored = !!(state && state.unstored);
+  const confirmed = !!(state && state.confirmed);
+  const base = { action: "new-build", publish: false, navigate: false, url: null, save: dirty };
+  if (dirty && !saveOk && !confirmed) return { ...base, clear: false, ask: true, reason: "unsaved" };
+  if (unstored && !confirmed) return { ...base, clear: false, ask: true, reason: "unstored" };
+  return { ...base, clear: true, ask: false, reason: "ready" };
+}
+
+export function plansNeverPublish(action, state) {
+  if (ACTIONS.includes(action)) {
+    const plan = leavePlan(action, state);
+    return plan.publish === false && !isPublishUrl(plan.url);
+  }
+  if (action === "new-build") {
+    const plan = newBuildPlan(state);
+    return plan.publish === false && plan.navigate === false && !isPublishUrl(plan.url);
+  }
+  return false;
+}

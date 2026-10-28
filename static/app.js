@@ -414,6 +414,25 @@ function mbShowSides() {
     else { delete img.dataset.url; img.removeAttribute("src"); img.alt = ""; }
   });
 }
+/* New build clears the photo screen. The saved build stays in My Studio. This does not publish. */
+function clearLithoWork() {
+  if (S.building) return;
+  clearFile();
+  S.current = null;
+  mbSlots.fill(null);
+  mbShowSides();
+  const mb = $("#mbFiles"); if (mb) mb.value = "";
+  $("#result").hidden = true;
+  $("#vtools").hidden = true;
+  $("#viewerEmpty").hidden = false;
+  $("#buildWarn").hidden = true;
+  if (viewer && viewer.group) viewer.group.clear();
+  $("#viewer").setAttribute("aria-label", "3D preview of your model. Use the Turn left, Turn right and Reset view buttons to look around it.");
+}
+document.addEventListener("zeim:new-build", e => {
+  if (!e.detail || e.detail.section !== "lithophane" || e.detail.publish) return;
+  clearLithoWork();
+});
 $("#mbFiles").addEventListener("change", () => {
   const fs = [...$("#mbFiles").files].slice(0, 4); mbSlots.fill(null); fs.forEach((f, i) => { mbSlots[i] = f; }); mbShowSides();
 });
