@@ -85,15 +85,21 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
         thumb = ("<details class=mature-share><summary class=btn><b>Mature content</b> - Are you sure? This may contain nudity. "
                  "Show it</summary>" + (thumb.replace("alt=''", "alt='Preview picture (mature content)'") if thumb else "") + "</details>")
     ex = "<p class=pill>EXAMPLE seed data - not a real creator project</p>" if i.get("example") else ""
-    files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
     _pub = catalog.public(i, actor)
     eng = f" · {_pub['likes']} {'nozzle' if _pub['likes'] == 1 else 'nozzles'} · ⬇ {_pub['downloads']}" if _pub["likes"] is not None else ""
     cl = credits.credit_line(i)
     credit = (f"<p class=credit>Credit: <b>{escape(cl['creator'])}</b>" + (f" · Licence: {_lic(cl['licence'], cl['licence_url'])}" if cl["licence"] else "") + " · <a href='/credits'>Thank you &amp; credits</a></p>") if cl else ""
     off = "<p class=help>Remixes off</p>" if not catalog.allows_remixes(i) else ""
-    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{off}{thumb}"
+    posted = (f"<p class=help>First posted on {escape(_pub['first_posted'])}</p>"
+              if _pub.get("first_posted") and not i.get("example") else "")
+    if _pub["download_blocked"]:
+        files_block = "<h3>Downloads</h3><p class=help>View only: the maker turned off downloads.</p>"
+    else:
+        files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
+        files_block = f"<h3>Free downloads</h3>{('<ul>' + files + '</ul>') if files else '<p class=help>No model yet.</p>'}"
+    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{off}{posted}{thumb}"
             f"<p>{escape(i['description'])}</p><p>{' '.join('<span class=pill>' + escape(t) + '</span>' for t in i['tags'])}</p>"
-            f"<h3>Free downloads</h3>{('<ul>' + files + '</ul>') if files else '<p class=help>No model yet.</p>'}")
+            f"{files_block}")
     return _page(i["title"], body, i["description"])
 
 

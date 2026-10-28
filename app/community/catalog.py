@@ -522,9 +522,11 @@ def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -
     if level != "private" and config.DUPLICATE_CHECK and actor.user:
         from . import protect
         fp = protect.FINGERPRINTS.read().get(item_id, {}).get("fp")
-        match = protect.find_match(fp, actor.user["id"], remix_of or mine.get("remix_of", ""), exclude=item_id)
-        if match:
-            c = protect.share_conflict(match)
+        rev = protect.review_upload(fp, actor=actor, creator_id=actor.user["id"],
+                                    remix_of=remix_of or mine.get("remix_of", ""),
+                                    source_model_id=str(mine.get("source_model_id") or ""), exclude=item_id)
+        if rev["match"]:
+            c = protect.share_conflict(rev["match"])
             raise Denied(409, c["message"], c)
     found = {}
 
@@ -624,16 +626,23 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
         ps.apply_to_listing(item, print_settings)
     if remix_of:
         item["remix_of"] = remix_of
-    # re-upload protection: fingerprint the geometry. Sharing (followers / public) a near-match of ANOTHER maker's
-    # visible project is not allowed as-is: remixable originals get a credited-remix offer, remix-off ones a refusal.
-    # Keeping it Private is always fine (it is also kept in the maker's Studio library either way).
+    # re-upload protection: fingerprint the geometry, and read a hidden owner tag if this build imported a
+    # downloaded 3MF. Sharing (followers / public) a near-match of ANOTHER maker's visible project is not
+    # allowed as-is: remixable originals get a credited-remix offer, remix-off ones a refusal. Keeping it
+    # Private is always fine (it is also kept in the maker's Studio library either way).
     from . import fingerprint, protect
     fpr = fingerprint.safe_compute(d / f"{slug}.stl")
-    match = protect.find_match(fpr, actor.user["id"], remix_of) if config.DUPLICATE_CHECK else None
+    rev = protect.review_upload(fpr, actor=actor, creator_id=actor.user["id"], remix_of=remix_of,
+                                build_id=build_id) if config.DUPLICATE_CHECK else None
+    match = rev["match"] if rev else None
+    if rev and rev["source_model_id"]:
+        item["source_model_id"] = rev["source_model_id"]
     warnings = []
     mine_hit = protect.own_match(fpr, actor.user["id"]) if fpr else None
     if mine_hit:
         warnings.append(f"This looks like your project \"{mine_hit['title'][:60]}\". It was posted anyway.")
+    elif rev and rev["own"]:
+        warnings.append(f"This file still carries your project \"{rev['own']['title'][:60]}\". It was posted anyway.")
     if match and visibility != "private":
         shutil.rmtree(d, ignore_errors=True)
         from ..services.history import store as _bs0

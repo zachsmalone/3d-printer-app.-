@@ -137,6 +137,25 @@ def test_downloaded_3mf_carries_owner_tag_and_first_posted():
     trimesh.load(io.BytesIO(r.content), file_type="3mf")      # still a valid 3MF
 
 
+def test_read_owner_tag_roundtrip_and_ignores_junk():
+    raw = trimesh.creation.box().export(file_type="3mf")
+    tagged = protect.tag_3mf(raw, {"Title": "T", "zeim:ModelId": "abc123def0"})
+    assert protect.read_owner_tag(tagged)["model_id"] == "abc123def0"
+    assert protect.read_owner_tag(b"garbage") is None
+    assert protect.read_owner_tag(raw) is None
+
+
+def test_share_page_hides_view_only_downloads_and_shows_first_posted():
+    a, b = U("PageA"), U("PageB")
+    src = pub(a, "Look", view_only="yes").json()
+    day = src["created"][:10]
+    other = b.get(src["share_url"]).text
+    assert "View only" in other and "First posted on " + day in other
+    assert f"/api/showcase/{src['id']}/files/" not in other
+    owner = a.get(src["share_url"]).text
+    assert f"/api/showcase/{src['id']}/files/" in owner and "First posted on " + day in owner
+
+
 def test_tag_3mf_is_idempotent_and_safe():
     m = {"Title": "T", "zeim:ModelId": "abc"}
     raw = trimesh.creation.box().export(file_type="3mf")

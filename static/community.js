@@ -602,7 +602,7 @@ async function openItem(id) {
     ${i.first_posted && !i.example ? `<p class="help first-posted">First posted on ${esc(new Date(i.first_posted + "T12:00:00Z").toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</p>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itViewOnly">Downloads</label><select id="itViewOnly"><option value="no" ${i.view_only ? "" : "selected"}>Anyone who can see it may download it</option><option value="yes" ${i.view_only ? "selected" : ""}>View only, no download</option></select></div>` : ""}
     ${i.owned && !i.original && !i.example ? `<div class="itcols" id="itCols" data-iid="${i.id}"></div>` : ""}
-    ${i.owned && !i.original && !i.example ? `<div class="field"><label for="itTip">Tip link <em>optional</em></label><div class="row"><input id="itTip" type="url" maxlength="300" placeholder="https://…" value="${esc(i.tip_url || "")}"><button type="button" class="btn small ghost" id="itTipSave">Save</button></div><small class="help">One https link. Leave it empty to remove it.</small></div>` : ""}
+    ${i.owned && !i.original && !i.example ? `<div class="field"><label for="itTip">Tip link <em>optional</em></label><div class="row"><input id="itTip" type="url" maxlength="300" placeholder="https://…" value="${esc(i.tip_url || "")}"><button type="button" class="btn small ghost" id="itTipSave">Save</button></div><small class="help">One https link. Leave it empty to remove it. ZEIM never takes a cut of tips or of sales you make from that link. Showcase downloads stay free.</small></div>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itRemixSw">Allow remixes</label><select id="itRemixSw"><option value="yes" ${i.allow_remixes ? "selected" : ""}>Yes</option><option value="no" ${i.allow_remixes ? "" : "selected"}>No</option></select><small class="help">Remixes already posted keep their credit either way.</small></div>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "Private — only me", followers: "Followers only", public: "Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
@@ -617,6 +617,7 @@ async function openItem(id) {
       <ul class="reup-list" id="itCopyList"></ul>
       <div class="field"><label for="itCopyUrl">Link to the copy</label><input id="itCopyUrl" maxlength="200" placeholder="https://…/p/abc123"></div>
       <button type="button" class="btn" id="itCopySend">Send to moderators</button></div>` : ""}
+    ${i.example || i.owned || i.original ? "" : `<div class="field"><label for="itStolenUrl">Link to the original <em>optional</em></label><input id="itStolenUrl" maxlength="200" placeholder="https://…/p/… or a page on another site"><small class="help">Leave this empty and ZEIM looks for an earlier matching shape.</small></div>` : ""}
     ${!i.example && !i.allow_remixes ? `<p class="help remix-off" id="itRemixOff"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Remixes off${i.owned ? "" : `: ${esc(i.remix_off_reason)}`}</p>` : !i.example && !i.owned && !i.can_remix ? `<p class="help" id="itRemixWhy">Remix is off: ${esc(i.remix_off_reason)}</p>` : ""}
     <div id="itWill" aria-live="polite"></div>
     <p class="help">Nozzles and downloads are counted once per person and only for public projects. Projects by makers you follow show up in the Following tab.</p>
@@ -708,7 +709,8 @@ async function openItem(id) {
   if ($("#itViewOnly")) $("#itViewOnly").onchange = async e => { try { await api(`/api/showcase/${id}/download`, J("PUT", { view_only: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Now view only: nobody else can download it" : "Downloads turned on", "ok"); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itStolen")) $("#itStolen").onclick = async () => {
     const b = $("#itStolen"); b.disabled = true;
-    try { const r = await api(`/api/showcase/${id}/report-stolen`, J("POST", {}));
+    try { const original_url = ($("#itStolenUrl")?.value || "").trim();
+      const r = await api(`/api/showcase/${id}/report-stolen`, J("POST", original_url ? { original_url } : {}));
       b.textContent = "Reported"; toast(r.message, "ok");
       b.insertAdjacentHTML("afterend", `<p class="help">Sent to the moderators${r.original_url ? `, with a link to <a href="${esc(r.original_url)}">the original</a>` : ""}. Rights holders can also send a <a href="${esc(r.dmca_url)}" target="_blank" rel="noopener">formal takedown notice</a>.</p>`);
     } catch (e) { b.disabled = false; toast(e.message, "err"); }
@@ -1210,7 +1212,7 @@ async function openChallenge(cid) {
   $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
     <p>${esc(c.blurb)}</p>
     <ul class="help chrules">${rules}</ul>
-    <p class="help">ZEIM takes no cut of tips. Tip links stay optional with no nags.</p>
+    <p class="help">ZEIM never takes a cut of tips or of sales a maker makes from their own link. Tip links stay optional with no nags. Showcase downloads stay free.</p>
     ${c.can_enter ? `<div class="field"><label for="chEnterId">Your remix project id or /p/… link</label><input id="chEnterId" maxlength="200" placeholder="abc123 or https://…/p/abc123"></div>
       <button type="button" class="btn primary" id="chEnterGo">Enter my remix</button>` : ""}
     <h4>Entries</h4><ul class="plist" id="chEntries">${entries}</ul>`;

@@ -245,6 +245,95 @@ def test_owner_report_a_copy_and_admin_review_list(monkeypatch, tmp_path):
     assert c.get(f"/api/showcase/{cp['id']}").status_code == 200        # never auto-hidden
 
 
+def _download_3mf(c, item):
+    seen = c.get(f"/api/showcase/{item['id']}").json()
+    f3 = next(f for f in seen["files"] if f["name"].endswith(".3mf"))
+    r = c.get(f3["url"])
+    assert r.status_code == 200, r.text
+    return r.content
+
+
+def _plant(bid, blob):
+    from app.services.history import store
+    p = store.dir(bid) / "original.3mf"
+    p.write_bytes(blob)
+
+
+def _no_shape(monkeypatch):
+    """Shape check misses. The owner tag is the only signal."""
+    monkeypatch.setattr(fp, "safe_compute", lambda p: None)
+
+
+def test_owner_tag_blocks_reupload_when_the_shape_check_misses(monkeypatch):
+    a, b = U("TagA"), U("TagB")
+    src = pub(a, "Keep off", allow_remixes=False).json()
+    blob = _download_3mf(a, src)
+    _no_shape(monkeypatch)
+    assert pub(b, "Different shape").status_code == 200
+    bid = photo_build(b)
+    _plant(bid, blob)
+    r = pub(b, "Stolen file", build=bid)
+    assert r.status_code == 409, r.text
+    j = r.json()
+    assert j["code"] == "copy_refused" and j["original"]["id"] == src["id"]
+    assert not any(x["title"] == "Stolen file" for x in LISTINGS.read())
+
+
+def test_owner_tag_on_a_remixable_model_offers_credit(monkeypatch):
+    a, b = U("TagOpen"), U("TagTake")
+    src = pub(a, "Open").json()
+    blob = _download_3mf(a, src)
+    _no_shape(monkeypatch)
+    bid = photo_build(b)
+    _plant(bid, blob)
+    r = pub(b, "No credit", build=bid)
+    assert r.status_code == 409 and r.json()["code"] == "remix_offer"
+    ok = pub(b, "Credited", build=bid, remix_of=src["id"])
+    assert ok.status_code == 200, ok.text
+    assert b.get(f"/api/showcase/{ok.json()['id']}").json()["remix_chain"][0]["id"] == src["id"]
+
+
+def test_owner_tag_of_a_private_project_is_not_revealed(monkeypatch):
+    a, b = U("TagPriv"), U("TagStranger")
+    src = pub(a, "Secret title", visibility="private", allow_remixes=False).json()
+    raw = trimesh.creation.box().export(file_type="3mf")
+    blob = protect.tag_3mf(raw, {"Title": "T", "zeim:ModelId": src["id"]})
+    _no_shape(monkeypatch)
+    bid = photo_build(b)
+    _plant(bid, blob)
+    r = pub(b, "Public anyway", build=bid)
+    assert r.status_code == 200, r.text
+    assert "Secret title" not in r.text
+
+
+def test_own_tagged_file_passes_with_a_warning(monkeypatch):
+    a = U("TagSelf")
+    src = pub(a, "Mine first").json()
+    blob = _download_3mf(a, src)
+    _no_shape(monkeypatch)
+    bid = photo_build(a)
+    _plant(bid, blob)
+    r = pub(a, "Mine again", build=bid)
+    assert r.status_code == 200, r.text
+    assert r.json()["warnings"] and "your project" in r.json()["warnings"][0]
+
+
+def test_private_keep_of_a_tagged_file_cannot_be_flipped_public(monkeypatch):
+    a, b = U("TagKeepA"), U("TagKeepB")
+    src = pub(a, "Locked", allow_remixes=False).json()
+    blob = _download_3mf(a, src)
+    _no_shape(monkeypatch)
+    bid = photo_build(b)
+    _plant(bid, blob)
+    kept = pub(b, "Kept", build=bid, visibility="private")
+    assert kept.status_code == 200, kept.text
+    kid = kept.json()["id"]
+    v = b.put(f"/api/showcase/{kid}/visibility", json={"visibility": "public"})
+    assert v.status_code == 409 and v.json()["code"] == "copy_refused" and v.json()["original"]["id"] == src["id"]
+    ok = b.put(f"/api/showcase/{kid}/visibility", json={"visibility": "public", "remix_of": src["id"]})
+    assert ok.status_code == 403 and "turned off remixes" in ok.text
+
+
 def test_download_origin_tag_keeps_geometry():
     a, b = U("TagO"), U("TagD")
     src = pub(a, "Tagged").json()
