@@ -1216,3 +1216,12 @@ main.zws>.wsbar{position:absolute;z-index:12;top:8px;left:8px;max-width:min(calc
 .plan-card.on { border-color: var(--accent, #29b6ff); box-shadow: inset 0 0 0 1px var(--accent, #29b6ff); }
 .plan-card ul { margin: 6px 0 10px; padding-left: 1.2em; }
 .plan-card .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #1e2636; font-size: 0.85em; }
+
+/* Project stages: Design → Check & Repair → Prepare → Slice & Export. Sits under the header, outside each workspace. */
+.pflow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:6px 16px 8px;border-bottom:1px solid var(--line);background:var(--panel)}
+.pflow[hidden]{display:none !important}
+.pflow .path{margin:0}
+.pflow .path li{padding:0}
+.pflow .path button{font:inherit;font-weight:600;color:inherit;background:none;border:0;padding:8px 12px;min-height:44px;cursor:pointer}
+.pflow .help{margin:0;flex:1 1 16rem}
+body.cadws .pflow{flex:none}

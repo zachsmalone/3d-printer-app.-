@@ -40,16 +40,17 @@ function snap(storage) {
 }
 
 test("My Studio routes stay on the Account library and do not select Lithophane", () => {
-  for (const hash of ["#account/studio", "#studio", "#studio/"]) {
+  for (const hash of ["#account/studio", "#studio", "#studio/", "#projects"]) {
     const intent = routeIntent(hash);
     assert.equal(intent.library, true);
     assert.equal(intent.view, "account");
     assert.equal(intent.hash, LIBRARY_HASH);
-    assert.equal(intent.nav, "account");
+    assert.equal(intent.nav, "projects");
     assert.notEqual(intent.view, "lithophane");
   }
   assert.equal(routeIntent("#account/studio").rewrite, false, "refresh keeps #account/studio");
   assert.equal(routeIntent("#studio").rewrite, true, "the old #studio bookmark is rewritten onto the library");
+  assert.equal(routeIntent("#projects").rewrite, true, "Projects in the top bar lands on the same library");
   const litho = routeIntent("#lithophane");
   assert.equal(litho.library, false);
   assert.equal(litho.view, "lithophane");

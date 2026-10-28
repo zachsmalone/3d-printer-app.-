@@ -1,6 +1,7 @@
 /* My Studio is the saved-project library on Account (#account/studio).
    Choosing that route stays on Account. Open and Edit are the actions that enter a workspace.
    #studio used to alias to the shared Lithophane page; it now resolves to this library.
+   #projects is the top-bar name for this same list. It rewrites to #account/studio.
    #create remains the photo workspace (it does not force the Lithophane style).
    Return uses the existing sessionStorage key zeim.back. Project and draft keys are not renamed. */
 export const LIBRARY_HASH = "#account/studio";
@@ -22,10 +23,10 @@ export function routeIntent(hash) {
   const head = full.split("/")[0].split("?")[0];
   const sub = (full.split("/")[1] || "").split("?")[0];
   if (head === "account" && sub === "studio") {
-    return { library: true, view: "account", hash: LIBRARY_HASH, rewrite: full !== "account/studio", nav: "account" };
+    return { library: true, view: "account", hash: LIBRARY_HASH, rewrite: full !== "account/studio", nav: "projects" };
   }
-  if (head === "studio") {
-    return { library: true, view: "account", hash: LIBRARY_HASH, rewrite: true, nav: "account" };
+  if (head === "studio" || head === "projects") {
+    return { library: true, view: "account", hash: LIBRARY_HASH, rewrite: true, nav: "projects" };
   }
   if (head === "lithophane") {
     return { library: false, view: "lithophane", hash: "#lithophane", rewrite: false, nav: "lithophane" };
@@ -171,8 +172,8 @@ export function libraryHTML(builds, opts) {
       ${thumb}
       <div class="meta"><b>${esc(title)}</b><span>${esc(label)}${kind === "edit" && mode !== "edit" ? " · Edited model" : ""}${openNow ? " · " + openNow : ""}</span></div>
       <div class="row2">
-        <button type="button" class="btn small" data-lib="open" data-id="${esc(id)}">Open</button>
-        <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}">Edit</button>
+        <button type="button" class="btn small" data-lib="open" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in the FDM Slicer" : "Open this photo design"}">Open</button>
+        <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays in Projects."}">Edit</button>
         <button type="button" class="btn small" data-lib="send" data-id="${esc(id)}">Send…</button>
         <button type="button" class="btn small" data-lib="star" data-id="${esc(id)}" aria-pressed="${b.favorite ? "true" : "false"}">${b.favorite ? "Starred" : "Star"}</button>
         <button type="button" class="btn small" data-lib="delete" data-id="${esc(id)}">Delete</button>

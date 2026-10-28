@@ -16,7 +16,10 @@
       root._zwsOn = on;
       if (!on) { if (root.style.getPropertyValue("--zws-h")) root.style.removeProperty("--zws-h"); return; }
       var vv = window.visualViewport, vh = vv ? vv.height : innerHeight;
-      var hdr = document.querySelector(".topbar"), top = hdr ? Math.max(0, hdr.getBoundingClientRect().bottom) : 0;
+      var hdr = document.querySelector(".topbar");
+      var flow = document.getElementById("projectFlow");
+      var edge = (flow && !flow.hidden && flow.getBoundingClientRect().height > 0) ? flow : hdr;
+      var top = edge ? Math.max(0, edge.getBoundingClientRect().bottom) : 0;
       var pb = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
       var v = Math.max(260, Math.round(vh - top - pb)) + "px";
       if (root.style.getPropertyValue("--zws-h") !== v) root.style.setProperty("--zws-h", v);   // only on a real change (no layout loop)
@@ -41,7 +44,7 @@
     return raw === "lithophane" ? "litho" : "studio";
   }
   var lastKey = studioRoute();
-  var studio = make({ id: "studio", key: function () { return studioRoute(); }, title: function () { return studioRoute() === "litho" ? "Lithophane" : "Studio"; },
+  var studio = make({ id: "studio", key: function () { return studioRoute(); }, title: function () { return studioRoute() === "litho" ? "Lithophane" : "Photo"; },
     root: "#viewCreate", active: function () { return vis($("#result")); },
     watch: ["#result", "#litLightBox", "#viewCreate"], obstacles: ["#busy:not([hidden])"],
     panels: [

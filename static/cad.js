@@ -6,6 +6,7 @@ import { OrbitControls } from "/static/vendor/OrbitControls.js";
 import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/cad-planes.js";
 import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
+import { bindFlow } from "/static/project-flow.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -695,7 +696,7 @@ async function addOp(op, params) {
       if (!["sketch_extrude", "revolve", "cad_text", "cad_shape", "cad_joint"].includes(op)) throw new Error("Start with a shape, or a sketch and Extrude.");
       const j = rep = await api("/api/cad/new", { method: "POST", json: { op, params, title: $("#cwTitle").value || "My design" } });
       if (!j.id) throw new Error("Your 5 recent builds are full. Delete one on the main page, then try again.");
-      S.bid = j.id; history.replaceState(null, "", `?bid=${S.bid}`);
+      S.bid = j.id; history.replaceState(null, "", `?bid=${S.bid}`); document.dispatchEvent(new CustomEvent("zeim:flow"));
     } else {
       rep = await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op, params } });
     }
@@ -1560,7 +1561,7 @@ $("#cwTitle").addEventListener("change", () => {
 });
 
 /* ---------------------------------------------------------------- open / import a user's own file or build */
-function openProject(id) { S.bid = id; S.openStep = 0; S.hidden.clear(); history.replaceState(null, "", `?bid=${id}`); return load(); }
+function openProject(id) { S.bid = id; S.openStep = 0; S.hidden.clear(); history.replaceState(null, "", `?bid=${id}`); document.dispatchEvent(new CustomEvent("zeim:flow")); return load(); }
 $("#cwOpen").onclick = () => { const m = $("#cwOpenMenu"), open = m.hidden; m.hidden = !open; $("#cwOpen").setAttribute("aria-expanded", open); };
 document.addEventListener("click", e => { if (!e.target.closest(".cw-menu")) $("#cwOpenMenu").hidden = true; });
 $("#cwImport").onclick = e => { e.preventDefault(); $("#cwFile").click(); };
@@ -1686,6 +1687,21 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
     location.href = `/?publish=${encodeURIComponent(S.bid)}&title=${encodeURIComponent(title)}`;
   };
   $("#cwToSlicer").addEventListener("click", () => { if (S.bid) { document.dispatchEvent(new CustomEvent("zeim:save-now")); mark("FDM Slicer"); } });
+  function cadKind() { try { return localStorage.getItem("zeim.printKind") === "resin" ? "resin" : "fdm"; } catch { return "fdm"; } }
+  bindFlow(() => ({ view: "cad", tool: "", photoId: "", editId: S.bid || "", copyId: "", kind: cadKind() }), plan => {
+    if (!plan || plan.stay) return;
+    const id = plan.editId || plan.id || S.bid || "";
+    if (plan.open === "send" && plan.target === "torchc0" && id) {
+      location.href = "/?resin=" + encodeURIComponent(id) + "#torchc0";
+      return;
+    }
+    if ((plan.open === "edit" || plan.hash && plan.hash.indexOf("slicer") === 1) && id && plan.hash) {
+      location.href = "/?edit=" + encodeURIComponent(id) + plan.hash;
+      return;
+    }
+    if (plan.url) { location.href = plan.url; return; }
+    if (plan.hash) location.href = "/" + plan.hash;
+  });
   const q = new URLSearchParams(location.search), from = q.get("from"), back = q.get("back");
   if (from && back && back.startsWith("/") && !back.startsWith("//")) {
     const a = document.createElement("a"); a.className = "backchip cad"; a.id = "backChip"; a.href = back;

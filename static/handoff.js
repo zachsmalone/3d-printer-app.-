@@ -6,8 +6,9 @@
    its file in this browser (IndexedDB) so leaving and coming back, or a reload, does not lose it. */
 import { S, api, toast, $, esc } from "/static/app.js";
 import { isPublishUrl } from "/static/workspace-controls.js";
+import { readFlow, rememberCopy, reuseCopy } from "/static/project-flow.js";
 
-const NAMES = { lithophane: "Studio", slicer: "FDM Slicer", torchc0: "TorchC0", cad: "CAD" };
+const NAMES = { lithophane: "Photo", slicer: "FDM Slicer", torchc0: "TorchC0", cad: "CAD" };
 const DESC = { cad: "Design and edit it with exact sizes", slicer: "Slice it for your filament printer", torchc0: "Hollow, support and prepare it for resin" };
 const ICON = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-send"/></svg>`;
 const kind = () => document.body.dataset.printKind === "resin" ? "resin" : "fdm";
@@ -45,11 +46,16 @@ document.addEventListener("zeim:torchc0-ready", async () => {      // the TorchC
 });
 
 /* ---- the model of a section, as an edit-project id (CAD and the Slicer share these) ---- */
-async function editIdFrom(src) {
+async function editIdFrom(src, explicit) {
+  if (explicit && /^[0-9a-f]{12}$/.test(explicit)) return explicit;
   if (src === "slicer") { const id = window.__zeimEdit?.p?.id || ss.get("zeim.edit.last"); if (id) return id; throw new Error("Open a model in the Slicer first."); }
   if (src === "lithophane") {
     if (!S.current?.id) throw new Error("Make a model first, then send it.");
-    return (await api("/api/edit/new", { method: "POST", body: FD({ from_build: S.current.id, beginner: beginner() }) })).id;
+    const kept = reuseCopy(readFlow(sessionStorage), S.current.id);
+    if (kept) return kept;
+    const id = (await api("/api/edit/new", { method: "POST", body: FD({ from_build: S.current.id, beginner: beginner() }) })).id;
+    rememberCopy(sessionStorage, S.current.id, id);
+    return id;
   }
   if (src === "torchc0") {
     const f = await torchFile(); if (!f) throw new Error("Choose a model in TorchC0 first.");
@@ -101,25 +107,27 @@ async function sendToShowcase(src) {
   } catch (e) { toast(e.message, "err"); return false; }
 }
 
-export async function sendTo(target, src = sourceNow()) {
-  if (!targetsFor(src).includes(target)) { toast(`${NAMES[target]} doesn't match your printer type. Change it with My printer at the top.`); return false; }
+export async function sendTo(target, src = sourceNow(), opt) {
+  const tool = opt && typeof opt === "object" ? (opt.tool || "") : "";
+  const explicit = opt && typeof opt === "object" ? (opt.editId || "") : "";
+  if (!explicit && !targetsFor(src).includes(target)) { toast(`${NAMES[target]} doesn't match your printer type. Change it with My printer at the top.`); return false; }
   document.dispatchEvent(new CustomEvent("zeim:save-now"));                    // nothing is lost
   const root = document.documentElement; root.classList.add("handing");
   try {
-    if (src === "lithophane" && target === "torchc0" && S.current?.downloads?.stl) {
+    if (!explicit && src === "lithophane" && target === "torchc0" && S.current?.downloads?.stl) {
       const f = new File([await blobOf(S.current.downloads.stl)], "studio.stl", { type: "model/stl" });
       remember(src); location.hash = "torchc0";
       document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f }));
       return true;
     }
-    const id = await editIdFrom(src);
+    const id = await editIdFrom(src, explicit);
     remember(src);
     if (target === "cad") {
       try { localStorage.setItem("zeim.cad.units", units()); } catch { }
       location.href = `/static/cad.html?bid=${encodeURIComponent(id)}&from=${encodeURIComponent(NAMES[src])}&back=${encodeURIComponent("/#" + src)}`;
       return true;
     }
-    if (target === "slicer") { location.hash = "slicer"; document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })); return true; }
+    if (target === "slicer") { location.hash = tool ? "slicer/" + tool : "slicer"; document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })); return true; }
     if (target === "torchc0") { const f = await fileFromEdit(id); location.hash = "torchc0"; document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f })); return true; }
   } catch (e) { toast(e.message, "err"); return false; }
   finally { setTimeout(() => root.classList.remove("handing"), 220); }
