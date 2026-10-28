@@ -9,11 +9,11 @@ PRODUCT_NAME = "ZEIM"
 TAGLINE = "Turn photos into things you can hold"
 
 SECTIONS = {
-    "create": "Studio",             # build lithophanes / reliefs / pop-art
+    "create": "Photo",              # photo → model (Lithophane is the style, not this name)
     "discover": "Showcase",         # community projects (all free)
     "learn": "Learn",               # learning library (same name in nav, page and links)
     "groups": "Build Plates",       # hobbyist groups (plural); singular below
-    "edit": "Edit",                 # upload + modify existing 3D files
+    "edit": "FDM Slicer",           # slice and export an existing model. My Studio is the project list.
     "history": "Pick up where you left off",
 }
 SHOWCASE_TABS = {"trending": "Trending", "free": "Newest", "foryou": "For You", "following": "Following"}   # key "free" kept for stored data/API stability; everything is free anyway

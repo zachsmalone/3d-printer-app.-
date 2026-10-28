@@ -1,4 +1,6 @@
 // Repair page (POST /api/repair): pick a file, show the before/after report, offer the fixed file.
+// Continue opens a slicer project from the repaired file. That project is a copy of the download.
+import { slicerUrlForNewProject } from "/static/project-flow.js";
 const $ = s => document.querySelector(s), esc = t => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const yn = b => b ? "yes" : "no";
 $("#rpFile").onchange = () => { const f = $("#rpFile").files[0]; $("#rpName").textContent = f ? `${f.name} · ${(f.size / 2 ** 20).toFixed(1)} MB` : ""; $("#rpGo").disabled = !f; };
@@ -25,8 +27,33 @@ $("#rpForm").onsubmit = async e => {
       <ul class="rp-fx">${fx.map(([k, v]) => `<li>${k}: <b>${esc(v)}</b></li>`).join("")}</ul>
       ${(j.warnings || []).map(w => `<p class="help">${esc(w)}</p>`).join("")}
       ${(j.notes || []).map(n => `<p class="help rp-note" role="note">${esc(n.text)} <button type="button" class="link rp-note-x" aria-label="Dismiss note">Dismiss</button></p>`).join("")}
-      <p class="help">The file is kept for one hour. Check it in your slicer before printing.</p>`;
+      <p class="help">The repaired file is kept for one hour. Opening it in the FDM Slicer starts a new project from that file. The file you uploaded stays as it was.</p>
+      <p><button type="button" class="btn" id="rpOpenSlicer">Open in the FDM Slicer</button></p>`;
     out.querySelectorAll(".rp-note-x").forEach(b => b.onclick = () => b.parentElement.remove());
+    const goSlicer = $("#rpOpenSlicer");
+    if (goSlicer) goSlicer.onclick = async () => {
+      goSlicer.disabled = true;
+      try {
+        const fileRes = await fetch(j.download_url, { credentials: "same-origin" });
+        if (!fileRes.ok) throw new Error("That repaired file has expired. Repair it again.");
+        const blob = await fileRes.blob();
+        const fd = new FormData();
+        fd.append("file", new File([blob], j.filename || "repaired.stl", { type: blob.type || "model/stl" }));
+        fd.append("units", "mm");
+        const made = await fetch("/api/edit/new", { method: "POST", body: fd, credentials: "same-origin" });
+        const body = await made.json().catch(() => ({}));
+        if (!made.ok) throw new Error(typeof body.detail === "string" ? body.detail : "The FDM Slicer could not open that file.");
+        const url = slicerUrlForNewProject(body.id);
+        if (!url) throw new Error("The FDM Slicer did not return a project.");
+        location.href = url;
+      } catch (err) {
+        goSlicer.disabled = false;
+        const p = document.createElement("p");
+        p.className = "bad";
+        p.textContent = err.message;
+        goSlicer.after(p);
+      }
+    };
   } catch (err) { out.innerHTML = `<p class="bad">${esc(err.message)}</p>`; }
   finally { $("#rpGo").disabled = !$("#rpFile").files[0]; }
 };

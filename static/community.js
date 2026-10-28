@@ -1,6 +1,8 @@
 import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showBuild } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
 import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
+import { bindFlow, readFlow, reuseCopy } from "/static/project-flow.js";
+import { sendTo } from "/static/handoff.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 let CFG = null, ME = null, shTab = "trending";
@@ -75,9 +77,10 @@ function paintStudioHome(raw) {
   const crumb = $("#studioFromMe");
   if (crumb) crumb.hidden = !(fromLib && (raw === "lithophane" || raw === "create"));
   const note = $("#lithoStudioNote");
-  if (note) note.hidden = raw !== "lithophane";
+  if (note) note.hidden = !(raw === "lithophane" || raw === "create");
   const expert = document.querySelector("#h1 [data-lvl=expert]");
-  if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : "Studio";
+  const photoName = (CFG && CFG.sections && CFG.sections.create) || "Photo";
+  if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : photoName;
   /* Saved projects are listed on Account. This block stays hidden so the photo page does not become the library. */
   const recent = $("#recentBuilds");
   if (recent) recent.hidden = true;
@@ -105,7 +108,7 @@ function route() {
   const h = location.hash.replace("#", "").split("/");
   const raw = h[0];
   const v = intent.library ? "account" : (ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase"));
-  show(v);
+  show(v, intent.library ? (intent.nav || "projects") : v);
   paintStudioHome(intent.library ? "account" : raw);
   markLibrary(!!intent.library);
   if (intent.library) arriveLibrary(sessionStorage);
@@ -924,6 +927,43 @@ async function openLesson(id) {
 }
 
 
+function flowCtx() {
+  const hash = location.hash.replace(/^#/, "");
+  const tool = (hash.split("/")[1] || "").split("?")[0];
+  const photoId = S.current && S.current.id || "";
+  const edit = window.__zeimEdit && window.__zeimEdit.p;
+  const editId = edit && edit.id || "";
+  const copyId = reuseCopy(readFlow(sessionStorage), photoId);
+  const kind = document.body.dataset.printKind === "resin" ? "resin" : "fdm";
+  return { view: document.body.dataset.view || "", tool, photoId, editId, copyId, kind };
+}
+async function followFlow(plan) {
+  if (!plan || plan.stay) return;
+  if (plan.open === "focus") {
+    const el = plan.focus && document.querySelector(plan.focus);
+    const note = document.querySelector("[data-flow-note]");
+    if (note && plan.note) note.textContent = plan.note;
+    if (el) el.focus();
+    return;
+  }
+  if (plan.open === "send" && plan.target) {
+    await sendTo(plan.target, plan.src || "lithophane", { tool: plan.tool || "", editId: plan.editId || "" });
+    return;
+  }
+  if (plan.url) { location.href = plan.url; return; }
+  if (plan.open === "edit" && plan.id) {
+    if (plan.hash) location.hash = plan.hash.replace(/^#/, "");
+    document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: plan.id }));
+    return;
+  }
+  if (plan.open === "build" && plan.id) {
+    if (plan.hash) location.hash = plan.hash.replace(/^#/, "");
+    document.dispatchEvent(new CustomEvent("zeim:open-build", { detail: plan.id }));
+    return;
+  }
+  if (plan.hash) location.hash = plan.hash.replace(/^#/, "");
+}
+bindFlow(flowCtx, followFlow);
 init();
 
 

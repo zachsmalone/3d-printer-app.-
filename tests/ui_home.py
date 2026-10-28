@@ -72,7 +72,7 @@ def run(name, launch, with_axe):
     ok(f"{name}: Keep exploring tiles are links", pg.locator(".tiles a.tile").count() == 3)
     if with_axe: axe(pg, "Studio built, 390 light")
     pg.select_option("#modeSel", "expert"); pg.wait_for_timeout(300)
-    ok(f"{name}: Experienced collapses the hero to 'Studio' and hides the tiles", pg.locator("h1:visible").inner_text().strip() == "Studio" and not pg.is_visible(".lede") and not pg.is_visible(".tiles"))
+    ok(f"{name}: Experienced collapses the hero to 'Photo' and hides the tiles", pg.locator("h1:visible").inner_text().strip() == "Photo" and not pg.is_visible(".lede") and not pg.is_visible(".tiles"))
     if with_axe: axe(pg, "Experienced, 390 light")
     pg.select_option("#modeSel", "beginner")
     # themes
@@ -99,9 +99,9 @@ def run(name, launch, with_axe):
     # keyboard order of the first controls
     ctx, pg = page()
     order = []
-    for _ in range(16):
+    for _ in range(18):
         pg.keyboard.press("Tab"); order.append(pg.evaluate("document.activeElement.id || document.activeElement.textContent.trim().slice(0,12)"))
-    ok(f"{name}: keyboard reaches the seven tabs, Mode, then the Dark mode toggle", all(any(o.startswith(t) for o in order) for t in ("Showcase", "FDM Slicer", "TorchC0", "CAD", "Lithophane", "Smart Fix", "Account", "modeSel", "themeToggle")) and order.index("modeSel") < order.index("themeToggle"), order)
+    ok(f"{name}: keyboard reaches Projects, the other tabs, Mode, then the Dark mode toggle", all(any(o.startswith(t) for o in order) for t in ("Showcase", "FDM Slicer", "TorchC0", "CAD", "Lithophane", "Smart Fix", "Projects", "Account", "modeSel", "themeToggle")) and order.index("modeSel") < order.index("themeToggle"), order)
     ok(f"{name}: no page errors", not errs, errs)
     ctx.close(); b.close()
 

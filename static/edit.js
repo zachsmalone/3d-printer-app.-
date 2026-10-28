@@ -3,6 +3,7 @@ import { Viewer } from "/static/viewer.js";
 import { openSend } from "/static/send.js";
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
 import { guardNewBuild } from "/static/workspace-bar.js";
+import { rememberCopy, readFlow, reuseCopy, forgetCopy } from "/static/project-flow.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate } from "/static/plate.js";
 import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
@@ -11,6 +12,7 @@ const J = (method, body) => ({ method, headers: { "Content-Type": "application/j
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
 const E = { p: null, unit: localStorage.eunit || "mm", tool: null, measure: false, pts: [], last: null };
 let viewer = null, ghost = null, measureObjs = [];
+let copyFromPhoto = "";
 
 /* ---------- helpers ---------- */
 const U = () => UNITS[E.unit];
@@ -40,11 +42,12 @@ async function create(fd, retry) {
   try {
     const r = await api("/api/edit/new", { method: "POST", body: fd });
     S.history = r.history; renderHistory(); loadProject(r);
+    if (copyFromPhoto && r.id) { rememberCopy(sessionStorage, copyFromPhoto, r.id); copyFromPhoto = ""; document.dispatchEvent(new CustomEvent("zeim:flow")); }
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
-    else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) editPick.msg(e.message);       // photo problems stay under the photo buttons (QA-3)
-    else toast(e.message, "err");
+    else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) { copyFromPhoto = ""; editPick.msg(e.message); }       // photo problems stay under the photo buttons (QA-3)
+    else { copyFromPhoto = ""; toast(e.message, "err"); }
   } finally { busy(false); }
 }
 const PHOTO_RE = /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i;
@@ -70,7 +73,7 @@ function fromFile(file) {
   create(mk(), mk);
 }
 const drop = $("#editDrop");
-$("#btnHave3d")?.addEventListener("click", () => { location.hash = "slicer"; $("#editFile").click(); });     // Studio → Edit (same tap, so iOS opens the picker)
+$("#btnHave3d")?.addEventListener("click", () => { location.hash = "slicer"; $("#editFile").click(); });     // photo page → FDM Slicer (same tap, so iOS opens the picker)
 $("#editChooseModel").onclick = () => $("#editFile").click();
 $("#editPhoto").innerHTML = photoBlock("e", { sample: true });
 const editPick = mountPhoto("e", f => fromFile(f));   // defined BEFORE the file handlers below: fromFile() uses it (an early pick hit a TDZ error and the file silently never loaded)
@@ -135,13 +138,16 @@ $("#multiPlate").onclick = () => sendMulti("plate");
 $("#multiSeparate").onclick = () => sendMulti("separate");
 $("#editSample").onclick = async () => { const b = await (await fetch("/static/sample_model.stl")).blob(); fromFile(new File([b], "sample_cat.stl")); };
 function fromBuild(id) {
+  const kept = reuseCopy(readFlow(sessionStorage), id);
+  if (kept) { document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: kept })); return; }
+  copyFromPhoto = id;
   const mk = () => { const fd = new FormData(); fd.append("from_build", id); fd.append("beginner", !isExpert()); return fd; };
   create(mk(), mk);
 }
 $("#editFromBuildGo").onclick = () => { const v = $("#editFromBuild").value; if (v) fromBuild(v); };
-$("#btnEditThis")?.addEventListener("click", () => { if (S.current) { location.hash = "slicer"; fromBuild(S.current.id); } });
+$("#btnEditThis")?.addEventListener("click", () => { $("#btnSendSlicer")?.click(); });
 function fillBuildSelect() {
-  $("#editFromBuild").innerHTML = S.history.length ? S.history.slice().reverse().map(b => `<option value="${b.id}">${esc(b.title)} (${b.kind === "edit" ? "edited" : b.mode})</option>`).join("") : `<option value="">No builds yet — make one in the Studio</option>`;
+  $("#editFromBuild").innerHTML = S.history.length ? S.history.slice().reverse().map(b => `<option value="${b.id}">${esc(b.title)} (${b.kind === "edit" ? "edited model" : b.mode})</option>`).join("") : `<option value="">No saved projects yet</option>`;
   $("#editFromBuildGo").disabled = !S.history.length;
 }
 /* Send to Slicer sets the hash (which restores zeim.edit.last) and then opens the new project.
@@ -173,7 +179,10 @@ document.addEventListener("zeim:open-edit", async e => {
     const p = await api("/api/edit/" + encodeURIComponent(e.detail));
     if (gen !== editLoadGen) return;
     loadProject(p);
-  } catch (er) { if (gen === editLoadGen) toast(er.message, "err"); }
+  } catch (er) {
+    forgetCopy(sessionStorage, e.detail);
+    if (gen === editLoadGen) toast(er.message, "err");
+  }
 });
 document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
