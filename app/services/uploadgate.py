@@ -55,11 +55,18 @@ def _audit(entry: dict) -> None:
 
 def _allowed(sid: str, now: float, source: str = "generate") -> bool:
     """Per-account hourly limit. db mode: SQLite counter (shared by all workers); json mode: in-process.
-    Mesh edit/CAD imports have their own (larger) budget: opening your own files is cheap and frequent."""
-    limit = config.EDIT_UPLOADS_PER_HOUR if source == "edit" else config.UPLOADS_PER_HOUR
+    Mesh edit/CAD imports have their own (larger) budget: opening your own files is cheap and frequent.
+    Photo-prep previews use a separate cap (source ai3d-prep) so they do not spend the upload allowance."""
+    # Photo-prep previews are the same photo the mesh job will upload. They have their own
+    # small cap so a few crops do not use up the hourly upload allowance. The mesh job still counts.
+    if source == "edit":
+        limit, key = config.EDIT_UPLOADS_PER_HOUR, f"edit:{sid}"
+    elif source == "ai3d-prep":
+        limit, key = 30, f"ai3dprep:{sid}"
+    else:
+        limit, key = config.UPLOADS_PER_HOUR, sid
     if limit <= 0 or config.TESTING_MODE:                 # testing mode: no hourly upload quota
         return True
-    key = sid if source != "edit" else f"edit:{sid}"
     if config.STORAGE_MODE == "db":
         from .. import db
         db.upload_events_prune(now, _HOUR)                # best-effort housekeeping
@@ -125,6 +132,8 @@ def gate(data: bytes, actor_sid: str, source: str = "generate", **limits) -> upl
     now = time.time()
     if not _allowed(actor_sid, now, source):
         _audit({"sid": actor_sid, "src": source, "size": len(data), "verdict": "rate_limited"})
+        if source == "ai3d-prep":
+            raise GateError(429, "You have reached this hour's photo prep limit (30). Try again later.")
         raise GateError(429, f"You have reached this hour's upload limit ({config.UPLOADS_PER_HOUR}). Try again later.")
     try:
         checked = uploadsafe.check(data, **limits)

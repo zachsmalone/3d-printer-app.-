@@ -12,6 +12,7 @@ Docker network, do not publish the port to the internet). Optional shared secret
 """
 from __future__ import annotations
 
+import base64
 import io
 import json
 import os
@@ -21,8 +22,12 @@ import types
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
+from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+from prep import prepare_image
 CODE = os.environ.get("ZEIM_AI3D_CODE", os.path.join(HERE, "TripoSR"))
 WEIGHTS = os.environ.get("ZEIM_AI3D_WEIGHTS", os.path.join(HERE, "weights"))
 TOKEN = os.environ.get("ZEIM_AI3D_TOKEN", "")
@@ -74,29 +79,31 @@ def ready() -> bool:
     return os.path.isfile(os.path.join(WEIGHTS, "model.ckpt")) and os.path.isdir(os.path.join(CODE, "tsr"))
 
 
-def prepare(data: bytes, mode: str):
-    """Cut the subject out (rembg, MIT), centre it on grey like TripoSR expects. Bust: keep the top of the subject."""
-    from PIL import Image
-    import rembg
-    im = Image.open(io.BytesIO(data)).convert("RGB")
-    im.thumbnail((1024, 1024))
+def _cutout_alpha(im: Image.Image):
+    """rembg when it is installed. None lets prep fall back to a border-colour mask."""
+    try:
+        import rembg
+    except ImportError:
+        return None
     cut = rembg.remove(im, session=_session())
-    a = np.asarray(cut).astype(np.float32) / 255.0
-    alpha = a[..., 3]
-    ys, xs = np.where(alpha > 0.5)
-    if len(xs) < 50:
-        raise ValueError("No clear subject was found in the photo. A plain background and good light help.")
-    y0, y1, x0, x1 = ys.min(), ys.max(), xs.min(), xs.max()
-    if mode == "bust":                       # head and shoulders: the top ~55% of the subject
-        y1 = y0 + int((y1 - y0) * 0.55)
-    a = a[y0:y1 + 1, x0:x1 + 1]
-    rgb = a[..., :3] * a[..., 3:4] + 0.5 * (1 - a[..., 3:4])
-    h, w = rgb.shape[:2]
-    side = int(max(h, w) / 0.85)
-    canvas = np.full((side, side, 3), 0.5, np.float32)
-    oy, ox = (side - h) // 2, (side - w) // 2
-    canvas[oy:oy + h, ox:ox + w] = rgb
-    return Image.fromarray((canvas * 255).astype(np.uint8)).resize((512, 512))
+    arr = np.asarray(cut)
+    if arr.ndim != 3 or arr.shape[-1] != 4:
+        return None
+    return arr[..., 3]
+
+
+def prepare(data: bytes, mode: str, *, crop: bool = True, tone: bool = True, grey: bool = True, prepared: bool = False):
+    """Photo TripoSR should see, at 512 px.
+
+    prepared=True: ZEIM already cropped and toned this photo. Do not cut or crop it again.
+    Otherwise: the shared prep (crop, light, grey), using rembg for the cut-out when it imports.
+    """
+    if prepared:
+        im = Image.open(io.BytesIO(data)).convert("RGB")
+        return im.resize((512, 512), Image.Resampling.LANCZOS), []
+    png, notes = prepare_image(data, mode, crop=crop, tone=tone, grey=grey, alpha_fn=_cutout_alpha)
+    im = Image.open(io.BytesIO(png)).convert("RGB").resize((512, 512), Image.Resampling.LANCZOS)
+    return im, notes
 
 
 _rs = None
@@ -110,9 +117,9 @@ def _session():
     return _rs
 
 
-def generate(data: bytes, mode: str, res: int) -> bytes:
+def generate(data: bytes, mode: str, res: int, *, crop: bool = True, tone: bool = True, grey: bool = True, prepared: bool = False) -> bytes:
     import torch
-    img = prepare(data, mode)
+    img, _notes = prepare(data, mode, crop=crop, tone=tone, grey=grey, prepared=prepared)
     with _lock:
         m = load()
         with torch.no_grad():
@@ -146,16 +153,30 @@ class H(BaseHTTPRequestHandler):
         self._json(200, {"ok": True, "engine": "TripoSR", "device": dev, "ready": ready(), "busy": _lock.locked()})
 
     def do_POST(self):
-        if self.path != "/generate" or not self._auth():
-            return self._json(404 if self.path != "/generate" else 403, {"error": "no"})
+        if self.path not in ("/generate", "/prepare") or not self._auth():
+            return self._json(404 if self.path not in ("/generate", "/prepare") else 403, {"error": "no"})
         n = int(self.headers.get("Content-Length") or 0)
         if n <= 0 or n > MAX_BODY:
             return self._json(413, {"error": "The photo is too large."})
         data = self.rfile.read(n)
         mode = "bust" if self.headers.get("X-Mode") == "bust" else "figure"
+        crop = self.headers.get("X-Prep-Crop", "1") != "0"
+        tone = self.headers.get("X-Prep-Tone", "1") != "0"
+        grey = self.headers.get("X-Prep-Bg", "grey") != "keep"
+        prepared = self.headers.get("X-Prepared") == "1"
+        if self.path == "/prepare":
+            try:
+                _im, notes = prepare(data, mode, crop=crop, tone=tone, grey=grey, prepared=False)
+                buf = io.BytesIO()
+                _im.save(buf, format="PNG")
+            except ValueError as e:
+                return self._json(422, {"error": str(e)})
+            except Exception as e:
+                return self._json(500, {"error": "The engine could not prepare this photo.", "kind": type(e).__name__})
+            return self._json(200, {"ok": True, "png_b64": base64.b64encode(buf.getvalue()).decode(), "notes": notes})
         res = max(96, min(320, int(self.headers.get("X-Resolution") or 192)))
         try:
-            out = generate(data, mode, res)
+            out = generate(data, mode, res, crop=crop, tone=tone, grey=grey, prepared=prepared)
         except ValueError as e:
             return self._json(422, {"error": str(e)})
         except Exception as e:     # message only, no photo data

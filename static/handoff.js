@@ -8,7 +8,7 @@ import { S, api, toast, $, esc } from "/static/app.js";
 import { isPublishUrl } from "/static/workspace-controls.js";
 import { readFlow, rememberCopy, reuseCopy } from "/static/project-flow.js";
 
-const NAMES = { lithophane: "Photo", slicer: "FDM Slicer", torchc0: "TorchC0", cad: "CAD" };
+const NAMES = { lithophane: "Photo", slicer: "FDM Slicer", torchc0: "TorchC0", cad: "CAD", ai3d: "2D→3D" };
 const DESC = { cad: "Design and edit it with exact sizes", slicer: "Slice it for your filament printer", torchc0: "Hollow, support and prepare it for resin" };
 const ICON = `<svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-send"/></svg>`;
 const kind = () => document.body.dataset.printKind === "resin" ? "resin" : "fdm";
@@ -17,7 +17,9 @@ const ss = { get: k => { try { return sessionStorage.getItem(k); } catch { retur
 const beginner = () => document.body.dataset.level !== "expert";
 
 export function targetsFor(src, k = kind()) {
-  return ["cad", "slicer", "torchc0"].filter(t => t !== src && !(t === "slicer" && k === "resin") && !(t === "torchc0" && k === "fdm"));
+  const all = ["cad", "slicer", "torchc0"].filter(t => t !== src && !(t === "slicer" && k === "resin") && !(t === "torchc0" && k === "fdm"));
+  if (src === "ai3d") return ["cad", "slicer", "torchc0"].filter(t => !(t === "slicer" && k === "resin") && !(t === "torchc0" && k === "fdm"));
+  return all;
 }
 function sourceNow() { const v = document.body.dataset.view; return v === "slicer" || v === "torchc0" ? v : "lithophane"; }
 
@@ -48,6 +50,7 @@ document.addEventListener("zeim:torchc0-ready", async () => {      // the TorchC
 /* ---- the model of a section, as an edit-project id (CAD and the Slicer share these) ---- */
 async function editIdFrom(src, explicit) {
   if (explicit && /^[0-9a-f]{12}$/.test(explicit)) return explicit;
+  if (src === "ai3d") throw new Error("Make a mesh first, then send it.");
   if (src === "slicer") { const id = window.__zeimEdit?.p?.id || ss.get("zeim.edit.last"); if (id) return id; throw new Error("Open a model in the Slicer first."); }
   if (src === "lithophane") {
     if (!S.current?.id) throw new Error("Make a model first, then send it.");

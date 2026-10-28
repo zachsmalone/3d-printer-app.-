@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends git libgl1 libg
 WORKDIR /worker
 COPY requirements.txt .
 RUN pip install --no-cache-dir torch --index-url ${TORCH_INDEX} && pip install --no-cache-dir -r requirements.txt
-COPY server.py setup_weights.py ./
+COPY server.py setup_weights.py prep.py ./
 # Weights live in a volume (/data), fetched on first start, never baked into an image.
 ENV ZEIM_AI3D_CODE=/data/TripoSR ZEIM_AI3D_WEIGHTS=/data/weights U2NET_HOME=/data/u2net HF_HOME=/data/hf
 VOLUME /data
