@@ -57,7 +57,7 @@ def test_resolve_rules():
 
 def test_anonymous_choice_is_browser_only_and_signed_up_choice_is_saved_on_the_profile():
     a = client()
-    assert a.get("/api/me/printer").json() == {"signed_up": False, "stored": "browser", "printer_id": "creality_k1", "nozzle": 0.4}
+    assert a.get("/api/me/printer").json() == {"signed_up": False, "stored": "browser", "printer_id": "creality_k1", "nozzle": 0.4, "saved": False}
     r = a.put("/api/me/printer", json={"printer_id": "bambu_a1_mini", "nozzle": 0.6}).json()
     assert r["stored"] == "browser" and a.get("/api/me/printer").json()["printer_id"] == "creality_k1"
     assert a.put("/api/me/printer", json={"printer_id": "bambu_a1_mini", "nozzle": 0.3}).status_code == 400
@@ -68,7 +68,7 @@ def test_anonymous_choice_is_browser_only_and_signed_up_choice_is_saved_on_the_p
 
 def test_signup_can_carry_the_optional_printer():
     c = client({**ADULT, "printer_id": "elegoo_saturn3", "nozzle": 0.4})
-    assert c.get("/api/me/printer").json() == {"signed_up": True, "stored": "profile", "printer_id": "elegoo_saturn3", "nozzle": None}
+    assert c.get("/api/me/printer").json() == {"signed_up": True, "stored": "profile", "printer_id": "elegoo_saturn3", "nozzle": None, "saved": True}
     c2 = client({**ADULT, "printer_id": "bad_printer"})                      # an optional bad choice never blocks sign-up
     assert c2.get("/api/me/printer").json()["printer_id"] == "creality_k1"
 

@@ -536,7 +536,9 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
     ml = volume_mm3 / 1000.0
     return {**cost_of(ml, s.get("price", DEFAULT_PRICE), s.get("price_unit", DEFAULT_PRICE_UNIT), s.get("density_g_ml", RESIN_DENSITY_G_ML)),
             "layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
-            "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film."}
+            "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film.",
+            "machine_file": False,
+            "slice_note": "This is an estimate of layers and time. TorchC0 does not write the printer's layer file. Export the mesh and slice it in the resin printer's own slicer."}
 
 
 def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None) -> tuple[trimesh.Trimesh, dict]:

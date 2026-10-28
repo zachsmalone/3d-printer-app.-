@@ -213,6 +213,41 @@ def _json(r) -> dict:
         return {}
 
 
+def _print_confirmed(st: dict, name: str) -> bool:
+    """True only when the printer's own status says this file is printing."""
+    if not st or not st.get("ok"):
+        return False
+    if str(st.get("state") or "").strip().lower() != "printing":
+        return False
+    job = str(st.get("job_name") or "")
+    if not job:
+        return True
+    return name in job or job in name
+
+
+def _upload_accepted(printer: dict, name: str, start: bool, t: str) -> dict:
+    """An HTTP upload is acceptance. A start flag is a request. Only a later status read confirms it."""
+    who = printer.get("name") or "printer"
+    note = " (Live API — real HTTP upload; not yet Hardware-tested on Zach's K1)."
+    confirmed = False
+    if start and t in ("moonraker", "octoprint"):
+        try:
+            confirmed = _print_confirmed(status(printer), name)
+        except Exception:
+            confirmed = False
+    if not start:
+        start_state = "not_requested"
+        msg = f"Uploaded '{name}' to {who}. The printer accepted the file. Print was not started."
+    elif confirmed:
+        start_state = "confirmed"
+        msg = f"Uploaded '{name}' to {who}. The printer accepted the file and reports the print is running."
+    else:
+        start_state = "requested"
+        msg = (f"Uploaded '{name}' to {who}. The printer accepted the file. "
+               "A start was requested. The printer has not confirmed that it is printing.")
+    return {"ok": True, "transfer": "accepted", "start": start_state, "message": msg + note, **_v(ptype=t)}
+
+
 def send(printer: dict, gcode: "Path | None", name: str, start: bool) -> dict:
     err = _guard_printer(printer)
     if err:
@@ -232,10 +267,7 @@ def send(printer: dict, gcode: "Path | None", name: str, start: bool) -> dict:
                            data={"root": "gcodes", "print": "true" if start else "false"})
         if r.status_code >= 300:
             return {"ok": False, "message": f"{t} answered HTTP {r.status_code}: {r.text[:200]}", **_v(ptype=t)}
-        return {"ok": True, "message": f"Uploaded '{name}' to {printer.get('name') or 'printer'}"
-                + (" and started the print" if start else "")
-                + " (Live API — real HTTP upload; not yet Hardware-tested on Zach's K1).",
-                "response": r.text[:300], **_v(ptype=t)}
+        return {**_upload_accepted(printer, name, start, t), "response": r.text[:300]}
     except httpx.HTTPError as e:
         return {"ok": False, "message": f"could not reach printer: {e}", **_v(ptype=t)}
 
@@ -421,7 +453,8 @@ def _control_octoprint(printer: dict, action: str) -> dict:
         if r.status_code in (401, 403):
             return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v(ptype="octoprint")}
         if r.status_code in (204, 200):
-            return {"ok": True, "action": action, "message": f"Sent {action} to {printer.get('name') or 'printer'}.", **_v(ptype="octoprint")}
+            return {"ok": True, "action": action, "accepted": True, "confirmed": False,
+                    "message": f"The printer accepted {action}. ZEIM has not confirmed the new state.", **_v(ptype="octoprint")}
         if r.status_code == 409:
             return {"ok": False, "message": f"OctoPrint refused {action} (nothing active to {action}).", **_v(ptype="octoprint")}
         return {"ok": False, "message": f"OctoPrint answered HTTP {r.status_code}: {r.text[:200]}", **_v(ptype="octoprint")}
@@ -434,7 +467,8 @@ def _control_moonraker(printer: dict, action: str) -> dict:
         if r.status_code in (401, 403):
             return {"ok": False, "message": "The printer asked for a key. Check the API key.", **_v(ptype="moonraker")}
         if r.status_code == 200:
-            return {"ok": True, "action": action, "message": f"Sent {action} to {printer.get('name') or 'printer'}.", **_v(ptype="moonraker")}
+            return {"ok": True, "action": action, "accepted": True, "confirmed": False,
+                    "message": f"The printer accepted {action}. ZEIM has not confirmed the new state.", **_v(ptype="moonraker")}
         return {"ok": False, "message": f"Moonraker answered HTTP {r.status_code}: {r.text[:200]}", **_v(ptype="moonraker")}
 
 
@@ -589,8 +623,10 @@ def _send_bambu(printer: dict, gcode: Path | None, name: str, start: bool) -> di
                 "message": "Bambu LAN needs address, 8-digit access code, and serial. Or use Open in Bambu Studio.",
                 "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
     if (os.environ.get("ZEIM_BAMBU_MOCK") or "").lower() in ("1", "true", "yes"):
-        return {"ok": True, "message": f"Simulated Bambu LAN upload of '{name}'"
-                + (" and print start" if start else "") + ". Not tried on a real Bambu.",
+        return {"ok": True, "transfer": "simulated", "start": "not_confirmed",
+                "message": f"Simulated Bambu path: '{name}' was not sent to a real printer. "
+                           + ("A start was not confirmed. " if start else "Print was not started. ")
+                           + "Not tried on a real Bambu.",
                 "fallback": "bambu_studio", "limits": BAMBU_LIMITS, "mock": True, **_v(ptype="bambu")}
     # Real path: FTPS put, then optional MQTT start. Label Simulated until hardware-verified.
     try:
@@ -604,12 +640,14 @@ def _send_bambu(printer: dict, gcode: Path | None, name: str, start: bool) -> di
         try:
             _bambu_mqtt_print(host, code, serial, name)
         except Exception as e:
-            return {"ok": True, "started": False, "fallback": "bambu_studio",
-                    "message": f"Uploaded '{name}' but could not start print ({e}). "
+            return {"ok": True, "started": False, "transfer": "accepted", "start": "requested", "fallback": "bambu_studio",
+                    "message": f"Uploaded '{name}'. A start was requested and the printer did not confirm it ({e}). "
                                "Open the file on the printer or use Open in Bambu Studio. Needs Developer Mode.",
                     "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
-    return {"ok": True, "message": f"Uploaded '{name}' to Bambu (Simulated path)"
-            + (" and asked it to start" if start else "") + ". Not verified on real hardware yet.",
+    return {"ok": True, "transfer": "accepted", "start": "requested" if start else "not_requested",
+            "message": f"Uploaded '{name}' to Bambu (Simulated path). "
+                       + ("A start was requested and is not confirmed on the printer. " if start else "Print was not started. ")
+                       + "Not verified on real hardware yet.",
             "fallback": "bambu_studio", "limits": BAMBU_LIMITS, **_v(ptype="bambu")}
 
 
@@ -690,7 +728,7 @@ def _control_bambu(printer: dict, action: str) -> dict:
     try:
         _bambu_mqtt_cmd(host, code, serial, cmd)
         return {"ok": True, "action": action,
-                "message": f"Sent {action} to Bambu (Simulated path; needs Developer Mode).",
+                "message": f"Bambu accepted {action} (Simulated path; not confirmed. Needs Developer Mode).",
                 **_v(ptype="bambu"), "limits": BAMBU_LIMITS}
     except Exception as e:
         return {"ok": False, "fallback": "bambu_studio",

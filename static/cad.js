@@ -7,6 +7,7 @@ import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/ca
 import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
 import { bindFlow } from "/static/project-flow.js";
+import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -66,7 +67,17 @@ const S = {
   sk: null,   // sketch session: {plane, entities, constraints, sel:Set, tool, draft, editStep, auto, showCons}
 };
 const msg = (t, ok) => { const m = $("#cwMsg"); m.textContent = t || ""; m.style.color = ok ? "var(--ok)" : ""; };
-const busy = on => { $("#cwBusy").hidden = !on; };
+const busy = (on, cancel) => {
+  const el = $("#cwBusy"); if (!el) return;
+  el.hidden = !on;
+  let btn = $("#cwBusyCancel");
+  if (!btn) {
+    btn = document.createElement("button"); btn.type = "button"; btn.id = "cwBusyCancel"; btn.className = "cw-btn"; btn.textContent = "Cancel";
+    el.append(btn);
+  }
+  btn.hidden = !on || typeof cancel !== "function";
+  btn.onclick = typeof cancel === "function" ? cancel : null;
+};
 /* Coach hints: one compact pill (tap to expand). "Hints off" (toolbar chip, remembered per browser) hides every hint overlay. */
 const LS = (() => { try { return localStorage; } catch { return null; } })();
 let HINTS_ON = hintsOn(LS);
@@ -117,8 +128,22 @@ const helpers = new THREE.Group(); scene.add(helpers);
 const sketchG = new THREE.Group(); scene.add(sketchG);
 let gridObj = null;
 const clipPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+function disposeObj(obj) {
+  if (!obj || !obj.traverse) return;
+  obj.traverse(n => {
+    if (n.geometry && n.geometry.dispose) n.geometry.dispose();
+    const mats = n.material;
+    if (Array.isArray(mats)) mats.forEach(m => m && m.dispose && m.dispose());
+    else if (mats && mats.dispose) mats.dispose();
+  });
+}
+function clearGroup(g) {
+  const kids = g.children.slice();
+  g.clear();
+  for (const c of kids) disposeObj(c);
+}
 function makeGrid() {
-  if (gridObj) helpers.remove(gridObj);
+  if (gridObj) { helpers.remove(gridObj); disposeObj(gridObj); gridObj = null; }
   const n = 40, size = S.grid * n;
   gridObj = new THREE.GridHelper(size, n, 0x6d7fa8, 0x3a4560);
   gridObj.rotation.x = Math.PI / 2; gridObj.material.transparent = true; gridObj.material.opacity = 0.45;
@@ -159,12 +184,12 @@ function bodyMaterial(i) {
   return m;
 }
 function buildWorld(keepCam) {
-  world.clear(); invalidate();
+  clearGroup(world); invalidate();
   for (const b of S.scene?.bodies || []) {
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(b64(b.positions, Float32Array), 3));
     g.setIndex(new THREE.BufferAttribute(b64(b.indices, Uint32Array), 1));
-    const ng = g.toNonIndexed(); ng.computeVertexNormals();
+    const ng = g.toNonIndexed(); g.dispose(); ng.computeVertexNormals();
     const mesh = new THREE.Mesh(ng, bodyMaterial(b.index)); mesh.userData.body = b.index;
     const eg = new THREE.BufferGeometry(); eg.setAttribute("position", new THREE.BufferAttribute(b64(b.edges, Float32Array), 3));
     const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x10131a, clippingPlanes: S.section ? [clipPlane] : [] }));
@@ -174,6 +199,7 @@ function buildWorld(keepCam) {
   }
   emptyHint();
   if (!keepCam) fit();
+  reconcileSelection();
   drawSelection();
 }
 function fit() {
@@ -248,22 +274,57 @@ function ndc(ev) { const r = renderer.domElement.getBoundingClientRect(); return
 function pickBody(ev) {
   ray.setFromCamera(ndc(ev), camera);
   const meshes = world.children.filter(g => g.visible).map(g => g.children[0]);
-  const hit = ray.intersectObjects(meshes, false).find(h => !S.section || clipPlane.distanceToPoint(h.point) >= 0);
+  const hit = ray.intersectObjects(meshes, false).find(h => (!S.section || clipPlane.distanceToPoint(h.point) >= 0) && clipOf(h.point).w > 1e-4);
   return hit ? { body: hit.object.userData.body, point: hit.point.clone(), normal: hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() } : null;
 }
-function toScreen(v) { const p = v.clone().project(camera), r = renderer.domElement.getBoundingClientRect(); return [(p.x + 1) / 2 * r.width, (1 - p.y) / 2 * r.height, p.z]; }
+function clipOf(v) {
+  const p = v.clone().applyMatrix4(camera.matrixWorldInverse);
+  const e = camera.projectionMatrix.elements;
+  const x = p.x, y = p.y, z = p.z;
+  return {
+    x: e[0] * x + e[4] * y + e[8] * z + e[12],
+    y: e[1] * x + e[5] * y + e[9] * z + e[13],
+    z: e[2] * x + e[6] * y + e[10] * z + e[14],
+    w: e[3] * x + e[7] * y + e[11] * z + e[15],
+  };
+}
+function toScreen(v) {
+  const c = clipOf(v), r = renderer.domElement.getBoundingClientRect();
+  if (!(c.w > 1e-4)) return [0, 0, 2];
+  const [x, y] = screenOf(c, r.width, r.height);
+  const nz = c.z / c.w;
+  return [x, y, nz > 1 ? 2 : nz];
+}
 function pickEdge(ev) {
   const r = renderer.domElement.getBoundingClientRect(), mx = ev.clientX - r.left, my = ev.clientY - r.top;
+  const hit = pickBody(ev);
   let best = null, bd = ev.pointerType === "touch" ? 24 : 14;
+  const minW = 1e-4;
   for (const g of world.children) {
     if (!g.visible) continue;
     const a = g.children[1].geometry.attributes.position.array;
     for (let i = 0; i < a.length; i += 6) {
-      const A = new THREE.Vector3(a[i], a[i + 1], a[i + 2]), B = new THREE.Vector3(a[i + 3], a[i + 4], a[i + 5]);
-      const [ax, ay] = toScreen(A), [bx, by] = toScreen(B);
-      const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((mx - ax) * dx + (my - ay) * dy) / L));
-      const d = Math.hypot(ax + dx * t - mx, ay + dy * t - my);
-      if (d < bd) { bd = d; best = { a: A, b: B, body: g.userData.body }; }
+      const origA = [a[i], a[i + 1], a[i + 2]], origB = [a[i + 3], a[i + 4], a[i + 5]];
+      let A = origA, B = origB;
+      if (S.section) {
+        const kept = clipHalfSpace(A, B, clipPlane.distanceToPoint(new THREE.Vector3(...A)), clipPlane.distanceToPoint(new THREE.Vector3(...B)));
+        if (!kept) continue;
+        A = kept.a; B = kept.b;
+      }
+      const Av = new THREE.Vector3(...A), Bv = new THREE.Vector3(...B);
+      const seg = clipByW(clipOf(Av), clipOf(Bv), minW);
+      if (!seg) continue;
+      const tAt = (w0, w1, w) => Math.abs(w1 - w0) < 1e-12 ? 0 : (w - w0) / (w1 - w0);
+      const ca = clipOf(Av), cb = clipOf(Bv);
+      const t0 = tAt(ca.w, cb.w, seg[0].w), t1 = tAt(ca.w, cb.w, seg[1].w);
+      const at = t => new THREE.Vector3(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t);
+      const p0 = at(t0), p1 = at(t1);
+      const [ax, ay] = screenOf(seg[0], r.width, r.height), [bx, by] = screenOf(seg[1], r.width, r.height);
+      const sd = screenDist(ax, ay, bx, by, mx, my);
+      if (sd.d >= bd) continue;
+      const q = p0.clone().lerp(p1, sd.t);
+      if (hit && !inFrontOfHit(q.distanceTo(camera.position), hit.point.distanceTo(camera.position), 0.01)) continue;
+      bd = sd.d; best = { a: new THREE.Vector3(...origA), b: new THREE.Vector3(...origB), body: g.userData.body };
     }
   }
   return best;
@@ -271,7 +332,7 @@ function pickEdge(ev) {
 const selG = new THREE.Group(); scene.add(selG);
 function drawSelection() {
   invalidate();
-  selG.clear();
+  clearGroup(selG);
   for (const e of S.selEdges) {
     const g = new THREE.BufferGeometry().setFromPoints([e.a, e.b]);
     selG.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x29b6ff, linewidth: 3, depthTest: false })));
@@ -282,7 +343,12 @@ function drawSelection() {
   }
   for (const p of S.measPts) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffb26b, depthTest: false })); s.position.copy(p); selG.add(s); }
   if (S.measPts.length === 2) selG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(S.measPts), new THREE.LineBasicMaterial({ color: 0xffb26b, depthTest: false })));
-  world.children.forEach(g => { g.children[0].material = bodyMaterial(g.userData.body); });
+  world.children.forEach(g => {
+    const mesh = g.children[0]; if (!mesh) return;
+    const prev = mesh.material;
+    mesh.material = bodyMaterial(g.userData.body);
+    if (prev && prev !== mesh.material && prev.dispose) prev.dispose();
+  });
   renderItems();
 }
 
@@ -345,6 +411,18 @@ function renderRail() {
     r.innerHTML = `<h3>Model</h3>` + MODEL_TOOLS.map(t => toolBtn(t, S.tool)).join("");
   }
   r.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => S.mode === "sketch" ? setSkTool(b.dataset.tool) : setTool(b.dataset.tool));
+  syncSketchLocks();
+}
+function syncSketchLocks() {
+  if (S.mode !== "sketch" || !S.sk) return;
+  const n = S.sk.sel.size;
+  const need2 = new Set(["parallel", "perpendicular", "equal", "tangent", "concentric", "coincident"]);
+  document.querySelectorAll("#cwRail [data-con]").forEach(b => {
+    const off = n === 0 || (need2.has(b.dataset.con) && n !== 2);
+    b.disabled = off;
+    b.setAttribute("aria-disabled", off ? "true" : "false");
+    b.title = off ? (need2.has(b.dataset.con) ? "Select exactly two curves first" : "Select curves first") : "";
+  });
 }
 
 /* ---------------------------------------------------------------- model tool panels */
@@ -357,6 +435,12 @@ const vec = id => [0, 1, 2].map(k => parseFloat($("#" + id + k).value) || 0);
 function seg(id, opts, cur) { return `<div class="cw-seg" id="${id}" role="group">${opts.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${v === cur}">${l}</button>`).join("")}</div>`; }
 function segVal(id) { return $(`#${id} [aria-pressed=true]`)?.dataset.v; }
 function wireSegs(root) { root.querySelectorAll(".cw-seg").forEach(g => g.querySelectorAll("button").forEach(b => b.onclick = () => { g.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); g.dispatchEvent(new Event("change")); })); }
+function lockApply(reason) {
+  const b = $("#tApply"); if (!b) return;
+  b.disabled = !!reason;
+  if (reason) { b.setAttribute("aria-disabled", "true"); b.title = reason; }
+  else { b.removeAttribute("aria-disabled"); b.removeAttribute("title"); }
+}
 function panel(title, html, onApply, applyLabel = "Apply") {
   const p = $("#cwTool"); p.hidden = false;
   p.innerHTML = `<h2>${esc(title)}</h2>${html}<div class="cw-row"><button class="primary" id="tApply">${esc(applyLabel)}</button><button id="tCancel">Cancel</button></div>`;
@@ -521,7 +605,7 @@ const TOOL_PANELS = {
     panel("Fillet / Chamfer", `${seg("tStyle", [["fillet", "Fillet (round)"], ["chamfer", "Chamfer (bevel)"]], "fillet")}
       <div class="f"><label for="tR">Radius / size (mm)</label>${num("tR", 1)}</div>
       <div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>
-      <p class="help" id="tEdges">${S.selEdges.length ? `${S.selEdges.length} edge(s) picked.` : "No edges picked: every outside edge is rounded."} Approximate: inside corners stay sharp and corners at the ends of picked edges blend a little. Can take a few seconds.</p>`,
+      <p class="help" id="tEdges">${S.selEdges.length ? `${S.selEdges.length} edge(s) picked.` : "No edges picked: every outside edge is rounded."} Approximate mesh, not a precise solid fillet or chamfer: inside corners stay sharp and corners at the ends of picked edges blend a little. Can take a few seconds.</p>`,
       () => addOp("round_edges", { style: segVal("tStyle"), radius: val("tR"), body: +$("#tBody").value, edges: S.selEdges.map(e => [e.a.toArray(), e.b.toArray()]) }));
   },
   shell() {
@@ -530,15 +614,16 @@ const TOOL_PANELS = {
       () => addOp("hollow", { wall: val("tW"), drain_diameter: val("tD") }));
   },
   faceoffset() {
-    panel("Face extrude", `<p class="help">${S.selFace ? "Face picked." : "Tap a flat face on the model."}</p>
+    panel("Face extrude", `<p class="help">${S.selFace ? "Face picked." : "Tap a flat face on the model. Apply stays off until you do."}</p>
       ${seg("tDir", [["out", "Outward"], ["in", "Inward"]], "out")}
       <div class="f"><label for="tDist">Distance (mm)</label>${num("tDist", 2)}</div>
-      <p class="help">Outward grows the face. Inward pushes it into the solid. The distance here is always positive.</p>`,
+      <p class="help">Outward grows the face. Inward pushes it into the solid. This pushes one flat mesh region. It is not a precise solid offset: neighbouring triangles stretch, and a face that is not flat is refused. The distance here is always positive.</p>`,
       () => {
         if (!S.selFace) return msg("Tap a flat face first.");
         const d = Math.abs(val("tDist"));
         addOp("face_offset", { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray(), distance: segVal("tDir") === "in" ? -d : d });
       });
+    if (!S.selFace) lockApply("Tap a flat face first");
   },
   move() {
     panel("Move / Rotate", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${v3("tMv:Move", [0, 0, 0])}${v3("tRo:Rotate°", [0, 0, 0])}<p class="help">Rotation is about the body's centre.</p>`,
@@ -577,9 +662,9 @@ const TOOL_PANELS = {
       <div class="f"><label for="tRad">Size <b id="tRadV">${B.radius} mm</b></label><input id="tRad" type="range" min="0.5" max="40" step="0.5" value="${B.radius}"></div>
       <div class="f"><label for="tStr">Strength <b id="tStrV">${Math.round(B.strength * 100)}%</b></label><input id="tStr" type="range" min="0.05" max="1" step="0.05" value="${B.strength}"></div>
       <label class="cw-toggle"><span>Symmetry X (mirror across X = 0)</span><input type="checkbox" id="tSym" ${B.sym ? "checked" : ""}></label>
-      <div class="f"><label for="tEdge">Detail (remesh edge, mm)</label>${num("tEdge", B.edge)}</div>
-      <p class="help">Every brush shows live on the model as you drag. Strokes save in the background (no waiting spinner). Undo with Ctrl/⌘+Z. Remesh first if the mesh is too coarse. The brush is a sphere: on thin walls the back moves too.</p>`,
-      () => addOp("remesh", { edge: val("tEdge") }).then(() => setTool("sculpt")), "Remesh for detail");
+      <div class="f"><label for="tEdge">Longest edge after subdivision (mm)</label>${num("tEdge", B.edge)}</div>
+      <p class="help">Every brush shows live on the model as you drag. Strokes save in the background (no waiting spinner). Undo waits until the stroke has saved. The brush follows the surface you are looking at: the back of a thin wall stays put. A stroke that would fold the mesh or change size outside the brush is refused. Subdivide evenly splits long edges. It does not build a new surface.</p>`,
+      () => addOp("remesh", { edge: val("tEdge") }).then(() => setTool("sculpt")), "Subdivide evenly");
     const sync = () => { B.brush = segVal("tBrush"); B.radius = val("tRad"); B.strength = val("tStr"); B.sym = $("#tSym").checked; B.edge = val("tEdge");
       $("#tRadV").textContent = B.radius + " mm"; $("#tStrV").textContent = Math.round(B.strength * 100) + "%"; };
     $("#cwTool").querySelectorAll("input").forEach(i => i.oninput = sync); $("#tBrush").addEventListener("change", sync);
@@ -619,6 +704,7 @@ const TOOL_PANELS = {
       rotation: val("tRot") || 0, nozzle: val("tNoz") || 0.4, plate_thickness: val("tPth"), margin: val("tMg") });
     $("#cwTool").querySelectorAll("input,select").forEach(i => i.addEventListener("input", sync));
     if ($("#tPick")) $("#tPick").onclick = () => { sync(); $("#cwTool").hidden = true; hint("Text", "Tap the model where the text should be centred.", true); };   // panel steps aside (phones), the tap brings it back
+    if (T.target === "surface" && !S.selFace) lockApply("Tap the model where the text should go");
     ["tStyle", "tTarget"].forEach(id => $("#" + id).addEventListener("change", () => { sync(); const open = $("#cwTool .cw-adv").open; TOOL_PANELS.text(); $("#cwTool .cw-adv").open = open; }));
   },
   visualize() {
@@ -648,7 +734,9 @@ async function load(keepCam) {
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
 }
 function updateTop() {
-  $("#cwUndo").disabled = !S.scene?.can_undo; $("#cwRedo").disabled = !S.scene?.can_redo;
+  $("#cwUndo").disabled = sculptSaving || !S.scene?.can_undo;
+  $("#cwUndo").title = sculptSaving ? "Undo waits until this stroke finishes saving" : "Undo · Ctrl/⌘+Z";
+  $("#cwRedo").disabled = !S.scene?.can_redo;
   const d = S.scene?.downloads;
   $("#cwDlStl").href = d ? d.stl : "#"; $("#cwDl3mf").href = d ? d["3mf"] : "#";
   $("#cwToSlicer").href = S.bid ? `/?edit=${encodeURIComponent(S.bid)}#slicer` : "#";
@@ -678,7 +766,11 @@ function bigModel(e) {
 }
 async function run(fn, okText) {
   busy(true); msg("");
-  try { await fn(); if (okText) msg(okText, true); return true; } catch (e) { msg(e.message); return false; } finally { busy(false); }
+  try { await fn(); if (okText) msg(okText, true); return true; }
+  catch (e) {
+    if (e.name === "AbortError") { msg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects."); return false; }
+    msg(e.message); return false;
+  } finally { busy(false); }
 }
 /* Print warnings (e.g. text thinner than the nozzle): advisory only, dismissible, never block. */
 function showWarn(list) {
@@ -789,7 +881,18 @@ function renderItems() {
   fillTx(box);
 }
 $("#cwItems").addEventListener("click", e => {
-  const ey = e.target.closest("[data-eye]"); if (ey) { const i = +ey.dataset.eye; S.hidden.has(i) ? S.hidden.delete(i) : S.hidden.add(i); world.children.forEach(g => g.visible = !S.hidden.has(g.userData.body)); return renderItems(); }
+  const ey = e.target.closest("[data-eye]"); if (ey) {
+    const i = +ey.dataset.eye; S.hidden.has(i) ? S.hidden.delete(i) : S.hidden.add(i);
+    world.children.forEach(g => g.visible = !S.hidden.has(g.userData.body));
+    if (S.hidden.has(i) && (S.selBody === i || S.selEdges.some(ed => ed.body === i))) {
+      S.selEdges = S.selEdges.filter(ed => ed.body !== i);
+      if (S.selBody === i) { S.selBody = -1; S.selFace = null; }
+      hideCtx(); msg("Selection cleared. That body is hidden — show it, then tap it again.");
+      drawSelection();
+      if (S.mode === "model" && S.tool && TOOL_PANELS[S.tool]) TOOL_PANELS[S.tool]();
+    }
+    return renderItems();
+  }
   const h = e.target.closest("[data-h]"); if (h) { const o = h.dataset.h === "grid" ? gridObj : axes; o.visible = !o.visible; return renderItems(); }
   const sk = e.target.closest("[data-skedit]"); if (sk) { const st = S.scene.ops[+sk.dataset.skedit - 1]; return startSketch(st.params.plane, st.params.sketch, st.i); }
   const b = e.target.closest("[data-body]"); if (b) { S.selBody = S.selBody === +b.dataset.body ? -1 : +b.dataset.body; drawSelection(); }
@@ -872,7 +975,7 @@ function startSketch(plane, sketch = null, editStep = 0) {
   setSkTool("line"); drawSketch();
 }
 function exitSketch() {
-  S.mode = "model"; S.sk = null; sketchG.clear(); controls.enableRotate = true; helpers.visible = true;
+  S.mode = "model"; S.sk = null; clearGroup(sketchG); controls.enableRotate = true; helpers.visible = true;
   $("#cwMode").textContent = "Modeling"; renderRail(); hint(...HINTS.null); $("#cwLabels").innerHTML = ""; buildWorld(true);
   camera.up.set(0, 0, 1); viewAlong(new THREE.Vector3(0.9, -1.3, 1)); if (world.children.length) fit();
 }
@@ -945,7 +1048,8 @@ function hitEntity(ev) {
 
 /* drawing */
 function drawSketch() {
-  sketchG.clear(); invalidate();
+  clearGroup(sketchG); invalidate();
+  syncSketchLocks();
   if (!S.sk) return;
   const lineMat = (sel, cons) => new THREE.LineBasicMaterial({ color: sel ? 0x29b6ff : cons ? 0x8a93a8 : 0xf2f5ff, depthTest: false, transparent: true });
   const fill = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x2b63ff, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide }));
@@ -1191,7 +1295,7 @@ async function finishSketch() {
 
 /* ---------------------------------------------------------------- Extrude / Revolve from the pending sketch */
 async function drawPending() {
-  sketchG.clear(); invalidate();
+  clearGroup(sketchG); invalidate();
   const pd = S.pending; if (!pd) return;
   sketchG.matrixAutoUpdate = false; sketchG.matrix.copy(pd.F.m);
   try {
@@ -1213,7 +1317,7 @@ function extrudePanel(kind) {
   const lines = pd.sketch.entities.filter(e => e.type === "line");
   const common = `${seg("tMode", modes, "new")}<p class="help">Tap regions on the sketch to use only those (none picked = all closed shapes; a shape inside another is a hole).</p>
     <p class="help" id="tPicks">${pd.picks?.length ? pd.picks.length + " region(s) picked." : "All regions."}</p>`;
-  const go = (op, extra) => addOp(op, { sketch: pd.sketch, plane: pd.plane, picks: pd.picks || [], mode: segVal("tMode"), ...extra }).then(() => { if (S.tool === null) { S.pending = null; sketchG.clear(); } if (hasBody) modePop(); });
+  const go = (op, extra) => addOp(op, { sketch: pd.sketch, plane: pd.plane, picks: pd.picks || [], mode: segVal("tMode"), ...extra }).then(() => { if (S.tool === null) { S.pending = null; clearGroup(sketchG); } if (hasBody) modePop(); });
   if (kind === "extrude")
     panel("Extrude", `<div class="f"><label for="tDist">Distance (mm)</label>${num("tDist", 10)}</div>${seg("tDir", [["up", "Up"], ["down", "Down"], ["both", "Both (symmetric)"]], "up")}
       <div class="f"><label for="tTaper">Taper angle°</label>${num("tTaper", 0)}</div>${common}`,
@@ -1267,9 +1371,13 @@ function previewDab(c, n, k) {   // Live Sculpt: approximate feedback for every 
     // Flatten uses a plane through the first dab (stored on stroke); fall back to camera-facing
     const planeN = (brush === "flatten" && stroke?.flatN) ? stroke.flatN : n;
     const planeC = (brush === "flatten" && stroke?.flatC) ? stroke.flatC : c;
+    const facing = n || stroke?.n;
+    if (facing && !geo.attributes.normal) geo.computeVertexNormals();
+    const na = geo.attributes.normal?.array;
     for (let i = 0; i < a.length; i += 3) {
       const dx = a[i] - c.x, dy = a[i + 1] - c.y, dz = a[i + 2] - c.z, d2 = dx * dx + dy * dy + dz * dz;
       if (d2 >= r * r) continue;
+      if (facing && na && na[i] * facing.x + na[i + 1] * facing.y + na[i + 2] * facing.z <= 0.2) continue;
       const fall = (1 - d2 / (r * r)) ** 2, s = B.strength;
       if (brush === "grab") {
         a[i] += k.x * fall; a[i + 1] += k.y * fall; a[i + 2] += k.z * fall;
@@ -1320,9 +1428,32 @@ const sculptMove = perFrame(ev => {
 });
 stage.addEventListener("pointermove", sculptMove, { capture: true, passive: true });
 let sculptSaving = false;
+const strokeQueue = [];
 function setLiveSculptStatus(text) {
   const el = document.getElementById("cwLiveSculpt");
   if (el) el.textContent = text || "";
+}
+async function pumpStrokes() {
+  if (sculptSaving) return;
+  sculptSaving = true; updateTop();
+  try {
+    while (strokeQueue.length) {
+      const params = strokeQueue.shift();
+      setLiveSculptStatus("Saving stroke…");
+      try {
+        await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "sculpt_stroke", params } });
+      } catch (e) {
+        strokeQueue.length = 0;
+        if (!stroke) await load(true);
+        msg(e.message || "The stroke did not save. The model was put back. Redo that stroke.");
+        setLiveSculptStatus("Save failed — mesh restored");
+        return;
+      }
+    }
+    if (!stroke) { try { await load(true); } catch (e) { msg(e.message); } }
+    setLiveSculptStatus("Live Sculpt · stroke saved");
+    setTimeout(() => { if (!sculptSaving) setLiveSculptStatus("Live Sculpt · drag to shape"); }, 1200);
+  } finally { sculptSaving = false; updateTop(); if (strokeQueue.length) pumpStrokes(); }
 }
 async function endStroke(ev) {
   sculptMove.flush();
@@ -1332,17 +1463,9 @@ async function endStroke(ev) {
   const r = (v) => v.toArray().map(x => Math.round(x * 1e4) / 1e4);
   const params = { brush: B.brush, radius: B.radius, strength: B.strength, symmetry_x: B.sym, points: st.pts.map(r), normal: r(st.n) };
   if (B.brush === "grab") { if (!st.delta) return; params.delta = r(st.delta); params.strength = 1; }
-  // Live Sculpt: keep the approximate mesh on screen; save in the background (no full-screen busy spinner)
-  sculptSaving = true; setLiveSculptStatus("Saving stroke…");
-  try {
-    await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op: "sculpt_stroke", params } });
-    await load(true);
-    setLiveSculptStatus("Live Sculpt · stroke saved");
-    setTimeout(() => { if (!sculptSaving) setLiveSculptStatus("Live Sculpt · drag to shape"); }, 1200);
-  } catch (e) {
-    msg(e.message); await load(true);   // revert approximate preview to last good server mesh
-    setLiveSculptStatus("Save failed — mesh restored");
-  } finally { sculptSaving = false; }
+  if (!S.bid) { msg("Make a solid first."); if (!stroke) load(true); return; }
+  strokeQueue.push(params);
+  pumpStrokes();
 }
 stage.addEventListener("pointerup", endStroke, true);
 stage.addEventListener("pointercancel", endStroke, true);
@@ -1500,6 +1623,42 @@ function modelTap(ev) {
   drawSelection();
   if (S.tool && TOOL_PANELS[S.tool] && !["extrude", "revolve", "visualize"].includes(S.tool)) TOOL_PANELS[S.tool]();
 }
+function reconcileSelection() {
+  if (S.mode === "sketch") return;
+  if (!S.selEdges.length && !S.selFace && !(S.selBody >= 0)) return;
+  const need = new Set(S.selEdges.map(e => e.body));
+  if (S.selBody >= 0) need.add(S.selBody);
+  const bodies = [];
+  for (const g of world.children) {
+    if (!need.has(g.userData.body)) continue;
+    const edges = g.children[1]?.geometry?.attributes?.position?.array;
+    const tris = g.children[0]?.geometry?.attributes?.position?.array;
+    bodies.push({
+      index: g.userData.body,
+      visible: g.visible !== false,
+      edges: edges ? Array.from(edges) : [],
+      tris: tris ? Array.from(tris) : [],
+    });
+  }
+  const had = S.selEdges.length || S.selFace || S.selBody >= 0;
+  let edges = S.selEdges.map(e => ({ a: [e.a.x, e.a.y, e.a.z], b: [e.b.x, e.b.y, e.b.z], body: e.body }));
+  if (S.section) {
+    const vis = edges.filter(e => clipHalfSpace(e.a, e.b, clipPlane.distanceToPoint(new THREE.Vector3(...e.a)), clipPlane.distanceToPoint(new THREE.Vector3(...e.b))));
+    if (vis.length !== edges.length) edges = vis;
+  }
+  let face = S.selFace ? [S.selFace.point.x, S.selFace.point.y, S.selFace.point.z] : null;
+  if (S.section && face && clipPlane.distanceToPoint(S.selFace.point) < -1e-6) face = null;
+  const out = reconcileGeom({ body: S.selBody, edges, face }, bodies, 0.75);
+  const dropped = out.droppedEdge || out.droppedFace || out.droppedBody || edges.length !== S.selEdges.length || (S.selFace && !face);
+  S.selEdges = out.edges.map(e => ({ a: new THREE.Vector3(...e.a), b: new THREE.Vector3(...e.b), body: e.body }));
+  if (!out.face) S.selFace = null;
+  if (out.droppedBody) { S.selBody = -1; S.selFace = null; S.selEdges = []; }
+  if (had && dropped) {
+    hideCtx();
+    msg("Selection cleared. The shape changed — tap the model again.");
+    if (S.mode === "model" && S.tool && TOOL_PANELS[S.tool]) TOOL_PANELS[S.tool]();
+  }
+}
 function deselect() {
   hideCtx();
   S.selBody = -1; S.selFace = null; S.selEdges = []; S.measPts = []; setMeasLabel(null); renderSkLabels();
@@ -1575,18 +1734,30 @@ function importTitle() {
   const t = ($("#cwTitle").value || "").trim();
   return (!S.bid && t && t !== "My design" ? t : "Imported model").slice(0, 60);
 }
+let importCtl = null;
 async function importFile(f) {
   if (f && f.size > 500 * 1024 * 1024) return msg("That file is over 500 MB. Try a smaller one, or simplify it first.");
+  if (importCtl) importCtl.abort();
+  const ctl = importCtl = new AbortController();
   let warn = []; $("#cwOpenMenu").hidden = true; $("#cwOpen").setAttribute("aria-expanded", false);
-  const ok = await run(async () => {
+  busy(true, () => ctl.abort()); msg("");
+  try {
     const fd = new FormData(); fd.append("file", f); fd.append("title", importTitle());
     fd.append("units", UNITS.includes($("#cwUnits").value) ? $("#cwUnits").value : "mm");
-    const j = await api("/api/edit/new", { method: "POST", body: fd });
+    const j = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
+    if (ctl.signal.aborted || ctl !== importCtl) return;
     const id = j.id || j.project?.id; if (!id) throw new Error("Your recent builds are full. Delete one on the main page, then try again.");
     warn = j.warnings || j.project?.warnings || [];
     await openProject(id);
-  }, "Imported. It's Import 01 in History; edit it with any tool.");
-  if (ok && warn.length) msg("Imported. " + warn.join(" "));
+    if (ctl !== importCtl) return;
+    msg(warn.length ? "Imported. " + warn.join(" ") : "Imported. It's Import 01 in History; edit it with any tool.", true);
+  } catch (e) {
+    if (e.name === "AbortError") {
+      if (ctl === importCtl) msg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects.");
+      return;
+    }
+    msg(e.message);
+  } finally { if (ctl === importCtl) busy(false); }
 }
 $("#cwFile").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if (f) importFile(f); };
 stage.addEventListener("dragover", e => e.preventDefault());

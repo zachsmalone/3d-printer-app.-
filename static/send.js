@@ -43,7 +43,7 @@ function render() {
   $("#ssTitle").textContent = adult ? "Send or save your model" : "Save your model";
   const chooser = adult ? `<div class="fmt" role="radiogroup" aria-label="File type">${FMTS.map(f =>
     `<button type="button" role="radio" aria-checked="${f === fmt}" class="${f === fmt ? "on" : ""}" data-fmt="${f}">${f.toUpperCase()}${sizes[f] ? `<small>${mb(sizes[f])}</small>` : ""}</button>`).join("")}</div>
-    <p class="help" id="ssFmtHint">${{ "3mf": "Best for most slicers. Smallest file.", stl: "Works almost everywhere. Use this one for Shapr3D.", obj: "For other 3D apps." }[fmt]}</p>` : "";
+    <p class="help" id="ssFmtHint">${{ "3mf": "Best for most slicers. Smallest file.", stl: "A triangle mesh. Shapr3D opens it as a reference shape, not an editable solid.", obj: "For other 3D apps." }[fmt]}</p>` : "";
   const fileLine = !adult ? "" : !isExpert()
     ? `<div class="help">File: 3D print file (3MF)<details class="inl"><summary>Different file type?</summary>${chooser}</details></div>` : chooser;
   const save = [], other = [], print = [];

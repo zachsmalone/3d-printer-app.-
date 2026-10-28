@@ -19,7 +19,14 @@ const U = () => UNITS[E.unit];
 const fmt = mm => (mm / U()).toFixed(E.unit === "mm" ? 2 : 3).replace(/\.?0+$/, "");   // mm → display
 const val = (root, name) => { const el = $(`[name=${name}]`, root); return el ? el.value : undefined; };
 const len = (root, name) => +val(root, name) * U();                                       // display → mm
-const busy = (on, text = "Working…") => { $("#editBusy").hidden = !on; $("#editBusyText").textContent = text; };
+let importCtl = null;
+const busy = (on, text = "Working…", cancel = null) => {
+  $("#editBusy").hidden = !on; $("#editBusyText").textContent = text;
+  const b = $("#editBusyCancel");
+  if (!b) return;
+  b.hidden = !on || typeof cancel !== "function";
+  b.onclick = typeof cancel === "function" ? cancel : null;
+};
 const lenInput = (name, mmVal, label, extra = "") => `<div class="field"><label>${label} <em>${E.unit}</em></label><input type="number" name="${name}" value="${fmt(mmVal)}" step="any" ${extra}></div>`;
 const numInput = (name, v, label, unit = "", extra = "") => `<div class="field"><label>${label} <em>${unit}</em></label><input type="number" name="${name}" value="${v}" step="any" ${extra}></div>`;
 const A = () => E.p.analysis;
@@ -38,17 +45,23 @@ function ensureViewer() {
 
 /* ---------- opening / creating projects ---------- */
 async function create(fd, retry) {
-  busy(true, "Importing…");
+  if (importCtl) importCtl.abort();
+  const ctl = importCtl = new AbortController();
+  busy(true, "Importing…", () => ctl.abort());
   try {
-    const r = await api("/api/edit/new", { method: "POST", body: fd });
+    const r = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
+    if (ctl.signal.aborted || ctl !== importCtl) return;
     S.history = r.history; renderHistory(); loadProject(r);
     if (copyFromPhoto && r.id) { rememberCopy(sessionStorage, copyFromPhoto, r.id); copyFromPhoto = ""; document.dispatchEvent(new CustomEvent("zeim:flow")); }
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
     else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) { copyFromPhoto = ""; editPick.msg(e.message); }       // photo problems stay under the photo buttons (QA-3)
+    else if (e.name === "AbortError") {
+      if (ctl === importCtl) modelMsg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects.");
+    }
     else { copyFromPhoto = ""; toast(e.message, "err"); }
-  } finally { busy(false); }
+  } finally { if (ctl === importCtl) busy(false); }
 }
 const PHOTO_RE = /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/i;
 const MODEL_RE = /\.(stl|obj|3mf)(\.zip)?$/i;

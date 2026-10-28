@@ -86,10 +86,12 @@
     var label = indicatorLabel();
     ind.textContent = label;
     if (ind.classList) { if (saveFailed) ind.classList.add("bad"); else ind.classList.remove("bad"); }
-    var title = whereText();
-    if (saveFailed) title += " The last draft did not store in this browser. Your changes are still unsaved.";
-    else if (lastAt) title += " The time is when this browser stored the workspace draft, not a separate server confirmation.";
-    ind.title = title;
+    var title = saveFailed
+      ? "Not saved. The last draft did not store in this browser. This label is not a server confirmation. "
+      : lastAt
+        ? "Draft saved in this browser. This time is not a server confirmation. "
+        : indicatorLabel() + ". This label is not a server confirmation. ";
+    ind.title = title + whereText();
     ind.setAttribute("aria-label", label + ". Open saving settings");
   }
 
