@@ -8,8 +8,12 @@ import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
 import { bindFlow } from "/static/project-flow.js";
 import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
-import { previewPlacement } from "/static/gizmo-math.js";
+import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo } from "/static/gizmo-view.js";
+import {
+  PAINT, pickChoice, edgeKey, curvePaint, bodyGlow, constraintBlock, constraintSummary,
+  filletBlock, faceOffsetBlock, extrudeBlock, revolveBlock, measureBlock, anchorClear,
+} from "/static/cad-feel.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -70,6 +74,8 @@ const S = {
 };
 let gzKind = "move";
 let mdrag = null;
+let pickPaint = { hover: null, press: null };
+let pressing = false;
 const msg = (t, ok) => { const m = $("#cwMsg"); m.textContent = t || ""; m.style.color = ok ? "var(--ok)" : ""; };
 const busy = (on, cancel) => {
   const el = $("#cwBusy"); if (!el) return;
@@ -106,7 +112,7 @@ function frame() {
   const tol = 2e-4 * camera.position.distanceTo(controls.target);   // stop once the damping tail is sub-pixel
   const moving = camera.position.distanceToSquared(lastPos) > tol * tol || 1 - Math.abs(camera.quaternion.dot(lastQuat)) > 1e-8;
   lastPos.copy(camera.position); lastQuat.copy(camera.quaternion);
-  renderer.render(scene, camera); syncCube(); placeLabels(); placeCtx(); window.__cadFrames++;
+  renderer.render(scene, camera); syncCube(); placeLabels(); placeCtx(); placePicks(); window.__cadFrames++;
   if (--dirtyN > 0 || moving) invalidate(Math.max(dirtyN, 1));
 }
 const stage = $("#cwStage");
@@ -166,7 +172,7 @@ function loop() { invalidate(); }
 for (const t of ["pointerdown", "pointermove", "pointerup", "pointercancel", "wheel", "keydown", "keyup", "input", "change", "click"])
   addEventListener(t, () => invalidate(), { capture: true, passive: true });
 // async results (fetch -> buildWorld/drawSketch) mutate DOM too; ignore our own per-frame label/cube/ctx moves
-new MutationObserver(recs => { if (recs.some(r => !r.target.closest?.(".cw-labels,.cw-cubewrap,.cw-ctx"))) invalidate(); })
+new MutationObserver(recs => { if (recs.some(r => !r.target.closest?.(".cw-labels,.cw-cubewrap,.cw-ctx,.cw-pick"))) invalidate(); })
   .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "class", "aria-pressed"] });
 /* coalesce heavy pointermove work (raycasts, snapping, highlight) to once per frame; flush before up/down */
 function perFrame(fn) {
@@ -184,7 +190,8 @@ function bodyMaterial(i) {
   const m = new THREE.MeshStandardMaterial({ color: a.color || PALETTE[i % PALETTE.length], roughness: rough, metalness: metal,
     clippingPlanes: S.section ? [clipPlane] : [], side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   if (a.finish === "glass") { m.transparent = true; m.opacity = 0.45; }
-  if (i === S.selBody) m.emissive = new THREE.Color(0x2a3cff), m.emissiveIntensity = 0.35;
+  const glow = bodyGlow(i, { selected: S.selBody, hover: pickPaint.hover?.body ?? -1, press: pickPaint.press?.body ?? -1 });
+  if (glow) { m.emissive = new THREE.Color(glow.color); m.emissiveIntensity = glow.intensity; }
   return m;
 }
 function buildWorld(keepCam) {
@@ -337,14 +344,6 @@ const selG = new THREE.Group(); scene.add(selG);
 function drawSelection() {
   invalidate();
   clearGroup(selG);
-  for (const e of S.selEdges) {
-    const g = new THREE.BufferGeometry().setFromPoints([e.a, e.b]);
-    selG.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x29b6ff, linewidth: 3, depthTest: false })));
-  }
-  if (S.selFace) {
-    const m = new THREE.Mesh(new THREE.CircleGeometry(3, 24), new THREE.MeshBasicMaterial({ color: 0x29b6ff, transparent: true, opacity: 0.6, depthTest: false, side: THREE.DoubleSide }));
-    m.position.copy(S.selFace.point); m.lookAt(S.selFace.point.clone().add(S.selFace.normal)); selG.add(m);
-  }
   for (const p of S.measPts) { const s = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffb26b, depthTest: false })); s.position.copy(p); selG.add(s); }
   if (S.measPts.length === 2) selG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(S.measPts), new THREE.LineBasicMaterial({ color: 0xffb26b, depthTest: false })));
   world.children.forEach(g => {
@@ -400,8 +399,9 @@ function renderRail() {
   if (S.mode === "sketch") {
     const s = S.sk;
     r.innerHTML = `<h3>Sketch</h3>${SKETCH_TOOLS.map(t => toolBtn(t, s.tool)).join("")}<h3>Constraints</h3>` +
-      CONS.map(([id, label, g]) => `<button class="cw-tool" data-con="${id}" title="${esc(label)}: select curves first" aria-label="Add ${esc(label)} constraint to the selection"><b style="width:22px;text-align:center">${g}</b><span class="lbl">${esc(label)}</span></button>`).join("") +
-      `<label class="cw-toggle"><span>Auto-constraint</span><input type="checkbox" id="skAuto" ${s.auto ? "checked" : ""}></label>
+      CONS.map(([id, label, g]) => `<button class="cw-tool" data-con="${id}" title="${esc(label)}" aria-label="Add ${esc(label)} constraint to the selection"><b style="width:22px;text-align:center">${g}</b><span class="lbl">${esc(label)}</span></button>`).join("") +
+      `<p class="cw-why" id="cwConWhy" role="status" hidden></p>
+       <label class="cw-toggle"><span>Auto-constraint</span><input type="checkbox" id="skAuto" ${s.auto ? "checked" : ""}></label>
        <label class="cw-toggle"><span>Show constraints</span><input type="checkbox" id="skShow" ${s.showCons ? "checked" : ""}></label>
        <label class="cw-toggle"><span>Arc mode</span><input type="checkbox" id="skArc" ${s.arc ? "checked" : ""}></label>
        <button class="cw-tool" id="skDone" aria-label="Finish sketch (Enter)">${IC.done}<span class="lbl">Finish sketch</span><kbd>↵</kbd></button>
@@ -419,14 +419,19 @@ function renderRail() {
 }
 function syncSketchLocks() {
   if (S.mode !== "sketch" || !S.sk) return;
-  const n = S.sk.sel.size;
-  const need2 = new Set(["parallel", "perpendicular", "equal", "tangent", "concentric", "coincident"]);
+  const ents = [...S.sk.sel].map(id => S.sk.entities.find(e => e.id === id)).filter(Boolean);
   document.querySelectorAll("#cwRail [data-con]").forEach(b => {
-    const off = n === 0 || (need2.has(b.dataset.con) && n !== 2);
-    b.disabled = off;
-    b.setAttribute("aria-disabled", off ? "true" : "false");
-    b.title = off ? (need2.has(b.dataset.con) ? "Select exactly two curves first" : "Select curves first") : "";
+    const reason = constraintBlock(b.dataset.con, ents);
+    b.disabled = false;
+    b.setAttribute("aria-disabled", reason ? "true" : "false");
+    b.title = reason || b.querySelector(".lbl")?.textContent || "";
   });
+  const why = $("#cwConWhy");
+  if (why) {
+    const text = constraintSummary(ents);
+    why.hidden = !text;
+    why.textContent = text;
+  }
 }
 
 /* ---------------------------------------------------------------- model tool panels */
@@ -441,13 +446,23 @@ function segVal(id) { return $(`#${id} [aria-pressed=true]`)?.dataset.v; }
 function wireSegs(root) { root.querySelectorAll(".cw-seg").forEach(g => g.querySelectorAll("button").forEach(b => b.onclick = () => { g.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); g.dispatchEvent(new Event("change")); })); }
 function lockApply(reason) {
   const b = $("#tApply"); if (!b) return;
+  const why = $("#tWhy");
   b.disabled = !!reason;
-  if (reason) { b.setAttribute("aria-disabled", "true"); b.title = reason; }
-  else { b.removeAttribute("aria-disabled"); b.removeAttribute("title"); }
+  if (reason) {
+    b.setAttribute("aria-disabled", "true");
+    b.title = reason;
+    b.setAttribute("aria-describedby", "tWhy");
+    if (why) { why.hidden = false; why.textContent = reason; }
+  } else {
+    b.removeAttribute("aria-disabled");
+    b.removeAttribute("title");
+    b.removeAttribute("aria-describedby");
+    if (why) { why.hidden = true; why.textContent = ""; }
+  }
 }
 function panel(title, html, onApply, applyLabel = "Apply") {
   const p = $("#cwTool"); p.hidden = false;
-  p.innerHTML = `<h2>${esc(title)}</h2>${html}<div class="cw-row"><button class="primary" id="tApply">${esc(applyLabel)}</button><button id="tCancel">Cancel</button></div>`;
+  p.innerHTML = `<h2>${esc(title)}</h2>${html}<p class="cw-why" id="tWhy" role="status" hidden></p><div class="cw-row"><button class="primary" id="tApply">${esc(applyLabel)}</button><button id="tCancel">Cancel</button></div>`;
   wireSegs(p);
   $("#tApply").onclick = onApply; $("#tCancel").onclick = () => setTool(null);
 }
@@ -610,7 +625,13 @@ const TOOL_PANELS = {
       <div class="f"><label for="tR">Radius / size (mm)</label>${num("tR", 1)}</div>
       <div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>
       <p class="help" id="tEdges">${S.selEdges.length ? `${S.selEdges.length} edge(s) picked.` : "No edges picked: every outside edge is rounded."} Approximate mesh, not a precise solid fillet or chamfer: inside corners stay sharp and corners at the ends of picked edges blend a little. Can take a few seconds.</p>`,
-      () => addOp("round_edges", { style: segVal("tStyle"), radius: val("tR"), body: +$("#tBody").value, edges: S.selEdges.map(e => [e.a.toArray(), e.b.toArray()]) }));
+      () => {
+        const reason = filletBlock({ bodies: bodyCount(), radius: val("tR") });
+        if (reason) return status("Fillet/Chamfer", reason);
+        addOp("round_edges", { style: segVal("tStyle"), radius: val("tR"), body: +$("#tBody").value, edges: S.selEdges.map(e => [e.a.toArray(), e.b.toArray()]) });
+      });
+    $("#tR")?.addEventListener("input", syncFilletGate);
+    syncFilletGate();
   },
   shell() {
     panel("Shell", `<div class="f"><label for="tW">Wall (mm)</label>${num("tW", 2)}</div><div class="f"><label for="tD">Drain hole Ø (mm, 0 = none)</label>${num("tD", 0)}</div>
@@ -623,11 +644,14 @@ const TOOL_PANELS = {
       <div class="f"><label for="tDist">Distance (mm)</label>${num("tDist", 2)}</div>
       <p class="help">Outward grows the face. Inward pushes it into the solid. This pushes one flat mesh region. It is not a precise solid offset: neighbouring triangles stretch, and a face that is not flat is refused. The distance here is always positive.</p>`,
       () => {
-        if (!S.selFace) return msg("Tap a flat face first.");
         const d = Math.abs(val("tDist"));
-        addOp("face_offset", { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray(), distance: segVal("tDir") === "in" ? -d : d });
+        const signed = segVal("tDir") === "in" ? -d : d;
+        const reason = faceOffsetBlock({ hasFace: !!S.selFace, distance: signed });
+        if (reason) return status("Face extrude", reason);
+        addOp("face_offset", { point: S.selFace.point.toArray(), normal: S.selFace.normal.toArray(), distance: signed });
       });
-    if (!S.selFace) lockApply("Tap a flat face first");
+    $("#tDist")?.addEventListener("input", syncFaceGate);
+    syncFaceGate();
   },
   move() {
     panel("Move / Rotate", `<div class="f"><label for="tBody">Body</label>${bodySel("tBody")}</div>${v3("tMv:Move", [0, 0, 0])}${v3("tRo:Rotate°", [0, 0, 0])}
@@ -745,6 +769,10 @@ function updateTop() {
   $("#cwUndo").disabled = sculptSaving || !S.scene?.can_undo;
   $("#cwUndo").title = sculptSaving ? "Undo waits until this stroke finishes saving" : "Undo · Ctrl/⌘+Z";
   $("#cwRedo").disabled = !S.scene?.can_redo;
+  syncMeasure();
+  if (S.tool === "fillet") syncFilletGate();
+  if (S.tool === "faceoffset") syncFaceGate();
+  if (S.tool === "extrude" || S.tool === "revolve") syncExtrudeGate();
   const d = S.scene?.downloads;
   $("#cwDlStl").href = d ? d.stl : "#"; $("#cwDl3mf").href = d ? d["3mf"] : "#";
   $("#cwToSlicer").href = S.bid ? `/?edit=${encodeURIComponent(S.bid)}#slicer` : "#";
@@ -925,9 +953,47 @@ $("#cwSection").onclick = () => toggleSection(); $("#cwSecPos").oninput = sectio
 /* angle between two tapped faces: 0° = parallel facing the same way, 90° = square, 180° = facing each other */
 function measAngle(n1, n2) { return Math.acos(Math.max(-1, Math.min(1, n1.dot(n2)))) * 180 / Math.PI; }
 window.__measAngle = (a, b) => measAngle(new THREE.Vector3(...a).normalize(), new THREE.Vector3(...b).normalize());
+function syncMeasure() {
+  const b = $("#cwMeasure"); if (!b) return;
+  const reason = S.measure ? "" : measureBlock({ bodies: bodyCount() });
+  b.setAttribute("aria-disabled", reason ? "true" : "false");
+  b.title = reason || "Measure · D";
+}
+function syncFilletGate() {
+  if (!$("#tR")) return;
+  lockApply(filletBlock({ bodies: bodyCount(), radius: val("tR") }));
+}
+function syncFaceGate() {
+  if (!$("#tDist")) return;
+  const d = Math.abs(val("tDist"));
+  const signed = segVal("tDir") === "in" ? -d : d;
+  lockApply(faceOffsetBlock({ hasFace: !!S.selFace, distance: Number.isFinite(signed) ? signed : Number.NaN }));
+}
+function extrudeState() {
+  const pd = S.pending;
+  return {
+    pending: !!pd,
+    failed: !!pd?.regionFailed,
+    regionsKnown: Array.isArray(pd?.regions),
+    regionCount: pd?.regions?.length || 0,
+    distance: $("#tDist") ? val("tDist") : Number.NaN,
+    angle: $("#tAng") ? val("tAng") : Number.NaN,
+  };
+}
+function syncExtrudeGate() {
+  if (!$("#tApply")) return;
+  const st = extrudeState();
+  if (!st.pending) { lockApply(""); return; }
+  lockApply(S.tool === "revolve" ? revolveBlock(st) : extrudeBlock(st));
+}
 function toggleMeasure(on = !S.measure) {
+  if (on) {
+    const reason = measureBlock({ bodies: bodyCount() });
+    if (reason) { status("Measure", reason); syncMeasure(); return; }
+  }
   S.measure = on; S.measPts = []; $("#cwMeasure").setAttribute("aria-pressed", on); drawSelection();
   if (on) { S.tool = null; renderRail(); $("#cwTool").hidden = true; hint("Measure", "Tap two points on the model, or tap an edge for its length."); } else hint(...HINTS.null);
+  syncMeasure();
 }
 $("#cwMeasure").onclick = () => toggleMeasure();
 let measLabel = null;
@@ -970,10 +1036,11 @@ let eidN = 1;
 const newId = () => { const used = new Set(S.sk.entities.map(e => e.id)); while (used.has("e" + eidN)) eidN++; return "e" + eidN++; };
 function startSketch(plane, sketch = null, editStep = 0) {
   hideCtx();
+  pickPaint = { hover: null, press: null };
   S.mode = "sketch"; S.tool = null; $("#cwTool").hidden = true;
   const F = frameOf(plane);
   S.sk = { plane, F, entities: structuredClone(sketch?.entities || []), constraints: structuredClone(sketch?.constraints || []), sel: new Set(), tool: "line",
-    draft: null, editStep, auto: true, showCons: true, arc: false, undo: [], dimsEdit: null };
+    draft: null, editStep, auto: true, showCons: true, arc: false, undo: [], dimsEdit: null, hover: null, press: null };
   sketchG.matrixAutoUpdate = false; sketchG.matrix.copy(F.m);
   controls.enableRotate = false;
   viewAlong(F.n.clone(), F.y.clone());
@@ -1059,13 +1126,14 @@ function drawSketch() {
   clearGroup(sketchG); invalidate();
   syncSketchLocks();
   if (!S.sk) return;
-  const lineMat = (sel, cons) => new THREE.LineBasicMaterial({ color: sel ? 0x29b6ff : cons ? 0x8a93a8 : 0xf2f5ff, depthTest: false, transparent: true });
+  const lineMat = (role) => new THREE.LineBasicMaterial({ color: PAINT[role] || PAINT.idle, depthTest: false, transparent: true });
   const fill = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshBasicMaterial({ color: 0x2b63ff, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide }));
   sketchG.add(fill);
   const gl = new THREE.GridHelper(S.grid * 40, 40, 0x7f8db0, 0x46516c); gl.rotation.x = Math.PI / 2; gl.material.transparent = true; gl.material.opacity = 0.35; gl.material.depthTest = false; sketchG.add(gl);
   for (const e of S.sk.entities) {
     const pts = tess(e).map(p => new THREE.Vector3(p[0], p[1], 0));
-    const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(S.sk.sel.has(e.id), e.construction)); ln.renderOrder = 5; sketchG.add(ln);
+    const role = curvePaint(e.id, { hover: S.sk.hover, press: S.sk.press, selected: S.sk.sel.has(e.id), construction: e.construction });
+    const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat(role)); ln.renderOrder = 5; sketchG.add(ln);
     for (const [, p] of keyPoints(e)) { const d = new THREE.Mesh(new THREE.CircleGeometry(Math.max(0.25, S.grid * 0.04), 12), new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false })); d.position.set(p[0], p[1], 0); d.renderOrder = 6; sketchG.add(d); }
   }
   const dr = S.sk.draft;
@@ -1148,8 +1216,8 @@ async function solveSketch() {
 }
 function addConstraint(type) {
   const sel = [...S.sk.sel].map(id => S.sk.entities.find(e => e.id === id)).filter(Boolean);
-  const need2 = ["parallel", "perpendicular", "equal", "tangent", "concentric", "coincident"].includes(type);
-  if (!sel.length || (need2 && sel.length !== 2)) return status("Constraints", need2 ? "Select exactly two curves first." : "Select curves first.");
+  const reason = constraintBlock(type, sel);
+  if (reason) return status("Constraints", reason);
   pushUndo();
   if (type === "horizontal") sel.filter(e => e.type === "line").forEach(e => S.sk.constraints.push({ type: Math.abs(e.p1[0] - e.p0[0]) >= Math.abs(e.p1[1] - e.p0[1]) ? "horizontal" : "vertical", a: e.id }));
   else if (type === "lock") sel.forEach(e => keyPoints(e).forEach(([ref]) => S.sk.constraints.push({ type: "lock", a: ref })));
@@ -1191,8 +1259,16 @@ function arc3(a, b, m) {   // circle through start a, end b, passing m
 /* sketch pointer input: mouse, touch and Apple Pencil (pointer events). One finger / pen draws;
    two fingers pan and zoom (rotation is off while sketching). */
 let drag = null;
+function noteSketchHover(ev) {
+  if (!S.sk || S.sk.draft || drag) return;
+  const id = hitEntity(ev)?.id || null;
+  if (id === S.sk.hover) return;
+  S.sk.hover = id;
+  drawSketch();
+}
 function skDown(ev) {
   const sk = S.sk, t = sk.tool;
+  sk.press = hitEntity(ev)?.id || null;
   if (!t) {   // select / drag point
     const sp = snapPt(ev);
     if (sp?.ref && sp.ref !== "draft0") { drag = { ref: sp.ref, moved: false }; pushUndo(); return; }
@@ -1267,7 +1343,7 @@ function skMove(ev) {
     else if (part === "s" || part === "e") { const a = Math.atan2(p[1] - e.c[1], p[0] - e.c[0]) * 180 / Math.PI; e[part === "s" ? "a0" : "a1"] = a; }
     return drawSketch();
   }
-  const dr = sk.draft; if (!dr) return;
+  const dr = sk.draft; if (!dr) { noteSketchHover(ev); return; }
   const sp = snapPt(ev); if (!sp) return; const p = sp.p, a = dr.pts[0], t = sk.tool;
   if (t === "line") { const prev = dr.pts[dr.pts.length - 1]; if (sk.arc && dr.arcEnd) { const A = arc3(prev, dr.arcEnd.p, p); dr.preview = A ? tess({ type: "arc", ...A }) : [prev, dr.arcEnd.p]; } else dr.preview = [prev, p]; }
   else if (t === "spline") dr.preview = dr.pts.length > 1 ? catmull([...dr.pts, p], false) : [a, p];
@@ -1308,14 +1384,15 @@ async function drawPending() {
   sketchG.matrixAutoUpdate = false; sketchG.matrix.copy(pd.F.m);
   try {
     const r = await api("/api/cad/sketch/regions", { method: "POST", json: { sketch: pd.sketch, picks: pd.picks?.length ? pd.picks : null } });
-    pd.faces = r.faces; pd.regions = r.regions;
-  } catch (e) { msg(e.message); return; }
+    pd.regionFailed = false; pd.faces = r.faces; pd.regions = r.regions;
+  } catch (e) { msg(e.message); pd.regionFailed = true; pd.regions = []; syncExtrudeGate(); return; }
   for (const e of pd.sketch.entities) sketchG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(tess(e).map(p => new THREE.Vector3(p[0], p[1], 0))), new THREE.LineBasicMaterial({ color: 0xf2f5ff, depthTest: false })));
   for (const rg of pd.regions) {
     const sh = new THREE.Shape(rg.outer.map(p => new THREE.Vector2(...p))); rg.holes.forEach(h => sh.holes.push(new THREE.Path(h.map(p => new THREE.Vector2(...p)))));
     const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: 0x29b6ff, transparent: true, opacity: 0.35, depthTest: false, side: THREE.DoubleSide })); m.renderOrder = 3; sketchG.add(m);
   }
   if (!pd.regions.length) msg("This sketch has no closed shape. Edit it so the outline closes.");
+  syncExtrudeGate();
 }
 function extrudePanel(kind) {
   const pd = S.pending;
@@ -1325,7 +1402,16 @@ function extrudePanel(kind) {
   const lines = pd.sketch.entities.filter(e => e.type === "line");
   const common = `${seg("tMode", modes, "new")}<p class="help">Tap regions on the sketch to use only those (none picked = all closed shapes; a shape inside another is a hole).</p>
     <p class="help" id="tPicks">${pd.picks?.length ? pd.picks.length + " region(s) picked." : "All regions."}</p>`;
-  const go = (op, extra) => addOp(op, { sketch: pd.sketch, plane: pd.plane, picks: pd.picks || [], mode: segVal("tMode"), ...extra }).then(() => { if (S.tool === null) { S.pending = null; clearGroup(sketchG); } if (hasBody) modePop(); });
+  const blocked = () => {
+    const st = extrudeState();
+    const reason = kind === "revolve" ? revolveBlock(st) : extrudeBlock(st);
+    if (reason) { status(kind === "revolve" ? "Revolve" : "Extrude", reason); return true; }
+    return false;
+  };
+  const go = (op, extra) => {
+    if (blocked()) return;
+    addOp(op, { sketch: pd.sketch, plane: pd.plane, picks: pd.picks || [], mode: segVal("tMode"), ...extra }).then(() => { if (S.tool === null) { S.pending = null; clearGroup(sketchG); } if (hasBody) modePop(); });
+  };
   if (kind === "extrude")
     panel("Extrude", `<div class="f"><label for="tDist">Distance (mm)</label>${num("tDist", 10)}</div>${seg("tDir", [["up", "Up"], ["down", "Down"], ["both", "Both (symmetric)"]], "up")}
       <div class="f"><label for="tTaper">Taper angle°</label>${num("tTaper", 0)}</div>${common}`,
@@ -1336,6 +1422,9 @@ function extrudePanel(kind) {
       () => { const a = $("#tAxis").value, L = lines.find(l => l.id === a);
         const axis = a === "y" ? { p: [0, 0], d: [0, 1] } : a === "x" ? { p: [0, 0], d: [1, 0] } : { p: L.p0, d: [L.p1[0] - L.p0[0], L.p1[1] - L.p0[1]] };
         go("revolve", { axis, angle: val("tAng") }); });
+  $("#tDist")?.addEventListener("input", syncExtrudeGate);
+  $("#tAng")?.addEventListener("input", syncExtrudeGate);
+  syncExtrudeGate();
 }
 /* Right after an extrude/revolve onto existing bodies: a big, obvious "what should this do?" pop-up.
    Changing it re-runs the step with the new mode (history edit), so a wrong default costs one tap. */
@@ -1481,10 +1570,87 @@ stage.addEventListener("pointercancel", endStroke, true);
 /* ---------------------------------------------------------------- in-canvas context actions + push/pull handle */
 let CTX = null;
 function hideCtx() { if (CTX) { CTX.bar.remove(); CTX.handle?.remove(); CTX = null; } }
+function feelShown(el) {
+  if (!el || el.hidden || el.closest("[hidden]")) return false;
+  const s = getComputedStyle(el);
+  return s.display !== "none" && s.visibility !== "hidden" && el.getClientRects().length > 0;
+}
+const FEEL_CHROME = ".cw-top, .cw-cubewrap, .cw-chips, .cw-bl, .cw-panel, .cw-section, .cw-hint, .cw-lesson, .cw-rail, .zws-p, .wsbar";
+function stageChrome() {
+  const host = stage.getBoundingClientRect();
+  return [...document.querySelectorAll(FEEL_CHROME)].filter(feelShown).map(el => {
+    const r = el.getBoundingClientRect();
+    return { left: r.left - host.left, top: r.top - host.top, right: r.right - host.left, bottom: r.bottom - host.top };
+  });
+}
+function stagePoint(v) {
+  const [x, y, z] = toScreen(v);
+  const canvas = renderer.domElement.getBoundingClientRect();
+  const host = stage.getBoundingClientRect();
+  return { x: x + (canvas.left - host.left), y: y + (canvas.top - host.top), behind: !(z <= 1) };
+}
+function samePick(a, b) {
+  if (!a || !b) return !a && !b;
+  if (a.kind !== b.kind || a.body !== b.body) return false;
+  if (a.kind === "edge") return edgeKey(a.edge.a.toArray(), a.edge.b.toArray()) === edgeKey(b.edge.a.toArray(), b.edge.b.toArray());
+  return a.body === b.body;
+}
+function listedEdge(e) {
+  const key = edgeKey(e.a.toArray(), e.b.toArray());
+  return S.selEdges.some(x => edgeKey(x.a.toArray(), x.b.toArray()) === key);
+}
+function visibleSeg(a, b) {
+  if (!S.section) return [a, b];
+  const kept = clipHalfSpace(a.toArray(), b.toArray(), clipPlane.distanceToPoint(a), clipPlane.distanceToPoint(b));
+  if (!kept) return null;
+  return [new THREE.Vector3(...kept.a), new THREE.Vector3(...kept.b)];
+}
+function placePicks() {
+  const svg = $("#cwMarks"); if (!svg) return;
+  const parts = [];
+  const addEdge = (e, cls) => {
+    const seg = visibleSeg(e.a, e.b); if (!seg) return;
+    const A = stagePoint(seg[0]), B = stagePoint(seg[1]);
+    if (A.behind || B.behind) return;
+    parts.push(`<line class="${cls}" x1="${A.x.toFixed(1)}" y1="${A.y.toFixed(1)}" x2="${B.x.toFixed(1)}" y2="${B.y.toFixed(1)}" />`);
+  };
+  const addFace = (f, cls) => {
+    if (S.section && clipPlane.distanceToPoint(f.point) < -1e-6) return;
+    const p = stagePoint(f.point); if (p.behind) return;
+    const tip = stagePoint(f.point.clone().addScaledVector(f.normal, 12));
+    const r = cls === "pk-press" ? 16 : cls === "pk-sel" ? 14 : 11;
+    parts.push(`<circle class="${cls}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r}" />`);
+    if (!tip.behind) parts.push(`<line class="${cls}" x1="${p.x.toFixed(1)}" y1="${p.y.toFixed(1)}" x2="${tip.x.toFixed(1)}" y2="${tip.y.toFixed(1)}" />`);
+  };
+  for (const e of S.selEdges) addEdge(e, "pk-sel");
+  if (S.selFace) addFace(S.selFace, "pk-sel");
+  const press = pickPaint.press, hover = pickPaint.hover;
+  if (press?.kind === "edge" && !listedEdge(press.edge)) addEdge(press.edge, "pk-press");
+  if (press?.kind === "face" && !(S.selFace && press.face.point.distanceToSquared(S.selFace.point) < 1e-6)) addFace(press.face, "pk-press");
+  if (hover && !samePick(hover, press)) {
+    if (hover.kind === "edge" && !listedEdge(hover.edge)) addEdge(hover.edge, "pk-hover");
+    if (hover.kind === "face" && !(S.selFace && hover.face.point.distanceToSquared(S.selFace.point) < 1e-6)) addFace(hover.face, "pk-hover");
+  }
+  const html = parts.join("");
+  if (svg.dataset.sig !== html) { svg.dataset.sig = html; svg.innerHTML = html; }
+}
 function placeCtx() {
   if (!CTX) return;
-  const [x, y] = toScreen(CTX.at); CTX.bar.style.left = x + "px"; CTX.bar.style.top = y + "px";
-  if (CTX.handle) { const [hx, hy] = toScreen(CTX.at.clone().addScaledVector(S.selFace.normal, CTX.len + (CTX.d || 0))); CTX.handle.style.left = hx + "px"; CTX.handle.style.top = hy + "px"; }
+  const at = stagePoint(CTX.at);
+  const w = CTX.bar.offsetWidth || 240, h = CTX.bar.offsetHeight || 48;
+  const placed = anchorClear({ x: at.x, y: at.y, behind: at.behind }, { w, h, gap: 18 }, { w: stage.clientWidth || 1, h: stage.clientHeight || 1 }, stageChrome());
+  CTX.bar.hidden = placed.hidden;
+  if (!placed.hidden) { CTX.bar.style.left = placed.x + "px"; CTX.bar.style.top = placed.y + "px"; }
+  if (CTX.handle && S.selFace) {
+    const hp = stagePoint(CTX.at.clone().addScaledVector(S.selFace.normal, CTX.len + (CTX.d || 0)));
+    CTX.handle.hidden = hp.behind;
+    if (!hp.behind) {
+      CTX.handle.style.left = hp.x + "px"; CTX.handle.style.top = hp.y + "px";
+      const host = stage.getBoundingClientRect();
+      const rects = [...document.querySelectorAll(FEEL_CHROME)].filter(feelShown).map(el => el.getBoundingClientRect());
+      CTX.handle.hidden = overlapsChrome(host.left + hp.x, host.top + hp.y, rects, 8);
+    }
+  }
 }
 function showCtx(kind, at) {
   hideCtx();
@@ -1507,13 +1673,34 @@ function showCtx(kind, at) {
       const p0 = CTX.at, n = S.selFace.normal, w0 = p0.clone().sub(ray.ray.origin), b = n.dot(ray.ray.direction), dd = n.dot(w0), e = ray.ray.direction.dot(w0), den = 1 - b * b;
       if (Math.abs(den) < 1e-6) return;
       let t = (b * e - dd) / den - CTX.len; const g = S.snap ? S.grid / 10 : 0; if (g) t = Math.round(t / g) * g;
-      CTX.d = t; $("#ctxD").value = fmt(t); facePreview(t);
+      CTX.d = t; $("#ctxD").value = fmt(t); facePreview(t); syncCtxGate();
     });
     hd.addEventListener("pointerup", () => { if (!CTX?.drag) return; CTX.drag = false; controls.enabled = true; if (Math.abs(CTX.d) > 1e-6) ctxRun("pp"); });
   }
   bar.addEventListener("click", e => { const b = e.target.closest("[data-c]"); if (b) ctxRun(b.dataset.c); });
+  bar.querySelector("#ctxD").addEventListener("input", syncCtxGate);
   bar.querySelector("#ctxD").addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Enter") ctxRun(kind === "face" ? "pp" : "fi"); });
+  syncCtxGate();
   hint(kind === "face" ? "Face" : "Edge", kind === "face" ? "Drag the arrow or type a distance to push/pull; or sketch on it." : `${showEdgeLen(S.selEdges[0])} long. Type a radius, then Fillet or Chamfer this edge (approximate).`);
+}
+function syncCtxGate() {
+  if (!CTX) return;
+  const v = parseFloat($("#ctxD")?.value);
+  if (CTX.kind === "edge") {
+    const reason = filletBlock({ bodies: bodyCount(), radius: v });
+    for (const id of ["fi", "ch"]) {
+      const b = CTX.bar.querySelector(`[data-c="${id}"]`);
+      if (!b) continue;
+      b.setAttribute("aria-disabled", reason ? "true" : "false");
+      b.title = reason || (id === "fi" ? "Round this edge. Approximate mesh." : "Bevel this edge. Approximate mesh.");
+    }
+    return;
+  }
+  const reason = faceOffsetBlock({ hasFace: !!S.selFace, distance: v });
+  const b = CTX.bar.querySelector('[data-c="pp"]');
+  if (!b) return;
+  b.setAttribute("aria-disabled", reason ? "true" : "false");
+  b.title = reason || "Move this face by the distance";
 }
 function facePreviewStart() {   // remember positions on the picked face's plane for a live preview
   const out = [], { point, normal } = S.selFace, tol = 1e-3 * Math.max(1, new THREE.Box3().setFromObject(world).getSize(new THREE.Vector3()).length());
@@ -1530,13 +1717,21 @@ async function ctxRun(c) {
   if (!CTX) return;
   const v = parseFloat($("#ctxD").value), f = S.selFace, e = S.selEdges[0];
   if (c === "x") { hideCtx(); return deselect(); }
+  if (c === "pp") {
+    const reason = faceOffsetBlock({ hasFace: !!f, distance: v });
+    if (reason) { status("Face extrude", reason); syncCtxGate(); return; }
+  }
+  if (c === "fi" || c === "ch") {
+    const reason = filletBlock({ bodies: bodyCount(), radius: v });
+    if (reason) { status("Fillet/Chamfer", reason); syncCtxGate(); return; }
+  }
   hideCtx();
-  if (c === "pp") { if (!v) return msg("Type or drag a distance first."); return addOp("face_offset", { point: f.point.toArray(), normal: f.normal.toArray(), distance: v }); }
+  if (c === "pp") return addOp("face_offset", { point: f.point.toArray(), normal: f.normal.toArray(), distance: v });
   if (c === "sk") return startSketch(planeFromFace(f));
   if (c === "sh") return setTool("shell");
   if (c === "fa") { S.selEdges = []; return setTool("fillet"); }
   if (c === "sc") return setTool("sculpt");
-  if (c === "fi" || c === "ch") return addOp("round_edges", { style: c === "fi" ? "fillet" : "chamfer", radius: v || 1, body: e.body, edges: [[e.a.toArray(), e.b.toArray()]] });
+  if (c === "fi" || c === "ch") return addOp("round_edges", { style: c === "fi" ? "fillet" : "chamfer", radius: v, body: e.body, edges: [[e.a.toArray(), e.b.toArray()]] });
   if (c === "ms") { S.measPts = [e.a, e.b]; status("Edge length", showEdgeLen(e)); drawSelection(); }
 }
 
@@ -1662,20 +1857,57 @@ window.__mergeSnap = mergeSnap;
 
 /* ---------------------------------------------------------------- stage pointer routing */
 let downAt = null;
+function chooseAt(ev) {
+  if (S.mode !== "model" || ev.target?.closest?.(".zg, .cw-ctx, .cw-handle, .cw-panel, .cw-bl, .cw-chips, .cw-cubewrap, .cw-hint, .cw-section, .cw-lesson")) return null;
+  const edge = pickEdge(ev), hit = pickBody(ev);
+  const choice = pickChoice({ tool: S.tool, measure: S.measure, edge: !!edge, hit: !!hit, onEdge: onEdge(edge, hit) });
+  if (choice.kind === "edge" && edge) return { kind: "edge", edge, body: edge.body };
+  if (choice.kind === "face" && hit) return { kind: "face", face: { point: hit.point.clone(), normal: hit.normal.clone() }, body: hit.body };
+  return null;
+}
+function endPress() {
+  pressing = false;
+  const had = pickPaint.press || S.sk?.press;
+  pickPaint.press = null;
+  if (S.sk) S.sk.press = null;
+  if (!had) return;
+  if (S.mode === "sketch") drawSketch(); else drawSelection();
+}
 renderer.domElement.addEventListener("pointerdown", ev => {
   if (ev.button > 0) return;
   skMoveF.flush();
+  pressing = true;
   downAt = { x: ev.clientX, y: ev.clientY, t: performance.now(), id: ev.pointerId };
-  if (S.mode === "sketch" && (ev.pointerType !== "touch" || ev.isPrimary)) { renderer.domElement.setPointerCapture(ev.pointerId); skDown(ev); }
+  if (S.mode === "sketch" && (ev.pointerType !== "touch" || ev.isPrimary)) { renderer.domElement.setPointerCapture(ev.pointerId); skDown(ev); return; }
+  if (S.mode === "model") { pickPaint.press = chooseAt(ev); drawSelection(); }
 });
 const skMoveF = perFrame(ev => { if (S.mode === "sketch") { skMove(ev); invalidate(); } });
-renderer.domElement.addEventListener("pointermove", skMoveF, { passive: true });
+const modelHover = perFrame(ev => {
+  if (S.mode !== "model" || pressing) return;
+  const next = chooseAt(ev);
+  const same = samePick(pickPaint.hover, next);
+  pickPaint.hover = next;
+  if (same) return;
+  drawSelection();
+});
+renderer.domElement.addEventListener("pointermove", ev => { skMoveF(ev); modelHover(ev); }, { passive: true });
+renderer.domElement.addEventListener("pointerleave", () => {
+  if (pressing) return;
+  if (!pickPaint.hover && !S.sk?.hover) return;
+  pickPaint.hover = null;
+  if (S.sk) S.sk.hover = null;
+  if (S.mode === "sketch") drawSketch(); else drawSelection();
+});
 renderer.domElement.addEventListener("pointerup", ev => {
   skMoveF.flush();
+  modelHover.flush();
+  const start = downAt;
+  endPress();
   if (S.mode === "sketch") { if (drag) { const moved = drag.moved; drag = null; if (moved) solveSketch(); } return; }
-  if (!downAt || Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y) > 6) return;   // it was an orbit drag
+  if (!start || Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) return;   // it was an orbit drag
   modelTap(ev);
 });
+renderer.domElement.addEventListener("pointercancel", () => { endPress(); });
 renderer.domElement.addEventListener("dblclick", () => { if (S.mode === "sketch") endChain(); });
 function modelTap(ev) {
   if (S.tool === "sculpt") return;
@@ -1698,7 +1930,14 @@ function modelTap(ev) {
     drawSelection(); renderSkLabels(); return;
   }
   if ((S.tool === "extrude" || S.tool === "revolve") && pickRegion(ev)) return;
-  if (S.tool === "fillet") { const e = pickEdge(ev); if (e) { const k = S.selEdges.findIndex(x => x.a.equals(e.a) && x.b.equals(e.b)); k >= 0 ? S.selEdges.splice(k, 1) : S.selEdges.push(e); const el = $("#tEdges"); if (el) el.firstChild.textContent = `${S.selEdges.length || "No"} edge(s) picked. `; drawSelection(); return; } }
+  if (S.tool === "fillet") {
+    const e = pickEdge(ev);
+    if (!e) { status("Fillet/Chamfer", "No edge under the pointer."); return; }
+    const k = S.selEdges.findIndex(x => x.a.equals(e.a) && x.b.equals(e.b));
+    k >= 0 ? S.selEdges.splice(k, 1) : S.selEdges.push(e);
+    const el = $("#tEdges"); if (el) el.firstChild.textContent = `${S.selEdges.length || "No"} edge(s) picked. `;
+    drawSelection(); syncFilletGate(); return;
+  }
   const h = pickBody(ev);
   if (!h) { if (!S.tool) deselect(); return; }
   if (S.selFace && !S.selFace.point.equals(h.point)) S.prevFace = S.selFace;
@@ -1869,7 +2108,7 @@ $("#cwFromBuild").onclick = async e => {
 /* ---------------------------------------------------------------- start */
 $("#cwHints").onclick = () => { HINTS_ON = setHintsOn(LS, !HINTS_ON); applyHints(); };
 $("#cwHint").onclick = () => $("#cwHint").classList.toggle("open");
-renderRail(); hint(...HINTS.null); applyHints(); loop();
+renderRail(); hint(...HINTS.null); applyHints(); syncMeasure(); loop();
 /* Never silently drop a project (QA B4): if it exists but can't be shown here (e.g. too detailed),
    keep it and offer Undo / the editor instead of an empty workspace. */
 load().then(() => {   // S8: deep link to a tool, e.g. /static/cad.html?tool=text

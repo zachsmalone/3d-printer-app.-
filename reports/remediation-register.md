@@ -231,3 +231,24 @@ Not run: Playwright UI scripts (`tests/ui_*.py`). No signed-in pass of a loaded 
 | ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | UI-4 | Build chrome / on-model gizmos | Verified by the bead math, the source contract, and a headless drag that commits a plate transform. Not clicked on a loaded plate or in CAD. | Move / Rotate / Scale only focused the number fields. The plate could already be dragged, but there was no handle for turn or size. | Makers could not grab a bead on the model. | `8728a71`. Beads call the existing step. The bottom row still focuses the fields. | 11 node tests and the pytest list above. Plate editor and CAD workspace tests passed. | A live model was not opened. Plate turn and size preview do not repeat the server’s drop onto the bed until the step returns, so the part can settle on release. A bead under Exit, the dock, the process sheet, or the view rail is hidden until the view moves. |
+
+## CAD interaction polish — selection, gates, 180 ms
+
+Branch `cursor/cad-interaction-polish-b7a7`, off `zeim` @ `ba8f636`. No deploy. Saved projects, history, and body ids are unchanged. Exit still leaves the workspace and does not send the model to Showcase. Send to Showcase stays its own control.
+
+Hover, press, and the committed face, edge, or body are separate. Hover uses the same edge test as the tap, including the Batch 4 clip and occlusion rules. A fillet tap that misses an edge does not store the face under it. Sketch curves use the same three states. Face and edge marks are screen-sized strokes. The push/pull handle uses the bead hover and press (180 ms ease; reduced motion turns that off). Tool rows use that same ease on colour and shadow.
+
+Fillet/chamfer, face extrude, extrude, revolve, sketch constraints, and Measure say why they cannot run. Apply stays off for a size or distance of 0, a missing face, or a sketch that is not closed. Constraint buttons stay pressable when blocked so the hint can say why. A context bar is shifted off Exit, the view cube, and the mid-right grid/snap dock. A push/pull handle on that chrome is not a hit target.
+
+Verification (this branch, Python 3.12, Playwright not installed):
+
+- `node --check` on `static/cad.js` and `static/cad-feel.js` — syntax ok.
+- `node --test tests/js/cad-feel.test.mjs tests/js/pickgeom.test.mjs tests/js/gizmo-math.test.mjs` — 19 passed.
+- `python3 -m pytest -q tests/test_cad_feel.py tests/test_gizmo.py` — 5 passed.
+- Headless Chrome on `cad.html` (1280×800): Exit stayed the hit. The mark layer does not take clicks (`pointer-events: none`); the middle of the view is the canvas. The view cube and the Grid chip stayed the hits on the mid-right dock. Download… was still the format picker. Measure, with no solid, stayed available to click and said “Make a solid first.” Parallel, with no curves, said “Select curves first.” Face extrude said “Tap a flat face first.”, then “Type a distance other than 0.”, and Apply came back at 2 mm. Fillet at size 0 said “Type a size greater than 0.” Tool rows reported a 0.18 s ease.
+
+Not run: Playwright UI scripts (`tests/ui_*.py`). No signed-in CAD body and no printer. Not deployed.
+
+| ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| UI-5 | CAD selection and tool gates | Verified by the pick/gate math and a headless CAD page. Not dragged on a saved body. | Hover was absent, a fillet miss could store the face, and several tools looked ready when the size was 0 or the pick was missing. Context actions could sit on the view dock. | A pick felt vague, and Apply could be pressed when the step could not run. | This change. Hover uses the tap’s edge test. Gates name the reason. The bar stays off Exit and the mid-right dock. Motion is the bead’s 180 ms ease. | 19 node tests, the pytest pair above, and the Chrome checks. | A loaded body was not filleted in the browser. The push/pull handle hides while it sits on a dock. |

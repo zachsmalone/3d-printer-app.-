@@ -40,4 +40,4 @@ jobs:
       # - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends prusa-slicer
 
       - name: Run tests
-        run: pytest tests/test_app.py tests/test_features.py tests/test_printer_profiles.py tests/test_slice_api.py tests/test_lithophane_handoff.py tests/test_subscriptions.py tests/test_coming_soon.py tests/test_ai3d_off.py tests/test_auth_password.py tests/test_catalog_image.py -q
+        run: pytest tests/test_app.py tests/test_features.py tests/test_printer_profiles.py tests/test_slice_api.py tests/test_lithophane_handoff.py tests/test_subscriptions.py tests/test_coming_soon.py tests/test_ai3d_off.py tests/test_auth_password.py tests/test_catalog_image.py tests/test_cad_feel.py -q
