@@ -388,7 +388,7 @@ Verification (this branch, Python 3.12 venv, Playwright not installed, PrusaSlic
 - `python -m pytest -q` on the CI file list, which now includes `tests/test_section_themes_ui.py` — 232 passed, 3 skipped. The skips are `tests/test_app.py` “no slicer”, `tests/test_slice_api.py` “PrusaSlicer not installed”, and `tests/test_section_themes_ui.py` “needs playwright Chromium”. They were not run and are not counted as passed.
 - Headless Chrome on the live app (`127.0.0.1:8765`, age gate off): Showcase, FDM Slicer, TorchC0, CAD, Lithophane, and Account at 1280×900 and 390×844. Each open section had one band, the heading did not sit on the band, and the page did not scroll sideways. Desktop Exit on the FDM Slicer and TorchC0 stayed the hit. Adding `zws` hid the band and cleared the wash. Dark mode still showed the TorchC0 sky.
 
-Not run: Playwright `tests/ui_section_themes.py`. No signed-in pass. No printer. Not deployed. GitHub CI `test` is the check that still has to go green; this note does not mark that job passed.
+Not run: Playwright `tests/ui_section_themes.py`. No signed-in pass. No printer. Not deployed. GitHub CI `test` on this PR passed (run 40711075486). The three skips in that job are the same environment skips as above. They are not counted as passed.
 
 | ID | Category | Evidence/status | Root cause | User impact | Fix/commit | Tests/results | Remaining blocker |
 | --- | --- | --- | --- | --- | --- | --- | --- |
