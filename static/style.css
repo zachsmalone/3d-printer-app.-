@@ -733,7 +733,7 @@ html[data-theme=dark] .pill.warn{color:#422006}   /* the warn pill keeps its lig
 #mboxBox .row2 { display: flex; flex-wrap: wrap; gap: 8px; }
 #mbCustom[hidden], #mboxBox[hidden] { display: none; }
 /* Repair page (static/repair.html): one column, big targets, fits 320 px */
-.rp-main{max-width:640px;margin:0 auto;padding:16px}.rp-pick,.rp-go,.rp-dl{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:8px 0;box-sizing:border-box;text-align:center}
+.rp-main{max-width:640px;margin:0 auto;padding:16px}.rp-pick,.rp-go,.rp-dl,.rp-open{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:8px 0;box-sizing:border-box;text-align:center}
 .rp-t{width:100%;border-collapse:collapse;margin:12px 0;font-size:15px}.rp-t th,.rp-t td{padding:8px 6px;border-bottom:1px solid var(--line,#ccc);text-align:left;overflow-wrap:anywhere}.rp-fx{padding-left:20px;line-height:1.7}
 
 /* ---------- Colour preferences (theme.js "Colours & accessibility"): accent, high contrast, colour-vision-safe status colours.

@@ -62,12 +62,23 @@ def test_stage_bar_is_on_the_main_app_and_in_cad():
         assert label in flow
 
 
-def test_repair_page_can_continue_into_the_slicer_as_a_copy():
+def test_repair_page_hands_off_on_the_server_and_says_when_the_project_is_new():
     assert "Open in the FDM Slicer" in REPAIR
     assert "slicerUrlForNewProject" in REPAIR
     assert "new project from that file" in REPAIR
+    assert "/api/repair/" in REPAIR and "/slicer" in REPAIR
+    assert "/api/edit/new" not in REPAIR
+    assert "new File" not in REPAIR
+    assert "rememberRepair" in REPAIR and "reuseRepair" in REPAIR
+    assert "download_url" in REPAIR
     page = (ROOT / "static/repair.html").read_text(encoding="utf-8")
     assert 'src="/static/repair.js"' in page
+    assert 'id="projectFlow"' in page and 'aria-label="Project stages"' in page
+    assert 'data-view="repair"' in page
+    flow = (ROOT / "static/project-flow.js").read_text(encoding="utf-8")
+    assert "rememberRepair" in flow and "reuseRepair" in flow
+    edit = (ROOT / "static/edit.js").read_text(encoding="utf-8")
+    assert 'hash.startsWith("slicer")' in edit
 
 
 def test_body_list_order_is_separate_from_stored_identity():

@@ -981,4 +981,8 @@ window.__zeimEditStarted = true;               // (static/boot.js watchdog)
 
 /* CAD workspace hand-off: /?edit=<project id>#slicer opens that project here (Slicer + plate editor). */
 { const id = new URLSearchParams(location.search).get("edit");
-  if (id && /^[0-9a-f]{12}$/.test(id)) { location.hash = "slicer"; setTimeout(() => document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })), 0); } }
+  if (id && /^[0-9a-f]{12}$/.test(id)) {
+    const hash = location.hash.replace(/^#/, "");
+    if (!hash.startsWith("slicer")) location.hash = "slicer";
+    setTimeout(() => document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })), 0);
+  } }

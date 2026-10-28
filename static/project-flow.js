@@ -2,7 +2,9 @@
    My Studio stays at #account/studio. Projects in the top bar is that same list.
    A photo design and its slicer copy are different records. The copy is remembered
    for this browser tab (zeim.flow) so the next stage does not import the photo again.
-   Resin layer files are made in the printer's own slicer. TorchC0 only prepares. */
+   A repaired file that is not a project yet is remembered the same way: one slicer
+   project per repair id. Resin layer files are made in the printer's own slicer.
+   TorchC0 only prepares. */
 export const FLOW_KEY = "zeim.flow";
 export const STAGES = [
   { id: "design", label: "Design" },
@@ -11,15 +13,17 @@ export const STAGES = [
   { id: "slice", label: "Slice & Export" },
 ];
 const ID = /^[0-9a-f]{12}$/;
+const REPAIR_ID = /^[0-9a-f]{16}$/;
 const MAX_COPIES = 8;
 
 const valid = id => ID.test(id || "");
+const validRepair = id => REPAIR_ID.test(id || "");
 
 export function stageFor(view, tool) {
   const t = tool || "";
   if (view === "lithophane" || view === "cad") return "design";
   if (view === "torchc0") return "prepare";
-  if (view === "smartfix") return "repair";
+  if (view === "smartfix" || view === "repair") return "repair";
   if (view === "slicer") {
     if (t === "repair" || t === "simplify") return "repair";
     if (t === "smartorient" || t === "orient" || t === "hollow" || t === "cut") return "prepare";
@@ -32,27 +36,53 @@ export function flowVisible(view) {
   return stageFor(view, "") !== "" || view === "slicer";
 }
 
+function blankFlow() {
+  return { copies: {}, repairs: {} };
+}
+
 export function readFlow(storage) {
-  let copies = {};
+  const out = blankFlow();
   try {
     const raw = storage && storage.getItem(FLOW_KEY);
     const j = raw ? JSON.parse(raw) : {};
-    if (j && typeof j.copies === "object" && j.copies) copies = Object.assign({}, j.copies);
-  } catch { copies = {}; }
-  return { copies };
+    if (j && typeof j.copies === "object" && j.copies) out.copies = Object.assign({}, j.copies);
+    if (j && typeof j.repairs === "object" && j.repairs) out.repairs = Object.assign({}, j.repairs);
+  } catch { return blankFlow(); }
+  return out;
+}
+
+function writeFlow(storage, flow) {
+  try { storage.setItem(FLOW_KEY, JSON.stringify({ copies: flow.copies, repairs: flow.repairs })); }
+  catch { /* the stage still opens; the next visit may copy again */ }
+}
+
+function trimMap(map, keepKey, validKey) {
+  const keys = Object.keys(map).filter(k => k !== keepKey);
+  const next = {};
+  for (const k of keys) if (validKey(k) && valid(map[k])) next[k] = map[k];
+  const ordered = Object.keys(next);
+  while (ordered.length >= MAX_COPIES) delete next[ordered.shift()];
+  return next;
 }
 
 export function rememberCopy(storage, photoId, editId) {
   if (!storage || !valid(photoId) || !valid(editId)) return readFlow(storage);
   const cur = readFlow(storage);
-  const keys = Object.keys(cur.copies).filter(k => k !== photoId);
-  const copies = {};
-  for (const k of keys) if (valid(k) && valid(cur.copies[k])) copies[k] = cur.copies[k];
-  const ordered = Object.keys(copies);
-  while (ordered.length >= MAX_COPIES) delete copies[ordered.shift()];
+  const copies = trimMap(cur.copies, photoId, valid);
   copies[photoId] = editId;
-  try { storage.setItem(FLOW_KEY, JSON.stringify({ copies })); } catch { /* the stage still opens; the next visit may copy again */ }
-  return { copies };
+  const flow = { copies, repairs: cur.repairs };
+  writeFlow(storage, flow);
+  return flow;
+}
+
+export function rememberRepair(storage, repairId, editId) {
+  if (!storage || !validRepair(repairId) || !valid(editId)) return readFlow(storage);
+  const cur = readFlow(storage);
+  const repairs = trimMap(cur.repairs, repairId, validRepair);
+  repairs[repairId] = editId;
+  const flow = { copies: cur.copies, repairs };
+  writeFlow(storage, flow);
+  return flow;
 }
 
 export function forgetCopy(storage, editId) {
@@ -62,13 +92,21 @@ export function forgetCopy(storage, editId) {
   for (const k of Object.keys(cur.copies)) {
     if (cur.copies[k] === editId) { delete cur.copies[k]; changed = true; }
   }
-  if (changed) { try { storage.setItem(FLOW_KEY, JSON.stringify({ copies: cur.copies })); } catch { /* leave the stored pair */ } }
+  for (const k of Object.keys(cur.repairs)) {
+    if (cur.repairs[k] === editId) { delete cur.repairs[k]; changed = true; }
+  }
+  if (changed) writeFlow(storage, cur);
   return cur;
 }
 
 export function reuseCopy(flow, photoId) {
   const id = flow && flow.copies ? flow.copies[photoId] : "";
   return valid(photoId) && valid(id) ? id : "";
+}
+
+export function reuseRepair(flow, repairId) {
+  const id = flow && flow.repairs ? flow.repairs[repairId] : "";
+  return validRepair(repairId) && valid(id) ? id : "";
 }
 
 export function slicerUrlForNewProject(id) {
@@ -79,8 +117,13 @@ function meshOf(ctx) {
   const editId = valid(ctx.editId) ? ctx.editId : "";
   const copyId = valid(ctx.copyId) ? ctx.copyId : "";
   if (ctx.view === "lithophane") return copyId;
-  if (ctx.view === "slicer" || ctx.view === "cad") return editId;
+  if (ctx.view === "slicer" || ctx.view === "cad" || ctx.view === "repair") return editId;
   return editId || copyId;
+}
+
+function repairPageNote(ctx) {
+  if (valid(ctx.editId)) return "Check & Repair uses the project kept for this repair. Slice & Export opens that project in the FDM Slicer.";
+  return "This page repairs a file that is not a project yet. Open in the FDM Slicer starts a new project from the repaired file. The file you uploaded stays as it was.";
 }
 
 function sameNote(stage) {
@@ -156,6 +199,7 @@ export function planHop(stage, ctx) {
     }
     return { stage, stay: view === "cad", hash: "#cad", open: "", note: "Design starts in CAD, or from a photo in Lithophane." };
   }
+  if (stage === "repair" && c.view === "repair") return { stage, stay: true, open: "", note: repairPageNote(c) };
   if (stage === "repair") return Object.assign({ stage }, slicerPlan("repair", c, "repair"));
   if (stage === "prepare" && kind === "fdm") return Object.assign({ stage }, slicerPlan("prepare", c, "smartorient"));
   if (stage === "prepare" && kind === "resin") {

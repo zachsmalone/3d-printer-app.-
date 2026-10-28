@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  stageFor, planHop, readFlow, rememberCopy, reuseCopy, forgetCopy, slicerUrlForNewProject, flowNote,
+  stageFor, planHop, readFlow, rememberCopy, reuseCopy, forgetCopy, rememberRepair, reuseRepair, slicerUrlForNewProject, flowNote,
 } from "../../static/project-flow.js";
 
 const PHOTO = "aaaaaaaaaaaa";
@@ -116,4 +116,52 @@ test("a repaired file opens as a new slicer project only with a real id", () => 
   assert.equal(slicerUrlForNewProject(EDIT), "/?edit=" + EDIT + "#slicer");
   assert.equal(slicerUrlForNewProject("nope"), "");
   assert.equal(slicerUrlForNewProject(""), "");
+});
+
+const REPAIR = "abcdabcdabcdabcd";
+
+test("the repair page stays on Check & Repair, and a kept project is the same id", () => {
+  assert.equal(stageFor("repair", ""), "repair");
+  const fresh = planHop("repair", { view: "repair", kind: "fdm" });
+  assert.equal(fresh.stay, true);
+  assert.match(fresh.note, /new project from the repaired file/);
+  assert.doesNotMatch(fresh.note, /same one/);
+  const kept = planHop("repair", { view: "repair", editId: EDIT, kind: "fdm" });
+  assert.equal(kept.stay, true);
+  assert.match(kept.note, /project kept for this repair/);
+  assert.doesNotMatch(kept.note, /new project/);
+  const slice = planHop("slice", { view: "repair", editId: EDIT, kind: "fdm" });
+  assert.equal(slice.open, "edit");
+  assert.equal(slice.id, EDIT);
+  assert.equal(slice.hash, "#slicer");
+  assert.doesNotMatch(slice.note, /copy/);
+  const prepare = planHop("prepare", { view: "repair", editId: EDIT, kind: "fdm" });
+  assert.equal(prepare.id, EDIT);
+  assert.equal(prepare.hash, "#slicer/smartorient");
+  const design = planHop("design", { view: "repair", editId: EDIT, kind: "fdm" });
+  assert.equal(design.url, "/static/cad.html?bid=" + EDIT);
+  const none = planHop("slice", { view: "repair", kind: "fdm" });
+  assert.equal(none.hash, "#account/studio");
+});
+
+test("a repair hand-off is remembered beside photo copies and dropped with that project", () => {
+  const storage = mem();
+  rememberCopy(storage, PHOTO, EDIT);
+  assert.equal(reuseRepair(readFlow(storage), REPAIR), "");
+  rememberRepair(storage, REPAIR, EDIT);
+  assert.equal(reuseCopy(readFlow(storage), PHOTO), EDIT);
+  assert.equal(reuseRepair(readFlow(storage), REPAIR), EDIT);
+  rememberRepair(storage, "short", EDIT);
+  assert.equal(readFlow(storage).repairs[REPAIR], EDIT);
+  for (let i = 0; i < 10; i++) {
+    rememberRepair(storage, "e" + String(i).padStart(15, "0"), "f" + String(i).padStart(11, "0"));
+  }
+  const repairs = readFlow(storage).repairs;
+  assert.equal(Object.keys(repairs).length, 8);
+  assert.equal(repairs[REPAIR], undefined);
+  assert.equal(reuseCopy(readFlow(storage), PHOTO), EDIT);
+  const gone = Object.values(repairs)[0];
+  forgetCopy(storage, gone);
+  assert.equal(Object.values(readFlow(storage).repairs).includes(gone), false);
+  assert.equal(reuseCopy(readFlow(storage), PHOTO), EDIT);
 });
