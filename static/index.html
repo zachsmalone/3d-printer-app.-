@@ -73,7 +73,7 @@
   <section class="hero" aria-labelledby="h1">
     <p class="studio-crumb" id="studioFromMe" hidden><a href="#projects" data-ws-act="return-studio" data-ws="lithophane">Return to Projects</a></p>
     <h1 id="h1"><span data-lvl="beginner">Turn a photo into something you can print.</span><span data-lvl="expert">Studio</span></h1>
-    <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then gets it ready to print. Free to use.</p>
+    <p class="lede" data-lvl="beginner">Take or choose a photo. ZEIM makes a 3D model you can turn around, then you save it or open it in a slicer. Free to use.</p>
     <p class="help" id="lithoStudioNote" hidden>Saved projects are in <a href="#projects">Projects</a>. This page makes a model from a photo.</p>
     <div id="studioPhoto"></div>
     <p class="have3d"><button type="button" class="linkbtn" id="btnHave3d">Already have a 3D file (STL, OBJ or 3MF)? Open it in the FDM Slicer</button></p>
@@ -86,7 +86,7 @@
     <button type="button" class="btn small primary ws-go" id="lithoGo" data-go="btnSendSlicer" title="Save first, then open this model in the FDM Slicer. This does not send it to Showcase.">Send to Slicer</button>
   </div>
   <nav class="pathnav" aria-label="Your progress">
-    <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Print-ready</li></ol>
+    <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Save or slice</li></ol>
     <p class="help" id="pathSay" role="status" aria-live="polite">Step 1 of 3: choose a photo.</p>
   </nav>
   <aside class="panel controls" aria-label="Make a 3D model">
@@ -104,7 +104,7 @@
         <label class="card" data-mode="lithophane"><input type="radio" name="style" value="lithophane" checked><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-bulb"/></svg></span><b>Lithophane</b><small>A picture that glows with a light behind it</small></label>
         <label class="card" data-mode="relief"><input type="radio" name="style" value="relief"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-mountain"/></svg></span><b>Relief</b><small>Your picture as raised hills and valleys</small></label>
         <label class="card" data-mode="popart"><input type="radio" name="style" value="popart"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-palette"/></svg></span><b>Pop-art</b><small>Flat colour layers stacked up</small></label>
-        <label class="card" data-mode="bust"><input type="radio" name="style" value="bust"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/><path d="M8 21h8v-1.5c0-1.5-1.5-2.5-4-2.5s-4 1-4 2.5V21z"/></svg></span><b>Bust</b><small>Head &amp; shoulders, rounded back, pedestal</small></label>
+        <label class="card" data-mode="bust"><input type="radio" name="style" value="bust"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h12v12H6z"/><path d="M4 17h16v4H4z"/></svg></span><b>Photo plaque</b><small>Raised photo on a rounded plaque and pedestal. Not a scanned head.</small></label>
         <label class="card" data-mode="trace2d"><input type="radio" name="style" value="trace2d"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg></span><b>Logo &amp; Drawing to 3D</b><small>A logo, sketch or drawing as a clean 3D shape, cookie cutter or stamp</small></label>
       </fieldset>
       <fieldset class="cards shapes" id="shapeCards" aria-describedby="shapeHelp"><legend>Lithophane shape</legend>
@@ -351,11 +351,11 @@
             <div class="field"><label>Base plate <em>mm</em></label><input type="number" name="base_mm" id="exp_base_mm" value="2" min="0.2" step="0.2"></div>
             <div class="field" data-modes="relief"><label>Relief height <em>mm</em></label><input type="number" name="relief_mm" id="exp_relief_mm" value="6" min="0.2" step="0.5"></div>
           </div></details>
-        <details open data-modes="bust"><summary>Bust &amp; pedestal</summary>
-          <p class="help">Auto-select head &amp; shoulders (or trace them) for a classical cut — auto is a starting mask you can edit. Builds a thicker rounded-back bust on a clean pedestal (printable photo bust, not an AI figure).</p>
+        <details open data-modes="bust"><summary>Photo plaque</summary>
+          <p class="help" id="bustHelp">Bright parts of the photo stand out on the front of a thicker plaque. The back is a smooth rounded bulge, and a pedestal sits underneath. This does not rebuild a head, neck, or shoulders. An outline only crops the plaque. The 3D preview is this same plaque.</p>
           <div class="grid2">
-            <div class="field"><label>Pedestal height <em>mm</em></label><input type="number" name="base_mm" id="bust_base_mm" value="12" min="2" step="1"></div>
-            <div class="field"><label>Face depth <em>mm</em></label><input type="number" name="relief_mm" id="bust_relief_mm" value="8" min="0.5" step="0.5"></div>
+            <div class="field"><label for="bust_base_mm">Pedestal height <em>mm</em></label><input type="number" name="base_mm" id="bust_base_mm" value="12" min="2" step="1"></div>
+            <div class="field"><label for="bust_relief_mm">Front relief <em>mm</em></label><input type="number" name="relief_mm" id="bust_relief_mm" value="8" min="0.5" step="0.5"></div>
             <div class="field"><label>Rounded back <em>mm</em></label><input type="number" name="back_mm" id="bust_back_mm" value="14" min="0" max="40" step="1"></div>
             <div class="field"><label>Pedestal shape</label><select name="base_style" id="bust_base_style"><option value="round" selected>Round</option><option value="rect">Rectangle</option><option value="outline">Follow outline</option></select></div>
             <div class="field"><label>Pedestal margin <em>mm</em></label><input type="number" name="base_margin" id="bust_base_margin" value="8" min="0" step="1"></div>
@@ -471,7 +471,7 @@
       <div hidden><label for="editFromBuild" class="sr-only">Saved project</label><select id="editFromBuild"></select><button type="button" class="btn" id="editFromBuildGo">Open in the slicer</button></div>
       <h2 style="margin-top:16px"><i>or</i> Build from primitives</h2>
       <div class="row"><a class="btn" href="/builder.html">Open the parts builder ▸</a><span class="help" style="align-self:center">Combine boxes, cylinders and more — solids add, holes cut, every size stays editable.</span></div>
-      <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your 5 recent builds. Colours from multi-colour builds/3MF files are merged into one mesh.</p>
+      <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your recent builds. The count is on Lithophane. Starred builds stay. Colours from multi-colour builds and 3MF files are merged into one mesh for slicing.</p>
     </section>
     <section id="editPanel" hidden></section>
   </aside>
@@ -687,7 +687,7 @@
 
 <main class="page" id="viewAi3d" hidden>
 <div class="zt-band" data-zt="ai3d" aria-hidden="true"><svg class="zt-ai3d" viewBox="0 0 1000 150" preserveAspectRatio="xMaxYMid slice" focusable="false"><path class="enso" d="M842 30c38-6 74 18 80 54s-20 66-58 68-70-22-72-56c-1-24 14-46 38-56"/><g class="wire"><path d="M640 120l30-52 30 52zM670 68l30 52 28-30zM700 120l28-30 26 30zM670 68l58 22"/><circle cx="670" cy="52" r="15"/><path d="M655 52h30M670 37c-8 8-8 22 0 30M670 37c8 8 8 22 0 30"/></g><path class="hill" d="M0 150c120-30 260-34 420-14s300 10 580-22v36z"/></svg></div>
-  <div class="pagehead"><div><h1>2D→3D</h1><p class="help">Turn one photo into a mesh with TripoSR, an open model. It guesses the sides the photo does not show. Figure or bust, then a mesh you can repair, edit, or slice. A starting point, not a scan.</p></div></div>
+  <div class="pagehead"><div><h1>2D→3D</h1><p class="help">Turn one photo into a mesh with TripoSR, an open model. It guesses the sides the photo does not show. Figure, or an upper crop, then a mesh you can repair, edit, or slice. A starting point, not a scan. This is separate from Photo plaque on Lithophane.</p></div></div>
   <div class="wsbar" data-ws="ai3d" role="group" aria-label="2D to 3D workspace">
     <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
     <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Projects, go back to the list. This does not send the model to Showcase.">Done</button>
@@ -713,9 +713,9 @@
     </section>
     <section class="a3card" aria-labelledby="a3H2">
       <h2 id="a3H2"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-user"/></svg> What to make</h2>
-      <div class="a3modes" role="radiogroup" aria-label="Figure or bust">
+      <div class="a3modes" role="radiogroup" aria-label="Figure or upper crop">
         <label class="a3mode"><input type="radio" name="a3Mode" value="figure" checked><span><b>Figure</b><small>The whole subject as a mesh, with a flat bottom. About 80 mm tall.</small></span></label>
-        <label class="a3mode"><input type="radio" name="a3Mode" value="bust"><span><b>Bust</b><small>Head and shoulders as a mesh. About 60 mm tall.</small></span></label>
+        <label class="a3mode"><input type="radio" name="a3Mode" value="bust"><span><b>Upper crop</b><small>TripoSR guesses a mesh from the top of the photo. Not a scanned head. About 60 mm tall.</small></span></label>
       </div>
       <div class="field"><label for="a3Title">Title</label><input id="a3Title" maxlength="80" placeholder="My figure" autocomplete="off"></div>
       <div class="field"><label for="a3H">Height (mm)</label><input id="a3H" type="number" min="20" max="250" step="5" inputmode="numeric" placeholder="80"></div>
@@ -737,7 +737,7 @@
 <div class="zt-band" data-zt="smartfix" aria-hidden="true"></div>
   <div class="pagehead"><div><h1>Smart Fix</h1><p class="help">Check &amp; Repair runs on the open project. Open it from Projects, then repair, hollow or simplify it. ZEIM checks for holes, flipped faces and hidden voids.</p></div></div>
   <ul class="grid toolgrid">
-    <li class="toolcard"><h2>Repair</h2><p class="help">Fix normals, fill holes, remove duplicates, keep the largest part.</p><a class="btn" href="#slicer/repair">Repair a model</a></li>
+    <li class="toolcard"><h2>Repair</h2><p class="help">Fix normals, fill holes, and remove duplicate faces. Separate parts stay unless you choose to keep only the largest piece.</p><a class="btn" href="#slicer/repair">Repair a model</a></li>
     <li class="toolcard"><h2>Hollow</h2><p class="help">Save material with a hollow inside and a drain hole.</p><a class="btn" href="#slicer/hollow">Hollow a model</a></li>
     <li class="toolcard"><h2>Smart orient</h2><p class="help">Lay flat on the largest flat face, or let ZEIM find the position with the least overhang and support. Manual rotate too.</p><a class="btn" href="#slicer/smartorient">Orient a model</a></li>
     <li class="toolcard"><h2>Simplify</h2><p class="help">Lower the triangle count while keeping the shape.</p><a class="btn" href="#slicer/simplify">Simplify a model</a></li>

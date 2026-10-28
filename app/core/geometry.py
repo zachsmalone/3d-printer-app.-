@@ -427,12 +427,12 @@ def bust(im: Image.Image, width_mm=80.0, base_mm=12.0, relief_mm=8.0,
          base_style="round", base_margin=8.0, back_mm=14.0, core_mm=5.0,
          resolution=180, smooth=0.8, gamma=1.0,
          auto_contrast=True, invert=False, _alpha=None, **_) -> Model:
-    """Portrait bust: photo as a raised face on a thicker, rounded-back body with a clean pedestal.
+    """Photo bust: a raised photo on a thicker plaque with a rounded back and a pedestal.
 
-    Not an AI figure (see 2D→3D for that). Geometry is a printable 2.5D bust: photo relief on the
-    front, a smooth rounded back from the silhouette depth, sitting on a pedestal. Trace or
-    auto-select the head and shoulders for a classical cut; without a selection the whole photo
-    becomes a volumetric portrait plaque. Pedestal styles: round (default), rect, or outline.
+    This is a heightfield, not a reconstructed head. Bright pixels stand out on the front.
+    The back is a smooth bulge from the outline distance, not a scanned skull. A selection
+    only crops that plaque. Pedestal styles: round (default), rect, or outline.
+    2D→3D is a separate TripoSR mesh and is not this function.
     """
     style = (base_style or "round").lower().strip()
     if style not in ("round", "rect", "outline"):
@@ -496,8 +496,8 @@ def bust(im: Image.Image, width_mm=80.0, base_mm=12.0, relief_mm=8.0,
     m = Model([Body("bust", v, f)], "bust")
     m.info = dict(pixels=[nx, ny], pitch_mm=round(pitch, 4), pedestal=base_info,
                   relief_mm=float(rel), core_mm=core, back_mm=back, width_mm=float(width_mm),
-                  volumetric=True,
-                  note="Printable photo bust with a rounded back — not an AI figure scan.")
+                  volumetric=True, kind="photo_relief",
+                  note="Raised photo on a rounded plaque and pedestal. Bright areas stand out on the front. This is not a scanned head. The preview is this same mesh.")
     m.thumb = thumbnail.relief_shaded(top - bottom, pitch)
     if cells is not None:
         m.thumb = _cut_thumb(m.thumb, cells)
@@ -639,7 +639,7 @@ def build(im: Image.Image, mode: str, params: dict) -> Model:
         m.info = {**(m.info or {}), "select": selectmask.summary(sel)}
     elif mode == "bust":
         warnings = warnings + [
-            "Tip: Auto-select head and shoulders (or trace them) for a cleaner bust cut. Auto is a starting mask you can edit. The whole photo is still a photo bust on a pedestal, not an AI figure."
+            "The whole photo becomes a raised photo plaque on a pedestal. An outline only crops that plaque. This is not a scanned head."
         ]
         ped = (m.info or {}).get("pedestal") or {}
         if ped.get("skipped") and ped.get("message"):

@@ -16,8 +16,8 @@ from . import selectmask
 
 WORK = 384
 TIP = (
-    "Auto head and shoulders is a starting mask — edit it with Trace, Add, or Subtract, "
-    "then press Make it from my selection."
+    "This outline is a starting mask. It only crops the raised photo. It does not build a scanned head. "
+    "Edit it with Trace, Add, or Subtract, then press Make it from my selection."
 )
 TIPS = {
     "face": TIP,

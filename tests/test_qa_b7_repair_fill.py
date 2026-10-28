@@ -44,6 +44,20 @@ def test_flat_hole_unchanged_and_no_warning():
     assert "warning" not in rep and rep["message"] == "Mesh is watertight ✔"
 
 
+def test_keep_largest_names_every_dropped_piece():
+    """The option drops every piece except the largest, including a real second part."""
+    a = trimesh.creation.icosphere(subdivisions=2, radius=8)
+    b = trimesh.creation.box((4, 4, 4))
+    b.apply_translation([30, 0, 0])
+    m = trimesh.util.concatenate([a, b])
+    before = len(m.faces)
+    out, rep = meshedit.op_repair(m, {"keep_largest": True, "fill_holes": False})
+    steps = " ".join(rep.get("steps") or [])
+    assert len(out.faces) < before
+    assert "kept only the largest piece" in steps
+    assert "small floating" not in steps
+
+
 def test_closed_mesh_untouched():
     s = trimesh.creation.icosphere(2, 10)
     out, rep = meshedit.op_repair(trimesh.Trimesh(s.vertices, s.faces, process=False), {})

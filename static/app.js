@@ -7,7 +7,7 @@ const S = { mode: "lithophane", level: localStorage.level === "expert" ? "expert
 const PRESET_HELP = {
   lithophane: { thin: "Lighter, glows brighter, more fragile (0.6–2.4 mm).", standard: "Balanced contrast and strength (0.8–3.2 mm).", thick: "Deep shadows, sturdy (1.0–4.0 mm)." },
   relief: { thin: "Shallow, subtle relief (≈4% of width).", standard: "Clear depth (≈7% of width).", thick: "Dramatic depth (≈11% of width)." },
-  bust: { thin: "Shallower face, shorter pedestal, lighter rounded back.", standard: "Clear face depth, rounded back, solid round pedestal.", thick: "Deeper face, taller pedestal, fuller rounded back." },
+  bust: { thin: "Shallower front relief, shorter pedestal, lighter rounded back.", standard: "Clear front relief on a rounded plaque, with a round pedestal.", thick: "Deeper front relief, taller pedestal, fuller rounded back." },
   popart: { thin: "3 colour layers, small steps.", standard: "4 colour layers, medium steps.", thick: "5 colour layers, tall steps." } };
 
 function toast(msg, kind = "") {
@@ -63,7 +63,7 @@ const api = async (url, opt) => {
 };
 const ago = iso => { const s = (Date.now() - new Date(iso)) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.floor(s / 60) + " min ago" : s < 86400 ? Math.floor(s / 3600) + " h ago" : new Date(iso).toLocaleDateString(); };
 window.zeimPhotoAck = () => (typeof pick !== "undefined" && pick.acked ? pick.acked() : "true");
-const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", bust: "Bust", popart: "Pop-art", trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model", memorybox: "Memory box" };
+const MODE_LABEL = { lithophane: "Lithophane", relief: "Relief", bust: "Photo plaque", popart: "Pop-art", trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model", memorybox: "Memory box" };
 
 let viewer;
 try { viewer = new Viewer($("#viewer")); } catch (e) { console.warn("WebGL unavailable", e); }
@@ -211,7 +211,7 @@ $("#presetSeg").onchange = () => { S.preset = ($("#presetSeg input:checked") || 
 $("#widthRange").oninput = e => $("#width_mm").value = e.target.value;
 $("#width_mm").oninput = e => $("#widthRange").value = e.target.value;
 
-/* ---------- the three-step path: Photo -> Preview -> Print-ready (ticks AND a border, never colour alone; changes announced politely) ---------- */
+/* ---------- the three-step path: Photo -> Preview -> Save or slice (ticks AND a border, never colour alone; changes announced politely) ---------- */
 function setPath(step, say) {
   $$("#path li").forEach(li => {
     const n = +li.dataset.step; li.classList.toggle("done", n < step); li.classList.toggle("cur", n === step);
@@ -314,9 +314,13 @@ function revealResult() {
   // wait until build() has put the page back (busy bar hidden) so the scroll target is final
   setTimeout(() => { const v = $("#viewer"); v.style.scrollMarginTop = ($(".topbar").offsetHeight + 8) + "px"; v.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" }); }, 60);
 }
+function historyFullMsg(body, next) {
+  const n = body && body.max;
+  return (n ? `Your recent builds are full (${n} of ${n}).` : "Your recent builds are full.") + " " + next;
+}
 function buildDone(r) {                 /* shared success tail: a real build came back */
   showBuild(r); S.history = r.history; renderHistory(); $("#btnBuild").textContent = "Make it again with these settings";
-  setPath(3, "Model ready. Step 3 of 3: save or print it.");
+  setPath(3, "Model ready. Step 3 of 3: save it or open it in a slicer. It is not sliced yet.");
   toast("Your model is ready ✔", "ok");
   revealResult();
 }
@@ -333,7 +337,7 @@ async function resumePending() {        /* the scanner was down: re-check the pa
   } catch (e) {
     if (e.status === 422) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg(e.message || "That file was flagged by the malware scanner. Nothing of it was kept — please choose a different photo."); return; }   /* terminal: the parked upload was discarded */
     if (e.status === 404) { S.pending = null; $("#btnBuild").textContent = "Build my model"; pick.msg("Your parked upload is no longer available — please choose your photo again."); return; }
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); return; }   /* parked upload RETAINED: press Build to retry */
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg(historyFullMsg(e.body, "Delete one, then press Build.")); return; }   /* parked upload RETAINED: press Build to retry */
     toast("Resume didn't work: " + (e.message || "something went wrong") + " Your upload is still parked — try again.", "err");
   } finally { $("#busy").hidden = true; $("#btnBuild").disabled = !S.file; S.building = false; }
 }
@@ -353,7 +357,7 @@ async function build(autoDelete = false) {
     }
     buildDone(r);
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg("Your recent builds are full (5 of 5). Delete one, then press Build."); }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); openFull(); pick.msg(historyFullMsg(e.body, "Delete one, then press Build.")); }
     else if (e.status === 400 && /photo/i.test(e.message)) { clearFile(); pick.msg(e.message); }          // photo problems stay visible under the buttons; the refused photo is forgotten (QA-2)
     else { setPath(S.file ? 1 : 1, "That didn't work. Your photo is still here, so you can try again."); toast("We couldn't make your model: " + (e.message || "something went wrong") + " Your photo is still here. Try again.", "err"); }
   } finally { $("#busy").hidden = true; $("#makingLine").hidden = true; $("#btnBuild").disabled = !S.file; $("#btnPrint").disabled = false; $("#btnSendSheet").disabled = false; ["btnSaveWork","btnSendSlicer","btnSendCad"].forEach(id => { const b = $(id); if (b) b.disabled = false; }); S.building = false; }
@@ -384,7 +388,7 @@ function showBuild(r) {
     if (r.mode === "bust") {
       const ped = r.info?.pedestal || {};
       const shape = { round: "round", rect: "rectangular", outline: "following the outline" }[ped.style] || ped.style;
-      const bits = [r.info?.note || "Photo bust with a rounded back. This is not an AI figure."];
+      const bits = [r.info?.note || "Raised photo on a rounded plaque and pedestal. This is not a scanned head. The preview is this same mesh."];
       if (!ped.skipped && shape && ped.thickness_mm != null) bits.push("Pedestal: " + shape + ", " + ped.thickness_mm + " mm.");
       bustNote.hidden = false;
       bustNote.textContent = bits.join(" ");
