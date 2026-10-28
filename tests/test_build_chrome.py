@@ -68,6 +68,17 @@ def test_process_sheet_groups_only_existing_slicer_choices():
     assert "Creality" not in _between(PRINTER, "const PAT_ICON", "export function matWarnHTML")
 
 
+def test_slice_is_not_covered_by_customise():
+    # The labelled control joins the strip. A 60px hole was narrower than "Customise", so that button took Slice's hit.
+    assert '":scope > .wsbar"' in LAYOUT and 'className = "ws-end"' in LAYOUT
+    assert "padding:8px 60px 8px" not in CSS
+    assert "main.zws>.wsbar>.ws-end{display:flex;flex:0 0 auto;" in CSS
+    assert "main.zws>.wsbar>.ws-end>.zws-cust" in CSS and "position:static;z-index:auto;" in CSS
+    assert "main:not(.zws)>.wsbar>.ws-end{display:none}" in CSS
+    assert "main.zws>.wsbar .ws-go{margin-left:auto;flex:0 0 auto}" in CSS
+    assert "main.zws>.wsbar{position:absolute;z-index:48;" in CSS
+
+
 def test_primary_actions_do_not_become_showcase():
     edit = _between(HTML, 'id="viewEdit"', 'id="viewShowcase"')
     assert 'id="slicerSlice"' in edit and 'data-go="spGo"' in edit

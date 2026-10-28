@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>build chrome</title>
 <link rel="stylesheet" href="/static/style.css">
 <style>
@@ -15,6 +16,8 @@
 <main id="root">
   <div class="wsbar" data-ws="slicer" role="group" aria-label="Slicer workspace">
     <button type="button" class="btn small" id="exit" data-ws-act="exit" aria-label="Exit workspace">Exit</button>
+    <button type="button" class="btn small" id="done" data-ws-act="done">Done</button>
+    <button type="button" class="btn small" id="newBuild" data-ws-act="new-build">New build</button>
     <button type="button" class="btn small primary ws-go" id="go">Slice</button>
   </div>
   <div id="tools">Tools</div>
@@ -52,8 +55,41 @@
     const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return el && (el.id === "exit" || exit.contains(el));
   }
+  function faceMiss(el) {
+    if (!el) return ["missing"];
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return ["empty"];
+    const xs = [r.left + 4, r.left + r.width / 2, r.right - 4];
+    const ys = [r.top + 4, r.top + r.height / 2, r.bottom - 4];
+    const bad = [];
+    ys.forEach((y) => xs.forEach((x) => {
+      const n = document.elementFromPoint(x, y);
+      if (!(n && (n === el || el.contains(n)))) bad.push((n ? (n.id || n.className || n.tagName) : "none") + "@" + Math.round(x) + "," + Math.round(y));
+    }));
+    return bad;
+  }
+  function covers(a, b) {
+    if (!a || !b) return false;
+    const A = a.getBoundingClientRect(), B = b.getBoundingClientRect();
+    return A.left < B.right - 0.5 && B.left < A.right - 0.5 && A.top < B.bottom - 0.5 && B.top < A.bottom - 0.5;
+  }
+  const slice = document.getElementById("go");
+  const cust = root.querySelector(".zws-cust");
+  function checkSlice(where) {
+    const bar = root.querySelector(":scope > .wsbar");
+    check(!!cust && bar && bar.contains(cust) && cust.parentElement.classList.contains("ws-end"), where + ": Customise sits with Slice in the workspace bar");
+    const sr = slice.getBoundingClientRect(), cr = cust.getBoundingClientRect();
+    check(Math.abs(sr.top - cr.top) < 2 && cr.left >= sr.right - 0.5, where + ": Customise sits on Slice's row, after it");
+    const sliceMiss = faceMiss(slice);
+    check(!sliceMiss.length, where + ": Slice receives the pointer across its face " + sliceMiss.join("; "));
+    const custMiss = faceMiss(cust);
+    check(!custMiss.length, where + ": Customise receives the pointer across its face " + custMiss.join("; "));
+    check(!covers(cust, slice), where + ": Customise does not cover Slice");
+    check(!covers(cust, exit), where + ": Customise does not cover Exit");
+  }
   check(root.classList.contains("zws"), "workspace mounted");
   check(hit(), "Exit is the top hit before a drag");
+  checkSlice("before a drag");
   const tools = document.querySelector("#zws-tools");
   const grip = tools.querySelector(".zws-grip");
   const gr = grip.getBoundingClientRect();
@@ -85,7 +121,13 @@
   check(hit(), "Exit stays the top hit with the process sheet open");
   check(hitId("processClose"), "Close on the sheet is clickable and is not Exit");
   check(hitId("move"), "Move stays clickable above the sheet");
-  document.getElementById("out").textContent = JSON.stringify({ fails: fails, width: innerWidth, height: innerHeight });
+  checkSlice("with the process sheet open");
+  const sr = slice.getBoundingClientRect(), cr = cust.getBoundingClientRect();
+  document.getElementById("out").textContent = JSON.stringify({
+    fails: fails, width: innerWidth, height: innerHeight,
+    slice: { x: Math.round(sr.x), y: Math.round(sr.y), w: Math.round(sr.width), h: Math.round(sr.height) },
+    customise: { x: Math.round(cr.x), y: Math.round(cr.y), w: Math.round(cr.width), h: Math.round(cr.height) }
+  });
 })();
 </script>
 </body>

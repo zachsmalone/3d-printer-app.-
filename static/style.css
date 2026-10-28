@@ -956,7 +956,7 @@ main.zws>.stage{position:absolute;inset:0;display:block}
 main.zws .viewer,main.zws>.stage>.viewer{position:absolute;inset:0;height:auto;min-height:0;border-radius:0;border:0;box-shadow:none}
 main.zws>.zws-bg{position:absolute!important;inset:0;width:auto!important;height:auto!important;min-height:0!important;border-radius:0!important}
 main.zws>.zws-cust{position:absolute;top:8px;right:8px;z-index:49;min-height:44px}
-main:not(.zws)>.zws-cust{display:none}
+main:not(.zws)>.zws-cust,main:not(.zws)>.wsbar>.zws-cust,main:not(.zws)>.wsbar>.ws-end{display:none}
 main.zws .zws-p>.zws-body>*{margin:0;max-width:100%;box-sizing:border-box}
 main.zws .zws-p>.zws-body>.controls{position:static;max-height:none;width:340px;max-width:100%;border:0;box-shadow:none;background:none}
 main.zws .zws-p.user-size>.zws-body>.controls,main.zws .zws-p.user-size>.zws-body>.result,main.zws .zws-p.user-size>.zws-body>.history,main.zws .zws-p.user-size>.zws-body>#torchPanel,main.zws .zws-p.user-size>.zws-body>#torchOut{width:100%;max-width:100%;min-width:0}
@@ -1161,9 +1161,12 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .wsbar{position:relative;z-index:40;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
 .wsbar .btn{min-height:44px}
 .wsbar [hidden]{display:none !important}
-main.zws>.wsbar{position:absolute;z-index:48;top:0;left:0;right:0;max-width:none;margin:0;padding:8px 60px 8px max(8px,env(safe-area-inset-left));border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:none;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);pointer-events:none}
+main.zws>.wsbar{position:absolute;z-index:48;top:0;left:0;right:0;max-width:none;margin:0;padding:8px max(8px,env(safe-area-inset-right)) 8px max(8px,env(safe-area-inset-left));border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:none;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);pointer-events:none}
 main.zws>.wsbar .btn,main.zws>.wsbar a{pointer-events:auto}
-main.zws>.wsbar .ws-go{margin-left:auto}
+/* Slice and Customise are one trailing pair. A corner layer with a 60px hole covered Slice. */
+main.zws>.wsbar>.ws-end{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px;margin-left:auto;max-width:100%;pointer-events:none}
+main.zws>.wsbar>.ws-end>.zws-cust,main.zws>.wsbar>.ws-end .ws-go{position:static;z-index:auto;flex:0 0 auto;margin:0;white-space:nowrap}
+main.zws>.wsbar .ws-go{margin-left:auto;flex:0 0 auto}
 main:not(.zws)>.wsbar .ws-go{display:none}
 #viewEdit:not(.zws)>.objdock,#viewEdit:not(.zws)>.proc-sheet{display:none!important}
 main.zws>.objdock{position:absolute;z-index:24;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
