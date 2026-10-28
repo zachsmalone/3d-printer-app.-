@@ -379,6 +379,17 @@ function showBuild(r) {
     `<span class="pill">${st.triangles.toLocaleString()} triangles</span><span class="pill">${st.bodies.length} ${st.bodies.length > 1 ? "bodies" : "body"}</span>` +
     `<span class="pill ${st.watertight ? "ok" : "bad"}">${st.watertight ? "✔ watertight" : "✖ not watertight"}</span>`;
   const bw = (r.info?.warnings || []); $("#buildWarn").hidden = !bw.length; $("#buildWarn").innerHTML = bw.map(w => "<svg class=i aria-hidden=true focusable=false><use href=#i-alert></use></svg> " + esc(w)).join("<br>");
+  const bustNote = $("#bustNote");
+  if (bustNote) {
+    if (r.mode === "bust") {
+      const ped = r.info?.pedestal || {};
+      const shape = { round: "round", rect: "rectangular", outline: "following the outline" }[ped.style] || ped.style;
+      const bits = [r.info?.note || "Photo bust with a rounded back. This is not an AI figure."];
+      if (!ped.skipped && shape && ped.thickness_mm != null) bits.push("Pedestal: " + shape + ", " + ped.thickness_mm + " mm.");
+      bustNote.hidden = false;
+      bustNote.textContent = bits.join(" ");
+    } else { bustNote.hidden = true; bustNote.textContent = ""; }
+  }
   const notes = r.auto_notes || [];
   $("#autoBox").hidden = !notes.length;
   $("#autoTable").innerHTML = notes.map(n => `<tr><td>${n.label}</td><td><b>${n.value}</b></td><td>${n.why}</td></tr>`).join("");

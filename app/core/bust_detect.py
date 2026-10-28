@@ -16,9 +16,14 @@ from . import selectmask
 
 WORK = 384
 TIP = (
-    "Auto head & shoulders is a starting mask — edit it with Trace / Add / Subtract, "
+    "Auto head and shoulders is a starting mask — edit it with Trace, Add, or Subtract, "
     "then press Make it from my selection."
 )
+TIPS = {
+    "face": TIP,
+    "skin": TIP + " This follows colour and the portrait shape, not a found face. Edit the outline if the cut is wrong.",
+    "prior": TIP + " No face was found, so this is a centred head-and-shoulders shape. Edit it before you build.",
+}
 
 
 def _resize_work(im: Image.Image):
@@ -220,5 +225,5 @@ def auto_select(im: Image.Image, soft: float = 2.0) -> dict:
         "paths": [{"op": "new", "pts": path}],
         "auto": True,
         "method": method,
-        "tip": TIP,
+        "tip": TIPS.get(method, TIP),
     }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   FEEL_MS, pickChoice, edgeKey, curvePaint, bodyGlow,
   constraintBlock, constraintSummary, filletBlock, faceOffsetBlock,
-  extrudeBlock, revolveBlock, measureBlock, jointBlock,
+  extrudeBlock, revolveBlock, measureBlock, subdivideBlock, jointBlock,
   boxesOverlap, mergeFeel, facePair, measureLine, anchorClear, barRect,
 } from "../../static/cad-feel.js";
 
@@ -115,4 +115,13 @@ test("a context bar stays inside the stage and off the mid-right dock", () => {
   assert.ok(barRect(underHeader, bar).top >= -0.5);
 
   assert.equal(anchorClear({ x: 40, y: 40, behind: true }, bar, bounds, []).hidden, true);
+});
+
+test("subdivide stays off until the edge length is one the server keeps", () => {
+  assert.equal(subdivideBlock(1), "");
+  assert.equal(subdivideBlock(0.05), "");
+  assert.equal(subdivideBlock(100), "");
+  assert.match(subdivideBlock(0.04), /0\.05 and 100/);
+  assert.match(subdivideBlock(101), /0\.05 and 100/);
+  assert.match(subdivideBlock(Number.NaN), /millimetres/);
 });

@@ -51,7 +51,7 @@ with sync_playwright() as p:
     pg.mouse.up()
     wait(pg, "() => window.__cad.S.scene.ops.length === 1")
     lab = pg.evaluate("window.__cad.S.scene.ops[0].label")
-    ok("a mouse stroke became a History step with X symmetry", lab.startswith("Sculpt Draw") and "X sym" in lab, lab)
+    ok("a mouse stroke became a History step with mirror", lab.startswith("Sculpt Draw") and "mirror" in lab, lab)
     pg.click("#tBrush [data-v=grab]")
     g = scr(pg, [0, -25, 25]); pg.mouse.move(*g); pg.mouse.down(); pg.mouse.move(g[0], g[1] + 60, steps=8); pg.mouse.up()
     wait(pg, "() => window.__cad.S.scene.ops.length === 2")

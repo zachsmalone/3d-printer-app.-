@@ -52,9 +52,17 @@ const snapshot = () => JSON.stringify({ paths: st.paths, invert: st.invert });
 function push() { st.undo.push(snapshot()); if (st.undo.length > 60) st.undo.shift(); }
 function setTool(t) { st.tool = t; host.querySelectorAll("[data-tool]").forEach(b => b.setAttribute("aria-pressed", b.dataset.tool === t)); }
 function say(t) { host.querySelector("#selSay").textContent = t; }
+function openLabel() {
+  const btn = host.querySelector("#selOpen");
+  if (!btn) return;
+  btn.textContent = st.open ? "Hide selection tools" : (st.mode === "bust" ? "Head and shoulders" : "Choose part of the photo");
+}
 function status() {
   const has = st.use && st.mask && st.paths.length;
-  host.querySelector("#selState").textContent = has ? `Using your selection (${Math.round(st.area * 100)}% of the photo).` : "Using the whole photo.";
+  const whole = st.mode === "bust"
+    ? "Whole photo. This builds a photo bust on a pedestal, not a cut-out head."
+    : "Using the whole photo.";
+  host.querySelector("#selState").textContent = has ? `Using your selection (${Math.round(st.area * 100)}% of the photo).` : whole;
   host.querySelector("#selUndo").disabled = !st.undo.length;
   host.querySelector("#selClear").disabled = !st.paths.length && !st.invert;
   host.querySelector("#selInvert").setAttribute("aria-pressed", st.invert);
@@ -62,6 +70,7 @@ function status() {
   host.querySelector("#selOutside").hidden = st.mode !== "lithophane";
   const autoBtn = host.querySelector("#selAuto");
   if (autoBtn) autoBtn.hidden = st.mode !== "bust" || !st.file;
+  openLabel();
 }
 function warn(t) { const w = host.querySelector("#selWarn"); w.hidden = !t; w.textContent = t || ""; }
 
@@ -269,7 +278,7 @@ host.querySelector("#selAuto").onclick = () => { autoHeadShoulders(); };
 
 function openPanel(o) {
   st.open = o; host.querySelector("#selPanel").hidden = !o; host.querySelector("#selOpen").setAttribute("aria-expanded", o);
-  host.querySelector("#selOpen").textContent = o ? "Hide selection tools" : "Choose part of the photo";
+  openLabel();
   if (o) { draw(); status(); }
 }
 host.querySelector("#selOpen").onclick = () => openPanel(!st.open);
@@ -302,7 +311,8 @@ document.addEventListener("zeim:file", e => {
 });
 document.addEventListener("zeim:mode", e => {
   st.mode = e.detail; host.hidden = !MODES.includes(st.mode) || !st.img; status(); draw();
-  if (st.mode === "bust") say("For a bust, press Auto head & shoulders for a starting mask you can edit, or draw round them yourself.");
+  if (st.mode === "bust") say("Head and shoulders is a starting mask you can edit. Without it, the whole photo becomes a photo bust on a pedestal, not an AI figure.");
+  openLabel(); status();
 });
 document.addEventListener("zeim:build", e => {        /* a saved build carries its selection: keep it for "make it again" */
   const s = e.detail?.params?.select; if (!s || !Array.isArray(s.paths)) return;
