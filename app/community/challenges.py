@@ -80,6 +80,16 @@ def entered(cid: str, item_id: str) -> bool:
     return any(e["challenge_id"] == cid and e["item_id"] == item_id for e in CHALLENGE_ENTRIES.read())
 
 
+def entry_for(cid: str, sid: str) -> dict | None:
+    """This person's entry on a challenge, if they have one. One remix per person."""
+    if not sid:
+        return None
+    c = get(cid)
+    if not c:
+        return None
+    return next((e for e in entries(c["id"]) if e.get("owner_sid") == sid), None)
+
+
 def enter(cid: str, *, item_id: str, sid: str, uid: str, remix_of: str,
           now: float | None = None) -> dict:
     """Record an entry. Caller must have verified the item is a public remix by this user."""

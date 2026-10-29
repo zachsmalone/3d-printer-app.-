@@ -495,6 +495,7 @@
           <button class="btn primary" id="editSend" aria-haspopup="dialog" title="Save this model or send it somewhere"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg> Send or save</button>
           <label class="inl" title="Who can open this project's files"><select id="editVis"><option value="private">Private</option><option value="followers">Followers</option><option value="public">Public</option></select></label>
           <button class="btn" id="editPrint"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-printer"/></svg> Print…</button>
+          <button class="btn" id="editPublish" type="button" title="Open the Showcase form for this model. Nothing is published until you confirm in that form."><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-globe"/></svg> Send to Showcase</button>
           <a class="btn" id="editOpenCad" href="/static/cad.html" title="Edit this model in the CAD workspace: sketch on faces, extrude, cut, fillet, pattern"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg> Open in CAD</a>
         </div>
       </div>
@@ -838,7 +839,22 @@
     <div class="field"><label for="pub_vis">Who can see this</label><select id="pub_vis"><option value="private">Private — only me (default)</option><option value="followers">Followers only</option><option value="public">Public — anyone, listed in Showcase</option></select></div>
     <div class="field"><label for="pub_title">Title</label><input id="pub_title" maxlength="80"><small class="help">This is the name of the Showcase files. Don't use real names, phone numbers or addresses.</small></div>
     <div class="field"><label for="pub_desc">Description</label><input id="pub_desc" maxlength="500"></div>
-    <div class="field"><label for="pub_remix">Remixed from <em>optional: paste the Showcase link</em></label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
+    <div class="field" id="pubRemixBox">
+      <span id="pubRemixLabel">Remixed from <em>optional</em></span>
+      <div id="pubRemixNow" hidden>
+        <p class="help" id="pubRemixNowText">You just chose a Showcase project to remix.</p>
+        <button type="button" class="btn" id="pubRemixUse">Use the project I just remixed</button>
+      </div>
+      <p class="help" id="pubRemixChosen" hidden></p>
+      <div class="field"><label for="pubRemixSearch">Credit a public Showcase project</label>
+        <div class="row"><input id="pubRemixSearch" type="search" maxlength="80" placeholder="Search by title" autocomplete="off"><button type="button" class="btn" id="pubRemixGo">Search</button></div></div>
+      <div id="pubRemixRecent"></div>
+      <ul class="plist" id="pubRemixHits"></ul>
+      <details class="pubps" id="pubRemixAdv"><summary>Paste a Showcase link</summary>
+        <p class="help">For a project that is not in the list. A Showcase link or its id both work.</p>
+        <div class="field"><label for="pub_remix">Showcase link or id</label><input id="pub_remix" maxlength="200" placeholder="https://…/p/abc123"></div>
+      </details>
+    </div>
     <div class="field"><label for="pub_allow_remix">Allow remixes</label><select id="pub_allow_remix"><option value="yes">Yes: others may post remixes that credit this (default)</option><option value="no">No: nobody can post this as the source of a remix</option></select><small class="help">You can change this later. The licence you pick also has to allow remixes.</small></div>
     <div class="field"><label for="pub_view_only">Downloads</label><select id="pub_view_only"><option value="no">Anyone who can see it may download it (default)</option><option value="yes">View only, no download</option></select></div>
     <div class="field"><label class="inl"><input type="checkbox" id="pub_ai"> <span>This model is AI-made</span></label><small class="help">Adds a small AI-made label. Models from the 2D to 3D tab always carry it.</small><small class="help" id="pub_ai_note" hidden>Ticked and locked: this model came from the 2D to 3D tab, so it's always labelled AI-made.</small></div>
@@ -863,6 +879,16 @@
   </div>
   <div class="reup" id="pubConflict" role="alert" hidden></div>
   <div class="df"><button class="btn primary" id="btnDoPublish">Publish</button></div>
+</div></dialog>
+
+<dialog id="dlgEnterOffer" aria-labelledby="enterOfferH"><div class="dlg">
+  <div class="dh"><h3 id="enterOfferH">Enter an open challenge?</h3><button class="x" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  <div class="body">
+    <p id="enterOfferWhich"></p>
+    <p class="help">Prize-free: no cash, no prizes, no ranking rewards. One remix per person. You can skip this.</p>
+    <div class="row" id="enterOfferBody"></div>
+  </div>
+  <div class="df"><button class="btn" type="button" data-close>Not now</button></div>
 </div></dialog>
 
 <dialog id="dlgMulti" aria-labelledby="multiH"><div class="dlg">

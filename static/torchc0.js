@@ -57,7 +57,7 @@ function panelHTML() {
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
     <p class="help">${esc(cat.test_note)} ${esc(cat.formats_note)}</p>
     <details><summary>Resin safety</summary><ul id="rzSafety">${cat.safety.map(s => `<li>${esc(s)}</li>`).join("")}</ul></details>
-    <div class="row"><button class="btn primary big" id="rzGo">Prepare for resin</button></div>`;
+    <div class="row"><button class="btn primary big" id="rzGo">Prepare for resin</button><button type="button" class="btn" id="rzPublish" title="Open the Showcase form for this model. Nothing is published until you confirm in that form.">Send to Showcase</button></div>`;
 }
 
 function wire() {
@@ -109,6 +109,8 @@ function wire() {
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
   drop.addEventListener("drop", e => { const fs = e.dataTransfer?.files; if (!fs?.length) return;
     const dt = new DataTransfer(); dt.items.add(fs[0]); inp.files = dt.files; show(); });
+  const publishTorch = () => document.dispatchEvent(new CustomEvent("zeim:send-showcase", { detail: { src: "torchc0" } }));
+  if ($("#rzPublish")) $("#rzPublish").onclick = publishTorch;
   $("#rzGo").onclick = async () => {
     const out = $("#torchOut"), f = $("#rzFile").files[0];
     if (!f) { out.innerHTML = `<p class="help warn rzNeedFile" role="alert">Choose an STL, 3MF or OBJ file first.</p>`; return; }
@@ -123,6 +125,7 @@ function wire() {
   };
   let last = null;
   $("#torchOut").addEventListener("click", async e => {      // one-click fixes re-run the same job with the extra points
+    if (e.target.closest("#rzPublishResult")) { document.dispatchEvent(new CustomEvent("zeim:send-showcase", { detail: { src: "torchc0" } })); return; }
     const b = e.target.closest("#rzFixIsl,#rzFixCup"); if (!b || !last || !last.rep) return;
     const lc = last.rep.layer_check;
     if (b.id === "rzFixIsl") last.isl = last.isl.concat(lc.islands.map(i => i.at).filter(Boolean));
@@ -154,7 +157,7 @@ function wire() {
         ${(r.material_notes || []).map(n => `<p class="help">${esc(n)}</p>`).join("")}
         ${r.notes.filter(n => !/ island\(s\)| suction cup\(s\)/.test(n)).map(n => `<p class="help warn rzWarn">${esc(n)} <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss this warning">Dismiss</button></p>`).join("")}
         <p class="help">${esc(e.resin_note)} ${esc(e.cost_note)}</p>
-        <div class="row"><button type="button" class="btn primary" id="rzExport" data-export-rid="${esc(r.export?.rid || "")}" data-export-name="${esc(r.export?.name || "")}" aria-haspopup="dialog"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Export…</button><a class="btn" href="${r.downloads.stl}" download id="rzQuickStl">Quick STL</a></div>`;
+        <div class="row"><button type="button" class="btn primary" id="rzExport" data-export-rid="${esc(r.export?.rid || "")}" data-export-name="${esc(r.export?.name || "")}" aria-haspopup="dialog"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Export…</button><a class="btn" href="${r.downloads.stl}" download id="rzQuickStl">Quick STL</a><button type="button" class="btn" id="rzPublishResult" title="Open the Showcase form for this prepared model. Nothing is published until you confirm in that form.">Send to Showcase</button></div>`;
       out.classList.add("rzResult");
       out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
       show3D($("#rzView"), r.downloads.stl, lc);

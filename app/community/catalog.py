@@ -503,6 +503,42 @@ def mine(actor: Actor) -> list[dict]:
     return [i for i in _all() if i.get("owner_sid") == actor.sid and not i["hidden"]]
 
 
+def _remix_card(i: dict, actor: Actor, users: dict) -> dict:
+    """Owner-facing summary of a credited remix. A parent title is included only when this person can still see it."""
+    parent_id = str(i.get("remix_of") or "")
+    parent_title = ""
+    if parent_id:
+        try:
+            parent_title = get(parent_id, actor).get("title") or ""
+        except Denied:
+            parent_title = ""
+    vis = privacy.effective(i.get("visibility", "private"), users.get(i.get("owner_sid"))) if i.get("owner_sid") else "public"
+    return {"id": i["id"], "title": i["title"], "share_url": f"/p/{i['id']}",
+            "remix_of": parent_id, "remix_title": parent_title, "visibility": vis}
+
+
+def credited_remixes(actor: Actor) -> dict:
+    """This account's credited Showcase remixes.
+
+    `items` are public, so they can be entered in the remix challenge.
+    `needs_public` are credited but still private or followers-only.
+    Hidden and example rows are left out. Signed-out callers get empty lists.
+    """
+    if not actor.user:
+        return {"signed_in": False, "items": [], "needs_public": []}
+    users = USERS.read()
+    public, needs = [], []
+    for i in mine(actor):
+        if i.get("example") or not i.get("remix_of"):
+            continue
+        card = _remix_card(i, actor, users)
+        if is_public(i, users):
+            public.append(card)
+        else:
+            needs.append(card)
+    return {"signed_in": True, "items": public, "needs_public": needs}
+
+
 def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -> dict:
     try:
         level = privacy.check_level(actor, level)

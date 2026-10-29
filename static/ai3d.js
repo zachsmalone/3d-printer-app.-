@@ -143,7 +143,7 @@ function showResult(r) {
   $("#a3Res").hidden = false;
   $("#a3Res").innerHTML = `<p class="a3title"><b>${esc(r.title)}</b> <span class="ailbl" title="Made with an open model">${ico("sparkle")} ${esc(r.ai_label || "AI-made")}</span></p>
     <p class="help">${sz.length ? sz.map(n => Math.round(n)).join(" × ") + " mm" : ""} · ${rep.watertight ? ico("check") + " Watertight, ready to slice" : "Not fully watertight"}</p>
-    <p class="help">Preview matches this mesh. Export, repair, CAD, and the slicer use the same triangles. This does not send it to Showcase.</p>
+    <p class="help">Preview matches this mesh. Export, repair, CAD, and the slicer use the same triangles. Those buttons do not send it to Showcase.</p>
     ${notes.length ? `<ul class="a3list">${notes.map(n => `<li>${ico("check")} ${esc(n)}</li>`).join("")}</ul>` : ""}
     ${warns.length ? `<ul class="a3list warn">${warns.map(n => `<li>${ico("alert")} ${esc(n)}</li>`).join("")}</ul>` : ""}
     <div class="row a3handoff" role="group" aria-label="Open this mesh in another ZEIM tool">
@@ -151,6 +151,7 @@ function showResult(r) {
       <button type="button" class="btn" id="a3Repair">${ico("wrench")} Check &amp; Repair</button>
       <button type="button" class="btn" id="a3Cad">${ico("cube")} Send to CAD</button>
       <button type="button" class="btn primary" id="a3Export">${ico("download")} Export</button>
+      <button type="button" class="btn" id="a3Publish" title="Open the Showcase form for this mesh. Nothing is published until you confirm in that form.">${ico("globe")} Send to Showcase</button>
     </div>`;
   const go = async (btn, target, tool) => {
     if (!resultId || btn.disabled) return;
@@ -162,6 +163,12 @@ function showResult(r) {
   $("#a3Repair").onclick = () => go($("#a3Repair"), "slicer", "repair");
   $("#a3Cad").onclick = () => go($("#a3Cad"), "cad", "");
   $("#a3Export").onclick = () => openExport({ ws: "ai3d", bid: r.id });
+  $("#a3Publish").onclick = () => {
+    if (!resultId) return;
+    const title = ($("#a3Title")?.value || "").trim() || r.title || "";
+    if (typeof window.zeimOpenShowcase !== "function") { toast("Send to Showcase is not available on this page.", "err"); return; }
+    window.zeimOpenShowcase({ id: resultId, title, ai: true, mode: "ai3d" });
+  };
 }
 
 function clearAi3dWork() {
