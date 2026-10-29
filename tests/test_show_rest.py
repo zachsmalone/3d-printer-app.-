@@ -155,8 +155,8 @@ def test_remix_challenge_prize_free_enter():
     assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem2}).status_code == 400
 
 
-def test_challenge_eligible_lists_own_public_remixes():
-    """The enter dialog picks from this list. Other people's work and private remixes stay out of it."""
+def test_challenge_eligible_lists_own_published_showcase_items():
+    """The enter dialog picks from published Showcase projects. Studio files, private posts, and other people stay out."""
     a, b = U("ElOrig"), U("ElRemix")
     src = publish(a, "Source cup", license_id="cc-by-4.0")
     rem = publish(b, "My cup remix", remix_of=src["id"], license_id="cc-by-4.0")
@@ -170,10 +170,10 @@ def test_challenge_eligible_lists_own_public_remixes():
     body = b.get(f"/api/challenges/{cid}/eligible").json()
     assert body["signed_in"] is True and body["already_entered"] is False and body["can_enter"] is True
     ids = [i["id"] for i in body["items"]]
-    assert rem["id"] in ids and plain["id"] not in ids and other["id"] not in ids and priv["id"] not in ids
+    assert rem["id"] in ids and plain["id"] in ids and other["id"] not in ids and priv["id"] not in ids
     hit = next(i for i in body["items"] if i["id"] == rem["id"])
     assert hit["remix_of"] == src["id"] and hit["remix_title"] == "Source cup" and hit["share_url"] == f"/p/{rem['id']}"
-    assert priv["id"] in [i["id"] for i in body["needs_public"]]
+    assert b.post(f"/api/challenges/{cid}/enter", json={"build_id": "aaaaaaaaaaaa"}).status_code == 400
     assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem["id"]}).status_code == 200
     again = b.get(f"/api/challenges/{cid}/eligible").json()
     assert again["already_entered"] is True and again["can_enter"] is False

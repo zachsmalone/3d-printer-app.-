@@ -44,16 +44,38 @@ def test_remix_credit_is_a_picker_and_paste_is_advanced():
     assert "Enter an open challenge?" in HTML
 
 
-def test_challenge_enter_picks_a_remix_and_does_not_ask_for_a_url():
+def test_challenge_enter_picks_a_published_showcase_item_and_does_not_ask_for_a_url():
     assert "/eligible" in COMM
-    assert "Your public credited remixes" in COMM
-    assert "You don't have a public credited remix to enter yet." in COMM
-    assert 'href="#lithophane"' in COMM and 'href="#showcase"' in COMM
+    assert "Your Showcase projects" in COMM
+    assert "Publish a project to Showcase first." in COMM
+    assert "Enter challenge" in COMM
+    assert "Send to challenge" in COMM
+    assert "pickChallengeForItem" in COMM
+    assert "Open challenges" in COMM
+    assert 'name="chOffer"' in COMM
+    assert ">Entered</span>" in COMM or "Entered" in COMM
+    assert 'id="chOfferGo"' in COMM
+    assert 'id="itEnterCh"' in COMM
+    assert "My Showcase" in HTML
+    assert 'id="meShowList"' in HTML
+    assert "data-send-ch" in COMM
+    assert "Are you sure? We'll miss your work." in COMM
+    assert 'cancelLabel: "No"' in COMM
+    assert 'okLabel: "Yes"' in COMM
+    assert "Remix of a design by" in COMM
+    assert "original removed by creator" not in COMM
+    assert "Remove from Showcase" in COMM
+    assert 'id="itRemove"' in COMM
+    assert "data-remove-show" in COMM
+    assert "chEnterGo" in COMM
+    assert "item_id: itemId" in COMM or "item_id: item.id" in COMM
+    assert "build_id" not in COMM.split("function enterChallengeItem")[1].split("function offerChallenge")[0]
     assert "chEnterPaste" not in COMM
     assert "chEnterId" not in COMM
     assert "Your remix project id or /p/" not in COMM
     assert "Paste your remix's Showcase link" not in COMM
     assert "Enter with a project id" not in COMM
+    assert 'data-lib="pick"' not in LIB
 
 
 def test_remix_opens_the_model_and_keeps_the_credit():

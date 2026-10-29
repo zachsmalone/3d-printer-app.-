@@ -80,6 +80,16 @@ def entered(cid: str, item_id: str) -> bool:
     return any(e["challenge_id"] == cid and e["item_id"] == item_id for e in CHALLENGE_ENTRIES.read())
 
 
+def pull_item(item_id: str) -> None:
+    """Drop every challenge entry that used this Showcase project."""
+    if not item_id:
+        return
+
+    def f(l):
+        l[:] = [e for e in l if e.get("item_id") != item_id]
+    CHALLENGE_ENTRIES.update(f)
+
+
 def entry_for(cid: str, sid: str) -> dict | None:
     """This person's entry on a challenge, if they have one. One remix per person."""
     if not sid:

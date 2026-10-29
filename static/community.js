@@ -131,7 +131,7 @@ function route() {
   if (!(h[0] === "c" && h[1]) && $("#dlgCollection")?.open) $("#dlgCollection").close();
   if (h[0] === "c" && h[1]) setTimeout(() => openCollection(h[1]), 50);
   if (v === "account") {
-    loadFavorites(); loadCollections(); paintAccountHandle();
+    loadFavorites(); loadCollections(); loadMyShowcase(); paintAccountHandle();
     paintStudioOwn();
     refreshStudioLibrary();
     if (intent.ownership) {
@@ -666,6 +666,8 @@ async function openItem(id) {
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
       ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
+      ${i.owned && !i.example && !i.original ? `<button type="button" class="btn" id="itEnterCh">Enter challenge</button>` : ""}
+      ${i.owned && !i.example && !i.original ? `<button type="button" class="btn ghost danger" id="itRemove">Remove</button>` : ""}
       ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn primary" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix this</button>`}
       <button class="btn ghost" id="itShare"><svg class=i aria-hidden=true focusable=false><use href=#i-link></use></svg> Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>'}
@@ -775,6 +777,8 @@ async function openItem(id) {
   };
   if ($("#itTipSave")) $("#itTipSave").onclick = async () => { try { await api(`/api/showcase/${id}/tip`, J("PUT", { tip_url: $("#itTip").value.trim() })); toast($("#itTip").value.trim() ? "Tip link saved" : "Tip link removed", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); } };
   if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); openItem(id); } };
+  if ($("#itEnterCh")) $("#itEnterCh").onclick = () => pickChallengeForItem(i);
+  if ($("#itRemove")) $("#itRemove").onclick = () => removeShowcaseItem(i);
   if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => startRemix(i);
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
   if ($("#itReport")) $("#itReport").onclick = () => {
@@ -996,6 +1000,16 @@ function wireRemixPicker() {
   });
 }
 let publishBuild = null;
+function publishPayload(build) {
+  return {
+    build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
+    tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value,
+    remix_of: ($("#pub_remix")?.value || "").trim(), nsfw: $("[name=pub_nsfw]:checked")?.value === "yes",
+    allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
+    ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
+    print_settings: psFields(),
+  };
+}
 function openShowcase(build) {
   if (!build?.id) { toast("Make a model first, then send it to Showcase.", "err"); return; }
   if (!ME?.signed_up) { toast("Create an account first to share projects.", "err"); openAccount("signup"); return; }
@@ -1060,15 +1074,11 @@ $("#btnDoPublish").onclick = async () => {
   if ($("#pubConflict")) $("#pubConflict").hidden = true;
   const nsfw = $("[name=pub_nsfw]:checked")?.value;
   if (!nsfw) return inlineMsg($("#btnDoPublish"), "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.");
+  const remixSent = ($("#pub_remix")?.value || "").trim();
   try {
     const build = publishBuild || S.current;
     if (!build?.id) return inlineMsg($("#btnDoPublish"), "Make a model first, then send it to Showcase.");
-    const remixSent = ($("#pub_remix")?.value || "").trim();
-    const i = await api("/api/showcase", J("POST", { build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
-      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: remixSent, nsfw: nsfw === "yes",
-      allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
-      ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
-      print_settings: psFields() }));
+    const i = await api("/api/showcase", J("POST", publishPayload(build)));
     if (remixSent) { try { sessionStorage.removeItem(REMIX_NOW); } catch { /* the credit is already on the project */ } }
     if ($("#pub_remix")) { $("#pub_remix").value = ""; delete $("#pub_remix").dataset.title; }
     clearInline($("#btnDoPublish")); $("#dlgPublish").close();
@@ -1076,6 +1086,7 @@ $("#btnDoPublish").onclick = async () => {
     if (i.held_for_review) return toast(i.hold_message, "ok");
     toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
     if (i.visibility === "public" && remixSent && i.id) offerChallenge(i);
+    if (document.body.dataset.view === "account") loadMyShowcase();
   } catch (e) { if (e.status === 409 && e.body?.code) { clearInline($("#btnDoPublish")); return showConflict(e.body); } inlineMsg($("#btnDoPublish"), e.message); }
 };
 
@@ -1256,8 +1267,17 @@ $("#favGrid").addEventListener("click", e => { const c = e.target.closest("a[dat
 
 /* ---------- remix credit chain ---------- */
 function remixHTML(chain) {
-  const step = x => x.id ? `<a href="#" data-open-item="${x.id}">${esc(x.title)}</a> by ${x.creator_id && x.creator !== "ZEIM" ? `<a href="#u/${x.creator_id}">${esc(x.creator)}</a>` : esc(x.creator || "")}` : esc(x.title);
-  return `<p class="remix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remixed from ${step(chain[0])}${chain.length > 1 ? `<span class="remix-more">, which was remixed from ${chain.slice(1).map(step).join(", remixed from ")}</span>` : ""}</p>`;
+  const who = x => {
+    const raw = String(x.creator_username || x.creator || "").replace(/^@/, "");
+    const at = raw ? "@" + raw : (x.creator || "");
+    return x.creator_id && x.creator !== "ZEIM" ? `<a href="#u/${esc(x.creator_id)}">${esc(at)}</a>` : esc(at);
+  };
+  const credit = x => x.removed
+    ? `a design by ${who(x)}`
+    : (x.id ? `<a href="#" data-open-item="${x.id}">${esc(x.title)}</a> by ${who(x)}` : esc(x.title));
+  const first = chain[0] && chain[0].removed ? `Remix of a design by ${who(chain[0])}` : ("Remixed from " + credit(chain[0]));
+  const rest = chain.length > 1 ? `<span class="remix-more">, which was remixed from ${chain.slice(1).map(credit).join(", remixed from ")}</span>` : "";
+  return `<p class="remix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> ${first}${rest}</p>`;
 }
 document.addEventListener("click", e => { const a = e.target.closest("a[data-open-item]"); if (a) { e.preventDefault(); openItem(a.dataset.openItem); } });
 
@@ -1437,16 +1457,9 @@ async function loadQuestions(id, item) {
 }
 
 /* ---------- prize-free themed challenges ---------- */
-const VIS_LABEL = { private: "Private", followers: "Followers only", public: "Public" };
-function openModelForPublish() {
-  if (S.current?.id) return { id: S.current.id, title: ($("#designName")?.value || "").trim() || S.current.title, ai: S.current.ai, mode: S.current.mode, base: S.current.base };
-  const p = window.__zeimEdit?.p;
-  if (p?.id) return { id: p.id, title: p.title || "Slicer model" };
-  return null;
-}
 function challengeEntryHTML(elig) {
   if (!elig.signed_in && !ME?.signed_up) {
-    return `<p>Sign in to enter with one of your Showcase remixes.</p><button type="button" class="btn primary" id="chEnterSign">Sign in</button>`;
+    return `<p>Sign in to enter one of your Showcase projects.</p><button type="button" class="btn primary" id="chEnterSign">Sign in</button>`;
   }
   if (elig.status === "closed") return `<p class="help">This challenge is closed.</p>`;
   if (elig.already_entered) {
@@ -1459,56 +1472,97 @@ function challengeEntryHTML(elig) {
   if (elig.error) return `<p><button type="button" class="btn" id="chEnterRetry">Try again</button></p>`;
   if (!elig.can_enter) return `<p class="help">This account can't enter right now.</p>`;
   const items = elig.items || [];
-  const needs = elig.needs_public || [];
-  const needHTML = needs.length ? `<p class="help">These credited remixes are saved, but an entry has to be public. Open one and set Who can see this to Public.</p>
-    <ul class="plist">${needs.map(i => `<li><a href="#" data-open-item="${esc(i.id)}">${esc(i.title)}</a> <span class="help">${esc(VIS_LABEL[i.visibility] || i.visibility || "")}</span></li>`).join("")}</ul>` : "";
   if (!items.length) {
-    const open = openModelForPublish();
-    return `<p>You don't have a public credited remix to enter yet.</p>
-      ${needHTML}
-      <div class="row">
-        <a class="btn primary" href="#showcase" id="chFindRemix">Find a project to remix</a>
-        <a class="btn" href="#lithophane" id="chMakeRemix">Make one in Lithophane</a>
-        ${open ? `<button type="button" class="btn" id="chPublishOpen">Send the open model to Showcase</button>` : ""}
-      </div>
-      <p class="help">Remix a public project, publish your version with that credit, and set it to Public. Then pick it here.</p>`;
+    return `<p>Publish a project to Showcase first. Then you can enter it here.</p>
+      <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>`;
   }
   const radios = items.map((it, n) => `<label class="choice"><input type="radio" name="chPick" value="${esc(it.id)}" ${n === 0 ? "checked" : ""}>
-    <span><b>${esc(it.title)}</b><small class="help">${it.remix_title ? "Remix of " + esc(it.remix_title) : "Credited remix"}</small></span></label>`).join("");
-  return `<fieldset class="reasons" id="chPickList"><legend>Your public credited remixes</legend>${radios}</fieldset>
-    <button type="button" class="btn primary" id="chEnterGo">Enter this remix</button>
-    <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>
-    ${needHTML}`;
+    <span><b>${esc(it.title)}</b><small class="help">${it.remix_title ? "Remix of " + esc(it.remix_title) : "Showcase project"}</small></span></label>`).join("");
+  return `<fieldset class="reasons" id="chPickList"><legend>Your Showcase projects</legend>${radios}</fieldset>
+    <button type="button" class="btn primary" id="chEnterGo">Enter this project</button>
+    <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>`;
 }
+async function pickChallengeForItem(item) {
+  if (!item?.id) return;
+  let list; try { list = await api("/api/challenges"); } catch (e) { return toast(e.message, "err"); }
+  const open = (list.challenges || []).filter(x => x.status === "open");
+  if (!open.length || !$("#dlgEnterOffer")) return toast("No open challenges right now.", "err");
+  const which = $("#enterOfferWhich");
+  if (which) which.textContent = item.title ? `Send “${item.title}” to a challenge.` : "Send this Showcase project to a challenge.";
+  const host = $("#enterOfferBody");
+  if (!host) return;
+  const choices = open.map(c => c.entered
+    ? `<p><b>${esc(c.title)}</b> <span class="pill">Entered</span></p>`
+    : `<label class="choice"><input type="radio" name="chOffer" value="${esc(c.id)}"><span>${esc(c.title)}</span></label>`).join("");
+  const canPick = open.some(c => !c.entered);
+  host.innerHTML = `<fieldset class="reasons" id="chOfferList"><legend>Open challenges</legend>${choices}</fieldset>`
+    + (canPick ? `<button type="button" class="btn primary" id="chOfferGo">Confirm</button>` : "");
+  const go = host.querySelector("#chOfferGo");
+  if (go) go.onclick = async () => {
+    const cid = host.querySelector("[name=chOffer]:checked")?.value || "";
+    if (!cid) return inlineMsg(go, "Pick a challenge.");
+    go.disabled = true;
+    try {
+      const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id: item.id }));
+      $("#dlgEnterOffer").close();
+      toast(r.message || "Entered", "ok");
+    } catch (e) { inlineMsg(go, e.message); go.disabled = false; }
+  };
+  $("#dlgEnterOffer").showModal();
+}
+async function removeShowcaseItem(item) {
+  const yes = await askConfirm({
+    title: "Remove from Showcase",
+    message: "Are you sure? We'll miss your work.",
+    okLabel: "Yes",
+    cancelLabel: "No",
+    danger: true,
+  });
+  if (!yes) return;
+  try {
+    const r = await api("/api/showcase/" + item.id, { method: "DELETE" });
+    toast(r.message || "Removed from Showcase. Your saved file stays.", "ok");
+    if ($("#dlgItem")?.open) $("#dlgItem").close();
+    loadMyShowcase();
+    if (document.body.dataset.view === "showcase") loadShowcase();
+    loadChallenges();
+  } catch (e) { toast(e.message, "err"); }
+}
+async function loadMyShowcase() {
+  const host = $("#meShowList");
+  if (!host) return;
+  if (!ME?.signed_up) { host.innerHTML = `<li class="help">Sign in to see projects you published.</li>`; return; }
+  let r; try { r = await api("/api/me/projects"); } catch (e) { host.innerHTML = `<li class="help">${esc(e.message)}</li>`; return; }
+  const items = r.projects || [];
+  host.innerHTML = items.length ? items.map(i => `<li>
+      <a href="#" data-open-item="${esc(i.id)}">${esc(i.title)}</a>
+      <button type="button" class="btn small" data-send-ch="${esc(i.id)}">Send to challenge</button>
+      <button type="button" class="btn small ghost danger" data-remove-show="${esc(i.id)}">Remove from Showcase</button>
+    </li>`).join("") : `<li class="help">No Showcase projects yet. Send a saved project to Showcase when you want it public.</li>`;
+}
+$("#meShowList")?.addEventListener("click", async e => {
+  const enter = e.target.closest("[data-send-ch]");
+  const rm = e.target.closest("[data-remove-show]");
+  if (enter) {
+    e.preventDefault();
+    try { pickChallengeForItem(await api("/api/showcase/" + enter.dataset.sendCh)); }
+    catch (err) { toast(err.message, "err"); }
+    return;
+  }
+  if (rm) {
+    e.preventDefault();
+    removeShowcaseItem({ id: rm.dataset.removeShow });
+  }
+});
 async function enterChallengeItem(cid, itemId, btn) {
-  if (!itemId) return inlineMsg(btn, "Pick one of your remixes.");
+  if (!itemId) return inlineMsg(btn, "Pick one of your Showcase projects.");
   btn.disabled = true;
   try { const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id: itemId })); toast(r.message || "Entered", "ok"); openChallenge(cid); }
   catch (e) { inlineMsg(btn, e.message); }
   finally { btn.disabled = false; }
 }
 async function offerChallenge(item) {
-  let list; try { list = await api("/api/challenges"); } catch { return; }
-  const open = [];
-  for (const c of (list.challenges || []).filter(x => x.status === "open")) {
-    try { const elig = await api(`/api/challenges/${c.id}/eligible`); if (elig.can_enter) open.push(c); }
-    catch { /* skip a challenge we could not check */ }
-  }
-  if (!open.length || !$("#dlgEnterOffer")) return;
-  const which = $("#enterOfferWhich");
-  if (which) which.textContent = item.title ? `“${item.title}” is a public credited remix.` : "This public credited remix can be entered.";
-  const host = $("#enterOfferBody");
-  if (!host) return;
-  host.innerHTML = open.map(c => `<button type="button" class="btn primary" data-offer-ch="${esc(c.id)}">Enter ${esc(c.title)}</button>`).join(" ");
-  host.querySelectorAll("[data-offer-ch]").forEach(b => b.onclick = async () => {
-    b.disabled = true;
-    try {
-      const r = await api(`/api/challenges/${b.dataset.offerCh}/enter`, J("POST", { item_id: item.id }));
-      $("#dlgEnterOffer").close();
-      toast(r.message || "Entered", "ok");
-    } catch (e) { inlineMsg(b, e.message); b.disabled = false; }
-  });
-  $("#dlgEnterOffer").showModal();
+  if (item?.id) pickChallengeForItem(item);
 }
 async function loadChallenges() {
   const host = $("#chHost"); if (!host) return;
@@ -1531,7 +1585,7 @@ async function openChallenge(cid) {
   $("#chDlgH").textContent = c.title;
   const rules = (c.rules || []).map(r => `<li>${esc(r)}</li>`).join("");
   const entries = (c.entries || []).map(e => `<li><a href="#" data-open-item="${esc(e.id)}">${esc(e.title)}</a> <span class="help">by ${esc(e.creator)}</span></li>`).join("")
-    || `<li class="help">No entries yet. Publish a credited remix, then pick it here.</li>`;
+    || `<li class="help">No entries yet.</li>`;
   $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
     <p>${esc(c.blurb)}</p>
     <ul class="help chrules">${rules}</ul>
@@ -1541,11 +1595,6 @@ async function openChallenge(cid) {
     <h4>Entries</h4><ul class="plist" id="chEntries">${entries}</ul>`;
   $("#chDlgBody").querySelectorAll("a[href^='#']").forEach(a => a.addEventListener("click", () => $("#dlgChallenge").close()));
   if ($("#chEnterSign")) $("#chEnterSign").onclick = () => { $("#dlgChallenge").close(); openAccount("signup"); };
-  if ($("#chPublishOpen")) $("#chPublishOpen").onclick = () => {
-    const model = openModelForPublish();
-    $("#dlgChallenge").close();
-    if (model) openShowcase(model);
-  };
   if ($("#chEnterRetry")) $("#chEnterRetry").onclick = () => openChallenge(cid);
   if ($("#chEnterGo")) $("#chEnterGo").onclick = () => {
     const item_id = $("#chDlgBody [name=chPick]:checked")?.value || "";

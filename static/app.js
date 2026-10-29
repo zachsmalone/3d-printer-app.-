@@ -24,13 +24,15 @@ function inlineMsg(near, msg, kind = "err") {
 }
 function clearInline(near) { const p = near?.previousElementSibling; if (p?.classList.contains("inline-msg")) p.remove(); }
 /** Accessible confirm dialog (replaces window.confirm). Resolves true/false. */
-function askConfirm({ title = "Please confirm", message, okLabel = "OK", danger = true } = {}) {
+function askConfirm({ title = "Please confirm", message, okLabel = "OK", cancelLabel = "Cancel", danger = true } = {}) {
   return new Promise(resolve => {
     const dlg = $("#dlgConfirm"); if (!dlg) { resolve(window.confirm(message || title)); return; }
     $("#confirmTitle").textContent = title;
     $("#confirmMsg").textContent = message || "";
     const ok = $("#confirmOk");
+    const cancel = $("#confirmCancel");
     ok.textContent = okLabel;
+    if (cancel) cancel.textContent = cancelLabel;
     ok.className = danger ? "btn danger" : "btn primary";
     let settled = false;
     const done = (v) => { if (settled) return; settled = true; dlg.close(); resolve(v); };

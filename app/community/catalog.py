@@ -119,7 +119,7 @@ def _all() -> list[dict]:
     items = _seed() + LISTINGS.read()
     eng = ENGAGEMENT.read()
     for i in items:
-        i["hidden"] = i["id"] in hidden
+        i["hidden"] = i["id"] in hidden or bool(i.get("removed_by_creator"))
         # base = example seed numbers (or legacy counters); plus ONE per distinct visitor session
         i["_likers"] = eng["likes"].get(i["id"], [])
         i["_dlers"] = eng["downloads"].get(i["id"], [])
@@ -435,6 +435,15 @@ def remix_chain(i: dict, actor, limit: int = 10) -> list[dict]:
     while cur and cur not in seen and len(out) < limit:
         seen.add(cur)
         p = by_id.get(cur)
+        if p and p.get("removed_by_creator"):
+            # The post is gone. The remix still names the maker: "Remix of a design by @username".
+            p = resolve(p, users)
+            un = str(p.get("creator_username") or "").lstrip("@")
+            out.append({"id": None, "title": "a design", "removed": True,
+                        "creator": ("@" + un) if un else "", "creator_username": un,
+                        "creator_id": p.get("creator_id")})
+            cur = p.get("remix_of")
+            continue
         if not p or not ok(p):
             out.append({"id": None, "title": "a project that is no longer available", "creator": None, "creator_id": None})
             break
@@ -517,26 +526,50 @@ def _remix_card(i: dict, actor: Actor, users: dict) -> dict:
             "remix_of": parent_id, "remix_title": parent_title, "visibility": vis}
 
 
-def credited_remixes(actor: Actor) -> dict:
-    """This account's credited Showcase remixes.
+def own_published(actor: Actor) -> dict:
+    """This account's public Showcase projects.
 
-    `items` are public, so they can be entered in the remix challenge.
-    `needs_public` are credited but still private or followers-only.
-    Hidden and example rows are left out. Signed-out callers get empty lists.
+    Studio files are not included. Private and followers-only posts are not included.
+    Hidden and example rows are left out. Signed-out callers get an empty list.
     """
     if not actor.user:
-        return {"signed_in": False, "items": [], "needs_public": []}
+        return {"signed_in": False, "items": []}
     users = USERS.read()
-    public, needs = [], []
+    items = []
     for i in mine(actor):
-        if i.get("example") or not i.get("remix_of"):
+        if i.get("example") or not is_public(i, users):
             continue
-        card = _remix_card(i, actor, users)
-        if is_public(i, users):
-            public.append(card)
-        else:
-            needs.append(card)
-    return {"signed_in": True, "items": public, "needs_public": needs}
+        items.append(_remix_card(i, actor, users))
+    return {"signed_in": True, "items": items}
+
+
+def remove_listing(actor: Actor, item_id: str, *, admin: bool = False) -> dict:
+    """Delete a Showcase post. The saved Studio build is a separate copy and is left in place.
+
+    A short record stays so a remix can still say who made the original. The published files are removed.
+    """
+    raw = next((i for i in LISTINGS.read() if i.get("id") == item_id), None)
+    if not raw or raw.get("example") or raw.get("original"):
+        raise Denied(404, "not found")
+    if not admin and raw.get("owner_sid") != actor.sid:
+        raise Denied(403, "You can only remove your own Showcase project.")
+    if raw.get("removed_by_creator"):
+        return raw
+    shutil.rmtree(LDIR / item_id, ignore_errors=True)
+    found = {}
+
+    def f(l):
+        for i in l:
+            if i.get("id") == item_id:
+                i["removed_by_creator"] = True
+                i["hidden"] = True
+                i["files"] = []
+                i["has_thumb"] = False
+                found.update(i)
+    LISTINGS.update(f)
+    if not found:
+        raise Denied(404, "not found")
+    return found
 
 
 def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -> dict:
@@ -651,6 +684,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "downloads": 0, "description": (description or "")[:500],
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
+            "source_build_id": build_id,
             "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False,
             "view_only": bool(view_only),
             # honest AI label: the creator said so, the build (or any build it came from) is from ZEIM's 2D->3D tab,

@@ -197,6 +197,7 @@ def get_build(bid: str, actor: Actor = Depends(get_actor)):
 
 @router.delete("/builds/{bid}")
 def delete_build(bid: str, actor: Actor = Depends(get_actor)):
+    """Delete one saved build. A Showcase post copied from it is a separate file and stays."""
     meta_for(bid, actor, owner_only=True)
     from ..services import filestore
     filestore.delete_build(bid)               # remote FIRST, durably recorded — raises => local survives

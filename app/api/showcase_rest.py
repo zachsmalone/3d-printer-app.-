@@ -4,7 +4,9 @@ No DMs. No cash/prizes. Tip links stay optional elsewhere; ZEIM takes no tip cut
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import hmac
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .. import config
@@ -121,7 +123,12 @@ def delete_question(iid: str, qid: str, actor: Actor = Depends(get_actor)):
 # ---------------- prize-free themed challenges ----------------
 @router.get("/challenges")
 def list_challenges(actor: Actor = Depends(get_actor)):
-    return {"challenges": [challenges.public(c) for c in challenges.list_all()]}
+    rows = []
+    for c in challenges.list_all():
+        row = challenges.public(c)
+        row["entered"] = bool(actor.user and challenges.entry_for(c["id"], actor.sid))
+        rows.append(row)
+    return {"challenges": rows}
 
 
 @router.get("/challenges/{cid}")
@@ -149,7 +156,7 @@ def challenge_eligible(cid: str, actor: Actor = Depends(get_actor)):
     c = challenges.get(cid)
     if not c:
         raise HTTPException(404, "Challenge not found.")
-    pack = catalog.credited_remixes(actor)
+    pack = catalog.own_published(actor)
     prior = challenges.entry_for(c["id"], actor.sid) if actor.user else None
     entry = None
     if prior:
@@ -164,30 +171,59 @@ def challenge_eligible(cid: str, actor: Actor = Depends(get_actor)):
             "can_enter": bool(actor.user and actor.is_adult and c.get("status") == "open" and not prior)}
 
 
+def _entry_limit(actor: Actor):
+    if not config.TESTING_MODE and not ratelimit.hit("chent:" + actor.sid, 10, 3600):
+        raise HTTPException(429, "That's a lot of challenge entries for one hour. Please wait a while.")
+
+
+def _admin_ok(token: str) -> bool:
+    if not token or not config.ADMIN_TOKEN:
+        return False
+    return hmac.compare_digest(token.encode(), config.ADMIN_TOKEN.encode())
+
+
+@router.delete("/showcase/{iid}")
+def remove_showcase(iid: str, actor: Actor = Depends(get_actor), x_admin_token: str = Header("")):
+    """Owner or admin. Unpublishes the post. The Studio file stays. Remix credit keeps a stub."""
+    try:
+        catalog.remove_listing(actor, iid, admin=_admin_ok(x_admin_token))
+    except catalog.Denied as e:
+        raise D(e)
+    challenges.pull_item(iid)
+    return {"ok": True, "removed": True,
+            "message": "Removed from Showcase. Your saved file stays."}
+
+
 @router.post("/challenges/{cid}/enter")
 def enter_challenge(cid: str, body: dict, request: Request, actor: Actor = Depends(get_actor)):
     if not actor.user:
         raise HTTPException(401, "Make a free account to enter a challenge.")
     if not actor.is_adult:
         raise HTTPException(403, "This account can't enter right now.")
+    c = challenges.get(cid)
+    if not c:
+        raise HTTPException(404, "Challenge not found.")
+    if c.get("status") != "open":
+        raise HTTPException(400, "This challenge is closed.")
+    if challenges.entry_for(c["id"], actor.sid):
+        raise HTTPException(400, "You already entered this challenge. One remix per person.")
     item_id = str(body.get("item_id") or "").strip()
     if not item_id:
         raise HTTPException(400, "Pick a project to enter.")
     try:
-        i = catalog.get(item_id, actor)
+        item = catalog.get(item_id, actor)
     except catalog.Denied as e:
         raise D(e)
-    if i.get("owner_sid") != actor.sid:
+    if item.get("owner_sid") != actor.sid:
         raise HTTPException(403, "You can only enter your own project.")
-    if not catalog.is_public(i):
+    if not catalog.is_public(item):
         raise HTTPException(400, "Make the project public before entering.")
-    remix_of = i.get("remix_of") or ""
+    remix_of = item.get("remix_of") or ""
     if not remix_of:
         raise HTTPException(400, "This challenge is for credited remixes. Publish with a Remixed-from link first.")
-    if not config.TESTING_MODE and not ratelimit.hit("chent:" + actor.sid, 10, 3600):
-        raise HTTPException(429, "That's a lot of challenge entries for one hour. Please wait a while.")
+    _entry_limit(actor)
     try:
-        rec = challenges.enter(cid, item_id=item_id, sid=actor.sid, uid=actor.user["id"], remix_of=remix_of)
+        rec = challenges.enter(c["id"], item_id=item_id, sid=actor.sid, uid=actor.user["id"], remix_of=remix_of)
     except KeyError:
         raise HTTPException(404, "Challenge not found.")
     except challenges.Bad as e:
