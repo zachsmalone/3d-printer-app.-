@@ -212,7 +212,16 @@ export function planHop(stage, ctx) {
         : "Prepare copies this photo model into TorchC0. The photo design stays on Account. The layer file is made in your resin printer's slicer.");
     return Object.assign({ stage }, torchPlan(c, note, c.view === "torchc0" ? "" : meshId));
   }
-  if (stage === "slice" && kind === "fdm") return Object.assign({ stage }, slicerPlan("slice", c, ""));
+  if (stage === "slice" && kind === "fdm") {
+    const plan = Object.assign({ stage }, slicerPlan("slice", c, ""));
+    /* Already on this slicer project used to set stay, so the click did nothing and never sliced. */
+    plan.slice = true;
+    if (c.view === "slicer" && plan.id && c.editId === plan.id) {
+      plan.stay = false;
+      plan.open = "slice";
+    }
+    return plan;
+  }
   if (stage === "slice" && kind === "resin") {
     const meshId = meshOf(c);
     const note = "Slice & Export for resin is the layer file in your resin printer's slicer. TorchC0 prepares the model. Export that file, then open it in the printer's slicer.";

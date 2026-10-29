@@ -1,6 +1,6 @@
 /* ZEIM main-app workspaces (Studio, Lithophane, FDM Slicer, TorchC0) on the floating layout (wslayout.js, original code).
    Once a model is on screen, its 3D view becomes the full background of the workspace and every panel floats over it
-   (drag / dock / resize / minimise / hide, "Customise workspace", "Reset layout"); before that the page reads as usual. */
+   (drag / dock / resize / minimise / hide, "Customise workspace"); before that the page reads as usual. */
 (function boot() {
   "use strict";
   if (!window.ZWS) { var sc = document.createElement("script"); sc.src = "/static/wslayout.js"; sc.onload = boot; document.head.append(sc); return; }

@@ -51,13 +51,22 @@ test("an open slicer project stays that project through repair, prepare, and sli
   const ctx = { view: "slicer", editId: EDIT, kind: "fdm", tool: "" };
   for (const [stage, hash] of [["repair", "#slicer/repair"], ["prepare", "#slicer/smartorient"], ["slice", "#slicer"]]) {
     const plan = planHop(stage, ctx);
-    assert.equal(plan.open, "edit");
     assert.equal(plan.id, EDIT);
     assert.equal(plan.hash, hash);
     assert.equal(plan.derived, undefined);
     assert.doesNotMatch(plan.note, /copy/);
+    if (stage === "slice") {
+      assert.equal(plan.open, "slice");
+      assert.equal(plan.slice, true);
+      assert.equal(plan.stay, false);
+    } else {
+      assert.equal(plan.open, "edit");
+    }
   }
-  assert.equal(planHop("slice", ctx).stay, true);
+  const fromPrepare = planHop("slice", { ...ctx, tool: "smartorient" });
+  assert.equal(fromPrepare.stay, false);
+  assert.equal(fromPrepare.slice, true);
+  assert.equal(fromPrepare.hash, "#slicer");
   assert.equal(planHop("repair", { ...ctx, tool: "repair", editId: EDIT }).stay, true);
 });
 

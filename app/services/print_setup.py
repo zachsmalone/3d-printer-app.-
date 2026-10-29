@@ -29,7 +29,20 @@ DEFAULT_NOZZLE = 0.4
 NOZZLES = (0.2, 0.4, 0.6, 0.8, 1.0)       # sizes with sourced specs in data/nozzles/nozzle-specs.json
 LAYER_MIN, LAYER_MAX = 0.25, 0.75            # fraction of the nozzle
 LINE_WIDTH_FACTOR = 1.125
-PATTERNS = {"grid": "grid", "gyroid": "gyroid", "honeycomb": "honeycomb", "cubic": "cubic", "lines": "line", "lightning": "lightning", "rectilinear": "rectilinear"}  # rectilinear is the only pattern PrusaSlicer accepts at 100% fill
+# Zeim id -> PrusaSlicer 2.9.2 fill_pattern. That enum is the sparse set the CLI accepts.
+# Creality Print stores Tri-hexagon as stars. Its first Zig-zag option is rectilinear; zigzag below is the real zig-zag.
+# Quarter cubic, octet, cross, cross 3D, tetrahedral, and TPMS are Creality Print only. They are not in this map.
+PATTERNS = {
+    "grid": "grid", "gyroid": "gyroid", "honeycomb": "honeycomb", "cubic": "cubic",
+    "lines": "line", "lightning": "lightning", "rectilinear": "rectilinear",
+    "alignedrectilinear": "alignedrectilinear", "triangles": "triangles", "stars": "stars",
+    "concentric": "concentric", "3dhoneycomb": "3dhoneycomb", "hilbertcurve": "hilbertcurve",
+    "archimedeanchords": "archimedeanchords", "octagramspiral": "octagramspiral",
+    "adaptivecubic": "adaptivecubic", "supportcubic": "supportcubic", "zigzag": "zigzag",
+}
+BEGINNER_PATTERNS = ("grid", "gyroid", "honeycomb", "cubic", "lines", "lightning", "rectilinear")
+# PrusaSlicer refuses 100% density unless the pattern is also a top-fill pattern.
+SOLID_PATTERNS = ("rectilinear", "alignedrectilinear", "concentric", "hilbertcurve", "archimedeanchords", "octagramspiral")
 SUPPORTS = ("off", "auto", "everywhere")
 SEAMS = ("aligned", "nearest", "rear", "random")
 IRONING = ("off", "top")
@@ -145,7 +158,8 @@ def public() -> dict:
     mats = catalog.load_materials()
     return {"default": {"printer_id": DEFAULT_PRINTER, "nozzle": DEFAULT_NOZZLE}, "nozzles": list(NOZZLES),
             "printers": [printer_public(pid) for pid in sorted(_catalog(), key=lambda k: printer_public(k)["name"])],
-            "patterns": list(PATTERNS), "supports": list(SUPPORTS),
+            "patterns": list(BEGINNER_PATTERNS), "patterns_advanced": list(PATTERNS),
+            "patterns_solid": list(SOLID_PATTERNS), "supports": list(SUPPORTS),
             # the preset's own numbers too, so the Advanced fields start from the preset the maker picked (not from Standard's numbers)
             "presets": [{"id": k, **{x: v[x] for x in PRESET_PUBLIC}} for k, v in PRESETS.items()], "default_preset": DEFAULT_PRESET,
             "materials": {m: {**material_temps(m), "warning": material_safety(m)} for m in mats}, "layer_fraction": [LAYER_MIN, LAYER_MAX],

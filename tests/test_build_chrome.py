@@ -55,9 +55,8 @@ def test_process_sheet_groups_only_existing_slicer_choices():
     assert 'id="procExpand"' in HTML
     for name in ("Quality", "Support", "Infill", "Adhesion"):
         assert name in PRINTER
-    icon = re.search(r"const PAT_ICON = \{([^}]+)\}", PRINTER)
-    assert icon
-    keys = set(re.findall(r"^\s*([A-Za-z0-9_]+):", icon.group(1), re.M))
+    block = _between(PRINTER, "const PAT = {", "const PAT_LABEL")
+    keys = set(re.findall(r'^\s*"?([A-Za-z0-9_]+)"?:\s*\{', block, re.M))
     assert keys == set(PATTERNS)
     sup = re.search(r"const SUP_META = \{([^}]+)\}", PRINTER)
     assert sup
@@ -67,8 +66,12 @@ def test_process_sheet_groups_only_existing_slicer_choices():
     assert 'fd.append("infill_pattern"' in PRINTER
     assert 'fd.append("brim"' in PRINTER
     assert 'id="spGo"' in PRINTER
-    assert "Bambu" not in _between(PRINTER, "const PAT_ICON", "export function matWarnHTML")
-    assert "Creality" not in _between(PRINTER, "const PAT_ICON", "export function matWarnHTML")
+    assert "Bambu" not in block
+    layout = (ROOT / "static" / "wslayout.js").read_text(encoding="utf-8")
+    assert "Reset layout" not in layout and "data-zws-reset" not in layout
+    assert "zeim:fdm-slice" in PRINTER
+    assert "body[data-view=slicer] .topbar .nav{position:static" in CSS
+    assert "Quarter cubic, octet, cross, cross 3D, and TPMS" in PRINTER
 
 
 def test_slice_is_not_covered_by_customise():

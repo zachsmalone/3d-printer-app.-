@@ -1161,8 +1161,31 @@ function flowCtx() {
   const kind = document.body.dataset.printKind === "resin" ? "resin" : "fdm";
   return { view: document.body.dataset.view || "", tool, photoId, editId, copyId, kind };
 }
+function armSlice(plan) {
+  if (!plan || !plan.slice) return;
+  try { sessionStorage.setItem("zeim.sliceNow", "1"); } catch { /* the click still changes the step */ }
+}
+function runArmedSlice() {
+  let armed = "";
+  try { armed = sessionStorage.getItem("zeim.sliceNow") || ""; } catch { armed = ""; }
+  if (armed !== "1") return;
+  document.dispatchEvent(new CustomEvent("zeim:fdm-slice"));
+}
+document.addEventListener("zeim:edit-loaded", runArmedSlice);
 async function followFlow(plan) {
   if (!plan || plan.stay) return;
+  if (plan.slice) armSlice(plan);
+  const sameProject = !!(plan.id && window.__zeimEdit && window.__zeimEdit.p && window.__zeimEdit.p.id === plan.id);
+  if (plan.open === "slice" || (plan.slice && plan.open === "edit" && sameProject)) {
+    if (plan.hash) location.hash = plan.hash.replace(/^#/, "");
+    runArmedSlice();
+    return;
+  }
+  if (plan.slice && plan.open === "edit" && plan.id) {
+    if (plan.hash) location.hash = plan.hash.replace(/^#/, "");
+    document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: plan.id }));
+    return;
+  }
   if (plan.open === "focus") {
     const el = plan.focus && document.querySelector(plan.focus);
     const note = document.querySelector("[data-flow-note]");

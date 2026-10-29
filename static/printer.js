@@ -154,16 +154,31 @@ function slotsHTML(p, mats) {
     }).join("")}
     <p class="help" id="spSlotNotes" aria-live="polite"></p></fieldset>`;
 }
-const PAT_ICON = {
-  grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 12h16M4 16h16M8 4v16M12 4v16M16 4v16"/></svg>',
-  gyroid: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8c3-4 6 4 9 0s6 4 9 0M3 16c3-4 6 4 9 0s6 4 9 0"/></svg>',
-  honeycomb: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8l4 7-4 7H8l-4-7z"/></svg>',
-  cubic: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/></svg>',
-  lines: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"/></svg>',
-  lightning: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14l6-2-2 8 12-12-6 2 2-8z"/></svg>',
-  rectilinear: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L19 5M9 19l10-10M5 15L15 5"/></svg>',
+const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+/* Beginner keeps the short row. Advanced adds every PrusaSlicer 2.9 sparse pattern.
+   Tri-hexagon is Creality Print's name for the stars key. Zigzag is PrusaSlicer's zigzag,
+   not Creality's first Zig-zag option (that one is rectilinear in their source). */
+const PAT = {
+  grid: { label: "Grid", note: "Everyday strength. A good lid under the top.", icon: svg("M4 8h16M4 12h16M4 16h16M8 4v16M12 4v16M16 4v16") },
+  gyroid: { label: "Gyroid", note: "Strong in every direction. Uses more time.", icon: svg("M3 8c3-4 6 4 9 0s6 4 9 0M3 16c3-4 6 4 9 0s6 4 9 0") },
+  honeycomb: { label: "Honeycomb", note: "Stiff in the layer. Slower than grid.", icon: svg("M8 4h8l4 7-4 7H8l-4-7z") },
+  cubic: { label: "Cubic", note: "Strong up and down. A good functional part.", icon: svg("M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9") },
+  lines: { label: "Lines", note: "Fast and light. Weaker than grid.", icon: svg("M5 7h14M5 12h14M5 17h14") },
+  lightning: { label: "Lightning", note: "Fastest. Only holds the top up. Not for strength.", icon: svg("M4 14l6-2-2 8 12-12-6 2 2-8z") },
+  rectilinear: { label: "Solid lines", note: "Creality's Rectilinear. Fine at 100% fill.", icon: svg("M5 19L19 5M9 19l10-10M5 15L15 5") },
+  adaptivecubic: { label: "Adaptive cubic", note: "Denser near the walls, sparse in the middle. Saves filament.", icon: svg("M12 3l8 4.5v9L12 21l-8-4.5v-9zM8 9l4 2 4-2M12 11v6") },
+  supportcubic: { label: "Support cubic", note: "Dense only under inner overhangs. Light everywhere else.", icon: svg("M4 18h16M7 14h10M10 10h4M12 6v4") },
+  triangles: { label: "Triangles", note: "Stiff in the layer. More crossings than lines.", icon: svg("M12 4l8 14H4zM12 4v14M4 18l8-7 8 7") },
+  stars: { label: "Tri-hexagon", note: "Creality's Tri-hexagon. This slicer runs it as stars.", icon: svg("M12 3l2.5 6h6l-5 4 2 6-5.5-3.5L6.5 19l2-6-5-4h6z") },
+  concentric: { label: "Concentric", note: "Rings that follow the walls. Fast and flexible. Fine at 100%.", icon: svg("M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0M12 12m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0") },
+  alignedrectilinear: { label: "Aligned rectilinear", note: "Lines keep one direction. Faster, weaker than grid. Fine at 100%.", icon: svg("M5 6h14M5 10h14M5 14h14M5 18h14") },
+  zigzag: { label: "Zig zag", note: "Connected lines, fewer travels. PrusaSlicer key zigzag.", icon: svg("M4 8l4 4 4-4 4 4 4-4M4 16l4 4 4-4 4 4 4-4") },
+  "3dhoneycomb": { label: "3D honeycomb", note: "Honeycomb stacked through the height. Slower, stronger.", icon: svg("M8 3h8l4 5-4 5H8L4 8zM8 11h8l4 5-4 5H8l-4-5z") },
+  hilbertcurve: { label: "Hilbert curve", note: "One long curl. Slow and flexible. Fine at 100%.", icon: svg("M6 6h4v4H6zM14 6h4v4h-4zM6 14h4v4H6zM10 8v8h4") },
+  archimedeanchords: { label: "Archimedean chords", note: "A spiral. Slow, mostly for looks. Fine at 100%.", icon: svg("M12 12c2 0 3-2 2-3s-3 0-4 2-1 5 2 6 6-2 6-5-3-6-6-6") },
+  octagramspiral: { label: "Octagram spiral", note: "A star spiral. Slow. Fine at 100%.", icon: svg("M12 3l2 6 6 1-5 4 2 6-5-3-5 3 2-6-5-4 6-1z") },
 };
-const PAT_LABEL = { grid: "Grid", gyroid: "Gyroid", honeycomb: "Honeycomb", cubic: "Cubic", lines: "Lines", lightning: "Lightning", rectilinear: "Solid lines" };
+const PAT_LABEL = Object.fromEntries(Object.entries(PAT).map(([id, meta]) => [id, meta.label]));
 const SUP_META = {
   off: ["Off", "No extra material under overhangs."],
   auto: ["From the bed", "Supports grow up from the bed only."],
@@ -183,7 +198,13 @@ export function panelHTML(hintMode) {
   const sel = (id, label, vals, cur, names = {}) => `<div class="field"><label for="${id}">${label}</label><select id="${id}">${vals.map(v => `<option value="${v}" ${v === cur ? "selected" : ""}>${esc(names[v] || v)}</option>`).join("")}</select></div>`;
   const num = (id, label, v, min, max, step, unit) => `<div class="field"><label for="${id}">${label} <em>${unit}</em></label><input type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" inputmode="decimal"></div>`;
   const patCur = pv.pattern || "grid";
-  const pats = (P.cat.patterns || []).map(id => `<button type="button" class="pat" data-pat="${esc(id)}" aria-pressed="${id === patCur ? "true" : "false"}">${PAT_ICON[id] || ""}<span>${esc(PAT_LABEL[id] || id)}</span></button>`).join("");
+  const beginnerPats = new Set(P.cat.patterns || Object.keys(PAT).slice(0, 7));
+  const allPats = P.cat.patterns_advanced || P.cat.patterns || [...beginnerPats];
+  const pats = allPats.map(id => {
+    const meta = PAT[id] || { label: id, note: "", icon: "" };
+    const advancedOnly = !beginnerPats.has(id);
+    return `<button type="button" class="pat" data-pat="${esc(id)}" data-pat-level="${advancedOnly ? "advanced" : "beginner"}" ${advancedOnly && beginner ? "hidden" : ""} aria-pressed="${id === patCur ? "true" : "false"}">${meta.icon || ""}<span>${esc(meta.label)}</span><small>${esc(meta.note)}</small></button>`;
+  }).join("");
   const sups = (P.cat.supports || []).map(id => {
     const meta = SUP_META[id] || [id, ""];
     return `<button type="button" class="supchoice" data-sup="${esc(id)}" aria-pressed="${id === "off" ? "true" : "false"}"><b>${esc(meta[0])}</b><small>${esc(meta[1])}</small></button>`;
@@ -262,8 +283,9 @@ export function panelHTML(hintMode) {
     <div id="procPane-infill" role="tabpanel" aria-labelledby="procTab-infill" hidden>
       <div class="patgrid" role="listbox" aria-label="Infill pattern">${pats}</div>
       <p class="help" id="spInfillRead"></p>
-      <p class="help">At full fill, use Solid lines. Other patterns can be refused at 100%.</p>
-      <div class="sr-only">${sel("spPattern", "Infill pattern", P.cat.patterns, patCur, PAT_LABEL)}</div>
+      <p class="help">At full fill, Solid lines works. Advanced can also use Concentric, Aligned rectilinear, Hilbert curve, Archimedean chords, or Octagram spiral. Other patterns can be refused at 100%.</p>
+      <p class="help sp-adv" ${beginner ? "hidden" : ""}>Advanced is every sparse pattern PrusaSlicer 2.9 can slice. Quarter cubic, octet, cross, cross 3D, and TPMS are in Creality Print only, so they are not here.</p>
+      <div class="sr-only">${sel("spPattern", "Infill pattern", allPats, patCur, PAT_LABEL)}</div>
       <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>${num("spInfill", "Infill", pv.infill ?? 15, 0, 100, 1, "%")}</div>
     </div>
     <div id="procPane-adhesion" role="tabpanel" aria-labelledby="procTab-adhesion" hidden>
@@ -348,7 +370,17 @@ export function wirePanel(getModelId) {
   const mode = adv => {
     localStorage.setItem("zeim.slicerMode", adv ? "advanced" : "beginner");
     document.querySelectorAll("#slicePanel .sp-adv").forEach(el => { el.hidden = !adv; });
+    document.querySelectorAll("#slicePanel [data-pat-level=advanced]").forEach(el => { el.hidden = !adv; });
+    if (!adv && $("#spPattern")) {
+      const cur = $("#spPattern").value;
+      const shown = document.querySelector(`#slicePanel [data-pat="${CSS.escape(cur)}"]`);
+      if (shown && shown.dataset.patLevel === "advanced") {
+        const next = presetOf(document.querySelector("[name=spPreset]:checked")?.value).pattern;
+        $("#spPattern").value = document.querySelector(`#slicePanel [data-pat="${CSS.escape(next)}"][data-pat-level=beginner]`) ? next : "grid";
+      }
+    }
     $("#spBeginner").setAttribute("aria-pressed", !adv); $("#spAdvanced").setAttribute("aria-pressed", adv);
+    paintProcess();
   };
   $("#spBeginner").onclick = () => mode(false); $("#spAdvanced").onclick = () => mode(true);
   const showProc = id => {
@@ -370,7 +402,7 @@ export function wirePanel(getModelId) {
     document.querySelectorAll("#slicePanel [data-iron]").forEach(b => b.setAttribute("aria-pressed", b.dataset.iron === iron ? "true" : "false"));
     document.querySelectorAll("#slicePanel [data-mat]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mat === matName ? "true" : "false"));
     const read = $("#spInfillRead"), pv = presetOf(document.querySelector("[name=spPreset]:checked")?.value);
-    if (read) read.textContent = `Infill ${$("#spInfill")?.value || pv.infill || ""}% · ${PAT_LABEL[pat] || pat || ""}. The preset fills this in. Advanced can change the percent.`;
+    if (read) read.textContent = `Infill ${$("#spInfill")?.value || pv.infill || ""}% · ${PAT_LABEL[pat] || pat || ""}. ${PAT[pat]?.note || ""}`.trim();
     const help = $("#spPresetHelp"); if (help) help.textContent = pv.help || "";
   };
   document.querySelectorAll("#slicePanel [data-sup]").forEach(b => b.onclick = () => { $("#spSup").value = b.dataset.sup; paintProcess(); });
@@ -436,6 +468,12 @@ export function wirePanel(getModelId) {
       if (HAS_GL) gcDispose = wireGcodePreview(r.downloads.gcode, { time: r.print_time_human, grams: r.filament_grams, mm: r.filament_mm },
         { firmware: r.firmware, markers: r.problem_markers, pausedUrl: r.downloads.gcode + "-paused" });
       else if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
+      if ($("#spGo")?.dataset.reveal === "1") {
+        delete $("#spGo").dataset.reveal;
+        const sheet = document.getElementById("processSheet");
+        if (sheet) sheet.hidden = false;
+        out.querySelector("a[download]")?.focus();
+      }
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
         const sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = false;
@@ -450,7 +488,21 @@ export function wirePanel(getModelId) {
   };
   $("#spGo").onclick = () => doSlice(false);
   applySmartFix();
+  let armed = "";
+  try { armed = sessionStorage.getItem("zeim.sliceNow") || ""; } catch { armed = ""; }
+  if (armed === "1") {
+    try { sessionStorage.removeItem("zeim.sliceNow"); } catch { /* the click still runs */ }
+    $("#spGo").dataset.reveal = "1";
+    $("#spGo").click();
+  }
 }
+document.addEventListener("zeim:fdm-slice", () => {
+  const go = document.getElementById("spGo");
+  if (!go || go.disabled) return;
+  try { sessionStorage.removeItem("zeim.sliceNow"); } catch { /* click still exports */ }
+  go.dataset.reveal = "1";
+  go.click();
+});
 
 /* Changes the maker said yes to in the Failure photo doctor (Smart Fix): filled into Advanced once, shown with Undo. */
 function applySmartFix() {
