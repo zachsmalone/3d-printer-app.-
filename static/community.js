@@ -1497,19 +1497,26 @@ async function pickChallengeForItem(item) {
   if (which) which.textContent = item.title ? `Send “${item.title}” to a challenge.` : "Send this Showcase project to a challenge.";
   const host = $("#enterOfferBody");
   if (!host) return;
-  const choices = open.map(c => c.entered
-    ? `<p><b>${esc(c.title)}</b> <span class="pill">Entered</span></p>`
-    : `<label class="choice"><input type="radio" name="chOffer" value="${esc(c.id)}"><span>${esc(c.title)}</span></label>`).join("");
-  const canPick = open.some(c => !c.entered);
-  host.innerHTML = `<fieldset class="reasons" id="chOfferList"><legend>Open challenges</legend>${choices}</fieldset>`
-    + (canPick ? `<button type="button" class="btn primary" id="chOfferGo">Confirm</button>` : "");
+  if (!open.length) {
+    host.innerHTML = `<p class="help">No open challenge right now.</p>`;
+    $("#dlgEnterOffer").showModal();
+    return;
+  }
+  const options = open.map(c => `<option value="${esc(c.id)}" ${c.entered ? "disabled" : ""}>${esc(c.title)}${c.entered ? " — Entered" : ""}</option>`).join("");
+  const selectable = open.filter(c => !c.entered);
+  host.innerHTML = `<label class="field" for="chOfferPick">Open challenges
+      <select id="chOfferPick">${options}</select></label>`
+    + (selectable.length ? `<button type="button" class="btn primary" id="chOfferGo">Confirm</button>` : `<p class="help">You already entered the open challenges.</p>`);
+  const sel = host.querySelector("#chOfferPick");
+  if (sel && selectable[0]) sel.value = selectable[0].id;
   const go = host.querySelector("#chOfferGo");
   if (go) go.onclick = async () => {
-    const cid = host.querySelector("[name=chOffer]:checked")?.value || "";
-    if (!cid) return inlineMsg(go, "Pick a challenge.");
+    const cid = sel && sel.value || "";
+    const picked = open.find(c => c.id === cid);
+    if (!cid || !picked || picked.entered) return inlineMsg(go, "Pick a challenge.");
     go.disabled = true;
     try {
-      const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id: item.id }));
+      const r = await api(`/api/challenges/${encodeURIComponent(cid)}/enter`, J("POST", { item_id: item.id }));
       $("#dlgEnterOffer").close();
       toast(r.message || "Entered", "ok");
     } catch (e) { inlineMsg(go, e.message); go.disabled = false; }

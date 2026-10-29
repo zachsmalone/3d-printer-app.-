@@ -52,8 +52,10 @@ def test_challenge_enter_picks_a_published_showcase_item_and_does_not_ask_for_a_
     assert "Send to challenge" in COMM
     assert "pickChallengeForItem" in COMM
     assert "Open challenges" in COMM
-    assert 'name="chOffer"' in COMM
-    assert ">Entered</span>" in COMM or "Entered" in COMM
+    assert 'id="chOfferPick"' in COMM
+    assert "<select" in COMM
+    assert "selectable[0]" in COMM
+    assert "Entered" in COMM
     assert 'id="chOfferGo"' in COMM
     assert 'id="itEnterCh"' in COMM
     assert "My Showcase" in HTML
