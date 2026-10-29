@@ -1,4 +1,7 @@
-/* One project across Design → Check & Repair → Prepare → Slice & Export.
+/* One project across Design → Prepare → Export/Print.
+   The row shows only while a file is open in FDM, CAD, Lithophane, or TorchC0.
+   It stays off the file picker, the photo chooser, Showcase, and Account.
+   Repair stays a slicer tool, not a step.
    Saved work is on Account (#account). #projects and #studio open that page.
    A photo design and its slicer copy are different records. The copy is remembered
    for this browser tab (zeim.flow) so the next stage does not import the photo again.
@@ -9,9 +12,8 @@ import { LIBRARY_HASH } from "./studio-library.js";
 export const FLOW_KEY = "zeim.flow";
 export const STAGES = [
   { id: "design", label: "Design" },
-  { id: "repair", label: "Check & Repair" },
   { id: "prepare", label: "Prepare" },
-  { id: "slice", label: "Slice & Export" },
+  { id: "slice", label: "Export/Print" },
 ];
 const ID = /^[0-9a-f]{12}$/;
 const REPAIR_ID = /^[0-9a-f]{16}$/;
@@ -24,9 +26,7 @@ export function stageFor(view, tool) {
   const t = tool || "";
   if (view === "lithophane" || view === "cad") return "design";
   if (view === "torchc0") return "prepare";
-  if (view === "smartfix" || view === "repair") return "repair";
   if (view === "slicer") {
-    if (t === "repair" || t === "simplify") return "repair";
     if (t === "smartorient" || t === "orient" || t === "hollow" || t === "cut") return "prepare";
     return "slice";
   }
@@ -45,9 +45,16 @@ export function slicerHash(hash) {
   return String(hash).startsWith("#") ? String(hash) : "#" + String(hash);
 }
 
-export function flowVisible(view) {
-  if (view === "slicer") return false;
-  return stageFor(view, "") !== "";
+const WORKSPACES = new Set(["slicer", "cad", "lithophane", "torchc0"]);
+
+/* Showcase, Account, and every first-load screen pass working: false. */
+export function flowVisible(view, ctx) {
+  if (!WORKSPACES.has(view || "")) return false;
+  return !!(ctx && ctx.working);
+}
+
+export function stagesFor() {
+  return STAGES.slice();
 }
 
 function blankFlow() {
@@ -155,7 +162,7 @@ function repairPageNote(ctx) {
 function sameNote(stage) {
   if (stage === "repair") return "Check & Repair uses this project.";
   if (stage === "prepare") return "Prepare places this project on the bed.";
-  if (stage === "slice") return "Slice & Export uses this project.";
+  if (stage === "slice") return "Export/Print uses this project.";
   return "This project continues here.";
 }
 
@@ -163,13 +170,13 @@ function copyNote(stage) {
   const head = "This slicer project is a copy of the photo design. The photo design stays on Account.";
   if (stage === "repair") return head + " Check & Repair uses that copy.";
   if (stage === "prepare") return head + " Prepare places that copy on the bed.";
-  return head + " Slice & Export uses that copy.";
+  return head + " Export/Print uses that copy.";
 }
 
 function willCopyNote(stage) {
   if (stage === "repair") return "Check & Repair opens a slicer copy of this photo design. The photo design stays on Account.";
   if (stage === "prepare") return "Prepare opens a slicer copy of this photo design and places it on the bed. The photo design stays on Account.";
-  return "Slice & Export opens a slicer copy of this photo design. The photo design stays on Account.";
+  return "Export/Print opens a slicer copy of this photo design. The photo design stays on Account.";
 }
 
 function meshNote(stage, ctx, meshId) {
@@ -249,7 +256,7 @@ export function planHop(stage, ctx) {
   }
   if (stage === "slice" && kind === "resin") {
     const meshId = meshOf(c);
-    const note = "Slice & Export for resin is the layer file in your resin printer's slicer. TorchC0 prepares the model. Export that file, then open it in the printer's slicer.";
+    const note = "Export/Print for resin is the layer file in your resin printer's slicer. TorchC0 prepares the model. Export that file, then open it in the printer's slicer.";
     if (c.view === "torchc0") return { stage, stay: false, open: "focus", focus: "#rzExport", note };
     return Object.assign({ stage }, torchPlan(c, note, meshId));
   }
@@ -263,23 +270,26 @@ export function flowNote(ctx) {
 }
 
 export function bindFlow(getCtx, go) {
-  const root = document.getElementById("projectFlow");
-  if (!root) return function () {};
-  const list = root.querySelector("ol");
-  const note = root.querySelector("[data-flow-note]");
+  const roots = [...document.querySelectorAll("#projectFlow, [data-flow]")];
+  if (!roots.length) return function () {};
   function paint() {
     const ctx = (typeof getCtx === "function" ? getCtx() : {}) || {};
     const stage = stageFor(ctx.view, ctx.tool);
-    const show = flowVisible(ctx.view);
-    root.hidden = !show;
-    if (!show || !list) return;
-    list.innerHTML = STAGES.map(s => {
+    const show = flowVisible(ctx.view, ctx);
+    const html = stagesFor().map(s => {
       const on = s.id === stage;
       return `<li class="${on ? "cur" : ""}"><button type="button" data-stage="${s.id}"${on ? ' aria-current="step"' : ""}>${s.label}</button></li>`;
     }).join("");
-    if (note) note.textContent = flowNote(ctx);
+    const noteText = show ? (flowNote(ctx) || "") : "";
+    for (const root of roots) {
+      root.hidden = !show;
+      const list = root.querySelector("ol");
+      if (show && list) list.innerHTML = html;
+      const note = root.querySelector("[data-flow-note]");
+      if (note) note.textContent = noteText;
+    }
   }
-  if (list) list.addEventListener("click", e => {
+  for (const root of roots) root.addEventListener("click", e => {
     const b = e.target.closest("[data-stage]");
     if (!b || typeof go !== "function") return;
     const plan = planHop(b.dataset.stage, (getCtx() || {}));

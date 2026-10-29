@@ -1094,6 +1094,7 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 [data-theme="dark"] .backchip{background:transparent;color:var(--txt)}
 .backchip[hidden]{display:none!important}
 #viewEdit:not(.has-model)>#slicerBar{display:none!important}
+#viewEdit.has-model>#slicerBar{display:flex!important}
 #viewTorch:not(.has-model) #torchGo{display:none!important}
 #viewTorch:not(.has-model) #torchPanel:has(.rzRow)>:not(h2):not(.rzRow){display:none!important}
 html.handing main.page:not([hidden]),html.handing .cw-main{opacity:.4;transition:opacity .12s ease}
@@ -1354,15 +1355,18 @@ html[data-theme=dark] .proc-sheet .slicepanel>.row{background:color-mix(in srgb,
 .plan-card ul { margin: 6px 0 10px; padding-left: 1.2em; }
 .plan-card .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #1e2636; font-size: 0.85em; }
 
-/* Project stages stay on CAD, Lithophane, TorchC0, and the repair page. FDM uses the thin header and the bottom bar. */
+/* The site-level row is for Lithophane and TorchC0. FDM uses the compact row in its header. */
 body[data-view=slicer] #projectFlow{display:none!important}
-.pflow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:6px 16px 8px;border-bottom:1px solid var(--line);background:var(--panel)}
+.pflow{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;padding:2px 8px;border-bottom:1px solid var(--line);background:var(--panel);overflow-x:auto;scrollbar-width:none}
 .pflow[hidden]{display:none !important}
-.pflow .path{margin:0}
+.pflow .path{display:flex;flex-wrap:nowrap;gap:2px;margin:0;padding:0;list-style:none}
 .pflow .path li{padding:0}
-.pflow .path button{font:inherit;font-weight:600;color:inherit;background:none;border:0;padding:8px 12px;min-height:44px;cursor:pointer}
-.pflow .help{margin:0;flex:1 1 16rem}
+.pflow .path button{font:inherit;font-weight:650;font-size:13px;color:inherit;background:none;border:0;border-radius:8px;padding:0 10px;min-height:32px;height:32px;cursor:pointer;white-space:nowrap}
+.pflow .path button[aria-current=step]{background:color-mix(in srgb,#0066FF 16%,var(--panel))}
+.pflow .help{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 body.cadws .pflow{flex:none}
+#viewEdit>.bed-head .pflow-inline{flex:1 1 auto;min-width:0;margin:0;padding:0;border:0;background:transparent}
+#viewEdit>.bed-head .pflow-inline .path button{min-height:32px;height:32px;padding:0 8px}
 
 /* On-model move / rotate / scale beads. One blue, letters for the axis. Under the workspace bar and the dock. */
 .zg{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}

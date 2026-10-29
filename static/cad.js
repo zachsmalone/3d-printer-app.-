@@ -37,6 +37,7 @@ const IC = {
   extrude: P('<path d="M5 15l7 4 7-4"/><path d="M5 15V9l7-4 7 4v6"/><path d="M12 13V5"/><path d="M9.5 7.5L12 5l2.5 2.5"/>'),
   revolve: P('<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M7 6a8 3 0 1 0 10 0"/><path d="M15 4l2 2-2 2"/>'),
   shapes: P('<rect x="3" y="11" width="9" height="9" rx="1"/><circle cx="16.5" cy="7.5" r="4.5"/>'),
+  import: P('<path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 21h16"/>'),
   boolean: P('<circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/>'),
   fillet: P('<path d="M4 20V10a6 6 0 0 1 6-6h10"/><path d="M4 20h4M20 4v4"/>'),
   shell: P('<path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M8 10l4-2 4 2v4l-4 2-4-2z"/>'),
@@ -234,11 +235,18 @@ function viewAlong(dir, up = new THREE.Vector3(0, 0, 1)) {
   camera.position.copy(controls.target).addScaledVector(dir.clone().normalize(), d); camera.lookAt(controls.target); controls.update(); invalidate();
 }
 
+let cadFlowWork = null;
 function paintCadChrome() {
   const tool = $("#cwTool");
   const open = !!(tool && !tool.hidden);
   const asked = document.body.classList.contains("tools-on");
-  document.body.classList.toggle("has-work", cadHasWork() || open || asked);
+  const work = cadHasWork();
+  document.body.classList.toggle("has-model", work);
+  document.body.classList.toggle("has-work", work || open || asked);
+  if (cadFlowWork !== work) {
+    cadFlowWork = work;
+    document.dispatchEvent(new CustomEvent("zeim:flow"));
+  }
 }
 function cadHasWork() {
   if (S.bid) return true;
@@ -261,7 +269,9 @@ function resetCadBed() {
   document.dispatchEvent(new CustomEvent("zeim:flow"));
 }
 $("#cwShowTools")?.addEventListener("click", () => {
-  document.body.classList.add("tools-on");
+  const on = !document.body.classList.contains("tools-on");
+  document.body.classList.toggle("tools-on", on);
+  $("#cwShowTools")?.setAttribute("aria-pressed", on ? "true" : "false");
   paintCadChrome();
 });
 paintCadChrome();
@@ -407,6 +417,7 @@ function drawSelection() {
 const MODEL_TOOLS = [
   { id: "shapes", key: "N", label: "Shapes", sub: "cube · cylinder · hole", tip: "Drop a ready-made shape: cube, cylinder, sphere, cone, ring, tube, wedge or a hole." },
   { id: "sketch", key: "K", label: "Sketch", sub: "on a plane or face", tip: "Draw a 2D shape on a plane (XY/XZ/YZ) or on a flat face you tapped first." },
+  { id: "import", key: "", label: "Import", sub: "STL · OBJ · 3MF", tip: "Bring in an STL, OBJ or 3MF and edit it with the same tools." },
   { id: "extrude", key: "E", label: "Extrude", sub: "up · down · both · cut", tip: "Pull a closed sketch into a solid, or cut it into the model." },
   { id: "revolve", key: "R", label: "Revolve", sub: "axis + angle", tip: "Spin a sketch profile around an axis (vases, knobs, wheels)." },
   { id: "boolean", key: "B", label: "Boolean", sub: "union · subtract · intersect", tip: "Combine two bodies, cut one from another or keep only the overlap." },
@@ -439,8 +450,17 @@ const SKETCH_TOOLS = [
 const CONS = [["horizontal", "Horizontal/Vertical", "H"], ["parallel", "Parallel", "∥"], ["perpendicular", "Perpendicular", "⊥"], ["equal", "Equal", "="],
   ["tangent", "Tangent", "T"], ["concentric", "Concentric", "◎"], ["coincident", "Coincident", "•"], ["lock", "Lock", "Fx"]];
 
-function toolBtn(t, active) {
-  return `<button class="cw-tool" data-tool="${t.id}" aria-pressed="${active === t.id}" data-tip="${esc(t.tip)}" aria-label="${esc(t.label)} (${esc(t.key)}). ${esc(t.tip)}">${IC[t.id] || IC[t.id === "faceoffset" ? "offset" : t.id === "sdelete" ? "del" : "step"]}<span class="lbl">${esc(t.label)}<span class="sub">${esc(t.sub)}</span></span><kbd>${esc(t.key)}</kbd></button>`;
+function toolLocked(id) {
+  if (id === "shapes" || id === "sketch" || id === "import") return false;
+  if ((id === "extrude" || id === "revolve") && S.pending) return false;
+  if (id === "text" || id === "joints") return false;
+  return bodyCount() < 1;
+}
+function toolBtn(t, active, locked) {
+  const key = t.key ? ` (${esc(t.key)})` : "";
+  const kbd = t.key ? `<kbd>${esc(t.key)}</kbd>` : "";
+  const lock = locked ? ` disabled aria-disabled="true" title="Make a solid first: Shapes, or Sketch then Extrude."` : "";
+  return `<button class="cw-tool" data-tool="${t.id}" aria-pressed="${active === t.id}" data-tip="${esc(t.tip)}" aria-label="${esc(t.label)}${key}. ${esc(t.tip)}"${lock}>${IC[t.id] || IC[t.id === "faceoffset" ? "offset" : t.id === "sdelete" ? "del" : "step"]}<span class="lbl">${esc(t.label)}<span class="sub">${esc(t.sub)}</span></span>${kbd}</button>`;
 }
 function renderRail() {
   const r = $("#cwRail");
@@ -460,9 +480,13 @@ function renderRail() {
     $("#skDone").onclick = finishSketch; $("#skCancel").onclick = () => exitSketch();
     r.querySelectorAll("[data-con]").forEach(b => b.onclick = () => addConstraint(b.dataset.con));
   } else {
-    r.innerHTML = `<h3>Model</h3>` + MODEL_TOOLS.map(t => toolBtn(t, S.tool)).join("");
+    r.innerHTML = `<h3>Model</h3>` + MODEL_TOOLS.map(t => toolBtn(t, S.tool, toolLocked(t.id))).join("");
   }
-  r.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => S.mode === "sketch" ? setSkTool(b.dataset.tool) : setTool(b.dataset.tool));
+  r.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => {
+    if (b.disabled || b.getAttribute("aria-disabled") === "true") return;
+    if (b.dataset.tool === "import" && S.mode !== "sketch") { $("#cwFile")?.click(); return; }
+    S.mode === "sketch" ? setSkTool(b.dataset.tool) : setTool(b.dataset.tool);
+  });
   syncSketchLocks();
 }
 function syncSketchLocks() {
@@ -532,14 +556,17 @@ const HINTS = {
 };
 function setTool(id) {
   hideCtx();
+  if (id === "import") { $("#cwFile")?.click(); return; }
+  if (id && toolLocked(id)) {
+    msg("Make a solid first: Shapes, or Sketch then Extrude.");
+    S.tool = null; renderRail(); $("#cwTool").hidden = true; paintCadChrome(); return;
+  }
   controls.touches.TWO = id === "sculpt" ? THREE.TOUCH.DOLLY_ROTATE : THREE.TOUCH.DOLLY_PAN;   // sculpt: one finger sculpts, two orbit
   if (id !== "sculpt") ring.visible = false;
   S.tool = id; renderRail(); $("#cwTool").hidden = true;
   const [t, s] = HINTS[id] || HINTS.null; hint(t, s);
   if (S.measure && id) toggleMeasure(false);
   if (!id) { paintCadChrome(); return; }
-  const needModel = !["sketch", "visualize"].includes(id);
-  if (needModel && !bodyCount() && !["extrude", "revolve", "text", "shapes", "joints"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); paintCadChrome(); return; }
   TOOL_PANELS[id]?.();
   paintCadChrome();
 }
@@ -838,7 +865,7 @@ const TOOL_PANELS = {
 /* ---------------------------------------------------------------- server round trips */
 async function load(keepCam) {
   hideCtx();
-  if (!S.bid) { S.scene = null; buildWorld(); renderHist(); paintCadChrome(); return; }
+  if (!S.bid) { S.scene = null; buildWorld(); renderHist(); if (S.mode !== "sketch") renderRail(); paintCadChrome(); return; }
   try { S.scene = await api(`/api/cad/${S.bid}/scene`); }
   catch (e) { if (e.status === 413 && e.info?.keep_ratio) { bigModel(e); return; } throw e; }
   $("#cwBig")?.remove();
@@ -846,6 +873,7 @@ async function load(keepCam) {
   S.appearance = S.scene.appearance || {};
   $("#cwTitle").value = S.scene.title || "My design";
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
+  if (S.mode !== "sketch") renderRail();
   paintCadChrome();
 }
 function updateTop() {
@@ -2192,7 +2220,7 @@ document.addEventListener("keydown", e => {
     const t = SKETCH_TOOLS.find(t => t.key.toLowerCase() === k); if (t) setSkTool(t.id);
     return;
   }
-  const t = MODEL_TOOLS.find(t => t.key.toLowerCase() === k); if (t) setTool(t.id);
+  const t = MODEL_TOOLS.find(t => t.key && t.key.toLowerCase() === k); if (t) setTool(t.id);
 });
 $("#cwTitle").addEventListener("change", () => {
   const t = ($("#cwTitle").value || "").trim();
@@ -2341,14 +2369,21 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
   };
   $("#cwToSlicer").addEventListener("click", () => { if (S.bid) { document.dispatchEvent(new CustomEvent("zeim:save-now")); mark("FDM Slicer"); } });
   function cadKind() { try { return localStorage.getItem("zeim.printKind") === "resin" ? "resin" : "fdm"; } catch { return "fdm"; } }
-  bindFlow(() => ({ view: "cad", tool: "", photoId: "", editId: S.bid || "", copyId: "", kind: cadKind() }), plan => {
+  bindFlow(() => ({ view: "cad", tool: "", photoId: "", editId: S.bid || "", copyId: "", kind: cadKind(), working: cadHasWork() }), plan => {
     if (!plan || plan.stay) return;
     const id = plan.editId || plan.id || S.bid || "";
+    if ((plan.stage === "prepare" || plan.stage === "slice") && !id) {
+      msg("Make a solid first: Shapes, or Sketch then Extrude.");
+      return;
+    }
+    if (plan.slice) {
+      try { sessionStorage.setItem("zeim.sliceNow", "1"); } catch { /* the slicer still opens */ }
+    }
     if (plan.open === "send" && plan.target === "torchc0" && id) {
       location.href = "/?resin=" + encodeURIComponent(id) + "#torchc0";
       return;
     }
-    if ((plan.open === "edit" || plan.hash && plan.hash.indexOf("slicer") === 1) && id && plan.hash) {
+    if ((plan.open === "edit" || (plan.hash && plan.hash.indexOf("slicer") === 1)) && id && plan.hash) {
       location.href = "/?edit=" + encodeURIComponent(id) + plan.hash;
       return;
     }

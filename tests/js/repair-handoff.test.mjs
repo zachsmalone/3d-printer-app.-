@@ -97,10 +97,8 @@ test("headless chrome: Open in the FDM Slicer does not upload the repaired file 
     await send("Page.enable", {});
     await send("DOM.enable", {});
     await send("Page.navigate", { url: `http://127.0.0.1:${PORT}/static/repair.html` });
-    await waitFor(async () => {
-      const text = await value("document.getElementById('projectFlow') && document.getElementById('projectFlow').innerText");
-      return text && text.includes("Check & Repair") && text.includes("Slice & Export") ? text : null;
-    }, 15000);
+    await waitFor(async () => (await value("!!document.getElementById('rpFile')")) ? true : null, 15000);
+    assert.equal(await value("document.getElementById('projectFlow').hidden"), true);
     const doc = await send("DOM.getDocument", { depth: 1 });
     const input = await send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "#rpFile" });
     await send("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [STL] });
@@ -111,7 +109,7 @@ test("headless chrome: Open in the FDM Slicer does not upload the repaired file 
       return text && text.includes("new project from that file") ? text : null;
     }, 30000);
     assert.match(note, /file you uploaded stays as it was/);
-    assert.match(await value("document.getElementById('projectFlow').innerText"), /Check & Repair/);
+    assert.equal(await value("document.getElementById('projectFlow').hidden"), true);
     await value("document.getElementById('rpOpenSlicer').click()");
     const landed = await waitFor(async () => {
       const href = await value("location.href");

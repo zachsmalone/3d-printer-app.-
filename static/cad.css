@@ -307,29 +307,30 @@ body.cadws.cw-phone{height:var(--vvh,100dvh);padding:0}
 .cw-phone .cw-top>.zws-cust{display:none}
 .zws-cw .lbl{display:none}
 
-/* Clean bed: no mid-screen cards. Tools are a bottom bar, and only once there is work or Tools was opened. */
-body.cadws:not(.has-work) #cwShowTools{display:inline-flex!important}
-body.cadws.has-work #cwShowTools{display:none!important}
+/* An open CAD bed starts empty, so Shapes, Sketch and Import stay on the bottom bar.
+   Hide-until-work belongs to the file-picker workspaces, not this page.
+   History, the view cube and quick tools wait until a body exists or Tools is on. */
+body.cadws:not(.has-model) #cwShowTools{display:inline-flex!important}
+body.cadws.has-model #cwShowTools{display:none!important}
 body.cadws:not(.has-work) .cw-cubewrap,
-body.cadws:not(.has-work) #zws-tools,
 body.cadws:not(.has-work) #zws-tool,
 body.cadws:not(.has-work) #zws-quick,
 body.cadws:not(.has-work) #zws-view,
-body.cadws:not(.has-work) .cw-main>.cw-rail,
 body.cadws:not(.has-work) .cw-bl,
 body.cadws:not(.has-work) .cw-chips,
 body.cadws:not(.has-work) #cwTool,
 body.cadws:not(.has-work) #cwSide{display:none!important}
-body.cadws.has-work #zws-tools,
-body.cadws.has-work .cw-main>.cw-rail{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:auto!important;max-width:none!important;height:auto!important;max-height:none!important;min-height:52px;margin:0!important;transform:none!important;z-index:45;display:flex!important;flex-direction:column;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;box-shadow:0 -6px 18px rgba(0,0,0,.12)!important;background:color-mix(in srgb,var(--panel) 96%,#fff)!important}
-body.cadws.cw-phone.has-work #zws-tools{bottom:var(--peek,0px)!important}
-body.cadws.has-work #zws-tools .zws-head,
-body.cadws.has-work #zws-tools .zws-rs,
-body.cadws.has-work #zws-tools .zws-edge{display:none!important}
-body.cadws.has-work #zws-tools .zws-body,
-body.cadws.has-work #zws-tools .cw-rail,
-body.cadws.has-work .cw-main>.cw-rail{display:flex!important;flex-direction:row!important;align-items:stretch;gap:2px;overflow-x:auto;overflow-y:hidden;width:100%!important;max-height:56px;border:0;background:transparent;box-shadow:none;padding:0 4px env(safe-area-inset-bottom)}
-body.cadws.has-work #zws-tools .cw-rail h3{display:none}
+body.cadws #zws-tools,
+body.cadws .cw-main>.cw-rail{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;width:auto!important;max-width:none!important;height:auto!important;max-height:none!important;min-height:52px;margin:0!important;transform:none!important;z-index:45;display:flex!important;flex-direction:column;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;box-shadow:0 -6px 18px rgba(0,0,0,.12)!important;background:color-mix(in srgb,var(--panel) 96%,#fff)!important}
+body.cadws.cw-phone #zws-tools{bottom:var(--peek,0px)!important}
+body.cadws #zws-tools .zws-head,
+body.cadws #zws-tools .zws-rs,
+body.cadws #zws-tools .zws-edge{display:none!important}
+body.cadws #zws-tools .zws-body,
+body.cadws #zws-tools .cw-rail,
+body.cadws .cw-main>.cw-rail{display:flex!important;flex-direction:row!important;align-items:stretch;gap:2px;overflow-x:auto;overflow-y:hidden;width:100%!important;max-height:56px;border:0;background:transparent;box-shadow:none;padding:0 4px env(safe-area-inset-bottom)}
+body.cadws #zws-tools .cw-rail h3,
+body.cadws .cw-main>.cw-rail h3{display:none}
 body.cadws.has-work #zws-quick{position:fixed!important;left:4px!important;right:auto!important;top:auto!important;bottom:var(--peek,0px)!important;width:auto!important;max-width:none!important;height:52px!important;max-height:52px!important;min-height:0!important;transform:none!important;z-index:46;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
 body.cadws.has-work #zws-quick .zws-head,
 body.cadws.has-work #zws-quick .zws-rs,
@@ -340,5 +341,5 @@ body.cadws.has-work #zws-tools .zws-body{padding-left:200px;box-sizing:border-bo
 body.cadws.has-work #zws-tool{position:fixed!important;left:0!important;right:0!important;bottom:56px!important;top:auto!important;width:auto!important;max-width:none!important;height:auto!important;max-height:42dvh!important;transform:none!important;z-index:44;border-radius:16px 16px 0 0!important}
 body.cadws.cw-phone.has-work #zws-tool{bottom:calc(var(--peek,0px) + 52px)!important}
 body.cadws.has-work #zws-tool .cw-panel{position:static!important;width:100%!important;max-height:40dvh;box-shadow:none}
-body.cadws.has-work .cw-main{padding-bottom:56px;box-sizing:border-box}
-body.cadws.cw-phone.has-work .cw-stage{bottom:calc(var(--peek,48px) + 52px)!important}
+body.cadws .cw-main{padding-bottom:56px;box-sizing:border-box}
+body.cadws.cw-phone .cw-stage{bottom:calc(var(--peek,48px) + 52px)!important}

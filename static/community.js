@@ -1205,15 +1205,27 @@ async function openLesson(id) {
 }
 
 
+function flowWorking(view) {
+  if (view === "slicer") {
+    const edit = window.__zeimEdit && window.__zeimEdit.p;
+    if (edit && edit.id) return true;
+    const result = document.getElementById("editResult");
+    return !!(result && !result.hidden);
+  }
+  if (view === "lithophane") return !!(S.current && S.current.id);
+  if (view === "torchc0") return !!document.body.dataset.torchStl;
+  return false;
+}
 function flowCtx() {
   const hash = location.hash.replace(/^#/, "");
   const tool = (hash.split("/")[1] || "").split("?")[0];
+  const view = document.body.dataset.view || "";
   const photoId = S.current && S.current.id || "";
   const edit = window.__zeimEdit && window.__zeimEdit.p;
   const editId = edit && edit.id || "";
   const copyId = reuseCopy(readFlow(sessionStorage), photoId);
   const kind = document.body.dataset.printKind === "resin" ? "resin" : "fdm";
-  return { view: document.body.dataset.view || "", tool, photoId, editId, copyId, kind };
+  return { view, tool, photoId, editId, copyId, kind, working: flowWorking(view) };
 }
 function armSlice(plan) {
   if (!plan || !plan.slice) return;
