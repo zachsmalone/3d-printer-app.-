@@ -1,8 +1,9 @@
 /* Exit, Done, New build, and Return to Account on Lithophane, the Slicer, TorchC0, and 2D→3D.
    Save uses the same leave / saveNow path as CAD. None of these actions publish to Showcase. */
 import { S, api, askConfirm, esc, toast } from "/static/app.js";
+import { askBedLeave, BED_LEAVE_MESSAGE } from "/static/bed-leave.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
-import { fdmDonePlan, fdmLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
+import { fdmDonePlan, bedLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
 import { mountSlicerPrinter, prefLabel } from "/static/printer.js";
 
 function fromStudio() {
@@ -108,28 +109,69 @@ function saveThen(done) {
   }
 }
 
-let slicerLeaveOpen = false;
+let bedLeaveOpen = false;
 
-function confirmSlicerLeave(nextUrl) {
-  if (slicerLeaveOpen) return;
-  const ask = fdmLeavePlan({ confirmed: false, nextUrl: nextUrl || "" });
-  if (!ask.ask || ask.publish || isPublishUrl(ask.url)) return;
-  slicerLeaveOpen = true;
-  askConfirm({
-    title: "Leave the FDM Slicer?",
-    message: "Save this work, then clear the bed? A model already on Account stays there. This does not send it to Showcase.",
-    okLabel: "Save and clear",
-    danger: false,
-  }).then(yes => {
-    slicerLeaveOpen = false;
-    if (!yes) return;
-    const plan = fdmLeavePlan({ confirmed: true, nextUrl: nextUrl || "" });
-    if (plan.publish || isPublishUrl(plan.url)) return;
-    saveThen(() => {
-      if (plan.clear) document.dispatchEvent(new CustomEvent("zeim:new-build", { detail: { section: "slicer", publish: false } }));
-      if (plan.navigate && plan.url) navigate(plan.url);
-      paintWorkspaceBars();
-    });
+function sectionSaveDirty(section) {
+  return !!(window.zeimSave && typeof window.zeimSave.isSectionDirty === "function" && window.zeimSave.isSectionDirty(section));
+}
+
+function slicerDirty() {
+  if (window.__zeimEdit && window.__zeimEdit.p) return true;
+  const result = document.getElementById("editResult");
+  if (result && !result.hidden) return true;
+  const file = document.getElementById("editFile");
+  if (file && file.files && file.files.length) return true;
+  const busyEl = document.getElementById("editBusy");
+  if (busyEl && !busyEl.hidden) return true;
+  return sectionSaveDirty("slicer");
+}
+
+function torchDirty() {
+  if (document.body.dataset.torchStl) return true;
+  const inp = document.getElementById("rzFile");
+  if (inp && inp.files && inp.files.length) return true;
+  const out = document.getElementById("torchOut");
+  if (out && out.classList.contains("rzResult")) return true;
+  return sectionSaveDirty("torchc0");
+}
+
+function bedDirty(section) {
+  if (section === "slicer") return slicerDirty();
+  if (section === "torchc0") return torchDirty();
+  return false;
+}
+
+function exitUrl() {
+  return leavePlan("exit", { fromStudio: fromStudio(), libraryUrl: LIBRARY_URL }).url;
+}
+
+function applyBedLeave(plan) {
+  if (!plan || plan.ask || plan.choice === "stay" || plan.publish || isPublishUrl(plan.url)) return;
+  const go = () => {
+    if (plan.clear) clearSection(plan.section);
+    if (plan.navigate && plan.url) finishLeave(plan);
+    else paintWorkspaceBars();
+  };
+  if (plan.choice === "abandon" && window.zeimSave && typeof window.zeimSave.discard === "function") window.zeimSave.discard(plan.section);
+  if (plan.save) saveThen(go);
+  else go();
+}
+
+function startBedLeave(section, nextUrl) {
+  const wait = busy(section);
+  if (wait) { toast(wait, "err"); return; }
+  const dirty = bedDirty(section);
+  const fallbackUrl = exitUrl();
+  if (!dirty) {
+    applyBedLeave(bedLeavePlan({ section, dirty: false, nextUrl: nextUrl || "", fallbackUrl }));
+    return;
+  }
+  if (bedLeaveOpen) return;
+  bedLeaveOpen = true;
+  const title = section === "torchc0" ? "Leave TorchC0?" : "Leave the FDM Slicer?";
+  askBedLeave({ title, message: BED_LEAVE_MESSAGE }).then(choice => {
+    bedLeaveOpen = false;
+    applyBedLeave(bedLeavePlan({ section, dirty: true, choice, nextUrl: nextUrl || "", fallbackUrl }));
   });
 }
 
@@ -191,9 +233,10 @@ function viewOfHash(href) {
   return VIEW_ALIAS[head] || head || "showcase";
 }
 
-function onSlicerNav(ev) {
-  if (document.body.dataset.view !== "slicer") return;
-  if (ev.target.closest && ev.target.closest("#fdmDone, #fdmImport, #dlgConfirm")) return;
+function onBedNav(ev) {
+  const section = document.body.dataset.view;
+  if (section !== "slicer" && section !== "torchc0") return;
+  if (ev.target.closest && ev.target.closest("#fdmDone, #fdmImport, #dlgConfirm, #dlgBedLeave")) return;
   const navBtn = ev.target.closest && ev.target.closest("#mainNav button[data-view]");
   const link = ev.target.closest && ev.target.closest("a[href]");
   let next = "";
@@ -201,13 +244,21 @@ function onSlicerNav(ev) {
   else if (link) {
     const href = link.getAttribute("href") || "";
     if (!href.startsWith("#")) return;
-    if (viewOfHash(href) === "slicer") return;
+    if (viewOfHash(href) === section) return;
     next = href;
   } else return;
-  if (!next || viewOfHash(next) === "slicer") return;
+  if (!next || viewOfHash(next) === section) return;
+  const wait = busy(section);
+  if (wait) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    toast(wait, "err");
+    return;
+  }
+  if (!bedDirty(section)) return;
   ev.preventDefault();
   ev.stopPropagation();
-  confirmSlicerLeave(next.startsWith("#") ? next : "#" + next);
+  startBedLeave(section, next.startsWith("#") ? next : "#" + next);
 }
 
 async function openFdmImport() {
@@ -421,9 +472,9 @@ function onControl(ev) {
   const action = el.getAttribute("data-ws-act");
   const host = el.closest("[data-ws]");
   const section = el.getAttribute("data-ws") || (host && host.getAttribute("data-ws")) || "";
-  if (section === "slicer" && action === "exit") {
+  if ((section === "slicer" || section === "torchc0") && action === "exit") {
     ev.preventDefault();
-    confirmSlicerLeave("");
+    startBedLeave(section, "");
     return;
   }
   if (section === "slicer" && action === "done") {
@@ -453,7 +504,7 @@ function onControl(ev) {
 }
 
 document.addEventListener("click", onBedCat, true);
-document.addEventListener("click", onSlicerNav, true);
+document.addEventListener("click", onBedNav, true);
 document.addEventListener("click", onFdmAct);
 document.addEventListener("click", onControl);
 document.getElementById("fdmImportClose")?.addEventListener("click", () => document.getElementById("fdmImport")?.close());
@@ -461,6 +512,7 @@ document.getElementById("fdmImportClose")?.addEventListener("click", () => docum
   document.addEventListener(name, () => { paintWorkspaceBars(); paintDevice(); });
 });
 document.addEventListener("zeim:fdm-note", e => { if (e.detail) toast(String(e.detail)); });
+document.addEventListener("change", ev => { if (ev.target && ev.target.id === "rzFile") paintWorkBars(); });
 function placeFdmSheet() {
   const head = document.querySelector("#viewEdit > .bed-head");
   if (!head) return;
@@ -468,7 +520,30 @@ function placeFdmSheet() {
   document.documentElement.style.setProperty("--fdm-head-bottom", top + "px");
 }
 
-function paintChrome() { paintWorkspaceBars(); paintDevice(); placeFdmSheet(); }
+function bedHasModel() {
+  if (window.__zeimEdit && window.__zeimEdit.p) return true;
+  const result = document.getElementById("editResult");
+  if (result && !result.hidden) return true;
+  const busyEl = document.getElementById("editBusy");
+  return !!(busyEl && !busyEl.hidden);
+}
+
+function torchHasModel() {
+  if (document.body.dataset.torchStl) return true;
+  const inp = document.getElementById("rzFile");
+  if (inp && inp.files && inp.files.length) return true;
+  const out = document.getElementById("torchOut");
+  return !!(out && out.classList.contains("rzResult"));
+}
+
+function paintWorkBars() {
+  const edit = document.getElementById("viewEdit");
+  if (edit) edit.classList.toggle("has-model", bedHasModel());
+  const torch = document.getElementById("viewTorch");
+  if (torch) torch.classList.toggle("has-model", torchHasModel());
+}
+
+function paintChrome() { paintWorkspaceBars(); paintDevice(); placeFdmSheet(); paintWorkBars(); }
 window.addEventListener("hashchange", paintChrome);
 window.addEventListener("resize", placeFdmSheet);
 new MutationObserver(paintChrome).observe(document.body, { attributes: true, attributeFilter: ["data-view", "data-torch-stl"] });

@@ -87,6 +87,32 @@ def test_outside_cad_bars_keep_exit_done_new_build_and_return_off_showcase():
     assert HTML.count('<script type="module" src="/static/workspace-bar.js"></script>') == 1
 
 
+def test_bed_leave_choices_cover_fdm_cad_and_torch():
+    leave = (ROOT / "static" / "bed-leave.js").read_text(encoding="utf-8")
+    controls = (ROOT / "static" / "workspace-controls.js").read_text(encoding="utf-8")
+    cad = (ROOT / "static" / "cad.js").read_text(encoding="utf-8")
+    for label in ("Stay", "Save & leave", "Reset bed", "Abandon work"):
+        assert label in leave
+    assert "cannot be undone" in leave
+    assert "work already on Account stays" in leave
+    assert "function bedLeavePlan" in controls
+    assert 'section === "slicer" || section === "torchc0"' in BAR
+    assert "slicerDirty" in BAR and "torchDirty" in BAR
+    assert "isSectionDirty" in BAR
+    assert "askBedLeave" in BAR and "askBedLeave" in cad
+    assert "resetCadBed" in cad and "cadHasWork" in cad
+    back = cad.split('$("#cwBack")', 1)[1].split("view cube", 1)[0]
+    assert "takeExit" in back and "publish" not in back
+    assert "zeim.edit.last" in EDIT
+    css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
+    assert "body>.backchip.cad{top:60px}" not in css
+    assert ".backchip{position:static" in css
+    assert "#viewEdit:not(.has-model)>#slicerBar{display:none!important}" in css
+    chip = cad.split('a.className = "backchip"', 1)[1].split("view cube", 1)[0]
+    assert "cwBack" in chip
+    assert "document.body.append" not in chip
+
+
 def test_new_build_saves_or_asks_and_exit_uses_leave_without_publishing():
     assert "zeimSave.leave" in BAR
     assert "guardNewBuild" in BAR

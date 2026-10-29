@@ -715,6 +715,7 @@ $("#editPanel").addEventListener("click", e => {
 });
 function clearSlicerWork() {
   E.p = null;
+  try { sessionStorage.removeItem("zeim.edit.last"); } catch { }
   delete document.body.dataset.bedSel;
   $("#editStart").hidden = false;
   $("#editPanel").hidden = true;
@@ -733,6 +734,7 @@ function clearSlicerWork() {
 }
 document.addEventListener("zeim:new-build", e => {
   if (!e.detail || e.detail.section !== "slicer" || e.detail.publish) return;
+  editLoadGen++;
   clearSlicerWork();
 });
 $("#editPanel").addEventListener("input", e => {

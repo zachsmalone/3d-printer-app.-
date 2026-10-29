@@ -6,6 +6,8 @@ import { OrbitControls } from "/static/vendor/OrbitControls.js";
 import { offsetPlane, midPlane, parallel, hintsOn, setHintsOn } from "/static/cad-planes.js";
 import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
+import { askBedLeave, BED_LEAVE_MESSAGE } from "/static/bed-leave.js";
+import { bedLeavePlan } from "/static/workspace-controls.js";
 import { bindFlow } from "/static/project-flow.js";
 import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, chainStraight, closestSample, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
 import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
@@ -232,6 +234,37 @@ function viewAlong(dir, up = new THREE.Vector3(0, 0, 1)) {
   camera.position.copy(controls.target).addScaledVector(dir.clone().normalize(), d); camera.lookAt(controls.target); controls.update(); invalidate();
 }
 
+function paintCadChrome() {
+  const tool = $("#cwTool");
+  const open = !!(tool && !tool.hidden);
+  const asked = document.body.classList.contains("tools-on");
+  document.body.classList.toggle("has-work", cadHasWork() || open || asked);
+}
+function cadHasWork() {
+  if (S.bid) return true;
+  if (S.mode === "sketch") return true;
+  if (S.scene && S.scene.bodies && S.scene.bodies.length) return true;
+  return !!(window.zeimSave && typeof window.zeimSave.isSectionDirty === "function" && window.zeimSave.isSectionDirty("cad"));
+}
+function resetCadBed() {
+  if (S.mode === "sketch") exitSketch();
+  S.bid = null;
+  S.scene = null;
+  S.hidden.clear();
+  S.openStep = 0;
+  S.tool = null;
+  const title = $("#cwTitle");
+  if (title) title.value = "My design";
+  history.replaceState(null, "", location.pathname);
+  document.body.classList.remove("tools-on");
+  load();
+  document.dispatchEvent(new CustomEvent("zeim:flow"));
+}
+$("#cwShowTools")?.addEventListener("click", () => {
+  document.body.classList.add("tools-on");
+  paintCadChrome();
+});
+paintCadChrome();
 /* ---------------------------------------------------------------- exit workspace (save the browser draft first; the design itself is already on the server) */
 $("#cwBack")?.addEventListener("click", ev => {
   ev.preventDefault(); ev.stopPropagation();
@@ -241,7 +274,15 @@ $("#cwBack")?.addEventListener("click", ev => {
     let same = false; try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch {}
     if (same && history.length > 1) history.back(); else location.href = "/";
   };
-  if (window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(go); else go();
+  if (!cadHasWork()) { go(); return; }
+  askBedLeave({ title: "Leave CAD?", message: BED_LEAVE_MESSAGE }).then(choice => {
+    const plan = bedLeavePlan({ section: "cad", dirty: true, choice, fallbackUrl: "/" });
+    if (!plan || plan.ask || plan.choice === "stay") return;
+    if (plan.reset) { resetCadBed(); return; }
+    if (plan.choice === "abandon" && window.zeimSave && typeof window.zeimSave.discard === "function") window.zeimSave.discard("cad");
+    if (plan.save && window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(go);
+    else go();
+  });
 });
 
 /* ---------------------------------------------------------------- view cube (CSS 3D, own design) */
@@ -495,10 +536,11 @@ function setTool(id) {
   S.tool = id; renderRail(); $("#cwTool").hidden = true;
   const [t, s] = HINTS[id] || HINTS.null; hint(t, s);
   if (S.measure && id) toggleMeasure(false);
-  if (!id) return;
+  if (!id) { paintCadChrome(); return; }
   const needModel = !["sketch", "visualize"].includes(id);
-  if (needModel && !bodyCount() && !["extrude", "revolve", "text", "shapes", "joints"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); return; }
+  if (needModel && !bodyCount() && !["extrude", "revolve", "text", "shapes", "joints"].includes(id)) { msg("Make a solid first: Sketch, then Extrude."); S.tool = null; renderRail(); paintCadChrome(); return; }
   TOOL_PANELS[id]?.();
+  paintCadChrome();
 }
 /* Beginner shapes: one tap drops a ready-made solid (server op cad_shape, reusing the parts-builder primitives). */
 const SHAPES = [["box", "Cube"], ["cylinder", "Cylinder"], ["sphere", "Sphere"], ["cone", "Cone"], ["torus", "Ring"], ["tube", "Tube"], ["wedge", "Wedge"], ["hole", "Hole"]];
@@ -795,7 +837,7 @@ const TOOL_PANELS = {
 /* ---------------------------------------------------------------- server round trips */
 async function load(keepCam) {
   hideCtx();
-  if (!S.bid) { S.scene = null; buildWorld(); renderHist(); return; }
+  if (!S.bid) { S.scene = null; buildWorld(); renderHist(); paintCadChrome(); return; }
   try { S.scene = await api(`/api/cad/${S.bid}/scene`); }
   catch (e) { if (e.status === 413 && e.info?.keep_ratio) { bigModel(e); return; } throw e; }
   $("#cwBig")?.remove();
@@ -803,6 +845,7 @@ async function load(keepCam) {
   S.appearance = S.scene.appearance || {};
   $("#cwTitle").value = S.scene.title || "My design";
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
+  paintCadChrome();
 }
 function updateTop() {
   $("#cwUndo").disabled = sculptSaving || !S.scene?.can_undo;
@@ -2313,7 +2356,7 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
   });
   const q = new URLSearchParams(location.search), from = q.get("from"), back = q.get("back");
   if (from && back && back.startsWith("/") && !back.startsWith("//")) {
-    const a = document.createElement("a"); a.className = "backchip cad"; a.id = "backChip"; a.href = back;
+    const a = document.createElement("a"); a.className = "backchip"; a.id = "backChip"; a.href = back;
     a.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg> Back to ${esc(from)}`;
     a.addEventListener("click", ev => {
       ev.preventDefault();
@@ -2321,6 +2364,8 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
       const go = () => { location.href = href; };
       if (window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(go); else go();
     });
-    document.body.append(a);
+    const exit = $("#cwBack");
+    if (exit) exit.after(a);
+    else $(".cw-top")?.append(a);
   }
 }

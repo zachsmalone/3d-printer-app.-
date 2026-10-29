@@ -264,13 +264,22 @@ function restoreStudio() {
 }
 
 /* ---- one-tap way back ---- */
+function backHost() {
+  const view = document.body.dataset.view;
+  if (view === "slicer") return document.querySelector("#viewEdit > .bed-head");
+  if (view === "torchc0") return document.querySelector("#viewTorch .wsbar");
+  if (view === "lithophane") return document.querySelector("#viewCreate .wsbar");
+  if (view === "ai3d") return document.querySelector("#viewAi3d .wsbar");
+  return null;
+}
 function backChip() {
   let info = null; try { info = JSON.parse(ss.get("zeim.back") || "null"); } catch { }
   let c = $("#backChip");
   const here = document.body.dataset.view;
-  if (!info || Date.now() - (info.t || 0) > 6 * 3600e3 || info.hash === here || !here) { if (c) c.hidden = true; return; }
+  const host = backHost();
+  if (!info || Date.now() - (info.t || 0) > 6 * 3600e3 || info.hash === here || !here || !host) { if (c) c.hidden = true; return; }
   if (!c) {
-    c = document.createElement("a"); c.id = "backChip"; c.className = "backchip"; document.body.append(c);
+    c = document.createElement("a"); c.id = "backChip"; c.className = "backchip";
     c.addEventListener("click", ev => {
       const href = c.getAttribute("href");
       const go = () => {
@@ -285,6 +294,8 @@ function backChip() {
       else { document.dispatchEvent(new CustomEvent("zeim:save-now")); go(); }
     });
   }
+  const slot = host.querySelector("[data-ws-act=exit]");
+  if (slot) slot.after(c); else host.append(c);
   if (info.from === "mystudio") { c.hidden = true; return; }
   const url = info.url && info.url.startsWith("/") && !info.url.startsWith("//") && !isPublishUrl(info.url) ? info.url : "#" + info.hash;
   if (isPublishUrl(url)) { c.hidden = true; return; }

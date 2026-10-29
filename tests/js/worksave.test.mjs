@@ -131,6 +131,18 @@ test("exit stores a dirty draft and then leaves", () => {
   assert.ok(globalThis.localStorage.getItem(S._draftKey("exitok")).includes(A));
 });
 
+test("discard clears one section and does not write a draft", () => {
+  useStore();
+  S.setAccount("u:" + A);
+  S.register("bedq", { collect: () => ({ layer: "9" }), restore: () => true });
+  S._markDirty("bedq");
+  assert.equal(S.isSectionDirty("bedq"), true);
+  assert.equal(S.isSectionDirty("other"), false);
+  assert.equal(S.discard("bedq"), true);
+  assert.equal(S.isSectionDirty("bedq"), false);
+  assert.equal(globalThis.localStorage.getItem(S._draftKey("bedq")), null);
+});
+
 test("exit with nothing dirty leaves without claiming a new save", () => {
   useStore();
   S.setAccount("guest");
