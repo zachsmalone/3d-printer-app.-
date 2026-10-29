@@ -44,6 +44,39 @@ export function newBuildPlan(state) {
   return { ...base, clear: true, ask: false, reason: "ready" };
 }
 
+/* FDM Back clears the bed after a confirm. It does not publish and does not open Showcase.
+   A next URL is only the tab the person already chose. Done lists destinations and stays. */
+export const FDM_DONE = ["cad", "device", "account", "showcase"];
+
+export function fdmLeavePlan(state) {
+  const confirmed = !!(state && state.confirmed);
+  const next = state && state.nextUrl ? String(state.nextUrl) : "";
+  return {
+    action: "exit",
+    section: "slicer",
+    publish: false,
+    clear: confirmed,
+    save: true,
+    ask: !confirmed,
+    navigate: confirmed && !!next,
+    url: confirmed && next ? next : null,
+  };
+}
+
+export function fdmDonePlan() {
+  return {
+    action: "done",
+    section: "slicer",
+    publish: false,
+    clear: false,
+    save: false,
+    navigate: false,
+    url: null,
+    sheet: true,
+    destinations: FDM_DONE.slice(),
+  };
+}
+
 export function plansNeverPublish(action, state) {
   if (ACTIONS.includes(action)) {
     const plan = leavePlan(action, state);

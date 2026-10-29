@@ -42,6 +42,7 @@ def test_tool_rails_dock_instead_of_floating_over_exit():
     assert 'edge: "right", t: 0.36' in MAIN
     assert "id=\"slicerDock\"" in HTML
     assert "data-xform=\"move\"" in HTML and "data-xform=\"rotate\"" in HTML and "data-xform=\"scale\"" in HTML
+    assert "data-xform=\"clone\"" in HTML and "data-xform=\"delete\"" in HTML
     assert "focusXform" in MAIN
 
 
@@ -49,7 +50,9 @@ def test_process_sheet_groups_only_existing_slicer_choices():
     sheet = _between(HTML, 'id="processSheet"', "</main>")
     assert 'id="slicePanel"' in sheet
     assert 'id="processClose"' in sheet
-    assert "min(52dvh,560px)" in CSS
+    assert "70dvh" in CSS
+    assert 'id="slicerBar"' in HTML
+    assert 'id="procExpand"' in HTML
     for name in ("Quality", "Support", "Infill", "Adhesion"):
         assert name in PRINTER
     icon = re.search(r"const PAT_ICON = \{([^}]+)\}", PRINTER)

@@ -124,8 +124,16 @@ def test_exit_new_build_and_done_do_not_publish(base):
             )
             row = pg.locator(root + " .wsbar")
             assert row.locator("[data-ws-act=exit]").is_visible()
-            assert row.locator("[data-ws-act=new-build]").is_visible()
-            assert row.locator("[data-ws-act=return-studio]").is_hidden()
+            if view == "slicer":
+                assert row.locator("[data-ws-act=exit]").inner_text() == "Back"
+                assert row.locator("[data-ws-act=done]").is_visible()
+                assert pg.locator("#slicerBar [data-bed-sheet=filament]").inner_text() == "Filament"
+                assert pg.locator("#slicerBar [data-bed-sheet=process]").inner_text() == "Process"
+                assert pg.locator("#slicerBar [data-bed-act=import]").is_visible()
+                assert pg.locator("#mainNav button[data-view=projects]").count() == 0
+            else:
+                assert row.locator("[data-ws-act=new-build]").is_visible()
+                assert row.locator("[data-ws-act=return-studio]").is_hidden()
 
         pg.evaluate("""() => {
           sessionStorage.setItem('zeim.back', JSON.stringify({

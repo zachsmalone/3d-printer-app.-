@@ -28,7 +28,7 @@
   function make(o) {
     var root = $(o.root); if (!root) return null;
     o.root = root; o.before = fill(root); o.btnClass = "btn small zws-cw";
-    o.customise = root; o.obstacles = (o.obstacles || []).concat(["#" + root.id + " > .zws-cust", "#" + root.id + " > .wsbar", "#" + root.id + " > .objdock:not([hidden])", "#" + root.id + " > .proc-sheet:not([hidden])"]);
+    o.customise = root; o.obstacles = (o.obstacles || []).concat(["#" + root.id + " > .zws-cust", "#" + root.id + " > .wsbar", "#" + root.id + " > .bed-bar", "#" + root.id + " > .objdock:not([hidden])", "#" + root.id + " > .proc-sheet:not([hidden])", "#" + root.id + " > .bed-sheet:not([hidden])"]);
     o.panels = o.panels.map(function (p) { p.el = typeof p.el === "string" ? $(p.el) : p.el; return p; }).filter(function (p) { return p.el; });
     var ws = ZWS.create(o);
     root.addEventListener("zws:layout", function () {
@@ -83,15 +83,50 @@
   function syncSlicerDock() {
     var res = document.getElementById("editResult"), dock = document.getElementById("slicerDock");
     if (!dock || !res) return;
-    var show = !res.hidden;
+    var plateSel = document.getElementById("plateSel");
+    var selected = plateSel ? !plateSel.hidden : document.body.dataset.bedSel === "1";
+    var show = !res.hidden && selected;
     if (dock.hidden !== !show) dock.hidden = !show;
-    if (!show) { var sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = true; }
+    var plateOn = !!(plateSel && !plateSel.hidden);
+    dock.querySelectorAll("[data-xform=clone],[data-xform=delete]").forEach(function (b) {
+      b.disabled = !plateOn;
+      b.title = plateOn
+        ? (b.getAttribute("data-xform") === "clone" ? "Copy the selected part" : "Remove the selected part")
+        : "Select a part on a plate. A single mesh uses Move, Rotate, and Scale.";
+    });
+    if (res.hidden) {
+      var sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = true;
+      var device = document.getElementById("deviceSheet"); if (device) device.hidden = true;
+    }
+    var empty = document.getElementById("procEmpty"), panel = document.getElementById("slicePanel");
+    if (empty) empty.hidden = !!(panel && panel.childElementCount);
   }
   function setDockTab(which) {
-    var dock = document.getElementById("slicerDock"); if (!dock) return;
-    dock.querySelectorAll("[data-docktab]").forEach(function (b) { b.setAttribute("aria-selected", b.getAttribute("data-docktab") === which ? "true" : "false"); });
     var sheet = document.getElementById("processSheet");
-    if (sheet) sheet.hidden = which !== "process";
+    var device = document.getElementById("deviceSheet");
+    var title = document.getElementById("procTitle");
+    if (which === "device") {
+      if (sheet) sheet.hidden = true;
+      if (device) device.hidden = false;
+      document.dispatchEvent(new CustomEvent("zeim:fdm-device"));
+      return;
+    }
+    if (device) device.hidden = true;
+    if (which === "process" || which === "filament") {
+      if (sheet) sheet.hidden = false;
+      if (title) title.textContent = which === "filament" ? "Filament" : "Process";
+      if (which === "filament") {
+        var quality = document.querySelector("#slicePanel [data-proc=quality]");
+        if (quality) quality.click();
+        var mat = document.getElementById("spMat");
+        if (mat) mat.focus();
+      }
+      var empty = document.getElementById("procEmpty"), panel = document.getElementById("slicePanel");
+      if (empty) empty.hidden = !!(panel && panel.childElementCount);
+      return;
+    }
+    if (sheet) sheet.hidden = true;
+    if (device) device.hidden = true;
   }
   function focusXform(kind) {
     var plate = document.getElementById("plateTool"); if (plate) plate.open = true;
@@ -105,29 +140,53 @@
     var big = kind === "scale" ? document.querySelector("[data-big=scale]") : null;
     if (big) big.click();
   }
+  document.addEventListener("zeim:bed-sel", syncSlicerDock);
+  document.addEventListener("zeim:edit-loaded", syncSlicerDock);
+  document.addEventListener("zeim:new-build", syncSlicerDock);
   document.addEventListener("click", function (e) {
-    var go = e.target.closest && e.target.closest(".ws-go");
-    if (go) {
+    var go = e.target.closest && e.target.closest(".ws-go, #slicerSlice");
+    if (go && (go.classList.contains("ws-go") || go.id === "slicerSlice")) {
       e.preventDefault();
       if (go.id === "slicerSlice") setDockTab("process");
       var target = document.getElementById(go.getAttribute("data-go") || "");
       if (target && !target.disabled) target.click();
       return;
     }
+    var sheetBtn = e.target.closest && e.target.closest("#slicerBar [data-bed-sheet]");
+    if (sheetBtn) {
+      e.preventDefault();
+      setDockTab(sheetBtn.getAttribute("data-bed-sheet"));
+      return;
+    }
     var xform = e.target.closest && e.target.closest("#slicerDock [data-xform]");
     if (xform) {
       e.preventDefault();
-      document.querySelectorAll("#slicerDock [data-xform]").forEach(function (b) { b.setAttribute("aria-pressed", b === xform ? "true" : "false"); });
       var kind = xform.getAttribute("data-xform");
+      if (kind === "clone" || kind === "delete") {
+        if (xform.disabled) {
+          document.dispatchEvent(new CustomEvent("zeim:fdm-note", { detail: xform.title || "Select a part on a plate first." }));
+          return;
+        }
+        var pact = document.querySelector("#plateTool [data-pact=" + (kind === "clone" ? "duplicate" : "delete") + "]");
+        if (pact && !pact.disabled) pact.click();
+        else document.dispatchEvent(new CustomEvent("zeim:fdm-note", { detail: kind === "clone" ? "Clone copies a selected part on a plate." : "Delete removes a selected part on a plate." }));
+        return;
+      }
+      document.querySelectorAll("#slicerDock [data-xform]").forEach(function (b) { b.setAttribute("aria-pressed", b === xform ? "true" : "false"); });
       focusXform(kind);
       document.dispatchEvent(new CustomEvent("zeim:xform", { detail: { kind: kind } }));
       return;
     }
     var tab = e.target.closest && e.target.closest("#slicerDock [data-docktab]");
     if (tab) { e.preventDefault(); setDockTab(tab.getAttribute("data-docktab")); return; }
-    if (e.target.closest && e.target.closest("#processClose")) {
+    if (e.target.closest && (e.target.closest("#processClose") || e.target.closest("#deviceClose"))) {
       e.preventDefault();
       setDockTab("plate");
+    }
+    if (e.target.closest && e.target.closest("#procExpand")) {
+      e.preventDefault();
+      var adv = document.getElementById("spAdvanced");
+      if (adv) adv.click();
     }
   });
   window.zeimWorkspaces = ZWS.all;

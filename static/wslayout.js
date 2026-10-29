@@ -396,7 +396,7 @@
         var box = { x: M + sa.l, y: M + Math.max(0, sa.t - rr.top), w: rr.width - 2 * M - sa.l - sa.r, h: Math.max(120, bottom - 2 * M - Math.max(0, sa.t - rr.top) - (rr.bottom >= innerHeight - 1 ? sa.b : 0)) };
         if (o.inset) { var ins = o.inset(); box.x += ins.l || 0; box.y += ins.t || 0; box.w -= (ins.l || 0) + (ins.r || 0); box.h -= (ins.t || 0) + (ins.b || 0); }
         var topChrome = chromeBand(rr, ":scope > .wsbar", true);
-        var botChrome = chromeBand(rr, ":scope > .objdock, :scope > .proc-sheet", false);
+        var botChrome = chromeBand(rr, ":scope > .bed-bar, :scope > .objdock, :scope > .proc-sheet, :scope > .bed-sheet", false);
         if (topChrome + 4 > box.y) { var cut = topChrome + 4 - box.y; box.y += cut; box.h -= cut; }
         if (botChrome > 0) box.h -= botChrome + 4;
         if (box.w < 1) box.w = 1; if (box.h < 80) box.h = 80;
