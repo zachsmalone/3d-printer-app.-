@@ -419,6 +419,18 @@ function onBedCat(ev) {
 }
 
 function onFdmAct(ev) {
+  const repair = ev.target.closest && ev.target.closest("[data-bed-act=repair]");
+  if (repair && repair.closest("#viewEdit")) {
+    ev.preventDefault();
+    if (!slicerModel()) { toast("Open a model first, then Repair.", "err"); return; }
+    const big = document.querySelector("#viewEdit [data-big=fix]");
+    if (big) { big.click(); return; }
+    const form = document.querySelector("#viewEdit form[data-form=repair]");
+    const go = form && form.querySelector("button");
+    if (go) { go.click(); return; }
+    toast("Repair isn't available for this model.", "err");
+    return;
+  }
   const preview = ev.target.closest && ev.target.closest("[data-bed-act=preview]");
   if (preview && preview.closest("#viewEdit")) {
     ev.preventDefault();

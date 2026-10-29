@@ -1,7 +1,7 @@
 import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showPhotoBuild } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
 import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
-import { bindFlow, readFlow, reuseCopy } from "/static/project-flow.js";
+import { bindFlow, readFlow, reuseCopy, slicerHash } from "/static/project-flow.js";
 import { sendTo } from "/static/handoff.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -116,7 +116,9 @@ function route() {
   if (intent.rewrite && intent.hash && location.hash !== intent.hash) {
     history.replaceState(null, "", location.pathname + location.search + intent.hash);
   }
-  const h = location.hash.replace("#", "").split("/");
+  const wanted = slicerHash(location.hash);
+  if (wanted && wanted !== location.hash) history.replaceState(null, "", location.pathname + location.search + wanted);
+  const h = (wanted || location.hash).replace("#", "").split("/");
   const raw = h[0];
   const v = intent.view || (ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase"));
   show(v, intent.nav || v);

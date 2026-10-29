@@ -33,8 +33,21 @@ export function stageFor(view, tool) {
   return "";
 }
 
+const LEGACY_SLICER_STEP = new Set(["repair", "prepare", "design"]);
+
+/* Old stage bookmarks open the FDM workspace itself. They are not a second chrome row. */
+export function slicerHash(hash) {
+  const raw = String(hash || "").replace(/^#/, "");
+  const [head, tool] = raw.split("/");
+  const view = head === "edit" || head === "fdm" ? "slicer" : head;
+  if ((view === "slicer" || head === "slicer") && LEGACY_SLICER_STEP.has(tool || "")) return "#slicer";
+  if (!hash) return "";
+  return String(hash).startsWith("#") ? String(hash) : "#" + String(hash);
+}
+
 export function flowVisible(view) {
-  return stageFor(view, "") !== "" || view === "slicer";
+  if (view === "slicer") return false;
+  return stageFor(view, "") !== "";
 }
 
 function blankFlow() {

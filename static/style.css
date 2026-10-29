@@ -1321,7 +1321,8 @@ html[data-theme=dark] .proc-sheet .slicepanel>.row{background:color-mix(in srgb,
 .plan-card ul { margin: 6px 0 10px; padding-left: 1.2em; }
 .plan-card .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #1e2636; font-size: 0.85em; }
 
-/* Project stages: Design → Check & Repair → Prepare → Slice & Export. Sits under the header, outside each workspace. */
+/* Project stages stay on CAD, Lithophane, TorchC0, and the repair page. FDM uses the thin header and the bottom bar. */
+body[data-view=slicer] #projectFlow{display:none!important}
 .pflow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:6px 16px 8px;border-bottom:1px solid var(--line);background:var(--panel)}
 .pflow[hidden]{display:none !important}
 .pflow .path{margin:0}

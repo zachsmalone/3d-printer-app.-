@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   stageFor, planHop, readFlow, rememberCopy, reuseCopy, forgetCopy, rememberRepair, reuseRepair, slicerUrlForNewProject, flowNote,
-  leaveBedUrl,
+  leaveBedUrl, flowVisible, slicerHash,
 } from "../../static/project-flow.js";
 
 const PHOTO = "aaaaaaaaaaaa";
@@ -152,6 +152,20 @@ test("the repair page stays on Check & Repair, and a kept project is the same id
   assert.equal(design.url, "/static/cad.html?bid=" + EDIT);
   const none = planHop("slice", { view: "repair", kind: "fdm" });
   assert.equal(none.hash, "#account");
+});
+
+test("the FDM workspace hides the old stage row, and legacy hashes open the bed", () => {
+  assert.equal(flowVisible("slicer"), false);
+  assert.equal(flowVisible("lithophane"), true);
+  assert.equal(flowVisible("cad"), true);
+  assert.equal(flowVisible("torchc0"), true);
+  assert.equal(slicerHash("#slicer/repair"), "#slicer");
+  assert.equal(slicerHash("#slicer/prepare"), "#slicer");
+  assert.equal(slicerHash("#slicer/design"), "#slicer");
+  assert.equal(slicerHash("#edit/repair"), "#slicer");
+  assert.equal(slicerHash("#slicer"), "#slicer");
+  assert.equal(slicerHash("#slicer/cut"), "#slicer/cut");
+  assert.equal(slicerHash("#lithophane"), "#lithophane");
 });
 
 test("reload keeps the open bed, and leaving drops the restore link", () => {
