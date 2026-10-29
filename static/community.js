@@ -996,13 +996,29 @@ function wireRemixPicker() {
   });
 }
 let publishBuild = null;
+let pendingChallenge = null;
+$("#dlgPublish")?.addEventListener("close", () => {
+  pendingChallenge = null;
+  if ($("#btnDoPublish")) $("#btnDoPublish").textContent = "Publish";
+  if ($("#pubChallengeNote")) $("#pubChallengeNote").hidden = true;
+});
+function publishPayload(build) {
+  return {
+    build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
+    tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value,
+    remix_of: ($("#pub_remix")?.value || "").trim(), nsfw: $("[name=pub_nsfw]:checked")?.value === "yes",
+    allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
+    ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
+    print_settings: psFields(),
+  };
+}
 function openShowcase(build) {
   if (!build?.id) { toast("Make a model first, then send it to Showcase.", "err"); return; }
   if (!ME?.signed_up) { toast("Create an account first to share projects.", "err"); openAccount("signup"); return; }
   publishBuild = build;
-  const named = ($("#designName")?.value || "").trim();
+  const named = pendingChallenge ? "" : ($("#designName")?.value || "").trim();
   $("#pub_title").value = named || build.title || "";
-  $("#pub_vis").value = ME.privacy?.default_visibility || "private"; $$("[name=pub_nsfw]").forEach(r => r.checked = false);
+  $("#pub_vis").value = pendingChallenge ? "public" : (ME.privacy?.default_visibility || "private"); $$("[name=pub_nsfw]").forEach(r => r.checked = false);
   // 2D to 3D builds are always saved as AI-made by the server, so show that honestly instead of a box that can be unticked
   const src = publishBuild || S.current;
   const aiForced = !!(src?.ai || src?.mode === "ai3d" || src?.base?.from_mode === "ai3d"), aiBox = $("#pub_ai");
@@ -1014,6 +1030,8 @@ function openShowcase(build) {
   if ($("#pub_remix") && !$("#pub_remix").value && pending) setRemixCredit(pending, recentRemixTitle(pending));
   else { paintRemixCredit(); paintRemixRecent(); }
   if ($("#pubRemixHits")) $("#pubRemixHits").innerHTML = "";
+  if ($("#pubChallengeNote")) $("#pubChallengeNote").hidden = !pendingChallenge;
+  if ($("#btnDoPublish")) $("#btnDoPublish").textContent = pendingChallenge ? "Publish and enter" : "Publish";
   $("#dlgPublish").showModal();
   if (pending && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending) && !recentRemixTitle(pending)) {
     resolveRemixTitle(pending).then(t => { if (t && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending)) { $("#pub_remix").dataset.title = t; paintRemixCredit(); } });
@@ -1054,28 +1072,43 @@ function showConflict(c) {
     <button type="button" class="btn ghost" id="pubKeepPrivate"><svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg> Keep it Private</button></div>`;
   box.hidden = false; box.scrollIntoView({ block: "end", behavior: "instant" }); box.tabIndex = -1; box.focus({ preventScroll: true });
   if ($("#pubAsRemix")) $("#pubAsRemix").onclick = () => { $("#pub_remix").value = location.origin + o.share_url; box.hidden = true; $("#btnDoPublish").click(); };
-  $("#pubKeepPrivate").onclick = () => { $("#pub_vis").value = "private"; box.hidden = true; $("#btnDoPublish").click(); };
+  $("#pubKeepPrivate").onclick = () => {
+    $("#pub_vis").value = "private";
+    pendingChallenge = null;
+    if ($("#btnDoPublish")) $("#btnDoPublish").textContent = "Publish";
+    if ($("#pubChallengeNote")) $("#pubChallengeNote").hidden = true;
+    box.hidden = true;
+    $("#btnDoPublish").click();
+  };
 }
 $("#btnDoPublish").onclick = async () => {
   if ($("#pubConflict")) $("#pubConflict").hidden = true;
   const nsfw = $("[name=pub_nsfw]:checked")?.value;
   if (!nsfw) return inlineMsg($("#btnDoPublish"), "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.");
+  const cid = pendingChallenge;
+  const remixSent = ($("#pub_remix")?.value || "").trim();
+  if (cid && $("#pub_vis").value !== "public") return inlineMsg($("#btnDoPublish"), "An entry has to be public.");
+  if (cid && !remixSent) return inlineMsg($("#btnDoPublish"), "This challenge is for credited remixes. Credit the project you remixed, then confirm.");
   try {
     const build = publishBuild || S.current;
     if (!build?.id) return inlineMsg($("#btnDoPublish"), "Make a model first, then send it to Showcase.");
-    const remixSent = ($("#pub_remix")?.value || "").trim();
-    const i = await api("/api/showcase", J("POST", { build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
-      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: remixSent, nsfw: nsfw === "yes",
-      allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
-      ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
-      print_settings: psFields() }));
+    const payload = publishPayload(build);
+    const i = cid
+      ? await api(`/api/challenges/${encodeURIComponent(cid)}/enter`, J("POST", payload))
+      : await api("/api/showcase", J("POST", payload));
+    const project = i.project || i;
     if (remixSent) { try { sessionStorage.removeItem(REMIX_NOW); } catch { /* the credit is already on the project */ } }
     if ($("#pub_remix")) { $("#pub_remix").value = ""; delete $("#pub_remix").dataset.title; }
     clearInline($("#btnDoPublish")); $("#dlgPublish").close();
-    (i.warnings || []).forEach(w => toast(w, "ok"));
-    if (i.held_for_review) return toast(i.hold_message, "ok");
-    toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
-    if (i.visibility === "public" && remixSent && i.id) offerChallenge(i);
+    (project.warnings || []).forEach(w => toast(w, "ok"));
+    if (project.held_for_review) return toast(project.hold_message, "ok");
+    if (cid) {
+      toast(i.message || "Entered", "ok");
+      openChallenge(cid);
+      return;
+    }
+    toast(project.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + project.share_url, "ok");
+    if (project.visibility === "public" && remixSent && project.id) offerChallenge(project);
   } catch (e) { if (e.status === 409 && e.body?.code) { clearInline($("#btnDoPublish")); return showConflict(e.body); } inlineMsg($("#btnDoPublish"), e.message); }
 };
 
@@ -1437,16 +1470,9 @@ async function loadQuestions(id, item) {
 }
 
 /* ---------- prize-free themed challenges ---------- */
-const VIS_LABEL = { private: "Private", followers: "Followers only", public: "Public" };
-function openModelForPublish() {
-  if (S.current?.id) return { id: S.current.id, title: ($("#designName")?.value || "").trim() || S.current.title, ai: S.current.ai, mode: S.current.mode, base: S.current.base };
-  const p = window.__zeimEdit?.p;
-  if (p?.id) return { id: p.id, title: p.title || "Slicer model" };
-  return null;
-}
 function challengeEntryHTML(elig) {
   if (!elig.signed_in && !ME?.signed_up) {
-    return `<p>Sign in to enter with one of your Showcase remixes.</p><button type="button" class="btn primary" id="chEnterSign">Sign in</button>`;
+    return `<p>Sign in to enter a saved project from your Studio.</p><button type="button" class="btn primary" id="chEnterSign">Sign in</button>`;
   }
   if (elig.status === "closed") return `<p class="help">This challenge is closed.</p>`;
   if (elig.already_entered) {
@@ -1458,27 +1484,29 @@ function challengeEntryHTML(elig) {
   }
   if (elig.error) return `<p><button type="button" class="btn" id="chEnterRetry">Try again</button></p>`;
   if (!elig.can_enter) return `<p class="help">This account can't enter right now.</p>`;
-  const items = elig.items || [];
-  const needs = elig.needs_public || [];
-  const needHTML = needs.length ? `<p class="help">These credited remixes are saved, but an entry has to be public. Open one and set Who can see this to Public.</p>
-    <ul class="plist">${needs.map(i => `<li><a href="#" data-open-item="${esc(i.id)}">${esc(i.title)}</a> <span class="help">${esc(VIS_LABEL[i.visibility] || i.visibility || "")}</span></li>`).join("")}</ul>` : "";
-  if (!items.length) {
-    const open = openModelForPublish();
-    return `<p>You don't have a public credited remix to enter yet.</p>
-      ${needHTML}
-      <div class="row">
-        <a class="btn primary" href="#showcase" id="chFindRemix">Find a project to remix</a>
-        <a class="btn" href="#lithophane" id="chMakeRemix">Make one in Lithophane</a>
-        ${open ? `<button type="button" class="btn" id="chPublishOpen">Send the open model to Showcase</button>` : ""}
-      </div>
-      <p class="help">Remix a public project, publish your version with that credit, and set it to Public. Then pick it here.</p>`;
-  }
-  const radios = items.map((it, n) => `<label class="choice"><input type="radio" name="chPick" value="${esc(it.id)}" ${n === 0 ? "checked" : ""}>
-    <span><b>${esc(it.title)}</b><small class="help">${it.remix_title ? "Remix of " + esc(it.remix_title) : "Credited remix"}</small></span></label>`).join("");
-  return `<fieldset class="reasons" id="chPickList"><legend>Your public credited remixes</legend>${radios}</fieldset>
-    <button type="button" class="btn primary" id="chEnterGo">Enter this remix</button>
-    <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>
-    ${needHTML}`;
+  return `<p>Pick a saved project from your Studio. Confirming publishes that file to Showcase and enters it here.</p>
+    <button type="button" class="btn primary" id="chEnterStart">Enter</button>
+    <div id="chStudioPick" hidden></div>
+    <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>`;
+}
+async function showChallengeStudio(cid) {
+  const host = $("#chStudioPick");
+  if (!host) return;
+  host.hidden = false;
+  host.innerHTML = `<p class="help">Loading your Studio…</p>`;
+  try { await loadHistory(); }
+  catch (e) { host.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
+  host.innerHTML = `<ul class="hlist studio-lib" id="chStudioList">${libraryHTML(S.history || [], { pick: "challenge" })}</ul>
+    <p class="help">Choose one. The Showcase form is where you confirm. Nothing is entered until then.</p>`;
+  host.onclick = e => {
+    const b = e.target.closest("[data-lib='pick']");
+    if (!b) return;
+    const build = (S.history || []).find(x => x.id === b.dataset.id);
+    if (!build) return toast("That saved project is no longer in your Studio.", "err");
+    pendingChallenge = cid;
+    $("#dlgChallenge").close();
+    openShowcase({ id: build.id, title: build.title, ai: build.ai, mode: build.mode, base: build.base });
+  };
 }
 async function enterChallengeItem(cid, itemId, btn) {
   if (!itemId) return inlineMsg(btn, "Pick one of your remixes.");
@@ -1531,7 +1559,7 @@ async function openChallenge(cid) {
   $("#chDlgH").textContent = c.title;
   const rules = (c.rules || []).map(r => `<li>${esc(r)}</li>`).join("");
   const entries = (c.entries || []).map(e => `<li><a href="#" data-open-item="${esc(e.id)}">${esc(e.title)}</a> <span class="help">by ${esc(e.creator)}</span></li>`).join("")
-    || `<li class="help">No entries yet. Publish a credited remix, then pick it here.</li>`;
+    || `<li class="help">No entries yet.</li>`;
   $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
     <p>${esc(c.blurb)}</p>
     <ul class="help chrules">${rules}</ul>
@@ -1541,16 +1569,8 @@ async function openChallenge(cid) {
     <h4>Entries</h4><ul class="plist" id="chEntries">${entries}</ul>`;
   $("#chDlgBody").querySelectorAll("a[href^='#']").forEach(a => a.addEventListener("click", () => $("#dlgChallenge").close()));
   if ($("#chEnterSign")) $("#chEnterSign").onclick = () => { $("#dlgChallenge").close(); openAccount("signup"); };
-  if ($("#chPublishOpen")) $("#chPublishOpen").onclick = () => {
-    const model = openModelForPublish();
-    $("#dlgChallenge").close();
-    if (model) openShowcase(model);
-  };
   if ($("#chEnterRetry")) $("#chEnterRetry").onclick = () => openChallenge(cid);
-  if ($("#chEnterGo")) $("#chEnterGo").onclick = () => {
-    const item_id = $("#chDlgBody [name=chPick]:checked")?.value || "";
-    enterChallengeItem(cid, item_id, $("#chEnterGo"));
-  };
+  if ($("#chEnterStart")) $("#chEnterStart").onclick = () => showChallengeStudio(cid);
   if (!$("#dlgChallenge").open) $("#dlgChallenge").showModal();
 }
 document.addEventListener("DOMContentLoaded", () => { try { loadChallenges(); } catch { } });

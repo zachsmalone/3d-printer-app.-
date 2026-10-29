@@ -91,6 +91,16 @@ test("browsing the library does not change project storage or the open project i
   assert.equal(html.includes('href="#lithophane"'), false);
   assert.equal(html.includes('href="#studio"'), false);
   assert.equal(html.includes("Cat <b>"), false);
+  const picked = libraryHTML([
+    { id: PHOTO, title: "Cat", mode: "lithophane", kind: "photo" },
+  ], { pick: "challenge" });
+  assert.match(picked, /data-lib="pick"/);
+  assert.match(picked, />Choose</);
+  assert.equal(picked.includes('data-lib="delete"'), false);
+  assert.equal(picked.includes('data-lib="showcase"'), false);
+  assert.match(picked, /Cat/);
+  const none = libraryHTML([], { pick: "challenge" });
+  assert.match(none, /Saved work is listed on Account/);
   const own = visitLibrary("#account/studio", storage, project);
   assert.equal(own.library, true);
   assert.equal(own.intent.view, "account");

@@ -539,6 +539,26 @@ def credited_remixes(actor: Actor) -> dict:
     return {"signed_in": True, "items": public, "needs_public": needs}
 
 
+def listing_for_build(actor: Actor, build_id: str) -> dict | None:
+    """This account's Showcase project made from a Studio build, if one exists.
+
+    A public credited remix is preferred. Otherwise the newest listing of that build is returned
+    so a second publish is not started for the same saved file.
+    """
+    if not actor.user or not build_id:
+        return None
+    rows = [i for i in _all()
+            if i.get("source_build_id") == build_id and i.get("owner_sid") == actor.sid
+            and not i.get("hidden") and not i.get("example")]
+    if not rows:
+        return None
+    rows.sort(key=lambda i: i.get("created") or "", reverse=True)
+    for i in rows:
+        if is_public(i) and i.get("remix_of"):
+            return i
+    return rows[0]
+
+
 def set_visibility(actor: Actor, item_id: str, level: str, remix_of: str = "") -> dict:
     try:
         level = privacy.check_level(actor, level)
@@ -652,7 +672,7 @@ def create_project(actor: Actor, *, title, description, tags, build_id, accept_g
             "created": datetime.now(timezone.utc).isoformat(), "files": files,
             "owner_sid": actor.sid, "visibility": visibility, "has_thumb": (d / "thumb.png").exists(), "hidden": False,
             "nsfw": bool(nsfw), "license_id": lid, "allow_remixes": allow_remixes is not False,
-            "view_only": bool(view_only),
+            "view_only": bool(view_only), "source_build_id": build_id,
             # honest AI label: the creator said so, the build (or any build it came from) is from ZEIM's 2D->3D tab,
             # or it remixes an AI-made project. Inherited labels are locked (can't be unticked).
             "ai_made": bool(ai_made) or ai_locked, "ai_locked": ai_locked}

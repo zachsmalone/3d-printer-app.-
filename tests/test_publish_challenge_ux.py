@@ -44,16 +44,24 @@ def test_remix_credit_is_a_picker_and_paste_is_advanced():
     assert "Enter an open challenge?" in HTML
 
 
-def test_challenge_enter_picks_a_remix_and_does_not_ask_for_a_url():
+def test_challenge_enter_picks_a_studio_project_and_does_not_ask_for_a_url():
     assert "/eligible" in COMM
-    assert "Your public credited remixes" in COMM
-    assert "You don't have a public credited remix to enter yet." in COMM
-    assert 'href="#lithophane"' in COMM and 'href="#showcase"' in COMM
+    assert "chEnterStart" in COMM
+    assert 'pick: "challenge"' in COMM
+    assert "libraryHTML" in COMM
+    assert "Publish and enter" in COMM
+    assert "/api/challenges/" in COMM and "build_id: build.id" in COMM
+    assert "Your public credited remixes" not in COMM
+    assert "You don't have a public credited remix to enter yet." not in COMM
     assert "chEnterPaste" not in COMM
     assert "chEnterId" not in COMM
+    assert "chEnterGo" not in COMM
     assert "Your remix project id or /p/" not in COMM
     assert "Paste your remix's Showcase link" not in COMM
     assert "Enter with a project id" not in COMM
+    assert 'pick === "challenge"' in LIB
+    assert 'data-lib="pick"' in LIB
+    assert "No saved projects yet. Saved work is listed on Account." in LIB
 
 
 def test_remix_opens_the_model_and_keeps_the_credit():
