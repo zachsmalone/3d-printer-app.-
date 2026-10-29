@@ -35,8 +35,8 @@ function torchInput(f) {
   const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event("change")); return true;
 }
 let pendingTorch = null;
-document.addEventListener("zeim:torchc0-file", e => { pendingTorch = e.detail; if (torchInput(e.detail)) pendingTorch = null; keepTorchFile(e.detail); });
-document.addEventListener("zeim:torchc0-forget", () => { idbDo("readwrite", s => s.delete("torchc0")).catch(() => { }); });
+document.addEventListener("zeim:torchc0-file", e => { pendingTorch = e.detail; delete document.body.dataset.torchPublishId; delete document.body.dataset.torchPublishStamp; if (torchInput(e.detail)) pendingTorch = null; keepTorchFile(e.detail); });
+document.addEventListener("zeim:torchc0-forget", () => { delete document.body.dataset.torchPublishId; delete document.body.dataset.torchPublishStamp; idbDo("readwrite", s => s.delete("torchc0")).catch(() => { }); });
 document.addEventListener("zeim:torchc0-ready", async () => {      // the TorchC0 panel was just built
   const inp = $("#rzFile"); if (!inp) return;
   inp.addEventListener("change", () => { if (inp.files[0]) keepTorchFile(inp.files[0]); });
@@ -102,7 +102,15 @@ async function sendToShowcase(src) {
       if (!id) throw new Error("Open a model in the Slicer first.");
       build = { id, title: window.__zeimEdit?.p?.title || "Slicer model" };
     } else if (src === "torchc0") {
-      build = { id: await editIdFrom("torchc0"), title: "Resin model" };
+      const stamp = document.body.dataset.torchStl || "";
+      const cacheId = document.body.dataset.torchPublishId || "";
+      const cacheStamp = document.body.dataset.torchPublishStamp || "";
+      if (stamp && cacheId && cacheStamp === stamp && /^[0-9a-f]{12}$/.test(cacheId)) {
+        build = { id: cacheId, title: "Resin model" };
+      } else {
+        build = { id: await editIdFrom("torchc0"), title: "Resin model" };
+        if (stamp) { document.body.dataset.torchPublishId = build.id; document.body.dataset.torchPublishStamp = stamp; }
+      }
     } else throw new Error("Nothing to send.");
     if (typeof window.zeimOpenShowcase === "function") { window.zeimOpenShowcase(build); return true; }
     location.href = "/?publish=" + encodeURIComponent(build.id);
@@ -199,6 +207,12 @@ function wireStudioHandoff() {
 }
 wireStudioHandoff();
 addBtn("editSendTo", $("#editSend"), "slicer");
+const editPub = $("#editPublish");
+if (editPub) editPub.onclick = () => sendToShowcase("slicer");
+document.addEventListener("zeim:send-showcase", e => {
+  const src = e.detail && e.detail.src;
+  if (src === "slicer" || src === "torchc0" || src === "lithophane") sendToShowcase(src);
+});
 { const ph = $("#viewTorch .pagehead"); if (ph && !$("#torchSendTo")) { const s = document.createElement("span"); ph.append(s); addBtn("torchSendTo", s, "torchc0"); s.remove(); } }
 
 /* Phone layouts can fold a section's panels away (the Slicer's result panel starts minimised), which hid its Send to…

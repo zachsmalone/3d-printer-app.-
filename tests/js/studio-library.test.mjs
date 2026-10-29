@@ -84,6 +84,8 @@ test("browsing the library does not change project storage or the open project i
   ], { currentId: PHOTO });
   assert.match(html, /data-lib="open"/);
   assert.match(html, /data-lib="edit"/);
+  assert.match(html, /data-lib="showcase"/);
+  assert.match(html, /Send to Showcase/);
   assert.match(html, /Open in this visit/);
   assert.match(html, /Cat &lt;b&gt;/);
   assert.equal(html.includes('href="#lithophane"'), false);

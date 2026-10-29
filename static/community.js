@@ -155,6 +155,11 @@ $("#studioLib")?.addEventListener("click", async e => {
     document.dispatchEvent(new CustomEvent("zeim:send-build", { detail: build }));
     return;
   }
+  if (action === "showcase") {
+    if (typeof window.zeimOpenShowcase === "function") window.zeimOpenShowcase({ id: build.id, title: build.title, ai: build.ai, mode: build.mode, base: build.base });
+    else toast("Send to Showcase is not available on this page.", "err");
+    return;
+  }
   if (action === "star") {
     try {
       await api(`/api/builds/${id}/favorite`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ favorite: !build.favorite }) });
@@ -495,7 +500,7 @@ async function loadShowcase() {
   $("#shClear").hidden = !q;
   let r;
   if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}&sort=${encodeURIComponent(shSortVal())}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
   if (r.filters && $("#shMature")) $("#shMature").value = r.filters.mature;
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
@@ -505,11 +510,11 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
-    const filtered = !!(q || shCat || shAiVal() !== "show");
+    const filtered = !!(q || shCat || shAiVal() !== "show" || shNarrowed());
     const e = filtered ? { text: "Your filters are hiding results. Nothing matches all of them right now.", action: { do: "reset-filters", label: "Reset filters" } }
       : (r.empty || { text: "Nothing here yet. Check back soon.", action: null });
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
@@ -530,13 +535,17 @@ function shAiSave(v) {
   if (SH_AI_OK.includes(v)) el.value = v; })();
 $("#shAi")?.addEventListener("change", () => { shAiSave(shAiVal()); loadShowcase(); });
 // printer / material / supports / licence / mature filters (server validates; 'Not stated' = the model does not say)
+const SH_SORTS = ["", "newest", "likes", "printed"];
+function shSortVal() { const v = $("#shSort")?.value || ""; return SH_SORTS.includes(v) ? v : ""; }
 const SH_FILTERS = { printer: "#shPrinter", material: "#shMaterial", supports: "#shSupports", licence: "#shLicence", mature: "#shMature" };
+function shNarrowed() { return ["#shPrinter", "#shMaterial", "#shSupports", "#shLicence"].some(sel => $(sel)?.value); }
 let shMatureTouched = false;
 function shFilterQS() { return Object.entries(SH_FILTERS).map(([k, sel]) => { const el = $(sel); return el && (k !== "mature" || shMatureTouched) ? `&${k}=${encodeURIComponent(el.value)}` : ""; }).join(""); }
 function shFiltersReset() { Object.values(SH_FILTERS).forEach(sel => { const el = $(sel); if (el) el.selectedIndex = 0; }); shMatureTouched = false; }
 $("#shMature")?.addEventListener("change", () => { shMatureTouched = true; });
 Object.values(SH_FILTERS).forEach(sel => $(sel)?.addEventListener("change", () => loadShowcase()));
 $("#shFiltReset")?.addEventListener("click", () => { shFiltersReset(); loadShowcase(); });
+$("#shSort")?.addEventListener("change", () => loadShowcase());
 $("#shGrid").addEventListener("click", e => { if (!e.target.closest('[data-empty="reset-filters"]')) return;
   e.stopPropagation(); $("#shSearch").value = ""; shCat = ""; if ($("#shAi")) $("#shAi").value = "show"; shAiSave("show"); shFiltersReset(); loadShowcase(); }, true);
 // honest provenance labels: AI-made (creator said so, or 2D to 3D tab) and 'Printed by the community' (>=1 approved print photo). No counts, no ranking.
@@ -657,7 +666,7 @@ async function openItem(id) {
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
       ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
-      ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn ghost" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix</button>`}
+      ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn primary" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix this</button>`}
       <button class="btn ghost" id="itShare"><svg class=i aria-hidden=true focusable=false><use href=#i-link></use></svg> Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>'}
       ${i.example || i.owned || i.original ? "" : '<button class="btn ghost danger" id="itStolen">Report as stolen</button>'}
@@ -766,7 +775,7 @@ async function openItem(id) {
   };
   if ($("#itTipSave")) $("#itTipSave").onclick = async () => { try { await api(`/api/showcase/${id}/tip`, J("PUT", { tip_url: $("#itTip").value.trim() })); toast($("#itTip").value.trim() ? "Tip link saved" : "Tip link removed", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); } };
   if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); openItem(id); } };
-  if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => { sessionStorage.setItem("zeim_remix_of", location.origin + i.share_url); toast("Make your version in the Studio, then Share it: this project will be credited as the original.", "ok"); };
+  if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => startRemix(i);
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
   if ($("#itReport")) $("#itReport").onclick = () => {
     $$("#dlgReport [name=repReason]").forEach(r => r.checked = false); $("#repDetails").value = ""; clearInline($("#repSend"));
@@ -832,7 +841,160 @@ function psRead(prefix) {
     printer_name: $(`#${prefix}_name`)?.value || "", notes: $(`#${prefix}_notes`)?.value || "" };
 }
 
-/* publish — one Showcase path, opened from Studio, the Slicer, TorchC0 and CAD */
+/* publish — one Showcase path, opened from Lithophane, the Slicer, TorchC0, CAD, 2D→3D and Projects */
+const REMIX_NOW = "zeim_remix_of";
+const REMIX_RECENT = "zeim_remix_recent";
+function remixIdOf(raw) {
+  const s = String(raw || "").trim();
+  const m = s.match(/\/p\/([A-Za-z0-9]+)/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9]{4,40}$/.test(s) ? s : "";
+}
+function readRecentRemixes() {
+  try {
+    const rows = JSON.parse(sessionStorage.getItem(REMIX_RECENT) || "[]");
+    return Array.isArray(rows) ? rows.filter(r => r && remixIdOf(r.id || r.url)).slice(0, 8) : [];
+  } catch { return []; }
+}
+function rememberRemixIntent(item) {
+  if (!item?.id || !item.share_url) return;
+  const url = location.origin + item.share_url;
+  try {
+    sessionStorage.setItem(REMIX_NOW, url);
+    const row = { id: item.id, title: item.title || "Project", creator: item.creator || "", url };
+    const next = [row, ...readRecentRemixes().filter(r => r.id !== item.id)].slice(0, 8);
+    sessionStorage.setItem(REMIX_RECENT, JSON.stringify(next));
+  } catch { /* the Remix button still tells them what to do next */ }
+}
+async function startRemix(item) {
+  rememberRemixIntent(item);
+  const file = (item.files || []).find(f => f.url && /\.stl$/i.test(f.name || "")) || (item.files || []).find(f => f.url);
+  const credit = item.title || "this project";
+  if (item.download_blocked || item.view_only || !file) {
+    toast(`Downloads are off for this project, so it can't be opened as a remix. The credit for ${credit} is saved for a model you make yourself.`, "ok");
+    return;
+  }
+  const btn = $("#itRemix");
+  if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+  try {
+    const res = await fetch(file.url, { credentials: "same-origin" });
+    if (!res.ok) throw new Error("Couldn't download that model.");
+    const blob = await res.blob();
+    const safe = String(file.name || "remix.stl").replace(/[^\w.\-]+/g, "_").slice(0, 80) || "remix.stl";
+    const mesh = new File([blob], safe, { type: blob.type || "model/stl" });
+    const resin = document.body.dataset.printKind === "resin";
+    $("#dlgItem")?.close();
+    if (resin) {
+      location.hash = "torchc0";
+      document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: mesh }));
+      toast(`Opened in TorchC0. Send to Showcase will credit ${credit}.`, "ok");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", mesh);
+    fd.append("title", String(item.title || "Remix").slice(0, 80));
+    fd.append("units", "mm");
+    const project = await api("/api/edit/new", { method: "POST", body: fd });
+    if (!project?.id) { toast("Your recent builds are full. Delete one on Account, then remix again.", "err"); return; }
+    location.hash = "slicer";
+    document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: project.id }));
+    toast(`Opened in the FDM Slicer. Send to Showcase will credit ${credit}.`, "ok");
+  } catch (e) {
+    toast(e.message || "Couldn't open that remix.", "err");
+  } finally {
+    if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); }
+  }
+}
+function recentRemixTitle(raw) {
+  const id = remixIdOf(raw);
+  return readRecentRemixes().find(r => r.id === id || remixIdOf(r.url) === id)?.title || "";
+}
+function setRemixCredit(raw, title) {
+  const field = $("#pub_remix");
+  if (!field) return;
+  field.value = raw || "";
+  if (title) field.dataset.title = title;
+  else delete field.dataset.title;
+  paintRemixCredit();
+  paintRemixRecent();
+}
+function paintRemixCredit() {
+  const field = $("#pub_remix"), chosen = $("#pubRemixChosen"), now = $("#pubRemixNow");
+  if (!field || !chosen) return;
+  const raw = field.value.trim();
+  const pending = (() => { try { return sessionStorage.getItem(REMIX_NOW) || ""; } catch { return ""; } })();
+  if (raw) {
+    const title = field.dataset.title || recentRemixTitle(raw);
+    chosen.hidden = false;
+    chosen.replaceChildren();
+    const span = document.createElement("span");
+    span.textContent = title ? `Remixed from ${title}.` : "Remixed from the project in the link below.";
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.className = "btn small ghost"; clear.id = "pubRemixClear";
+    clear.textContent = "Don't credit a remix";
+    chosen.append(span, document.createTextNode(" "), clear);
+    if (now) now.hidden = true;
+  } else {
+    chosen.hidden = true;
+    chosen.replaceChildren();
+    if (now) {
+      now.hidden = !pending;
+      const note = $("#pubRemixNowText");
+      const title = recentRemixTitle(pending);
+      if (note) note.textContent = title ? `You just chose to remix “${title}”.` : "You just chose a Showcase project to remix.";
+    }
+  }
+}
+function paintRemixRecent() {
+  const host = $("#pubRemixRecent");
+  if (!host) return;
+  const current = remixIdOf($("#pub_remix")?.value);
+  const rows = readRecentRemixes().filter(r => r.id !== current);
+  host.innerHTML = rows.length ? `<p class="help">Recent remixes</p><ul class="plist">${rows.map(r =>
+    `<li><button type="button" class="btn small" data-remix-pick="${esc(r.id)}" data-remix-title="${esc(r.title)}">${esc(r.title)}${r.creator ? ` <span class="help">by ${esc(r.creator)}</span>` : ""}</button></li>`).join("")}</ul>` : "";
+}
+async function resolveRemixTitle(raw) {
+  const id = remixIdOf(raw);
+  if (!id) return "";
+  const known = recentRemixTitle(raw);
+  if (known) return known;
+  try { return (await api("/api/showcase/" + encodeURIComponent(id))).title || ""; }
+  catch { return ""; }
+}
+async function searchRemixSources() {
+  const q = ($("#pubRemixSearch")?.value || "").trim();
+  const host = $("#pubRemixHits");
+  if (!host) return;
+  if (!q) { host.innerHTML = `<li class="help">Type a title, then Search.</li>`; return; }
+  host.innerHTML = `<li class="help">Searching…</li>`;
+  try {
+    const r = await api(`/api/showcase?tab=free&q=${encodeURIComponent(q)}`);
+    const items = (r.items || []).filter(i => i.can_remix);
+    host.innerHTML = items.length ? items.slice(0, 8).map(i =>
+      `<li><button type="button" class="btn small" data-remix-pick="${esc(i.id)}" data-remix-title="${esc(i.title)}">${esc(i.title)} <span class="help">by ${esc(i.creator || "")}</span></button></li>`).join("")
+      : `<li class="help">No remixable public projects match that. Try a shorter word.</li>`;
+  } catch (e) { host.innerHTML = `<li class="help">${esc(e.message)}</li>`; }
+}
+function wireRemixPicker() {
+  const box = $("#pubRemixBox");
+  if (!box || box.dataset.wired) return;
+  box.dataset.wired = "1";
+  $("#pubRemixUse")?.addEventListener("click", () => {
+    let pending = ""; try { pending = sessionStorage.getItem(REMIX_NOW) || ""; } catch { pending = ""; }
+    if (!pending) return;
+    setRemixCredit(pending, recentRemixTitle(pending));
+    resolveRemixTitle(pending).then(t => { if (t && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending)) { $("#pub_remix").dataset.title = t; paintRemixCredit(); } });
+  });
+  $("#pubRemixGo")?.addEventListener("click", searchRemixSources);
+  $("#pubRemixSearch")?.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); searchRemixSources(); } });
+  $("#pub_remix")?.addEventListener("input", () => { delete $("#pub_remix").dataset.title; paintRemixCredit(); paintRemixRecent(); });
+  box.addEventListener("click", e => {
+    if (e.target.closest("#pubRemixClear")) { setRemixCredit("", ""); return; }
+    const b = e.target.closest("[data-remix-pick]");
+    if (!b) return;
+    setRemixCredit(location.origin + "/p/" + b.dataset.remixPick, b.dataset.remixTitle || "");
+  });
+}
 let publishBuild = null;
 function openShowcase(build) {
   if (!build?.id) { toast("Make a model first, then send it to Showcase.", "err"); return; }
@@ -846,8 +1008,16 @@ function openShowcase(build) {
   const aiForced = !!(src?.ai || src?.mode === "ai3d" || src?.base?.from_mode === "ai3d"), aiBox = $("#pub_ai");
   if (aiBox) { aiBox.checked = aiForced || aiBox.checked && !aiBox.disabled; aiBox.disabled = aiForced; }
   if ($("#pub_ai_note")) $("#pub_ai_note").hidden = !aiForced;
-  $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no"; if (!$("#pub_remix").value && sessionStorage.getItem("zeim_remix_of")) $("#pub_remix").value = sessionStorage.getItem("zeim_remix_of");
+  $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no";
+  wireRemixPicker();
+  let pending = ""; try { pending = sessionStorage.getItem(REMIX_NOW) || ""; } catch { pending = ""; }
+  if ($("#pub_remix") && !$("#pub_remix").value && pending) setRemixCredit(pending, recentRemixTitle(pending));
+  else { paintRemixCredit(); paintRemixRecent(); }
+  if ($("#pubRemixHits")) $("#pubRemixHits").innerHTML = "";
   $("#dlgPublish").showModal();
+  if (pending && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending) && !recentRemixTitle(pending)) {
+    resolveRemixTitle(pending).then(t => { if (t && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending)) { $("#pub_remix").dataset.title = t; paintRemixCredit(); } });
+  }
 }
 $("#btnPublish").onclick = () => openShowcase(S.current);
 window.zeimOpenShowcase = openShowcase;
@@ -893,16 +1063,19 @@ $("#btnDoPublish").onclick = async () => {
   try {
     const build = publishBuild || S.current;
     if (!build?.id) return inlineMsg($("#btnDoPublish"), "Make a model first, then send it to Showcase.");
+    const remixSent = ($("#pub_remix")?.value || "").trim();
     const i = await api("/api/showcase", J("POST", { build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
-      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: $("#pub_remix").value.trim(), nsfw: nsfw === "yes",
+      tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value, remix_of: remixSent, nsfw: nsfw === "yes",
       allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
       ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
       print_settings: psFields() }));
-    if ($("#pub_remix").value.trim()) sessionStorage.removeItem("zeim_remix_of");
+    if (remixSent) { try { sessionStorage.removeItem(REMIX_NOW); } catch { /* the credit is already on the project */ } }
+    if ($("#pub_remix")) { $("#pub_remix").value = ""; delete $("#pub_remix").dataset.title; }
     clearInline($("#btnDoPublish")); $("#dlgPublish").close();
     (i.warnings || []).forEach(w => toast(w, "ok"));
     if (i.held_for_review) return toast(i.hold_message, "ok");
     toast(i.visibility === "private" ? "Saved as Private — only you can see it. Change it any time." : "Shared! " + location.origin + i.share_url, "ok");
+    if (i.visibility === "public" && remixSent && i.id) offerChallenge(i);
   } catch (e) { if (e.status === 409 && e.body?.code) { clearInline($("#btnDoPublish")); return showConflict(e.body); } inlineMsg($("#btnDoPublish"), e.message); }
 };
 
@@ -1241,6 +1414,79 @@ async function loadQuestions(id, item) {
 }
 
 /* ---------- prize-free themed challenges ---------- */
+const VIS_LABEL = { private: "Private", followers: "Followers only", public: "Public" };
+function openModelForPublish() {
+  if (S.current?.id) return { id: S.current.id, title: ($("#designName")?.value || "").trim() || S.current.title, ai: S.current.ai, mode: S.current.mode, base: S.current.base };
+  const p = window.__zeimEdit?.p;
+  if (p?.id) return { id: p.id, title: p.title || "Slicer model" };
+  return null;
+}
+function challengeEntryHTML(elig) {
+  if (!elig.signed_in && !ME?.signed_up) {
+    return `<p>Sign in to enter with one of your Showcase remixes.</p><button type="button" class="btn primary" id="chEnterSign">Sign in</button>`;
+  }
+  if (elig.status === "closed") return `<p class="help">This challenge is closed.</p>`;
+  if (elig.already_entered) {
+    const title = elig.entry?.title || "";
+    const id = elig.entry?.item_id || "";
+    return `<p>You already entered this challenge${title ? ` with <b>${esc(title)}</b>` : ""}.</p>
+      ${id ? `<p><a href="#" data-open-item="${esc(id)}">Open your entry</a></p>` : ""}
+      <p class="help">One remix per person. Prize-free: no cash, no prizes.</p>`;
+  }
+  if (elig.error) return `<p><button type="button" class="btn" id="chEnterRetry">Try again</button></p>`;
+  if (!elig.can_enter) return `<p class="help">This account can't enter right now.</p>`;
+  const items = elig.items || [];
+  const needs = elig.needs_public || [];
+  const needHTML = needs.length ? `<p class="help">These credited remixes are saved, but an entry has to be public. Open one and set Who can see this to Public.</p>
+    <ul class="plist">${needs.map(i => `<li><a href="#" data-open-item="${esc(i.id)}">${esc(i.title)}</a> <span class="help">${esc(VIS_LABEL[i.visibility] || i.visibility || "")}</span></li>`).join("")}</ul>` : "";
+  if (!items.length) {
+    const open = openModelForPublish();
+    return `<p>You don't have a public credited remix to enter yet.</p>
+      ${needHTML}
+      <div class="row">
+        <a class="btn primary" href="#showcase" id="chFindRemix">Find a project to remix</a>
+        <a class="btn" href="#lithophane" id="chMakeRemix">Make one in Lithophane</a>
+        ${open ? `<button type="button" class="btn" id="chPublishOpen">Send the open model to Showcase</button>` : ""}
+      </div>
+      <p class="help">Remix a public project, publish your version with that credit, and set it to Public. Then pick it here.</p>`;
+  }
+  const radios = items.map((it, n) => `<label class="choice"><input type="radio" name="chPick" value="${esc(it.id)}" ${n === 0 ? "checked" : ""}>
+    <span><b>${esc(it.title)}</b><small class="help">${it.remix_title ? "Remix of " + esc(it.remix_title) : "Credited remix"}</small></span></label>`).join("");
+  return `<fieldset class="reasons" id="chPickList"><legend>Your public credited remixes</legend>${radios}</fieldset>
+    <button type="button" class="btn primary" id="chEnterGo">Enter this remix</button>
+    <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>
+    ${needHTML}`;
+}
+async function enterChallengeItem(cid, itemId, btn) {
+  if (!itemId) return inlineMsg(btn, "Pick one of your remixes.");
+  btn.disabled = true;
+  try { const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id: itemId })); toast(r.message || "Entered", "ok"); openChallenge(cid); }
+  catch (e) { inlineMsg(btn, e.message); }
+  finally { btn.disabled = false; }
+}
+async function offerChallenge(item) {
+  let list; try { list = await api("/api/challenges"); } catch { return; }
+  const open = [];
+  for (const c of (list.challenges || []).filter(x => x.status === "open")) {
+    try { const elig = await api(`/api/challenges/${c.id}/eligible`); if (elig.can_enter) open.push(c); }
+    catch { /* skip a challenge we could not check */ }
+  }
+  if (!open.length || !$("#dlgEnterOffer")) return;
+  const which = $("#enterOfferWhich");
+  if (which) which.textContent = item.title ? `“${item.title}” is a public credited remix.` : "This public credited remix can be entered.";
+  const host = $("#enterOfferBody");
+  if (!host) return;
+  host.innerHTML = open.map(c => `<button type="button" class="btn primary" data-offer-ch="${esc(c.id)}">Enter ${esc(c.title)}</button>`).join(" ");
+  host.querySelectorAll("[data-offer-ch]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const r = await api(`/api/challenges/${b.dataset.offerCh}/enter`, J("POST", { item_id: item.id }));
+      $("#dlgEnterOffer").close();
+      toast(r.message || "Entered", "ok");
+    } catch (e) { inlineMsg(b, e.message); b.disabled = false; }
+  });
+  $("#dlgEnterOffer").showModal();
+}
 async function loadChallenges() {
   const host = $("#chHost"); if (!host) return;
   let r; try { r = await api("/api/challenges"); } catch (e) { host.innerHTML = `<p class="help">${esc(e.message)}</p>`; return; }
@@ -1254,23 +1500,33 @@ async function loadChallenges() {
 }
 async function openChallenge(cid) {
   let c; try { c = await api("/api/challenges/" + cid); } catch (e) { return toast(e.message, "err"); }
+  let elig = { signed_in: !!ME?.signed_up, items: [], needs_public: [], can_enter: false, already_entered: false, status: c.status };
+  if (ME?.signed_up) {
+    try { elig = await api(`/api/challenges/${cid}/eligible`); }
+    catch (e) { elig = { ...elig, error: e.message, can_enter: !!c.can_enter }; }
+  }
   $("#chDlgH").textContent = c.title;
   const rules = (c.rules || []).map(r => `<li>${esc(r)}</li>`).join("");
   const entries = (c.entries || []).map(e => `<li><a href="#" data-open-item="${esc(e.id)}">${esc(e.title)}</a> <span class="help">by ${esc(e.creator)}</span></li>`).join("")
-    || `<li class="help">No entries yet. Publish a credited remix, then enter it here.</li>`;
+    || `<li class="help">No entries yet. Publish a credited remix, then pick it here.</li>`;
   $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
     <p>${esc(c.blurb)}</p>
     <ul class="help chrules">${rules}</ul>
     <p class="help">ZEIM never takes a cut of tips or of sales a maker makes from their own link. Tip links stay optional with no nags. Showcase downloads stay free.</p>
-    ${c.can_enter ? `<div class="field"><label for="chEnterId">Your remix project id or /p/… link</label><input id="chEnterId" maxlength="200" placeholder="abc123 or https://…/p/abc123"></div>
-      <button type="button" class="btn primary" id="chEnterGo">Enter my remix</button>` : ""}
+    ${elig.error ? `<p class="help">${esc(elig.error)}</p>` : ""}
+    ${challengeEntryHTML(elig)}
     <h4>Entries</h4><ul class="plist" id="chEntries">${entries}</ul>`;
-  if ($("#chEnterGo")) $("#chEnterGo").onclick = async () => {
-    let raw = ($("#chEnterId").value || "").trim(); const m = raw.match(/\/p\/([A-Za-z0-9]+)/); const item_id = m ? m[1] : raw;
-    if (!item_id) return inlineMsg($("#chEnterGo"), "Paste your remix's Showcase link or id.");
-    $("#chEnterGo").disabled = true;
-    try { const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id })); toast(r.message || "Entered", "ok"); openChallenge(cid); }
-    catch (e) { inlineMsg($("#chEnterGo"), e.message); } finally { $("#chEnterGo").disabled = false; }
+  $("#chDlgBody").querySelectorAll("a[href^='#']").forEach(a => a.addEventListener("click", () => $("#dlgChallenge").close()));
+  if ($("#chEnterSign")) $("#chEnterSign").onclick = () => { $("#dlgChallenge").close(); openAccount("signup"); };
+  if ($("#chPublishOpen")) $("#chPublishOpen").onclick = () => {
+    const model = openModelForPublish();
+    $("#dlgChallenge").close();
+    if (model) openShowcase(model);
+  };
+  if ($("#chEnterRetry")) $("#chEnterRetry").onclick = () => openChallenge(cid);
+  if ($("#chEnterGo")) $("#chEnterGo").onclick = () => {
+    const item_id = $("#chDlgBody [name=chPick]:checked")?.value || "";
+    enterChallengeItem(cid, item_id, $("#chEnterGo"));
   };
   if (!$("#dlgChallenge").open) $("#dlgChallenge").showModal();
 }

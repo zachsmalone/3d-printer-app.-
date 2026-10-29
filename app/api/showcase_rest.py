@@ -143,6 +143,27 @@ def get_challenge(cid: str, actor: Actor = Depends(get_actor)):
             "can_enter": bool(actor.user and actor.is_adult and c.get("status") == "open")}
 
 
+@router.get("/challenges/{cid}/eligible")
+def challenge_eligible(cid: str, actor: Actor = Depends(get_actor)):
+    """Signed-in maker's own credited remixes, so the enter dialog can list them instead of asking for a URL."""
+    c = challenges.get(cid)
+    if not c:
+        raise HTTPException(404, "Challenge not found.")
+    pack = catalog.credited_remixes(actor)
+    prior = challenges.entry_for(c["id"], actor.sid) if actor.user else None
+    entry = None
+    if prior:
+        title = ""
+        try:
+            title = catalog.get(prior["item_id"], actor).get("title") or ""
+        except catalog.Denied:
+            title = ""
+        entry = {"id": prior["id"], "item_id": prior["item_id"], "title": title}
+    return {**pack, "challenge_id": c["id"], "status": c.get("status") or "open",
+            "already_entered": bool(prior), "entry": entry,
+            "can_enter": bool(actor.user and actor.is_adult and c.get("status") == "open" and not prior)}
+
+
 @router.post("/challenges/{cid}/enter")
 def enter_challenge(cid: str, body: dict, request: Request, actor: Actor = Depends(get_actor)):
     if not actor.user:

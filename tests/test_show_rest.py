@@ -155,6 +155,31 @@ def test_remix_challenge_prize_free_enter():
     assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem2}).status_code == 400
 
 
+def test_challenge_eligible_lists_own_public_remixes():
+    """The enter dialog picks from this list. Other people's work and private remixes stay out of it."""
+    a, b = U("ElOrig"), U("ElRemix")
+    src = publish(a, "Source cup", license_id="cc-by-4.0")
+    rem = publish(b, "My cup remix", remix_of=src["id"], license_id="cc-by-4.0")
+    plain = publish(b, "Plain cup")
+    priv = publish(b, "Private remix", remix_of=src["id"], license_id="cc-by-4.0", visibility="private")
+    other = publish(a, "Other remix", remix_of=src["id"], license_id="cc-by-4.0")
+    cid = challenges.REMIX_ID
+    anon = client().get(f"/api/challenges/{cid}/eligible")
+    assert anon.status_code == 200 and anon.json()["signed_in"] is False and anon.json()["items"] == []
+    assert client().get("/api/challenges/no-such-challenge/eligible").status_code == 404
+    body = b.get(f"/api/challenges/{cid}/eligible").json()
+    assert body["signed_in"] is True and body["already_entered"] is False and body["can_enter"] is True
+    ids = [i["id"] for i in body["items"]]
+    assert rem["id"] in ids and plain["id"] not in ids and other["id"] not in ids and priv["id"] not in ids
+    hit = next(i for i in body["items"] if i["id"] == rem["id"])
+    assert hit["remix_of"] == src["id"] and hit["remix_title"] == "Source cup" and hit["share_url"] == f"/p/{rem['id']}"
+    assert priv["id"] in [i["id"] for i in body["needs_public"]]
+    assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem["id"]}).status_code == 200
+    again = b.get(f"/api/challenges/{cid}/eligible").json()
+    assert again["already_entered"] is True and again["can_enter"] is False
+    assert again["entry"]["item_id"] == rem["id"] and again["entry"]["title"] == "My cup remix"
+
+
 def test_old_tip_rule_is_replaced_once():
     CHALLENGES.write([{"id": challenges.REMIX_ID, "slug": "remix", "prize_free": True, "created": 1,
                        "rules": ["Prize-free: ZEIM offers no cash or prizes for this challenge.", challenges._OLD_TIP_RULE]}])

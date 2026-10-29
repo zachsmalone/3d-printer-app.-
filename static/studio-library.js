@@ -196,6 +196,7 @@ export function libraryHTML(builds, opts) {
         <button type="button" class="btn small" data-lib="open" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in the FDM Slicer" : "Open this photo design"}">Open</button>
         <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays on Account."}">Edit</button>
         <button type="button" class="btn small" data-lib="send" data-id="${esc(id)}">Send…</button>
+        <button type="button" class="btn small" data-lib="showcase" data-id="${esc(id)}" title="Open the Showcase form for this project. Nothing is published until you confirm in that form.">Send to Showcase</button>
         <button type="button" class="btn small" data-lib="star" data-id="${esc(id)}" aria-pressed="${b.favorite ? "true" : "false"}">${b.favorite ? "Starred" : "Star"}</button>
         <button type="button" class="btn small" data-lib="delete" data-id="${esc(id)}">Delete</button>
       </div></li>`;
