@@ -3,7 +3,7 @@
 import { S, api, askConfirm, esc, toast } from "/static/app.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
 import { fdmDonePlan, fdmLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
-import { prefLabel } from "/static/printer.js";
+import { mountSlicerPrinter, prefLabel } from "/static/printer.js";
 
 function fromStudio() {
   return exitTarget(sessionStorage) === LIBRARY_URL;
@@ -92,6 +92,12 @@ function paintDevice() {
   if (stateEl) stateEl.textContent = state;
   const read = document.getElementById("deviceReadout");
   if (read) read.textContent = (name || "No printer saved") + " · " + state;
+  const mat = document.getElementById("spMat");
+  document.querySelectorAll("#bedTools [data-mat]").forEach(btn => {
+    const on = mat && btn.getAttribute("data-mat") === mat.value;
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  if (document.body.dataset.view === "slicer") mountSlicerPrinter();
 }
 
 function saveThen(done) {
@@ -309,6 +315,47 @@ export function guardNewBuild(section) {
   if (plan.clear) clearSection(section);
 }
 
+function pinCategory(id, label) {
+  const pin = document.getElementById("bedPin");
+  const cats = document.getElementById("bedCats");
+  const tools = document.getElementById("bedTools");
+  if (!pin || !cats || !tools) return;
+  tools.querySelectorAll("[data-for]").forEach(row => { row.hidden = row.getAttribute("data-for") !== id; });
+  pin.hidden = false;
+  pin.textContent = label;
+  pin.dataset.cat = id;
+  cats.hidden = true;
+  tools.hidden = false;
+  tools.scrollLeft = 0;
+}
+
+function unpinCategory() {
+  const pin = document.getElementById("bedPin");
+  const cats = document.getElementById("bedCats");
+  const tools = document.getElementById("bedTools");
+  if (!pin || !cats || !tools) return;
+  pin.hidden = true;
+  pin.textContent = "";
+  delete pin.dataset.cat;
+  tools.hidden = true;
+  cats.hidden = false;
+}
+
+function onBedCat(ev) {
+  const pin = ev.target.closest && ev.target.closest("#bedPin");
+  if (pin) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    unpinCategory();
+    return;
+  }
+  const cat = ev.target.closest && ev.target.closest("#bedCats [data-bed-cat]");
+  if (!cat) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  pinCategory(cat.getAttribute("data-bed-cat"), cat.getAttribute("data-bed-label") || cat.textContent.trim());
+}
+
 function onFdmAct(ev) {
   const preview = ev.target.closest && ev.target.closest("[data-bed-act=preview]");
   if (preview && preview.closest("#viewEdit")) {
@@ -328,9 +375,25 @@ function onFdmAct(ev) {
     return;
   }
   const imp = ev.target.closest && ev.target.closest("#slicerBar [data-bed-act=import]");
-  if (imp) {
+  if (imp && !imp.hasAttribute("data-bed-cat")) {
     ev.preventDefault();
     openFdmImport();
+    return;
+  }
+  const matBtn = ev.target.closest && ev.target.closest("#bedTools [data-mat]");
+  if (matBtn) {
+    ev.preventDefault();
+    const sel = document.getElementById("spMat");
+    if (!sel) { toast("Open a model first, then pick a filament.", "err"); return; }
+    sel.value = matBtn.getAttribute("data-mat");
+    sel.dispatchEvent(new Event("change"));
+    paintDevice();
+    return;
+  }
+  const jump = ev.target.closest && ev.target.closest("#bedTools [data-bed-click]");
+  if (jump) {
+    ev.preventDefault();
+    document.getElementById(jump.getAttribute("data-bed-click"))?.click();
   }
 }
 
@@ -383,6 +446,7 @@ function onControl(ev) {
   runLeave(plan);
 }
 
+document.addEventListener("click", onBedCat, true);
 document.addEventListener("click", onSlicerNav, true);
 document.addEventListener("click", onFdmAct);
 document.addEventListener("click", onControl);

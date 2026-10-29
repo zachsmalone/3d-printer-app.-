@@ -39,7 +39,7 @@ def test_tool_rails_dock_instead_of_floating_over_exit():
     assert 'el: "#vtools"' in MAIN and "lead: true" in MAIN
     assert 'el: "#editVtools"' in MAIN
     assert 'edge: "right", t: 0.42' in MAIN
-    assert 'edge: "right", t: 0.36' in MAIN
+    assert 'edge: "right", t: 0.08, min: true' in MAIN
     assert "id=\"slicerDock\"" in HTML
     assert "data-xform=\"move\"" in HTML and "data-xform=\"rotate\"" in HTML and "data-xform=\"scale\"" in HTML
     assert "data-xform=\"clone\"" in HTML and "data-xform=\"delete\"" in HTML
