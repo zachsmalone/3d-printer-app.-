@@ -59,12 +59,12 @@
   if (studio) window.addEventListener("hashchange", function () {
     var k = studioRoute(); if (k === lastKey) return; lastKey = k; studio.rekey();
   });
-  make({ id: "slicer", title: "FDM Slicer", root: "#viewEdit", active: function () { return vis($("#editResult")); },
+  make({ id: "slicer", key: function () { return "slicer2"; }, title: "FDM Slicer", root: "#viewEdit", active: function () { return vis($("#editResult")); },
     watch: ["#editResult", "#viewEdit", "#processSheet", "#slicerDock"], obstacles: ["#editBusy:not([hidden])", "#eMeasureOut:not([hidden])"],
     panels: [
-      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, dock: true, lead: true, def: function () { return { edge: "right", t: 0.36 }; }, resize: false, bare: true },
-      { id: "tools", el: "#editSide", label: "Tools", core: true, dock: true, def: function () { return { edge: "left", t: 0, min: phone() }; } },
-      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, dock: true, def: function () { return { edge: "right", t: 0, min: phone() }; } }
+      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, dock: true, lead: true, def: function () { return { edge: "right", t: 0.08, min: true }; }, resize: false, bare: true },
+      { id: "tools", el: "#editSide", label: "Tools", core: true, dock: true, def: function () { return { edge: "left", t: 0, min: true }; } },
+      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, dock: true, def: function () { return { edge: "right", t: 0.2, min: true }; } }
     ] });
   /* TorchC0: the result view moves out of the results card to become the background */
   var tRoot = $("#viewTorch"), tOut = $("#torchOut");
@@ -88,7 +88,7 @@
     var show = !res.hidden && selected;
     if (dock.hidden !== !show) dock.hidden = !show;
     var plateOn = !!(plateSel && !plateSel.hidden);
-    dock.querySelectorAll("[data-xform=clone],[data-xform=delete]").forEach(function (b) {
+    document.querySelectorAll("#slicerDock [data-xform=clone], #slicerDock [data-xform=delete], #bedTools [data-xform=clone], #bedTools [data-xform=delete]").forEach(function (b) {
       b.disabled = !plateOn;
       b.title = plateOn
         ? (b.getAttribute("data-xform") === "clone" ? "Copy the selected part" : "Remove the selected part")
@@ -112,12 +112,15 @@
       return;
     }
     if (device) device.hidden = true;
-    if (which === "process" || which === "filament") {
+    if (which === "process" || which === "filament" || (which && which.indexOf("tab:") === 0)) {
       if (sheet) sheet.hidden = false;
-      if (title) title.textContent = which === "filament" ? "Filament" : "Process";
+      var tabId = which.indexOf("tab:") === 0 ? which.slice(4) : (which === "filament" ? "filament" : "");
+      if (title) title.textContent = tabId ? tabId.charAt(0).toUpperCase() + tabId.slice(1) : "Process";
+      if (tabId) {
+        var tabBtn = document.querySelector("#slicePanel [data-proc='" + tabId + "']");
+        if (tabBtn) tabBtn.click();
+      }
       if (which === "filament") {
-        var filTab = document.querySelector("#slicePanel [data-proc=filament]");
-        if (filTab) filTab.click();
         var mat = document.getElementById("spMat");
         if (mat) mat.focus();
       }
@@ -152,13 +155,19 @@
       if (target && !target.disabled) target.click();
       return;
     }
-    var sheetBtn = e.target.closest && e.target.closest("#slicerBar [data-bed-sheet]");
-    if (sheetBtn) {
+    var sheetBtn = e.target.closest && e.target.closest("#slicerBar [data-bed-sheet], #bedTools [data-bed-sheet]");
+    if (sheetBtn && !(sheetBtn.hasAttribute("data-bed-cat"))) {
       e.preventDefault();
       setDockTab(sheetBtn.getAttribute("data-bed-sheet"));
       return;
     }
-    var xform = e.target.closest && e.target.closest("#slicerDock [data-xform]");
+    var tabBtn = e.target.closest && e.target.closest("#bedTools [data-bed-tab]");
+    if (tabBtn) {
+      e.preventDefault();
+      setDockTab("tab:" + tabBtn.getAttribute("data-bed-tab"));
+      return;
+    }
+    var xform = e.target.closest && e.target.closest("#slicerDock [data-xform], #bedTools [data-xform]");
     if (xform) {
       e.preventDefault();
       var kind = xform.getAttribute("data-xform");
@@ -172,7 +181,7 @@
         else document.dispatchEvent(new CustomEvent("zeim:fdm-note", { detail: kind === "clone" ? "Clone copies a selected part on a plate." : "Delete removes a selected part on a plate." }));
         return;
       }
-      document.querySelectorAll("#slicerDock [data-xform]").forEach(function (b) { b.setAttribute("aria-pressed", b === xform ? "true" : "false"); });
+      document.querySelectorAll("#slicerDock [data-xform], #bedTools [data-xform]").forEach(function (b) { b.setAttribute("aria-pressed", b.getAttribute("data-xform") === kind ? "true" : "false"); });
       focusXform(kind);
       document.dispatchEvent(new CustomEvent("zeim:xform", { detail: { kind: kind } }));
       return;

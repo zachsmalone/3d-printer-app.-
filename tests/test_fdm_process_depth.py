@@ -68,4 +68,12 @@ def test_process_sheet_tabs_and_form_fields():
                   "travel_speed", "first_layer_speed", "fan_min", "fan_max", "fan_off_layers", "infill_overlap", "line_width"):
         assert f'"{field}"' in js
     assert "mountSlicerPrinter" in js
-    assert 'id="devicePick"' in (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+    html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+    assert 'id="devicePick"' in html
+    bar = html[html.index('id="slicerBar"'):html.index('id="fdmDone"')]
+    head = html[html.index('class="bed-head wsbar"'):html.index('id="editSide"')]
+    assert 'id="bedPin"' in bar and 'id="bedCats"' in bar and 'id="bedTools"' in bar
+    assert 'data-bed-cat="filament"' in bar and 'data-bed-cat="process"' in bar and 'data-bed-cat="transform"' in bar
+    assert 'id="slicerSlice"' in bar and 'data-go="spGo"' in bar
+    assert 'id="slicerSlice"' not in head and "Preview" not in head and "Customise" not in head
+    assert 'data-ws-act="exit"' in head and 'data-ws-act="done"' in head

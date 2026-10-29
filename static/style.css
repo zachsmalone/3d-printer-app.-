@@ -1183,15 +1183,24 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 .proc-bar h2{flex:1;margin:0;font-size:16px;font-weight:650}
 .proc-sheet .slicepanel{margin:0;border:0;border-radius:0;background:transparent;box-shadow:none;flex:1;min-height:0;overflow:auto}
 /* FDM workspace: fixed header actions, fixed bottom tool bar, sheets cover about 70% of the screen. */
-#viewEdit:not(.zws)>.bed-head{position:sticky;top:var(--ui6-top,72px);z-index:48;display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px;border-radius:14px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line)}
-#viewEdit>.bed-head .bed-name{font-weight:650;white-space:nowrap}
-#viewEdit>.bed-head .bed-head-actions{margin-left:auto;display:flex;gap:6px;overflow-x:auto;max-width:100%}
-#viewEdit>.bed-head #slicerSlice{display:inline-flex}
-#viewEdit>.bed-bar{position:fixed;left:0;right:0;width:auto;bottom:0;z-index:48;display:flex;gap:6px;align-items:stretch;margin:0;padding:6px max(8px,env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:color-mix(in srgb,var(--panel) 96%,#fff);border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(0,0,0,.12)}
-#viewEdit>.bed-bar button{flex:1 1 0;min-height:52px;min-width:44px;padding:4px 8px;border:0;border-radius:12px;background:transparent;color:var(--txt);font:inherit;font-size:14px;font-weight:650;cursor:pointer}
+#viewEdit>.bed-head,#viewEdit.zws>.bed-head.wsbar{position:sticky;top:var(--ui6-top,72px);z-index:48;display:flex;flex-wrap:nowrap;align-items:center;gap:4px;height:36px;min-height:36px;margin:0;padding:0 6px;border-radius:0;background:color-mix(in srgb,var(--panel) 94%,transparent);border:0;border-bottom:1px solid var(--line);box-shadow:none}
+#viewEdit.zws>.bed-head.wsbar{position:absolute;top:0;left:0;right:0}
+#viewEdit>.bed-head .bed-name{font-weight:650;font-size:13px;white-space:nowrap}
+#viewEdit>.bed-head .btn,#viewEdit>.bed-head .zws-cust{min-height:32px;height:32px;padding:0 8px;font-size:13px}
+#viewEdit>.bed-head .bed-done{margin-left:auto}
+#viewEdit>.bed-head .zws-cust .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#viewEdit>.bed-head .ws-end{margin-left:4px;flex:0 0 auto}
+#viewEdit>.bed-bar{position:fixed;left:0;right:0;width:auto;bottom:0;z-index:48;display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;height:52px;margin:0;padding:0 max(4px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(4px,env(safe-area-inset-left));background:color-mix(in srgb,var(--panel) 96%,#fff);border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(0,0,0,.12)}
+#viewEdit>.bed-bar .bed-pin{flex:0 0 auto;min-height:44px;margin:4px 0;padding:0 12px;border:0;border-right:1px solid var(--line);border-radius:10px 0 0 10px;background:color-mix(in srgb,#0066FF 16%,var(--panel));color:var(--txt);font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+#viewEdit>.bed-bar .bed-pin[hidden]{display:none!important}
+#viewEdit>.bed-bar .bed-scroll{flex:1 1 auto;display:flex;align-items:stretch;gap:2px;overflow-x:auto;scrollbar-width:none;min-width:0}
+#viewEdit>.bed-bar .bed-scroll[hidden]{display:none!important}
+#viewEdit>.bed-bar .bed-scroll > div{display:flex;align-items:stretch;gap:2px;min-width:100%}
+#viewEdit>.bed-bar .bed-scroll > div[hidden]{display:none!important}
+#viewEdit>.bed-bar button.bed-cat,#viewEdit>.bed-bar .bed-scroll button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:var(--txt);font:inherit;font-size:14px;font-weight:650;cursor:pointer;white-space:nowrap}
 #viewEdit>.bed-bar button:hover{background:color-mix(in srgb,#0066FF 10%,var(--panel))}
 #viewEdit>.bed-bar button:focus-visible{outline:3px solid var(--focus,#6AA6FF);outline-offset:2px}
-#viewEdit>.bed-bar .bed-device{flex:1.4 1 72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;line-height:1.2}
+#viewEdit>.bed-bar .bed-device{flex:0 0 auto;max-width:148px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;line-height:1.15;padding-top:2px;padding-bottom:2px}
 #viewEdit .bed-dev-name{font-size:14px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #viewEdit .bed-dev-state{font-size:12px;font-weight:500;color:var(--mut)}
 #viewEdit>.zt-band{display:none}
@@ -1207,7 +1216,9 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #fdmImport .fdm-import{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50dvh;overflow:auto}
 #fdmImport .fdm-import button{width:100%;min-height:44px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
 #fdmImport .fdm-import small{color:var(--mut);font-weight:500}
-#viewEdit .objdock button:disabled{opacity:.45;cursor:not-allowed}
+#viewEdit>.objdock{display:none!important}
+body[data-view=slicer] #sendToFab{display:none!important}
+#viewEdit .objdock button:disabled,#viewEdit .bed-bar button:disabled{opacity:.45;cursor:not-allowed}
 #editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
 .proc-tabs button{min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;cursor:pointer;white-space:nowrap}
