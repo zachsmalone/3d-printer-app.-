@@ -1,14 +1,20 @@
 """Account badges. Earned by real actions, or seeded. No money and no prizes.
 
-Tester is private: only the account whose username is cc0hort sees it, and it
-never appears on a public profile. Official OG is permanent once earned and
-goes to that account plus the first 100 accounts by creation time.
+Each badge has visibility "public" (the default) or "private". Public badges
+show on profiles and posts. A private badge is visible only to its owner, on
+their own badge box. Tester is private, and only username cc0hort is awarded
+it. Official OG is permanent once earned and goes to that account plus the
+first 100 accounts by creation time. Creator is public and only username
+ZeimApp is awarded it.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
 from ..services.entitlements import TESTER_USERNAME, grant_pro_comp
+
+CREATOR_USERNAME = "zeimapp"
+PLACE_BADGE = {1: "win_gold", 2: "win_silver", 3: "win_bronze"}
 from .store import PRINTS, USERS
 
 OG_LIMIT = 100
@@ -20,7 +26,8 @@ TESTER_NOTE = (
     "You believed in me, and you are part of the reason I made ZEIM. — Zach"
 )
 
-# Order is the order on the Account card. `private` never leaves the owner's own view.
+# Order is the order on the Account card.
+# visibility "private" stays on the owner's badge box. Missing visibility is public.
 # `auto` is not a task: it shows only after it has been earned.
 CATALOG = (
     {
@@ -29,6 +36,15 @@ CATALOG = (
         "label": "Thank you for being a tester",
         "note": TESTER_NOTE,
         "private": True,
+        "visibility": "private",
+        "how": "",
+    },
+    {
+        "id": "creator",
+        "name": "Creator",
+        "label": "ZEIM founder",
+        "visibility": "public",
+        "auto": True,
         "how": "",
     },
     {
@@ -108,6 +124,23 @@ CATALOG = (
         "need": 10,
         "how": 'Share 10 "I printed this" photos.',
     },
+    {"id": "win_gold", "name": "Gold winner", "tier": "gold", "auto": True, "visibility": "public", "how": ""},
+    {"id": "win_silver", "name": "Silver winner", "tier": "silver", "auto": True, "visibility": "public", "how": ""},
+    {"id": "win_bronze", "name": "Bronze winner", "tier": "bronze", "auto": True, "visibility": "public", "how": ""},
+    {"id": "likes_10", "name": "10 likes", "event": "likes_received", "need": 10, "visibility": "public", "how": "Try sharing work people nozzle."},
+    {"id": "likes_50", "name": "50 likes", "event": "likes_received", "need": 50, "visibility": "public", "how": "Try sharing work people nozzle."},
+    {"id": "likes_100", "name": "100 likes", "event": "likes_received", "need": 100, "visibility": "public", "how": "Try sharing work people nozzle."},
+    {"id": "likes_500", "name": "500 likes", "event": "likes_received", "need": 500, "visibility": "public", "how": "Try sharing work people nozzle."},
+    {"id": "challenge_likes_10", "name": "Challenge likes", "event": "challenge_likes", "need": 10, "visibility": "public", "how": "Try entering a challenge."},
+    {"id": "supports_bronze", "name": "Supports", "tier": "bronze", "event": "supports_slice", "need": 1, "visibility": "public", "how": "Try a slice with supports on."},
+    {"id": "supports_silver", "name": "Supports", "tier": "silver", "event": "supports_slice", "need": 3, "visibility": "public", "how": "Try a slice with supports on."},
+    {"id": "supports_gold", "name": "Supports", "tier": "gold", "event": "supports_slice", "need": 10, "visibility": "public", "how": "Try a slice with supports on."},
+    {"id": "split_bronze", "name": "Smart split", "tier": "bronze", "event": "smart_split", "need": 1, "visibility": "public", "how": "Try Smart split with a connector."},
+    {"id": "infill_bronze", "name": "Adaptive infill", "tier": "bronze", "event": "adaptive_infill", "need": 1, "visibility": "public", "how": "Try adaptive infill."},
+    {"id": "litho_detail", "name": "Fine lithophane", "tier": "gold", "event": "litho_detail", "need": 1, "visibility": "public", "how": "Try a lithophane at a high detail setting."},
+    {"id": "fillet_bronze", "name": "Fillet", "tier": "bronze", "event": "fillet", "need": 1, "visibility": "public", "how": "Try a fillet or chamfer in CAD."},
+    {"id": "remixed_by_others", "name": "Remixed onward", "event": "remixed_by", "need": 1, "visibility": "public", "how": "Try publishing something others remix."},
+    {"id": "printed_by_5", "name": "Printed by others", "event": "printed_by_others", "need": 5, "visibility": "public", "how": "Try a model that 5 other people print."},
 )
 
 _BY_ID = {spec["id"]: spec for spec in CATALOG}
@@ -164,6 +197,8 @@ def apply_seed(users: dict) -> dict:
     for user in users.values():
         if not isinstance(user, dict):
             continue
+        if (user.get("username") or "").lower() == CREATOR_USERNAME and _grant(user, "creator"):
+            stats["creator"] = stats.get("creator", 0) + 1
         if (user.get("username") or "").lower() != TESTER_USERNAME:
             continue
         if grant_pro_comp(user):
@@ -293,6 +328,14 @@ def stamp_sid(response, sid: str, event: str):
     return stamp(response, who, event)
 
 
+def _visibility(spec: dict) -> str:
+    """public, or private (only the owner sees it). Private is the Tester badge unless a spec says otherwise."""
+    vis = spec.get("visibility")
+    if vis in ("public", "private"):
+        return vis
+    return "private" if spec.get("private") else "public"
+
+
 def _is_tester(user: dict) -> bool:
     return (user.get("username") or "").lower() == TESTER_USERNAME
 
@@ -304,17 +347,18 @@ def _rows(user: dict, *, owner: bool) -> list[dict]:
     out = []
     for spec in CATALOG:
         earned = spec["id"] in have
-        private = bool(spec.get("private"))
+        private = _visibility(spec) == "private"
         if private:
-            # Only cc0hort, looking at his own account, and only once it is granted.
-            if not (owner and tester and earned):
+            # Private-to-owner, and only after it is earned. Tester stays on
+            # cc0hort's own box even if the id is copied onto another account.
+            if not (owner and earned) or (spec["id"] == "tester" and not tester):
                 continue
         elif spec.get("auto") and not earned:
             continue
         need = int(spec.get("need") or 1)
         progress = int(prog.get(spec["event"]) or 0) if spec.get("event") else 0
         note = ""
-        if earned and owner and private and tester:
+        if earned and owner and private:
             note = spec.get("note") or ""
         row = {
             "id": spec["id"],
@@ -323,6 +367,8 @@ def _rows(user: dict, *, owner: bool) -> list[dict]:
             "how": "" if earned else (spec.get("how") or ""),
             "label": spec.get("label") or "",
             "note": note,
+            "tier": spec.get("tier") or "",
+            "visibility": _visibility(spec),
         }
         if earned:
             stored = have.get(spec["id"]) if isinstance(have.get(spec["id"]), dict) else {}
@@ -346,7 +392,8 @@ def for_owner(sid: str) -> dict:
         if badge_id not in visible or badge_id not in _BY_ID:
             continue
         unseen.append({"id": badge_id, "name": _BY_ID[badge_id]["name"]})
-    return {"signed_up": True, "badges": rows, "unseen": unseen}
+    n = win_tally(user)
+    return {"signed_up": True, "badges": rows, "unseen": unseen, "win_tally": n, "win_label": win_label(n)}
 
 
 def public_earned(user: dict | None) -> list[dict]:
@@ -356,11 +403,56 @@ def public_earned(user: dict | None) -> list[dict]:
     have = user.get("badges") if isinstance(user.get("badges"), dict) else {}
     out = []
     for spec in CATALOG:
-        if spec.get("private"):
+        if _visibility(spec) == "private":
             continue
         if spec["id"] in have:
             out.append({"id": spec["id"], "name": spec["name"]})
     return out
+
+
+def win_tally(user: dict | None) -> int:
+    if not isinstance(user, dict):
+        return 0
+    wins = user.get("challenge_wins")
+    return len(wins) if isinstance(wins, list) else 0
+
+
+def win_label(n: int) -> str:
+    return f"Monthly winner ×{n}" if n else ""
+
+
+def award_winners(winners: list[dict], challenge_id: str) -> None:
+    """One gold, silver, or bronze badge per place, and one tick on the win tally. Idempotent per challenge."""
+    def f(data):
+        if not isinstance(data, dict):
+            return
+        for w in winners:
+            sid = w.get("owner_sid") or ""
+            place = int(w.get("place") or 0)
+            badge_id = PLACE_BADGE.get(place)
+            user = data.get(sid)
+            if not badge_id or not isinstance(user, dict):
+                continue
+            wins = user.get("challenge_wins")
+            if not isinstance(wins, list):
+                wins = []
+                user["challenge_wins"] = wins
+            if any(isinstance(row, dict) and row.get("challenge_id") == challenge_id for row in wins):
+                continue
+            wins.append({"challenge_id": challenge_id, "place": place})
+            _grant(user, badge_id)
+    USERS.update(f)
+
+
+def note_likes(owner_sid: str, *, received: int, on_entries: int) -> list[dict]:
+    """Award like milestones from a real like count. Challenge-entry likes are counted again on their own line."""
+    found = []
+    seen = set()
+    for badge in record(owner_sid, "likes_received", count=received) + record(owner_sid, "challenge_likes", count=on_entries):
+        if badge["id"] not in seen:
+            seen.add(badge["id"])
+            found.append(badge)
+    return found
 
 
 def mark_seen(sid: str) -> None:

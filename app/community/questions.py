@@ -101,6 +101,7 @@ def visible(q: dict, *, actor_sid: str | None, owner_sid: str | None) -> bool:
 def public(q: dict, *, mine: bool = False, can_answer: bool = False) -> dict:
     return {"id": q["id"], "text": q.get("text") or "", "created": q["created"],
             "by": ("@" + q["asker_username"]) if q.get("asker_username") else "a ZEIM maker",
+            "asker_id": q.get("asker_uid") or "",
             "answer": q.get("answer") or "", "answered_at": q.get("answered_at"),
             "status": "answered" if q.get("answer") else "open",
             "mine": mine, "can_answer": can_answer and not q.get("answer")}

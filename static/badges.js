@@ -13,7 +13,11 @@
     first_showcase: '<circle cx="12" cy="12" r="7"/><path d="M5 12h14M12 5c2.2 2.2 2.2 9.6 0 14M12 5c-2.2 2.2-2.2 9.6 0 14"/>',
     first_remix: '<path d="M8 7h7l-2-2M16 17H9l2 2"/><path d="M15 5v4h4M9 19v-4H5"/>',
     challenge_entrant: '<path d="M6 20V5h9l-1.6 3.2L15 11H6"/>',
-    prints_10: '<text x="12" y="16" text-anchor="middle" font-size="9" fill="currentColor" stroke="none">10</text>'
+    prints_10: '<text x="12" y="16" text-anchor="middle" font-size="9" fill="currentColor" stroke="none">10</text>',
+    creator: '<path d="M4 16h16l-1.4-7-3.6 3L12 5l-3 7-3.6-3z"/><path d="M6 16h12v3H6z"/>',
+    win_gold: '<circle cx="12" cy="13" r="5"/><path d="M8 4l2 4M16 4l-2 4M12 3v4"/>',
+    win_silver: '<circle cx="12" cy="13" r="5"/><path d="M8 4l2 4M16 4l-2 4"/>',
+    win_bronze: '<circle cx="12" cy="13" r="5"/>'
   };
 
   function esc(s) {
@@ -88,11 +92,12 @@
       return;
     }
     var rows = data.badges || [];
+    var tally = data.win_label ? '<p class="help">' + esc(data.win_label) + "</p>" : "";
     if (!rows.length) {
-      box.innerHTML = '<p class="help">No badges yet.</p>';
+      box.innerHTML = tally + '<p class="help">No badges yet.</p>';
       return;
     }
-    box.innerHTML = '<ul class="badgegrid">' + rows.map(function (b) {
+    box.innerHTML = tally + '<ul class="badgegrid">' + rows.map(function (b) {
       var locked = !b.earned;
       var sub = locked ? (b.how || "") : (b.label || "");
       if (locked && b.need > 1 && b.progress) sub = (sub ? sub + " " : "") + b.progress + " of " + b.need + " so far.";
@@ -101,7 +106,7 @@
       if (b.note) {
         return '<li><button type="button" class="badge earned" data-kind="' + esc(b.id) + '" data-note="1">' + inner + "</button></li>";
       }
-      return '<li><div class="badge ' + (locked ? "locked" : "earned") + '" data-kind="' + esc(b.id) + '">' + inner + "</div></li>";
+      return '<li><div class="badge ' + (locked ? "locked" : "earned") + (b.tier ? " tier-" + esc(b.tier) : "") + '" data-kind="' + esc(b.id) + '">' + inner + "</div></li>";
     }).join("") + "</ul>";
     box.querySelectorAll("button[data-note]").forEach(function (btn) {
       btn.addEventListener("click", function () {

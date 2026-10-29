@@ -249,6 +249,11 @@ def slice_model(
         except OSError:
             pass
 
+    slice_events = ["fdm_slice"]
+    if str(supports or "").lower() not in ("", "off", "false", "none", "0"):
+        slice_events.append("supports_slice")
+    if (infill_pattern or "") == "adaptivecubic":
+        slice_events.append("adaptive_infill")
     return badges.merge({
         "slice_id": slice_id,
         "profile": prof.id,
@@ -270,7 +275,7 @@ def slice_model(
         "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
-    }, actor, "fdm_slice")
+    }, actor, *slice_events)
 
 
 FIT_MARGIN_MM = 2.0      # kept clear on each side in X/Y and above the model in Z

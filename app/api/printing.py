@@ -140,7 +140,10 @@ def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float
         res["bed"] = list(printers.bed_of(None))
     if res.get("ok"):
         res["download"] = f"/files/{bid}/model.gcode"
-        res = badges.merge(res, actor, "fdm_slice")
+        events = ["fdm_slice"]
+        if supports:
+            events.append("supports_slice")
+        res = badges.merge(res, actor, *events)
     return JSONResponse(res)  # unavailable slicer -> 200 with available=false
 
 

@@ -46,6 +46,7 @@ async function refreshMe() {
   document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
   document.body.dataset.role = ME.send?.role || "";
   document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
+  loadNotes();
   paintAccountHandle();
 }
 
@@ -513,10 +514,11 @@ async function loadShowcase() {
   $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
   $("#shSub").textContent = r.subtitle || "";
   loadRecent();
+  loadUserSearch(q);
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
@@ -526,6 +528,41 @@ async function loadShowcase() {
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
   }
 }
+async function loadUserSearch(q) {
+  const host = $("#shUsers");
+  if (!host) return;
+  const needle = String(q || "").trim().replace(/^@/, "");
+  if (needle.length < 2) { host.hidden = true; host.innerHTML = ""; return; }
+  let r; try { r = await api("/api/users/search?q=" + encodeURIComponent(needle)); } catch { host.hidden = true; return; }
+  const rows = r.users || [];
+  host.hidden = !rows.length;
+  host.innerHTML = rows.length ? `<p class="help">People</p><ul class="plist">${rows.map(u => `<li><a class="creator-link" href="/u/${esc(u.id)}">@${esc(u.username)}</a></li>`).join("")}</ul>` : "";
+}
+async function loadNotes() {
+  const dot = $("#bellDot");
+  if (!dot || !ME?.signed_up) { if (dot) dot.hidden = true; return; }
+  let r; try { r = await api("/api/me/notifications"); } catch { return; }
+  dot.hidden = !r.unread;
+  dot.textContent = String(r.unread || 0);
+  const host = $("#noteList");
+  if (!host) return;
+  host.innerHTML = (r.notifications || []).map(n => `<button type="button" class="btn small" data-note="${esc(n.id)}" data-item="${esc(n.item_id || "")}" data-user="${esc(n.user_id || "")}">${esc(n.text)}</button>`).join("") || `<p class="help">No notifications.</p>`;
+}
+$("#btnBell")?.addEventListener("click", async () => {
+  const host = $("#noteList");
+  if (!host) return;
+  host.hidden = !host.hidden;
+  await loadNotes();
+  if (!host.hidden) await api("/api/me/notifications/read", J("POST", {}));
+});
+$("#noteList")?.addEventListener("click", e => {
+  const b = e.target.closest("[data-note]");
+  if (!b) return;
+  if (b.dataset.item) openItem(b.dataset.item);
+  else if (b.dataset.user) openProfile(b.dataset.user);
+  $("#noteList").hidden = true;
+  loadNotes();
+});
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
 // AI filter survives a reload: ?ai= in the URL wins, then the last choice in localStorage
@@ -659,7 +696,7 @@ async function openItem(id) {
   $("#itBody").innerHTML = `${i.example ? '<p class="pill">EXAMPLE seed data — not a real creator project</p>' : ""}
     ${i.thumb ? `<img src="${i.thumb}" alt="${i.nsfw ? "Preview picture (mature content)" : `Preview picture of ${esc(i.title)}`}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
-    ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`} · free${i.downloads != null ? ` · <svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}` : ""}</p>
+    ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""} · free${i.downloads != null ? ` · <svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}` : ""}</p>
     ${provHTML(i) ? `<p class="provrow">${provHTML(i)}</p>` : ""}${tipHTML(i)}
     ${i.owned && !i.original && !i.example ? psHTML(i.print_settings, { editable: true, idPrefix: "itPs" }) : psHTML(i.print_settings)}
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
@@ -1333,7 +1370,10 @@ async function openProfile(uid) {
   let cols = []; try { cols = (await api("/api/users/" + uid + "/collections")).collections || []; } catch { cols = []; }
   const colStrip = cols.length ? `<h4><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> Collections</h4>
     <div class="colstrip">${cols.map(c => `<button type="button" class="colchip" data-col="${esc(c.id)}"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> ${esc(c.name)} <span class="help">${c.count}</span></button>`).join("")}</div>` : "";
+  const badgeLine = (u.badges || []).map(b => `<span class="pill">${esc(b.name)}</span>`).join(" ");
   $("#pfBody").innerHTML = `<p class="counts">${n(u.followers, u.followers === 1 ? "follower" : "followers")} ${n(u.following, "following")}</p>
+    ${u.win_label ? `<p>${esc(u.win_label)}</p>` : ""}
+    ${badgeLine ? `<p class="help">Badges ${badgeLine}</p>` : ""}
     ${u.can_follow ? `<button type="button" class="btn ${u.following_creator ? "" : "primary"}" id="pfFollow" aria-pressed="${!!u.following_creator}">${u.following_creator ? "✔ Following" : "＋ Follow"}</button>` : ""}
     <p class="help">Following shows their new projects in the Following tab. There are no messages in ZEIM.</p>
     ${colStrip}
@@ -1433,7 +1473,7 @@ async function loadQuestions(id, item) {
   const list = $("#qaList"), ask = $("#qaAsk"); if (!list) return;
   let r; try { r = await api(`/api/showcase/${id}/questions`); } catch { list.innerHTML = ""; return; }
   list.innerHTML = r.questions.length ? r.questions.map(q => `<li class="qaitem" data-qid="${esc(q.id)}">
-      <p class="q"><b>Q.</b> ${esc(q.text)} <span class="help">${esc(q.by)}</span></p>
+      <p class="q"><b>Q.</b> ${esc(q.text)} <span class="help">${q.asker_id ? `<a class="creator-link" href="/u/${esc(q.asker_id)}">${esc(q.by)}</a>` : esc(q.by)}</span></p>
       ${q.answer ? `<p class="a"><b>A.</b> ${esc(q.answer)}</p>` : `<p class="help">${q.status === "open" ? "Waiting for the creator" : ""}</p>`}
       ${q.can_answer ? `<div class="field row"><input id="qaAns_${esc(q.id)}" maxlength="1000" placeholder="Your answer"><button type="button" class="btn small" data-qaans="${esc(q.id)}">Answer</button></div>` : ""}
       ${(q.mine && !q.answer) || item.owned ? `<button type="button" class="btn small ghost danger" data-qadel="${esc(q.id)}">Delete</button>` : ""}
@@ -1497,19 +1537,26 @@ async function pickChallengeForItem(item) {
   if (which) which.textContent = item.title ? `Send “${item.title}” to a challenge.` : "Send this Showcase project to a challenge.";
   const host = $("#enterOfferBody");
   if (!host) return;
-  const choices = open.map(c => c.entered
-    ? `<p><b>${esc(c.title)}</b> <span class="pill">Entered</span></p>`
-    : `<label class="choice"><input type="radio" name="chOffer" value="${esc(c.id)}"><span>${esc(c.title)}</span></label>`).join("");
-  const canPick = open.some(c => !c.entered);
-  host.innerHTML = `<fieldset class="reasons" id="chOfferList"><legend>Open challenges</legend>${choices}</fieldset>`
-    + (canPick ? `<button type="button" class="btn primary" id="chOfferGo">Confirm</button>` : "");
+  if (!open.length) {
+    host.innerHTML = `<p class="help">No open challenge right now.</p>`;
+    $("#dlgEnterOffer").showModal();
+    return;
+  }
+  const options = open.map(c => `<option value="${esc(c.id)}" ${c.entered ? "disabled" : ""}>${esc(c.title)}${c.entered ? " — Entered" : ""}</option>`).join("");
+  const selectable = open.filter(c => !c.entered);
+  host.innerHTML = `<label class="field" for="chOfferPick">Open challenges
+      <select id="chOfferPick">${options}</select></label>`
+    + (selectable.length ? `<button type="button" class="btn primary" id="chOfferGo">Confirm</button>` : `<p class="help">You already entered the open challenges.</p>`);
+  const sel = host.querySelector("#chOfferPick");
+  if (sel && selectable[0]) sel.value = selectable[0].id;
   const go = host.querySelector("#chOfferGo");
   if (go) go.onclick = async () => {
-    const cid = host.querySelector("[name=chOffer]:checked")?.value || "";
-    if (!cid) return inlineMsg(go, "Pick a challenge.");
+    const cid = sel && sel.value || "";
+    const picked = open.find(c => c.id === cid);
+    if (!cid || !picked || picked.entered) return inlineMsg(go, "Pick a challenge.");
     go.disabled = true;
     try {
-      const r = await api(`/api/challenges/${cid}/enter`, J("POST", { item_id: item.id }));
+      const r = await api(`/api/challenges/${encodeURIComponent(cid)}/enter`, J("POST", { item_id: item.id }));
       $("#dlgEnterOffer").close();
       toast(r.message || "Entered", "ok");
     } catch (e) { inlineMsg(go, e.message); go.disabled = false; }
@@ -1592,9 +1639,13 @@ async function openChallenge(cid) {
   const rules = (c.rules || []).map(r => `<li>${esc(r)}</li>`).join("");
   const entries = (c.entries || []).map(e => `<li><a href="#" data-open-item="${esc(e.id)}">${esc(e.title)}</a> <span class="help">by ${esc(e.creator)}</span></li>`).join("")
     || `<li class="help">No entries yet.</li>`;
+  const winners = c.winners_visible ? `<h4>Winners</h4><ol class="plist">${(c.winners || []).map(w => `<li>${w.place}. <a href="#" data-open-item="${esc(w.item_id)}">${esc(w.title || "Entry")}</a> <span class="help">${w.likes} ${w.likes === 1 ? "like" : "likes"}</span></li>`).join("") || `<li class="help">No entries to place.</li>`}</ol>` : "";
+  const next = c.next_theme ? `<p class="help">Next month: ${esc(c.next_theme)}</p>` : "";
   $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
     <p>${esc(c.blurb)}</p>
+    ${next}
     <ul class="help chrules">${rules}</ul>
+    ${winners}
     <p class="help">ZEIM never takes a cut of tips or of sales a maker makes from their own link. Tip links stay optional with no nags. Showcase downloads stay free.</p>
     ${elig.error ? `<p class="help">${esc(elig.error)}</p>` : ""}
     ${challengeEntryHTML(elig)}

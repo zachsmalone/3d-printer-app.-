@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
-from ..community import badges, catalog, discovery, links, moderation, personalization, privacy, recovery, safety, usernames
+from ..community import badges, catalog, discovery, links, moderation, notify, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS, LISTINGS
@@ -227,6 +227,43 @@ def set_links(body: dict, actor: Actor = Depends(get_actor)):
     return {"links": cleaned}
 
 
+@router.get("/users/search")
+def search_users(q: str = "", actor: Actor = Depends(get_actor)):
+    """Find public accounts by @username. Email is never returned."""
+    needle = q.strip().lstrip("@").lower()
+    if len(needle) < 2:
+        return {"users": []}
+    found = []
+    for user in USERS.read().values():
+        if not isinstance(user, dict):
+            continue
+        name = user.get("username") or ""
+        if needle not in name.lower():
+            continue
+        if not privacy.can_view_profile(actor, user["id"]):
+            continue
+        found.append({"id": user["id"], "username": name})
+        if len(found) >= 8:
+            break
+    return {"users": found}
+
+
+@router.get("/me/notifications")
+def my_notifications(actor: Actor = Depends(get_actor)):
+    if not actor.user:
+        raise HTTPException(401, "Sign in to see notifications.")
+    rows = notify.for_user(actor.sid)
+    return {"unread": notify.unread(actor.sid), "notifications": rows}
+
+
+@router.post("/me/notifications/read")
+def read_notifications(body: dict | None = None, actor: Actor = Depends(get_actor)):
+    if not actor.user:
+        raise HTTPException(401, "Sign in to see notifications.")
+    notify.mark_read(actor.sid, str((body or {}).get("id") or ""))
+    return {"ok": True, "unread": notify.unread(actor.sid)}
+
+
 @router.get("/users/{uid}")
 def public_user(uid: str, actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
@@ -248,6 +285,8 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
             "links": {} if idn.restricted(u) else u.get("links", {}),
             "badges": badges.public_earned(u),
+            "win_tally": badges.win_tally(u),
+            "win_label": badges.win_label(badges.win_tally(u)),
             "projects": [catalog.public(i, actor) for i in catalog.list_items(actor, "free") if i["creator_id"] == uid]}
 
 
@@ -300,6 +339,10 @@ def follow(uid: str, actor: Actor = Depends(get_actor)):
     if tu and not privacy.can_follow(actor, tu):
         raise HTTPException(404, "unknown creator")      # opted out / private profile: cannot be followed
     USERS.update(lambda d: d[actor.sid]["following"].append(uid) if uid not in d[actor.sid]["following"] else None)
+    target_sid = next((s for s, u in USERS.read().items() if isinstance(u, dict) and u.get("id") == uid), "")
+    handle = "@" + (actor.user.get("username") or "someone")
+    if target_sid:
+        notify.add(target_sid, "follow", f"{handle} followed you", user_id=actor.user["id"])
     return {"following": True}
 
 
@@ -419,6 +462,16 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
     events = ["showcase"]
     if i.get("remix_of"):
         events.append("remix")
+        parent = next((row for row in catalog._all() if row.get("id") == i.get("remix_of")), None)
+        if parent and parent.get("owner_sid") and parent.get("owner_sid") != actor.sid:
+            badges.record(parent["owner_sid"], "remixed_by")
+    if out.get("visibility") == "public":
+        handle = "@" + (actor.user.get("username") or "someone")
+        for sid, user in USERS.read().items():
+            if not isinstance(user, dict) or sid == actor.sid:
+                continue
+            if actor.user["id"] in (user.get("following") or []):
+                notify.add(sid, "post", f"{handle} posted to Showcase", item_id=i["id"])
     return badges.merge(out, actor, *events)
 
 

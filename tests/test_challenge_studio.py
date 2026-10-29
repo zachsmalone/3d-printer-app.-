@@ -49,13 +49,13 @@ def test_removing_a_showcase_post_leaves_the_saved_file_and_drops_challenge_entr
     src, _ = publish(origin, "Root lamp")
     item, bid = publish(maker, "Middle lamp", remix_of=src["id"])
     kid, _ = publish(child, "Child lamp", remix_of=item["id"])
-    assert maker.post(f"/api/challenges/{challenges.REMIX_ID}/enter", json={"item_id": item["id"]}).status_code == 200
+    assert maker.post(f"/api/challenges/{challenges.XMAS_ID}/enter", json={"item_id": item["id"]}).status_code == 200
     gone = maker.delete(f"/api/showcase/{item['id']}")
     assert gone.status_code == 200, gone.text
     assert maker.get(f"/api/builds/{bid}").status_code == 200
     assert maker.get(f"/files/{bid}/model.stl").status_code == 200
     assert maker.get(f"/api/showcase/{item['id']}").status_code == 404
-    detail = maker.get(f"/api/challenges/{challenges.REMIX_ID}").json()
+    detail = maker.get(f"/api/challenges/{challenges.XMAS_ID}").json()
     assert all(e["id"] != item["id"] for e in detail["entries"])
     assert not any(e.get("item_id") == item["id"] for e in CHALLENGE_ENTRIES.read())
     seen = child.get(f"/api/showcase/{kid['id']}")
@@ -84,16 +84,16 @@ def test_challenge_picker_lists_every_open_challenge():
     origin, maker = U("ListOrig"), U("ListMaker")
     src, _ = publish(origin, "Open source")
     item, _ = publish(maker, "Open remix", remix_of=src["id"])
-    assert maker.post(f"/api/challenges/{challenges.REMIX_ID}/enter", json={"item_id": item["id"]}).status_code == 200
+    assert maker.post(f"/api/challenges/{challenges.XMAS_ID}/enter", json={"item_id": item["id"]}).status_code == 200
     assert maker.post("/api/challenges/ch_shapes/enter", json={"build_id": "aaaaaaaaaaaa"}).status_code == 400
     ok = maker.post("/api/challenges/ch_shapes/enter", json={"item_id": item["id"]})
     assert ok.status_code == 200, ok.text
     assert ok.json()["prize_free"] is True
     rows = {c["id"]: c for c in maker.get("/api/challenges").json()["challenges"] if c["status"] == "open"}
-    assert "ch_remix" in rows and "ch_shapes" in rows
-    assert rows["ch_remix"]["entered"] is True
+    assert challenges.XMAS_ID in rows and "ch_shapes" in rows
+    assert rows[challenges.XMAS_ID]["entered"] is True
     assert rows["ch_shapes"]["entered"] is True
-    assert rows["ch_remix"]["prize_free"] is True and rows["ch_shapes"]["prize_free"] is True
+    assert rows[challenges.XMAS_ID]["prize_free"] is True and rows["ch_shapes"]["prize_free"] is True
     stranger = U("ListNew")
     fresh = {c["id"]: c for c in stranger.get("/api/challenges").json()["challenges"] if c["status"] == "open"}
-    assert fresh["ch_remix"]["entered"] is False and fresh["ch_shapes"]["entered"] is False
+    assert fresh[challenges.XMAS_ID]["entered"] is False and fresh["ch_shapes"]["entered"] is False
