@@ -129,9 +129,12 @@ def test_printer_send():
 
 
 def test_accounts_not_configured():
-    for p in c.get("/api/accounts").json()["providers"]:
-        assert p["state"] == "not_configured" and not p["sharing_implemented"]
-    assert c.get("/api/accounts/reddit/connect", follow_redirects=False).status_code == 409
+    body = c.get("/api/accounts").json()
+    assert body["providers"] == []
+    assert "PHOTO3D_" not in c.get("/api/accounts").text
+    refused = c.get("/api/accounts/reddit/connect", follow_redirects=False)
+    assert refused.status_code == 409
+    assert "PHOTO3D_" not in refused.text and "restart" not in refused.text.lower()
 
 
 def test_community_flow(monkeypatch):

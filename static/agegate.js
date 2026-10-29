@@ -1,7 +1,7 @@
 /* First-visit 18+ confirmation for every visitor (not just sign-up). Classic synchronous script so the page is covered
    before anything else paints. Yes -> remembered in this browser (localStorage) and, when signed in, on the account.
    No -> a polite exit screen; nothing at all is stored (no answer, no birthdate, no personal data).
-   Test-only: <html data-agegate="off"> (server setting PHOTO3D_AGE_GATE=0) skips it. */
+   Test-only: <html data-agegate="off"> (the server age-gate switch) skips it. */
 (function () {
   var KEY = "zeim.adult", root = document.documentElement, gate = document.getElementById("ageGate");
   if (!gate) return;

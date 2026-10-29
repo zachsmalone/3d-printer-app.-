@@ -128,7 +128,10 @@ def test_in_app_copy_has_no_apologetic_internal_wording():
         src = open(os.path.join(root, fn), encoding="utf-8").read()
         for bad in ("scaffold", "isn't built", "not built yet", "not implemented"):
             assert bad not in src, (fn, bad)
-    assert "Coming soon" in open(os.path.join(root, "static/community.js"), encoding="utf-8").read()
+    app_js = open(os.path.join(root, "static/app.js"), encoding="utf-8").read()
+    comm = open(os.path.join(root, "static/community.js"), encoding="utf-8").read()
+    assert "Coming soon" not in comm and "Coming soon" not in app_js
+    assert "PHOTO3D_" not in comm and "PHOTO3D_" not in app_js
 
 
 # ---- attribution standard 7.1 fields ------------------------------------------------------------------------------------------

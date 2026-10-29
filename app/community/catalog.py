@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
-from .identity import Actor
+from .identity import Actor, restricted
 from . import originals_qa, privacy
 from ..services.credits import credit_line
 from ..services.history import store as _bstore
@@ -174,6 +174,14 @@ def _owner_badges(i: dict, users: dict) -> list[dict]:
     return badges.public_earned(owner) if owner else []
 
 
+def _owner_links(i: dict, users: dict) -> list[dict]:
+    from . import links as linkouts
+    owner = next((u for u in users.values() if isinstance(u, dict) and u.get("id") == i.get("creator_id")), None)
+    if not owner or restricted(owner):
+        return []
+    return linkouts.for_display(owner.get("links"))
+
+
 def resolve(i: dict, users: dict | None = None) -> dict:
     """Credit follows the ACCOUNT, not a copy of its name: the uploader's CURRENT username is looked up by account id every time, so a rename
     updates every old credit, and the display name (which may be a real name) is never shown as the creator of a community project."""
@@ -220,6 +228,7 @@ def public(i: dict, actor: Actor) -> dict:
             "supports_level": i.get("supports_level", "") if i.get("original") else "", "supports_detail": i.get("supports_detail", "") if i.get("original") else "",
             "creator_username": i.get("creator_username"), "credit": credit_line(i),
             "creator_badges": _owner_badges(i, users),
+            "creator_links": _owner_links(i, users),
             "favorited": bool(actor.user) and _social().is_fav(actor.sid, i["id"]), "can_favorite": bool(actor.user),
             "license_id": i.get("license_id") or "",
             **remix_status(i),

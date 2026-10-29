@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 
 from .. import branding
 from ..config import STATIC as STATIC_DIR
-from ..community import catalog, education, privacy
+from ..community import catalog, education, links as linkouts, privacy
 from ..services import credits
 from . import guards
 from ..community import identity as idn
@@ -97,7 +97,8 @@ def project_page(pid: str, actor: Actor = Depends(get_actor)):
     else:
         files = "".join(f"<li><a href='/api/showcase/{pid}/files/{escape(f['name'])}'>{escape(f['name'])}</a> ({f['size_kb']} KB)</li>" for f in i["files"])
         files_block = f"<h3>Free downloads</h3>{('<ul>' + files + '</ul>') if files else '<p class=help>No model yet.</p>'}"
-    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>{credit}{off}{posted}{thumb}"
+    body = (f"{ex}<h1>{escape(i['title'])}</h1><p class=help>by {escape(i['creator'])} · {escape(i['mode'])} · free{eng}</p>"
+            f"{linkouts.anchors(_pub.get('creator_links'))}{credit}{off}{posted}{thumb}"
             f"<p>{escape(i['description'])}</p><p>{' '.join('<span class=pill>' + escape(t) + '</span>' for t in i['tags'])}</p>"
             f"{files_block}")
     return _page(i["title"], body, i["description"])
@@ -112,12 +113,9 @@ def user_page(uid: str, actor: Actor = Depends(get_actor)):
     if u and not privacy.can_view_profile(actor, uid):
         raise HTTPException(404)
     name = (("@" + u["username"]) if u.get("username") else "a ZEIM maker") if u else catalog.CREATORS[uid]     # @username, never the display name
-    lk = "" if (not u or idn.restricted(u)) else "".join(
-        f"<li>{escape(v['handle'])} on <a rel='nofollow noopener noreferrer' target=_blank href='{escape(v['url'])}'>{escape(k)}</a> "
-        f"<span class=pill>{'verified' if v.get('verified') else 'unverified'}</span></li>" for k, v in u.get("links", {}).items())
+    lk = "" if (not u or idn.restricted(u)) else linkouts.anchors(linkouts.for_display(u.get("links")))
     projs = "".join(f"<li><a href='/p/{i['id']}'>{escape(i['title'])}</a></li>" for i in catalog.list_items(actor, "free") if i["creator_id"] == uid)
-    body = (f"<h1>{escape(name)}</h1><h3>Projects</h3><ul>{projs or '<li>None yet</li>'}</ul>"
-            f"{'<h3>Also find me on</h3><ul>' + lk + '</ul>' if lk else ''}")
+    body = (f"<h1>{escape(name)}</h1>{lk}<h3>Projects</h3><ul>{projs or '<li>None yet</li>'}</ul>")
     return _page(name, body)
 
 

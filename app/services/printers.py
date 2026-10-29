@@ -45,7 +45,7 @@ PROFILES = {
                     "hint": ("Point ZEIM at Moonraker on the K1: http://<printer-ip>:7125 (not Fluidd/Mainsail on 4408). "
                              "Root/community firmware with Moonraker works; stock Creality UI alone may not. "
                              "Add the printer as type Moonraker, optional API key if auth is on, then use Test connection. "
-                             "Hardware pass on Zach's K1 is still pending — label is Live API, not Hardware-tested.")},
+                             "This path is Live API, not Hardware-tested on a real printer yet.")},
 }
 
 # Verified from Bambu Lab Wiki (third-party integration + Developer Mode pages, 2026):
@@ -67,7 +67,7 @@ BAMBU_LIMITS = {
 
 HONESTY_NOTE_LIVE = (
     "Moonraker / OctoPrint use a real HTTP send (Live API). "
-    "Not yet confirmed on Zach's Creality K1 hardware. "
+    "Not Hardware-tested on a real printer yet. "
     "Bambu LAN and unconfigured/stub paths stay Simulated."
 )
 HONESTY_NOTE_NONE = (
@@ -142,9 +142,8 @@ def direct_control_enabled() -> bool:
     return (os.environ.get("ZEIM_ENV") or "").lower() != "production"
 
 
-DIRECT_OFF_MESSAGE = ("This deployment uses file handoff instead of direct printer control: "
-                      "download the .gcode and upload it in your printer's own app. "
-                      "(Server-side printer control is disabled in production unless ZEIM_PRINTER_DIRECT=1.)")
+DIRECT_OFF_MESSAGE = ("This ZEIM sends a file you download, rather than talking to the printer itself. "
+                      "Download the G-code and upload it in your printer's own app.")
 
 
 def check_url(url: str) -> None:
@@ -185,8 +184,7 @@ def _guard_printer(printer: dict) -> dict | None:
         return {"ok": False, "message": DIRECT_OFF_MESSAGE, **_v(ptype=t)}
     if t not in IMPLEMENTED:
         return {"ok": False, "stub": True,
-                "message": f"'{t}' support is a stub and not implemented yet. "
-                           "Use 'Open in slicer' or download the G-code and send it manually.", **_v(ptype=t)}
+                "message": "ZEIM can't send to this printer type. Open the file in your slicer, or download the G-code.", **_v(ptype=t)}
     if not printer.get("url"):
         return {"ok": False, "message": "printer URL is not configured — add an address in Settings, or use Open in slicer / download G-code.",
                 **_v(ptype=t)}
@@ -228,7 +226,7 @@ def _print_confirmed(st: dict, name: str) -> bool:
 def _upload_accepted(printer: dict, name: str, start: bool, t: str) -> dict:
     """An HTTP upload is acceptance. A start flag is a request. Only a later status read confirms it."""
     who = printer.get("name") or "printer"
-    note = " (Live API — real HTTP upload; not yet Hardware-tested on Zach's K1)."
+    note = " (Live API. Not Hardware-tested on a real printer yet.)"
     confirmed = False
     if start and t in ("moonraker", "octoprint"):
         try:
@@ -297,7 +295,7 @@ def test(printer: dict) -> dict:
     if t == "bambu":
         return _test_bambu(printer)
     if t not in IMPLEMENTED:
-        return {"ok": False, "message": f"'{t}' is not implemented yet, so it cannot be tested.", "detail": {}, **_v(ptype=t)}
+        return {"ok": False, "message": "ZEIM can't test this printer type. Open the file in your slicer, or download the G-code.", "detail": {}, **_v(ptype=t)}
     if not printer.get("url"):
         return {"ok": False, "message": "Add the printer's address first.", "detail": {}, **_v(ptype=t)}
     denial = shared_mode_denial(printer["url"])

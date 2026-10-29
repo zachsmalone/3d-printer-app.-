@@ -687,7 +687,7 @@
     <hr data-kind-only="fdm">
     <div id="printerBlock" data-kind-only="fdm">
     <h4>Send to a network printer</h4>
-    <p class="help" id="printerHonest">Moonraker / OctoPrint: Live API (real HTTP). Not yet confirmed on Zach's Creality K1 hardware. Bambu LAN and unconfigured/stub paths stay Simulated.</p>
+    <p class="help" id="printerHonest">Moonraker / OctoPrint: Live API (real HTTP). Not Hardware-tested on a real printer yet. Bambu LAN stays Simulated.</p>
     <div class="row"><select id="printerSel" aria-label="Printer"></select>
       <label class="inl"><input type="checkbox" id="startNow"> Start print immediately</label>
       <button class="btn" id="btnSend">Send</button>
@@ -750,16 +750,13 @@
       <p class="help" id="setLock" hidden>Printers can be saved here. The public address and default slicer stay with the server admin.</p>
       <h4>Printers</h4><div id="printerList"></div>
       <button class="btn small" id="btnAddPrinter">+ Add printer</button>
-      <p class="help">OctoPrint and Moonraker (Creality K1 / Klipper) use a real HTTP send path labelled <b>Live API</b> (mock-tested; not yet confirmed on Zach's K1 hardware). Bambu LAN stays <b>Simulated</b> until a hardware pass — needs LAN Only + Developer Mode; keep Open in Bambu Studio as fallback. Other types are Coming soon. API keys are stored encrypted in <code>data/settings.json</code>.</p>
+      <p class="help">OctoPrint and Moonraker can send a file on your network. Bambu on the local network is a practice path. Open in Bambu Studio still works. A printer key stays on this server.</p>
       <p class="help"><button type="button" class="btn small ghost" id="btnOpenBoardFromSettings">Open printer board</button></p>
     </div>
     <div id="tAcc" class="tab" role="tabpanel" aria-labelledby="tabAcc" hidden>
-      <p class="help">Show link-outs to your own channels on your public profile. Nothing is sold here. Handles are displayed as <b>unverified</b> until OAuth verification is built.</p>
+      <p class="help">Add a public name or a link to a page you already have. It shows as a small icon on your profile and on your Showcase posts. ZEIM does not post to those sites for you.</p>
       <div class="grid2" id="linkInputs"></div>
-      <button class="btn small" id="btnSaveLinks">Save link-outs</button>
-      <h4>OAuth connections <small>Coming soon</small></h4>
-      <p class="help" id="accNote"></p>
-      <div id="accList"></div>
+      <button class="btn small" id="btnSaveLinks">Save</button>
     </div>
   </div>
   <div class="df"><button class="btn primary" id="btnSaveSettings">Save</button></div>

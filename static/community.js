@@ -5,6 +5,22 @@ import { bindFlow, originOf, readFlow, reuseCopy, slicerHash } from "/static/pro
 import { sendTo } from "/static/handoff.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+const SOC_LABEL = { tiktok: "TikTok", instagram: "Instagram", reddit: "Reddit", patreon: "Patreon", youtube: "YouTube", x: "X", website: "Website" };
+const SOC_ICON = {
+  tiktok: '<path d="M9 8v8a3 3 0 1 1-2-2.8M9 8c.6 2 2.2 3.2 4.2 3.4"/>',
+  instagram: '<rect x="5" y="5" width="14" height="14" rx="4"/><circle cx="12" cy="12" r="3.2"/>',
+  reddit: '<circle cx="12" cy="13" r="6"/><path d="M9.5 15.2c.8.7 1.6 1 2.5 1s1.7-.3 2.5-1"/>',
+  patreon: '<circle cx="12" cy="12" r="6"/><path d="M12 8v8"/>',
+  youtube: '<rect x="4" y="7" width="16" height="10" rx="2"/><path d="M11 10l4 2-4 2z"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  website: '<circle cx="12" cy="12" r="7"/><path d="M5 12h14M12 5c2 2.2 2 9.6 0 14M12 5c-2 2.2-2 9.6 0 14"/>',
+};
+function socHTML(links) {
+  const rows = Array.isArray(links) ? links : Object.entries(links || {}).map(([id, v]) => ({ id, label: SOC_LABEL[id] || id, url: v && v.url }));
+  const good = rows.filter(r => r && typeof r.url === "string" && r.url.startsWith("https://"));
+  if (!good.length) return "";
+  return '<p class="soclinks">' + good.map(r => `<a class="soc" href="${esc(r.url)}" target="_blank" rel="noopener nofollow ugc" aria-label="${esc(r.label || SOC_LABEL[r.id] || "Link")}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true" focusable="false">${SOC_ICON[r.id] || '<circle cx="12" cy="12" r="5"/>'}</svg></a>`).join("") + "</p>";
+}
 let CFG = null, ME = null, shTab = "trending";
 
 /* ---------- config / branding (names come from app/branding.py) ---------- */
@@ -365,9 +381,9 @@ function renderAccount() {
       <p class="help">Turning following <b>off</b> removes all your follows and followers immediately, hides follow buttons and follower counts for you, and turns “followers only” items into private ones. Everything starts Private; every build and project can be changed individually.</p>
       <div class="row"><button class="btn small" id="pv_save">Save privacy</button><button class="btn small ghost" id="pv_followers">My followers</button><button class="btn small ghost" id="pv_following" aria-expanded="false" aria-controls="pv_followingList">People I follow</button></div>
       <div id="pv_followingList" hidden></div>
-      <ul class="help"><li>Direct messages from strangers: <b>off</b> (messaging between people: Coming soon)</li>
-      <li>Social link-outs on your public profile: <b>${r.public_link_outs ? "shown (unverified)" : "hidden"}</b></li></ul>
-      <p class="help">Add link-outs in Settings → Promote your accounts.</p>
+      <ul class="help"><li>Direct messages from strangers: <b>off</b>. ZEIM has no messages between people.</li>
+      <li>Links you add in Settings: <b>${r.public_link_outs ? "shown on your public profile" : "hidden"}</b></li></ul>
+      <p class="help">Add them in Settings → Promote your accounts.</p>
       <h4>Plans</h4>
       <div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>
       <h4>Sign out</h4><p class="help">Signing out makes this browser forget your account. Use it on a shared computer.</p>
@@ -518,7 +534,7 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${socHTML(i.creator_links)}${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
@@ -697,6 +713,7 @@ async function openItem(id) {
     ${i.thumb ? `<img src="${i.thumb}" alt="${i.nsfw ? "Preview picture (mature content)" : `Preview picture of ${esc(i.title)}`}" style="max-width:100%;border-radius:10px">` : ""}
     <p>${esc(i.description)}</p><p>${i.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</p>
     ${i.original ? origHTML(i).replace(/<a class="btn small"[^]*?<\/a>/g, "") : ""}${i.original ? origMoreHTML(i) : ""}<p class="help">by ${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}" target="_blank" rel="noopener noreferrer">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""} · free${i.downloads != null ? ` · <svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}` : ""}</p>
+    ${socHTML(i.creator_links)}
     ${provHTML(i) ? `<p class="provrow">${provHTML(i)}</p>` : ""}${tipHTML(i)}
     ${i.owned && !i.original && !i.example ? psHTML(i.print_settings, { editable: true, idPrefix: "itPs" }) : psHTML(i.print_settings)}
     ${i.credit ? `<p class="credit-line">Credit: <b>${esc(i.credit.creator)}</b>${i.credit.licence ? ` · Licence: ${/^https:\/\//.test(i.credit.licence_url) ? `<a href="${esc(i.credit.licence_url)}" target="_blank" rel="noopener noreferrer">${esc(i.credit.licence)}</a>` : esc(i.credit.licence)}` : ""} · <a href="/credits">Thank you &amp; credits</a></p>` : ""}
@@ -1394,6 +1411,7 @@ async function openProfile(uid) {
   $("#pfBody").innerHTML = `<p class="counts">${n(u.followers, u.followers === 1 ? "follower" : "followers")} ${n(u.following, "following")}</p>
     ${u.win_label ? `<p>${esc(u.win_label)}</p>` : ""}
     ${badgeLine ? `<p class="help">Badges ${badgeLine}</p>` : ""}
+    ${socHTML(u.links)}
     ${u.can_follow ? `<button type="button" class="btn ${u.following_creator ? "" : "primary"}" id="pfFollow" aria-pressed="${!!u.following_creator}">${u.following_creator ? "✔ Following" : "＋ Follow"}</button>` : ""}
     <p class="help">Following shows their new projects in the Following tab. There are no messages in ZEIM.</p>
     ${colStrip}

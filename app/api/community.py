@@ -878,7 +878,7 @@ def set_personalization(body: dict, actor: Actor = Depends(get_actor)):
 def _admin(token: str, request: Request | None = None):
     import hmac
     if not config.ADMIN_TOKEN:
-        raise HTTPException(403, "moderation queue disabled: set PHOTO3D_ADMIN_TOKEN")
+        raise HTTPException(403, "The moderation queue is off.")
     key = "admintok:" + (_ip(request) if request else "-")
     if ratelimit.count(key, 600) >= config.ADMIN_FAIL_LIMIT:            # same guess limiter as the other admin routes
         raise HTTPException(429, "Too many wrong admin tokens from this address. Try again in a few minutes.")
