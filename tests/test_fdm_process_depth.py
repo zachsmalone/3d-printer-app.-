@@ -60,6 +60,33 @@ def test_ironing_off_and_bad_values_are_explicit():
         raise AssertionError(bad)
 
 
+ADVANCED_INFILL = (
+    ("grid", "grid"), ("gyroid", "gyroid"), ("honeycomb", "honeycomb"), ("cubic", "cubic"),
+    ("lines", "line"), ("lightning", "lightning"), ("rectilinear", "rectilinear"),
+    ("alignedrectilinear", "alignedrectilinear"), ("triangles", "triangles"), ("stars", "stars"),
+    ("concentric", "concentric"), ("3dhoneycomb", "3dhoneycomb"), ("hilbertcurve", "hilbertcurve"),
+    ("archimedeanchords", "archimedeanchords"), ("octagramspiral", "octagramspiral"),
+    ("adaptivecubic", "adaptivecubic"), ("supportcubic", "supportcubic"), ("zigzag", "zigzag"),
+)
+
+
+def test_advanced_infill_uses_prusaslicer_fill_pattern():
+    from app.services import print_setup as ps
+    assert list(ps.BEGINNER_PATTERNS) == ["grid", "gyroid", "honeycomb", "cubic", "lines", "lightning", "rectilinear"]
+    assert ps.public()["patterns"] == list(ps.BEGINNER_PATTERNS)
+    assert ps.public()["patterns_advanced"] == list(ps.PATTERNS)
+    for pattern, ini in ADVANCED_INFILL:
+        assert ps.PATTERNS[pattern] == ini
+        assert _ini({"infill_pattern": pattern, "infill": "15"})["fill_pattern"] == ini
+    for missing in ("quarter_cubic", "octet", "cross", "cross3d", "tpmsd", "tetrahedral"):
+        assert missing not in ps.PATTERNS
+        try:
+            eng.profile_for("creality_k1", 0.4, {"infill_pattern": missing})
+        except eng.SliceError:
+            continue
+        raise AssertionError(missing)
+
+
 def test_process_sheet_tabs_and_form_fields():
     js = (ROOT / "static" / "printer.js").read_text(encoding="utf-8")
     for name in ("Quality", "Filament", "Strength", "Speed", "Cooling", "Support", "Infill", "Adhesion"):
@@ -68,6 +95,11 @@ def test_process_sheet_tabs_and_form_fields():
                   "travel_speed", "first_layer_speed", "fan_min", "fan_max", "fan_off_layers", "infill_overlap", "line_width"):
         assert f'"{field}"' in js
     assert "mountSlicerPrinter" in js
+    assert 'data-pat-level="${advancedOnly ? "advanced" : "beginner"}"' in js
+    for name in ("Adaptive cubic", "Support cubic", "Tri-hexagon", "Hilbert curve", "Octagram spiral", "Zig zag"):
+        assert name in js
+    assert "Quarter cubic, octet, cross, cross 3D, and TPMS" in js
+    assert "patterns_advanced" in js
     html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
     assert 'id="devicePick"' in html
     bar = html[html.index('id="slicerBar"'):html.index('id="fdmDone"')]

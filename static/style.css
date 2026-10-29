@@ -1235,6 +1235,9 @@ body[data-view=slicer] #sendToFab,body[data-view=slicer] .sitefoot,body[data-vie
 .supchoice small{color:var(--mut);font-size:12px}
 .supchoice[aria-pressed=true]{border-color:#0066FF;background:color-mix(in srgb,#0066FF 10%,var(--panel))}
 .patgrid{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity}
+#procPane-infill .patgrid{flex-wrap:wrap;overflow:visible}
+#procPane-infill .pat{flex:1 1 108px;max-width:150px;min-height:112px}
+#procPane-infill .pat small{display:block;color:var(--mut);font-size:10px;font-weight:500;line-height:1.25;text-align:center}
 .pat{flex:0 0 92px;min-height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:6px;border-radius:14px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;font-size:12px;cursor:pointer;scroll-snap-align:start}
 .pat svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .pat[aria-pressed=true]{border-color:#0066FF;background:color-mix(in srgb,#0066FF 10%,var(--panel))}
