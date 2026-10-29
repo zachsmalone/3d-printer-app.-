@@ -60,6 +60,24 @@ export class Viewer {
     this.camera.far = r * 20; this.camera.updateProjectionMatrix();
     this.controls.target.copy(c); this.controls.update();
   }
+  /* Top, front, or a three-quarter view. Z stays up, same as the bed. */
+  look(which) {
+    const box = new THREE.Box3().setFromObject(this.group);
+    if (box.isEmpty()) return;
+    const c = box.getCenter(new THREE.Vector3());
+    const s = box.getSize(new THREE.Vector3());
+    const r = Math.max(s.x, s.y, s.z, 40) * 1.6;
+    const dirs = {
+      top: [c.x, c.y - r * 0.01, c.z + r],
+      front: [c.x, c.y - r, c.z + r * 0.15],
+      iso: [c.x + r * 0.7, c.y - r * 0.7, c.z + r * 0.55],
+    };
+    const p = dirs[which] || dirs.iso;
+    this.camera.up.set(0, 0, 1);
+    this.camera.position.set(p[0], p[1], p[2]);
+    this.controls.target.copy(c);
+    this.controls.update();
+  }
   /* Turn left / right buttons (a keyboard- and touch-friendly alternative to dragging): spin the camera round the model's centre (Z is up here). */
   turn(deg) {
     const t = this.controls.target, v = this.camera.position.clone().sub(t), a = deg * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);

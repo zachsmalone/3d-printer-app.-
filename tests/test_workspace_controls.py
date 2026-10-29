@@ -26,7 +26,7 @@ def _bars(chunk):
 @pytest.mark.skipif(not shutil.which("node"), reason="node not installed")
 def test_workspace_control_decisions():
     r = subprocess.run(
-        ["node", "--test", str(ROOT / "tests/js/workspace-controls.test.mjs"), str(ROOT / "tests/js/studio-library.test.mjs")],
+        ["node", "--test", str(ROOT / "tests/js/workspace-controls.test.mjs"), str(ROOT / "tests/js/studio-library.test.mjs"), str(ROOT / "tests/js/fdm-chrome.test.mjs")],
         capture_output=True, text=True, timeout=120,
     )
     assert r.returncode == 0, r.stdout + r.stderr
@@ -40,6 +40,26 @@ def test_outside_cad_bars_keep_exit_done_new_build_and_return_off_showcase():
         "ai3d": _between(HTML, 'id="viewAi3d"', 'id="viewFix"'),
     }
     for name, chunk in sections.items():
+        if name == "slicer":
+            assert 'class="bed-head wsbar"' in chunk
+            assert 'data-ws="slicer"' in chunk
+            assert 'aria-label="Back"' in chunk
+            assert 'data-ws-act="exit"' in chunk
+            assert 'data-ws-act="done"' in chunk
+            assert 'id="slicerBar"' in chunk
+            assert 'data-bed-sheet="device"' in chunk
+            assert 'data-bed-sheet="filament"' in chunk
+            assert 'data-bed-sheet="process"' in chunk
+            assert 'data-bed-act="import"' in chunk
+            assert 'id="fdmDone"' in chunk
+            assert 'id="fdmImport"' in chunk
+            assert 'href="#projects"' not in chunk
+            assert 'href="#account/studio"' not in chunk
+            assert "btnPublish" not in chunk
+            assert "sendToShowcase" not in chunk
+            assert 'data-to="showcase"' not in chunk
+            assert "publish=" not in chunk
+            continue
         bars = _bars(chunk)
         assert len(bars) == 1, name
         bar = bars[0]

@@ -3,7 +3,7 @@ import {
   commitFor, dragAmount, handleName, keyAmount, layoutHandles, overlapsChrome, readout, ringSamples,
 } from "/static/gizmo-math.js";
 
-const CHROME = ".wsbar, .objdock, .proc-sheet, .zws-p, .cw-top, .cw-chips, .cw-cubewrap, .cw-bl, .cw-panel, .cw-section, .cw-hint, .cw-lesson, .cw-ctx, .vtools, #editVtools";
+const CHROME = ".wsbar, .bed-bar, .bed-sheet, .bed-view, .objdock, .proc-sheet, .zws-p, .cw-top, .cw-chips, .cw-cubewrap, .cw-bl, .cw-panel, .cw-section, .cw-hint, .cw-lesson, .cw-ctx, .vtools, #editVtools";
 
 function shown(el) {
   if (!el || el.hidden || el.closest("[hidden]")) return false;

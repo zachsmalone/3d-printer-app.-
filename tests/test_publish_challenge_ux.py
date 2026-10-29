@@ -104,7 +104,7 @@ def test_send_to_showcase_sits_where_work_finishes_not_on_leave_controls():
     send = CAD.split('$("#cwSendShowcase")', 1)[1].split("cwToSlicer", 1)[0]
     assert "publish=" in send
     assert 'data-lib="showcase"' in LIB and "Send to Showcase" in LIB
-    assert "Done in a workspace returns to this list and does not publish." in HTML
+    assert "Done in the FDM Slicer opens send choices and does not publish." in HTML
     assert "action === \"showcase\"" in COMM
     assert "zeimOpenShowcase" not in BAR and "sendToShowcase" not in BAR
     assert "publish: false" in CTRL

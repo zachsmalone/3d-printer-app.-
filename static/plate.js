@@ -241,6 +241,7 @@ export function paint() {
     if (m.material.emissive) m.material.emissive.set(on ? "#5a3300" : "#000000");
   });
   const live = $("#plateLive"); if (live) live.textContent = PL.sel.size ? `${PL.sel.size} selected` : "Nothing selected";
+  document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
 }
 function rerender() { const t = $("#plateTool"); if (t) { t.outerHTML = panelHTML(); } paint(); drawCutPlane(); }
 

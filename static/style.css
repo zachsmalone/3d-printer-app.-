@@ -1169,19 +1169,46 @@ main.zws>.wsbar>.ws-end{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:
 main.zws>.wsbar>.ws-end>.zws-cust,main.zws>.wsbar>.ws-end .ws-go{position:static;z-index:auto;flex:0 0 auto;margin:0;white-space:nowrap}
 main.zws>.wsbar .ws-go{margin-left:auto;flex:0 0 auto}
 main:not(.zws)>.wsbar .ws-go{display:none}
-#viewEdit:not(.zws)>.objdock,#viewEdit:not(.zws)>.proc-sheet{display:none!important}
+#viewEdit:not(.zws)>.objdock{display:none!important}
 main.zws>.objdock{position:absolute;z-index:24;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
 main.zws>.objdock[hidden]{display:none!important}
 main.zws>.objdock .objdock-tools,main.zws>.objdock .objdock-tabs{pointer-events:auto;display:flex;gap:6px;padding:4px;border-radius:14px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.16)}
 main.zws>.objdock button{min-height:44px;min-width:44px;padding:0 14px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--txt);font:inherit;cursor:pointer}
 main.zws>.objdock button[aria-pressed=true],main.zws>.objdock button[aria-selected=true]{background:color-mix(in srgb,#0066FF 14%,var(--panel));border-color:#0066FF;color:var(--txt)}
-main.zws:has(>.proc-sheet:not([hidden]))>.objdock{bottom:min(52dvh,560px)}
-main.zws>.proc-sheet{position:absolute;z-index:22;left:0;right:0;bottom:0;height:min(52dvh,560px);display:flex;flex-direction:column;box-sizing:border-box;padding:0 0 env(safe-area-inset-bottom);border-radius:18px 18px 0 0;border:1px solid color-mix(in srgb,#0066FF 35%,var(--line));border-bottom:0;background:color-mix(in srgb,#f7f4ee 94%,#fff);box-shadow:0 -10px 28px rgba(20,40,80,.12)}
+#viewEdit.zws>.objdock{bottom:calc(68px + env(safe-area-inset-bottom))}
+main.zws>.proc-sheet{position:absolute;z-index:22;left:0;right:0;bottom:0;height:70dvh;display:flex;flex-direction:column;box-sizing:border-box;padding:0 0 env(safe-area-inset-bottom);border-radius:18px 18px 0 0;border:1px solid color-mix(in srgb,#0066FF 35%,var(--line));border-bottom:0;background:color-mix(in srgb,#f7f4ee 94%,#fff);box-shadow:0 -10px 28px rgba(20,40,80,.12)}
 main.zws>.proc-sheet[hidden]{display:none!important}
 html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--panel) 92%,#0b1a33)}
 .proc-bar{display:flex;align-items:center;gap:8px;padding:8px 10px 6px;border-bottom:2px solid #0066FF}
 .proc-bar h2{flex:1;margin:0;font-size:16px;font-weight:650}
 .proc-sheet .slicepanel{margin:0;border:0;border-radius:0;background:transparent;box-shadow:none;flex:1;min-height:0;overflow:auto}
+/* FDM workspace: fixed header actions, fixed bottom tool bar, sheets cover about 70% of the screen. */
+#viewEdit:not(.zws)>.bed-head{position:sticky;top:var(--ui6-top,72px);z-index:48;display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px;border-radius:14px;background:color-mix(in srgb,var(--panel) 94%,transparent);border:1px solid var(--line)}
+#viewEdit>.bed-head .bed-name{font-weight:650;white-space:nowrap}
+#viewEdit>.bed-head .bed-head-actions{margin-left:auto;display:flex;gap:6px;overflow-x:auto;max-width:100%}
+#viewEdit>.bed-head #slicerSlice{display:inline-flex}
+#viewEdit>.bed-bar{position:fixed;left:0;right:0;width:auto;bottom:0;z-index:48;display:flex;gap:6px;align-items:stretch;margin:0;padding:6px max(8px,env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));background:color-mix(in srgb,var(--panel) 96%,#fff);border-top:1px solid var(--line);box-shadow:0 -6px 18px rgba(0,0,0,.12)}
+#viewEdit>.bed-bar button{flex:1 1 0;min-height:52px;min-width:44px;padding:4px 8px;border:0;border-radius:12px;background:transparent;color:var(--txt);font:inherit;font-size:14px;font-weight:650;cursor:pointer}
+#viewEdit>.bed-bar button:hover{background:color-mix(in srgb,#0066FF 10%,var(--panel))}
+#viewEdit>.bed-bar button:focus-visible{outline:3px solid var(--focus,#6AA6FF);outline-offset:2px}
+#viewEdit>.bed-bar .bed-device{flex:1.4 1 72px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;line-height:1.2}
+#viewEdit .bed-dev-name{font-size:14px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#viewEdit .bed-dev-state{font-size:12px;font-weight:500;color:var(--mut)}
+#viewEdit>.zt-band{display:none}
+#viewEdit:not(.zws)>aside.controls,#viewEdit:not(.zws)>.stage{padding-bottom:84px}
+#viewEdit>.proc-sheet,#viewEdit>.bed-sheet{position:fixed;left:0;right:0;bottom:0;top:max(var(--fdm-head-bottom,30dvh),30dvh);height:auto;z-index:60;display:flex;flex-direction:column;background:var(--panel);border-radius:18px 18px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.22);overflow:hidden}
+#viewEdit>.proc-sheet[hidden],#viewEdit>.bed-sheet[hidden]{display:none!important}
+#viewEdit .bed-sheet-body{padding:12px 16px;overflow:auto}
+#viewEdit .bed-check{min-width:44px;font-size:18px}
+#viewEdit .bed-view{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:4px}
+#viewEdit .bed-view button{min-width:44px;min-height:44px;padding:0 8px;border-radius:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 90%,transparent);color:var(--txt);font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+#viewEdit .bed-dest{display:flex;flex-direction:column;gap:8px}
+#viewEdit .bed-dest .btn{justify-content:flex-start;min-height:44px}
+#fdmImport .fdm-import{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50dvh;overflow:auto}
+#fdmImport .fdm-import button{width:100%;min-height:44px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+#fdmImport .fdm-import small{color:var(--mut);font-weight:500}
+#viewEdit .objdock button:disabled{opacity:.45;cursor:not-allowed}
+#editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
 .proc-tabs button{min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;cursor:pointer;white-space:nowrap}
 .proc-tabs button[aria-selected=true]{border-color:#0066FF;background:color-mix(in srgb,#0066FF 12%,var(--panel))}

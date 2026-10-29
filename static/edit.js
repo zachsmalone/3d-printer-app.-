@@ -207,6 +207,9 @@ function loadProject(p, keepCamera = false) {
   try { sessionStorage.setItem("zeim.edit.last", p.id); } catch { }   // so Back from CAD (full page load) can restore it
   E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearFaceMark(); clearMeasure(); clearGhost();
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
+  if (!p.plate) document.body.dataset.bedSel = "1";
+  else delete document.body.dataset.bedSel;
+  document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis;
   const q = p.quality_gate || { ok: true, issues: [], message: "Closed mesh. You can export the geometry. Slice it before printing." };
@@ -712,17 +715,21 @@ $("#editPanel").addEventListener("click", e => {
 });
 function clearSlicerWork() {
   E.p = null;
+  delete document.body.dataset.bedSel;
   $("#editStart").hidden = false;
   $("#editPanel").hidden = true;
   $("#editResult").hidden = true;
   $("#editVtools").hidden = true;
   $("#editEmpty").hidden = false;
+  const file = $("#editFile"); if (file) file.value = "";
+  ["processSheet", "deviceSheet"].forEach(id => { const el = document.getElementById(id); if (el) el.hidden = true; });
   viewer?.group.clear();
   dropPlateGizmo();
   dropMeshGizmo();
   clearGhost();
   clearFaceMark();
   fillBuildSelect();
+  document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
 }
 document.addEventListener("zeim:new-build", e => {
   if (!e.detail || e.detail.section !== "slicer" || e.detail.publish) return;
@@ -923,6 +930,12 @@ function updateGhost(f) {
 function clearMeasure() { E.pts = []; measureObjs.forEach(o => viewer?.scene.remove(o)); measureObjs = []; $("#eMeasureOut").hidden = true; $("#eMeasure").classList.toggle("on", E.measure); }
 function toggleMeasure() { E.measure = !E.measure; clearMeasure(); if (E.measure) { $("#eMeasureOut").hidden = false; $("#eMeasureOut").textContent = "Click the first point on the model…"; } const b = $("#toggleMeasure"); if (b) b.textContent = E.measure ? "Stop measuring" : "Measure two points"; }
 $("#eMeasure").onclick = toggleMeasure;
+$("#editViewer")?.addEventListener("click", e => {
+  const b = e.target.closest("[data-look]");
+  if (!b) return;
+  e.preventDefault();
+  ensureViewer()?.look(b.getAttribute("data-look"));
+});
 function pickFace(e) {
   const r = viewer.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, viewer.camera);
@@ -959,6 +972,15 @@ function onPick(e) {
       $("#textPickMsg").textContent = `Text point set at (${pt.x.toFixed(1)}, ${pt.y.toFixed(1)}, ${pt.z.toFixed(1)}).`;
       return;
     }
+  }
+  if (!E.p?.plate && !E.measure && !E.facePick && !E.drainPick && !E.textPick && viewer) {
+    const r = viewer.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, viewer.camera);
+    const hit = rc.intersectObjects(viewer.group.children, false)[0];
+    document.body.dataset.bedSel = hit ? "1" : "";
+    document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
+    return;
   }
   if (!E.measure && viewer) return pickAt(e);           // plate editor: select / shift-select objects
   if (!E.measure || !viewer) return;

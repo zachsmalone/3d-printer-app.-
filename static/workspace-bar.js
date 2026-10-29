@@ -1,8 +1,9 @@
 /* Exit, Done, New build, and Return to Account on Lithophane, the Slicer, TorchC0, and 2D→3D.
    Save uses the same leave / saveNow path as CAD. None of these actions publish to Showcase. */
-import { S, askConfirm, toast } from "/static/app.js";
+import { S, api, askConfirm, esc, toast } from "/static/app.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
-import { leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
+import { fdmDonePlan, fdmLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
+import { prefLabel } from "/static/printer.js";
 
 function fromStudio() {
   return exitTarget(sessionStorage) === LIBRARY_URL;
@@ -66,8 +67,178 @@ function paintWorkspaceBars() {
   document.querySelectorAll(".wsbar").forEach(bar => {
     const section = bar.getAttribute("data-ws");
     const done = bar.querySelector("[data-ws-act='done']");
-    if (done) done.hidden = !sectionHasWork(section);
+    if (!done) return;
+    /* FDM Done stays on the header. It opens destinations. It does not mean the bed has a model. */
+    if (section === "slicer") done.hidden = false;
+    else done.hidden = !sectionHasWork(section);
   });
+}
+
+function slicerModel() {
+  return !!(window.__zeimEdit && window.__zeimEdit.p && window.__zeimEdit.p.id);
+}
+
+function paintDevice() {
+  const nameEl = document.getElementById("bedPrinterName");
+  const stateEl = document.getElementById("bedPrinterState");
+  const fromPanel = document.getElementById("spPrinter");
+  let name = "";
+  try { name = (fromPanel && fromPanel.textContent.trim()) || prefLabel() || ""; } catch { name = ""; }
+  if (nameEl) nameEl.textContent = name || "No printer saved";
+  const liveBox = document.getElementById("liveStatus");
+  const liveText = document.getElementById("liveStatusText");
+  const live = liveBox && !liveBox.hidden && liveText && liveText.textContent.trim();
+  const state = live || "Not connected";
+  if (stateEl) stateEl.textContent = state;
+  const read = document.getElementById("deviceReadout");
+  if (read) read.textContent = (name || "No printer saved") + " · " + state;
+}
+
+function saveThen(done) {
+  if (window.zeimSave && typeof window.zeimSave.leave === "function") window.zeimSave.leave(done);
+  else {
+    document.dispatchEvent(new CustomEvent("zeim:save-now"));
+    done();
+  }
+}
+
+let slicerLeaveOpen = false;
+
+function confirmSlicerLeave(nextUrl) {
+  if (slicerLeaveOpen) return;
+  const ask = fdmLeavePlan({ confirmed: false, nextUrl: nextUrl || "" });
+  if (!ask.ask || ask.publish || isPublishUrl(ask.url)) return;
+  slicerLeaveOpen = true;
+  askConfirm({
+    title: "Leave the FDM Slicer?",
+    message: "Save this work, then clear the bed? A model already on Account stays there. This does not send it to Showcase.",
+    okLabel: "Save and clear",
+    danger: false,
+  }).then(yes => {
+    slicerLeaveOpen = false;
+    if (!yes) return;
+    const plan = fdmLeavePlan({ confirmed: true, nextUrl: nextUrl || "" });
+    if (plan.publish || isPublishUrl(plan.url)) return;
+    saveThen(() => {
+      if (plan.clear) document.dispatchEvent(new CustomEvent("zeim:new-build", { detail: { section: "slicer", publish: false } }));
+      if (plan.navigate && plan.url) navigate(plan.url);
+      paintWorkspaceBars();
+    });
+  });
+}
+
+function openFdmDone() {
+  const plan = fdmDonePlan();
+  if (plan.publish || plan.navigate || plan.clear || !plan.sheet) return;
+  const dlg = document.getElementById("fdmDone");
+  if (dlg && typeof dlg.showModal === "function") dlg.showModal();
+}
+
+function runFdmDone(dest) {
+  const dlg = document.getElementById("fdmDone");
+  if (dlg && dlg.open) dlg.close();
+  const has = slicerModel();
+  switch (dest) {
+    case "close":
+      return;
+    case "cad":
+      if (!has) { toast("Open a model first, then send it to CAD.", "err"); return; }
+      if (window.zeimSave && typeof window.zeimSave.saveNow === "function") window.zeimSave.saveNow();
+      document.getElementById("editOpenCad")?.click();
+      return;
+    case "device":
+      if (!has) { toast("Open a model first, then save the file.", "err"); return; }
+      document.getElementById("editSend")?.click();
+      return;
+    case "account": {
+      if (window.zeimSave && typeof window.zeimSave.saveNow === "function") window.zeimSave.saveNow();
+      const where = window.zeimSave && typeof window.zeimSave.where === "function" ? window.zeimSave.where() : null;
+      toast(where
+        ? "This model stays in saved work on Account. Slicer settings are stored for this sign-in in this browser."
+        : "Saved in this browser. Sign in on Account to keep it with your saved work.");
+      return;
+    }
+    case "showcase":
+      /* The existing result button opens the Showcase form. Nothing is published here. */
+      document.getElementById("editPublish")?.click();
+      return;
+    default: {
+      const unknown = dest;
+      return unknown;
+    }
+  }
+}
+
+const VIEW_ALIAS = {
+  "": "showcase",
+  edit: "slicer",
+  fdm: "slicer",
+  create: "lithophane",
+  projects: "account",
+  studio: "account",
+  resin: "torchc0",
+  "2d3d": "ai3d",
+};
+
+function viewOfHash(href) {
+  const head = String(href || "").replace(/^#/, "").split("/")[0].split("?")[0];
+  return VIEW_ALIAS[head] || head || "showcase";
+}
+
+function onSlicerNav(ev) {
+  if (document.body.dataset.view !== "slicer") return;
+  if (ev.target.closest && ev.target.closest("#fdmDone, #fdmImport, #dlgConfirm")) return;
+  const navBtn = ev.target.closest && ev.target.closest("#mainNav button[data-view]");
+  const link = ev.target.closest && ev.target.closest("a[href]");
+  let next = "";
+  if (navBtn) next = "#" + navBtn.getAttribute("data-view");
+  else if (link) {
+    const href = link.getAttribute("href") || "";
+    if (!href.startsWith("#")) return;
+    if (viewOfHash(href) === "slicer") return;
+    next = href;
+  } else return;
+  if (!next || viewOfHash(next) === "slicer") return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  confirmSlicerLeave(next.startsWith("#") ? next : "#" + next);
+}
+
+async function openFdmImport() {
+  const dlg = document.getElementById("fdmImport");
+  const list = document.getElementById("fdmImportList");
+  if (!dlg || !list) return;
+  list.innerHTML = "<li>Loading saved work…</li>";
+  if (typeof dlg.showModal === "function") dlg.showModal();
+  try {
+    const r = await api("/api/builds");
+    const builds = (r && r.builds) || [];
+    if (!builds.length) {
+      list.innerHTML = "<li>No saved work on this account yet.</li>";
+      return;
+    }
+    list.innerHTML = builds.slice().reverse().map(b => {
+      const id = String(b.id || "");
+      if (!/^[0-9a-f]{12}$/.test(id)) return "";
+      const title = esc(b.title || "Untitled");
+      const kind = b.kind === "edit" ? "Edited model" : esc(b.mode || "Saved");
+      return `<li><button type="button" data-import-id="${id}" data-import-kind="${b.kind === "edit" ? "edit" : "photo"}">${title}<small>${kind}</small></button></li>`;
+    }).join("") || "<li>No saved work on this account yet.</li>";
+  } catch (e) {
+    list.innerHTML = `<li>${esc(e && e.message ? e.message : "Could not load saved work. Sign in on Account if this list stays empty.")}</li>`;
+  }
+}
+
+function takeImport(btn) {
+  const id = btn.getAttribute("data-import-id") || "";
+  if (!/^[0-9a-f]{12}$/.test(id)) return;
+  const dlg = document.getElementById("fdmImport");
+  if (dlg && dlg.open) dlg.close();
+  if (btn.getAttribute("data-import-kind") === "edit") {
+    document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id }));
+    return;
+  }
+  document.dispatchEvent(new CustomEvent("zeim:edit-from-build", { detail: id }));
 }
 
 function navigate(url) {
@@ -138,12 +309,59 @@ export function guardNewBuild(section) {
   if (plan.clear) clearSection(section);
 }
 
+function onFdmAct(ev) {
+  const preview = ev.target.closest && ev.target.closest("[data-bed-act=preview]");
+  if (preview && preview.closest("#viewEdit")) {
+    ev.preventDefault();
+    const gc = document.getElementById("gcPrev");
+    if (!gc) { toast("Slice first. Preview shows the layers after Slice finishes."); return; }
+    const sheet = document.getElementById("processSheet");
+    if (sheet) sheet.hidden = false;
+    gc.scrollIntoView?.({ block: "nearest" });
+    return;
+  }
+  const send = ev.target.closest && ev.target.closest("[data-bed-act=send-print]");
+  if (send && send.closest("#viewEdit")) {
+    ev.preventDefault();
+    if (!slicerModel()) { toast("Open a model first, then send it to a printer.", "err"); return; }
+    document.getElementById("editPrint")?.click();
+    return;
+  }
+  const imp = ev.target.closest && ev.target.closest("#slicerBar [data-bed-act=import]");
+  if (imp) {
+    ev.preventDefault();
+    openFdmImport();
+  }
+}
+
 function onControl(ev) {
+  const doneDest = ev.target.closest && ev.target.closest("[data-fdm-done]");
+  if (doneDest) {
+    ev.preventDefault();
+    runFdmDone(doneDest.getAttribute("data-fdm-done") || "close");
+    return;
+  }
+  const imported = ev.target.closest && ev.target.closest("#fdmImportList [data-import-id]");
+  if (imported) {
+    ev.preventDefault();
+    takeImport(imported);
+    return;
+  }
   const el = ev.target.closest && ev.target.closest("[data-ws-act]");
   if (!el) return;
   const action = el.getAttribute("data-ws-act");
   const host = el.closest("[data-ws]");
   const section = el.getAttribute("data-ws") || (host && host.getAttribute("data-ws")) || "";
+  if (section === "slicer" && action === "exit") {
+    ev.preventDefault();
+    confirmSlicerLeave("");
+    return;
+  }
+  if (section === "slicer" && action === "done") {
+    ev.preventDefault();
+    openFdmDone();
+    return;
+  }
   if (action === "new-build") {
     ev.preventDefault();
     guardNewBuild(section);
@@ -165,10 +383,25 @@ function onControl(ev) {
   runLeave(plan);
 }
 
+document.addEventListener("click", onSlicerNav, true);
+document.addEventListener("click", onFdmAct);
 document.addEventListener("click", onControl);
-["zeim:build", "zeim:edit-loaded", "zeim:edit-shown", "zeim:new-build", "zeim:torchc0-ready"].forEach(name => {
-  document.addEventListener(name, paintWorkspaceBars);
+document.getElementById("fdmImportClose")?.addEventListener("click", () => document.getElementById("fdmImport")?.close());
+["zeim:build", "zeim:edit-loaded", "zeim:edit-shown", "zeim:new-build", "zeim:torchc0-ready", "zeim:printer", "zeim:fdm-device"].forEach(name => {
+  document.addEventListener(name, () => { paintWorkspaceBars(); paintDevice(); });
 });
-window.addEventListener("hashchange", paintWorkspaceBars);
-new MutationObserver(paintWorkspaceBars).observe(document.body, { attributes: true, attributeFilter: ["data-view", "data-torch-stl"] });
-paintWorkspaceBars();
+document.addEventListener("zeim:fdm-note", e => { if (e.detail) toast(String(e.detail)); });
+function placeFdmSheet() {
+  const head = document.querySelector("#viewEdit > .bed-head");
+  if (!head) return;
+  const top = Math.ceil(head.getBoundingClientRect().bottom + 8);
+  document.documentElement.style.setProperty("--fdm-head-bottom", top + "px");
+}
+
+function paintChrome() { paintWorkspaceBars(); paintDevice(); placeFdmSheet(); }
+window.addEventListener("hashchange", paintChrome);
+window.addEventListener("resize", placeFdmSheet);
+new MutationObserver(paintChrome).observe(document.body, { attributes: true, attributeFilter: ["data-view", "data-torch-stl"] });
+const slicePanel = document.getElementById("slicePanel");
+if (slicePanel) new MutationObserver(paintDevice).observe(slicePanel, { childList: true, subtree: true, characterData: true });
+paintChrome();
