@@ -4,6 +4,7 @@ import { S, api, askConfirm, esc, toast } from "/static/app.js";
 import { askBedLeave, BED_LEAVE_MESSAGE } from "/static/bed-leave.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
 import { fdmDonePlan, bedLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
+import { leaveBedUrl } from "/static/project-flow.js";
 import { mountSlicerPrinter, prefLabel } from "/static/printer.js";
 
 function fromStudio() {
@@ -145,8 +146,18 @@ function exitUrl() {
   return leavePlan("exit", { fromStudio: fromStudio(), libraryUrl: LIBRARY_URL }).url;
 }
 
+function forgetPersistedBed(section) {
+  if (section === "slicer") {
+    try { sessionStorage.removeItem("zeim.edit.last"); } catch { /* the address is still cleared */ }
+  }
+  if (section === "torchc0") document.dispatchEvent(new CustomEvent("zeim:torchc0-forget"));
+  const next = leaveBedUrl(location.href);
+  if (next !== location.pathname + location.search + location.hash) history.replaceState(null, "", next);
+}
+
 function applyBedLeave(plan) {
   if (!plan || plan.ask || plan.choice === "stay" || plan.publish || isPublishUrl(plan.url)) return;
+  forgetPersistedBed(plan.section);
   const go = () => {
     if (plan.clear) clearSection(plan.section);
     if (plan.navigate && plan.url) finishLeave(plan);

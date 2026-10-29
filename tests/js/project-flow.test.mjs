@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   stageFor, planHop, readFlow, rememberCopy, reuseCopy, forgetCopy, rememberRepair, reuseRepair, slicerUrlForNewProject, flowNote,
+  leaveBedUrl,
 } from "../../static/project-flow.js";
 
 const PHOTO = "aaaaaaaaaaaa";
@@ -151,6 +152,18 @@ test("the repair page stays on Check & Repair, and a kept project is the same id
   assert.equal(design.url, "/static/cad.html?bid=" + EDIT);
   const none = planHop("slice", { view: "repair", kind: "fdm" });
   assert.equal(none.hash, "#account");
+});
+
+test("reload keeps the open bed, and leaving drops the restore link", () => {
+  const mid = "/?edit=bbbbbbbbbbbb#slicer/smartorient";
+  assert.equal(new URL(mid, "http://zeim.local").searchParams.get("edit"), "bbbbbbbbbbbb");
+  assert.match(mid, /#slicer\/smartorient/);
+  const left = leaveBedUrl(mid);
+  assert.equal(left, "/#slicer");
+  assert.equal(new URL(left, "http://zeim.local").searchParams.get("edit"), null);
+  assert.equal(leaveBedUrl("/static/cad.html?bid=bbbbbbbbbbbb&from=TorchC0"), "/static/cad.html?from=TorchC0");
+  assert.equal(leaveBedUrl("/?resin=bbbbbbbbbbbb#torchc0"), "/#torchc0");
+  assert.equal(leaveBedUrl("/#slicer"), "/#slicer");
 });
 
 test("a repair hand-off is remembered beside photo copies and dropped with that project", () => {

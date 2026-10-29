@@ -8,7 +8,7 @@ import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
 import { askBedLeave, BED_LEAVE_MESSAGE } from "/static/bed-leave.js";
 import { bedLeavePlan } from "/static/workspace-controls.js";
-import { bindFlow } from "/static/project-flow.js";
+import { bindFlow, leaveBedUrl } from "/static/project-flow.js";
 import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, chainStraight, closestSample, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
 import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo, chromeRects } from "/static/gizmo-view.js";
@@ -255,7 +255,7 @@ function resetCadBed() {
   S.tool = null;
   const title = $("#cwTitle");
   if (title) title.value = "My design";
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(null, "", leaveBedUrl(location.href));
   document.body.classList.remove("tools-on");
   load();
   document.dispatchEvent(new CustomEvent("zeim:flow"));
@@ -269,6 +269,7 @@ paintCadChrome();
 $("#cwBack")?.addEventListener("click", ev => {
   ev.preventDefault(); ev.stopPropagation();
   const go = () => {
+    history.replaceState(null, "", leaveBedUrl(location.href));
     const home = takeExit(sessionStorage);
     if (home.url) { location.href = home.url; return; }
     let same = false; try { same = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch {}

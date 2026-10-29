@@ -104,6 +104,10 @@ def test_bed_leave_choices_cover_fdm_cad_and_torch():
     back = cad.split('$("#cwBack")', 1)[1].split("view cube", 1)[0]
     assert "takeExit" in back and "publish" not in back
     assert "zeim.edit.last" in EDIT
+    shown = EDIT.split('addEventListener("zeim:edit-shown"', 1)[1].split('addEventListener("zeim:edit-from-build"', 1)[0]
+    assert 'sessionStorage.getItem("zeim.edit.last")' in shown
+    assert "forgetPersistedBed" in BAR and "leaveBedUrl" in BAR
+    assert "leaveBedUrl" in (ROOT / "static" / "cad.js").read_text(encoding="utf-8")
     css = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
     assert "body>.backchip.cad{top:60px}" not in css
     assert ".backchip{position:static" in css

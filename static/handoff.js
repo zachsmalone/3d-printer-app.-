@@ -2,8 +2,8 @@
    Studio/Lithophane → three buttons (Save work · Send to Slicer/TorchC0 · Send to CAD); Slicer → CAD · TorchC0, TorchC0 → CAD · Slicer (CAD → … lives in cad.js).
    The same mesh travels (orientation and size kept), units go with it, work is saved first, and a "Back to …" chip
    gives a one-tap way back. Only the slicer that matches the printer type (FDM / Resin) is offered.
-   Kept models: Studio remembers the build it sent (sessionStorage zeim.studio.return) so Back from CAD reopens it; TorchC0 keeps
-   its file in this browser (IndexedDB) so leaving and coming back, or a reload, does not lose it. */
+   Kept models: Studio remembers the build it sent (sessionStorage zeim.studio.return) so Back from CAD reopens it.
+   TorchC0 keeps its file in this browser so a reload can put it back. Exit, Abandon, Save & leave, and Reset bed delete that copy. */
 import { S, api, toast, $, esc } from "/static/app.js";
 import { isPublishUrl } from "/static/workspace-controls.js";
 import { readFlow, rememberCopy, reuseCopy } from "/static/project-flow.js";

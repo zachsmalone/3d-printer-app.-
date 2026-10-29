@@ -166,13 +166,13 @@ function fillBuildSelect() {
   $("#editFromBuildGo").disabled = !S.history.length;
 }
 /* Send to Slicer sets the hash (which restores zeim.edit.last) and then opens the new project.
-   Whichever request finishes last used to win, so a previous slicer model could replace the lithophane. */
+   Whichever request finishes last used to win, so a previous slicer model could replace the lithophane.
+   Leave, Abandon, Save & leave, and Reset bed remove zeim.edit.last so a later reload stays blank. */
 let editLoadGen = 0;
 document.addEventListener("zeim:edit-shown", async () => {
   const gen = editLoadGen;
   try { await loadHistory(); } catch { } fillBuildSelect(); ensureViewer(); setTimeout(() => viewer?.resize(), 50);
   if (gen !== editLoadGen || E.p) return;
-  // returning from CAD (Back) reloads the page: reopen the model that was loaded (CAD edits are saved server-side on the same project)
   let last = null; try { last = sessionStorage.getItem("zeim.edit.last"); } catch { }
   if (!last) return;
   try {
