@@ -4,16 +4,16 @@ No DMs. No cash/prizes. Tip links stay optional elsewhere; ZEIM takes no tip cut
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+import hmac
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .. import config
 from ..core import ratelimit
 from ..community import catalog, challenges, questions, safety
 from ..community.identity import Actor, get_actor
-from ..services import quarantine
-from .builds import meta_for
-from .community import D, _yes_no
+from .community import D
 from .textcap import text_in
 
 router = APIRouter(prefix="/api", tags=["showcase-rest"])
@@ -123,7 +123,12 @@ def delete_question(iid: str, qid: str, actor: Actor = Depends(get_actor)):
 # ---------------- prize-free themed challenges ----------------
 @router.get("/challenges")
 def list_challenges(actor: Actor = Depends(get_actor)):
-    return {"challenges": [challenges.public(c) for c in challenges.list_all()]}
+    rows = []
+    for c in challenges.list_all():
+        row = challenges.public(c)
+        row["entered"] = bool(actor.user and challenges.entry_for(c["id"], actor.sid))
+        rows.append(row)
+    return {"challenges": rows}
 
 
 @router.get("/challenges/{cid}")
@@ -151,7 +156,7 @@ def challenge_eligible(cid: str, actor: Actor = Depends(get_actor)):
     c = challenges.get(cid)
     if not c:
         raise HTTPException(404, "Challenge not found.")
-    pack = catalog.credited_remixes(actor)
+    pack = catalog.own_published(actor)
     prior = challenges.entry_for(c["id"], actor.sid) if actor.user else None
     entry = None
     if prior:
@@ -166,84 +171,27 @@ def challenge_eligible(cid: str, actor: Actor = Depends(get_actor)):
             "can_enter": bool(actor.user and actor.is_adult and c.get("status") == "open" and not prior)}
 
 
-def _remix_key(raw: str) -> str:
-    return (raw or "").strip().rsplit("/p/", 1)[-1].strip("/ ")
-
-
 def _entry_limit(actor: Actor):
     if not config.TESTING_MODE and not ratelimit.hit("chent:" + actor.sid, 10, 3600):
         raise HTTPException(429, "That's a lot of challenge entries for one hour. Please wait a while.")
 
 
-def _entered(rec: dict, item: dict, actor: Actor) -> dict:
-    project = catalog.public(item, actor)
-    project["warnings"] = list(item.get("_warnings") or [])
-    return {"ok": True, "entry": {"id": rec["id"], "item_id": rec["item_id"],
-                                  "challenge_id": rec["challenge_id"], "created": rec["created"]},
-            "prize_free": True,
-            "project": project,
-            "message": "Entered. Prize-free challenge: no cash, no prizes — just makers helping makers."}
+def _admin_ok(token: str) -> bool:
+    if not token or not config.ADMIN_TOKEN:
+        return False
+    return hmac.compare_digest(token.encode(), config.ADMIN_TOKEN.encode())
 
 
-def _studio_project(body: dict, actor: Actor, build_id: str) -> dict:
-    """Publish a Studio build the same way Showcase does, or reuse the listing that build already has.
-
-    Remix Yes/No, credit, re-upload protection, and the AI-made label all stay in create_project.
-    """
-    meta_for(build_id, actor, owner_only=True)
-    if quarantine.is_quarantined(build_id):
-        raise HTTPException(409, "That project is pending its malware scan and can't be shared yet.")
-    remix_of = _remix_key(str(body.get("remix_of") or ""))
-    visibility = str(body.get("visibility") or "").strip()
-    existing = catalog.listing_for_build(actor, build_id)
-    if existing:
-        have = existing.get("remix_of") or ""
-        if catalog.is_public(existing) and have:
-            _entry_limit(actor)
-            return existing
-        if visibility != "public":
-            raise HTTPException(400, "An entry has to be public.")
-        credit = remix_of or have
-        if not credit:
-            raise HTTPException(400, "This challenge is for credited remixes. Publish with a Remixed-from link first.")
-        _entry_limit(actor)
-        try:
-            return catalog.set_visibility(actor, existing["id"], "public", credit)
-        except catalog.Denied as e:
-            raise D(e)
-    if visibility != "public":
-        raise HTTPException(400, "An entry has to be public.")
-    if not remix_of:
-        raise HTTPException(400, "This challenge is for credited remixes. Publish with a Remixed-from link first.")
+@router.delete("/showcase/{iid}")
+def remove_showcase(iid: str, actor: Actor = Depends(get_actor), x_admin_token: str = Header("")):
+    """Owner or admin. Unpublishes the post. The Studio file stays. Remix credit keeps a stub."""
     try:
-        title = text_in(body.get("title"), 80, "Title")
-        desc = text_in(body.get("description"), 500, "Description")
-        raw_tags = body.get("tags") or []
-        if not isinstance(raw_tags, list) or len(raw_tags) > 20:
-            raise ValueError("Use at most 8 tags.")
-        tags = [text_in(t, 30, "Each tag") for t in raw_tags][:8]
-        nsfw = None if body.get("nsfw") is None else safety.parse_nsfw(body.get("nsfw"))
-        title = safety.gate(actor, title, "showcase:title", bool(nsfw))
-        desc = safety.gate(actor, desc, "showcase:description", bool(nsfw))
-        tags = [safety.gate(actor, t, "showcase:tag", bool(nsfw)) for t in tags]
-        _entry_limit(actor)
-        item = catalog.create_project(
-            actor, title=title, description=desc, tags=tags, build_id=build_id,
-            accept_guidelines=bool(body.get("accept_guidelines")),
-            visibility="public", remix_of=remix_of, nsfw=nsfw,
-            license_id=body.get("license_id"),
-            allow_remixes=_yes_no(body.get("allow_remixes"), True, "allow_remixes"),
-            view_only=_yes_no(body.get("view_only"), False, "view_only"),
-            ai_made=_yes_no(body.get("ai_made"), False, "ai_made"),
-            tip_url=body.get("tip_url") or "",
-            print_settings=body.get("print_settings"))
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+        catalog.remove_listing(actor, iid, admin=_admin_ok(x_admin_token))
     except catalog.Denied as e:
         raise D(e)
-    if not item.get("remix_of") or not catalog.is_public(item):
-        raise HTTPException(400, "Make the project public before entering.")
-    return item
+    challenges.pull_item(iid)
+    return {"ok": True, "removed": True,
+            "message": "Removed from Showcase. Your saved file stays."}
 
 
 @router.post("/challenges/{cid}/enter")
@@ -259,36 +207,28 @@ def enter_challenge(cid: str, body: dict, request: Request, actor: Actor = Depen
         raise HTTPException(400, "This challenge is closed.")
     if challenges.entry_for(c["id"], actor.sid):
         raise HTTPException(400, "You already entered this challenge. One remix per person.")
-    build_id = str(body.get("build_id") or "").strip()
     item_id = str(body.get("item_id") or "").strip()
+    if not item_id:
+        raise HTTPException(400, "Pick a project to enter.")
     try:
-        if build_id and not item_id:
-            item = _studio_project(body, actor, build_id)
-            item_id = item["id"]
-            remix_of = item.get("remix_of") or ""
-        else:
-            if not item_id:
-                raise HTTPException(400, "Pick a project to enter.")
-            try:
-                item = catalog.get(item_id, actor)
-            except catalog.Denied as e:
-                raise D(e)
-            if item.get("owner_sid") != actor.sid:
-                raise HTTPException(403, "You can only enter your own project.")
-            if not catalog.is_public(item):
-                raise HTTPException(400, "Make the project public before entering.")
-            remix_of = item.get("remix_of") or ""
-            if not remix_of:
-                raise HTTPException(400, "This challenge is for credited remixes. Publish with a Remixed-from link first.")
-            _entry_limit(actor)
-    except safety.ChatBlocked as e:
-        return JSONResponse(status_code=e.status, content=e.payload)
+        item = catalog.get(item_id, actor)
+    except catalog.Denied as e:
+        raise D(e)
+    if item.get("owner_sid") != actor.sid:
+        raise HTTPException(403, "You can only enter your own project.")
+    if not catalog.is_public(item):
+        raise HTTPException(400, "Make the project public before entering.")
+    remix_of = item.get("remix_of") or ""
     if not remix_of:
         raise HTTPException(400, "This challenge is for credited remixes. Publish with a Remixed-from link first.")
+    _entry_limit(actor)
     try:
         rec = challenges.enter(c["id"], item_id=item_id, sid=actor.sid, uid=actor.user["id"], remix_of=remix_of)
     except KeyError:
         raise HTTPException(404, "Challenge not found.")
     except challenges.Bad as e:
         raise HTTPException(400, str(e))
-    return _entered(rec, item, actor)
+    return {"ok": True, "entry": {"id": rec["id"], "item_id": rec["item_id"],
+                                  "challenge_id": rec["challenge_id"], "created": rec["created"]},
+            "prize_free": True,
+            "message": "Entered. Prize-free challenge: no cash, no prizes — just makers helping makers."}

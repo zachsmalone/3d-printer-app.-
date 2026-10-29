@@ -1,25 +1,14 @@
-"""Enter the prize-free Remix challenge from a saved Studio build.
-
-The file is published through the same Showcase path as in-app work. A Studio id
-is not a Showcase id, and the enter call does not ask for a pasted URL.
-"""
-import os
-
+"""Showcase posts and saved builds stay separate. Challenges take Showcase posts only."""
 import pytest
 
-from app import config
-from app.community import challenges, fingerprint as fp
-from app.community import protect
+from app.community import challenges
 from app.community.store import CHALLENGE_ENTRIES, CHALLENGES, LISTINGS
 from tests.b1 import client, photo_build
-
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SAMPLE_STL = os.path.join(ROOT, "static", "sample_model.stl")
 
 
 @pytest.fixture(autouse=True)
 def _fresh():
-    snap = {s: s.read() for s in (LISTINGS, CHALLENGES, CHALLENGE_ENTRIES, protect.FINGERPRINTS)}
+    snap = {s: s.read() for s in (LISTINGS, CHALLENGES, CHALLENGE_ENTRIES)}
     yield
     for s, was in snap.items():
         s.write(was)
@@ -29,131 +18,82 @@ def U(n):
     return client({"display_name": n, "dob": "1990-01-01"})
 
 
-def showcase(c, title="Pub", build=None, **extra):
-    body = {"build_id": build or photo_build(c), "title": title, "description": "d",
-            "tags": ["lamp"], "accept_guidelines": True, "nsfw": False,
-            "visibility": "public", "license_id": "cc-by-4.0"}
+def publish(c, title, build=None, **extra):
+    bid = build or photo_build(c)
+    body = {"build_id": bid, "title": title, "description": "d", "tags": ["lamp"],
+            "accept_guidelines": True, "nsfw": False, "visibility": "public", "license_id": "cc-by-4.0"}
     body.update(extra)
     r = c.post("/api/showcase", json=body)
     assert r.status_code == 200, r.text
-    return r.json()
+    return r.json(), bid
 
 
-def enter(c, bid, **extra):
-    body = {"build_id": bid, "title": extra.pop("title", "Studio remix"), "description": "d",
-            "tags": ["lamp"], "accept_guidelines": True, "nsfw": False,
-            "visibility": extra.pop("visibility", "public"), "license_id": "cc-by-4.0"}
-    body.update(extra)
-    return c.post(f"/api/challenges/{challenges.REMIX_ID}/enter", json=body)
+def test_deleting_a_saved_build_leaves_the_showcase_post():
+    maker = U("KeepPost")
+    item, bid = publish(maker, "Posted lamp")
+    name = item["files"][0]["name"]
+    assert maker.delete(f"/api/builds/{bid}").status_code == 200
+    assert maker.get(f"/api/builds/{bid}").status_code == 404
+    still = maker.get(f"/api/showcase/{item['id']}")
+    assert still.status_code == 200, still.text
+    assert still.json()["title"] == "Posted lamp"
+    downloaded = maker.get(f"/api/showcase/{item['id']}/files/{name}")
+    assert downloaded.status_code == 200 and downloaded.content
+    row = next(i for i in LISTINGS.read() if i["id"] == item["id"])
+    assert row.get("source_build_id") == bid
+    assert not row.get("removed_by_creator")
 
 
-def test_enter_challenge_from_studio():
-    """A saved Studio file is published and entered. Credit, the AI label, and the remix switch stay."""
-    a, b = U("StSrc"), U("StMaker")
-    src = showcase(a, "Source lamp", ai_made=True)
-    bid = photo_build(b)
-    r = enter(b, bid, remix_of=src["id"], ai_made=False, allow_remixes=False, title="My studio remix")
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["prize_free"] is True
-    assert "no cash" in body["message"].lower() and "no prizes" in body["message"].lower()
-    assert "rank" not in body and "prize_amount" not in body
-    item_id = body["entry"]["item_id"]
-    project = body["project"]
-    assert project["id"] == item_id
-    assert project["remix_chain"][0]["id"] == src["id"]
-    assert project["ai_made"] is True and project["ai_locked"] is True
-    assert project["allow_remixes"] is False
-    row = next(i for i in LISTINGS.read() if i["id"] == item_id)
-    assert row["source_build_id"] == bid
-    later = U("StLater")
-    refused = later.post("/api/showcase", json={
-        "build_id": photo_build(later), "title": "Off the entry", "description": "d",
-        "tags": ["lamp"], "accept_guidelines": True, "nsfw": False,
-        "visibility": "public", "license_id": "cc-by-4.0", "remix_of": item_id})
-    assert refused.status_code == 403
-    assert "turned off remixes" in refused.json()["detail"]
-
-    again = enter(b, photo_build(b), remix_of=src["id"], title="Second studio file")
-    assert again.status_code == 400
-    assert "one remix per person" in again.json()["detail"].lower()
-
-    other = U("StOther")
-    foreign = enter(other, bid, remix_of=src["id"], title="Not mine")
-    assert foreign.status_code == 404
-
-    off = showcase(a, "Remixes off", allow_remixes=False)
-    blocked = U("StBlocked")
-    before_entries = len(CHALLENGE_ENTRIES.read())
-    no = enter(blocked, photo_build(blocked), remix_of=off["id"], title="Blocked remix")
-    assert no.status_code == 403
-    assert "turned off remixes" in no.json()["detail"]
-    assert len(CHALLENGE_ENTRIES.read()) == before_entries
-
-    plain = U("StPlain")
-    missing = enter(plain, photo_build(plain), title="No credit")
-    assert missing.status_code == 400
-    assert "credited remix" in missing.json()["detail"].lower()
-    n = len(LISTINGS.read())
-    private = enter(plain, photo_build(plain), remix_of=src["id"], visibility="private", title="Stay private")
-    assert private.status_code == 400
-    assert "public" in private.json()["detail"].lower()
-    assert len(LISTINGS.read()) == n
-
-    saved = U("StSaved")
-    saved_id = photo_build(saved)
-    posted = showcase(saved, "Already public", build=saved_id, remix_of=src["id"])
-    before = len(LISTINGS.read())
-    reuse = saved.post(f"/api/challenges/{challenges.REMIX_ID}/enter", json={"build_id": saved_id})
-    assert reuse.status_code == 200, reuse.text
-    assert reuse.json()["entry"]["item_id"] == posted["id"]
-    assert reuse.json()["prize_free"] is True
-    assert len(LISTINGS.read()) == before
+def test_removing_a_showcase_post_leaves_the_saved_file_and_drops_challenge_entries():
+    origin, maker, child = U("OrigAcct"), U("PostAcct"), U("RemixAcct")
+    src, _ = publish(origin, "Root lamp")
+    item, bid = publish(maker, "Middle lamp", remix_of=src["id"])
+    kid, _ = publish(child, "Child lamp", remix_of=item["id"])
+    assert maker.post(f"/api/challenges/{challenges.REMIX_ID}/enter", json={"item_id": item["id"]}).status_code == 200
+    gone = maker.delete(f"/api/showcase/{item['id']}")
+    assert gone.status_code == 200, gone.text
+    assert maker.get(f"/api/builds/{bid}").status_code == 200
+    assert maker.get(f"/files/{bid}/model.stl").status_code == 200
+    assert maker.get(f"/api/showcase/{item['id']}").status_code == 404
+    detail = maker.get(f"/api/challenges/{challenges.REMIX_ID}").json()
+    assert all(e["id"] != item["id"] for e in detail["entries"])
+    assert not any(e.get("item_id") == item["id"] for e in CHALLENGE_ENTRIES.read())
+    seen = child.get(f"/api/showcase/{kid['id']}")
+    assert seen.status_code == 200, seen.text
+    assert seen.json()["files"]
+    chain = seen.json()["remix_chain"]
+    un = maker.get("/api/me").json()["username"]
+    assert chain[0]["removed"] is True
+    assert chain[0]["id"] is None
+    assert chain[0]["creator_username"] == un
+    assert chain[0]["creator"] == "@" + un
+    assert chain[0]["creator_id"]
+    assert chain[1]["id"] == src["id"]
+    blob = str(chain).lower()
+    assert "original removed" not in blob
+    assert "anonymous" not in blob
 
 
-def test_studio_enter_still_refuses_a_reupload(monkeypatch):
-    """A Studio file that matches someone else's model still hits re-upload protection."""
-    monkeypatch.setattr(config, "DUPLICATE_CHECK", True)
-    protect.FINGERPRINTS.write({})
-    real = fp.safe_compute
-    target = fp.compute(SAMPLE_STL)
-    phase = {"fake": True}
-
-    def wrapped(path):
-        if str(config.ORIGINALS) in str(path):
-            return real(path)
-        return target if phase["fake"] else real(path)
-
-    monkeypatch.setattr(fp, "safe_compute", wrapped)
-    owner, maker, other = U("ReOwn"), U("ReMaker"), U("ReOther")
-    locked = showcase(owner, "Locked shape", allow_remixes=False)
-    phase["fake"] = False
-    credit = showcase(other, "Different shape")
-    phase["fake"] = True
-    n = len(LISTINGS.read())
-    refused = enter(maker, photo_build(maker), remix_of=credit["id"], title="Copied shape")
-    assert refused.status_code == 409, refused.text
-    assert refused.json()["code"] == "copy_refused"
-    assert refused.json()["original"]["id"] == locked["id"]
-    assert not any(i.get("title") == "Copied shape" for i in LISTINGS.read())
-    assert len(LISTINGS.read()) == n
-
-
-def test_studio_enter_accepts_a_credited_reupload(monkeypatch):
-    monkeypatch.setattr(config, "DUPLICATE_CHECK", True)
-    protect.FINGERPRINTS.write({})
-    real = fp.safe_compute
-    target = fp.compute(SAMPLE_STL)
-
-    def wrapped(path):
-        if str(config.ORIGINALS) in str(path):
-            return real(path)
-        return target
-
-    monkeypatch.setattr(fp, "safe_compute", wrapped)
-    owner, maker = U("CrOwn"), U("CrMaker")
-    src = showcase(owner, "Remixable shape")
-    r = enter(maker, photo_build(maker), remix_of=src["id"], title="Credited copy")
-    assert r.status_code == 200, r.text
-    assert r.json()["project"]["remix_chain"][0]["id"] == src["id"]
-    assert r.json()["prize_free"] is True
+def test_challenge_picker_lists_every_open_challenge():
+    CHALLENGES.update(lambda rows: rows.append({
+        "id": "ch_shapes", "slug": "shapes", "title": "Shape challenge", "theme": "shapes",
+        "blurb": "Share a shape. Prize-free: no cash, no prizes, no ranking rewards.",
+        "rules": ["Prize-free: ZEIM offers no cash or prizes for this challenge."],
+        "prize_free": True, "status": "open", "created": 2,
+    }))
+    origin, maker = U("ListOrig"), U("ListMaker")
+    src, _ = publish(origin, "Open source")
+    item, _ = publish(maker, "Open remix", remix_of=src["id"])
+    assert maker.post(f"/api/challenges/{challenges.REMIX_ID}/enter", json={"item_id": item["id"]}).status_code == 200
+    assert maker.post("/api/challenges/ch_shapes/enter", json={"build_id": "aaaaaaaaaaaa"}).status_code == 400
+    ok = maker.post("/api/challenges/ch_shapes/enter", json={"item_id": item["id"]})
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["prize_free"] is True
+    rows = {c["id"]: c for c in maker.get("/api/challenges").json()["challenges"] if c["status"] == "open"}
+    assert "ch_remix" in rows and "ch_shapes" in rows
+    assert rows["ch_remix"]["entered"] is True
+    assert rows["ch_shapes"]["entered"] is True
+    assert rows["ch_remix"]["prize_free"] is True and rows["ch_shapes"]["prize_free"] is True
+    stranger = U("ListNew")
+    fresh = {c["id"]: c for c in stranger.get("/api/challenges").json()["challenges"] if c["status"] == "open"}
+    assert fresh["ch_remix"]["entered"] is False and fresh["ch_shapes"]["entered"] is False

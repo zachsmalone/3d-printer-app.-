@@ -179,7 +179,6 @@ export function takeExit(storage, now) {
 
 export function libraryHTML(builds, opts) {
   const current = opts && opts.currentId ? String(opts.currentId) : "";
-  const pick = !!(opts && opts.pick === "challenge");
   const rows = (builds || []).slice().reverse().map(b => {
     const id = String(b.id || "");
     if (!/^[0-9a-f]{12}$/.test(id)) return "";
@@ -190,21 +189,18 @@ export function libraryHTML(builds, opts) {
     const here = id === current ? " cur" : "";
     const thumb = b.thumb ? `<img src="${esc(b.thumb)}" alt="">` : "";
     const openNow = id === current ? `<span class="pill">Open in this visit</span>` : "";
-    const actions = pick
-      ? `<button type="button" class="btn small primary" data-lib="pick" data-id="${esc(id)}">Choose</button>`
-      : `<button type="button" class="btn small" data-lib="open" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in the FDM Slicer" : "Open this photo design"}">Open</button>
-        <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays on Account."}">Edit</button>
-        <button type="button" class="btn small" data-lib="send" data-id="${esc(id)}">Send…</button>
-        <button type="button" class="btn small" data-lib="showcase" data-id="${esc(id)}" title="Open the Showcase form for this project. Nothing is published until you confirm in that form.">Send to Showcase</button>
-        <button type="button" class="btn small" data-lib="star" data-id="${esc(id)}" aria-pressed="${b.favorite ? "true" : "false"}">${b.favorite ? "Starred" : "Star"}</button>
-        <button type="button" class="btn small" data-lib="delete" data-id="${esc(id)}">Delete</button>`;
     return `<li class="hcard${here}" data-id="${esc(id)}">
       ${thumb}
       <div class="meta"><b>${esc(title)}</b><span>${esc(label)}${kind === "edit" && mode !== "edit" ? " · Edited model" : ""}${openNow ? " · " + openNow : ""}</span></div>
       <div class="row2">
-        ${actions}
+        <button type="button" class="btn small" data-lib="open" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in the FDM Slicer" : "Open this photo design"}">Open</button>
+        <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays on Account."}">Edit</button>
+        <button type="button" class="btn small" data-lib="send" data-id="${esc(id)}">Send…</button>
+        <button type="button" class="btn small" data-lib="showcase" data-id="${esc(id)}" title="Open the Showcase form for this project. Nothing is published until you confirm in that form.">Send to Showcase</button>
+        <button type="button" class="btn small" data-lib="star" data-id="${esc(id)}" aria-pressed="${b.favorite ? "true" : "false"}">${b.favorite ? "Starred" : "Star"}</button>
+        <button type="button" class="btn small" data-lib="delete" data-id="${esc(id)}">Delete</button>
       </div></li>`;
   }).filter(Boolean);
-  if (!rows.length) return `<li class="hslot">${pick ? "No saved projects yet. Saved work is listed on Account." : "No saved projects yet."}</li>`;
+  if (!rows.length) return `<li class="hslot">No saved projects yet.</li>`;
   return rows.join("");
 }
