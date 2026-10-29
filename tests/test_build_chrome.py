@@ -88,6 +88,11 @@ def test_slice_is_not_covered_by_customise():
 def test_primary_actions_do_not_become_showcase():
     edit = _between(HTML, 'id="viewEdit"', 'id="viewShowcase"')
     assert 'id="slicerSlice"' in edit and 'data-go="spGo"' in edit
+    assert 'id="slicerRepair"' in edit and 'data-bed-act="repair"' in edit
+    assert "body[data-view=slicer] #projectFlow{display:none!important}" in CSS
+    assert 'data-big="fix"' in (ROOT / "static" / "edit.js").read_text(encoding="utf-8")
+    bar = (ROOT / "static" / "workspace-bar.js").read_text(encoding="utf-8")
+    assert 'data-bed-act=repair' in bar and "[data-big=fix]" in bar
     assert "sendToShowcase" not in edit
     assert 'data-ws-act="exit"' in edit
     litho = _between(HTML, 'id="viewCreate"', 'id="viewEdit"')
