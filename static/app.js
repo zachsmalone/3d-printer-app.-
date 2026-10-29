@@ -758,7 +758,7 @@ async function openPrint(b) {
     const ver = printInfo.printer_verification || S.settings?.printer_verification || "Simulated";
     $("#printerHonest").textContent = honesty
       || (ver === "Live API"
-           ? "Moonraker / OctoPrint: Live API (real HTTP). Not yet confirmed on Zach's Creality K1 hardware. Bambu / stubs stay Simulated."
+           ? "Moonraker / OctoPrint: Live API (real HTTP). Not Hardware-tested on a real printer yet. Bambu stays Simulated."
            : ver + " until a real-hardware pass. Tested with a pretend printer only.");
   }
   $("#dlgPrint").showModal();
@@ -891,8 +891,8 @@ function renderPrinters() {
     <p class="help">${types.find(t => t.type === p.type)?.hint || ""}</p>
     ${(S.settings.printer_presets || []).find(x => x.id === p.profile) ? `<p class="help"><b>Experimental.</b> ${esc(S.settings.printer_presets.find(x => x.id === p.profile).hint)}</p>` : ""}
     ${dc
-      ? `<p class="help">Direct control is on for this install. Addresses are checked against SSRF rules before every request. This printer path: <b>${esc((p.type === "moonraker" || p.type === "octoprint") ? "Live API" : (p.type === "bambu" ? "Simulated" : ver))}</b>${(p.type === "moonraker" || p.type === "octoprint") ? " (real HTTP; not yet Hardware-tested on Zach's K1)." : (p.type === "bambu" ? " — Bambu LAN not confirmed on real hardware; keep Open in Bambu Studio as fallback." : ".")}</p>`
-      : `<p class="help">Direct control is off: slice, download the G-code and print from your printer's own app. (Arbitrary printer URLs can no longer be entered — they were an SSRF risk.)</p>`}
+      ? `<p class="help">Direct control is on for this install. Addresses are checked before every request. This printer path: <b>${esc((p.type === "moonraker" || p.type === "octoprint") ? "Live API" : (p.type === "bambu" ? "Simulated" : ver))}</b>${(p.type === "moonraker" || p.type === "octoprint") ? " (real HTTP; not Hardware-tested on a real printer yet)." : (p.type === "bambu" ? " — keep Open in Bambu Studio as a backup." : ".")}</p>`
+      : `<p class="help">Direct control is off: slice, download the G-code and print from your printer's own app.</p>`}
     <p class="help">${(S.settings.printer_honesty || "Moonraker / OctoPrint: Live API. Bambu / stubs: Simulated.")}</p>
     <button class="btn small" data-test="${i}" ${p.id ? "" : "disabled title='Save first, then test'"}>Test connection</button> <button class="btn small danger" data-rm="${i}">Remove</button>
     <p class="help" data-testout="${i}" role="status" aria-live="polite">${p.id ? "A test only asks the printer if it is there. It never starts a print." : "Save settings first, then you can test the connection."}</p></div>`).join("") || `<p class="help">No printers yet.</p>`;
@@ -940,27 +940,61 @@ $("#btnSaveSettings").onclick = async () => {
     toast("Settings saved", "ok"); $("#dlgSettings").close();
   } catch (e) { toast(e.message, "err"); }
 };
-const PLAT = { tiktok: "TikTok", instagram: "Instagram", reddit: "Reddit", patreon: "Patreon" };
-async function renderLinkInputs() {
+const PLATS = [
+  ["tiktok", "TikTok", "@name or a profile link"],
+  ["instagram", "Instagram", "@name or a profile link"],
+  ["reddit", "Reddit", "@name or a profile link"],
+  ["patreon", "Patreon", "@name or a profile link"],
+  ["youtube", "YouTube", "@name or a channel link"],
+  ["x", "X", "@name or a profile link"],
+  ["website", "Website", "https://yoursite.com"],
+];
+async function saveLinks() {
+  const body = {};
+  $$("[data-link]").forEach(i => { body[i.dataset.link] = i.value; });
+  const saved = await api("/api/me/links", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return saved.links || {};
+}
+async function renderAccounts() {
   const me = await api("/api/me");
-  $("#linkInputs").innerHTML = me.signed_up ? Object.entries(PLAT).map(([k, n]) => `<div class="field"><label>${n} handle</label><input data-link="${k}" value="${esc(me.links?.[k]?.handle || "")}" placeholder="yourname"></div>`).join("")
-    : `<p class="help wide2">Create an account (top right) to add link-outs.</p>`;
-  $("#btnSaveLinks").hidden = !me.signed_up;
+  let providers = [];
+  try { providers = (await api("/api/accounts")).providers || []; } catch { providers = []; }
+  const by = {};
+  providers.forEach(p => { by[p.id] = p; });
+  const host = $("#linkInputs");
+  if (!host) return;
+  if (!me.signed_up) {
+    host.innerHTML = `<p class="help wide2">Create an account (top right) to add your links.</p>`;
+    if ($("#btnSaveLinks")) $("#btnSaveLinks").hidden = true;
+    return;
+  }
+  if ($("#btnSaveLinks")) $("#btnSaveLinks").hidden = false;
+  host.innerHTML = PLATS.map(([k, n, ph]) => {
+    const p = by[k];
+    const val = (me.links && me.links[k] && (me.links[k].url || me.links[k].handle)) || "";
+    const oauth = p && p.connected
+      ? `<button type="button" class="btn small" data-disc="${k}">Disconnect</button>`
+      : (p && p.can_connect ? `<a class="btn small" href="/api/accounts/${k}/connect">Connect</a>` : "");
+    return `<div class="field"><label>${n}</label><input data-link="${k}" value="${esc(val)}" placeholder="${esc(ph)}" maxlength="300" autocomplete="off" spellcheck="false"><div class="row"><button type="button" class="btn small ghost" data-clear="${k}">Remove</button>${oauth}</div></div>`;
+  }).join("");
 }
 $("#btnSaveLinks").onclick = async () => {
-  const body = {}; $$("[data-link]").forEach(i => body[i.dataset.link] = i.value);
-  try { await api("/api/me/links", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); toast("Link-outs saved (shown as unverified)", "ok"); } catch (e) { toast(e.message, "err"); }
+  try { await saveLinks(); toast("Saved. These links show on your profile and posts.", "ok"); await renderAccounts(); } catch (e) { toast(e.message, "err"); }
 };
-async function renderAccounts() {
-  await renderLinkInputs();
-  const r = await api("/api/accounts"); $("#accNote").textContent = r.note;
-  const label = { not_configured: "Not configured", disconnected: "Ready to connect", connected: "Connected" };
-  $("#accList").innerHTML = r.providers.map(p => `<div class="acc"><div class="info"><b>${p.label}</b> <span class="pill ${p.state === "connected" ? "ok" : ""}">${label[p.state]}</span>
-    <small>${p.purpose} · posting/verification: <i>Coming soon</i></small>
-    ${p.state === "not_configured" ? `<small>Set <code>${p.env_vars[0]}</code> and <code>${p.env_vars[1]}</code>, then restart the server.</small>` : ""}</div>
-    ${p.state === "connected" ? `<button class="btn small" data-disc="${p.id}">Disconnect</button>` : `<a class="btn small ${p.state === "not_configured" ? "" : "primary"}" ${p.state === "not_configured" ? 'style="pointer-events:none;opacity:.4"' : `href="/api/accounts/${p.id}/connect"`}>Connect</a>`}</div>`).join("");
-}
-$("#accList").onclick = async e => { const d = e.target.closest("[data-disc]"); if (d) { await api("/api/accounts/" + d.dataset.disc, { method: "DELETE" }); renderAccounts(); } };
+$("#linkInputs").onclick = async e => {
+  const clear = e.target.closest("[data-clear]");
+  const disc = e.target.closest("[data-disc]");
+  try {
+    if (clear) {
+      const input = clear.closest(".field").querySelector("[data-link]");
+      if (input) input.value = "";
+      await saveLinks();
+      toast("Removed.", "ok");
+      await renderAccounts();
+    }
+    if (disc) { await api("/api/accounts/" + disc.dataset.disc, { method: "DELETE" }); await renderAccounts(); }
+  } catch (err) { toast(err.message, "err"); }
+};
 /* Settings sections are real tabs: aria-selected, one Tab stop, arrow keys / Home / End move between them. */
 const _tabs = $$(".tabs [role=tab]");
 const pickTab = (b, focus) => {

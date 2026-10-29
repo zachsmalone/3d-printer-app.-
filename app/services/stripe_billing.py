@@ -259,8 +259,7 @@ def _return_urls(base: str) -> tuple[str, str]:
 def _base_ok(mode: str, base: str) -> str | None:
     if mode == "live" and not (base or "").startswith("https://"):
         return (
-            "Live checkout needs PHOTO3D_PUBLIC_BASE_URL set to the https site "
-            "(https://zeimapp.com). Nothing was charged."
+            "Live checkout needs this site's address to be https. Nothing was charged."
         )
     if not base:
         return "Checkout needs a public site address. Nothing was charged."

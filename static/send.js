@@ -1,7 +1,7 @@
 /* The Send sheet (SEND-2..9, reports/design-ios-send.md): one place to save a build or hand it to another app.
    The SERVER decides what a person may do (/api/me -> send{...}, enforced again on every route); this file only draws what the
    server allows. Download is the product. Share/Email use the system share sheet and stay OFF until the device spike (SEND-0)
-   passed (server flag PHOTO3D_SEND_SHARE -> send.share_ui). No link is ever put in a share (no url field, no signed-link route). */
+   passed (the server decides whether the share sheet is offered). No link is ever put in a share (no url field, no signed-link route). */
 import { S, api, toast, $, $$, esc, openPrint, printBuild, isExpert } from "/static/app.js";
 
 const FMTS = ["3mf", "stl", "obj"];

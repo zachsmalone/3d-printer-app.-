@@ -73,7 +73,7 @@ def test_test_route_friendly_failures(local):
     assert "Traceback" not in json.dumps(r2) and "127.0.0.1" not in r2["message"]
     stub = c.put("/api/settings", json={"printers": [{"name": "b", "type": "bambu", "url": "x"}]}); assert stub.status_code == 200
     r3 = c.post(f"/api/printers/{settings.load()['printers'][0]['id']}/test").json()
-    assert r3["ok"] is False and "not implemented" in r3["message"]
+    assert r3["ok"] is False and "can't test this printer type" in r3["message"]
 
 
 def test_test_route_refuses_suspended_visitors_and_unknown_ids(local):

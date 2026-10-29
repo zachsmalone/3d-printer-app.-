@@ -104,7 +104,7 @@ class OAuthProvider:
         return tok
 
     def share(self, build: dict, token: dict) -> dict:
-        raise NotImplementedError(f"Sharing to {self.label} is not implemented yet (see ROADMAP.md)")
+        raise RuntimeError(f"ZEIM does not post to {self.label}.")
 
 
 class TikTok(OAuthProvider):
@@ -150,14 +150,17 @@ REGISTRY: dict[str, OAuthProvider] = {p.id: p for p in (TikTok(), Instagram(), R
 
 
 def status() -> list[dict]:
+    """What the page may show. No setup names. Connect exists only when this server has keys."""
     toks = _load_tokens()
     out = []
     for p in REGISTRY.values():
-        st = "connected" if p.id in toks else ("disconnected" if p.configured() else "not_configured")
-        out.append({"id": p.id, "label": p.label, "state": st, "purpose": p.purpose, "docs": p.docs,
-                    "env_vars": [f"PHOTO3D_{p.id.upper()}_CLIENT_ID", f"PHOTO3D_{p.id.upper()}_CLIENT_SECRET"],
-                    "sharing_implemented": False,
-                    "connected_at": toks.get(p.id, {}).get("obtained_at")})
+        connected = p.id in toks
+        out.append({
+            "id": p.id,
+            "label": p.label,
+            "can_connect": p.configured() and not connected,
+            "connected": connected,
+        })
     return out
 
 

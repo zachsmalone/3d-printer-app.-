@@ -83,6 +83,9 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
 .printer{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--sunk)}
 .printer .grid2{margin-bottom:0}.acc{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--sunk)}
 .acc .info{flex:1}.acc small{color:var(--mut);display:block}.acc code,code{background:var(--bg);padding:1px 5px;border-radius:5px;font-size:11px}
+.soclinks{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.soclinks a.soc{display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--line);color:inherit;text-decoration:none}
+.soclinks a.soc svg{width:16px;height:16px}
 .fulllist{display:grid;gap:8px}.fl{display:flex;gap:10px;align-items:center;background:var(--panel2);border-radius:10px;padding:6px 10px}.fl img{width:56px;height:42px;object-fit:cover;border-radius:6px}.fl span{flex:1}
 #toasts{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:50}
 .toast{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--acc);padding:10px 14px;border-radius:9px;max-width:360px;box-shadow:0 8px 30px #0008}

@@ -57,9 +57,8 @@ def put_printers(body: dict, request: Request, actor: Actor = Depends(get_actor)
 
 @router.get("/accounts")
 def list_accounts():
-    return {"providers": accounts.status(),
-            "note": "Scaffolding only: you can connect accounts when OAuth client keys are configured, "
-                    "but sharing/posting is not implemented yet."}
+    """Which places can offer Connect. Unconfigured places are omitted from the button list."""
+    return {"providers": [p for p in accounts.status() if p.get("can_connect") or p.get("connected")]}
 
 
 @router.get("/accounts/{provider}/connect")
@@ -69,8 +68,7 @@ def connect(provider: str, request: Request, actor: Actor = Depends(get_actor)):
     if not p:
         raise HTTPException(404)
     if not p.configured():
-        raise HTTPException(409, f"{p.label} is not configured. Set "
-                                 f"PHOTO3D_{provider.upper()}_CLIENT_ID and _CLIENT_SECRET and restart.")
+        raise HTTPException(409, f"{p.label} can't be connected from here.")
     return RedirectResponse(accounts.begin(provider, _base(request)))
 
 

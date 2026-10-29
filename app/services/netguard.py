@@ -88,8 +88,7 @@ def shared_mode_denial(url: str, *, lan_ok: bool) -> str | None:
                             "(loopback or link-local). Give the printer's LAN address, or run ZEIM in local mode.")
                 return ("On a shared server the printer address cannot point at the server's own machine or a private "
                         "network address: the server must never be used to reach internal addresses. Use the printer's "
-                        "public address, or run ZEIM in local mode on a computer on the same network as the printer. "
-                        "(Self-hosting on the printer's LAN? Set PHOTO3D_LAN_PRINTERS=1.)")
+                        "public address, or run ZEIM on a computer on the same network as the printer.")
         except ValueError:
             continue
     return None
