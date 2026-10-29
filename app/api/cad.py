@@ -282,6 +282,6 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
     return {"id": bid, "title": meta.get("title"), "bodies": out,
             "appearance": cadops.appearance_for_viewer(meta.get("appearance") or {}, m),
             "ops": p["ops"], "head": p["head"], "can_undo": p["can_undo"], "can_redo": p["can_redo"],
-            "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode")},
+            "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode", "origin", "from_mode", "from_build")},
             "downloads": {e: f"/api/download/{bid}/{e}" for e in ("stl", "3mf", "obj")},
             "display_simplified": simplified, "triangles": real_n, "display_triangles": shown}

@@ -22,9 +22,23 @@ const MAX_COPIES = 8;
 const valid = id => ID.test(id || "");
 const validRepair = id => REPAIR_ID.test(id || "");
 
-export function stageFor(view, tool) {
+const PHOTO_ORIGIN = new Set(["lithophane", "relief", "popart", "bust", "trace2d", "memorybox"]);
+
+/* A photo design keeps origin "lithophane" on the build and on the slicer copy (base.origin). */
+export function originOf(meta) {
+  const m = meta || {};
+  const base = m.base || {};
+  if (m.origin === "lithophane" || base.origin === "lithophane" || base.type === "photo") return "lithophane";
+  const mode = base.from_mode || base.photo_mode || "";
+  if (PHOTO_ORIGIN.has(mode)) return "lithophane";
+  if ((m.kind === "photo" || m.kind == null) && PHOTO_ORIGIN.has(m.mode || "")) return "lithophane";
+  return "";
+}
+
+export function stageFor(view, tool, origin) {
   const t = tool || "";
-  if (view === "lithophane" || view === "cad") return "design";
+  if (view === "lithophane") return origin === "lithophane" ? "design-lith" : "design";
+  if (view === "cad") return origin === "lithophane" ? "design-cad" : "design";
   if (view === "torchc0") return "prepare";
   if (view === "slicer") {
     if (t === "smartorient" || t === "orient" || t === "hollow" || t === "cut") return "prepare";
@@ -53,7 +67,15 @@ export function flowVisible(view, ctx) {
   return !!(ctx && ctx.working);
 }
 
-export function stagesFor() {
+export function stagesFor(ctx) {
+  if (ctx && ctx.origin === "lithophane") {
+    return [
+      { id: "design-lith", label: "Design Lith" },
+      { id: "design-cad", label: "Design CAD" },
+      { id: "prepare", label: "Prepare" },
+      { id: "slice", label: "Export/Print" },
+    ];
+  }
   return STAGES.slice();
 }
 
@@ -213,6 +235,24 @@ export function planHop(stage, ctx) {
   const kind = c.kind === "resin" ? "resin" : "fdm";
   const photoId = valid(c.photoId) ? c.photoId : "";
   const view = c.view || "";
+  if (stage === "design-lith") {
+    if (view === "lithophane" && photoId) {
+      return { stage, stay: true, hash: "#lithophane", open: "build", id: photoId, note: "Design Lith is this photo model." };
+    }
+    if (photoId) {
+      return { stage, stay: false, hash: "#lithophane", open: "build", id: photoId, note: "Design Lith opens this photo's settings." };
+    }
+    return { stage, stay: false, hash: "#lithophane", open: "", note: "Design Lith opens Lithophane." };
+  }
+  if (stage === "design-cad") {
+    const meshId = meshOf(c);
+    if (view === "cad") return { stage, stay: true, open: "", note: "Design CAD is this model." };
+    if (meshId) return { stage, stay: false, url: "/static/cad.html?bid=" + meshId, open: "", note: "Design CAD opens this model in CAD." };
+    return { stage, stay: false, hash: "#cad", open: "", note: "Design CAD starts in CAD." };
+  }
+  if (stage === "slice" && view === "lithophane") {
+    return { stage, stay: false, open: "destinations", note: "Export/Print asks where this model should go." };
+  }
   if (stage === "design") {
     if (view === "lithophane" && photoId) {
       return { stage, stay: true, hash: "#lithophane", open: "build", id: photoId, note: "Design is this photo model." };
@@ -274,9 +314,9 @@ export function bindFlow(getCtx, go) {
   if (!roots.length) return function () {};
   function paint() {
     const ctx = (typeof getCtx === "function" ? getCtx() : {}) || {};
-    const stage = stageFor(ctx.view, ctx.tool);
+    const stage = stageFor(ctx.view, ctx.tool, ctx.origin);
     const show = flowVisible(ctx.view, ctx);
-    const html = stagesFor().map(s => {
+    const html = stagesFor(ctx).map(s => {
       const on = s.id === stage;
       return `<li class="${on ? "cur" : ""}"><button type="button" data-stage="${s.id}"${on ? ' aria-current="step"' : ""}>${s.label}</button></li>`;
     }).join("");

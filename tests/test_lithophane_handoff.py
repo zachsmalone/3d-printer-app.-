@@ -49,7 +49,8 @@ def test_handoff_ui_keeps_both_sends_reachable():
     hand = (ROOT / "static" / "handoff.js").read_text()
     assert "editLoadGen" in edit and "zeim:open-edit" in edit
     assert "displayLite" in cad and "display_simplified" in cad
-    assert 'slicer.onclick' in hand and 'cad.onclick' in hand and "/api/edit/new" in hand
+    assert 'slicer.onclick' in hand and "/api/edit/new" in hand
+    assert "design-cad" in (ROOT / "static/project-flow.js").read_text(encoding="utf-8")
 
 
 def test_small_lithophane_reaches_slicer_and_cad_at_full_detail():
@@ -57,6 +58,7 @@ def test_small_lithophane_reaches_slicer_and_cad_at_full_detail():
                data={"mode": "lithophane", "shape": "rect", "width_mm": "80", "resolution": "40",
                      "beginner": "false", "photo_ack": "true", "title": "Small lithophane"})
     assert g.status_code == 200, g.text
+    assert g.json()["origin"] == "lithophane"
     full = g.json()["stats"]["triangles"]
     assert 0 < full < MAX_SCENE_FACES
     eid = _send(g.json()["id"])
@@ -64,6 +66,10 @@ def test_small_lithophane_reaches_slicer_and_cad_at_full_detail():
     assert edit.status_code == 200, edit.text
     body = edit.json()
     assert body["analysis"]["triangles"] == full
+    assert body["origin"] == "lithophane"
+    assert body["base"]["origin"] == "lithophane"
+    assert body["base"]["from_build"] == g.json()["id"]
+    assert body["base"]["from_mode"] == "lithophane"
     prev = body["preview"]["bodies"][0]
     faces = _faces(prev["indices"])
     verts = np.frombuffer(base64.b64decode(prev["positions"]), dtype="<f4").reshape(-1, 3)

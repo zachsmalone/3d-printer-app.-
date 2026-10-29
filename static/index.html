@@ -79,8 +79,10 @@
     <p class="have3d"><button type="button" class="linkbtn" id="btnHave3d">Already have a 3D file (STL, OBJ or 3MF)? Open it in the FDM Slicer</button></p>
   </section>
   <div class="wsbar" data-ws="lithophane" role="group" aria-label="Lithophane workspace">
-    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
-    <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Account, go back to the list. This does not send the model to Showcase.">Done</button>
+    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="If the bed is empty, leave. If there is work, choose stay, save and leave, reset the bed, or abandon unsaved changes. This does not send the model to Showcase.">Exit</button>
+    <nav id="lithoFlow" class="pflow pflow-inline" data-flow hidden aria-label="Project stages"><ol class="path"></ol></nav>
+    <span class="bed-name litho-name">Lithophane</span>
+    <button type="button" class="btn small bed-done" data-ws-act="done" hidden aria-label="Done" title="Choose where this model goes. Nothing is published from this button.">Done</button>
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A project already on Account stays there. This does not send the model to Showcase.">New build</button>
     <a class="btn small" data-ws-act="return-studio" href="#account" hidden aria-label="Return to Account" title="Go back to saved work on Account. The draft is saved first. This does not send the model to Showcase.">Return to Account</a>
     <button type="button" class="btn small primary ws-go" id="lithoGo" data-go="btnSendSlicer" title="Save first, then open this model in the FDM Slicer. This does not send it to Showcase.">Send to Slicer</button>
@@ -91,7 +93,7 @@
   </nav>
   <aside class="panel controls" aria-label="Make a 3D model">
     <p class="modeline" id="modeLine"></p>
-    <section class="step">
+    <section class="step" data-litho-group="photo">
       <h2><i>1</i> Your photo</h2>
       <div class="drop" id="drop"><img id="dropPreview" alt="Your chosen photo" hidden>
         <div id="dropHint"><div class="big" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-camera"/></svg></div><b>No photo yet</b><span>Use the buttons above, or drop a photo here. JPG, PNG or iPhone photos, up to 25 MB.</span></div></div>
@@ -100,14 +102,14 @@
     </section>
 
     <section class="step">
-      <fieldset class="cards" id="modeCards"><legend><i>2</i> Style</legend>
+      <fieldset class="cards" id="modeCards" data-litho-group="shape"><legend><i>2</i> Style</legend>
         <label class="card" data-mode="lithophane"><input type="radio" name="style" value="lithophane" checked><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-bulb"/></svg></span><b>Lithophane</b><small>A picture that glows with a light behind it</small></label>
         <label class="card" data-mode="relief"><input type="radio" name="style" value="relief"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-mountain"/></svg></span><b>Relief</b><small>Your picture as raised hills and valleys</small></label>
         <label class="card" data-mode="popart"><input type="radio" name="style" value="popart"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-palette"/></svg></span><b>Pop-art</b><small>Flat colour layers stacked up</small></label>
         <label class="card" data-mode="bust"><input type="radio" name="style" value="bust"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h12v12H6z"/><path d="M4 17h16v4H4z"/></svg></span><b>Photo plaque</b><small>Raised photo on a rounded plaque and pedestal. Not a scanned head.</small></label>
         <label class="card" data-mode="trace2d"><input type="radio" name="style" value="trace2d"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-pencil"/></svg></span><b>Logo &amp; Drawing to 3D</b><small>A logo, sketch or drawing as a clean 3D shape, cookie cutter or stamp</small></label>
       </fieldset>
-      <fieldset class="cards shapes" id="shapeCards" aria-describedby="shapeHelp"><legend>Lithophane shape</legend>
+      <fieldset class="cards shapes" id="shapeCards" data-litho-group="shape" aria-describedby="shapeHelp"><legend>Lithophane shape</legend>
 <label class="card" data-shape="rect"><input type="radio" name="litho_shape" value="rect" checked><span class="ico" aria-hidden="true">▭</span><b>Rectangle</b><small>Flat panel</small></label>
 <label class="card" data-shape="square"><input type="radio" name="litho_shape" value="square"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 5h14v14H5z"/></svg></span><b>Square</b><small>Flat panel</small></label>
 <label class="card" data-shape="circle"><input type="radio" name="litho_shape" value="circle"><span class="ico" aria-hidden="true">◯</span><b>Circle</b><small>Flat, round</small></label>
@@ -123,8 +125,8 @@
 <label class="card" data-shape="curve"><input type="radio" name="litho_shape" value="curve"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-curve"/></svg></span><b>Curved panel</b><small>Flat to half circle</small></label>
 <label class="card" data-shape="nightlight"><input type="radio" name="litho_shape" value="nightlight"><span class="ico" aria-hidden="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-candle"/></svg></span><b>Night-light</b><small>Slips over a tea-light</small></label>
       </fieldset>
-      <p class="help" id="shapeHelp">Flat shapes lie on the bed. Globe, cup, night-light and curved panel print standing up.</p>
-      <div class="grid2" id="curvedOpts" hidden>
+      <p class="help" id="shapeHelp" data-litho-group="shape">Flat shapes lie on the bed. Globe, cup, night-light and curved panel print standing up.</p>
+      <div class="grid2" id="curvedOpts" data-litho-group="shape" hidden>
         <div class="field wide2" id="lightFitBox" hidden>
           <label for="lightFit">Light fit</label>
           <select id="lightFit" aria-describedby="lightFitHelp">
@@ -149,14 +151,14 @@
           <p class="help warn" id="lipWarn" hidden></p>
         </div>
       </div>
-      <div id="curveOpts" hidden>
+      <div id="curveOpts" data-litho-group="shape" hidden>
         <div class="field"><label for="bend_deg">Bend <em id="bendOut">90°</em></label>
           <div class="range"><input type="range" id="bend_deg" min="0" max="180" step="5" value="90" aria-describedby="bendHelp"></div></div>
         <p class="help" id="bendHelp">0° is flat, 180° is a half circle. Width is measured along the curve, so the photo keeps its shape.</p>
         <label class="inl"><input type="checkbox" id="curveStand"> Built-in stand (a foot printed in one piece with the panel)</label>
         <p class="help" id="curveFit" role="status" aria-live="polite"></p>
       </div>
-      <div id="hangOpts" hidden>
+      <div id="hangOpts" data-litho-group="shape" hidden>
         <div class="grid2">
           <div class="field"><label for="hang">Hanging holes</label><select id="hang"><option value="">None</option><option value="top">One, top centre</option><option value="two">Two, along the top</option></select></div>
           <div class="field" id="hangHoleFld" hidden><label for="hole_d">Hole diameter <em>mm</em></label><input type="number" id="hole_d" value="4" min="2" max="20" step="0.5"></div>
@@ -165,7 +167,7 @@
         <label class="inl" id="standCapsRow" hidden><input type="checkbox" id="stand_caps"> Add stand end caps (two friction-fit plugs so the panel cannot slide out)</label>
         <p class="help">Flat shapes only. The stand is sized to the panel with a small slip-fit gap. End caps are plastic stops for the U-channel — not an electrical socket.</p>
       </div>
-      <div id="frameStyleBox" hidden>
+      <div id="frameStyleBox" data-litho-group="frame" hidden>
         <div class="field"><label for="frame_style">Frame style</label>
           <select id="frame_style" aria-describedby="frameStyleHelp">
             <option value="plain" selected>Plain rim</option>
@@ -175,7 +177,7 @@
           <p class="help" id="frameStyleHelp">Changes the rim thickness pattern on flat lithophanes. Still one solid mesh — not multi-colour.</p>
         </div>
       </div>
-      <div id="collageBox" hidden>
+      <div id="collageBox" data-litho-group="shape" hidden>
         <label class="inl"><input type="checkbox" id="collageOn"> Collage (2–6 photos on one panel)</label>
         <div id="collageOpts" hidden>
           <div class="field"><label for="collage_layout">Layout</label>
@@ -191,14 +193,14 @@
           </div>
         </div>
       </div>
-      <details class="placeEd" id="placeEditor" hidden open><summary>Move &amp; size the photo in the shape</summary><div id="placeRoot"></div></details>
+      <details class="placeEd" id="placeEditor" data-litho-group="shape" hidden open><summary>Move &amp; size the photo in the shape</summary><div id="placeRoot"></div></details>
     </section>
 
     <section class="step">
-      <h2><i>3</i> Size &amp; settings</h2>
-      <div class="field"><label for="width_mm">Width <em>mm</em></label>
+      <h2 data-litho-group="size"><i>3</i> Size &amp; settings</h2>
+      <div class="field" data-litho-group="size"><label for="width_mm">Width <em>mm</em></label>
         <div class="range"><input type="range" id="widthRange" min="30" max="300" step="5" value="100"><input type="number" name="width_mm" id="width_mm" value="100" min="5" max="1000" step="1"></div></div>
-      <div class="field" id="frameSizeBox" hidden>
+      <div class="field" id="frameSizeBox" data-litho-group="size" hidden>
         <label for="frameSize">Plate size</label>
         <select id="frameSize" aria-describedby="frameSizeHelp">
           <option value="">Custom width</option>
@@ -211,7 +213,7 @@
         <p class="help" id="frameSizeHelp">Sets the plate width to a common photo size. Height follows your picture.</p>
       </div>
 
-      <div id="traceOpts" hidden>
+      <div id="traceOpts" data-litho-group="shape" hidden>
         <p class="help">Best with a flat picture: a logo, icon, sketch or drawing on a plain background. PNG, JPG or SVG.</p>
         <fieldset class="field seg wide" id="tOut"><legend>What to make</legend>
           <label><input type="radio" name="t_out" value="extrude" checked>Shape</label><label><input type="radio" name="t_out" value="cutter">Cookie cutter</label><label><input type="radio" name="t_out" value="stamp">Stamp</label><label><input type="radio" name="t_out" value="layers">Colour layers</label>
@@ -264,16 +266,16 @@
           <p class="help" id="traceStatus" aria-live="polite"></p></div>
       </div>
 
-      <div class="field" id="lithMatBox"><p class="help lithKindLine">Printer type: <b id="lithKindName">Filament (FDM)</b>. Change it with <b>My printer</b> at the top.</p>
+      <div class="field" id="lithMatBox" data-litho-group="thickness"><p class="help lithKindLine">Printer type: <b id="lithKindName">Filament (FDM)</b>. Change it with <b>My printer</b> at the top.</p>
         <select id="lithMaterial" hidden aria-hidden="true" tabindex="-1"><option value="filament">Filament (FDM)</option><option value="resin">Resin (SLA / MSLA)</option></select>
         <label for="lithThk" class="sr-only">Thickness preset</label><select id="lithThk" class="exp-only"><option value="thin">Thin</option><option value="standard" selected>Standard</option><option value="thick">Thick</option></select>
         <p class="help" id="lithMatHelp">Filament: 0.8–3.2 mm walls. Starting suggestions; test a small strip first.</p></div>
-      <div class="field" id="backingBox"><label for="backing">Backing colour</label>
+      <div class="field" id="backingBox" data-litho-group="light"><label for="backing">Backing colour</label>
         <select id="backing" aria-describedby="backingHelp"><option value="">None (light only)</option><option value="warm">Warm white</option><option value="cool">Cool white</option><option value="paper">Paper</option><option value="custom">Custom colour</option></select>
         <div class="backingCustom" id="backingCustom" hidden><label for="backingRGB" class="sr-only">Pick a backing colour</label><input type="color" id="backingRGB" value="#fff4e0">
           <label for="backingHex" class="sr-only">Backing colour as hex, like #fff4e0</label><input type="text" id="backingHex" value="#fff4e0" maxlength="7" size="8" spellcheck="false" autocomplete="off" inputmode="text"></div>
         <p class="help" id="backingHelp">What sits behind the print, such as a white diffuser or a sheet of paper. The Light on preview uses this colour, and it is saved with the build.</p></div>
-      <details class="field" id="mboxBox"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box</summary>
+      <details class="field" id="mboxBox" data-litho-group="shape"><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Memory box</summary>
         <p class="help" id="mbIntro">A box for four lithophane sides and a light. The picture is the box together. Send to Slicer, Export, and the STL zip are the separate parts, laid out to print. They fit each other. Sizes are starting points.</p>
         <div class="grid2">
           <div class="field wide2"><label for="mbFiles">Up to 4 photos, one per side</label><input type="file" id="mbFiles" accept="image/*" multiple>
@@ -303,7 +305,7 @@
         <p class="help" id="mbDims" hidden></p>
         <p class="help" id="mbStatus" role="status" aria-live="polite">Uses the Printer type above (Filament or Resin). Sizes and fits are starting suggestions.</p>
       </details>
-      <div id="beginnerOpts">
+      <div id="beginnerOpts" data-litho-group="thickness">
         <fieldset class="field seg wide" id="presetSeg"><legend>Thickness</legend>
           <label data-preset="thin"><input type="radio" name="preset" value="thin">Thin</label><label data-preset="standard"><input type="radio" name="preset" value="standard" checked>Standard</label><label data-preset="thick"><input type="radio" name="preset" value="thick">Thick</label>
         </fieldset>
@@ -311,7 +313,7 @@
         <p class="help sticky">ZEIM picks the other settings for you. After your model is made you can see what it picked.</p>
       </div>
 
-      <div id="expertOpts" hidden>
+      <div id="expertOpts" data-litho-group="thickness" hidden>
         <details open><summary>Image &amp; detail</summary>
           <div class="grid2">
             <div class="field"><label>Resolution <em>px wide</em></label><input type="number" name="resolution" value="200" min="16" max="600"></div>
@@ -411,7 +413,6 @@
           <div class="handoffrow" id="studioHandoff" role="group" aria-label="Save or send this model">
             <button type="button" class="btn" id="btnSaveWork" title="Save your work in this browser (and on your account when signed in)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-check"/></svg> Save work</button>
             <button type="button" class="btn primary" id="btnSendSlicer" title="Save first, then open this model in the matching slicer"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-send"/></svg> <span id="btnSendSlicerL">Send to Slicer</span></button>
-            <button type="button" class="btn" id="btnSendCad" title="Save first, then open this model in CAD"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-cube"/></svg> Send to CAD</button>
           </div>
           <button class="btn" id="btnSendSheet" aria-haspopup="dialog" title="Save this model or send it somewhere"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg> Send or save</button>
           <label class="inl" title="Who can open this build's files"><select id="resVis"><option value="private">Private</option><option value="followers">Followers</option><option value="public">Public</option></select></label>
@@ -439,6 +440,42 @@
       </ul>
     </section>
   </section>
+  <nav class="bed-bar" id="lithoBar" data-ws="lithophane" aria-label="Lithophane tools" hidden>
+    <button type="button" class="bed-pin" id="lithoPin" hidden aria-label="Back to tool categories"></button>
+    <div class="bed-scroll" id="lithoCats">
+      <button type="button" data-litho-cat="photo" data-litho-label="Photo">Photo</button>
+      <button type="button" data-litho-cat="size" data-litho-label="Size">Size</button>
+      <button type="button" data-litho-cat="thickness" data-litho-label="Thickness">Thickness</button>
+      <button type="button" data-litho-cat="shape" data-litho-label="Shape">Shape</button>
+      <button type="button" data-litho-cat="frame" data-litho-label="Frame">Frame</button>
+      <button type="button" data-litho-cat="light" data-litho-label="Light">Light</button>
+      <button type="button" data-litho-cat="view" data-litho-label="View">View</button>
+    </div>
+    <div class="bed-scroll" id="lithoTools" hidden>
+      <div data-for="view">
+        <button type="button" data-litho-click="vLeft">Turn left</button>
+        <button type="button" data-litho-click="vRight">Turn right</button>
+        <button type="button" data-litho-click="vReset">Reset view</button>
+        <button type="button" data-litho-click="vWire">Wireframe</button>
+        <button type="button" data-litho-click="vLight">Light on</button>
+      </div>
+    </div>
+  </nav>
+  <dialog id="lithoDest" aria-labelledby="lithoDestTitle">
+    <div class="dlg">
+      <div class="dh"><h3 id="lithoDestTitle">Export / Print</h3><button type="button" class="x" data-litho-dest="close" aria-label="Close">✓</button></div>
+      <div class="body">
+        <p class="help">Where should this model go? Staying here is fine. Showcase opens the existing share form. Nothing is published until you confirm there.</p>
+        <div class="bed-dest">
+          <button type="button" class="btn" data-litho-dest="slicer">Send to Slicer</button>
+          <button type="button" class="btn" data-litho-dest="device">Save to this device</button>
+          <button type="button" class="btn" data-litho-dest="account">Save to Account</button>
+          <button type="button" class="btn" data-litho-dest="showcase">Send to Showcase</button>
+          <button type="button" class="btn ghost" data-litho-dest="close">Stay here</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
 </main>
 
 

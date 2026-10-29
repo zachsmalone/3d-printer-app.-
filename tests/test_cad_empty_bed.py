@@ -55,11 +55,14 @@ def test_steps_wait_for_an_open_file_and_the_slicer_bar_follows_the_model():
     assert 'new MutationObserver(paintWorkBars)' in barjs
     assert 'sessionStorage.setItem("zeim.sliceNow", "1")' in CAD_JS
     assert 'plan.stage === "prepare" || plan.stage === "slice"' in CAD_JS
-    assert "body[data-view=slicer] #projectFlow{display:none!important}" in STYLE
+    assert "body[data-view=slicer] #projectFlow,body[data-view=lithophane] #projectFlow{display:none!important}" in STYLE
     assert "#viewEdit.has-model>#slicerBar{display:flex!important}" in STYLE
     assert "#viewEdit:not(.has-model)>#slicerBar{display:none!important}" in STYLE
     head = INDEX[INDEX.index('class="bed-head'):INDEX.index('class="bed-name"')]
     assert 'id="fdmFlow"' in head
+    create = INDEX.split('id="viewCreate"')[1].split('id="viewEdit"')[0]
+    assert 'id="lithoBar"' in create and 'id="lithoFlow"' in create and 'id="lithoDest"' in create
+    assert 'id="btnSendCad"' not in create
     bar = INDEX[INDEX.index('id="slicerBar"'):INDEX.index('id="bedTools"')]
     for token in (
         'data-bed-label="Printer"',

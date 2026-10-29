@@ -89,7 +89,7 @@ def test_primary_actions_do_not_become_showcase():
     edit = _between(HTML, 'id="viewEdit"', 'id="viewShowcase"')
     assert 'id="slicerSlice"' in edit and 'data-go="spGo"' in edit
     assert 'id="slicerRepair"' in edit and 'data-bed-act="repair"' in edit
-    assert "body[data-view=slicer] #projectFlow{display:none!important}" in CSS
+    assert "body[data-view=slicer] #projectFlow,body[data-view=lithophane] #projectFlow{display:none!important}" in CSS
     assert 'id="fdmFlow"' in edit and "data-flow" in edit
     assert "#viewEdit.has-model>#slicerBar{display:flex!important}" in CSS
     assert "#viewEdit:not(.has-model)>#slicerBar{display:none!important}" in CSS
