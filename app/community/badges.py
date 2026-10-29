@@ -1,8 +1,11 @@
 """Account badges. Earned by real actions, or seeded. No money and no prizes.
 
-Tester is private: only the account whose username is cc0hort sees it, and it
-never appears on a public profile. Official OG is permanent once earned and
-goes to that account plus the first 100 accounts by creation time.
+Each badge has visibility "public" (the default) or "private". Public badges
+show on profiles and posts. A private badge is visible only to its owner, on
+their own badge box. Tester is private, and only username cc0hort is awarded
+it. Official OG is permanent once earned and goes to that account plus the
+first 100 accounts by creation time. Creator is public and only username
+ZeimApp is awarded it.
 """
 from __future__ import annotations
 
@@ -345,15 +348,16 @@ def _rows(user: dict, *, owner: bool) -> list[dict]:
         earned = spec["id"] in have
         private = _visibility(spec) == "private"
         if private:
-            # Only cc0hort, looking at his own account, and only once it is granted.
-            if not (owner and tester and earned):
+            # Private-to-owner, and only after it is earned. Tester stays on
+            # cc0hort's own box even if the id is copied onto another account.
+            if not (owner and earned) or (spec["id"] == "tester" and not tester):
                 continue
         elif spec.get("auto") and not earned:
             continue
         need = int(spec.get("need") or 1)
         progress = int(prog.get(spec["event"]) or 0) if spec.get("event") else 0
         note = ""
-        if earned and owner and private and tester:
+        if earned and owner and private:
             note = spec.get("note") or ""
         row = {
             "id": spec["id"],
