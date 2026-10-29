@@ -116,8 +116,8 @@
       if (sheet) sheet.hidden = false;
       if (title) title.textContent = which === "filament" ? "Filament" : "Process";
       if (which === "filament") {
-        var quality = document.querySelector("#slicePanel [data-proc=quality]");
-        if (quality) quality.click();
+        var filTab = document.querySelector("#slicePanel [data-proc=filament]");
+        if (filTab) filTab.click();
         var mat = document.getElementById("spMat");
         if (mat) mat.focus();
       }

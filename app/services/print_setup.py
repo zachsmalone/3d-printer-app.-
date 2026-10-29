@@ -31,6 +31,8 @@ LAYER_MIN, LAYER_MAX = 0.25, 0.75            # fraction of the nozzle
 LINE_WIDTH_FACTOR = 1.125
 PATTERNS = {"grid": "grid", "gyroid": "gyroid", "honeycomb": "honeycomb", "cubic": "cubic", "lines": "line", "lightning": "lightning", "rectilinear": "rectilinear"}  # rectilinear is the only pattern PrusaSlicer accepts at 100% fill
 SUPPORTS = ("off", "auto", "everywhere")
+SEAMS = ("aligned", "nearest", "rear", "random")
+IRONING = ("off", "top")
 MATERIALS = catalog.MATERIAL_NAMES             # PLA, PETG, TPU, ABS, ASA, PC (all sourced in materials.json)
 FILAMENTS_PATH = Path(__file__).resolve().parents[2] / "data" / "materials" / "filaments.json"
 FILAMENT_ID = {"PLA": "pla", "PETG": "petg", "TPU": "tpu_95a", "ABS": "abs", "ASA": "asa", "PC": "pc"}
@@ -235,6 +237,21 @@ def _num(v, lo, hi, name, cast=float):
     return x
 
 
+def _opt_num(o, key, lo, hi, name, cast=float):
+    if key not in o:
+        return None
+    return _num(o[key], lo, hi, name, cast)
+
+
+def _choice(o, key, allowed, label):
+    if key not in o:
+        return None
+    v = str(o[key])
+    if v not in allowed:
+        raise SetupError(label + " must be " + ", ".join(allowed) + ".")
+    return v
+
+
 def settings_for(printer_id=None, nozzle=None, opts: dict | None = None) -> dict:
     """Normalised slicer settings (preset first, then explicit Advanced values). Raises SetupError for bad input."""
     pid, n = resolve(printer_id, nozzle)
@@ -270,15 +287,37 @@ def settings_for(printer_id=None, nozzle=None, opts: dict | None = None) -> dict
     supports = o.get("supports", "off")
     if supports not in SUPPORTS:
         raise SetupError("Supports must be off, auto or everywhere.")
+    speed_cap = min(500, float(p.get("max_speed") or 500))
+    lw_spec = nozzle_spec(n)["line_width_mm"]
+    width = line_width(n)
+    if "line_width" in o:
+        width = _num(o["line_width"], float(lw_spec["min"]), float(lw_spec["max"]), "Line width")
+    fan_min = _opt_num(o, "fan_min", 0, 100, "Minimum fan", int)
+    fan_max = _opt_num(o, "fan_max", 0, 100, "Maximum fan", int)
+    if fan_min is not None and fan_max is not None and fan_min > fan_max:
+        raise SetupError("Minimum fan cannot be higher than maximum fan.")
     return {"printer_id": pid, "printer": p["name"], "nozzle": n, "preset": preset, "material": material,
-            "layer_height": layer, "line_width": line_width(n),
+            "layer_height": layer, "line_width": width,
             "nozzle_profiled": bool((nozzle_option(pid, n) or {}).get("profiled")),
             "max_volumetric_speed": _mvs(pid, n, material),
             "walls": _num(o.get("walls", pr["walls"]), 1, 10, "Walls", int),
             "top_bottom": _num(o.get("top_bottom", pr["top_bottom"]), 0, 20, "Top/bottom layers", int),
             "infill": _num(o.get("infill", pr["infill"]), 0, 100, "Infill", int), "infill_pattern": pattern,
             "supports": supports, "brim": _num(o.get("brim", 0), 0, 30, "Brim width"),
-            "speed": _num(o.get("speed", pr["speed"]), 10, min(500, float(p.get("max_speed") or 500)), "Speed", int),
+            "speed": _num(o.get("speed", pr["speed"]), 10, speed_cap, "Speed", int),
+            "seam": _choice(o, "seam", SEAMS, "Seam"),
+            "ironing": _choice(o, "ironing", IRONING, "Ironing"),
+            "ironing_flow": _opt_num(o, "ironing_flow", 5, 40, "Ironing flow", int),
+            "support_angle": _opt_num(o, "support_angle", 0, 90, "Support overhang", int),
+            "support_spacing": _opt_num(o, "support_spacing", 1, 8, "Support spacing"),
+            "skirt": _opt_num(o, "skirt", 0, 10, "Skirt loops", int),
+            "skirt_distance": _opt_num(o, "skirt_distance", 0, 20, "Skirt distance"),
+            "raft": _opt_num(o, "raft", 0, 8, "Raft layers", int),
+            "travel_speed": _opt_num(o, "travel_speed", 10, speed_cap, "Travel speed", int),
+            "first_layer_speed": _opt_num(o, "first_layer_speed", 5, speed_cap, "First layer speed", int),
+            "fan_min": fan_min, "fan_max": fan_max,
+            "fan_off_layers": _opt_num(o, "fan_off_layers", 0, 10, "Fan off layers", int),
+            "infill_overlap": _opt_num(o, "infill_overlap", 0, 50, "Infill overlap", int),
             "nozzle_temp": noz_c, "bed_temp": bed_c,
             "first_layer_nozzle_temp": max(noz_c, min(t["first_layer_nozzle_c"], max_noz)) if "nozzle_temp" not in o else noz_c,
             "first_layer_bed_temp": min(t["first_layer_bed_c"], max_bed) if "bed_temp" not in o else bed_c,
@@ -316,6 +355,38 @@ def ini_overrides(s: dict) -> dict:
            "bed_temperature": str(s["bed_temp"]), "first_layer_bed_temperature": str(s["first_layer_bed_temp"])}
     if s.get("max_volumetric_speed"):
         out["max_volumetric_speed"] = f"{s['max_volumetric_speed']:g}"
+    # Optional expert keys. Absent means the slicer's own default, so a beginner slice does not change.
+    if s.get("seam"):
+        out["seam_position"] = s["seam"]
+    if s.get("ironing") == "top":
+        out["ironing"] = "1"
+        out["ironing_type"] = "topmost"
+        if s.get("ironing_flow") is not None:
+            out["ironing_flowrate"] = f"{int(s['ironing_flow'])}%"
+    elif s.get("ironing") == "off":
+        out["ironing"] = "0"
+    if s.get("support_angle") is not None:
+        out["support_material_threshold"] = str(int(s["support_angle"]))
+    if s.get("support_spacing") is not None:
+        out["support_material_spacing"] = f"{s['support_spacing']:g}"
+    if s.get("skirt") is not None:
+        out["skirts"] = str(int(s["skirt"]))
+    if s.get("skirt_distance") is not None:
+        out["skirt_distance"] = f"{s['skirt_distance']:g}"
+    if s.get("raft") is not None:
+        out["raft_layers"] = str(int(s["raft"]))
+    if s.get("travel_speed") is not None:
+        out["travel_speed"] = str(int(s["travel_speed"]))
+    if s.get("first_layer_speed") is not None:
+        out["first_layer_speed"] = str(int(s["first_layer_speed"]))
+    if s.get("fan_min") is not None:
+        out["min_fan_speed"] = str(int(s["fan_min"]))
+    if s.get("fan_max") is not None:
+        out["max_fan_speed"] = str(int(s["fan_max"]))
+    if s.get("fan_off_layers") is not None:
+        out["disable_fan_first_layers"] = str(int(s["fan_off_layers"]))
+    if s.get("infill_overlap") is not None:
+        out["infill_overlap"] = f"{int(s['infill_overlap'])}%"
     for key, ini_key in (("retraction_length_mm", "retract_length"), ("retraction_speed_mm_s", "retract_speed"), ("z_hop_mm", "retract_lift")):
         if _v(p, key) is not None:
             out[ini_key] = f"{_v(p, key):g}"

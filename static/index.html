@@ -528,7 +528,7 @@
       <button type="button" class="btn small" id="procExpand">Expand</button>
       <button type="button" class="btn small bed-check" id="processClose" aria-label="Done">✓</button>
     </div>
-    <p class="help" id="procEmpty">Open a model to change quality, supports, infill, and brim.</p>
+    <p class="help" id="procEmpty">Open a model to change quality, filament, strength, speed, cooling, supports, infill, and adhesion.</p>
     <section class="slicepanel" id="slicePanel" aria-label="Slicer settings"></section>
   </section>
   <section id="deviceSheet" class="bed-sheet proc-sheet" hidden aria-labelledby="deviceTitle">
@@ -538,6 +538,7 @@
     </div>
     <div class="bed-sheet-body">
       <p id="deviceReadout">No printer saved · Not connected</p>
+      <div id="devicePick"></div>
       <p class="help">This is the printer saved on Account. ZEIM does not sync a printer-cloud account. The line stays “Not connected” until a Live API printer answers.</p>
       <p><a class="btn" href="#account">Change printer on Account</a></p>
     </div>

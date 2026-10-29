@@ -97,6 +97,21 @@ def slice_model(
     nozzle_temp: Optional[str] = Form(None),
     bed_temp: Optional[str] = Form(None),
     material: Optional[str] = Form(None),
+    line_width: Optional[str] = Form(None),
+    seam: Optional[str] = Form(None),
+    ironing: Optional[str] = Form(None),
+    ironing_flow: Optional[str] = Form(None),
+    support_angle: Optional[str] = Form(None),
+    support_spacing: Optional[str] = Form(None),
+    skirt: Optional[str] = Form(None),
+    skirt_distance: Optional[str] = Form(None),
+    raft: Optional[str] = Form(None),
+    travel_speed: Optional[str] = Form(None),
+    first_layer_speed: Optional[str] = Form(None),
+    fan_min: Optional[str] = Form(None),
+    fan_max: Optional[str] = Form(None),
+    fan_off_layers: Optional[str] = Form(None),
+    infill_overlap: Optional[str] = Form(None),
     scale_to_fit: bool = Form(False),
     fit: bool = Form(False),
     ventilation_ok: bool = Form(False),
@@ -125,7 +140,11 @@ def slice_model(
         _fail(400, "bad_request", "Send either an STL file or a model id (not both, not neither).")
     opts = {"preset": preset, "layer_height": layer_height, "walls": walls, "top_bottom": top_bottom, "infill": infill,
             "infill_pattern": infill_pattern, "supports": supports, "brim": brim, "speed": speed,
-            "nozzle_temp": nozzle_temp, "bed_temp": bed_temp, "material": material}
+            "nozzle_temp": nozzle_temp, "bed_temp": bed_temp, "material": material, "line_width": line_width,
+            "seam": seam, "ironing": ironing, "ironing_flow": ironing_flow, "support_angle": support_angle,
+            "support_spacing": support_spacing, "skirt": skirt, "skirt_distance": skirt_distance, "raft": raft,
+            "travel_speed": travel_speed, "first_layer_speed": first_layer_speed, "fan_min": fan_min,
+            "fan_max": fan_max, "fan_off_layers": fan_off_layers, "infill_overlap": infill_overlap}
     try:
         eng.get_profile(profile)                     # legacy field: still validated (only creality_k1)
         prof, chosen = eng.profile_for(printer_id or profile, nozzle, opts)

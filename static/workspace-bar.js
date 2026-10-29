@@ -3,7 +3,7 @@
 import { S, api, askConfirm, esc, toast } from "/static/app.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
 import { fdmDonePlan, fdmLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
-import { prefLabel } from "/static/printer.js";
+import { mountSlicerPrinter, prefLabel } from "/static/printer.js";
 
 function fromStudio() {
   return exitTarget(sessionStorage) === LIBRARY_URL;
@@ -92,6 +92,14 @@ function paintDevice() {
   if (stateEl) stateEl.textContent = state;
   const read = document.getElementById("deviceReadout");
   if (read) read.textContent = (name || "No printer saved") + " · " + state;
+  const filBtn = document.querySelector("#slicerBar [data-bed-sheet=filament]");
+  const mat = document.getElementById("spMat");
+  if (filBtn) {
+    const label = mat && mat.value ? mat.value : "Filament";
+    filBtn.textContent = label;
+    filBtn.setAttribute("aria-label", mat && mat.value ? "Filament, " + mat.value : "Filament");
+  }
+  if (document.body.dataset.view === "slicer") mountSlicerPrinter();
 }
 
 function saveThen(done) {

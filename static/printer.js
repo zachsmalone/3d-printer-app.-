@@ -195,24 +195,69 @@ export function panelHTML(hintMode) {
     <p class="help nozzlespec">${mfrHTML(pref.printer_id, n)}</p>
     <p class="help">Starting values for this printer. Filament and the machine can differ. These are not a promise about the finished print.</p>
     <div class="segmented" role="group" aria-label="Settings level"><button type="button" id="spBeginner" aria-pressed="${beginner}">Beginner</button><button type="button" id="spAdvanced" aria-pressed="${!beginner}">Advanced</button></div>
-    <div class="proc-tabs" role="tablist" aria-label="Process">${tab("quality", "Quality", true)}${tab("support", "Support", false)}${tab("infill", "Infill", false)}${tab("adhesion", "Adhesion", false)}</div>
+    <div id="spAdv"></div>
+    <div class="proc-tabs" role="tablist" aria-label="Process">${tab("quality", "Quality", true)}${tab("filament", "Filament", false)}${tab("strength", "Strength", false)}${tab("speed", "Speed", false)}${tab("cooling", "Cooling", false)}${tab("support", "Support", false)}${tab("infill", "Infill", false)}${tab("adhesion", "Adhesion", false)}</div>
     <div id="procPane-quality" role="tabpanel" aria-labelledby="procTab-quality">
       <div class="presets" role="radiogroup" aria-label="Preset">${P.cat.presets.map(x => `<label class="preset" title="${esc(x.help)}"><input type="radio" name="spPreset" value="${x.id}" ${x.id === wantPreset ? "checked" : ""}><span><b>${esc(x.label)}</b></span></label>`).join("")}</div>
       <p class="help" id="spPresetHelp">${esc(pv.help || "")}</p>
-      <div class="grid2" id="spMatRow">${sel("spMat", "Material", mats, "PLA")}</div>
+      <div class="sp-adv" ${beginner ? "hidden" : ""}>
+        <div class="grid3">
+          ${num("spLayer", "Layer height", presetLayer(pv, lh.recommended, lo, hi), lo, hi, 0.01, `mm (${lo} to ${hi})`).replace("<input ", `<input data-rec="${lh.recommended}" `)}
+          ${num("spLine", "Line width", o?.line_width_mm.recommended ?? n, o?.line_width_mm.min ?? n * 0.75, o?.line_width_mm.max ?? n * 1.5, 0.01, "mm")}
+        </div>
+        <p class="help">Seam is where each layer starts. Ironing runs a hot pass over the top. Both are starting points, not a finished-surface promise.</p>
+        <div class="patgrid" role="group" aria-label="Seam">${["aligned", "nearest", "rear", "random"].map(id => `<button type="button" class="pat" data-seam="${id}" aria-pressed="${id === "aligned" ? "true" : "false"}"><span>${id[0].toUpperCase() + id.slice(1)}</span></button>`).join("")}</div>
+        <div class="sr-only">${sel("spSeam", "Seam", ["aligned", "nearest", "rear", "random"], "aligned", { aligned: "Aligned", nearest: "Nearest", rear: "Rear", random: "Random" })}</div>
+        <div class="adhgrid" role="group" aria-label="Ironing">
+          <button type="button" class="supchoice" data-iron="off" aria-pressed="true"><b>Off</b><small>No ironing pass.</small></button>
+          <button type="button" class="supchoice" data-iron="top" aria-pressed="false"><b>Top</b><small>A slow pass on the top surface.</small></button>
+        </div>
+        <div class="sr-only">${sel("spIron", "Ironing", ["off", "top"], "off", { off: "Off", top: "Top" })}</div>
+        ${num("spIronFlow", "Ironing flow", 15, 5, 40, 1, "%")}
+        <p class="help">Line width starts at ${o?.line_width_mm.recommended ?? n} mm for the ${n} mm nozzle. Changing the preset fills layer height in again.</p>
+      </div>
+    </div>
+    <div id="procPane-filament" role="tabpanel" aria-labelledby="procTab-filament" hidden>
+      <div class="patgrid" role="group" aria-label="Filament">${mats.map(id => `<button type="button" class="pat" data-mat="${esc(id)}" aria-pressed="${id === "PLA" ? "true" : "false"}"><span>${esc(id)}</span></button>`).join("")}</div>
+      <div class="sr-only" id="spMatRow">${sel("spMat", "Material", mats, "PLA")}</div>
       ${slotsHTML(p, mats)}
       <div id="spMatWarn" aria-live="polite">${matWarnHTML("PLA")}</div>
-      <div id="spAdv" class="sp-adv" ${beginner ? "hidden" : ""}><div class="grid3">
-        ${num("spLayer", "Layer height", presetLayer(pv, lh.recommended, lo, hi), lo, hi, 0.01, `mm (${lo} to ${hi})`).replace("<input ", `<input data-rec="${lh.recommended}" `)}
+      <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
+        ${num("spNozT", "Nozzle temp", t.nozzle_c, 150, p?.max_nozzle_c || 300, 1, "°C")}${num("spBedT", "Bed temp", t.bed_c, 0, p?.max_bed_c || 110, 1, "°C")}
+        <p class="help">Temperatures start from the material's reference values and stay inside what this printer can reach.</p>
+      </div>
+    </div>
+    <div id="procPane-strength" role="tabpanel" aria-labelledby="procTab-strength" hidden>
+      <p class="help">Walls and solid layers come from the preset until you expand.</p>
+      <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
         ${num("spWalls", "Walls", pv.walls ?? 2, 1, 10, 1, "")}${num("spTB", "Top/bottom layers", pv.top_bottom ?? 4, 0, 20, 1, "")}
-        ${num("spSpeed", "Speed", pv.speed ?? 80, 10, 500, 5, "mm/s")}
-        ${num("spNozT", "Nozzle temp", t.nozzle_c, 150, p?.max_nozzle_c || 300, 1, "°C")}${num("spBedT", "Bed temp", t.bed_c, 0, p?.max_bed_c || 110, 1, "°C")}</div>
-        <p class="help">These start from the preset you picked. Changing the preset fills them in again. Line width ${o?.line_width_mm.recommended ?? n} mm for the ${n} mm nozzle. Temperatures start from the material's reference values.</p></div>
+        ${num("spOverlap", "Infill overlap", 25, 0, 50, 1, "%")}
+      </div>
+    </div>
+    <div id="procPane-speed" role="tabpanel" aria-labelledby="procTab-speed" hidden>
+      <p class="help">Expand sends these speeds. Print speed starts from the preset.</p>
+      <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
+        ${num("spSpeed", "Print speed", pv.speed ?? 80, 10, 500, 5, "mm/s")}
+        ${num("spTravel", "Travel speed", 150, 10, 500, 5, "mm/s")}
+        ${num("spFirst", "First layer speed", 20, 5, 200, 1, "mm/s")}
+      </div>
+    </div>
+    <div id="procPane-cooling" role="tabpanel" aria-labelledby="procTab-cooling" hidden>
+      <p class="help">PLA usually wants a strong fan. ABS, ASA and PC usually want less. These are starting points.</p>
+      <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
+        ${num("spFanMin", "Fan minimum", 100, 0, 100, 5, "%")}${num("spFanMax", "Fan maximum", 100, 0, 100, 5, "%")}
+        ${num("spFanOff", "Fan off for", 1, 0, 10, 1, "layers")}
+      </div>
     </div>
     <div id="procPane-support" role="tabpanel" aria-labelledby="procTab-support" hidden>
       <div class="supgrid" role="group" aria-label="Supports">${sups}</div>
       <div class="sr-only">${sel("spSup", "Supports", P.cat.supports, "off", { off: "Off", auto: "Auto (from the bed only)", everywhere: "Everywhere" })}</div>
       <div id="spPaintHost"></div>
+      <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
+        ${num("spSupAngle", "Overhang angle", 0, 0, 90, 5, "°")}
+        ${num("spSupSpace", "Support spacing", 2.5, 1, 8, 0.1, "mm")}
+        <p class="help">0° leaves the overhang check to the slicer. Spacing is the gap between support lines.</p>
+      </div>
     </div>
     <div id="procPane-infill" role="tabpanel" aria-labelledby="procTab-infill" hidden>
       <div class="patgrid" role="listbox" aria-label="Infill pattern">${pats}</div>
@@ -227,7 +272,13 @@ export function panelHTML(hintMode) {
         <button type="button" class="supchoice" data-brim="5" aria-pressed="false"><b>Brim</b><small>5 mm outline. A starting width, not a promise it stays down.</small></button>
         <button type="button" class="supchoice" data-brim="10" aria-pressed="false"><b>Wide brim</b><small>10 mm. Uses more of the bed.</small></button>
       </div>
-      <div class="sp-adv" ${beginner ? "hidden" : ""}>${num("spBrim", "Brim", 0, 0, 30, 1, "mm")}</div>
+      <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
+        ${num("spBrim", "Brim", 0, 0, 30, 1, "mm")}
+        ${num("spSkirt", "Skirt loops", 0, 0, 10, 1, "")}
+        ${num("spSkirtDist", "Skirt distance", 2, 0, 20, 0.5, "mm")}
+        ${num("spRaft", "Raft layers", 0, 0, 8, 1, "")}
+        <p class="help">Expand sends skirt and raft with the slice. 0 means none.</p>
+      </div>
     </div>
     <label class="inl chk"><input type="checkbox" id="spFit"> Scale down to fit this printer if it's too big</label>
     <div class="row"><button class="btn primary big" id="spGo">Slice</button></div>`}
@@ -245,7 +296,9 @@ function readPanel() {
   fd.append("printer_id", pref.printer_id); if (pref.nozzle) fd.append("nozzle", pref.nozzle);
   fd.append("preset", document.querySelector("[name=spPreset]:checked")?.value || "standard");
   fd.append("material", $("#spMat").value); fd.append("supports", $("#spSup").value);
-  if (adv) for (const [k, id] of [["layer_height", "spLayer"], ["walls", "spWalls"], ["top_bottom", "spTB"], ["infill", "spInfill"], ["speed", "spSpeed"], ["nozzle_temp", "spNozT"], ["bed_temp", "spBedT"]]) fd.append(k, $("#" + id).value);
+  if (adv) for (const [k, id] of [["layer_height", "spLayer"], ["line_width", "spLine"], ["walls", "spWalls"], ["top_bottom", "spTB"], ["infill", "spInfill"], ["infill_overlap", "spOverlap"], ["speed", "spSpeed"], ["travel_speed", "spTravel"], ["first_layer_speed", "spFirst"], ["nozzle_temp", "spNozT"], ["bed_temp", "spBedT"], ["seam", "spSeam"], ["ironing", "spIron"], ["ironing_flow", "spIronFlow"], ["support_angle", "spSupAngle"], ["support_spacing", "spSupSpace"], ["skirt", "spSkirt"], ["skirt_distance", "spSkirtDist"], ["raft", "spRaft"], ["fan_min", "spFanMin"], ["fan_max", "spFanMax"], ["fan_off_layers", "spFanOff"]]) {
+    const el = $("#" + id); if (el) fd.append(k, el.value);
+  }
   if ($("#spPattern")) fd.append("infill_pattern", $("#spPattern").value);
   if ($("#spBrim")) fd.append("brim", $("#spBrim").value);
   if ($("#spFit").checked) fd.append("scale_to_fit", "true");
@@ -309,9 +362,13 @@ export function wirePanel(getModelId) {
   document.querySelectorAll("#slicePanel [data-proc]").forEach(b => { b.onclick = () => showProc(b.dataset.proc); });
   const paintProcess = () => {
     const sup = $("#spSup")?.value, pat = $("#spPattern")?.value, brim = $("#spBrim") ? String($("#spBrim").value) : "";
+    const seam = $("#spSeam")?.value, iron = $("#spIron")?.value, matName = $("#spMat")?.value;
     document.querySelectorAll("#slicePanel [data-sup]").forEach(b => b.setAttribute("aria-pressed", b.dataset.sup === sup ? "true" : "false"));
     document.querySelectorAll("#slicePanel [data-pat]").forEach(b => b.setAttribute("aria-pressed", b.dataset.pat === pat ? "true" : "false"));
     document.querySelectorAll("#slicePanel [data-brim]").forEach(b => b.setAttribute("aria-pressed", b.dataset.brim === brim ? "true" : "false"));
+    document.querySelectorAll("#slicePanel [data-seam]").forEach(b => b.setAttribute("aria-pressed", b.dataset.seam === seam ? "true" : "false"));
+    document.querySelectorAll("#slicePanel [data-iron]").forEach(b => b.setAttribute("aria-pressed", b.dataset.iron === iron ? "true" : "false"));
+    document.querySelectorAll("#slicePanel [data-mat]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mat === matName ? "true" : "false"));
     const read = $("#spInfillRead"), pv = presetOf(document.querySelector("[name=spPreset]:checked")?.value);
     if (read) read.textContent = `Infill ${$("#spInfill")?.value || pv.infill || ""}% · ${PAT_LABEL[pat] || pat || ""}. The preset fills this in. Advanced can change the percent.`;
     const help = $("#spPresetHelp"); if (help) help.textContent = pv.help || "";
@@ -319,6 +376,9 @@ export function wirePanel(getModelId) {
   document.querySelectorAll("#slicePanel [data-sup]").forEach(b => b.onclick = () => { $("#spSup").value = b.dataset.sup; paintProcess(); });
   document.querySelectorAll("#slicePanel [data-pat]").forEach(b => b.onclick = () => { $("#spPattern").value = b.dataset.pat; paintProcess(); });
   document.querySelectorAll("#slicePanel [data-brim]").forEach(b => b.onclick = () => { $("#spBrim").value = b.dataset.brim; paintProcess(); });
+  document.querySelectorAll("#slicePanel [data-seam]").forEach(b => b.onclick = () => { $("#spSeam").value = b.dataset.seam; paintProcess(); });
+  document.querySelectorAll("#slicePanel [data-iron]").forEach(b => b.onclick = () => { $("#spIron").value = b.dataset.iron; paintProcess(); });
+  document.querySelectorAll("#slicePanel [data-mat]").forEach(b => b.onclick = () => { $("#spMat").value = b.dataset.mat; $("#spMat").dispatchEvent(new Event("change")); paintProcess(); });
   // reference temps, capped to what this printer can reach (the server caps them the same way and says so)
   const cap = (v, el) => Math.min(v, +el.max || v);
   mat.onchange = () => { const t = P.cat.materials[mat.value]; $("#spNozT").value = cap(t.nozzle_c, $("#spNozT")); $("#spBedT").value = cap(t.bed_c, $("#spBedT")); $("#spMatWarn").innerHTML = matWarnHTML(mat.value); };
@@ -416,3 +476,24 @@ async function initAccount() {
 }
 document.addEventListener("zeim:me", () => { P.cat && loadCatalog().then(initAccount); });
 initAccount();
+
+/* Printer and nozzle on the FDM device sheet. Same save path as Account. */
+export async function mountSlicerPrinter() {
+  const box = document.getElementById("devicePick");
+  if (!box || box.dataset.ready === "1") return;
+  try { await loadCatalog(); } catch { return; }
+  if (!P.cat) return;
+  box.dataset.ready = "1";
+  box.innerHTML = pickerHTML("fdm") + `<div class="row"><button type="button" class="btn" id="fdmPrSave">Use this printer</button><span class="help" id="fdmPrMsg" aria-live="polite"></span></div>`;
+  wirePicker("fdm");
+  const save = document.getElementById("fdmPrSave");
+  if (save) save.onclick = async () => {
+    const msg = document.getElementById("fdmPrMsg");
+    try {
+      const picked = readPicker("fdm");
+      if (!picked) { if (msg) msg.textContent = "Pick a printer first."; return; }
+      const r = await savePref(picked);
+      if (msg) msg.textContent = `Saved: ${prefLabel()}` + (r.stored === "profile" ? " (on your profile)." : " (in this browser).");
+    } catch (e) { if (msg) msg.textContent = e.message; }
+  };
+}
