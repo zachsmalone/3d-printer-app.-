@@ -114,6 +114,18 @@ export function slicerUrlForNewProject(id) {
   return valid(id) ? "/?edit=" + id + "#slicer" : "";
 }
 
+/* A reload keeps ?edit=, ?bid=, ?resin= and #slicer/tool so the open bed comes back.
+   Leave, Abandon, Save & leave, and Reset bed drop those so the next reload is blank. */
+export function leaveBedUrl(href) {
+  const u = new URL(String(href || "/"), "http://zeim.local");
+  u.searchParams.delete("edit");
+  u.searchParams.delete("bid");
+  u.searchParams.delete("resin");
+  if (/^#slicer\/.+/.test(u.hash)) u.hash = "#slicer";
+  const q = u.searchParams.toString();
+  return u.pathname + (q ? "?" + q : "") + u.hash;
+}
+
 function meshOf(ctx) {
   const editId = valid(ctx.editId) ? ctx.editId : "";
   const copyId = valid(ctx.copyId) ? ctx.copyId : "";
