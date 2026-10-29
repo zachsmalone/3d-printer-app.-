@@ -19,7 +19,7 @@ import trimesh
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from ..community import privacy, safety
+from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
 from ..core import cadops, meshedit
 from ..core import sketch as sk
@@ -122,8 +122,10 @@ def new_project(body: dict, actor: Actor = Depends(get_actor)):
             if meta:
                 store.delete(meta["id"])
             raise HTTPException(422, str(e))
-    return {**editproj.payload(meta["id"], rep), "bodies": cadops.body_info(editproj.mesh_at(meta["id"])),
-            "history": [summary(m) for m in store.list(actor.sid)]}
+    return badges.merge(
+        {**editproj.payload(meta["id"], rep), "bodies": cadops.body_info(editproj.mesh_at(meta["id"])),
+         "history": [summary(m) for m in store.list(actor.sid)]},
+        actor, "cad_save")
 
 
 def _edit(bid, actor, owner_only=False):

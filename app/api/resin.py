@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 from .. import config
+from ..community import badges
 from ..community.identity import Actor, get_actor
 from ..core import guard, meshedit, resin
 from ..services import editproj
@@ -129,7 +130,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid, "name": stem}))
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
-    return rep
+    return badges.merge(rep, actor, "resin_slice")
 
 
 RESIN_FORMATS = ("stl", "3mf", "obj", "ply", "glb", "amf")
@@ -158,5 +159,8 @@ def download(rid: str, fmt: str, name: str = "", actor: Actor = Depends(get_acto
         import trimesh
         m = trimesh.load(str(d / f"{rid}.stl"), file_type="stl", force="mesh")
         data, _ext, _mt = ue.export_mesh_data(m, force_format=fmt)
-    return Response(content=data, media_type=ue.FORMATS[fmt]["mime"],
+    resp = Response(content=data, media_type=ue.FORMATS[fmt]["mime"],
                     headers={"Content-Disposition": fnames.disposition(fname), "Cache-Control": "no-store"})
+    if fmt in badges.EXPORT_EXTS:
+        badges.stamp(resp, actor, "export")
+    return resp

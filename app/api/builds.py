@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from PIL import Image
 
 from .. import config
-from ..community import privacy, safety
+from ..community import badges, privacy, safety
 from .textcap import text_in
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS, MAX_UPLOAD, PREVIEW_RES
@@ -533,9 +533,12 @@ def generate(
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
         store.save(meta)
         store.cache[bid] = model
-    return {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
-            "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
-            "history": [summary(m) for m in store.list(actor.sid)]}
+    out = {**summary(meta), "params": params, "auto_notes": auto_notes, "info": model.info,
+           "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
+           "history": [summary(m) for m in store.list(actor.sid)]}
+    if mode == "lithophane":
+        out = badges.merge(out, actor, "lithophane")
+    return out
 
 
 # ---------------- 'Logo & Drawing to 3D' (trace2d) ----------------
@@ -693,14 +696,18 @@ def download(bid: str, ext: str, actor: Actor = Depends(get_actor)):
     # created before S3 was switched on), then redirect to a presigned URL with a TTL
     if filestore.enabled():
         filestore.put_build(bid, f"model.{ext}", p.read_bytes())
-        return RedirectResponse(filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900),
+        resp = RedirectResponse(filestore.signed_url(filestore.artifact_key(bid, f"model.{ext}"), ttl_s=900),
                                 status_code=303)
-    if ext == "3mf" and editproj.ai_lineage(bmeta):          # F8: AI-made provenance travels with the file
+    elif ext == "3mf" and editproj.ai_lineage(bmeta):          # F8: AI-made provenance travels with the file
         from fastapi.responses import Response
         from ..community import protect
-        return Response(protect.tag_3mf(p.read_bytes(), {editproj.AI_3MF_KEY: "true"}), media_type="model/3mf",
+        resp = Response(protect.tag_3mf(p.read_bytes(), {editproj.AI_3MF_KEY: "true"}), media_type="model/3mf",
                         headers={**NO_STORE, "Content-Disposition": f'attachment; filename="photo3d_{bid}.3mf"'})
-    return FileResponse(p, filename=f"photo3d_{bid}.{ext}", headers=NO_STORE)
+    else:
+        resp = FileResponse(p, filename=f"photo3d_{bid}.{ext}", headers=NO_STORE)
+    if ext in badges.EXPORT_EXTS and bmeta.get("owner_sid") == actor.sid:
+        badges.stamp(resp, actor, "export")
+    return resp
 
 
 @router.post("/memorybox")

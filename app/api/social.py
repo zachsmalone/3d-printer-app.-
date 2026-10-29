@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import FileResponse, JSONResponse
 
 from .. import config
-from ..community import catalog, moderation, personalization, privacy, safety, social
+from ..community import badges, catalog, moderation, personalization, privacy, safety, social
 from ..services import showoff
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
@@ -223,7 +223,7 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
                                nsfw=is_nsfw, settings=settings, name=pname)
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return _print_public(rec, actor)
+    return badges.merge(_print_public(rec, actor), actor, "print_shared")
 
 
 def _visible_print(pid: str, actor: Actor) -> dict:

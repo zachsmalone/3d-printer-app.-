@@ -95,6 +95,12 @@ try:
 except Exception:
     import logging
     logging.getLogger("zeim").exception("username migration failed")
+try:
+    from .community import badges as _badges
+    _badges.seed()                     # OG backfill, and lifetime Pro for username cc0hort (idempotent)
+except Exception:
+    import logging
+    logging.getLogger("zeim").exception("badge seed failed")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 

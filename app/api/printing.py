@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from .. import config
 from ..services import handoff, printers, settings, slicer
 from ..services.history import store
-from ..community import privacy
+from ..community import badges, privacy
 from ..community.identity import Actor, get_actor
 from . import guards
 from .builds import load_model, meta_for
@@ -43,8 +43,12 @@ def _send_file(bid: str, name: str):
 @files_router.get("/files/{bid}/{name}")
 def serve_file(bid: str, name: str, actor: Actor = Depends(get_actor)):
     """Stable, extension-terminated URLs. Needs access (owner / visibility) - private builds are 404 to others."""
-    meta_for(bid, actor)
-    return _send_file(bid, name)
+    meta = meta_for(bid, actor)
+    resp = _send_file(bid, name)
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if actor.user and meta.get("owner_sid") == actor.sid and ext in badges.EXPORT_EXTS:
+        badges.stamp(resp, actor, "export")
+    return resp
 
 
 @files_router.get("/f/{token}/{bid}/{name}")
@@ -136,6 +140,7 @@ def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float
         res["bed"] = list(printers.bed_of(None))
     if res.get("ok"):
         res["download"] = f"/files/{bid}/model.gcode"
+        res = badges.merge(res, actor, "fdm_slice")
     return JSONResponse(res)  # unavailable slicer -> 200 with available=false
 
 

@@ -20,6 +20,7 @@ from datetime import date, datetime, timezone
 from fastapi import Request, Response
 
 from .. import config
+from . import badges
 from .store import USERS
 
 COOKIE = "p3d_sid"
@@ -127,6 +128,8 @@ def link_auth_account(account_id: str, display_name: str = "", dob: str | None =
                 raise
             import logging
             logging.getLogger("zeim").exception("username for new passkey account failed")
+        if made["k"] in USERS.read():
+            badges.seed()
     return made["k"], made["u"]
 
 
