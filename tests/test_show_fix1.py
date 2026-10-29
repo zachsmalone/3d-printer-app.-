@@ -37,7 +37,7 @@ def test_b2_filtered_empty_state_offers_reset():
 
 # B3: publish form locks the AI box for 2D->3D builds, matching the server
 def test_b3_publish_ai_box_locked_for_ai3d():
-    assert 'S.current?.mode === "ai3d"' in JS and "aiBox.disabled = aiForced" in JS
+    assert 'src?.mode === "ai3d"' in JS and "aiBox.disabled = aiForced" in JS
     assert 'id="pub_ai_note" hidden' in HTML and "always labelled AI-made" in HTML
 
 

@@ -500,7 +500,7 @@ async function loadShowcase() {
   $("#shClear").hidden = !q;
   let r;
   if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}&sort=${encodeURIComponent(shSortVal())}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
   if (r.filters && $("#shMature")) $("#shMature").value = r.filters.mature;
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
@@ -510,11 +510,11 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
-    const filtered = !!(q || shCat || shAiVal() !== "show");
+    const filtered = !!(q || shCat || shAiVal() !== "show" || shNarrowed());
     const e = filtered ? { text: "Your filters are hiding results. Nothing matches all of them right now.", action: { do: "reset-filters", label: "Reset filters" } }
       : (r.empty || { text: "Nothing here yet. Check back soon.", action: null });
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
@@ -535,13 +535,17 @@ function shAiSave(v) {
   if (SH_AI_OK.includes(v)) el.value = v; })();
 $("#shAi")?.addEventListener("change", () => { shAiSave(shAiVal()); loadShowcase(); });
 // printer / material / supports / licence / mature filters (server validates; 'Not stated' = the model does not say)
+const SH_SORTS = ["", "newest", "likes", "printed"];
+function shSortVal() { const v = $("#shSort")?.value || ""; return SH_SORTS.includes(v) ? v : ""; }
 const SH_FILTERS = { printer: "#shPrinter", material: "#shMaterial", supports: "#shSupports", licence: "#shLicence", mature: "#shMature" };
+function shNarrowed() { return ["#shPrinter", "#shMaterial", "#shSupports", "#shLicence"].some(sel => $(sel)?.value); }
 let shMatureTouched = false;
 function shFilterQS() { return Object.entries(SH_FILTERS).map(([k, sel]) => { const el = $(sel); return el && (k !== "mature" || shMatureTouched) ? `&${k}=${encodeURIComponent(el.value)}` : ""; }).join(""); }
 function shFiltersReset() { Object.values(SH_FILTERS).forEach(sel => { const el = $(sel); if (el) el.selectedIndex = 0; }); shMatureTouched = false; }
 $("#shMature")?.addEventListener("change", () => { shMatureTouched = true; });
 Object.values(SH_FILTERS).forEach(sel => $(sel)?.addEventListener("change", () => loadShowcase()));
 $("#shFiltReset")?.addEventListener("click", () => { shFiltersReset(); loadShowcase(); });
+$("#shSort")?.addEventListener("change", () => loadShowcase());
 $("#shGrid").addEventListener("click", e => { if (!e.target.closest('[data-empty="reset-filters"]')) return;
   e.stopPropagation(); $("#shSearch").value = ""; shCat = ""; if ($("#shAi")) $("#shAi").value = "show"; shAiSave("show"); shFiltersReset(); loadShowcase(); }, true);
 // honest provenance labels: AI-made (creator said so, or 2D to 3D tab) and 'Printed by the community' (>=1 approved print photo). No counts, no ranking.
@@ -662,7 +666,7 @@ async function openItem(id) {
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
       ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
-      ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn ghost" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix</button>`}
+      ${i.example || i.owned || !i.can_remix ? "" : `<button class="btn primary" id="itRemix"><svg class=i aria-hidden=true focusable=false><use href=#i-repeat></use></svg> Remix this</button>`}
       <button class="btn ghost" id="itShare"><svg class=i aria-hidden=true focusable=false><use href=#i-link></use></svg> Copy link</button>
       ${i.example ? "" : '<button class="btn ghost danger" id="itReport"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>'}
       ${i.example || i.owned || i.original ? "" : '<button class="btn ghost danger" id="itStolen">Report as stolen</button>'}
@@ -771,7 +775,7 @@ async function openItem(id) {
   };
   if ($("#itTipSave")) $("#itTipSave").onclick = async () => { try { await api(`/api/showcase/${id}/tip`, J("PUT", { tip_url: $("#itTip").value.trim() })); toast($("#itTip").value.trim() ? "Tip link saved" : "Tip link removed", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); } };
   if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); openItem(id); } };
-  if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => { rememberRemixIntent(i); toast("Make your version, then Send to Showcase. This project is saved as the one you just remixed, so you can credit it without pasting a link.", "ok"); };
+  if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => startRemix(i);
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
   if ($("#itReport")) $("#itReport").onclick = () => {
     $$("#dlgReport [name=repReason]").forEach(r => r.checked = false); $("#repDetails").value = ""; clearInline($("#repSend"));
@@ -861,6 +865,45 @@ function rememberRemixIntent(item) {
     const next = [row, ...readRecentRemixes().filter(r => r.id !== item.id)].slice(0, 8);
     sessionStorage.setItem(REMIX_RECENT, JSON.stringify(next));
   } catch { /* the Remix button still tells them what to do next */ }
+}
+async function startRemix(item) {
+  rememberRemixIntent(item);
+  const file = (item.files || []).find(f => f.url && /\.stl$/i.test(f.name || "")) || (item.files || []).find(f => f.url);
+  const credit = item.title || "this project";
+  if (item.download_blocked || item.view_only || !file) {
+    toast(`Downloads are off for this project, so it can't be opened as a remix. The credit for ${credit} is saved for a model you make yourself.`, "ok");
+    return;
+  }
+  const btn = $("#itRemix");
+  if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+  try {
+    const res = await fetch(file.url, { credentials: "same-origin" });
+    if (!res.ok) throw new Error("Couldn't download that model.");
+    const blob = await res.blob();
+    const safe = String(file.name || "remix.stl").replace(/[^\w.\-]+/g, "_").slice(0, 80) || "remix.stl";
+    const mesh = new File([blob], safe, { type: blob.type || "model/stl" });
+    const resin = document.body.dataset.printKind === "resin";
+    $("#dlgItem")?.close();
+    if (resin) {
+      location.hash = "torchc0";
+      document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: mesh }));
+      toast(`Opened in TorchC0. Send to Showcase will credit ${credit}.`, "ok");
+      return;
+    }
+    const fd = new FormData();
+    fd.append("file", mesh);
+    fd.append("title", String(item.title || "Remix").slice(0, 80));
+    fd.append("units", "mm");
+    const project = await api("/api/edit/new", { method: "POST", body: fd });
+    if (!project?.id) { toast("Your recent builds are full. Delete one on Account, then remix again.", "err"); return; }
+    location.hash = "slicer";
+    document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: project.id }));
+    toast(`Opened in the FDM Slicer. Send to Showcase will credit ${credit}.`, "ok");
+  } catch (e) {
+    toast(e.message || "Couldn't open that remix.", "err");
+  } finally {
+    if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); }
+  }
 }
 function recentRemixTitle(raw) {
   const id = remixIdOf(raw);
@@ -1378,12 +1421,6 @@ function openModelForPublish() {
   if (p?.id) return { id: p.id, title: p.title || "Slicer model" };
   return null;
 }
-function challengeAdvanced() {
-  return `<details class="pubps" id="chEnterAdv"><summary>Enter with a project id</summary>
-    <p class="help">For a remix that is not in the list. A Showcase link or its id both work.</p>
-    <div class="field"><label for="chEnterId">Project id or link</label><input id="chEnterId" maxlength="200" placeholder="abc123 or https://…/p/abc123"></div>
-    <button type="button" class="btn" id="chEnterPaste">Enter this id</button></details>`;
-}
 function challengeEntryHTML(elig) {
   if (!elig.signed_in && !ME?.signed_up) {
     return `<p>Sign in to enter with one of your Showcase remixes.</p><button type="button" class="btn primary" id="chEnterSign">Sign in</button>`;
@@ -1396,7 +1433,7 @@ function challengeEntryHTML(elig) {
       ${id ? `<p><a href="#" data-open-item="${esc(id)}">Open your entry</a></p>` : ""}
       <p class="help">One remix per person. Prize-free: no cash, no prizes.</p>`;
   }
-  if (elig.error) return elig.can_enter ? challengeAdvanced() : "";
+  if (elig.error) return `<p><button type="button" class="btn" id="chEnterRetry">Try again</button></p>`;
   if (!elig.can_enter) return `<p class="help">This account can't enter right now.</p>`;
   const items = elig.items || [];
   const needs = elig.needs_public || [];
@@ -1411,16 +1448,14 @@ function challengeEntryHTML(elig) {
         <a class="btn" href="#lithophane" id="chMakeRemix">Make one in Lithophane</a>
         ${open ? `<button type="button" class="btn" id="chPublishOpen">Send the open model to Showcase</button>` : ""}
       </div>
-      <p class="help">Remix a public project, publish your version with that credit, and set it to Public. Then pick it here.</p>
-      ${challengeAdvanced()}`;
+      <p class="help">Remix a public project, publish your version with that credit, and set it to Public. Then pick it here.</p>`;
   }
   const radios = items.map((it, n) => `<label class="choice"><input type="radio" name="chPick" value="${esc(it.id)}" ${n === 0 ? "checked" : ""}>
     <span><b>${esc(it.title)}</b><small class="help">${it.remix_title ? "Remix of " + esc(it.remix_title) : "Credited remix"}</small></span></label>`).join("");
   return `<fieldset class="reasons" id="chPickList"><legend>Your public credited remixes</legend>${radios}</fieldset>
     <button type="button" class="btn primary" id="chEnterGo">Enter this remix</button>
     <p class="help">Prize-free: no cash, no prizes. One remix per person.</p>
-    ${needHTML}
-    ${challengeAdvanced()}`;
+    ${needHTML}`;
 }
 async function enterChallengeItem(cid, itemId, btn) {
   if (!itemId) return inlineMsg(btn, "Pick one of your remixes.");
@@ -1488,14 +1523,10 @@ async function openChallenge(cid) {
     $("#dlgChallenge").close();
     if (model) openShowcase(model);
   };
+  if ($("#chEnterRetry")) $("#chEnterRetry").onclick = () => openChallenge(cid);
   if ($("#chEnterGo")) $("#chEnterGo").onclick = () => {
     const item_id = $("#chDlgBody [name=chPick]:checked")?.value || "";
     enterChallengeItem(cid, item_id, $("#chEnterGo"));
-  };
-  if ($("#chEnterPaste")) $("#chEnterPaste").onclick = () => {
-    const item_id = remixIdOf($("#chEnterId")?.value);
-    if (!item_id) return inlineMsg($("#chEnterPaste"), "Enter a Showcase id or link.");
-    enterChallengeItem(cid, item_id, $("#chEnterPaste"));
   };
   if (!$("#dlgChallenge").open) $("#dlgChallenge").showModal();
 }

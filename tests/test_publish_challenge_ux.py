@@ -1,6 +1,7 @@
-"""Publish and challenge entry pick a project. A Showcase URL is not the happy path.
+"""Publish, remix, and challenge entry pick work in the app.
 
-Exit, Done, and New build still never publish. Paste stays only as a collapsed fallback.
+Exit, Done, and New build still never publish. Challenge enter does not ask for a URL.
+Remix credit keeps a collapsed link field for a project search cannot show.
 """
 import re
 from pathlib import Path
@@ -43,18 +44,37 @@ def test_remix_credit_is_a_picker_and_paste_is_advanced():
     assert "Enter an open challenge?" in HTML
 
 
-def test_challenge_enter_picks_a_remix_and_hides_the_url():
+def test_challenge_enter_picks_a_remix_and_does_not_ask_for_a_url():
     assert "/eligible" in COMM
     assert "Your public credited remixes" in COMM
     assert "You don't have a public credited remix to enter yet." in COMM
     assert 'href="#lithophane"' in COMM and 'href="#showcase"' in COMM
-    assert "chEnterPaste" in COMM
+    assert "chEnterPaste" not in COMM
+    assert "chEnterId" not in COMM
     assert "Your remix project id or /p/" not in COMM
     assert "Paste your remix's Showcase link" not in COMM
-    # The id field still exists, inside the collapsed fallback.
-    adv = COMM.split('id="chEnterAdv"', 1)[1].split("</details>", 1)[0]
-    assert 'id="chEnterId"' in adv
-    assert "Enter with a project id" in adv
+    assert "Enter with a project id" not in COMM
+
+
+def test_remix_opens_the_model_and_keeps_the_credit():
+    assert "async function startRemix" in COMM
+    assert "rememberRemixIntent(item)" in COMM
+    assert "Opened in the FDM Slicer" in COMM
+    assert "Opened in TorchC0" in COMM
+    assert "remix_chain" in COMM
+    assert "Send to Showcase will credit" in COMM
+
+
+def test_showcase_browse_keeps_filters_and_challenges_apart():
+    filters = HTML[HTML.index('id="shFilters"'):HTML.index('<section class="challenges"')]
+    assert "<section" not in filters
+    assert 'id="shSort"' in filters
+    assert 'id="shPrinter"' in filters and 'id="shMaterial"' in filters
+    assert "Most nozzles" in filters
+    grid = HTML.index('id="shGrid"')
+    assert HTML.index('id="chStrip"') < grid
+    assert "shNarrowed()" in COMM
+    assert "shSortVal()" in COMM
 
 
 def test_send_to_showcase_sits_where_work_finishes_not_on_leave_controls():
@@ -84,6 +104,7 @@ def test_send_to_showcase_sits_where_work_finishes_not_on_leave_controls():
     send = CAD.split('$("#cwSendShowcase")', 1)[1].split("cwToSlicer", 1)[0]
     assert "publish=" in send
     assert 'data-lib="showcase"' in LIB and "Send to Showcase" in LIB
+    assert "Done in a workspace returns to this list and does not publish." in HTML
     assert "action === \"showcase\"" in COMM
     assert "zeimOpenShowcase" not in BAR and "sendToShowcase" not in BAR
     assert "publish: false" in CTRL

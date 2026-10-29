@@ -1132,7 +1132,8 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .provrow{margin:4px 0}
 .tiplink{font-size:13px}
 .tiplink a{color:var(--acc2)}
-.aifilter{max-width:260px;margin:6px 0}
+.aifilter{max-width:220px;margin:0}
+.shfilters .aifilter{min-width:180px}
 
 /* Showcase filters (printer / material / supports / licence / mature) */
 .shfilters{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 12px;margin:8px 0}
@@ -1151,7 +1152,8 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 #meStudio .studio-lib .hcard{flex-direction:row;align-items:center;gap:10px;padding:8px}
 #meStudio .studio-lib .meta{flex:1;min-width:0;padding:0}
 #meStudio .studio-lib .meta b{white-space:normal}
-#meStudio .studio-lib .row2{padding:0;margin-left:auto}
+#meStudio .studio-lib .row2{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;padding:0;margin-left:auto;max-width:min(100%,560px)}
+#meStudio .studio-lib .row2 .btn{min-height:44px;padding:8px 12px;font-size:14px}
 #meStudio .studio-lib .btn{margin-top:0;width:auto;min-height:44px}
 #meStudio .studio-lib img{width:72px;height:72px;aspect-ratio:1;object-fit:cover;flex:0 0 72px}
 @media (max-width:768px){#meStudio .studio-lib .hcard{flex-wrap:wrap}#meStudio .studio-lib .row2{width:100%;margin-left:0}#meStudio .studio-lib .btn{width:auto;flex:1 1 44px}}
@@ -1231,7 +1233,7 @@ html[data-theme=dark] .proc-sheet .slicepanel>.row{background:color-mix(in srgb,
 .qalist{list-style:none;padding:0;margin:8px 0;display:grid;gap:10px}
 .qaitem{border:1px solid var(--line);border-radius:var(--r,10px);padding:10px 12px;background:var(--panel)}
 .qaitem .q{margin:0 0 4px}.qaitem .a{margin:4px 0 0;color:var(--acc2,#C24D6B)}
-.challenges{margin:14px 0 18px;padding:12px 14px;border:1px solid color-mix(in srgb, var(--acc2,#C24D6B) 35%, var(--line));border-radius:var(--r,12px);background:color-mix(in srgb, var(--acc2,#C24D6B) 6%, var(--panel))}
+.challenges{display:block;width:100%;box-sizing:border-box;margin:14px 0 18px;padding:12px 14px;border:1px solid color-mix(in srgb, var(--acc2,#C24D6B) 35%, var(--line));border-radius:var(--r,12px);background:color-mix(in srgb, var(--acc2,#C24D6B) 6%, var(--panel))}
 .challenges h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:1.05rem;color:var(--acc2,#C24D6B)}
 #chHost{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;margin-top:8px}
 .chcard{border:1px solid var(--line);border-radius:var(--r,10px);padding:12px;background:var(--panel)}
