@@ -8,7 +8,7 @@ import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
-from ..community import privacy, safety
+from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
 from ..core import autotune, exporters, geometry, imagesafe, meshedit
@@ -289,7 +289,12 @@ def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     if op in ("hollow", "boolean", "text", "base", "smart_split", "on_face", "thread"):                      # the heavy ones write big new meshes
         from .builds import disk_guard
         disk_guard()
-    return _act(bid, actor, lambda: editproj.add_op(bid, op, params))
+    out = _act(bid, actor, lambda: editproj.add_op(bid, op, params))
+    if isinstance(out, dict) and op == "smart_split":
+        return badges.merge(out, actor, "smart_split")
+    if isinstance(out, dict) and op == "round_edges":
+        return badges.merge(out, actor, "fillet")
+    return out
 
 
 @router.post("/{bid}/plate/split")

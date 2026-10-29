@@ -516,7 +516,7 @@ async function loadShowcase() {
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
-    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
+    <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
   showcaseBadges();
   if (!r.items.length) {
@@ -1333,7 +1333,10 @@ async function openProfile(uid) {
   let cols = []; try { cols = (await api("/api/users/" + uid + "/collections")).collections || []; } catch { cols = []; }
   const colStrip = cols.length ? `<h4><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> Collections</h4>
     <div class="colstrip">${cols.map(c => `<button type="button" class="colchip" data-col="${esc(c.id)}"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"></use></svg> ${esc(c.name)} <span class="help">${c.count}</span></button>`).join("")}</div>` : "";
+  const badgeLine = (u.badges || []).map(b => `<span class="pill">${esc(b.name)}</span>`).join(" ");
   $("#pfBody").innerHTML = `<p class="counts">${n(u.followers, u.followers === 1 ? "follower" : "followers")} ${n(u.following, "following")}</p>
+    ${u.win_label ? `<p>${esc(u.win_label)}</p>` : ""}
+    ${badgeLine ? `<p class="help">Badges ${badgeLine}</p>` : ""}
     ${u.can_follow ? `<button type="button" class="btn ${u.following_creator ? "" : "primary"}" id="pfFollow" aria-pressed="${!!u.following_creator}">${u.following_creator ? "✔ Following" : "＋ Follow"}</button>` : ""}
     <p class="help">Following shows their new projects in the Following tab. There are no messages in ZEIM.</p>
     ${colStrip}

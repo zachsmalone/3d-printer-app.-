@@ -248,6 +248,8 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
             "links": {} if idn.restricted(u) else u.get("links", {}),
             "badges": badges.public_earned(u),
+            "win_tally": badges.win_tally(u),
+            "win_label": badges.win_label(badges.win_tally(u)),
             "projects": [catalog.public(i, actor) for i in catalog.list_items(actor, "free") if i["creator_id"] == uid]}
 
 
@@ -419,6 +421,9 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
     events = ["showcase"]
     if i.get("remix_of"):
         events.append("remix")
+        parent = next((row for row in catalog._all() if row.get("id") == i.get("remix_of")), None)
+        if parent and parent.get("owner_sid") and parent.get("owner_sid") != actor.sid:
+            badges.record(parent["owner_sid"], "remixed_by")
     return badges.merge(out, actor, *events)
 
 

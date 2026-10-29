@@ -151,6 +151,8 @@ def ensure_winners(c: dict, now: datetime | None = None) -> list[dict]:
     CHALLENGES.update(f)
     c["winners"] = winners
     c["winners_frozen"] = True
+    from . import badges
+    badges.award_winners(winners, c["id"])
     return winners
 
 

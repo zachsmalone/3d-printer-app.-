@@ -223,6 +223,16 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
                                nsfw=is_nsfw, settings=settings, name=pname)
     except ValueError as e:
         raise HTTPException(400, str(e))
+    try:
+        item = catalog.get(iid, actor)
+    except catalog.Denied:
+        item = None
+    if item and item.get("owner_sid"):
+        from ..community.store import PRINTS
+        printers = {p.get("owner_sid") for p in PRINTS.read()
+                    if p.get("item_id") == iid and p.get("status") != "rejected" and p.get("owner_sid")}
+        others = {s for s in printers if s != item.get("owner_sid")}
+        badges.record(item["owner_sid"], "printed_by_others", count=len(others))
     return badges.merge(_print_public(rec, actor), actor, "print_shared")
 
 

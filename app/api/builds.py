@@ -537,7 +537,10 @@ def generate(
            "seconds": round(time.time() - t0, 2), "preview": preview_payload(prev),
            "history": [summary(m) for m in store.list(actor.sid)]}
     if mode == "lithophane":
-        out = badges.merge(out, actor, "lithophane")
+        events = ["lithophane"]
+        if int(params.get("resolution") or 0) >= 400:
+            events.append("litho_detail")
+        out = badges.merge(out, actor, *events)
     return out
 
 
