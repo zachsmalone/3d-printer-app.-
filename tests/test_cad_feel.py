@@ -28,6 +28,7 @@ def test_exit_does_not_publish_and_feel_is_wired():
     back = js.split('$("#cwBack")', 1)[1].split("view cube", 1)[0]
     assert "publish" not in back
     assert "takeExit" in back
+    assert "askBedLeave" in back and "resetCadBed" in back
     send = js.split('$("#cwSendShowcase")', 1)[1].split("cwToSlicer", 1)[0]
     assert "publish=" in send
     assert 'from "/static/cad-feel.js"' in js

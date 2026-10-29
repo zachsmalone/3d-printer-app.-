@@ -71,6 +71,8 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
 .dlg.wide{width:min(760px,94vw)}dialog:has(.wide){width:min(760px,94vw)}
 .dlg .dh{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.dlg h3{margin:0}
 .dlg .body{padding:14px 16px;max-height:70vh;overflow:auto}.dlg h4{margin:12px 0 6px}.dlg .df{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+#dlgBedLeave .df{flex-wrap:wrap;justify-content:stretch}
+#dlgBedLeave .df .btn{flex:1 1 40%;justify-content:center}
 .x{background:none;border:0;color:var(--mut);font-size:18px;cursor:pointer}hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 .slicers{display:grid;grid-template-columns:1fr 1fr;gap:8px}.slicers a{justify-content:center}.slicers a.def{border-color:var(--acc)}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.inl{display:flex;gap:5px;align-items:center;color:var(--mut)}
@@ -1054,11 +1056,13 @@ body:not([data-print-kind=resin]) [data-kind-only=resin],body[data-print-kind=re
 .spslot select{min-height:44px;flex:1 1 120px}
 .spslot input[type=color]{width:44px;height:44px;padding:2px;border:1px solid var(--line,#D9DBDF);border-radius:8px;background:var(--panel);cursor:pointer}
 
-.backchip{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top) + 76px);z-index:30;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 14px;border-radius:999px;background:#0A0A0A;color:#fff;text-decoration:none;font-weight:600;box-shadow:0 4px 14px rgba(10,10,10,.2)}
-[data-theme="dark"] .backchip{background:#F2F2F2;color:#0A0A0A}
-.backchip[hidden]{display:none}
-body>.backchip.cad{top:60px}
-@media (max-width:768px){.backchip{top:auto;bottom:calc(var(--tabbar-h,64px) + 96px + env(safe-area-inset-bottom))}}
+.backchip{position:static;inset:auto;transform:none;z-index:1;display:inline-flex;align-items:center;gap:4px;flex:0 1 auto;height:32px;max-height:32px;width:auto;max-width:min(46vw,11rem);min-height:32px;margin:0;padding:0 8px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--txt);text-decoration:none;font-weight:650;font-size:13px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:none}
+.backchip svg{flex:none;width:16px;height:16px}
+[data-theme="dark"] .backchip{background:transparent;color:var(--txt)}
+.backchip[hidden]{display:none!important}
+#viewEdit:not(.has-model)>#slicerBar{display:none!important}
+#viewTorch:not(.has-model) #torchGo{display:none!important}
+#viewTorch:not(.has-model) #torchPanel:has(.rzRow)>:not(h2):not(.rzRow){display:none!important}
 html.handing main.page:not([hidden]),html.handing .cw-main{opacity:.4;transition:opacity .12s ease}
 @media (prefers-reduced-motion:reduce){html.handing main.page:not([hidden]),html.handing .cw-main{transition:none}}
 #viewTorch .pagehead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -1216,8 +1220,8 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #fdmImport .fdm-import{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50dvh;overflow:auto}
 #fdmImport .fdm-import button{width:100%;min-height:44px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
 #fdmImport .fdm-import small{color:var(--mut);font-weight:500}
-#viewEdit>.objdock{display:none!important}
-body[data-view=slicer] #sendToFab{display:none!important}
+#viewEdit>.objdock,#viewEdit .zws-p,#viewEdit .bed-view,#viewEdit.zws>aside.controls,#viewEdit.zws .stage>.result,#viewEdit.zws #editVtools{display:none!important}
+body[data-view=slicer] #sendToFab,body[data-view=slicer] .sitefoot,body[data-view=slicer] .saveind:not(.inline){display:none!important}
 #viewEdit .objdock button:disabled,#viewEdit .bed-bar button:disabled{opacity:.45;cursor:not-allowed}
 #editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}

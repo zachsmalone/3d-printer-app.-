@@ -132,6 +132,18 @@
     saveFailed = false; lastResult = "empty"; return false;
   }
   function isDirty() { return Object.keys(held).length > 0 || Object.keys(dirty).some(function (k) { return dirty[k]; }); }
+  function sectionHeld(k) {
+    var pend = "pending." + k, tail = "." + k;
+    return Object.keys(held).some(function (key) { return key === pend || key.slice(-tail.length) === tail; });
+  }
+  function isSectionDirty(k) { return !!(k && (dirty[k] || sectionHeld(k))); }
+  function discard(k) {
+    if (!k) return false;
+    dirty[k] = false;
+    var pend = "pending." + k, tail = "." + k;
+    Object.keys(held).forEach(function (key) { if (key === pend || key.slice(-tail.length) === tail) delete held[key]; });
+    return true;
+  }
 
   function confirmLeave(go, why) {
     if (typeof document === "undefined" || !document.body) return;
@@ -296,7 +308,7 @@
   }
   root.zeimSave = {
     where: function () { return signedIn; }, _paintWhere: paintWhere, register: register, formSaver: formSaver,
-    saveNow: saveNow, prefs: prefs, setPrefs: setPrefs, isDirty: isDirty, leave: leave, hold: function (k) { if (dirty[k]) capture(k); },
+    saveNow: saveNow, prefs: prefs, setPrefs: setPrefs, isDirty: isDirty, isSectionDirty: isSectionDirty, discard: discard, leave: leave, hold: function (k) { if (dirty[k]) capture(k); },
     setAccount: setAccount, setProject: setProject, lastResult: function () { return lastResult; }, _label: indicatorLabel,
     _draftKey: draftKey, _tick: tick, _markDirty: function (k) { dirty[k] = true; }
   };

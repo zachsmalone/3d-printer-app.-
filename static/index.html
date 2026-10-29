@@ -445,7 +445,7 @@
 <div class="zt-band" data-zt="slicer" aria-hidden="true"><img class="zt-art" src="/static/zt/slicer.webp" srcset="/static/zt/slicer.webp 1x, /static/zt/slicer@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-wave far"></i><i class="zt-wave"></i></div>
   <h1 class="sr-only" data-sec="edit">FDM Slicer</h1>
   <header class="bed-head wsbar" data-ws="slicer" role="group" aria-label="Slicer workspace">
-    <button type="button" class="btn small bed-back" data-ws-act="exit" aria-label="Back" title="Save this work on Account, then clear the bed. This does not send it to Showcase.">Back</button>
+    <button type="button" class="btn small bed-back" data-ws-act="exit" aria-label="Back" title="If the bed is empty, go back. If there is work, choose stay, save and leave, reset the bed, or abandon unsaved changes. This does not send it to Showcase.">Back</button>
     <span class="bed-name">FDM</span>
     <button type="button" class="btn small bed-done" data-ws-act="done" aria-label="Done" title="Choose where this model goes. Nothing is published from this button.">Done</button>
   </header>
@@ -581,6 +581,10 @@
         <button type="button" data-xform="delete">Delete</button>
         <button type="button" data-bed-click="eUndo">Undo</button>
         <button type="button" data-bed-click="eRedo">Redo</button>
+        <button type="button" data-bed-click="eWire">Wire</button>
+        <button type="button" data-look="top">Top</button>
+        <button type="button" data-look="front">Front</button>
+        <button type="button" data-look="iso">Iso</button>
       </div>
       <div data-for="import" hidden>
         <button type="button" data-bed-act="import">From Account</button>
@@ -773,7 +777,7 @@
 <div class="zt-band" data-zt="torchc0" aria-hidden="true"><img class="zt-art" src="/static/zt/torchc0.webp" srcset="/static/zt/torchc0.webp 1x, /static/zt/torchc0@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-rain far"></i><i class="zt-rain"></i><svg class="zt-bolt" viewBox="0 0 60 110" focusable="false"><path d="M38 0L28 34L40 38L22 76L30 79L18 110"/><path d="M28 34L12 52" stroke-width="1.2"/></svg><i class="zt-ember"></i><i class="zt-ember"></i><i class="zt-ember"></i><i class="zt-ember"></i><i class="zt-ember"></i></div>
   <div class="pagehead"><div><h1>TorchC0</h1><p class="help">ZEIM's resin program. Hollow your model with a drain hole, tilt it, add supports and a raft, then open the STL or 3MF in your resin printer's own slicer to make the layer file.</p></div></div>
   <div class="wsbar" data-ws="torchc0" role="group" aria-label="TorchC0 workspace">
-    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="Leave this workspace. The draft is saved first. This does not send the model to Showcase.">Exit</button>
+    <button type="button" class="btn small" data-ws-act="exit" aria-label="Exit workspace" title="If the bed is empty, leave. If there is work, choose stay, save and leave, reset the bed, or abandon unsaved changes. This does not send the model to Showcase.">Exit</button>
     <button type="button" class="btn small" data-ws-act="done" hidden aria-label="Done" title="Save this work. If you opened it from Account, go back to the list. This does not send the model to Showcase.">Done</button>
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. This does not send the model to Showcase.">New build</button>
     <a class="btn small" data-ws-act="return-studio" href="#account" hidden aria-label="Return to Account" title="Go back to saved work on Account. The draft is saved first. This does not send the model to Showcase.">Return to Account</a>

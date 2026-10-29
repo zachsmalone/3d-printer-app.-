@@ -44,23 +44,60 @@ export function newBuildPlan(state) {
   return { ...base, clear: true, ask: false, reason: "ready" };
 }
 
-/* FDM Back clears the bed after a confirm. It does not publish and does not open Showcase.
-   A next URL is only the tab the person already chose. Done lists destinations and stays. */
+/* Back on FDM, CAD, and TorchC0.
+   An empty bed leaves with no save and no clear.
+   Dirty work asks: stay, save and leave, reset the bed, or abandon.
+   None of these publish. A next URL is only the tab the person already chose. */
 export const FDM_DONE = ["cad", "device", "account", "showcase"];
+export const BED_LEAVE = ["stay", "save", "reset", "abandon"];
+const BED_SECTIONS = ["slicer", "cad", "torchc0"];
 
-export function fdmLeavePlan(state) {
-  const confirmed = !!(state && state.confirmed);
-  const next = state && state.nextUrl ? String(state.nextUrl) : "";
+function safeLeaveUrl(url) {
+  const s = url ? String(url) : "";
+  if (!s || isPublishUrl(s)) return "";
+  return s;
+}
+
+function inertLeave(section) {
   return {
     action: "exit",
-    section: "slicer",
+    section: section || "",
     publish: false,
-    clear: confirmed,
-    save: true,
-    ask: !confirmed,
-    navigate: confirmed && !!next,
-    url: confirmed && next ? next : null,
+    ask: false,
+    choice: "",
+    save: false,
+    clear: false,
+    reset: false,
+    navigate: false,
+    url: null,
+    options: BED_LEAVE.slice(),
   };
+}
+
+export function bedLeavePlan(state) {
+  const section = state && state.section ? String(state.section) : "";
+  if (!BED_SECTIONS.includes(section)) return inertLeave(section);
+  const dirty = !!(state && state.dirty);
+  const choice = state && state.choice ? String(state.choice) : "";
+  const dest = safeLeaveUrl(state && state.nextUrl) || safeLeaveUrl(state && state.fallbackUrl);
+  const base = { action: "exit", section, publish: false, options: BED_LEAVE.slice() };
+  if (!dirty) {
+    return { ...base, ask: false, choice: "leave", save: false, clear: false, reset: false, navigate: !!dest, url: dest || null };
+  }
+  switch (choice) {
+    case "stay":
+      return { ...base, ask: false, choice, save: false, clear: false, reset: false, navigate: false, url: null };
+    case "save":
+      return { ...base, ask: false, choice, save: true, clear: true, reset: false, navigate: !!dest, url: dest || null };
+    case "reset":
+      return { ...base, ask: false, choice, save: false, clear: true, reset: true, navigate: false, url: null };
+    case "abandon":
+      return { ...base, ask: false, choice, save: false, clear: true, reset: false, navigate: !!dest, url: dest || null };
+    default: {
+      const unknown = choice;
+      return { ...base, ask: true, choice: unknown, save: false, clear: false, reset: false, navigate: false, url: null };
+    }
+  }
 }
 
 export function fdmDonePlan() {

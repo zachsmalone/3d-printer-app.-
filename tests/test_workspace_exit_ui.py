@@ -127,9 +127,11 @@ def test_exit_new_build_and_done_do_not_publish(base):
             if view == "slicer":
                 assert row.locator("[data-ws-act=exit]").inner_text() == "Back"
                 assert row.locator("[data-ws-act=done]").is_visible()
-                assert pg.locator("#slicerBar [data-bed-sheet=filament]").inner_text() == "Filament"
-                assert pg.locator("#slicerBar [data-bed-sheet=process]").inner_text() == "Process"
-                assert pg.locator("#slicerBar [data-bed-act=import]").is_visible()
+                bar = pg.locator("#slicerBar")
+                assert bar.is_hidden()
+                assert bar.locator("[data-bed-sheet=filament]").text_content() == "Filament"
+                assert bar.locator("[data-bed-sheet=process]").text_content() == "Process"
+                assert bar.locator("[data-bed-act=import]").count() == 1
                 assert pg.locator("#mainNav button[data-view=projects]").count() == 0
             else:
                 assert row.locator("[data-ws-act=new-build]").is_visible()
