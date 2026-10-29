@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   stageFor, planHop, readFlow, rememberCopy, reuseCopy, forgetCopy, rememberRepair, reuseRepair, slicerUrlForNewProject, flowNote,
-  leaveBedUrl, flowVisible, slicerHash,
+  leaveBedUrl, flowVisible, slicerHash, stagesFor,
 } from "../../static/project-flow.js";
 
 const PHOTO = "aaaaaaaaaaaa";
@@ -23,8 +23,9 @@ function mem() {
 test("stage names follow the open workspace", () => {
   assert.equal(stageFor("lithophane", ""), "design");
   assert.equal(stageFor("cad", ""), "design");
-  assert.equal(stageFor("smartfix", ""), "repair");
-  assert.equal(stageFor("slicer", "repair"), "repair");
+  assert.equal(stageFor("smartfix", ""), "");
+  assert.equal(stageFor("repair", ""), "");
+  assert.equal(stageFor("slicer", "repair"), "slice");
   assert.equal(stageFor("slicer", "smartorient"), "prepare");
   assert.equal(stageFor("slicer", ""), "slice");
   assert.equal(stageFor("torchc0", ""), "prepare");
@@ -130,8 +131,8 @@ test("a repaired file opens as a new slicer project only with a real id", () => 
 
 const REPAIR = "abcdabcdabcdabcd";
 
-test("the repair page stays on Check & Repair, and a kept project is the same id", () => {
-  assert.equal(stageFor("repair", ""), "repair");
+test("the repair page keeps its project id, and the step row is not a repair step", () => {
+  assert.equal(stageFor("repair", ""), "");
   const fresh = planHop("repair", { view: "repair", kind: "fdm" });
   assert.equal(fresh.stay, true);
   assert.match(fresh.note, /new project from the repaired file/);
@@ -154,11 +155,29 @@ test("the repair page stays on Check & Repair, and a kept project is the same id
   assert.equal(none.hash, "#account");
 });
 
-test("the FDM workspace hides the old stage row, and legacy hashes open the bed", () => {
+test("every workspace uses Design, Prepare, and Export/Print", () => {
+  assert.deepEqual(stagesFor().map(s => s.id), ["design", "prepare", "slice"]);
+  assert.deepEqual(stagesFor().map(s => s.label), ["Design", "Prepare", "Export/Print"]);
+  assert.equal(stagesFor().some(s => s.label === "Check & Repair"), false);
+});
+
+test("step buttons show only while a file is open in a workspace", () => {
+  assert.equal(flowVisible("slicer", { working: false }), false);
+  assert.equal(flowVisible("slicer", { working: true }), true);
+  assert.equal(flowVisible("cad", {}), false);
+  assert.equal(flowVisible("cad", { working: true }), true);
+  assert.equal(flowVisible("lithophane", {}), false);
+  assert.equal(flowVisible("lithophane", { working: true }), true);
+  assert.equal(flowVisible("torchc0", { working: false }), false);
+  assert.equal(flowVisible("torchc0", { working: true }), true);
+  assert.equal(flowVisible("showcase", { working: true }), false);
+  assert.equal(flowVisible("account", { working: true }), false);
+  assert.equal(flowVisible("repair", { working: true }), false);
+  assert.equal(flowVisible("smartfix", { working: true }), false);
   assert.equal(flowVisible("slicer"), false);
-  assert.equal(flowVisible("lithophane"), true);
-  assert.equal(flowVisible("cad"), true);
-  assert.equal(flowVisible("torchc0"), true);
+});
+
+test("legacy slicer hashes open the bed", () => {
   assert.equal(slicerHash("#slicer/repair"), "#slicer");
   assert.equal(slicerHash("#slicer/prepare"), "#slicer");
   assert.equal(slicerHash("#slicer/design"), "#slicer");

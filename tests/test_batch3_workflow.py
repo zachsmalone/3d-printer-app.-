@@ -65,8 +65,9 @@ def test_stage_bar_is_on_the_main_app_and_in_cad():
     assert "bindFlow" in (ROOT / "static/cad.js").read_text(encoding="utf-8")
     assert "projectFlow" in WS
     flow = (ROOT / "static/project-flow.js").read_text(encoding="utf-8")
-    for label in ("Design", "Check & Repair", "Prepare", "Slice & Export"):
+    for label in ("Design", "Prepare", "Export/Print"):
         assert label in flow
+    assert '{ id: "repair"' not in flow
 
 
 def test_repair_page_hands_off_on_the_server_and_says_when_the_project_is_new():

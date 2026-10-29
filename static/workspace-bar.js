@@ -532,10 +532,14 @@ document.addEventListener("click", onFdmAct);
 document.addEventListener("click", onControl);
 document.getElementById("fdmImportClose")?.addEventListener("click", () => document.getElementById("fdmImport")?.close());
 ["zeim:build", "zeim:edit-loaded", "zeim:edit-shown", "zeim:new-build", "zeim:torchc0-ready", "zeim:printer", "zeim:fdm-device"].forEach(name => {
-  document.addEventListener(name, () => { paintWorkspaceBars(); paintDevice(); });
+  document.addEventListener(name, () => { paintWorkspaceBars(); paintDevice(); paintWorkBars(); });
 });
 document.addEventListener("zeim:fdm-note", e => { if (e.detail) toast(String(e.detail)); });
 document.addEventListener("change", ev => { if (ev.target && ev.target.id === "rzFile") paintWorkBars(); });
+["editResult", "editBusy", "editEmpty"].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) new MutationObserver(paintWorkBars).observe(el, { attributes: true, attributeFilter: ["hidden"] });
+});
 function placeFdmSheet() {
   const head = document.querySelector("#viewEdit > .bed-head");
   if (!head) return;
