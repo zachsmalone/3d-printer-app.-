@@ -60,7 +60,7 @@ async function create(fd, retry) {
     if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); const n = e.body?.max; editPick.msg((n ? `Your recent builds are full (${n} of ${n}).` : "Your recent builds are full.") + " Delete one in the window, then continue."); }
     else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) { copyFromPhoto = ""; editPick.msg(e.message); }       // photo problems stay under the photo buttons (QA-3)
     else if (e.name === "AbortError") {
-      if (ctl === importCtl) modelMsg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects.");
+      if (ctl === importCtl) modelMsg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear on Account.");
     }
     else { copyFromPhoto = ""; toast(e.message, "err"); }
   } finally { if (ctl === importCtl) busy(false); }

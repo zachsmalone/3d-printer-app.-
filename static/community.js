@@ -50,8 +50,8 @@ async function refreshMe() {
 }
 
 /* ---------- views ---------- */
-const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", projects: "#viewProjects", account: "#viewAccount", learn: "#viewLearn" };
-const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", "2d3d": "ai3d" };
+const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn" };
+const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", "2d3d": "ai3d", projects: "account", studio: "account" };
 function show(view, tab) {
   const navTab = tab || view;
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === navTab); if (b.dataset.view === navTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
@@ -82,7 +82,7 @@ function paintStudioHome(raw) {
   const expert = document.querySelector("#h1 [data-lvl=expert]");
   const photoName = (CFG && CFG.sections && CFG.sections.create) || "Photo";
   if (expert) expert.textContent = raw === "lithophane" ? "Lithophane" : photoName;
-  /* Saved projects are listed in Projects. This block stays hidden so the photo page does not become the library. */
+  /* Saved work is listed on Account. This block stays hidden so the photo page does not become the library. */
   const recent = $("#recentBuilds");
   if (recent) recent.hidden = true;
 }
@@ -95,7 +95,8 @@ function paintStudioOwn() {
   const note = $("#studioOwnCount");
   if (!note) return;
   const n = (S.history || []).filter(b => /^[0-9a-f]{12}$/.test(String(b.id || ""))).length;
-  note.textContent = n === 0 ? "No saved projects yet." : (n === 1 ? "1 saved project." : n + " saved projects.");
+  note.hidden = n === 0;
+  note.textContent = n === 0 ? "" : (n === 1 ? "1 saved project." : n + " saved projects.");
 }
 function markStudioOwn(on) {
   const sec = $("#meStudio");
@@ -120,7 +121,7 @@ function route() {
   const v = intent.view || (ALIAS[raw] ?? (VIEWS[raw] ? raw : "showcase"));
   show(v, intent.nav || v);
   paintStudioHome(raw);
-  markStudioOwn(!!intent.ownership);
+  markStudioOwn(false);
   if (intent.library) arriveLibrary(sessionStorage);
   if (v === "lithophane" && raw === "lithophane") { const r = document.querySelector('#modeCards input[value=lithophane]'); if (r && !r.checked) r.click(); }
   if (v === "slicer" && h[1]) setTimeout(() => openTool(h[1]), 200);

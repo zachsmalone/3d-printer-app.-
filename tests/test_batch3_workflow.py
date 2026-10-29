@@ -1,6 +1,6 @@
-"""Batch 3: Projects is the saved-project list, and the stage bar keeps one project.
+"""Saved work lives on Account, and the stage bar keeps one project.
 
-The list lives on Projects. My Studio on Account is the ownership note, not a second list.
+There is no Projects tab and no second list with a shorter title.
 """
 import re
 from pathlib import Path
@@ -22,25 +22,24 @@ def _slice(text, start, end):
     return text[i:text.index(end, i)]
 
 
-def test_projects_owns_the_list_and_me_does_not_clone_it():
+def test_account_owns_the_list_and_projects_is_not_a_second_page():
     nav = _slice(HTML, 'id="mainNav"', "</nav>")
-    assert 'data-view="projects"' in nav
-    assert nav.index('data-view="projects"') < nav.index('data-view="account"')
-    assert "studio" not in re.findall(r'data-view="(\w+)"', nav)
-    projects = _slice(HTML, 'id="viewProjects"', 'id="viewAccount"')
-    assert 'id="studioLib"' in projects and 'id="studioLibHelp"' in projects
-    assert "Open continues that project" in projects
-    assert 'id="btnViewStudio"' in projects and "View in My Studio" in projects
-    assert 'id="btnLogin"' not in projects and 'id="btnAccount"' not in projects
+    views = re.findall(r'data-view="(\w+)"', nav)
+    assert "projects" not in views and "studio" not in views
+    assert "account" in views
+    assert 'id="viewProjects"' not in HTML
+    assert "Open in Projects" not in HTML and "View in My Studio" not in HTML
     acc = _slice(HTML, 'id="viewAccount"', 'id="viewLearn"')
-    studio = _slice(acc, 'id="meStudio"', "</section>")
-    assert "My Studio" in studio and 'href="#projects"' in studio and "Open in Projects" in studio
-    assert 'id="studioLib"' not in acc and 'data-lib="open"' not in acc
+    assert 'id="studioLib"' in acc and 'id="studioLibHelp"' in acc
+    assert "Open continues that project" in acc
+    assert 'id="btnLogin"' in acc and 'id="btnAccount"' in acc
+    assert HTML.count('id="studioLib"') == 1
     assert "This is Projects" not in HTML
     assert 'head === "projects"' in LIB
-    assert 'view: "projects"' in LIB
-    assert 'nav: "projects"' in LIB
-    assert '"#projects"' in LIB
+    assert 'view: "account"' in LIB
+    assert 'nav: "account"' in LIB
+    assert 'view: "projects"' not in LIB and 'nav: "projects"' not in LIB
+    assert '"#account"' in LIB and '"#projects"' in LIB
     assert "ownership: true" in LIB
 
 

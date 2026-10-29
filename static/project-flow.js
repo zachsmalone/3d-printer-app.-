@@ -1,5 +1,5 @@
 /* One project across Design → Check & Repair → Prepare → Slice & Export.
-   Projects (#projects) is the saved-work list. My Studio on Account does not list projects.
+   Saved work is on Account (#account). #projects and #studio open that page.
    A photo design and its slicer copy are different records. The copy is remembered
    for this browser tab (zeim.flow) so the next stage does not import the photo again.
    A repaired file that is not a project yet is remembered the same way: one slicer
@@ -135,16 +135,16 @@ function sameNote(stage) {
 }
 
 function copyNote(stage) {
-  const head = "This slicer project is a copy of the photo design. The photo design stays in Projects.";
+  const head = "This slicer project is a copy of the photo design. The photo design stays on Account.";
   if (stage === "repair") return head + " Check & Repair uses that copy.";
   if (stage === "prepare") return head + " Prepare places that copy on the bed.";
   return head + " Slice & Export uses that copy.";
 }
 
 function willCopyNote(stage) {
-  if (stage === "repair") return "Check & Repair opens a slicer copy of this photo design. The photo design stays in Projects.";
-  if (stage === "prepare") return "Prepare opens a slicer copy of this photo design and places it on the bed. The photo design stays in Projects.";
-  return "Slice & Export opens a slicer copy of this photo design. The photo design stays in Projects.";
+  if (stage === "repair") return "Check & Repair opens a slicer copy of this photo design. The photo design stays on Account.";
+  if (stage === "prepare") return "Prepare opens a slicer copy of this photo design and places it on the bed. The photo design stays on Account.";
+  return "Slice & Export opens a slicer copy of this photo design. The photo design stays on Account.";
 }
 
 function meshNote(stage, ctx, meshId) {
@@ -163,7 +163,7 @@ function slicerPlan(stage, ctx, tool) {
   if (photoId) {
     return { stage, stay: false, hash, open: "send", target: "slicer", src: "lithophane", tool, derived: true, note: willCopyNote(stage) };
   }
-  return { stage, stay: false, hash: LIBRARY_HASH, open: "", note: "Open a saved project in Projects, then continue." };
+  return { stage, stay: false, hash: LIBRARY_HASH, open: "", note: "Open a saved project on Account, then continue." };
 }
 
 function torchPlan(ctx, note, editId) {
@@ -206,10 +206,10 @@ export function planHop(stage, ctx) {
   if (stage === "prepare" && kind === "resin") {
     const meshId = meshOf(c);
     const note = meshId && photoId && meshId === c.copyId
-      ? "Prepare copies the slicer copy of this photo design into TorchC0. The photo design stays in Projects. The layer file is made in your resin printer's slicer."
+      ? "Prepare copies the slicer copy of this photo design into TorchC0. The photo design stays on Account. The layer file is made in your resin printer's slicer."
       : (meshId
         ? "Prepare copies this project's mesh into TorchC0. This project stays as it is. The layer file is made in your resin printer's slicer."
-        : "Prepare copies this photo model into TorchC0. The photo design stays in Projects. The layer file is made in your resin printer's slicer.");
+        : "Prepare copies this photo model into TorchC0. The photo design stays on Account. The layer file is made in your resin printer's slicer.");
     return Object.assign({ stage }, torchPlan(c, note, c.view === "torchc0" ? "" : meshId));
   }
   if (stage === "slice" && kind === "fdm") return Object.assign({ stage }, slicerPlan("slice", c, ""));
@@ -219,7 +219,7 @@ export function planHop(stage, ctx) {
     if (c.view === "torchc0") return { stage, stay: false, open: "focus", focus: "#rzExport", note };
     return Object.assign({ stage }, torchPlan(c, note, meshId));
   }
-  return { stage, stay: true, open: "", note: "Open a saved project in Projects." };
+  return { stage, stay: true, open: "", note: "Open a saved project on Account." };
 }
 
 export function flowNote(ctx) {

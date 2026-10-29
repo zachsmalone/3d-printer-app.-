@@ -1,6 +1,6 @@
-/* Exit, Done, New build, and Return to Projects outside CAD.
+/* Exit, Done, New build, and Return to Account outside CAD.
    Showcase publishing is never a side effect of these actions.
-   The library URL is Projects (studio-library.js). #showcase is the app home, not a publish. */
+   The library URL is Account (studio-library.js). #showcase is the app home, not a publish. */
 import { LIBRARY_URL } from "./studio-library.js";
 
 export { LIBRARY_URL };

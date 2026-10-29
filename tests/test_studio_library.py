@@ -1,4 +1,4 @@
-"""Node tests for the Projects list and the My Studio ownership route."""
+"""Node tests for the Account saved-work list and the old Projects bookmarks."""
 import shutil
 import subprocess
 from pathlib import Path

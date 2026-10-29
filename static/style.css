@@ -1143,20 +1143,18 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .shfilters small.help{flex-basis:100%;margin:0}
 
 /* Showcase collections — calm strip matching .shfilters / .prov (cherry-blossom vars) */
-/* My Studio: ownership note on Account (Me). The project list lives on Projects. */
+/* Saved work lives once, on Account. Rows stay a list, not a second page. */
 #viewAccount .mestudio{margin:0 0 var(--s4,16px);padding:var(--s5,20px);border:1px solid var(--line);border-left:3px solid var(--zt-a,#A3241C);border-radius:var(--r-lg,14px);background:var(--panel);box-shadow:var(--sh-1);max-width:100%}
-#viewAccount .mestudio.on{box-shadow:inset 0 0 0 1px var(--zt-a,#A3241C)}
 #viewAccount .mestudio h2{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-size:1.05rem}
 #viewAccount .mestudio h2 .i{width:20px;height:20px;color:var(--zt-a,#A3241C)}
-#viewAccount .mestudio .btn{min-height:44px;margin-top:10px;text-decoration:none}
-#viewProjects .studio-lib{display:flex;flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none}
-#viewProjects .studio-lib .hcard{flex-direction:row;align-items:center;gap:10px;padding:8px}
-#viewProjects .studio-lib .meta{flex:1;min-width:0;padding:0}
-#viewProjects .studio-lib .meta b{white-space:normal}
-#viewProjects .studio-lib .row2{padding:0;margin-left:auto}
-#viewProjects .studio-lib .btn{margin-top:0;width:auto}
-#viewProjects .studio-lib img{width:72px;height:72px;aspect-ratio:1;object-fit:cover;flex:0 0 72px}
-@media (max-width:768px){#viewAccount .mestudio .btn{width:100%;justify-content:center}#viewProjects .studio-lib .hcard{flex-wrap:wrap}#viewProjects .studio-lib .row2{width:100%;margin-left:0}#viewProjects .studio-lib .btn{width:auto;flex:1 1 44px}}
+#meStudio .studio-lib{display:flex;flex-direction:column;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+#meStudio .studio-lib .hcard{flex-direction:row;align-items:center;gap:10px;padding:8px}
+#meStudio .studio-lib .meta{flex:1;min-width:0;padding:0}
+#meStudio .studio-lib .meta b{white-space:normal}
+#meStudio .studio-lib .row2{padding:0;margin-left:auto}
+#meStudio .studio-lib .btn{margin-top:0;width:auto;min-height:44px}
+#meStudio .studio-lib img{width:72px;height:72px;aspect-ratio:1;object-fit:cover;flex:0 0 72px}
+@media (max-width:768px){#meStudio .studio-lib .hcard{flex-wrap:wrap}#meStudio .studio-lib .row2{width:100%;margin-left:0}#meStudio .studio-lib .btn{width:auto;flex:1 1 44px}}
 .studio-crumb{margin:0 0 8px;font-size:13px;color:var(--mut)}
 .studio-crumb a{font-weight:650}
 .wsbar{position:relative;z-index:40;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}

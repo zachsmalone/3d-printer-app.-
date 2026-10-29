@@ -21,7 +21,7 @@ function beginner() {
 
 function nextCopy(hasProject) {
   if (hasProject) {
-    return "The repaired file is kept here for one hour. Open in the FDM Slicer continues the project for this repair, if it is still in Projects. If it was deleted, a new project is started from the repaired file. The file you uploaded stays as it was.";
+    return "The repaired file is kept here for one hour. Open in the FDM Slicer continues the project for this repair, if it is still on Account. If it was deleted, a new project is started from the repaired file. The file you uploaded stays as it was.";
   }
   return "The repaired file is kept here for one hour. The first time you open it in the FDM Slicer, ZEIM starts a new project from that file. After that, the same project opens. The file you uploaded stays as it was.";
 }
@@ -52,7 +52,7 @@ function handoff(rid) {
     .then(async made => {
       const body = await made.json().catch(() => ({}));
       if (made.status === 409) {
-        throw new Error(typeof body.message === "string" ? body.message : "Your recent builds are full. Delete one in Projects, then try again.");
+        throw new Error(typeof body.message === "string" ? body.message : "Your recent builds are full. Delete one on Account, then try again.");
       }
       if (!made.ok) throw new Error(typeof body.detail === "string" ? body.detail : "The FDM Slicer could not open that file.");
       if (!slicerUrlForNewProject(body.id)) throw new Error("The FDM Slicer did not return a project.");
