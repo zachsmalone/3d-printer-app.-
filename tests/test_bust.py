@@ -1,4 +1,4 @@
-"""Bust mode: photo → volumetric head/shoulders on a clean pedestal + auto mask."""
+"""Photo bust: a raised photo on a rounded plaque and pedestal, plus an optional crop mask."""
 from __future__ import annotations
 
 import base64
@@ -89,7 +89,10 @@ def test_bust_with_select_crops_to_region():
 def test_bust_without_select_adds_tip_warning():
     m = geometry.build(_photo(), "bust", {"width_mm": 40, "resolution": 40, "base_mm": 8, "relief_mm": 4})
     warns = m.info.get("warnings") or []
-    assert any("auto" in w.lower() or "head and shoulders" in w.lower() or "trace" in w.lower() for w in warns)
+    assert any("not a scanned head" in w.lower() for w in warns)
+    assert m.info.get("kind") == "photo_relief"
+    assert "not a scanned head" in (m.info.get("note") or "").lower()
+    assert "raised photo" in (m.info.get("note") or "").lower()
 
 
 def test_bust_volumetric_thicker_than_flat_back():
@@ -113,6 +116,8 @@ def test_autotune_bust():
     assert P["back_mm"] == 14.0
     assert any(n["label"] == "Pedestal" for n in notes)
     assert any(n["label"] == "Rounded back" for n in notes)
+    front = next(n for n in notes if n["label"] == "Front relief")
+    assert "not a scanned face" in front["why"].lower()
 
 
 def test_detect_head_shoulders_returns_mask_and_path():

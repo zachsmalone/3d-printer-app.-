@@ -862,7 +862,7 @@ async function addOp(op, params) {
     if (!S.bid) {
       if (!["sketch_extrude", "revolve", "cad_text", "cad_shape", "cad_joint"].includes(op)) throw new Error("Start with a shape, or a sketch and Extrude.");
       const j = rep = await api("/api/cad/new", { method: "POST", json: { op, params, title: $("#cwTitle").value || "My design" } });
-      if (!j.id) throw new Error("Your 5 recent builds are full. Delete one on the main page, then try again.");
+      if (!j.id) throw new Error("Your recent builds are full. Delete one on the main page, then try again.");
       S.bid = j.id; history.replaceState(null, "", `?bid=${S.bid}`); document.dispatchEvent(new CustomEvent("zeim:flow"));
     } else {
       rep = await api(`/api/edit/${S.bid}/op`, { method: "POST", json: { op, params } });

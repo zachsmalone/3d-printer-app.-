@@ -729,7 +729,7 @@ def export_quality(m: trimesh.Trimesh) -> dict:
     return {
         "ok": not issues,
         "issues": issues,
-        "message": "Model is print-safe to export." if not issues else _GATE_PREFIX + "; ".join(issues) + ". Run Repair or simplify the mesh, then validate again.",
+        "message": "Closed mesh. You can export the geometry. Slice it before printing." if not issues else _GATE_PREFIX + "; ".join(issues) + ". Run Repair or simplify the mesh, then validate again.",
         "watertight": a["watertight"],
         "size_mm": a["size_mm"],
         "triangles": a["triangles"],

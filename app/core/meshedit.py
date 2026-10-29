@@ -359,7 +359,7 @@ def op_repair(m, p):
         parts = m.split(only_watertight=False)
         if len(parts) > 1:
             parts.sort(key=lambda x: len(x.faces), reverse=True)
-            steps.append(f"dropped {len(parts) - 1} small floating piece(s)")
+            steps.append(f"kept only the largest piece and dropped {len(parts) - 1} other piece(s)")
             m = parts[0]
     if p.get("fix_normals", True):
         trimesh.repair.fix_winding(m)

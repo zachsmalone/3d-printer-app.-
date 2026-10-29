@@ -12,7 +12,7 @@ const BACK_KEY = "zeim.back";
 const BACK_MS = 6 * 3600e3;
 
 const MODE_LABEL = {
-  lithophane: "Lithophane", relief: "Relief", bust: "Bust", popart: "Pop-art",
+  lithophane: "Lithophane", relief: "Relief", bust: "Photo plaque", popart: "Pop-art",
   trace2d: "Logo & Drawing", ai3d: "2D→3D", edit: "Edited model", memorybox: "Memory box",
 };
 

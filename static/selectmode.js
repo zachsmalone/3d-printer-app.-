@@ -26,7 +26,7 @@ host.innerHTML = `
     <button type="button" class="selm-t" id="selUndo" disabled>↶ Undo</button>
     <button type="button" class="selm-t" id="selClear" disabled>Clear</button>
     <button type="button" class="selm-t" id="selInvert" aria-pressed="false">Invert</button>
-    <button type="button" class="selm-t" id="selAuto" hidden>Auto head &amp; shoulders</button>
+    <button type="button" class="selm-t" id="selAuto" hidden>Guess an outline</button>
   </div>
   <div class="selm-stage" id="selStage"><div class="selm-zoom" id="selZoom"><canvas id="selCanvas" aria-label="Your photo. Draw round the part to keep."></canvas></div>
     <button type="button" class="selm-t selm-fit" id="selFit" hidden>Fit</button></div>
@@ -55,12 +55,12 @@ function say(t) { host.querySelector("#selSay").textContent = t; }
 function openLabel() {
   const btn = host.querySelector("#selOpen");
   if (!btn) return;
-  btn.textContent = st.open ? "Hide selection tools" : (st.mode === "bust" ? "Head and shoulders" : "Choose part of the photo");
+  btn.textContent = st.open ? "Hide selection tools" : (st.mode === "bust" ? "Crop the plaque" : "Choose part of the photo");
 }
 function status() {
   const has = st.use && st.mask && st.paths.length;
   const whole = st.mode === "bust"
-    ? "Whole photo. This builds a photo bust on a pedestal, not a cut-out head."
+    ? "Whole photo. This builds a raised photo plaque on a pedestal, not a scanned head."
     : "Using the whole photo.";
   host.querySelector("#selState").textContent = has ? `Using your selection (${Math.round(st.area * 100)}% of the photo).` : whole;
   host.querySelector("#selUndo").disabled = !st.undo.length;
@@ -246,7 +246,7 @@ host.querySelectorAll("input[name=selOut]").forEach(r => r.onchange = () => { st
 async function autoHeadShoulders() {
   if (st.mode !== "bust" || !st.file) return;
   const btn = host.querySelector("#selAuto");
-  btn.disabled = true; say("Finding a starting head & shoulders mask…");
+  btn.disabled = true; say("Finding a starting outline. This only crops the plaque.");
   try {
     const fd = new FormData();
     fd.append("file", st.file);
@@ -256,7 +256,7 @@ async function autoHeadShoulders() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.detail || j.message || ("Auto-select failed (" + r.status + ")"));
     const sel = j.select || {};
-    if (!sel.paths || !sel.paths.length) throw new Error("No outline came back. Trace the head and shoulders instead.");
+    if (!sel.paths || !sel.paths.length) throw new Error("No outline came back. Trace the part to keep.");
     push();
     st.paths = sel.paths;
     st.invert = false;
@@ -269,7 +269,7 @@ async function autoHeadShoulders() {
     recompute(); draw();
     say(j.tip || sel.tip || "Starting mask ready — edit it, then press Make it from my selection.");
   } catch (e) {
-    say((e && e.message) ? e.message : "Auto-select failed. Trace the head and shoulders instead.");
+    say((e && e.message) ? e.message : "Auto-select failed. Trace the part to keep.");
   } finally {
     btn.disabled = false; status();
   }
@@ -311,7 +311,7 @@ document.addEventListener("zeim:file", e => {
 });
 document.addEventListener("zeim:mode", e => {
   st.mode = e.detail; host.hidden = !MODES.includes(st.mode) || !st.img; status(); draw();
-  if (st.mode === "bust") say("Head and shoulders is a starting mask you can edit. Without it, the whole photo becomes a photo bust on a pedestal, not an AI figure.");
+  if (st.mode === "bust") say("An outline only crops the raised photo. It does not build a scanned head. Without one, the whole photo becomes a plaque on a pedestal.");
   openLabel(); status();
 });
 document.addEventListener("zeim:build", e => {        /* a saved build carries its selection: keep it for "make it again" */

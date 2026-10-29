@@ -57,7 +57,7 @@ async function create(fd, retry) {
     if (copyFromPhoto && r.id) { rememberCopy(sessionStorage, copyFromPhoto, r.id); copyFromPhoto = ""; document.dispatchEvent(new CustomEvent("zeim:flow")); }
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); editPick.msg("Your recent builds are full (5 of 5). Delete one in the window, then continue."); }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); const n = e.body?.max; editPick.msg((n ? `Your recent builds are full (${n} of ${n}).` : "Your recent builds are full.") + " Delete one in the window, then continue."); }
     else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) { copyFromPhoto = ""; editPick.msg(e.message); }       // photo problems stay under the photo buttons (QA-3)
     else if (e.name === "AbortError") {
       if (ctl === importCtl) modelMsg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects.");
@@ -209,9 +209,9 @@ function loadProject(p, keepCamera = false) {
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis;
-  const q = p.quality_gate || { ok: true, issues: [], message: "Model is print-safe to export." };
+  const q = p.quality_gate || { ok: true, issues: [], message: "Closed mesh. You can export the geometry. Slice it before printing." };
   $("#editStats").innerHTML = `<span class="pill">${a.size_mm.map(x => fmt(x)).join(" × ")} ${E.unit}</span><span class="pill">${a.triangles.toLocaleString()} triangles</span>` +
-    `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${q.ok ? "ok" : "bad"}">${q.ok ? "✔ print-safe" : "✖ needs repair"}</span>` +
+    `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${q.ok ? "ok" : "bad"}" title="${q.ok ? "Watertight mesh you can export. Slice it before printing." : "This mesh still needs a fix before export."}">${q.ok ? "✔ closed mesh" : "✖ needs repair"}</span>` +
     (a.internal_voids ? `<span class="pill bad" title="A sealed hollow inside the model. Hollow with a drain hole is intended; unexpected voids trap air or resin">${a.internal_voids} sealed void${a.internal_voids > 1 ? "s" : ""}</span>` : "") + (a.components > 1 ? `<span class="pill" title="Separate pieces in this model">${a.components} pieces</span>` : "") + (p.preview.decimated ? `<span class="pill" title="Exports use the full mesh">preview simplified</span>` : "");
   $("#editVis").value = p.visibility || "private";
   $("#eUndo").disabled = !p.can_undo; $("#eRedo").disabled = !p.can_redo;
@@ -652,7 +652,7 @@ function renderTools() {
       <button class="btn small">Apply thread</button>
       <p class="help">Approximate metric thread (stacked profile). Fit is <b>Simulated</b> until you test-print.</p></form>` : `<p class="help">Needs manifold3d.</p>`}</details>
     <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-wrench></use></svg> Repair &amp; simplify</summary>
-      <form data-form="repair"><label class="inl"><input type="checkbox" name="fix_normals" checked> Fix normals</label> <label class="inl"><input type="checkbox" name="fill_holes" checked> Fill holes</label> <label class="inl"><input type="checkbox" name="remove_duplicates" checked> Remove duplicates</label> <label class="inl"><input type="checkbox" name="keep_largest"> Drop floating bits</label><div><button class="btn small">Repair</button></div></form>
+      <form data-form="repair"><label class="inl"><input type="checkbox" name="fix_normals" checked> Fix normals</label> <label class="inl"><input type="checkbox" name="fill_holes" checked> Fill holes</label> <label class="inl"><input type="checkbox" name="remove_duplicates" checked> Remove duplicates</label> <label class="inl"><input type="checkbox" name="keep_largest"> Keep only the largest piece</label><div><button class="btn small">Repair</button></div></form>
       ${cap.simplify ? `<form data-form="simplify"><div class="field"><label>Keep <em><span id="keepPct">50</span>% of triangles</em></label><input type="range" name="keep_ratio" min="0.05" max="0.95" step="0.05" value="0.5"></div><button class="btn small">Simplify</button></form>` : ""}</details>
     <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-tag></use></svg> Named dimensions</summary>
       <p class="help">Give a size a name, then type <code>$name</code> instead of a number in a step (✎ on the history). Change it here and every step using it updates.</p>

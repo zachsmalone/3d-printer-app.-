@@ -82,7 +82,7 @@ def test_a_skipped_pedestal_is_a_warning(monkeypatch):
     })
     assert m.info["pedestal"].get("skipped")
     assert any("Pedestal could not be added" in w for w in m.info["warnings"])
-    assert any("photo bust" in w.lower() for w in m.info["warnings"])
+    assert any("not a scanned head" in w.lower() for w in m.info["warnings"])
 
 
 def test_sculpt_and_bust_copy_is_honest_in_source():
@@ -97,10 +97,27 @@ def test_sculpt_and_bust_copy_is_honest_in_source():
     brush = open("static/sculptbrush.js", encoding="utf-8").read()
     assert "0.15" in brush and "0.4" in brush
     sel = open("static/selectmode.js", encoding="utf-8").read()
-    assert "Head and shoulders" in sel
-    assert "not a cut-out head" in sel
+    assert "Crop the plaque" in sel
+    assert "not a scanned head" in sel
+    assert "Head and shoulders" not in sel
     css = open("static/style.css", encoding="utf-8").read().replace(" ", "")
     assert ".wsbar{position:relative;z-index:40;" in css
     assert "left:auto;right:8px" in css
     app = open("static/app.js", encoding="utf-8").read()
-    assert "bustNote" in app and "not an AI figure" in app
+    assert "bustNote" in app and "not a scanned head" in app
+    page = open("static/index.html", encoding="utf-8").read()
+    assert "Photo plaque" in page and "Not a scanned head." in page
+    assert "<b>Bust</b>" not in page
+    assert "Head &amp; shoulders" not in page and "Face depth" not in page
+    assert "Print-ready" not in page and "5 recent builds" not in page
+    edit = open("static/edit.js", encoding="utf-8").read()
+    assert "closed mesh" in edit and "print-safe" not in edit
+    assert "Keep only the largest piece" in edit and "Drop floating bits" not in edit
+
+
+def test_export_gate_does_not_say_the_mesh_is_ready_to_print():
+    from app.services.editproj import export_quality
+    q = export_quality(trimesh.creation.box((10, 10, 10)))
+    assert q["ok"]
+    assert "Slice it before printing" in q["message"]
+    assert "print-safe" not in q["message"].lower()
