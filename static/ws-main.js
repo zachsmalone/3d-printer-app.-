@@ -59,13 +59,10 @@
   if (studio) window.addEventListener("hashchange", function () {
     var k = studioRoute(); if (k === lastKey) return; lastKey = k; studio.rekey();
   });
-  make({ id: "slicer", key: function () { return "slicer2"; }, title: "FDM Slicer", root: "#viewEdit", active: function () { return vis($("#editResult")); },
-    watch: ["#editResult", "#viewEdit", "#processSheet", "#slicerDock"], obstacles: ["#editBusy:not([hidden])", "#eMeasureOut:not([hidden])"],
-    panels: [
-      { id: "undo", el: "#editVtools", label: "Undo & view", core: true, dock: true, lead: true, def: function () { return { edge: "right", t: 0.08, min: true }; }, resize: false, bare: true },
-      { id: "tools", el: "#editSide", label: "Tools", core: true, dock: true, def: function () { return { edge: "left", t: 0, min: true }; } },
-      { id: "result", el: "#editResult", label: "Slice, export & print", core: true, dock: true, def: function () { return { edge: "right", t: 0.2, min: true }; } }
-    ] });
+  /* No floating cards on the FDM bed. Tools live on the bottom bar. The 3D view still fills the workspace once a model is open. */
+  make({ id: "slicer", key: function () { return "slicer3"; }, title: "FDM Slicer", root: "#viewEdit", active: function () { return vis($("#editResult")); },
+    watch: ["#editResult", "#viewEdit", "#processSheet", "#slicerDock"], obstacles: ["#editBusy:not([hidden])"],
+    panels: [] });
   /* TorchC0: the result view moves out of the results card to become the background */
   var tRoot = $("#viewTorch"), tOut = $("#torchOut");
   function torchView() { var v = $("#rzView"); if (v && tRoot && v.parentElement !== tRoot && tRoot.classList.contains("zws")) { v._home = v.parentElement; tRoot.prepend(v); v.classList.add("zws-bg"); }
@@ -150,8 +147,11 @@
     var go = e.target.closest && e.target.closest(".ws-go, #slicerSlice");
     if (go && (go.classList.contains("ws-go") || go.id === "slicerSlice")) {
       e.preventDefault();
-      if (go.id === "slicerSlice") setDockTab("process");
       var target = document.getElementById(go.getAttribute("data-go") || "");
+      if (go.id === "slicerSlice" && (!target || target.disabled)) {
+        document.dispatchEvent(new CustomEvent("zeim:fdm-note", { detail: "Open a model first, then Slice." }));
+        return;
+      }
       if (target && !target.disabled) target.click();
       return;
     }

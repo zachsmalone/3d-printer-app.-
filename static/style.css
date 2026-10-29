@@ -1216,8 +1216,8 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #fdmImport .fdm-import{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50dvh;overflow:auto}
 #fdmImport .fdm-import button{width:100%;min-height:44px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:2px}
 #fdmImport .fdm-import small{color:var(--mut);font-weight:500}
-#viewEdit>.objdock{display:none!important}
-body[data-view=slicer] #sendToFab{display:none!important}
+#viewEdit>.objdock,#viewEdit .zws-p,#viewEdit .bed-view,#viewEdit.zws>aside.controls,#viewEdit.zws .stage>.result,#viewEdit.zws #editVtools{display:none!important}
+body[data-view=slicer] #sendToFab,body[data-view=slicer] .sitefoot,body[data-view=slicer] .saveind:not(.inline){display:none!important}
 #viewEdit .objdock button:disabled,#viewEdit .bed-bar button:disabled{opacity:.45;cursor:not-allowed}
 #editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}

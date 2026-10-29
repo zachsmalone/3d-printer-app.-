@@ -907,7 +907,7 @@ function markFace(p) {                                      // a translucent dis
 function clearGhost() { if (ghost) { viewer.scene.remove(ghost); ghost.geometry.dispose(); ghost = null; } }
 function updateGhost(f) {
   if (!viewer || !E.p) return; clearGhost();
-  const a = A(), c = a.center_mm, sz = a.size_mm, mat = new THREE.MeshBasicMaterial({ color: f.dataset.ghost === "cut" ? 0x22d3ee : 0xff9e00, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false });
+  const a = A(), c = a.center_mm, sz = a.size_mm, mat = new THREE.MeshBasicMaterial({ color: f.dataset.ghost === "cut" ? 0x22d3ee : 0x0066ff, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false });
   try {
     if (f.dataset.ghost === "cut") {
       const ax = val(f, "axis"), pos = len(f, "position"), big = Math.max(...sz) * 1.4;

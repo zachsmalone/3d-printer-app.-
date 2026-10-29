@@ -391,12 +391,19 @@ export function wirePanel(getModelId) {
     paintProcess();
   });
   paintProcess();
+  const bedBusy = (on, text) => {
+    const el = document.getElementById("editBusy"), label = document.getElementById("editBusyText");
+    if (!el) return;
+    el.hidden = !on;
+    if (label && text) label.textContent = text;
+  };
   const doSlice = async (ventOk = false) => {
     const out = $("#spOut"), fd = readPanel(); fd.append("model_id", getModelId());
     if (ventOk) fd.append("ventilation_ok", "true");
     $("#spMatWarn").hidden = false;
     if (gcDispose) { gcDispose(); gcDispose = null; }
     out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}…</p>`; $("#spGo").disabled = true;
+    bedBusy(true, "Slicing…");
     try {
       const r = await api("/api/slice", { method: "POST", body: fd });
       const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
@@ -431,6 +438,7 @@ export function wirePanel(getModelId) {
       else if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
+        const sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = false;
         out.innerHTML = matWarnHTML(e.body.detail.warning?.material || $("#spMat").value, { ask: true });
         $("#spMatWarn").hidden = true;                                           // one copy on screen (the one that asks)
         $("#spVentOk").onclick = () => doSlice(true);
@@ -438,7 +446,7 @@ export function wirePanel(getModelId) {
         $("#spVentOk").focus();
       } else out.innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`;
     }
-    finally { $("#spGo").disabled = false; }
+    finally { $("#spGo").disabled = false; bedBusy(false); }
   };
   $("#spGo").onclick = () => doSlice(false);
   applySmartFix();

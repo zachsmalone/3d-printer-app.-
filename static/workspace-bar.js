@@ -394,6 +394,12 @@ function onFdmAct(ev) {
   if (jump) {
     ev.preventDefault();
     document.getElementById(jump.getAttribute("data-bed-click"))?.click();
+    return;
+  }
+  const look = ev.target.closest && ev.target.closest("#bedTools [data-look]");
+  if (look) {
+    ev.preventDefault();
+    document.querySelector("#editViewer [data-look='" + look.getAttribute("data-look") + "']")?.click();
   }
 }
 
