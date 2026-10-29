@@ -46,6 +46,7 @@ async function refreshMe() {
   document.body.dataset.links = ME.send?.links ? "1" : "0";     // the server decides who can use Print / slicer links; the page only reflects it
   document.body.dataset.role = ME.send?.role || "";
   document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
+  loadNotes();
   paintAccountHandle();
 }
 
@@ -513,6 +514,7 @@ async function loadShowcase() {
   $("#shCats").innerHTML = ["", ...(r.categories || [])].map(c => `<button type="button" class="chip${c === shCat ? " on" : ""}" data-cat="${esc(c)}" aria-pressed="${c === shCat}">${c ? esc(c) : "All"}</button>`).join("");
   $("#shSub").textContent = r.subtitle || "";
   loadRecent();
+  loadUserSearch(q);
   $("#shCount").textContent = q ? `${r.result_count} project${r.result_count === 1 ? "" : "s"} match "${q}"` : "";
   // Example cards show NO numbers at all (not 0, not a dash); counts also arrive as null for non-public items.
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
@@ -526,6 +528,41 @@ async function loadShowcase() {
     $("#shGrid").innerHTML = `<li class="empty"><p>${esc(e.text)}</p>${e.action ? `<button class="btn" data-empty="${e.action.do}">${esc(e.action.label)}</button>` : ""}</li>`;
   }
 }
+async function loadUserSearch(q) {
+  const host = $("#shUsers");
+  if (!host) return;
+  const needle = String(q || "").trim().replace(/^@/, "");
+  if (needle.length < 2) { host.hidden = true; host.innerHTML = ""; return; }
+  let r; try { r = await api("/api/users/search?q=" + encodeURIComponent(needle)); } catch { host.hidden = true; return; }
+  const rows = r.users || [];
+  host.hidden = !rows.length;
+  host.innerHTML = rows.length ? `<p class="help">People</p><ul class="plist">${rows.map(u => `<li><a class="creator-link" href="/u/${esc(u.id)}">@${esc(u.username)}</a></li>`).join("")}</ul>` : "";
+}
+async function loadNotes() {
+  const dot = $("#bellDot");
+  if (!dot || !ME?.signed_up) { if (dot) dot.hidden = true; return; }
+  let r; try { r = await api("/api/me/notifications"); } catch { return; }
+  dot.hidden = !r.unread;
+  dot.textContent = String(r.unread || 0);
+  const host = $("#noteList");
+  if (!host) return;
+  host.innerHTML = (r.notifications || []).map(n => `<button type="button" class="btn small" data-note="${esc(n.id)}" data-item="${esc(n.item_id || "")}" data-user="${esc(n.user_id || "")}">${esc(n.text)}</button>`).join("") || `<p class="help">No notifications.</p>`;
+}
+$("#btnBell")?.addEventListener("click", async () => {
+  const host = $("#noteList");
+  if (!host) return;
+  host.hidden = !host.hidden;
+  await loadNotes();
+  if (!host.hidden) await api("/api/me/notifications/read", J("POST", {}));
+});
+$("#noteList")?.addEventListener("click", e => {
+  const b = e.target.closest("[data-note]");
+  if (!b) return;
+  if (b.dataset.item) openItem(b.dataset.item);
+  else if (b.dataset.user) openProfile(b.dataset.user);
+  $("#noteList").hidden = true;
+  loadNotes();
+});
 $("#shTabs").onclick = e => { const b = e.target.closest("[data-tab]"); if (!b) return; shTab = b.dataset.tab; $$("#shTabs button").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); }); loadShowcase(); };
 $("#shGrid").addEventListener("click", e => { const c = e.target.closest("a[data-open]"); if (c) { e.preventDefault(); openItem(c.dataset.open); } });
 // AI filter survives a reload: ?ai= in the URL wins, then the last choice in localStorage
@@ -1436,7 +1473,7 @@ async function loadQuestions(id, item) {
   const list = $("#qaList"), ask = $("#qaAsk"); if (!list) return;
   let r; try { r = await api(`/api/showcase/${id}/questions`); } catch { list.innerHTML = ""; return; }
   list.innerHTML = r.questions.length ? r.questions.map(q => `<li class="qaitem" data-qid="${esc(q.id)}">
-      <p class="q"><b>Q.</b> ${esc(q.text)} <span class="help">${esc(q.by)}</span></p>
+      <p class="q"><b>Q.</b> ${esc(q.text)} <span class="help">${q.asker_id ? `<a class="creator-link" href="/u/${esc(q.asker_id)}">${esc(q.by)}</a>` : esc(q.by)}</span></p>
       ${q.answer ? `<p class="a"><b>A.</b> ${esc(q.answer)}</p>` : `<p class="help">${q.status === "open" ? "Waiting for the creator" : ""}</p>`}
       ${q.can_answer ? `<div class="field row"><input id="qaAns_${esc(q.id)}" maxlength="1000" placeholder="Your answer"><button type="button" class="btn small" data-qaans="${esc(q.id)}">Answer</button></div>` : ""}
       ${(q.mine && !q.answer) || item.owned ? `<button type="button" class="btn small ghost danger" data-qadel="${esc(q.id)}">Delete</button>` : ""}

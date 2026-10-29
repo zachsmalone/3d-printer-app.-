@@ -287,7 +287,11 @@ def test_award_logic_never_fakes_progress_and_is_idempotent():
     }))
     rows = badges.for_owner(sid)["badges"]
     earnable = [b for b in rows if b["id"] not in ("official_og", "tester")]
-    assert len(earnable) == 10
+    ids = {b["id"] for b in earnable}
+    for required in ("first_slice", "first_export", "first_print", "first_lithophane", "first_resin",
+                     "first_cad", "first_showcase", "first_remix", "challenge_entrant", "prints_10", "likes_10"):
+        assert required in ids
+    assert "creator" not in ids and "win_gold" not in ids
     assert all(not b["earned"] and b["how"] and "\n" not in b["how"] for b in earnable)
     blob = " ".join(b["how"] + b["name"] for b in earnable).lower()
     assert "prize" not in blob and "$" not in blob and "cash" not in blob
