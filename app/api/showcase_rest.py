@@ -146,8 +146,18 @@ def get_challenge(cid: str, actor: Actor = Depends(get_actor)):
                               "entered_at": e["created"], "entry_id": e["id"]})
         except catalog.Denied:
             continue
-    return {**challenges.public(c, entry_count=len(ents)), "entries": items,
-            "can_enter": bool(actor.user and actor.is_adult and c.get("status") == "open")}
+    body = challenges.public(c, entry_count=len(ents))
+    titled = []
+    for w in body.get("winners") or []:
+        title = "Entry"
+        try:
+            title = catalog.get(w["item_id"], actor).get("title") or title
+        except catalog.Denied:
+            title = "Entry"
+        titled.append({**w, "title": title})
+    body["winners"] = titled
+    return {**body, "entries": items,
+            "can_enter": bool(actor.user and actor.is_adult and body.get("status") == "open" and not challenges.entry_for(c["id"], actor.sid))}
 
 
 @router.get("/challenges/{cid}/eligible")
@@ -219,7 +229,7 @@ def enter_challenge(cid: str, body: dict, request: Request, actor: Actor = Depen
     if not catalog.is_public(item):
         raise HTTPException(400, "Make the project public before entering.")
     remix_of = item.get("remix_of") or ""
-    if not remix_of:
+    if c.get("theme") == "remix" and not remix_of:
         raise HTTPException(400, "This challenge is for credited remixes. Publish with a Remixed-from link first.")
     _entry_limit(actor)
     try:

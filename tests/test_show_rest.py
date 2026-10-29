@@ -136,20 +136,22 @@ def test_remix_challenge_prize_free_enter():
     assert rem.get("remix_of") == src or rem.get("credit")
     # list challenges — Remix seed always present, prize_free
     chs = b.get("/api/challenges").json()["challenges"]
-    assert any(c["slug"] == "remix" and c["prize_free"] is True for c in chs)
-    cid = next(c["id"] for c in chs if c["slug"] == "remix")
+    assert any(c["slug"] == "christmas" and c["prize_free"] is True and c["status"] == "open" for c in chs)
+    cid = next(c["id"] for c in chs if c["slug"] == "christmas")
     detail = b.get(f"/api/challenges/{cid}").json()
     assert detail["prize_free"] is True
     assert "no cash" in detail["blurb"].lower() or any("prize" in r.lower() for r in detail["rules"])
     assert any("never takes a cut" in r for r in detail["rules"])
+    assert detail["next_theme"].startswith("January:")
+    assert "February" not in detail["next_theme"]
     # enter
     r = b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem["id"]})
     assert r.status_code == 200, r.text
     assert r.json()["prize_free"] is True
     assert "Prize-free" in r.json()["message"] or "prize" in r.json()["message"].lower()
-    # non-remix refused
-    plain = publish(b, "Not a remix")["id"]
-    assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": plain}).status_code == 400
+    plain_user = U("ChPlain")
+    plain = publish(plain_user, "Not a remix")["id"]
+    assert plain_user.post(f"/api/challenges/{cid}/enter", json={"item_id": plain}).status_code == 200
     # one entry per person
     rem2 = publish(b, "Second remix", remix_of=src, license_id="cc-by-4.0")["id"]
     assert b.post(f"/api/challenges/{cid}/enter", json={"item_id": rem2}).status_code == 400
@@ -163,7 +165,7 @@ def test_challenge_eligible_lists_own_published_showcase_items():
     plain = publish(b, "Plain cup")
     priv = publish(b, "Private remix", remix_of=src["id"], license_id="cc-by-4.0", visibility="private")
     other = publish(a, "Other remix", remix_of=src["id"], license_id="cc-by-4.0")
-    cid = challenges.REMIX_ID
+    cid = challenges.XMAS_ID
     anon = client().get(f"/api/challenges/{cid}/eligible")
     assert anon.status_code == 200 and anon.json()["signed_in"] is False and anon.json()["items"] == []
     assert client().get("/api/challenges/no-such-challenge/eligible").status_code == 404

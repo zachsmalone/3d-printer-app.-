@@ -1599,9 +1599,13 @@ async function openChallenge(cid) {
   const rules = (c.rules || []).map(r => `<li>${esc(r)}</li>`).join("");
   const entries = (c.entries || []).map(e => `<li><a href="#" data-open-item="${esc(e.id)}">${esc(e.title)}</a> <span class="help">by ${esc(e.creator)}</span></li>`).join("")
     || `<li class="help">No entries yet.</li>`;
+  const winners = c.winners_visible ? `<h4>Winners</h4><ol class="plist">${(c.winners || []).map(w => `<li>${w.place}. <a href="#" data-open-item="${esc(w.item_id)}">${esc(w.title || "Entry")}</a> <span class="help">${w.likes} ${w.likes === 1 ? "like" : "likes"}</span></li>`).join("") || `<li class="help">No entries to place.</li>`}</ol>` : "";
+  const next = c.next_theme ? `<p class="help">Next month: ${esc(c.next_theme)}</p>` : "";
   $("#chDlgBody").innerHTML = `<p class="pill prizefree">Prize-free</p>
     <p>${esc(c.blurb)}</p>
+    ${next}
     <ul class="help chrules">${rules}</ul>
+    ${winners}
     <p class="help">ZEIM never takes a cut of tips or of sales a maker makes from their own link. Tip links stay optional with no nags. Showcase downloads stay free.</p>
     ${elig.error ? `<p class="help">${esc(elig.error)}</p>` : ""}
     ${challengeEntryHTML(elig)}

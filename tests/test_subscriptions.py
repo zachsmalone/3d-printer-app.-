@@ -499,7 +499,7 @@ def test_real_actions_award_and_a_plain_publish_is_not_a_remix():
     assert {b["id"] for b in photo.json().get("badges_new", [])} == {"first_print"}
     assert "prints_10" not in _earned(remixer)
 
-    entered = remixer.post("/api/challenges/ch_remix/enter", json={"item_id": rem.json()["id"]})
+    entered = remixer.post("/api/challenges/ch_2026_12/enter", json={"item_id": rem.json()["id"]})
     assert entered.status_code == 200, entered.text
     assert "challenge_entrant" in {b["id"] for b in entered.json().get("badges_new", [])}
     assert entered.json()["prize_free"] is True
