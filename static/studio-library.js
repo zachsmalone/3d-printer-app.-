@@ -1,13 +1,20 @@
-/* Projects (#projects) is the saved-work list. Open and Edit are the actions that enter a workspace.
-   My Studio (#account/studio) is the ownership note on Account (Me). It does not list projects.
-   #studio used to alias to the shared Lithophane page, then to that Account list. It now opens Projects.
-   A return marker still uses from: "mystudio". Older markers stored /#account/studio; Exit follows Projects.
-   #create remains the photo workspace (it does not force the Lithophane style).
+/* Account (#account) is the saved-work list and the identity page. One list, on Me.
+   #projects, #studio, and #account/studio are older bookmarks. They open Account.
+   #studio used to alias to the shared Lithophane page. It does not open that workspace.
+   A return marker still uses from: "mystudio". Older markers stored /#projects or /#account/studio.
+   Exit follows Account. #create remains the photo workspace (it does not force the Lithophane style).
    Return uses the existing sessionStorage key zeim.back. Project and draft keys are not renamed. */
-export const LIBRARY_HASH = "#projects";
-export const LIBRARY_URL = "/#projects";
-export const STUDIO_HASH = "#account/studio";
-const LEGACY_LIBRARY_URL = "/#account/studio";
+export const LIBRARY_HASH = "#account";
+export const LIBRARY_URL = "/#account";
+export const STUDIO_HASH = "#account";
+const LEGACY_LIBRARY_URLS = new Set([
+  "/#projects",
+  "#projects",
+  "/#studio",
+  "#studio",
+  "/#account/studio",
+  "#account/studio",
+]);
 const BACK_KEY = "zeim.back";
 const BACK_MS = 6 * 3600e3;
 
@@ -28,14 +35,14 @@ export function routeIntent(hash) {
   const full = String(hash || "").replace(/^#/, "");
   const head = full.split("/")[0].split("?")[0];
   const sub = (full.split("/")[1] || "").split("?")[0];
-  if (head === "projects") {
-    return { library: true, ownership: false, view: "projects", hash: LIBRARY_HASH, rewrite: full !== "projects", nav: "projects" };
-  }
-  if (head === "studio") {
-    return { library: true, ownership: false, view: "projects", hash: LIBRARY_HASH, rewrite: true, nav: "projects" };
+  if (head === "projects" || head === "studio") {
+    return { library: true, ownership: true, view: "account", hash: LIBRARY_HASH, rewrite: true, nav: "account" };
   }
   if (head === "account" && sub === "studio") {
-    return { library: false, ownership: true, view: "account", hash: STUDIO_HASH, rewrite: full !== "account/studio", nav: "account" };
+    return { library: true, ownership: true, view: "account", hash: LIBRARY_HASH, rewrite: true, nav: "account" };
+  }
+  if (head === "account" && sub === "") {
+    return { library: true, ownership: false, view: "account", hash: LIBRARY_HASH, rewrite: full !== "account", nav: "account" };
   }
   if (head === "lithophane") {
     return { library: false, ownership: false, view: "lithophane", hash: "#lithophane", rewrite: false, nav: "lithophane" };
@@ -93,7 +100,7 @@ export function readBack(storage, now) {
 
 function isLibraryUrl(url) {
   const u = String(url || "");
-  return u === LIBRARY_URL || u === LEGACY_LIBRARY_URL || u === STUDIO_HASH;
+  return u === LIBRARY_URL || u === LIBRARY_HASH || u === STUDIO_HASH || LEGACY_LIBRARY_URLS.has(u);
 }
 
 function studioMark(info, now) {
@@ -102,7 +109,7 @@ function studioMark(info, now) {
   return info;
 }
 
-/* Once Projects is on screen, drop the library return marker.
+/* Once Account is on screen, drop the library return marker.
    A section hand-off may keep that return nested on zeim.back. Other keys stay. */
 export function arriveLibrary(storage, now) {
   const before = dump(storage);
@@ -115,7 +122,7 @@ export function arriveLibrary(storage, now) {
 }
 
 function marker() {
-  return { label: "Projects", hash: "projects", url: LIBRARY_URL, from: "mystudio" };
+  return { label: "Account", hash: "account", url: LIBRARY_URL, from: "mystudio" };
 }
 
 export function workspaceFor(build, action) {
@@ -141,7 +148,7 @@ export function workspaceFor(build, action) {
   return { action, view: "photo", hash: "#create", open: "build", id, back };
 }
 
-/* Records the return to Projects. Does not remove draft or project keys. */
+/* Records the return to Account. Does not remove draft or project keys. */
 export function openFromLibrary(build, action, storage) {
   const before = dump(storage);
   const plan = workspaceFor(build, action);
@@ -187,7 +194,7 @@ export function libraryHTML(builds, opts) {
       <div class="meta"><b>${esc(title)}</b><span>${esc(label)}${kind === "edit" && mode !== "edit" ? " · Edited model" : ""}${openNow ? " · " + openNow : ""}</span></div>
       <div class="row2">
         <button type="button" class="btn small" data-lib="open" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in the FDM Slicer" : "Open this photo design"}">Open</button>
-        <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays in Projects."}">Edit</button>
+        <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays on Account."}">Edit</button>
         <button type="button" class="btn small" data-lib="send" data-id="${esc(id)}">Send…</button>
         <button type="button" class="btn small" data-lib="star" data-id="${esc(id)}" aria-pressed="${b.favorite ? "true" : "false"}">${b.favorite ? "Starred" : "Star"}</button>
         <button type="button" class="btn small" data-lib="delete" data-id="${esc(id)}">Delete</button>

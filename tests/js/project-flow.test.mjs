@@ -37,14 +37,14 @@ test("a photo design makes one slicer copy, then later stages reuse it", () => {
   assert.equal(fresh.open, "send");
   assert.equal(fresh.target, "slicer");
   assert.match(fresh.note, /slicer copy/);
-  assert.match(fresh.note, /Projects/);
+  assert.match(fresh.note, /Account/);
 
   const again = planHop("slice", { view: "lithophane", photoId: PHOTO, copyId: EDIT, kind: "fdm" });
   assert.equal(again.open, "edit");
   assert.equal(again.id, EDIT);
   assert.equal(again.derived, undefined);
   assert.match(again.note, /copy of the photo design/);
-  assert.match(again.note, /Projects/);
+  assert.match(again.note, /Account/);
 });
 
 test("an open slicer project stays that project through repair, prepare, and slice", () => {
@@ -90,10 +90,10 @@ test("resin prepare names the TorchC0 copy, and slice points at the printer slic
   assert.match(flowNote({ view: "torchc0", kind: "resin" }), /resin printer's slicer/);
 });
 
-test("with no project, the next stage opens Projects", () => {
+test("with no project, the next stage opens Account", () => {
   const plan = planHop("repair", { view: "slicer", kind: "fdm" });
-  assert.equal(plan.hash, "#projects");
-  assert.match(plan.note, /Projects/);
+  assert.equal(plan.hash, "#account");
+  assert.match(plan.note, /Account/);
 });
 
 test("the slicer copy is remembered for this tab and dropped when that project is gone", () => {
@@ -141,7 +141,7 @@ test("the repair page stays on Check & Repair, and a kept project is the same id
   const design = planHop("design", { view: "repair", editId: EDIT, kind: "fdm" });
   assert.equal(design.url, "/static/cad.html?bid=" + EDIT);
   const none = planHop("slice", { view: "repair", kind: "fdm" });
-  assert.equal(none.hash, "#projects");
+  assert.equal(none.hash, "#account");
 });
 
 test("a repair hand-off is remembered beside photo copies and dropped with that project", () => {

@@ -1,4 +1,4 @@
-/* My Studio stays on Account. Open and Edit enter a workspace. Browsing does not clear project storage. */
+/* Account is the saved-work list. Open and Edit enter a workspace. Browsing does not clear project storage. */
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -39,34 +39,29 @@ function snap(storage) {
   return out;
 }
 
-test("Projects is the saved-work list and My Studio on Account is not", () => {
-  for (const hash of ["#projects", "#studio", "#studio/"]) {
+test("Account is the saved-work list and old Projects bookmarks open it", () => {
+  for (const hash of ["#projects", "#studio", "#studio/", "#account/studio"]) {
     const intent = routeIntent(hash);
     assert.equal(intent.library, true);
-    assert.equal(intent.ownership, false);
-    assert.equal(intent.view, "projects");
+    assert.equal(intent.ownership, true);
+    assert.equal(intent.view, "account");
     assert.equal(intent.hash, LIBRARY_HASH);
-    assert.equal(intent.hash, "#projects");
-    assert.equal(intent.nav, "projects");
-    assert.notEqual(intent.view, "account");
+    assert.equal(intent.hash, "#account");
+    assert.equal(intent.nav, "account");
+    assert.equal(intent.rewrite, true);
     assert.notEqual(intent.view, "lithophane");
   }
-  assert.equal(routeIntent("#projects").rewrite, false, "refresh keeps #projects");
-  assert.equal(routeIntent("#studio").rewrite, true, "the old #studio bookmark opens Projects");
-  const own = routeIntent("#account/studio");
-  assert.equal(own.library, false, "My Studio does not host the project list");
-  assert.equal(own.ownership, true);
-  assert.equal(own.view, "account");
-  assert.equal(own.nav, "account");
-  assert.equal(own.hash, "#account/studio");
-  assert.equal(own.rewrite, false);
+  const home = routeIntent("#account");
+  assert.equal(home.library, true);
+  assert.equal(home.ownership, false);
+  assert.equal(home.view, "account");
+  assert.equal(home.nav, "account");
+  assert.equal(home.rewrite, false, "refresh keeps #account");
   const litho = routeIntent("#lithophane");
   assert.equal(litho.library, false);
   assert.equal(litho.view, "lithophane");
   assert.equal(routeIntent("#create").library, false);
   assert.equal(routeIntent("#create").view, "lithophane");
-  assert.equal(routeIntent("#account").library, false);
-  assert.equal(routeIntent("#account").ownership, false);
   assert.equal(routeIntent("#account/save").library, false);
   assert.equal(routeIntent("#slicer").library, false);
 });
@@ -75,7 +70,7 @@ test("browsing the library does not change project storage or the open project i
   const storage = mem(PROJECT);
   const project = { id: PHOTO, mode: "lithophane", title: "Cat" };
   const before = snap(storage);
-  for (const hash of ["#projects", "#studio"]) {
+  for (const hash of ["#projects", "#studio", "#account", "#account/studio"]) {
     const visit = visitLibrary(hash, storage, project);
     assert.equal(visit.library, true);
     assert.equal(visit.storageSame, true);
@@ -95,13 +90,13 @@ test("browsing the library does not change project storage or the open project i
   assert.equal(html.includes('href="#studio"'), false);
   assert.equal(html.includes("Cat <b>"), false);
   const own = visitLibrary("#account/studio", storage, project);
-  assert.equal(own.library, false);
+  assert.equal(own.library, true);
   assert.equal(own.intent.view, "account");
   assert.equal(own.storageSame, true);
   assert.deepEqual(snap(storage), before);
 });
 
-test("Open and Edit reach the matching workspace and remember Projects", () => {
+test("Open and Edit reach the matching workspace and remember Account", () => {
   const storage = mem(PROJECT);
   const before = snap(storage);
   const litho = openFromLibrary({ id: PHOTO, kind: "photo", mode: "lithophane", title: "Cat" }, "open", storage);
@@ -111,10 +106,10 @@ test("Open and Edit reach the matching workspace and remember Projects", () => {
   assert.deepEqual(litho.changed, ["zeim.back"]);
   const back = JSON.parse(storage.getItem("zeim.back"));
   assert.equal(back.url, LIBRARY_URL);
-  assert.equal(back.url, "/#projects");
+  assert.equal(back.url, "/#account");
   assert.equal(back.from, "mystudio");
-  assert.equal(back.hash, "projects");
-  assert.equal(back.label, "Projects");
+  assert.equal(back.hash, "account");
+  assert.equal(back.label, "Account");
   for (const k of Object.keys(before)) assert.equal(storage.getItem(k), before[k], k);
 
   const box = workspaceFor({ id: PHOTO, kind: "photo", mode: "memorybox" }, "open");
@@ -215,15 +210,15 @@ test("a section hand-off keeps Exit pointed at My Studio and does not drop proje
   assert.equal(stale.getItem("zeim.back").includes("Studio"), true);
 });
 
-test("a refresh of the library route is still Projects", () => {
+test("a refresh of the library route is still Account", () => {
   const again = routeIntent(LIBRARY_HASH);
   assert.equal(again.library, true);
-  assert.equal(again.view, "projects");
+  assert.equal(again.view, "account");
   assert.equal(again.rewrite, false);
   assert.equal(again.hash, LIBRARY_HASH);
 });
 
-test("an older My Studio return address still leaves to Projects", () => {
+test("an older My Studio or Projects return address still leaves to Account", () => {
   const now = Date.now();
   const storage = mem({
     ...PROJECT,
@@ -231,9 +226,9 @@ test("an older My Studio return address still leaves to Projects", () => {
       label: "My Studio", hash: "account", url: "/#account/studio", from: "mystudio", t: now,
     }),
   });
-  assert.equal(exitTarget(storage, now), "/#projects");
+  assert.equal(exitTarget(storage, now), "/#account");
   const left = takeExit(storage, now);
-  assert.equal(left.url, "/#projects");
+  assert.equal(left.url, "/#account");
   assert.equal(storage.getItem("zeim.back"), null);
   for (const k of Object.keys(PROJECT)) assert.equal(storage.getItem(k), PROJECT[k], k);
 
@@ -245,4 +240,14 @@ test("an older My Studio return address still leaves to Projects", () => {
   });
   assert.equal(exitTarget(nested, now), LIBRARY_URL);
   assert.equal(arriveLibrary(nested, now).cleared, true);
+
+  const legacy = mem({
+    ...PROJECT,
+    "zeim.back": JSON.stringify({
+      label: "Projects", hash: "projects", url: "/#projects", from: "mystudio", t: now,
+    }),
+  });
+  assert.equal(exitTarget(legacy, now), LIBRARY_URL);
+  assert.equal(arriveLibrary(legacy, now).cleared, true);
+  assert.equal(legacy.getItem("zeim.back"), null);
 });

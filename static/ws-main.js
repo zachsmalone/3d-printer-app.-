@@ -38,9 +38,9 @@
     return ws;
   }
   function phone() { return PHONE.matches; }
-  /* #create and #lithophane share #viewCreate and each keep a layout. #studio rewrites to Projects and does not show this view.
+  /* #create and #lithophane share #viewCreate and each keep a layout. #studio rewrites to Account and does not show this view.
      The route is the identity. The light box only shows lithophane preview controls; opening it must not
-     swap the saved layout. Saved projects are listed in Projects. This panel follows that element's hidden flag.
+     swap the saved layout. Saved work is listed on Account. This panel follows that element's hidden flag.
      Defaults are read at layout time so a resize across the phone breakpoint is not stuck on the first paint. */
   function studioRoute() {
     var raw = (location.hash || "").replace(/^#/, "").split(/[/?]/)[0];

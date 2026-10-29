@@ -101,7 +101,7 @@ def run(name, launch, with_axe):
     order = []
     for _ in range(18):
         pg.keyboard.press("Tab"); order.append(pg.evaluate("document.activeElement.id || document.activeElement.textContent.trim().slice(0,12)"))
-    ok(f"{name}: keyboard reaches Projects, the other tabs, Mode, then the Dark mode toggle", all(any(o.startswith(t) for o in order) for t in ("Showcase", "FDM Slicer", "TorchC0", "CAD", "Lithophane", "Smart Fix", "Projects", "Account", "modeSel", "themeToggle")) and order.index("modeSel") < order.index("themeToggle"), order)
+    ok(f"{name}: keyboard reaches the tabs, Mode, then the Dark mode toggle", all(any(o.startswith(t) for o in order) for t in ("Showcase", "FDM Slicer", "TorchC0", "CAD", "Lithophane", "Smart Fix", "Account", "modeSel", "themeToggle")) and "Projects" not in order and order.index("modeSel") < order.index("themeToggle"), order)
     ok(f"{name}: no page errors", not errs, errs)
     ctx.close(); b.close()
 

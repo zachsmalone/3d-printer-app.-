@@ -450,7 +450,7 @@ function mbShowSides() {
     else { delete img.dataset.url; img.removeAttribute("src"); img.alt = ""; }
   });
 }
-/* New build clears the photo screen. The saved build stays in Projects. This does not publish. */
+/* New build clears the photo screen. The saved build stays on Account. This does not publish. */
 function clearLithoWork() {
   if (S.building) return;
   clearFile();

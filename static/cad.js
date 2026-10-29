@@ -843,7 +843,7 @@ async function run(fn, okText) {
   busy(true); msg("");
   try { await fn(); if (okText) msg(okText, true); return true; }
   catch (e) {
-    if (e.name === "AbortError") { msg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects."); return false; }
+    if (e.name === "AbortError") { msg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear on Account."); return false; }
     msg(e.message); return false;
   } finally { busy(false); }
 }
@@ -2191,7 +2191,7 @@ async function importFile(f) {
     msg(warn.length ? "Imported. " + warn.join(" ") : "Imported. It's Import 01 in History; edit it with any tool.", true);
   } catch (e) {
     if (e.name === "AbortError") {
-      if (ctl === importCtl) msg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear in Projects.");
+      if (ctl === importCtl) msg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear on Account.");
       return;
     }
     msg(e.message);

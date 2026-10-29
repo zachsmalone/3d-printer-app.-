@@ -1,4 +1,4 @@
-/* Exit, Done, New build, and Return to Projects on Lithophane, the Slicer, TorchC0, and 2D→3D.
+/* Exit, Done, New build, and Return to Account on Lithophane, the Slicer, TorchC0, and 2D→3D.
    Save uses the same leave / saveNow path as CAD. None of these actions publish to Showcase. */
 import { S, askConfirm, toast } from "/static/app.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
@@ -87,7 +87,8 @@ function navigate(url) {
 function finishLeave(plan) {
   if (plan.publish || isPublishUrl(plan.url)) return;
   if (plan.navigate && plan.url) {
-    if (plan.url === LIBRARY_URL || String(plan.url).indexOf("#account/studio") >= 0) takeExit(sessionStorage);
+    const leaveUrl = String(plan.url || "");
+    if (leaveUrl === LIBRARY_URL || leaveUrl.indexOf("#account") >= 0 || leaveUrl.indexOf("#projects") >= 0 || leaveUrl.indexOf("#studio") >= 0) takeExit(sessionStorage);
     navigate(plan.url);
   } else if (window.zeimSave && typeof window.zeimSave.lastResult === "function") {
     const why = window.zeimSave.lastResult();
@@ -125,7 +126,7 @@ export function guardNewBuild(section) {
   if (plan.publish || plan.navigate || isPublishUrl(plan.url)) return;
   if (plan.ask) {
     const message = plan.reason === "unsaved"
-      ? "This browser could not store the workspace draft. Start a new build anyway? A project already on your account stays in Projects. This does not send it to Showcase."
+      ? "This browser could not store the workspace draft. Start a new build anyway? A project already saved stays on Account. This does not send it to Showcase."
       : "This screen has work that is not a saved project yet. Start a new build anyway? This does not send it to Showcase.";
     askConfirm({ title: "New build", message, okLabel: "New build anyway", danger: true }).then(yes => {
       if (!yes) return;

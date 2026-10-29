@@ -49,8 +49,9 @@ def test_outside_cad_bars_keep_exit_done_new_build_and_return_off_showcase():
         assert 'aria-label="Exit workspace"' in bar
         assert ">Done</button>" in bar
         assert ">New build</button>" in bar
-        assert ">Return to Projects</a>" in bar
-        assert 'href="#projects"' in bar
+        assert ">Return to Account</a>" in bar
+        assert 'href="#account"' in bar
+        assert 'href="#projects"' not in bar
         assert 'href="#account/studio"' not in bar
         assert "btnPublish" not in bar
         assert "sendToShowcase" not in bar
@@ -61,7 +62,8 @@ def test_outside_cad_bars_keep_exit_done_new_build_and_return_off_showcase():
     assert "Send to Showcase" in create
     assert 'id="studioFromMe"' in create
     assert 'data-ws-act="return-studio"' in create
-    assert "Return to Projects" in create
+    assert "Return to Account" in create
+    assert "Return to Projects" not in HTML
     assert HTML.count('<script type="module" src="/static/workspace-bar.js"></script>') == 1
 
 
