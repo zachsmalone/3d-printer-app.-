@@ -468,6 +468,12 @@ export function wirePanel(getModelId) {
       if (HAS_GL) gcDispose = wireGcodePreview(r.downloads.gcode, { time: r.print_time_human, grams: r.filament_grams, mm: r.filament_mm },
         { firmware: r.firmware, markers: r.problem_markers, pausedUrl: r.downloads.gcode + "-paused" });
       else if (r.downloads.layers) wireLayerPreview(r.downloads.layers);
+      if ($("#spGo")?.dataset.reveal === "1") {
+        delete $("#spGo").dataset.reveal;
+        const sheet = document.getElementById("processSheet");
+        if (sheet) sheet.hidden = false;
+        out.querySelector("a[download]")?.focus();
+      }
     } catch (e) {
       if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
         const sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = false;
@@ -482,7 +488,21 @@ export function wirePanel(getModelId) {
   };
   $("#spGo").onclick = () => doSlice(false);
   applySmartFix();
+  let armed = "";
+  try { armed = sessionStorage.getItem("zeim.sliceNow") || ""; } catch { armed = ""; }
+  if (armed === "1") {
+    try { sessionStorage.removeItem("zeim.sliceNow"); } catch { /* the click still runs */ }
+    $("#spGo").dataset.reveal = "1";
+    $("#spGo").click();
+  }
 }
+document.addEventListener("zeim:fdm-slice", () => {
+  const go = document.getElementById("spGo");
+  if (!go || go.disabled) return;
+  try { sessionStorage.removeItem("zeim.sliceNow"); } catch { /* click still exports */ }
+  go.dataset.reveal = "1";
+  go.click();
+});
 
 /* Changes the maker said yes to in the Failure photo doctor (Smart Fix): filled into Advanced once, shown with Undo. */
 function applySmartFix() {

@@ -1223,6 +1223,22 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #viewEdit>.objdock,#viewEdit .zws-p,#viewEdit .bed-view,#viewEdit.zws>aside.controls,#viewEdit.zws .stage>.result,#viewEdit.zws #editVtools{display:none!important}
 body[data-view=slicer] #sendToFab,body[data-view=slicer] .sitefoot,body[data-view=slicer] .saveind:not(.inline){display:none!important}
 #viewEdit .objdock button:disabled,#viewEdit .bed-bar button:disabled{opacity:.45;cursor:not-allowed}
+/* Phone and tablet: same thin header, one scrolling stage row, tool bar on the bed. No second bottom tab strip. */
+@media (max-width:1024px){
+  body[data-view=slicer] .pflow{flex-wrap:nowrap;overflow-x:auto;gap:8px;padding:4px 8px}
+  body[data-view=slicer] .pflow .path{display:flex;flex-wrap:nowrap;margin:0;padding:0;list-style:none}
+  body[data-view=slicer] .pflow .help{flex:0 0 auto;white-space:nowrap;font-size:12px}
+  body[data-view=slicer] #viewEdit>.bed-head .btn{min-height:32px;height:32px;min-width:0}
+}
+@media (max-width:768px){
+  body[data-view=slicer] .topbar .nav{position:static;left:auto;right:auto;bottom:auto;z-index:auto;flex:1 0 100%;order:5;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;margin:0;padding:0;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+  body[data-view=slicer] .topbar .nav button{flex:0 0 auto;flex-direction:row;min-height:36px;font-size:12px;padding:0 8px}
+  body[data-view=slicer] .topbar .nav button.on .i{width:18px;height:18px;padding:0;background:none}
+  body[data-view=slicer]{padding-bottom:env(safe-area-inset-bottom)}
+  body[data-view=slicer] #viewEdit>.bed-bar,
+  body[data-view=slicer] #viewEdit>.proc-sheet,
+  body[data-view=slicer] #viewEdit>.bed-sheet{bottom:0}
+}
 #editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
 .proc-tabs button{min-height:44px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font:inherit;cursor:pointer;white-space:nowrap}

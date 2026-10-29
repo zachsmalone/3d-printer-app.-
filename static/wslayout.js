@@ -2,7 +2,7 @@
    it, docked to a side. A panel marked dock slides along its edge and cannot be left floating. Exit, Done,
    New build, Return to Account, and the primary action stay in a top strip that layout will not use, and a
    drag cannot move a panel into that strip. "Customise workspace" lists every panel with a checkbox and has
-   "Reset layout". Core panels (Undo, the tool menu, Export/Print) can't be hidden. The Customise button
+   Core panels (Undo, the tool menu, Export/Print) can't be hidden. The Customise button
    sits in the top strip when that strip is there, and is never inside a panel, so it stays reachable.
    Layout code only runs on change (drop / resize / rotate / keyboard), and a drag only moves the panel
    with a transform.
@@ -448,14 +448,13 @@
     function fillDlg() {
       dlg.innerHTML = '<form method="dialog"><h2>Customise workspace' + (o.title ? ": " + (typeof o.title === "function" ? o.title() : o.title) : "") + '</h2><p class="help">Show or hide each panel here. Drag a panel by its grip to move it or dock it to any side. Drag an edge to resize left, right, up or down. Exit stays in front of every panel.</p><ul class="zws-list">' +
         P.map(function (p) { return '<li><label><input type="checkbox" data-zws="' + p.id + '"' + (state[p.id].hidden ? "" : " checked") + (p.core ? " disabled" : "") + "> " + p.label + (p.core ? ' <small>(always shown)</small>' : "") + "</label>" + (p.core ? "" : '<button type="button" class="btn small" data-zws-remove="' + p.id + '">Remove</button>') + "</li>"; }).join("") +
-        '</ul><div class="zws-row"><button type="button" class="btn" data-zws-reset>Reset layout</button><button class="btn primary" value="ok">Done</button></div></form>';
+        '</ul><div class="zws-row"><button class="btn primary" value="ok">Done</button></div></form>';
       dlg.querySelectorAll("input[data-zws]").forEach(function (c) { c.onchange = function () { setHidden(c.dataset.zws, !c.checked); }; });
       dlg.querySelectorAll("[data-zws-remove]").forEach(function (b) { b.onclick = function () { setHidden(b.getAttribute("data-zws-remove"), true); fillDlg(); }; });
-      dlg.querySelector("[data-zws-reset]").onclick = function () { reset(); fillDlg(); };
     }
     document.body.append(dlg);
     var btn = document.createElement("button"); btn.type = "button"; btn.className = (o.btnClass || "btn small") + " zws-cust"; btn.id = "zwsCust-" + o.id;
-    btn.setAttribute("aria-haspopup", "dialog"); btn.title = "Customise workspace: show, hide, move panels; reset layout"; btn.setAttribute("aria-label", "Customise workspace");
+    btn.setAttribute("aria-haspopup", "dialog"); btn.title = "Customise workspace: show, hide, or move panels"; btn.setAttribute("aria-label", "Customise workspace");
     btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span class="lbl">Customise</span>';
     btn.onclick = function () { open(); };
     function open() { fillDlg(); dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", ""); }

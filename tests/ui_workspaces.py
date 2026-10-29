@@ -1,7 +1,7 @@
 """Floating workspaces in Chromium, desktop 1280x800 and phone 390x844: in Studio, Lithophane, FDM Slicer, TorchC0 and
 CAD the 3D view is the full background and every panel floats over it without overlapping another panel;
 Customise workspace lists every panel (core ones can't be hidden); hide/show and a dock move survive a reload;
-Reset layout restores the defaults.   python tests/ui_workspaces.py URL [SHOTDIR]"""
+The Customise dialog has no Reset layout button.   python tests/ui_workspaces.py URL [SHOTDIR]"""
 import os, sys, tempfile
 import trimesh
 from playwright.sync_api import sync_playwright
@@ -61,10 +61,8 @@ def customise(pg, tag, ws, root, open_model, bg, key=None):
            and (pg.is_visible(f"#zws-{vis_free[0]}") or pg.evaluate(f"document.querySelector('#zws-{vis_free[0]} > .zws-body > *').hidden"))); pg.keyboard.press("Escape")
         pg.click(f"#zwsCust-{ws}"); pg.uncheck(f"{dlg} input[data-zws={vis_free[0]}]")
     else: pg.click(f"#zwsCust-{ws}")
-    pg.click(f"{dlg} [data-zws-reset]"); pg.wait_for_timeout(250); pg.keyboard.press("Escape")
-    st2 = pg.evaluate("w => ZWS.all[w].state()", ws)
-    ok(f"{tag}: Reset layout restores the side", st2[core[0]]["edge"] == e0, (st2[core[0]], e0))
-    if vis_free: ok(f"{tag}: Reset layout brings {vis_free[0]} back", not st2[vis_free[0]]["hidden"])
+    ok(f"{tag}: Customise has no Reset layout button", pg.locator(f"{dlg} [data-zws-reset]").count() == 0 and "Reset layout" not in (pg.text_content(dlg) or ""))
+    pg.keyboard.press("Escape")
     ok(f"{tag}: Customise stays reachable", pg.is_visible(f"#zwsCust-{ws}") or pg.locator("#cwMore").is_visible())
 with sync_playwright() as p:
     br = p.chromium.launch()

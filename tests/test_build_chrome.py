@@ -67,6 +67,10 @@ def test_process_sheet_groups_only_existing_slicer_choices():
     assert 'fd.append("brim"' in PRINTER
     assert 'id="spGo"' in PRINTER
     assert "Bambu" not in block
+    layout = (ROOT / "static" / "wslayout.js").read_text(encoding="utf-8")
+    assert "Reset layout" not in layout and "data-zws-reset" not in layout
+    assert "zeim:fdm-slice" in PRINTER
+    assert "body[data-view=slicer] .topbar .nav{position:static" in CSS
     assert "Quarter cubic, octet, cross, cross 3D, and TPMS" in PRINTER
 
 
