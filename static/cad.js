@@ -8,7 +8,7 @@ import { initLessons } from "/static/cad-lessons.js";
 import { takeExit } from "/static/studio-library.js";
 import { askBedLeave, BED_LEAVE_MESSAGE } from "/static/bed-leave.js";
 import { bedLeavePlan } from "/static/workspace-controls.js";
-import { bindFlow, leaveBedUrl } from "/static/project-flow.js";
+import { bindFlow, leaveBedUrl, originOf } from "/static/project-flow.js";
 import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, chainStraight, closestSample, reconcileSelection as reconcileGeom } from "/static/pickgeom.js";
 import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo, chromeRects } from "/static/gizmo-view.js";
@@ -875,6 +875,7 @@ async function load(keepCam) {
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
   if (S.mode !== "sketch") renderRail();
   paintCadChrome();
+  document.dispatchEvent(new CustomEvent("zeim:flow"));
 }
 function updateTop() {
   $("#cwUndo").disabled = sculptSaving || !S.scene?.can_undo;
@@ -2369,7 +2370,7 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
   };
   $("#cwToSlicer").addEventListener("click", () => { if (S.bid) { document.dispatchEvent(new CustomEvent("zeim:save-now")); mark("FDM Slicer"); } });
   function cadKind() { try { return localStorage.getItem("zeim.printKind") === "resin" ? "resin" : "fdm"; } catch { return "fdm"; } }
-  bindFlow(() => ({ view: "cad", tool: "", photoId: "", editId: S.bid || "", copyId: "", kind: cadKind(), working: cadHasWork() }), plan => {
+  bindFlow(() => ({ view: "cad", tool: "", photoId: (S.scene && S.scene.base && S.scene.base.from_build) || "", editId: S.bid || "", copyId: "", kind: cadKind(), origin: originOf(S.scene || {}), working: cadHasWork() }), plan => {
     if (!plan || plan.stay) return;
     const id = plan.editId || plan.id || S.bid || "";
     if ((plan.stage === "prepare" || plan.stage === "slice") && !id) {
@@ -2387,6 +2388,11 @@ window.__cad = { lessons, V3: THREE.Vector3, cam: camera, S, startSketch, setToo
       location.href = "/?edit=" + encodeURIComponent(id) + plan.hash;
       return;
     }
+    if (plan.open === "build" && plan.id) {
+      location.href = "/?build=" + encodeURIComponent(plan.id) + "#lithophane";
+      return;
+    }
+    if (plan.open === "destinations") return;
     if (plan.url) { location.href = plan.url; return; }
     if (plan.hash) location.href = "/" + plan.hash;
   });

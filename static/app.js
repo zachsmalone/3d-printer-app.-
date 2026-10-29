@@ -1022,5 +1022,10 @@ document.getElementById("skipLink")?.addEventListener("click", e => {
 window.__errText = errText;   // tests
 /* E: Send to… / Back from CAD reopens the Studio model (static/handoff.js) */
 document.addEventListener("zeim:open-build", async e => { try { const r = await api("/api/builds/" + encodeURIComponent(e.detail)); if (S.current?.id) return; showPhotoBuild(r); } catch { } });
+{ const reopen = new URLSearchParams(location.search).get("build");
+  if (reopen && /^[0-9a-f]{12}$/.test(reopen)) {
+    if (!location.hash.startsWith("#lithophane") && location.hash !== "#create") location.hash = "lithophane";
+    setTimeout(() => document.dispatchEvent(new CustomEvent("zeim:open-build", { detail: reopen })), 0);
+  } }
 
 $("#btnOpenBoardFromSettings")?.addEventListener("click", () => window.ZEIM_openPrinterBoard?.());

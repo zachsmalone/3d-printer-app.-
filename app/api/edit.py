@@ -111,6 +111,9 @@ def new_project(
         mesh = trimesh.Trimesh(v, f, process=False)
         original, ext = exporters.to_stl(mdl), "stl"
         base = {"type": "build", "from_build": from_build, "from_mode": meta.get("mode")}
+        src_origin = meta.get("origin") or (meta.get("base") or {}).get("origin")
+        if src_origin == "lithophane" or meta.get("kind", "photo") == "photo":
+            base["origin"] = "lithophane"
         if len({(b.color or "").lower() for b in mdl.bodies}) > 1:          # only when colours are really lost (B12)
             warnings.append("Colours / separate colour bodies of the original build are merged into one mesh in the editor.")
     elif file is not None and file.filename:                    # ---- upload
@@ -168,7 +171,7 @@ def new_project(
             mesh = trimesh.Trimesh(v, f, process=False)
             original, ext_o = exporters.to_stl(mdl), "stl"
             source_image = (data, src_ext)
-            base = {"type": "photo", "photo_mode": photo_mode, "width_mm": width_mm, "params": params}
+            base = {"type": "photo", "origin": "lithophane", "photo_mode": photo_mode, "width_mm": width_mm, "params": params}
             ext = ext_o
             warnings.append(f"Photo converted to a {photo_mode} base mesh; edit it like any other model.")
         else:

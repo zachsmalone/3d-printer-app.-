@@ -175,11 +175,11 @@ function addBtn(id, after, src, cls = "btn") {
   const b = document.createElement("button"); b.type = "button"; b.className = cls + " sendtobtn"; b.id = id; b.setAttribute("aria-haspopup", "dialog");
   b.innerHTML = `${ICON} Send to…`; b.onclick = () => menu(src, b); after.after(b);
 }
-/* Studio/Lithophane: three side-by-side buttons after generate (Save work | Send to Slicer/TorchC0 | Send to CAD).
+/* Studio/Lithophane: Save work and Send to Slicer. Design CAD is a step, not a third button.
    Nozzle / multi-head controls stay out of this section — those live only in the FDM Slicer. */
 function wireStudioHandoff() {
   const save = $("#btnSaveWork"), slicer = $("#btnSendSlicer"), cad = $("#btnSendCad"), lab = $("#btnSendSlicerL");
-  if (!save || !slicer || !cad) return;
+  if (!save || !slicer) return;
   const paint = () => {
     const resin = kind() === "resin";
     slicer.dataset.to = resin ? "torchc0" : "slicer";
@@ -188,7 +188,7 @@ function wireStudioHandoff() {
       ? "Save first, then open this model in TorchC0 for resin"
       : "Save first, then open this model in the FDM Slicer";
     slicer.hidden = !targetsFor("lithophane").includes(slicer.dataset.to);
-    cad.hidden = !targetsFor("lithophane").includes("cad");
+    if (cad) cad.hidden = true;
   };
   save.onclick = () => {
     const ok = window.zeimSave ? !!window.zeimSave.saveNow() : (document.dispatchEvent(new CustomEvent("zeim:save-now")), true);
@@ -201,7 +201,7 @@ function wireStudioHandoff() {
     try { await sendTo(target, "lithophane"); } finally { btn.disabled = false; btn.removeAttribute("aria-busy"); }
   };
   slicer.onclick = () => go(slicer, slicer.dataset.to || "slicer");
-  cad.onclick = () => go(cad, "cad");
+  if (cad) cad.onclick = () => go(cad, "cad");
   paint();
   new MutationObserver(paint).observe(document.body, { attributes: true, attributeFilter: ["data-print-kind"] });
 }

@@ -1355,8 +1355,8 @@ html[data-theme=dark] .proc-sheet .slicepanel>.row{background:color-mix(in srgb,
 .plan-card ul { margin: 6px 0 10px; padding-left: 1.2em; }
 .plan-card .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #1e2636; font-size: 0.85em; }
 
-/* The site-level row is for Lithophane and TorchC0. FDM uses the compact row in its header. */
-body[data-view=slicer] #projectFlow{display:none!important}
+/* FDM and Lithophane keep the steps in their own header. The site-level row is for TorchC0. */
+body[data-view=slicer] #projectFlow,body[data-view=lithophane] #projectFlow{display:none!important}
 .pflow{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;padding:2px 8px;border-bottom:1px solid var(--line);background:var(--panel);overflow-x:auto;scrollbar-width:none}
 .pflow[hidden]{display:none !important}
 .pflow .path{display:flex;flex-wrap:nowrap;gap:2px;margin:0;padding:0;list-style:none}
@@ -1367,6 +1367,46 @@ body[data-view=slicer] #projectFlow{display:none!important}
 body.cadws .pflow{flex:none}
 #viewEdit>.bed-head .pflow-inline{flex:1 1 auto;min-width:0;margin:0;padding:0;border:0;background:transparent}
 #viewEdit>.bed-head .pflow-inline .path button{min-height:32px;height:32px;padding:0 8px}
+
+/* Lithophane work view: thin header, model only, one scrolling tool bar. The photo chooser stays as it is. */
+#viewCreate .litho-name,#viewCreate>.wsbar .pflow-inline{display:none}
+#viewCreate.has-model>.wsbar{position:sticky;top:0;z-index:48;display:flex;flex-wrap:nowrap;align-items:center;gap:4px;height:36px;min-height:36px;margin:0;padding:0 6px;border-radius:0;background:color-mix(in srgb,var(--panel) 94%,transparent);border-bottom:1px solid var(--line)}
+#viewCreate.has-model>.wsbar .btn{min-height:32px;height:32px;padding:0 8px;font-size:13px}
+#viewCreate.has-model>.wsbar [data-ws-act=new-build],
+#viewCreate.has-model>.wsbar [data-ws-act=return-studio],
+#viewCreate.has-model>.wsbar #lithoGo,
+#viewCreate.has-model>.wsbar .zws-cust{display:none!important}
+#viewCreate.has-model .litho-name{display:inline;font-weight:650;font-size:13px;white-space:nowrap}
+#viewCreate.has-model>.wsbar .pflow-inline:not([hidden]){display:flex;flex:1 1 auto;min-width:0;margin:0;padding:0;border:0;background:transparent}
+#viewCreate.has-model>.wsbar .bed-done{margin-left:auto}
+#viewCreate.has-model>.hero,
+#viewCreate.has-model>.zt-band,
+#viewCreate.has-model>.pathnav,
+#viewCreate.has-model .zws-p,
+#viewCreate.has-model #vtools,
+#viewCreate.has-model #result,
+#viewCreate.has-model .touch-hint,
+#viewCreate.has-model .explore,
+#viewCreate.has-model #recentBuilds{display:none!important}
+#viewCreate.has-model>aside.controls{display:none!important}
+#viewCreate.has-model>.stage{flex:1;min-height:50dvh}
+#viewCreate.has-model{padding-bottom:64px}
+#viewCreate:not(.has-model)>#lithoBar{display:none!important}
+#viewCreate.has-model>#lithoBar{display:flex!important;position:fixed;left:0;right:0;bottom:0;z-index:48;height:52px;margin:0;padding:0 4px env(safe-area-inset-bottom);background:color-mix(in srgb,var(--panel) 96%,#fff);border-top:1px solid var(--line);align-items:stretch}
+#viewCreate.has-model>#lithoBar .bed-pin{flex:0 0 auto;min-height:44px;margin:4px 0;padding:0 12px;border:0;border-right:1px solid var(--line);border-radius:10px 0 0 10px;background:color-mix(in srgb,#0066FF 16%,var(--panel));font:inherit;font-weight:700;cursor:pointer}
+#viewCreate.has-model>#lithoBar .bed-pin[hidden],#viewCreate.has-model>#lithoBar .bed-scroll[hidden]{display:none!important}
+#viewCreate.has-model>#lithoBar .bed-scroll{flex:1;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;min-width:0}
+#viewCreate.has-model>#lithoBar button{flex:0 0 auto;min-height:44px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:var(--txt);font:inherit;font-weight:650;white-space:nowrap;cursor:pointer}
+#viewCreate.has-model.litho-sheet>aside.controls,
+#viewCreate.has-model.litho-sheet #zws-settings{display:block!important;position:fixed;left:0;right:0;bottom:52px;top:auto;max-height:70dvh;overflow:auto;z-index:60;background:var(--panel);border-radius:18px 18px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.22);padding:12px 16px}
+#viewCreate.has-model.litho-sheet aside.controls [data-litho-group]{display:none!important}
+#viewCreate.has-model.litho-sheet[data-litho-cat=photo] aside.controls [data-litho-group=photo],
+#viewCreate.has-model.litho-sheet[data-litho-cat=size] aside.controls [data-litho-group=size],
+#viewCreate.has-model.litho-sheet[data-litho-cat=thickness] aside.controls [data-litho-group=thickness],
+#viewCreate.has-model.litho-sheet[data-litho-cat=shape] aside.controls [data-litho-group=shape],
+#viewCreate.has-model.litho-sheet[data-litho-cat=frame] aside.controls [data-litho-group=frame],
+#viewCreate.has-model.litho-sheet[data-litho-cat=light] aside.controls [data-litho-group=light]{display:block!important}
+#viewCreate.has-model[data-litho-cat=view] #vtools{display:flex!important;position:fixed;left:0;right:0;bottom:52px;z-index:60;flex-wrap:wrap;gap:6px;padding:8px;background:var(--panel);border-top:1px solid var(--line)}
 
 /* On-model move / rotate / scale beads. One blue, letters for the axis. Under the workspace bar and the dock. */
 .zg{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}

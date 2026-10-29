@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   stageFor, planHop, readFlow, rememberCopy, reuseCopy, forgetCopy, rememberRepair, reuseRepair, slicerUrlForNewProject, flowNote,
-  leaveBedUrl, flowVisible, slicerHash, stagesFor,
+  leaveBedUrl, flowVisible, slicerHash, stagesFor, originOf,
 } from "../../static/project-flow.js";
 
 const PHOTO = "aaaaaaaaaaaa";
@@ -42,11 +42,13 @@ test("a photo design makes one slicer copy, then later stages reuse it", () => {
   assert.match(fresh.note, /Account/);
 
   const again = planHop("slice", { view: "lithophane", photoId: PHOTO, copyId: EDIT, kind: "fdm" });
-  assert.equal(again.open, "edit");
-  assert.equal(again.id, EDIT);
-  assert.equal(again.derived, undefined);
-  assert.match(again.note, /copy of the photo design/);
-  assert.match(again.note, /Account/);
+  assert.equal(again.open, "destinations");
+  const prepare = planHop("prepare", { view: "lithophane", photoId: PHOTO, copyId: EDIT, kind: "fdm" });
+  assert.equal(prepare.open, "edit");
+  assert.equal(prepare.id, EDIT);
+  assert.equal(prepare.derived, undefined);
+  assert.match(prepare.note, /copy of the photo design/);
+  assert.match(prepare.note, /Account/);
 });
 
 test("an open slicer project stays that project through repair, prepare, and slice", () => {
@@ -159,6 +161,28 @@ test("every workspace uses Design, Prepare, and Export/Print", () => {
   assert.deepEqual(stagesFor().map(s => s.id), ["design", "prepare", "slice"]);
   assert.deepEqual(stagesFor().map(s => s.label), ["Design", "Prepare", "Export/Print"]);
   assert.equal(stagesFor().some(s => s.label === "Check & Repair"), false);
+});
+
+test("a lithophane file offers Design Lith and Design CAD", () => {
+  const labels = stagesFor({ origin: "lithophane" }).map(s => s.label);
+  assert.deepEqual(labels, ["Design Lith", "Design CAD", "Prepare", "Export/Print"]);
+  const back = planHop("design-lith", { view: "slicer", origin: "lithophane", photoId: PHOTO, editId: EDIT, kind: "fdm" });
+  assert.equal(back.open, "build");
+  assert.equal(back.id, PHOTO);
+  assert.equal(back.hash, "#lithophane");
+  const cad = planHop("design-cad", { view: "slicer", origin: "lithophane", editId: EDIT, kind: "fdm" });
+  assert.equal(cad.url, "/static/cad.html?bid=" + EDIT);
+  const here = planHop("design-lith", { view: "lithophane", origin: "lithophane", photoId: PHOTO });
+  assert.equal(here.stay, true);
+  const plain = planHop("design", { view: "slicer", editId: EDIT, kind: "fdm" });
+  assert.equal(plain.url, "/static/cad.html?bid=" + EDIT);
+  assert.equal(originOf({ origin: "lithophane" }), "lithophane");
+  assert.equal(originOf({ base: { origin: "lithophane", from_build: PHOTO } }), "lithophane");
+  assert.equal(originOf({ base: { from_mode: "lithophane", from_build: PHOTO } }), "lithophane");
+  assert.equal(originOf({ base: { type: "upload", format: "stl" } }), "");
+  assert.equal(originOf({ kind: "edit", mode: "lithophane" }), "");
+  const exp = planHop("slice", { view: "lithophane", origin: "lithophane", photoId: PHOTO, kind: "fdm" });
+  assert.equal(exp.open, "destinations");
 });
 
 test("step buttons show only while a file is open in a workspace", () => {

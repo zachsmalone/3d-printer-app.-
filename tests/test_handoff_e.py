@@ -27,11 +27,13 @@ def test_cad_send_to_menu_and_safe_back_link():
     assert 'back.startsWith("/") && !back.startsWith("//")' in js
 
 def test_lithophane_three_handoff_buttons_side_by_side():
-    """After generate: Save work | Send to Slicer | Send to CAD (Task 1)."""
+    """After generate: Save work and Send to Slicer. Design CAD is a step, not a Lithophane button."""
     h, js, css = (ST / "index.html").read_text(), (ST / "handoff.js").read_text(), (ST / "style.css").read_text()
-    assert 'id="studioHandoff"' in h and 'id="btnSaveWork"' in h
-    assert 'id="btnSendSlicer"' in h and 'id="btnSendCad"' in h
-    assert "wireStudioHandoff" in js and "Save work" in h and "Send to CAD" in h
+    create = h.split('id="viewCreate"')[1].split('id="viewEdit"')[0]
+    assert 'id="studioHandoff"' in create and 'id="btnSaveWork"' in create
+    assert 'id="btnSendSlicer"' in create and 'id="btnSendCad"' not in create
+    assert 'id="lithoBar"' in create and 'id="lithoDest"' in create
+    assert "wireStudioHandoff" in js and "Save work" in create and "Send to CAD" not in create
     assert ".handoffrow" in css and "flex" in css.split(".handoffrow")[1][:80]
     # Lithophane no longer injects the old Send to… menu button
     assert 'addBtn("btnSendTo"' not in js

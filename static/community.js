@@ -1,7 +1,7 @@
 import { S, api, toast, inlineMsg, clearInline, askConfirm, $, $$, esc, MODE_LABEL, ago, applyMode, loadHistory, showPhotoBuild } from "/static/app.js";
 import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML, checkShowcase } from "/static/printer.js";
 import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
-import { bindFlow, readFlow, reuseCopy, slicerHash } from "/static/project-flow.js";
+import { bindFlow, originOf, readFlow, reuseCopy, slicerHash } from "/static/project-flow.js";
 import { sendTo } from "/static/handoff.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
@@ -1220,12 +1220,16 @@ function flowCtx() {
   const hash = location.hash.replace(/^#/, "");
   const tool = (hash.split("/")[1] || "").split("?")[0];
   const view = document.body.dataset.view || "";
-  const photoId = S.current && S.current.id || "";
   const edit = window.__zeimEdit && window.__zeimEdit.p;
   const editId = edit && edit.id || "";
+  const fromBuild = (edit && edit.base && edit.base.from_build) || "";
+  const origin = (view === "lithophane" && S.current && S.current.id) ? "lithophane" : originOf(edit || {});
+  const photoId = view === "lithophane"
+    ? ((S.current && S.current.id) || "")
+    : (origin === "lithophane" ? (fromBuild || "") : ((S.current && S.current.id) || ""));
   const copyId = reuseCopy(readFlow(sessionStorage), photoId);
   const kind = document.body.dataset.printKind === "resin" ? "resin" : "fdm";
-  return { view, tool, photoId, editId, copyId, kind, working: flowWorking(view) };
+  return { view, tool, photoId, editId, copyId, kind, origin, working: flowWorking(view) };
 }
 function armSlice(plan) {
   if (!plan || !plan.slice) return;
@@ -1240,6 +1244,10 @@ function runArmedSlice() {
 document.addEventListener("zeim:edit-loaded", runArmedSlice);
 async function followFlow(plan) {
   if (!plan || plan.stay) return;
+  if (plan.open === "destinations") {
+    document.getElementById("lithoDest")?.showModal();
+    return;
+  }
   if (plan.slice) armSlice(plan);
   const sameProject = !!(plan.id && window.__zeimEdit && window.__zeimEdit.p && window.__zeimEdit.p.id === plan.id);
   if (plan.open === "slice" || (plan.slice && plan.open === "edit" && sameProject)) {

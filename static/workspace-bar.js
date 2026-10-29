@@ -505,6 +505,11 @@ function onControl(ev) {
     openFdmDone();
     return;
   }
+  if (section === "lithophane" && action === "done" && lithoHasModel()) {
+    ev.preventDefault();
+    openLithoDest();
+    return;
+  }
   if (action === "new-build") {
     ev.preventDefault();
     guardNewBuild(section);
@@ -526,6 +531,55 @@ function onControl(ev) {
   runLeave(plan);
 }
 
+function pinLitho(cat, label) {
+  const root = document.getElementById("viewCreate");
+  const pin = document.getElementById("lithoPin");
+  const tools = document.getElementById("lithoTools");
+  const cats = document.getElementById("lithoCats");
+  if (!root || !pin || !tools || !cats) return;
+  root.dataset.lithoCat = cat;
+  root.classList.toggle("litho-sheet", cat !== "view");
+  pin.hidden = false;
+  pin.textContent = label;
+  cats.hidden = true;
+  tools.hidden = cat === "view" ? false : true;
+  tools.querySelectorAll("[data-for]").forEach(el => { el.hidden = el.getAttribute("data-for") !== cat; });
+}
+
+function unpinLitho() {
+  const root = document.getElementById("viewCreate");
+  const pin = document.getElementById("lithoPin");
+  const tools = document.getElementById("lithoTools");
+  const cats = document.getElementById("lithoCats");
+  if (root) { delete root.dataset.lithoCat; root.classList.remove("litho-sheet"); }
+  if (pin) { pin.hidden = true; pin.textContent = ""; }
+  if (tools) tools.hidden = true;
+  if (cats) cats.hidden = false;
+}
+
+function onLithoBar(ev) {
+  const pin = ev.target.closest && ev.target.closest("#lithoPin");
+  if (pin) { ev.preventDefault(); unpinLitho(); return; }
+  const cat = ev.target.closest && ev.target.closest("#lithoCats [data-litho-cat]");
+  if (cat) {
+    ev.preventDefault();
+    pinLitho(cat.getAttribute("data-litho-cat"), cat.getAttribute("data-litho-label") || cat.textContent.trim());
+    return;
+  }
+  const jump = ev.target.closest && ev.target.closest("#lithoTools [data-litho-click]");
+  if (jump) {
+    ev.preventDefault();
+    document.getElementById(jump.getAttribute("data-litho-click"))?.click();
+    return;
+  }
+  const dest = ev.target.closest && ev.target.closest("[data-litho-dest]");
+  if (dest) {
+    ev.preventDefault();
+    runLithoDest(dest.getAttribute("data-litho-dest") || "close");
+  }
+}
+
+document.addEventListener("click", onLithoBar, true);
 document.addEventListener("click", onBedCat, true);
 document.addEventListener("click", onBedNav, true);
 document.addEventListener("click", onFdmAct);
@@ -563,11 +617,52 @@ function torchHasModel() {
   return !!(out && out.classList.contains("rzResult"));
 }
 
+function lithoHasModel() {
+  return !!(S.current && S.current.id);
+}
+
 function paintWorkBars() {
   const edit = document.getElementById("viewEdit");
   if (edit) edit.classList.toggle("has-model", bedHasModel());
   const torch = document.getElementById("viewTorch");
   if (torch) torch.classList.toggle("has-model", torchHasModel());
+  const litho = document.getElementById("viewCreate");
+  if (litho) {
+    const on = lithoHasModel();
+    litho.classList.toggle("has-model", on);
+    const exit = litho.querySelector("[data-ws-act=exit]");
+    if (exit) {
+      exit.textContent = on ? "Back" : "Exit";
+      exit.setAttribute("aria-label", on ? "Back" : "Exit workspace");
+    }
+    if (!on) {
+      delete litho.dataset.lithoCat;
+      litho.classList.remove("litho-sheet");
+    }
+  }
+}
+
+function openLithoDest() {
+  const dlg = document.getElementById("lithoDest");
+  if (dlg && !dlg.open) dlg.showModal();
+}
+
+function runLithoDest(action) {
+  const dlg = document.getElementById("lithoDest");
+  if (dlg && dlg.open) dlg.close();
+  if (action === "slicer") { document.getElementById("btnSendSlicer")?.click(); return; }
+  if (action === "account") { document.getElementById("btnSaveWork")?.click(); return; }
+  if (action === "showcase") { document.getElementById("btnPublish")?.click(); return; }
+  if (action === "device") {
+    const url = S.current && S.current.downloads && S.current.downloads.stl;
+    if (!url) { toast("Make a model first.", "err"); return; }
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "";
+    document.body.append(a);
+    a.click();
+    a.remove();
+  }
 }
 
 function paintChrome() { paintWorkspaceBars(); paintDevice(); placeFdmSheet(); paintWorkBars(); }

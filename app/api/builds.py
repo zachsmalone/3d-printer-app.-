@@ -56,6 +56,7 @@ def summary(meta: dict) -> dict:
     bid = meta["id"]
     return {**{k: meta[k] for k in ("id", "created", "mode", "beginner", "title", "stats")},
             "kind": meta.get("kind", "photo"), "visibility": meta.get("visibility", "private"),
+            "origin": meta.get("origin") or (meta.get("base") or {}).get("origin") or "",
             "favorite": bool(meta.get("favorite")), "ai": bool(meta.get("ai")), "expires": retention.expires_at(meta),
             "file_name": meta.get("file_name") or "",
             "thumb": f"/files/{bid}/thumb.png",
@@ -527,7 +528,7 @@ def generate(
         if mode == "lithophane" and params.get("shape", "rect") != "rect":
             from ..services import willprint            # same bed-fit check the Will-it-print box uses (default printer)
             model.info = {**(model.info or {}), "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), _bed_printer(printer_id))}
-        meta = {"id": bid, "mode": mode, "beginner": beginner, "preset": preset if beginner else None,
+        meta = {"id": bid, "mode": mode, "origin": "lithophane", "beginner": beginner, "preset": preset if beginner else None,
                 "title": title.strip() or sample_title or DEFAULT_PHOTO_TITLE,
                 "source": src, "params": params, "auto_notes": auto_notes, "info": model.info,
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
@@ -627,7 +628,7 @@ def _generate_trace(actor, data, photo_ack, trace_json, width_mm, title, sample_
             filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
         stats = mesh_stats(model)
         model.info = {**model.info, "bed_fit": willprint.bed_fit(tuple(stats["size_mm"]), "creality_k1")}
-        meta = {"id": bid, "mode": "trace2d", "beginner": False, "preset": None,
+        meta = {"id": bid, "mode": "trace2d", "origin": "lithophane", "beginner": False, "preset": None,
                 "title": title.strip() or sample_title or "My drawing build",
                 "source": src, "params": params, "auto_notes": _trace_notes(model.info), "info": model.info,
                 "stats": stats, "owner_sid": actor.sid, "visibility": privacy.default_level(actor), "photo_ack": ack}
@@ -816,7 +817,7 @@ def memorybox_save(actor: Actor, pm, view, params: dict, ack: bool, thumb_im=Non
                 filestore.put_build(bid, f"model.{ext}", (d / f"model.{ext}").read_bytes())
             filestore.put_build(bid, "thumb.png", (d / "thumb.png").read_bytes(), "image/png")
         stats = mesh_stats(view)
-        meta = {"id": bid, "mode": "memorybox", "beginner": False, "preset": None, "title": MEMORYBOX_TITLE,
+        meta = {"id": bid, "mode": "memorybox", "origin": "lithophane", "beginner": False, "preset": None, "title": MEMORYBOX_TITLE,
                 "source": None, "params": {**params, "shape": "memorybox"}, "auto_notes": [], "info": pm.info, "stats": stats,
                 "owner_sid": actor.sid, "visibility": "private", "photo_ack": ack}
         store.save(meta)
