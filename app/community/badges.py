@@ -26,7 +26,8 @@ TESTER_NOTE = (
     "You believed in me, and you are part of the reason I made ZEIM. — Zach"
 )
 
-# Order is the order on the Account card. `private` never leaves the owner's own view.
+# Order is the order on the Account card.
+# visibility "private" stays on the owner's badge box. Missing visibility is public.
 # `auto` is not a task: it shows only after it has been earned.
 CATALOG = (
     {
