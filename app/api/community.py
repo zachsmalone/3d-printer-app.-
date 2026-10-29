@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 
 from .. import branding, config
-from ..community import catalog, discovery, links, moderation, personalization, privacy, recovery, safety, usernames
+from ..community import badges, catalog, discovery, links, moderation, personalization, privacy, recovery, safety, usernames
 from ..community import identity as idn
 from ..community.identity import Actor, get_actor
 from ..community.store import USERS, LISTINGS
@@ -72,6 +72,21 @@ def me(request: Request, actor: Actor = Depends(get_actor)):
             "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
 
 
+@router.get("/me/badges")
+def my_badges(actor: Actor = Depends(get_actor)):
+    """This account's badges. The Tester note is included only for cc0hort himself."""
+    if not actor.user:
+        return {"signed_up": False, "badges": [], "unseen": []}
+    return badges.for_owner(actor.sid)
+
+
+@router.post("/me/badges/seen")
+def seen_badges(actor: Actor = Depends(get_actor)):
+    if actor.user:
+        badges.mark_seen(actor.sid)
+    return {"ok": True}
+
+
 def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None = None):
     """Same neutral answer for 'too young' and 'already refused': no threshold, no hint that retrying differs."""
     until = idn.lock_age(actor.sid, ip) if lock else None
@@ -107,6 +122,7 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
             save_pref(actor.sid, body.get("printer_id"), body.get("nozzle"))
         except SetupError:
             pass                                            # never fail a sign-up over an optional choice
+    badges.seed()
     me_now = Actor(actor.sid, USERS.read()[actor.sid])
     out = idn.public_profile(me_now)
     if me_now.is_adult:                                     # CR-15: shown ONCE, only a hash is kept
@@ -143,6 +159,7 @@ def set_username(request: Request, body: dict, actor: Actor = Depends(get_actor)
             svc.sync_login_name(auth_id, name)
         except AuthError as e:
             raise HTTPException(e.status, e.message)
+    badges.seed()
     u = USERS.read().get(actor.sid) or {}
     return {"username": name, "username_next_change": usernames.next_change(u), "username_starter": usernames.is_starter(u)}
 
@@ -230,6 +247,7 @@ def public_user(uid: str, actor: Actor = Depends(get_actor)):
             "can_follow": privacy.can_follow(actor, u),
             "following_creator": bool(actor.user and uid in actor.user.get("following", [])),
             "links": {} if idn.restricted(u) else u.get("links", {}),
+            "badges": badges.public_earned(u),
             "projects": [catalog.public(i, actor) for i in catalog.list_items(actor, "free") if i["creator_id"] == uid]}
 
 
@@ -398,7 +416,10 @@ def publish(body: dict, actor: Actor = Depends(get_actor)):
     if i.get("held"):
         from ..community import protect
         out.update(held_for_review=True, hold_message=protect.HOLD_MESSAGE)
-    return out
+    events = ["showcase"]
+    if i.get("remix_of"):
+        events.append("remix")
+    return badges.merge(out, actor, *events)
 
 
 @router.put("/showcase/{iid}/download")

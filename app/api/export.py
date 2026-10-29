@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.builds import meta_for
 from app.api.textcap import plain_text
-from app.community import safety
+from app.community import badges, safety
 from app.community.identity import Actor, get_actor
 from app.services import filenames as fnames
 from app.services import print_setup as ps
@@ -182,7 +182,7 @@ def download_export(
     except Exception as e:
         raise HTTPException(400, f"Could not export model: {e}")
 
-    return Response(
+    resp = Response(
         content=data,
         media_type=mime,
         headers={
@@ -195,6 +195,9 @@ def download_export(
             "X-Export-Part": info.get("part") or "",
         },
     )
+    if ext in badges.EXPORT_EXTS:
+        badges.stamp(resp, actor, "export")
+    return resp
 
 
 me_router = APIRouter(prefix="/api/me", tags=["export"])

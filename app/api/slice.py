@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from fastapi.responses import FileResponse, Response
 
 from app import config
+from app.community import badges
 from app.community.identity import Actor, get_actor
 from app.core.exporters import mesh_3mf
 from app.services import filament_slots as fslots
@@ -242,8 +243,13 @@ def slice_model(
         badge = None
     from app.services import gcode_hints, gcode_pause
     hints = gcode_hints.markers(work / "model.stl", chosen.get("supports") or "off", badge)
+    if getattr(actor, "user", None):
+        try:
+            (work / "owner_sid").write_text(actor.sid)
+        except OSError:
+            pass
 
-    return {
+    return badges.merge({
         "slice_id": slice_id,
         "profile": prof.id,
         "plate_objects": len(parts) if parts else 1,
@@ -264,7 +270,7 @@ def slice_model(
         "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
         "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                       "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
-    }
+    }, actor, "fdm_slice")
 
 
 FIT_MARGIN_MM = 2.0      # kept clear on each side in X/Y and above the model in Z
@@ -363,6 +369,13 @@ def fit_to_printer(src: Path, dst: Path, prof, scale: bool, info: Optional[dict]
 
 
 @router.get("/{slice_id}/model.{ext}")
+def _slice_owner(slice_id: str) -> str:
+    try:
+        return (slices_root() / slice_id / "owner_sid").read_text().strip()
+    except OSError:
+        return ""
+
+
 def download_model(slice_id: str, ext: str):
     """The model exactly as sliced: sized for the chosen printer, placed on its bed. 3MF is built from it on demand."""
     if not _SLICE_ID.match(slice_id) or ext not in ("stl", "3mf"):
@@ -371,14 +384,14 @@ def download_model(slice_id: str, ext: str):
     if not stl.is_file():
         _fail(404, "not_found", "That file has expired. Please slice again.")
     if ext == "stl":
-        return FileResponse(stl, media_type="model/stl", filename="zeim-model.stl")
+        return badges.stamp_sid(FileResponse(stl, media_type="model/stl", filename="zeim-model.stl"), _slice_owner(slice_id), "export")
     out = stl.with_suffix(".3mf")
     if not out.is_file():
         sj = stl.parent / "slots.json"
         plan = json.loads(sj.read_text()) if sj.is_file() else fslots.plan([], None)
         loaded = trimesh.load(str(stl), force="mesh")
         out.write_bytes(fslots.annotate_3mf(mesh_3mf(loaded.vertices, loaded.faces), plan))
-    return FileResponse(out, media_type="model/3mf", filename="zeim-model.3mf")
+    return badges.stamp_sid(FileResponse(out, media_type="model/3mf", filename="zeim-model.3mf"), _slice_owner(slice_id), "export")
 
 
 @router.get("/{slice_id}/gcode")
@@ -389,7 +402,9 @@ def download_gcode(slice_id: str):
     path = slices_root() / slice_id / "model.gcode"
     if not path.is_file():
         _fail(404, "not_found", "That G-code has expired. Please slice again.")
-    return FileResponse(path, media_type="text/plain", filename="zeim-model.gcode")
+    return badges.stamp_sid(
+        FileResponse(path, media_type="text/plain", filename="zeim-model.gcode"),
+        _slice_owner(slice_id), "export")
 
 
 @router.get("/{slice_id}/gcode-paused")
@@ -417,7 +432,9 @@ def download_gcode_paused(slice_id: str, layers: str = "", cmd: str = ""):
         tmp = out.with_name(f"{out.name}.{uuid.uuid4().hex}.tmp")
         gcode_pause.insert_pauses(path, tmp, want, cmd)
         tmp.replace(out)
-    return FileResponse(out, media_type="text/plain", filename="zeim-model-with-pauses.gcode")
+    return badges.stamp_sid(
+        FileResponse(out, media_type="text/plain", filename="zeim-model-with-pauses.gcode"),
+        _slice_owner(slice_id), "export")
 
 
 @router.get("/{slice_id}/layers")

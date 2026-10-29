@@ -23,6 +23,7 @@ from __future__ import annotations
 from .. import config
 from ..community.store import USERS
 from . import stripe_billing as billing
+from .entitlements import pro_comp
 
 # Honest catalog. `coming` and `purchasable` follow the plans flag and Stripe config.
 PLANS = (
@@ -179,13 +180,18 @@ def normalize_plan(raw) -> str:
 
 
 def plan_of(user: dict | None) -> str:
+    if pro_comp(user):
+        return "pro"
     if not user:
         return "free"
     return normalize_plan(user.get("plan"))
 
 
 def has_paid_plan(user: dict | None, *which: str) -> bool:
-    """Feature gate. True only for a webhook-maintained paid tier (or the dev helper)."""
+    """Feature gate. True for a webhook-maintained paid tier, a lifetime comp, or the dev helper.
+
+    A comp is read even while ZEIM_PLANS_ENABLED is off. It is not a checkout.
+    """
     plan = plan_of(user)
     if plan not in PAID_IDS:
         return False
@@ -199,10 +205,28 @@ def public_plan(user: dict | None) -> dict:
     status = billing_row.get("status") if billing_row.get("status") in billing.KNOWN_STATUS else "none"
     mode = billing.stripe_mode()
     customer_id = str(billing_row.get("customer_id") or "")
+    comp = pro_comp(user)
+    if comp:
+        return {
+            "id": "pro",
+            "name": meta["name"],
+            "price_label": "Lifetime, $0",
+            "price_usd": 0,
+            "comp": True,
+            "card": False,
+            "expires_at": None,
+            "payment_live": payment_live(),
+            "plans_enabled": plans_enabled(),
+            "stripe_mode": mode,
+            "status": "comp",
+            "cancel_at_period_end": False,
+            "can_manage": False,
+        }
     return {
         "id": pid,
         "name": meta["name"],
         "price_label": meta["price_label"],
+        "comp": False,
         "payment_live": payment_live(),
         "plans_enabled": plans_enabled(),
         "stripe_mode": mode,
@@ -242,6 +266,18 @@ def start_checkout(actor, plan_id: str, base_url: str = "") -> dict:
     keys stays Coming and does not charge. Card data is never stored here.
     """
     plan_id = normalize_plan(plan_id)
+    user = actor.user or {}
+    if pro_comp(user):
+        return {
+            "ok": True,
+            "checkout": False,
+            "comp": True,
+            "plan": "pro",
+            "message": (
+                "You have lifetime Pro. It is complimentary ($0), no card is on file, "
+                "and it does not expire. Nothing was charged."
+            ),
+        }
     if plan_id == "free":
         return {
             "ok": True,
@@ -259,7 +295,6 @@ def start_checkout(actor, plan_id: str, base_url: str = "") -> dict:
             "plan": plan_id,
             "message": f"{name} is coming later. Payment is not available yet — nothing was charged.",
         }
-    user = actor.user or {}
     mode = billing.stripe_mode()
     if mode == "off":
         out = billing.open_checkout(user, plan_id, base_url)
@@ -293,6 +328,13 @@ def start_checkout(actor, plan_id: str, base_url: str = "") -> dict:
 def open_portal(actor, base_url: str) -> dict:
     if not actor.user:
         return {"ok": False, "checkout": False, "message": "Make a free account first."}
+    if pro_comp(actor.user):
+        return {
+            "ok": True,
+            "checkout": False,
+            "comp": True,
+            "message": "Lifetime Pro has no card to manage. Nothing was charged.",
+        }
     if not plans_enabled():
         return {
             "ok": False,

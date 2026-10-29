@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from .. import config
 from ..core import ratelimit
-from ..community import catalog, challenges, questions, safety
+from ..community import badges, catalog, challenges, questions, safety
 from ..community.identity import Actor, get_actor
 from .community import D
 from .textcap import text_in
@@ -228,7 +228,9 @@ def enter_challenge(cid: str, body: dict, request: Request, actor: Actor = Depen
         raise HTTPException(404, "Challenge not found.")
     except challenges.Bad as e:
         raise HTTPException(400, str(e))
-    return {"ok": True, "entry": {"id": rec["id"], "item_id": rec["item_id"],
-                                  "challenge_id": rec["challenge_id"], "created": rec["created"]},
-            "prize_free": True,
-            "message": "Entered. Prize-free challenge: no cash, no prizes — just makers helping makers."}
+    return badges.merge(
+        {"ok": True, "entry": {"id": rec["id"], "item_id": rec["item_id"],
+                               "challenge_id": rec["challenge_id"], "created": rec["created"]},
+         "prize_free": True,
+         "message": "Entered. Prize-free challenge: no cash, no prizes — just makers helping makers."},
+        actor, "challenge")

@@ -36,6 +36,7 @@ import stripe
 
 from ..community.identity import user_by_id
 from ..community.store import USERS
+from .entitlements import pro_comp
 
 log = logging.getLogger("zeim.billing")
 
@@ -417,7 +418,8 @@ def staff_accounts(user_id: str | None = None) -> dict:
         if want and uid != want:
             continue
         billing = u.get("billing") if isinstance(u.get("billing"), dict) else {}
-        plan = u.get("plan") if u.get("plan") in PAID_PLANS else "free"
+        comp = bool(pro_comp(u))
+        plan = "pro" if comp else (u.get("plan") if u.get("plan") in PAID_PLANS else "free")
         customer = billing.get("customer_id") if _CUS.match(str(billing.get("customer_id") or "")) else ""
         if not want and plan == "free" and not customer:
             continue
@@ -429,6 +431,7 @@ def staff_accounts(user_id: str | None = None) -> dict:
             "username": u.get("username") or "",
             "display_name": u.get("display_name") or "",
             "plan": plan,
+            "comp": comp,
             "status": status,
             "stripe_customer_id": customer,
             "stripe_subscription_id": sub,
