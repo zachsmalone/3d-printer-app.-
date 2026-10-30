@@ -191,16 +191,12 @@
     if (e.target.closest && (e.target.closest("#processClose") || e.target.closest("#deviceClose"))) {
       e.preventDefault();
       setDockTab("plate");
-      document.dispatchEvent(new CustomEvent("zeim:bed-tools-close"));
     }
     if (e.target.closest && e.target.closest("#procExpand")) {
       e.preventDefault();
       var adv = document.getElementById("spAdvanced");
       if (adv) adv.click();
     }
-  });
-  document.addEventListener("zeim:bed-sheet", function (e) {
-    if (e.detail) setDockTab(e.detail);
   });
   window.zeimWorkspaces = ZWS.all;
 })();

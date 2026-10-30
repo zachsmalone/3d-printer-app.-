@@ -1205,6 +1205,7 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .wsbar [hidden]{display:none !important}
 main.zws>.wsbar{position:absolute;z-index:48;top:0;left:0;right:0;max-width:none;margin:0;padding:8px max(8px,env(safe-area-inset-right)) 8px max(8px,env(safe-area-inset-left));border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:none;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);pointer-events:none}
 main.zws>.wsbar .btn,main.zws>.wsbar a{pointer-events:auto}
+main.zws>.wsbar button,main.zws>.wsbar select,main.zws>.wsbar input,main.zws>.wsbar label{pointer-events:auto}
 /* Slice and Customise are one trailing pair. A corner layer with a 60px hole covered Slice. */
 main.zws>.wsbar>.ws-end{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px;margin-left:auto;max-width:100%;pointer-events:none}
 main.zws>.wsbar>.ws-end>.zws-cust,main.zws>.wsbar>.ws-end .ws-go{position:static;z-index:auto;flex:0 0 auto;margin:0;white-space:nowrap}
@@ -1430,92 +1431,3 @@ html[data-theme=dark] .zg-handle:hover,html[data-theme=dark] .zg-handle:focus-vi
 html[data-theme=dark] .zg-turn{background:transparent;color:#6AA6FF}
 html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6AA6FF}
 @media (prefers-reduced-motion:reduce){.zg-handle{transition:none}.zg-handle:hover,.zg-handle:focus-visible,.zg-handle:active,.zg-handle.zg-on{transition:none}}
-
-/* Work view chrome for FDM and Lithophane after a file is open. Landing pages keep the rules above. */
-.wl-switch{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:0 10px;border:0;border-radius:999px;background:#0E7A3D;color:#fff;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
-.wl-switch:focus-visible,.wl-plus:focus-visible,.wl-printer:focus-visible,.wl-pill:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
-.wl-printer{display:inline-flex;align-items:center;justify-content:center;min-height:32px;max-width:min(240px,46vw);padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--txt);font:inherit;font-weight:650;cursor:pointer}
-.wl-printer span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wl-mark{display:inline-flex;align-items:center;text-decoration:none}
-.wl-mark .logoimg{height:22px;width:auto}
-.wl-plus{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border:1px solid var(--line);border-radius:50%;background:var(--panel);color:var(--txt);font:inherit;font-size:22px;line-height:1;cursor:pointer}
-.wl-settings{display:none}
-.wl-sheetbar{display:none;align-items:center;gap:8px;min-height:44px;padding:4px 8px}
-.wl-sheetbar h2{flex:1;margin:0;font-size:16px;font-weight:650}
-.wl-sheetbar .x{min-width:44px;min-height:44px}
-.wl-foot{display:none}
-.wl-preview{display:none}
-.wl-preview h2{margin:0;font-size:16px;font-weight:650;text-align:center}
-.wl-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start;padding:4px 8px}
-.wl-chips button{min-height:32px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--txt);font:inherit;cursor:pointer}
-.wl-stats{display:flex;flex-wrap:wrap;gap:8px 14px;justify-content:center;padding:6px 12px;font-size:13px}
-.wl-stats b{font-weight:700}
-.wl-preview-acts{display:flex;justify-content:space-between;gap:8px;align-items:center}
-.wl-pill{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 28px;border:0;border-radius:999px;background:#0E7A3D;color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
-#viewCreate:not(.has-model)>#lithoSettings,#viewCreate:not(.has-model)>#lithoFoot,#viewCreate:not(.has-model)>#lithoPreview,#viewCreate:not(.has-model) #lithoSlicerSwitch,#viewCreate:not(.has-model) #lithoPrinterBtn,#viewCreate:not(.has-model) .wl-mark,#viewCreate:not(.has-model) #lithoPlus,#viewCreate:not(.has-model) #lithoSheetBar,#viewEdit:not(.has-model) .wl-mark,#viewEdit:not(.has-model) #fdmPlus,#viewEdit:not(.has-model) #fdmEditLitho,#viewEdit:not(.has-model)>#fdmFoot,#viewEdit:not(.has-model)>#fdmPreview,#viewEdit:not(.has-model)>#fdmSettings{display:none!important}
-#viewEdit:not(.has-model) #fdmFlow,#viewCreate:not(.has-model) #lithoFlow{display:none!important}
-#viewCreate.has-model{display:grid;grid-template-columns:84px minmax(0,1fr);grid-template-rows:auto auto minmax(280px,1fr) auto;max-width:none;width:auto;margin:0;padding:0;gap:0;align-items:stretch}
-#viewCreate.has-model>.wsbar{grid-column:1/-1;grid-row:1;display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto auto;align-items:center;height:auto;min-height:48px;gap:6px;padding:6px 8px}
-#viewCreate.has-model>.wsbar [data-ws-act=exit]{grid-column:1;grid-row:1}
-#viewCreate.has-model #lithoSlicerSwitch{grid-column:2;grid-row:1}
-#viewCreate.has-model #lithoPrinterBtn{grid-column:3;grid-row:1;justify-self:center}
-#viewCreate.has-model>.wsbar .bed-done{grid-column:4;grid-row:1;margin-left:0}
-#viewCreate.has-model>.wsbar .wl-mark{grid-column:5;grid-row:1;justify-self:end}
-#viewCreate.has-model #lithoPlus{grid-column:6;grid-row:1}
-#viewCreate.has-model>.wsbar .pflow-inline:not([hidden]){grid-column:1/-1;grid-row:2;display:flex}
-#viewCreate.has-model .litho-name{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-#viewCreate.has-model>#lithoSettings{grid-column:1/-1;grid-row:2;display:flex!important;gap:8px;padding:8px;background:var(--panel)}
-#viewCreate.has-model>#lithoSettings button{flex:1;min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--txt);font:inherit;font-weight:650;cursor:pointer}
-#viewCreate.has-model>#lithoBar.bed-bar{position:relative;left:auto;right:auto;bottom:auto;grid-column:1;grid-row:3;width:84px;height:auto;flex-direction:column;align-items:stretch;overflow:auto;border-top:0;border-right:1px solid var(--line);background:var(--panel);padding:4px 2px;z-index:4}
-#viewCreate.has-model>#lithoBar .bed-scroll{flex-direction:column;overflow:visible;align-items:stretch;min-width:0}
-#viewCreate.has-model>#lithoBar .bed-scroll button{flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:58px;padding:6px 2px;font-size:10px;line-height:1.15;white-space:normal;text-align:center}
-#viewCreate.has-model>.stage{grid-column:2;grid-row:3;min-height:0}
-#viewCreate.has-model .viewer{height:100%;min-height:280px;border:0;border-radius:0}
-#viewCreate.has-model>#lithoFoot{grid-column:1/-1;grid-row:4;display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
-#viewCreate.has-model #lithoCount{margin-left:auto}
-#viewCreate.has-model.wl-collapsed{grid-template-columns:52px minmax(0,1fr)}
-#viewCreate.has-model.wl-collapsed>#lithoBar{width:52px}
-#viewCreate.has-model.wl-collapsed>#lithoBar .bed-scroll button span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-#viewCreate.has-model.litho-sheet>aside.controls,#viewCreate.has-model.litho-sheet #zws-settings{bottom:64px}
-#viewCreate.has-model.litho-sheet #lithoSheetBar{display:flex}
-#viewCreate.has-model #lithoTools:not([hidden]){position:fixed;left:0;right:0;bottom:64px;z-index:60;display:flex!important;flex-direction:column;width:auto;height:auto;max-height:42dvh;overflow:auto;background:var(--panel);border-radius:18px 18px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.22);padding:4px 8px 12px}
-#viewCreate.has-model #lithoTools:not([hidden]) #lithoViewBar{display:flex}
-#viewCreate.has-model #lithoTools .bed-scroll,#viewCreate.has-model #lithoTools [data-for]{flex-direction:row;flex-wrap:wrap}
-#viewCreate.has-model[data-litho-cat=view] #vtools,#viewCreate.has-model[data-litho-cat=rotate] #vtools{bottom:64px}
-#viewCreate.has-model.litho-sheet[data-litho-cat=position] #placeEditor,#viewCreate.has-model.litho-sheet[data-litho-cat=arrange] #collageBox,#viewCreate.has-model.litho-sheet[data-litho-cat=arrange] #mboxBox,#viewCreate.has-model.litho-sheet[data-litho-cat=material] #lithMatBox,#viewCreate.has-model.litho-sheet[data-litho-cat=frame] #hangOpts,#viewCreate.has-model.litho-sheet[data-litho-cat=frame] #curveOpts,#viewCreate.has-model.litho-sheet[data-litho-cat=params] aside.controls [data-litho-group=size],#viewCreate.has-model.litho-sheet[data-litho-cat=params] aside.controls [data-litho-group=thickness]{display:block!important}
-#viewCreate.has-model.wl-previewing>#lithoBar,#viewCreate.has-model.wl-previewing>#lithoSettings,#viewCreate.has-model.wl-previewing>#lithoFoot{display:none!important}
-#viewCreate.wl-previewing>#lithoPreview{display:block;position:fixed;left:0;right:0;top:var(--wl-litho-top,120px);z-index:56;pointer-events:none}
-#viewCreate.wl-previewing>#lithoPreview .wl-chips,#viewCreate.wl-previewing>#lithoPreview .wl-preview-acts{pointer-events:auto}
-#viewCreate.wl-previewing>#lithoPreview .wl-preview-acts{position:fixed;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line);z-index:72}
-body[data-view=lithophane]:has(#viewCreate.has-model) .sitefoot{display:none}
-#viewEdit.has-model{display:block;max-width:none;width:auto;margin:0;padding:0}
-#viewEdit.has-model>.bed-head{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto auto;align-items:center;height:auto;min-height:48px;gap:6px}
-#viewEdit.has-model>.bed-head .bed-back{grid-column:1;grid-row:1}
-#viewEdit.has-model #fdmEditLitho:not([hidden]){display:inline-flex;grid-column:2;grid-row:1}
-#viewEdit.has-model #fdmPrinterBtn{grid-column:3;grid-row:1;justify-self:center}
-#viewEdit.has-model>.bed-head .bed-done{grid-column:4;grid-row:1;margin-left:0}
-#viewEdit.has-model>.bed-head .wl-mark{grid-column:5;grid-row:1;justify-self:end}
-#viewEdit.has-model #fdmPlus{grid-column:6;grid-row:1}
-#viewEdit.has-model>.bed-head .pflow-inline:not([hidden]){grid-column:1/-1;grid-row:2}
-#viewEdit.has-model>.bed-head .bed-name{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-#viewEdit.has-model>#slicerBar.bed-bar{position:fixed;left:0;right:auto;top:var(--wl-rail-top,168px);bottom:64px;width:84px;height:auto;flex-direction:column;align-items:stretch;overflow:auto;border-top:0;border-right:1px solid var(--line);box-shadow:none;padding:4px 2px;z-index:47}
-#viewEdit.has-model>#slicerBar .bed-scroll{flex-direction:column;overflow:visible;align-items:stretch}
-#viewEdit.has-model>#slicerBar .bed-cat{flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:62px;padding:6px 2px;font-size:10px;line-height:1.15;white-space:normal;text-align:center}
-#viewEdit.has-model>#fdmSettings{display:flex;gap:8px;padding:8px;background:var(--panel)}
-#viewEdit.has-model>#fdmSettings button{flex:1;min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--panel);color:var(--txt);font:inherit;font-weight:650;cursor:pointer}
-#viewEdit.has-model #bedDevice,#viewEdit.has-model #slicerSlice,#viewEdit.has-model #bedFilament,#viewEdit.has-model #slicerBar [data-bed-cat=process]{position:absolute;width:1px;height:1px;margin:0;padding:0;overflow:hidden;clip:rect(0 0 0 0);min-height:0;border:0;pointer-events:none}
-#viewEdit.has-model>#fdmFoot{position:fixed;left:0;right:0;bottom:0;z-index:48;display:flex;align-items:center;gap:12px;min-height:64px;padding:8px 148px calc(8px + env(safe-area-inset-bottom)) 96px;background:var(--panel);border-top:1px solid var(--line)}
-#viewEdit.has-model #fdmCount{margin-left:auto}
-#viewEdit.has-model #fdmSliceGo{margin-left:8px}
-#viewEdit.has-model>.stage{margin:0 0 64px 84px}
-#viewEdit.has-model .viewer{height:calc(100dvh - 260px);min-height:240px;border:0;border-radius:0}
-#viewEdit.has-model #bedTools:not([hidden]){position:fixed;left:0;right:0;bottom:64px;top:auto;z-index:64;display:flex!important;flex-direction:column;width:auto;height:auto;max-height:46dvh;overflow:auto;background:var(--panel);border-radius:18px 18px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.22);padding:4px 8px 12px}
-#viewEdit.has-model[data-bed-open=filament] #bedTools:not([hidden]),#viewEdit.has-model[data-bed-open=process] #bedTools:not([hidden]),#viewEdit.has-model[data-bed-open=device] #bedTools:not([hidden]){top:max(var(--fdm-head-bottom,18dvh),18dvh);bottom:auto;max-height:140px;border-radius:18px 18px 0 0;box-shadow:none}
-#viewEdit.has-model[data-bed-open=filament]>#processSheet:not([hidden]),#viewEdit.has-model[data-bed-open=process]>#processSheet:not([hidden]),#viewEdit.has-model[data-bed-open=device]>#deviceSheet:not([hidden]){top:calc(max(var(--fdm-head-bottom,18dvh),18dvh) + 132px)}
-#viewEdit.has-model #bedTools:not([hidden]) #bedToolsBar{display:flex}
-#viewEdit.has-model #bedTools:not([hidden]) [data-for]{flex-direction:row;flex-wrap:wrap;min-width:0}
-#viewEdit.has-model.wl-previewing>#slicerBar,#viewEdit.has-model.wl-previewing>#fdmFoot,#viewEdit.has-model.wl-previewing>#fdmSettings{display:none!important}
-#viewEdit.wl-previewing>#fdmPreview{display:block;position:fixed;left:0;right:0;top:var(--wl-row-top,128px);z-index:56;pointer-events:none}
-#viewEdit.wl-previewing>#fdmPreview .wl-chips,#viewEdit.wl-previewing>#fdmPreview .wl-preview-acts{pointer-events:auto}
-#viewEdit.wl-previewing>#fdmPreview .wl-preview-acts{position:fixed;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line);z-index:72}
-#viewEdit.wl-previewing #gcLegend{position:fixed;top:calc(var(--wl-row-top,128px) + 28px);left:12px;z-index:66;max-width:min(460px,70vw);background:color-mix(in srgb,var(--panel) 94%,transparent);border-radius:12px;padding:6px}

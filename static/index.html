@@ -86,21 +86,12 @@
     <button type="button" class="btn small" data-ws-act="new-build" aria-label="New build" title="Save this work, or ask first, then clear the screen. A project already on Account stays there. This does not send the model to Showcase.">New build</button>
     <a class="btn small" data-ws-act="return-studio" href="#account" hidden aria-label="Return to Account" title="Go back to saved work on Account. The draft is saved first. This does not send the model to Showcase.">Return to Account</a>
     <button type="button" class="btn small primary ws-go" id="lithoGo" data-go="btnSendSlicer" title="Save first, then open this model in the FDM Slicer. This does not send it to Showcase.">Send to Slicer</button>
-    <button type="button" class="wl-switch" id="lithoSlicerSwitch" title="Save first, then open this model in the FDM Slicer. This does not send it to Showcase.">Slicer</button>
-    <button type="button" class="wl-printer" id="lithoPrinterBtn" title="Printer saved on Account"><span id="lithoPrinterLabel">No printer saved</span></button>
-    <a class="wl-mark" href="/" title="ZEIM"><img src="/static/zeim-logo.png" alt="ZEIM" class="logoimg logo-light" width="72" height="24"><img src="/static/zeim-logo-dark.png" alt="" aria-hidden="true" class="logoimg logo-dark" width="72" height="24"></a>
-    <button type="button" class="wl-plus" id="lithoPlus" aria-label="Add a photo" title="Choose a photo">+</button>
-  </div>
-  <div class="wl-settings" id="lithoSettings">
-    <button type="button" data-litho-cat="material" data-litho-label="Material"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-spool"/></svg><span>Material</span></button>
-    <button type="button" data-litho-cat="params" data-litho-label="Lithophane Parameters"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-list"/></svg><span>Lithophane Parameters</span></button>
   </div>
   <nav class="pathnav" aria-label="Your progress">
     <ol class="path" id="path"><li data-step="1" aria-current="step"><span class="n" aria-hidden="true">1</span> Photo</li><li data-step="2"><span class="n" aria-hidden="true">2</span> Preview</li><li data-step="3"><span class="n" aria-hidden="true">3</span> Save or slice</li></ol>
     <p class="help" id="pathSay" role="status" aria-live="polite">Step 1 of 3: choose a photo.</p>
   </nav>
   <aside class="panel controls" aria-label="Make a 3D model">
-    <div class="wl-sheetbar" id="lithoSheetBar"><h2 id="lithoSheetTitle">Tool</h2><button type="button" class="x" id="lithoSheetClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
     <p class="modeline" id="modeLine"></p>
     <section class="step" data-litho-group="photo">
       <h2><i>1</i> Your photo</h2>
@@ -452,22 +443,15 @@
   <nav class="bed-bar" id="lithoBar" data-ws="lithophane" aria-label="Lithophane tools" hidden>
     <button type="button" class="bed-pin" id="lithoPin" hidden aria-label="Back to tool categories"></button>
     <div class="bed-scroll" id="lithoCats">
-      <button type="button" data-litho-cat="position" data-litho-label="Position"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-compass"/></svg><span>Position</span></button>
-      <button type="button" data-litho-cat="size" data-litho-label="Sizing"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-ruler"/></svg><span>Sizing</span></button>
-      <button type="button" data-litho-cat="rotate" data-litho-label="Rotate"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-repeat"/></svg><span>Rotate</span></button>
-      <button type="button" data-litho-cat="arrange" data-litho-label="Arrange"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-grid"/></svg><span>Arrange</span></button>
-      <button type="button" data-litho-cat="thickness" data-litho-label="Adjust"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-palette"/></svg><span>Adjust</span></button>
-      <button type="button" data-litho-cat="shape" data-litho-label="Shape"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-star"/></svg><span>Shape</span></button>
-      <button type="button" data-litho-cat="frame" data-litho-label="Frame &amp; Base"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-image"/></svg><span>Frame &amp; Base</span></button>
-      <button type="button" data-litho-cat="view" data-litho-label="View"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-eye"/></svg><span>View</span></button>
-      <button type="button" data-litho-cat="photo" data-litho-label="Photo"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-camera"/></svg><span>Photo</span></button>
-      <button type="button" data-litho-cat="light" data-litho-label="Light"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-bulb"/></svg><span>Light</span></button>
-      <button type="button" data-litho-act="print" data-litho-label="Print"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-printer"/></svg><span>Print</span></button>
-      <button type="button" data-litho-act="preview" data-litho-label="Preview"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-eye"/></svg><span>Preview</span></button>
-      <button type="button" data-litho-cat="collapse" data-litho-label="Collapse"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 6l-6 6 6 6"/></svg><span>Collapse</span></button>
+      <button type="button" data-litho-cat="photo" data-litho-label="Photo">Photo</button>
+      <button type="button" data-litho-cat="size" data-litho-label="Size">Size</button>
+      <button type="button" data-litho-cat="thickness" data-litho-label="Thickness">Thickness</button>
+      <button type="button" data-litho-cat="shape" data-litho-label="Shape">Shape</button>
+      <button type="button" data-litho-cat="frame" data-litho-label="Frame">Frame</button>
+      <button type="button" data-litho-cat="light" data-litho-label="Light">Light</button>
+      <button type="button" data-litho-cat="view" data-litho-label="View">View</button>
     </div>
     <div class="bed-scroll" id="lithoTools" hidden>
-      <div class="wl-sheetbar" id="lithoViewBar"><h2 id="lithoViewTitle">View</h2><button type="button" class="x" id="lithoViewClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
       <div data-for="view">
         <button type="button" data-litho-click="vLeft">Turn left</button>
         <button type="button" data-litho-click="vRight">Turn right</button>
@@ -477,20 +461,6 @@
       </div>
     </div>
   </nav>
-  <footer class="wl-foot" id="lithoFoot">
-    <span id="lithoDims"></span>
-    <span id="lithoCount"></span>
-    <button type="button" class="wl-pill" id="lithoGenerate">Generate</button>
-  </footer>
-  <section class="wl-preview" id="lithoPreview" hidden>
-    <h2 id="lithoPreviewTitle">Preview</h2>
-    <div class="wl-chips" id="lithoPreviewChips"></div>
-    <div class="wl-stats" id="lithoPreviewStats"></div>
-    <div class="wl-preview-acts">
-      <button type="button" class="btn" id="lithoBackPrepare">Back to Prepare</button>
-      <a class="btn primary" id="lithoDownloadStl" href="#" download>Download STL</a>
-    </div>
-  </section>
   <dialog id="lithoDest" aria-labelledby="lithoDestTitle">
     <div class="dlg">
       <div class="dh"><h3 id="lithoDestTitle">Export / Print</h3><button type="button" class="x" data-litho-dest="close" aria-label="Close">✓</button></div>
@@ -517,15 +487,7 @@
     <nav id="fdmFlow" class="pflow pflow-inline" data-flow hidden aria-label="Project stages"><ol class="path"></ol></nav>
     <span class="bed-name">FDM</span>
     <button type="button" class="btn small bed-done" data-ws-act="done" aria-label="Done" title="Choose where this model goes. Nothing is published from this button.">Done</button>
-    <button type="button" class="wl-switch" id="fdmEditLitho" hidden title="Open the lithophane this file was made from">Edit Litho</button>
-    <button type="button" class="wl-printer" id="fdmPrinterBtn" title="Printer saved on Account"><span id="fdmPrinterLabel">No printer saved</span></button>
-    <a class="wl-mark" href="/" title="ZEIM"><img src="/static/zeim-logo.png" alt="ZEIM" class="logoimg logo-light" width="72" height="24"><img src="/static/zeim-logo-dark.png" alt="" aria-hidden="true" class="logoimg logo-dark" width="72" height="24"></a>
-    <button type="button" class="wl-plus" id="fdmPlus" aria-label="Add a model" title="Choose a 3D file">+</button>
   </header>
-  <div class="wl-settings" id="fdmSettings">
-    <button type="button" id="fdmFilamentRow"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-spool"/></svg><span>Filament</span></button>
-    <button type="button" id="fdmProcessRow"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-list"/></svg><span>Process Parameters</span></button>
-  </div>
   <aside class="panel controls" id="editSide">
     <section id="editStart">
       <h2><i>1</i> Open a model</h2>
@@ -598,7 +560,7 @@
     <div class="proc-bar">
       <h2 id="procTitle">Process</h2>
       <button type="button" class="btn small" id="procExpand">Expand</button>
-      <button type="button" class="btn small bed-check" id="processClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
+      <button type="button" class="btn small bed-check" id="processClose" aria-label="Done">✓</button>
     </div>
     <p class="help" id="procEmpty">Open a model to change quality, filament, strength, speed, cooling, supports, infill, and adhesion.</p>
     <section class="slicepanel" id="slicePanel" aria-label="Slicer settings"></section>
@@ -606,7 +568,7 @@
   <section id="deviceSheet" class="bed-sheet proc-sheet" hidden aria-labelledby="deviceTitle">
     <div class="proc-bar">
       <h2 id="deviceTitle">Printer</h2>
-      <button type="button" class="btn small bed-check" id="deviceClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button>
+      <button type="button" class="btn small bed-check" id="deviceClose" aria-label="Done">✓</button>
     </div>
     <div class="bed-sheet-body">
       <p id="deviceReadout">No printer saved · Not connected</p>
@@ -619,21 +581,19 @@
     <button type="button" class="bed-pin" id="bedPin" hidden aria-label="Back to tool categories"></button>
     <div class="bed-scroll" id="bedCats">
       <button type="button" class="bed-cat bed-device" data-bed-cat="device" data-bed-label="Printer" data-bed-sheet="device" id="bedDevice">
-        <svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-printer"/></svg>
         <span class="bed-dev-name" id="bedPrinterName">No printer saved</span>
         <span class="bed-dev-state" id="bedPrinterState">Not connected</span>
       </button>
-      <button type="button" class="bed-cat" data-bed-cat="filament" data-bed-label="Filament" data-bed-sheet="filament" id="bedFilament"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-spool"/></svg><span>Filament</span></button>
-      <button type="button" class="bed-cat" data-bed-cat="process" data-bed-label="Process" data-bed-sheet="process"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-list"/></svg><span>Process Parameters</span></button>
-      <button type="button" class="bed-cat" data-bed-cat="transform" data-bed-label="Transform"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-compass"/></svg><span>Transform</span></button>
-      <button type="button" class="bed-cat" data-bed-cat="import" data-bed-label="Import"><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg><span>Import</span></button>
-      <button type="button" class="bed-cat bed-act" id="slicerRepair" data-bed-act="repair" title="Repair holes and flipped faces on the open model. This uses the same repair as Fix. It does not leave the workspace."><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-wrench"/></svg><span>Repair</span></button>
-      <button type="button" class="bed-cat bed-act" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace."><span>Slice</span></button>
-      <button type="button" class="bed-cat bed-act" id="slicerPreview" data-bed-act="preview" title="Show the sliced layers. Slice first."><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-eye"/></svg><span>Preview</span></button>
-      <button type="button" class="bed-cat bed-act" id="slicerSend" data-bed-act="send-print" title="Open print and send for a printer already set up."><svg class="i wl-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-send"/></svg><span>Send</span></button>
+      <button type="button" class="bed-cat" data-bed-cat="filament" data-bed-label="Filament" data-bed-sheet="filament" id="bedFilament">Filament</button>
+      <button type="button" class="bed-cat" data-bed-cat="process" data-bed-label="Process" data-bed-sheet="process">Process</button>
+      <button type="button" class="bed-cat" data-bed-cat="transform" data-bed-label="Transform">Transform</button>
+      <button type="button" class="bed-cat" data-bed-cat="import" data-bed-label="Import">Import</button>
+      <button type="button" class="bed-cat bed-act" id="slicerRepair" data-bed-act="repair" title="Repair holes and flipped faces on the open model. This uses the same repair as Fix. It does not leave the workspace.">Repair</button>
+      <button type="button" class="bed-cat bed-act" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace.">Slice</button>
+      <button type="button" class="bed-cat bed-act" id="slicerPreview" data-bed-act="preview" title="Show the sliced layers. Slice first.">Preview</button>
+      <button type="button" class="bed-cat bed-act" id="slicerSend" data-bed-act="send-print" title="Open print and send for a printer already set up.">Send</button>
     </div>
     <div class="bed-scroll" id="bedTools" hidden>
-      <div class="wl-sheetbar" id="bedToolsBar"><h2 id="bedToolsTitle">Tool</h2><button type="button" class="x" id="bedToolsClose" aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></button></div>
       <div data-for="device"><button type="button" data-bed-sheet="device">Change printer</button></div>
       <div data-for="filament" hidden>
         <button type="button" data-mat="PLA">PLA</button>
@@ -672,20 +632,6 @@
       </div>
     </div>
   </nav>
-  <footer class="wl-foot" id="fdmFoot">
-    <span id="fdmDims"></span>
-    <span id="fdmCount"></span>
-    <button type="button" class="wl-pill" id="fdmSliceGo">Slice</button>
-  </footer>
-  <section class="wl-preview" id="fdmPreview" hidden>
-    <h2 id="fdmPreviewTitle">Preview</h2>
-    <div class="wl-chips" id="fdmPreviewChips"></div>
-    <div class="wl-stats" id="fdmPreviewStats"></div>
-    <div class="wl-preview-acts">
-      <button type="button" class="btn" id="fdmBackPrepare">Back to Prepare</button>
-      <a class="btn primary" id="fdmDownloadStl" href="#" download>Download STL</a>
-    </div>
-  </section>
   <dialog id="fdmDone" aria-labelledby="fdmDoneTitle">
     <div class="dlg">
       <div class="dh"><h3 id="fdmDoneTitle">Done</h3><button type="button" class="x" data-fdm-done="close" aria-label="Close">✓</button></div>
