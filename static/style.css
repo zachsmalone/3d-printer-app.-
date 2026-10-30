@@ -1205,6 +1205,7 @@ html[data-theme=dark] .ailbl{color:#8FB0CC}
 .wsbar [hidden]{display:none !important}
 main.zws>.wsbar{position:absolute;z-index:48;top:0;left:0;right:0;max-width:none;margin:0;padding:8px max(8px,env(safe-area-inset-right)) 8px max(8px,env(safe-area-inset-left));border-radius:0 0 16px 16px;background:color-mix(in srgb,var(--panel) 90%,transparent);box-shadow:none;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent);pointer-events:none}
 main.zws>.wsbar .btn,main.zws>.wsbar a{pointer-events:auto}
+main.zws>.wsbar button,main.zws>.wsbar select,main.zws>.wsbar input,main.zws>.wsbar label{pointer-events:auto}
 /* Slice and Customise are one trailing pair. A corner layer with a 60px hole covered Slice. */
 main.zws>.wsbar>.ws-end{display:flex;flex:0 0 auto;flex-wrap:nowrap;align-items:center;gap:8px;margin-left:auto;max-width:100%;pointer-events:none}
 main.zws>.wsbar>.ws-end>.zws-cust,main.zws>.wsbar>.ws-end .ws-go{position:static;z-index:auto;flex:0 0 auto;margin:0;white-space:nowrap}
