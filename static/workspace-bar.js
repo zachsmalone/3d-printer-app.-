@@ -1,6 +1,6 @@
 /* Exit, Done, New build, and Return to Account on Lithophane, the Slicer, TorchC0, and 2D→3D.
    Save uses the same leave / saveNow path as CAD. None of these actions publish to Showcase. */
-import { S, api, askConfirm, esc, toast } from "/static/app.js";
+import { S, api, askConfirm, esc, toast, showPhotoBuild } from "/static/app.js";
 import { askBedLeave, BED_LEAVE_MESSAGE } from "/static/bed-leave.js";
 import { exitTarget, takeExit, LIBRARY_URL } from "/static/studio-library.js";
 import { fdmDonePlan, bedLeavePlan, leavePlan, newBuildPlan, isPublishUrl } from "/static/workspace-controls.js";
@@ -87,6 +87,10 @@ function paintDevice() {
   let name = "";
   try { name = (fromPanel && fromPanel.textContent.trim()) || prefLabel() || ""; } catch { name = ""; }
   if (nameEl) nameEl.textContent = name || "No printer saved";
+  const lithoName = document.getElementById("lithoPrinterLabel");
+  if (lithoName) lithoName.textContent = name || "No printer saved";
+  const fdmName = document.getElementById("fdmPrinterLabel");
+  if (fdmName) fdmName.textContent = name || "No printer saved";
   const liveBox = document.getElementById("liveStatus");
   const liveText = document.getElementById("liveStatusText");
   const live = liveBox && !liveBox.hidden && liveText && liveText.textContent.trim();
@@ -381,14 +385,20 @@ function pinCategory(id, label) {
   const pin = document.getElementById("bedPin");
   const cats = document.getElementById("bedCats");
   const tools = document.getElementById("bedTools");
+  const title = document.getElementById("bedToolsTitle");
   if (!pin || !cats || !tools) return;
   tools.querySelectorAll("[data-for]").forEach(row => { row.hidden = row.getAttribute("data-for") !== id; });
-  pin.hidden = false;
+  if (title) title.textContent = label || "Tool";
+  pin.hidden = true;
   pin.textContent = label;
   pin.dataset.cat = id;
-  cats.hidden = true;
+  cats.hidden = false;
   tools.hidden = false;
   tools.scrollLeft = 0;
+  const root = document.getElementById("viewEdit");
+  if (root) root.dataset.bedOpen = id;
+  const sheet = { filament: "filament", process: "process", device: "device" }[id] || "plate";
+  document.dispatchEvent(new CustomEvent("zeim:bed-sheet", { detail: sheet }));
 }
 
 function unpinCategory() {
@@ -401,6 +411,9 @@ function unpinCategory() {
   delete pin.dataset.cat;
   tools.hidden = true;
   cats.hidden = false;
+  const root = document.getElementById("viewEdit");
+  if (root) delete root.dataset.bedOpen;
+  document.dispatchEvent(new CustomEvent("zeim:bed-sheet", { detail: "plate" }));
 }
 
 function onBedCat(ev) {
@@ -415,7 +428,9 @@ function onBedCat(ev) {
   if (!cat) return;
   ev.preventDefault();
   ev.stopPropagation();
-  pinCategory(cat.getAttribute("data-bed-cat"), cat.getAttribute("data-bed-label") || cat.textContent.trim());
+  const span = cat.id === "bedDevice" ? null : cat.querySelector("span");
+  const label = (span && span.textContent.trim()) || cat.getAttribute("data-bed-label") || cat.textContent.trim();
+  pinCategory(cat.getAttribute("data-bed-cat"), label);
 }
 
 function onFdmAct(ev) {
@@ -434,6 +449,7 @@ function onFdmAct(ev) {
   const preview = ev.target.closest && ev.target.closest("[data-bed-act=preview]");
   if (preview && preview.closest("#viewEdit")) {
     ev.preventDefault();
+    openWorkPreview("slicer");
     const gc = document.getElementById("gcPrev");
     if (!gc) { toast("Slice first. Preview shows the layers after Slice finishes."); return; }
     const sheet = document.getElementById("processSheet");
@@ -536,14 +552,23 @@ function pinLitho(cat, label) {
   const pin = document.getElementById("lithoPin");
   const tools = document.getElementById("lithoTools");
   const cats = document.getElementById("lithoCats");
+  const title = document.getElementById("lithoSheetTitle");
+  const viewTitle = document.getElementById("lithoViewTitle");
   if (!root || !pin || !tools || !cats) return;
+  if (cat === "collapse") {
+    root.classList.toggle("wl-collapsed");
+    return;
+  }
+  const viewLike = cat === "view" || cat === "rotate";
   root.dataset.lithoCat = cat;
-  root.classList.toggle("litho-sheet", cat !== "view");
-  pin.hidden = false;
+  root.classList.toggle("litho-sheet", !viewLike);
+  if (title) title.textContent = label || "Tool";
+  if (viewTitle) viewTitle.textContent = label || "View";
+  pin.hidden = true;
   pin.textContent = label;
-  cats.hidden = true;
-  tools.hidden = cat === "view" ? false : true;
-  tools.querySelectorAll("[data-for]").forEach(el => { el.hidden = el.getAttribute("data-for") !== cat; });
+  cats.hidden = false;
+  tools.hidden = viewLike ? false : true;
+  tools.querySelectorAll("[data-for]").forEach(el => { el.hidden = el.getAttribute("data-for") !== "view"; });
 }
 
 function unpinLitho() {
@@ -560,10 +585,19 @@ function unpinLitho() {
 function onLithoBar(ev) {
   const pin = ev.target.closest && ev.target.closest("#lithoPin");
   if (pin) { ev.preventDefault(); unpinLitho(); return; }
-  const cat = ev.target.closest && ev.target.closest("#lithoCats [data-litho-cat]");
+  const cat = ev.target.closest && ev.target.closest("#lithoCats [data-litho-cat], #lithoSettings [data-litho-cat]");
   if (cat) {
     ev.preventDefault();
-    pinLitho(cat.getAttribute("data-litho-cat"), cat.getAttribute("data-litho-label") || cat.textContent.trim());
+    const span = cat.querySelector("span");
+    pinLitho(cat.getAttribute("data-litho-cat"), (span && span.textContent.trim()) || cat.getAttribute("data-litho-label") || cat.textContent.trim());
+    return;
+  }
+  const act = ev.target.closest && ev.target.closest("#lithoCats [data-litho-act]");
+  if (act) {
+    ev.preventDefault();
+    const name = act.getAttribute("data-litho-act");
+    if (name === "print") document.getElementById("btnPrint")?.click();
+    else if (name === "preview") openWorkPreview("lithophane");
     return;
   }
   const jump = ev.target.closest && ev.target.closest("#lithoTools [data-litho-click]");
@@ -596,9 +630,17 @@ document.addEventListener("change", ev => { if (ev.target && ev.target.id === "r
 });
 function placeFdmSheet() {
   const head = document.querySelector("#viewEdit > .bed-head");
-  if (!head) return;
-  const top = Math.ceil(head.getBoundingClientRect().bottom + 8);
-  document.documentElement.style.setProperty("--fdm-head-bottom", top + "px");
+  if (head) {
+    const bottom = Math.ceil(head.getBoundingClientRect().bottom);
+    document.documentElement.style.setProperty("--fdm-head-bottom", (bottom + 8) + "px");
+    document.documentElement.style.setProperty("--wl-row-top", (bottom + 8) + "px");
+    document.documentElement.style.setProperty("--wl-rail-top", (bottom + 56) + "px");
+  }
+  const litho = document.querySelector("#viewCreate.has-model > .wsbar");
+  if (litho) {
+    const bottom = Math.ceil(litho.getBoundingClientRect().bottom);
+    document.documentElement.style.setProperty("--wl-litho-top", (bottom + 8) + "px");
+  }
 }
 
 function bedHasModel() {
@@ -638,8 +680,12 @@ function paintWorkBars() {
     if (!on) {
       delete litho.dataset.lithoCat;
       litho.classList.remove("litho-sheet");
+      litho.classList.remove("wl-previewing");
     }
   }
+  const editLitho = document.getElementById("fdmEditLitho");
+  if (editLitho) editLitho.hidden = !lithoSourceId();
+  paintWorkReadout();
 }
 
 function openLithoDest() {
@@ -664,6 +710,216 @@ function runLithoDest(action) {
     a.remove();
   }
 }
+
+const PHOTO_MODES = new Set(["lithophane", "relief", "popart", "bust", "trace2d", "memorybox"]);
+
+function lithoSourceId() {
+  const p = window.__zeimEdit && window.__zeimEdit.p;
+  if (!p) return "";
+  const base = p.base || {};
+  const origin = p.origin || base.origin || "";
+  const mode = base.from_mode || base.photo_mode || p.mode || "";
+  const id = String(base.from_build || "");
+  if (!/^[0-9a-f]{12}$/.test(id)) return "";
+  if (origin === "lithophane" || PHOTO_MODES.has(mode)) return id;
+  return "";
+}
+
+function fmtMm(size) {
+  if (!size || !size.length) return "";
+  const parts = [];
+  for (const v of size) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "";
+    parts.push(String(Math.round(n * 10) / 10));
+  }
+  return parts.length ? parts.join(" × ") + " mm" : "";
+}
+
+function fmtBytes(n) {
+  const b = Number(n);
+  if (!Number.isFinite(b) || b < 0) return "";
+  if (b < 1024) return Math.round(b) + " B";
+  const kb = b / 1024;
+  if (kb < 1024) return (Math.round(kb * 10) / 10) + " KB";
+  return (Math.round((b / (1024 * 1024)) * 10) / 10) + " MB";
+}
+
+function modelCountLabel() {
+  const p = window.__zeimEdit && window.__zeimEdit.p;
+  if (!p) return "";
+  const objs = p.plate && p.plate.objects;
+  const total = objs && objs.length ? objs.length : 1;
+  const pressed = [...document.querySelectorAll("#viewEdit .pselect[aria-pressed=true]")];
+  if (pressed.length === 1) {
+    const n = Number(pressed[0].getAttribute("data-psel"));
+    const current = Number.isFinite(n) ? n + 1 : 1;
+    return "Models " + current + "/" + total;
+  }
+  if (pressed.length > 1) return "Models " + pressed.length + "/" + total;
+  if (total === 1) return "Models 1/1";
+  return "Models " + total;
+}
+
+function photoCountLabel() {
+  const imgs = [...document.querySelectorAll("#mbSides img")].filter(img => img.getAttribute("src"));
+  let n = imgs.length;
+  if (!n) {
+    n = (S.file || (S.current && S.current.id)) ? 1 : 0;
+    const extra = document.getElementById("collageExtra");
+    if (extra && extra.files && extra.files.length) n += extra.files.length;
+  }
+  if (!n) return "";
+  return "Photos " + n + "/" + n;
+}
+
+function workStats(which) {
+  if (which === "lithophane") {
+    const st = (S.current && S.current.stats) || {};
+    const sizes = (S.current && S.current.sizes) || {};
+    return {
+      size: fmtMm(st.size_mm),
+      triangles: Number.isFinite(Number(st.triangles)) ? Number(st.triangles).toLocaleString() : "",
+      weight: "",
+      stl: fmtBytes(sizes.stl),
+      href: (S.current && S.current.downloads && S.current.downloads.stl) || "",
+    };
+  }
+  const p = window.__zeimEdit && window.__zeimEdit.p;
+  const a = (p && p.analysis) || {};
+  const sizes = (p && p.sizes) || {};
+  const host = document.getElementById("viewEdit");
+  const grams = host && host.dataset.sliceGrams;
+  const weight = grams != null && grams !== "" && Number.isFinite(Number(grams)) ? "about " + grams + " g" : "";
+  const href = (host && host.dataset.sliceStl) || (p && p.id ? "/api/export/" + encodeURIComponent(p.id) + "/download?format=stl" : "");
+  return {
+    size: fmtMm(a.size_mm),
+    triangles: Number.isFinite(Number(a.triangles)) ? Number(a.triangles).toLocaleString() : "",
+    weight,
+    stl: fmtBytes(sizes.stl),
+    href,
+  };
+}
+
+function statRow(stats) {
+  const cell = (label, value) => `<span>${label}${value ? " <b>" + esc(value) + "</b>" : ""}</span>`;
+  return cell("Size", stats.size) + cell("Triangles", stats.triangles) + cell("Weight", stats.weight) + cell("STL size", stats.stl);
+}
+
+function paintWorkReadout() {
+  const slicer = workStats("slicer");
+  const dims = document.getElementById("fdmDims");
+  const count = document.getElementById("fdmCount");
+  if (dims) dims.textContent = slicer.size;
+  if (count) count.textContent = modelCountLabel();
+  const litho = workStats("lithophane");
+  const lDims = document.getElementById("lithoDims");
+  const lCount = document.getElementById("lithoCount");
+  if (lDims) lDims.textContent = litho.size;
+  if (lCount) lCount.textContent = photoCountLabel();
+  for (const [id, stats] of [["fdmPreviewStats", slicer], ["lithoPreviewStats", litho]]) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = statRow(stats);
+  }
+  for (const [id, href] of [["fdmDownloadStl", slicer.href], ["lithoDownloadStl", litho.href]]) {
+    const a = document.getElementById(id);
+    if (!a) continue;
+    if (href) { a.href = href; a.hidden = false; }
+    else { a.href = "#"; a.hidden = true; }
+  }
+}
+
+function previewChips(which) {
+  if (which === "lithophane") {
+    return [
+      ["vLeft", "Turn left"],
+      ["vRight", "Turn right"],
+      ["vReset", "Reset view"],
+      ["vWire", "Wireframe"],
+      ["vLight", "Light on"],
+    ].map(([id, label]) => `<button type="button" data-wl-click="${id}">${label}</button>`).join("");
+  }
+  const looks = [["top", "Top"], ["front", "Front"], ["iso", "Iso"]];
+  return `<button type="button" data-wl-click="eWire">Wireframe</button>` + looks.map(([id, label]) => `<button type="button" data-wl-look="${id}">${label}</button>`).join("");
+}
+
+function openWorkPreview(which) {
+  const root = document.getElementById(which === "lithophane" ? "viewCreate" : "viewEdit");
+  const panel = document.getElementById(which === "lithophane" ? "lithoPreview" : "fdmPreview");
+  const chips = document.getElementById(which === "lithophane" ? "lithoPreviewChips" : "fdmPreviewChips");
+  if (!root || !panel) return;
+  root.classList.add("wl-previewing");
+  panel.hidden = false;
+  if (chips && !chips.childElementCount) chips.innerHTML = previewChips(which);
+  paintWorkReadout();
+}
+
+function closeWorkPreview(which) {
+  const root = document.getElementById(which === "lithophane" ? "viewCreate" : "viewEdit");
+  const panel = document.getElementById(which === "lithophane" ? "lithoPreview" : "fdmPreview");
+  if (root) root.classList.remove("wl-previewing");
+  if (panel) panel.hidden = true;
+  if (which === "slicer") {
+    const sheet = document.getElementById("processSheet");
+    if (sheet) sheet.hidden = true;
+  }
+}
+
+async function openEditLitho() {
+  const id = lithoSourceId();
+  if (!id) return;
+  location.hash = "lithophane";
+  try {
+    const r = await api("/api/builds/" + encodeURIComponent(id));
+    showPhotoBuild(r);
+  } catch (e) {
+    toast((e && e.message) || "Could not open that lithophane.", "err");
+  }
+}
+
+function hideBedTools() {
+  const tools = document.getElementById("bedTools");
+  const pin = document.getElementById("bedPin");
+  const cats = document.getElementById("bedCats");
+  if (tools) tools.hidden = true;
+  if (pin) { pin.hidden = true; pin.textContent = ""; delete pin.dataset.cat; }
+  if (cats) cats.hidden = false;
+  const root = document.getElementById("viewEdit");
+  if (root) delete root.dataset.bedOpen;
+}
+
+document.getElementById("bedToolsClose")?.addEventListener("click", ev => { ev.preventDefault(); unpinCategory(); });
+document.getElementById("lithoSheetClose")?.addEventListener("click", ev => { ev.preventDefault(); unpinLitho(); });
+document.getElementById("lithoViewClose")?.addEventListener("click", ev => { ev.preventDefault(); unpinLitho(); });
+document.getElementById("lithoSlicerSwitch")?.addEventListener("click", () => document.getElementById("btnSendSlicer")?.click());
+document.getElementById("lithoPrinterBtn")?.addEventListener("click", () => pinLitho("material", "Material"));
+document.getElementById("lithoPlus")?.addEventListener("click", () => document.getElementById("sFile")?.click());
+document.getElementById("fdmPlus")?.addEventListener("click", () => document.getElementById("editChooseModel")?.click());
+document.getElementById("fdmPrinterBtn")?.addEventListener("click", () => document.getElementById("bedDevice")?.click());
+document.getElementById("fdmSliceGo")?.addEventListener("click", () => document.getElementById("slicerSlice")?.click());
+document.getElementById("fdmFilamentRow")?.addEventListener("click", () => document.getElementById("bedFilament")?.click());
+document.getElementById("fdmProcessRow")?.addEventListener("click", () => document.querySelector("#slicerBar [data-bed-cat=process]")?.click());
+document.getElementById("fdmEditLitho")?.addEventListener("click", () => { openEditLitho(); });
+document.getElementById("lithoGenerate")?.addEventListener("click", () => {
+  const go = document.getElementById("btnBuild");
+  if (!go || go.disabled) {
+    const hint = document.getElementById("buildHint");
+    toast((hint && hint.textContent.trim()) || "Choose or take a photo to begin.", "err");
+    return;
+  }
+  go.click();
+});
+document.getElementById("fdmBackPrepare")?.addEventListener("click", () => closeWorkPreview("slicer"));
+document.getElementById("lithoBackPrepare")?.addEventListener("click", () => closeWorkPreview("lithophane"));
+document.addEventListener("click", ev => {
+  const jump = ev.target.closest && ev.target.closest("[data-wl-click]");
+  if (jump) { ev.preventDefault(); document.getElementById(jump.getAttribute("data-wl-click"))?.click(); return; }
+  const look = ev.target.closest && ev.target.closest("[data-wl-look]");
+  if (look) { ev.preventDefault(); document.querySelector("#editViewer [data-look='" + look.getAttribute("data-wl-look") + "']")?.click(); }
+});
+document.addEventListener("zeim:bed-tools-close", hideBedTools);
+document.addEventListener("zeim:build", paintWorkReadout);
+document.addEventListener("zeim:edit-loaded", paintWorkReadout);
 
 function paintChrome() { paintWorkspaceBars(); paintDevice(); placeFdmSheet(); paintWorkBars(); }
 window.addEventListener("hashchange", paintChrome);
