@@ -438,6 +438,12 @@ export function wirePanel(getModelId) {
     bedBusy(true, "Slicing…");
     try {
       const r = await api("/api/slice", { method: "POST", body: fd });
+      const bed = document.getElementById("viewEdit");
+      if (bed) {
+        if (r.filament_grams != null) bed.dataset.sliceGrams = String(r.filament_grams);
+        else delete bed.dataset.sliceGrams;
+        if (r.downloads && r.downloads.stl) bed.dataset.sliceStl = r.downloads.stl;
+      }
       const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
       const paintNote = r.support_paint
         ? `<p class="help">Paint-on supports: ${r.support_paint.enforcers || 0} need / ${r.support_paint.blockers || 0} never. ${esc(r.support_paint.supports_note || r.support_paint.note || "")}</p>`
