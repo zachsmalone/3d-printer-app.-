@@ -103,6 +103,58 @@ def _work(data, ext, s, bed, isl=None, drains=None):
     return out.export(file_type="stl"), out.export(file_type="3mf"), rep
 
 
+PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
+
+
+def _preview(data, ext):
+    m, _ = meshedit.load_mesh(data, ext)
+    n = len(m.faces)
+    if n > PREVIEW_FACES:
+        try:
+            m, _ = meshedit.op_simplify(m, {"keep_ratio": max(0.02, PREVIEW_FACES / n)})
+        except meshedit.OpError:
+            pass
+    return m.export(file_type="stl"), n
+
+
+def _read_upload(file, actor):
+    """Read + check one uploaded model the same way prepare does. Returns (bytes, ext)."""
+    limit = editproj.MAX_UPLOAD_EDIT
+    data = file.file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(413, f"File too large (max {limit // 2**20} MB).")
+    if not data:
+        raise HTTPException(400, "The file is empty.")
+    ext = meshedit.guess_model_ext(file.filename, data, getattr(file, "content_type", "") or "")
+    if ext not in meshedit.ALLOWED:
+        raise HTTPException(415, "TorchC0 takes .stl, .3mf or .obj files.")
+    bad = meshedit.sniff(data, ext)
+    if bad:
+        raise HTTPException(415, bad)
+    from ..services import uploadgate
+    try:
+        uploadgate.gate(data, actor.sid, source="edit", max_bytes=limit)
+    except uploadgate.GateError as e:
+        raise HTTPException(e.status, e.message)
+    return data, ext
+
+
+@router.post("/preview")
+def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
+    """Load a picked model for the TorchC0 view right away (any STL/3MF/OBJ -> binary STL, simplified for display)."""
+    from fastapi import Response
+    data, ext = _read_upload(file, actor)
+    try:
+        stl, n = guard.run(_preview, data, ext, timeout=120)
+    except meshedit.OpError as e:
+        raise HTTPException(422, str(e))
+    except guard.Busy:
+        raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
+    except guard.Tripped:
+        raise HTTPException(422, "This model is too big or complex to load here. Simplify it first.")
+    return Response(stl, media_type="model/stl", headers={"X-Zeim-Faces": str(n), "Cache-Control": "no-store"})
+
+
 @router.post("/prepare")
 def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str = Form(""), preset: str = Form(""), layer_mm: str = Form(""),
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
@@ -127,23 +179,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             raise HTTPException(400, f"The {p['name']} is a filament printer. Use the Slicer for it; TorchC0 is for resin printers.")
         bed, pname = p["bed_mm"], p["name"]
     if file is not None and file.filename:
-        limit = editproj.MAX_UPLOAD_EDIT
-        data = file.file.read(limit + 1)
-        if len(data) > limit:
-            raise HTTPException(413, f"File too large (max {limit // 2**20} MB).")
-        if not data:
-            raise HTTPException(400, "The file is empty.")
-        ext = meshedit.guess_model_ext(file.filename, data, getattr(file, "content_type", "") or "")
-        if ext not in meshedit.ALLOWED:
-            raise HTTPException(415, "TorchC0 takes .stl, .3mf or .obj files.")
-        bad = meshedit.sniff(data, ext)
-        if bad:
-            raise HTTPException(415, bad)
-        from ..services import uploadgate
-        try:
-            uploadgate.gate(data, actor.sid, source="edit", max_bytes=limit)
-        except uploadgate.GateError as e:
-            raise HTTPException(e.status, e.message)
+        data, ext = _read_upload(file, actor)
     elif model_id:
         from .slice import resolve_model
         data, ext = resolve_model(model_id, actor).read_bytes(), "stl"
