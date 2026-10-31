@@ -33,7 +33,7 @@ def test_preview_loads_every_format(c, name, kind):
 
 def test_preview_simplifies_big_models_for_display(c, monkeypatch):
     from app.api import resin as api
-    monkeypatch.setattr(api, "PREVIEW_FACES", 2000)
+    monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=30, count=[80, 80])
     r = c.post("/api/resin/preview", files={"file": ("ball.3mf", m.export(file_type="3mf"), "model/3mf")})
     assert r.status_code == 200, r.text
@@ -67,3 +67,37 @@ def test_big_binary_stl_is_not_refused_for_its_unwelded_vertex_count(c, monkeypa
 def test_resin_uploads_allow_three_corners_per_face():
     src = (ROOT / "app/api/resin.py").read_text()
     assert "max_vertices=3 * uploadsafe.MAX_FACES" in src
+
+
+def test_big_binary_stl_loads_lean_and_prepare_reuses_it_by_id(c, monkeypatch):
+    """A 2.1M-triangle STL went through trimesh load + merge + simplify (~1.8 GB) in preview AND again in prepare, next to
+    a ~1.3 GB server in a 3 GB container: the kernel killed the child ('busy', then 'too big, turn hollowing off').
+    Big binary STLs are now welded + simplified from their bytes, and Prepare reuses preview's copy by id."""
+    from app.api import resin as api
+    from app.core import meshedit
+    monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
+    real = meshedit.load_mesh
+    def no_trimesh(data, ext, *a, **k):
+        assert len(data) <= 84 + 50 * 2000, "big binary STL went through the heavy trimesh loader"
+        return real(data, ext, *a, **k)
+    monkeypatch.setattr(meshedit, "load_mesh", no_trimesh)
+    m = trimesh.creation.uv_sphere(radius=20, count=[80, 80])
+    m.apply_translation((0, 0, 20))
+    data = m.export(file_type="stl")
+    r = c.post("/api/resin/preview", files={"file": ("big.stl", data, "model/stl")})
+    assert r.status_code == 200, r.text
+    assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) <= 2000
+    uid = r.headers["x-zeim-upload"]
+    r = c.post("/api/resin/prepare", data={"upload_id": uid, "file_name": "big.stl", "hollow": "false"})
+    assert r.status_code == 200, r.text
+    assert any("simplified copy" in n for n in r.json().get("notes", [])) and "big" in r.json()["export"]["name"]
+
+
+def test_prepare_upload_id_is_checked(c):
+    assert c.post("/api/resin/prepare", data={"upload_id": "../../etc"}).status_code == 400
+    assert c.post("/api/resin/prepare", data={"upload_id": "0" * 32}).status_code == 410
+
+
+def test_prepare_waits_for_the_pick_and_sends_its_id():
+    js = (ROOT / "static/torchc0.js").read_text()
+    assert "await pickLoad" in js and 'fd.append("upload_id", uid)' in js and "X-Zeim-Upload" in js
