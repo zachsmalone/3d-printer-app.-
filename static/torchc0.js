@@ -5,12 +5,14 @@ import { money } from "/static/cost.js";
 import * as THREE from "three";
 
 /* 3D result view: the prepared STL with island (red) and suction-cup (orange) markers. Lazy: only made after a result. */
-let viewer = null;
-async function show3D(el, url, lc) {
+const views = new WeakMap();   // one viewer per element: the picked-model preview and the result each keep their own
+async function show3D(el, url, lc, buf) {
   try {
     const { Viewer } = await import("/static/viewer.js");
-    if (!viewer || !el.contains(viewer.el)) viewer = new Viewer(el);
-    const buf = await (await fetch(url)).arrayBuffer(), dv = new DataView(buf), n = dv.getUint32(80, true);
+    let viewer = views.get(el);
+    if (!viewer || !el.contains(viewer.el)) { viewer = new Viewer(el); views.set(el, viewer); }
+    if (!buf) buf = await (await fetch(url)).arrayBuffer();
+    const dv = new DataView(buf), n = dv.getUint32(80, true);
     if (84 + n * 50 > buf.byteLength) throw new Error("not a binary STL");
     const pos = new Float32Array(n * 9);
     for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(84 + i * 50 + 12 + k * 4, true);
@@ -20,8 +22,8 @@ async function show3D(el, url, lc) {
     g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
     const mark = (p, color) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color, depthTest: false }));
       m.position.set(...p); m.renderOrder = 2; viewer.group.add(m); };
-    (lc.islands || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
-    (lc.suction || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
+    ((lc && lc.islands) || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
+    ((lc && lc.suction) || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
     viewer.reset(); el.dataset.markers = String(viewer.group.children.length - 1);
   } catch (e) { el.innerHTML = `<p class="help">3D preview unavailable here (${esc(e.message)}). The files below are still ready.</p>`; }
 }
@@ -39,7 +41,8 @@ function panelHTML() {
   return `<h2>Resin print settings</h2>
     <div class="grid2 rzRow"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
     <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
-      <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p></div></div>
+      <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p>
+      <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div></div></div>
     <p class="help" id="rzInfo"></p>
     <div class="grid2"><div class="field"><label for="rzMaterial">Resin</label><select id="rzMaterial">${(cat.materials || []).map(m => `<option value="${m.id}" ${m.id === cat.default_material ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
     <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div></div>
@@ -98,10 +101,26 @@ function wire() {
   const shownName = n => n.replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, "");
   const show = () => { const f = inp.files[0]; st.classList.remove("warn");
     $("#torchOut").querySelector(".rzNeedFile")?.remove();   // P1: the "choose a file first" note goes as soon as a file is chosen
-    if (!f) { st.textContent = ""; return; }
+    if (!f) { st.textContent = ""; pickSeq++; $("#rzPickView").hidden = true; return; }
     const nm = shownName(f.name) || "(unnamed file)";
-    if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, but you can still press Prepare for resin and TorchC0 will check the file itself.`; return; }
-    st.textContent = `${nm}, ${kb(f.size)}, ready. Press Prepare for resin.`; };
+    if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, TorchC0 is checking the file itself…`; loadPick(f, nm); return; }
+    st.textContent = `${nm}, ${kb(f.size)}, loading…`; loadPick(f, nm); };
+  // Load the picked model into the view right away (any STL/3MF/OBJ, via the server), so a pick visibly loads.
+  let pickSeq = 0;
+  const loadPick = async (f, nm) => {
+    const seq = ++pickSeq, pv = $("#rzPickView");
+    try {
+      const fd = new FormData(); fd.append("file", f);
+      const r = await fetch("/api/resin/preview", { method: "POST", body: fd, credentials: "same-origin" });
+      if (seq !== pickSeq) return;
+      if (!r.ok) { let m = `HTTP ${r.status}`; try { m = (await r.json()).detail || m; } catch { }
+        st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it. ${m}`; pv.hidden = true; return; }
+      const buf = await r.arrayBuffer(); if (seq !== pickSeq) return;
+      const n = +r.headers.get("X-Zeim-Faces") || 0;
+      pv.hidden = false; await show3D(pv, null, null, buf); pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
+    } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
+  };
   inp.addEventListener("change", () => { delete document.body.dataset.torchStl; show(); });   // a new model: Send to… uses it, not the old result
   // tapping anywhere on the drop zone opens the picker (phones can't drop); the input itself already does
   drop.addEventListener("click", e => { if (e.target !== inp && !e.target.closest("a,button,label")) inp.click(); });
@@ -180,6 +199,7 @@ document.addEventListener("zeim:new-build", e => {
   if (!e.detail || e.detail.section !== "torchc0" || e.detail.publish) return;
   const inp = $("#rzFile"); if (inp) inp.value = "";
   const st = $("#rzFileStatus"); if (st) { st.textContent = ""; st.classList.remove("warn"); }
+  const pv = $("#rzPickView"); if (pv) pv.hidden = true;
   delete document.body.dataset.torchStl;
   const out = $("#torchOut"); if (out) { out.innerHTML = ""; out.classList.remove("rzResult"); }
   document.dispatchEvent(new CustomEvent("zeim:torchc0-forget"));
