@@ -131,9 +131,11 @@ def _read_upload(file, actor):
     bad = meshedit.sniff(data, ext)
     if bad:
         raise HTTPException(415, bad)
-    from ..services import uploadgate
+    from ..services import uploadgate, uploadsafe
     try:
-        uploadgate.gate(data, actor.sid, source="edit", max_bytes=limit)
+        # STL stores 3 corners per triangle unwelded, so its "vertex" count is always 3x the faces: a 2.1M-triangle
+        # pre-supported resin STL counted 6.3M and was refused as a wrong file type (415). The face cap still applies.
+        uploadgate.gate(data, actor.sid, source="edit", max_bytes=limit, max_vertices=3 * uploadsafe.MAX_FACES)
     except uploadgate.GateError as e:
         raise HTTPException(e.status, e.message)
     return data, ext
@@ -145,7 +147,13 @@ def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
     from fastapi import Response
     data, ext = _read_upload(file, actor)
     try:
-        stl, n = guard.run(_preview, data, ext, timeout=120)
+        # same budget + one-at-a-time slot as prepare: a 2.1M-triangle STL needs ~2 GB to load and simplify
+        if not _one.acquire(timeout=guard.WAIT_S):
+            raise guard.Busy()
+        try:
+            stl, n = guard.run(_preview, data, ext, timeout=180, mem_mb=RESIN_MEM_MB)
+        finally:
+            _one.release()
     except meshedit.OpError as e:
         raise HTTPException(422, str(e))
     except guard.Busy:
