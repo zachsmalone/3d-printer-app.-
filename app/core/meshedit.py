@@ -800,6 +800,25 @@ def _measure_wall(outer, cavity, n=2500):
         return None
 
 
+VOX_FACES = 120_000
+
+
+def _vox_source(mm):
+    """The mesh to voxelize. trimesh subdivides every face down to the voxel pitch first, so a 500k-face model
+    (an ordinary 8 MB 3MF) needed well over the 1.5 GB worker budget. The grid is only ~one-pitch accurate anyway,
+    so voxelize a decimated copy above VOX_FACES; the boolean and wall checks still use the full mesh."""
+    n0 = len(mm.faces)
+    if n0 <= VOX_FACES:
+        return mm
+    try:
+        import fast_simplification as fs
+        ov, of = fs.simplify(np.asarray(mm.vertices, float), np.asarray(mm.faces, np.int64), target_reduction=1 - VOX_FACES / n0)
+        lo = _new(ov, of)
+        return lo if len(lo.faces) else mm
+    except Exception:
+        return mm
+
+
 def op_hollow(m, p):
     """Hollow with wall thickness via a distance field (voxel SDF → marching cubes → boolean difference).
     Accuracy is ~ one voxel, shown in the report. Optional drain hole at the lowest point of the cavity."""
@@ -817,7 +836,7 @@ def op_hollow(m, p):
     if pitch > wall / 1.5:
         raise OpError(f"Wall {wall:g} mm is too thin for a model this big (needs ≈{pitch * 1.5:.1f} mm+). "
                       "Increase the wall or scale the model down first.")
-    vox = mm.voxelized(pitch).fill()
+    vox = _vox_source(mm).voxelized(pitch).fill()
     inside = np.pad(vox.matrix, 2)
     d_in = ndimage.distance_transform_edt(inside) * pitch
     d_out = ndimage.distance_transform_edt(~inside) * pitch
@@ -830,8 +849,13 @@ def _ray_wall(m, n=1500):
     try:
         pts, fi = trimesh.sample.sample_surface(m, n, seed=1)
         nn = m.face_normals[fi]; org = pts - nn * 0.02
-        loc, ir, _ = m.ray.intersects_location(org, -nn, multiple_hits=False)
-        d = np.linalg.norm(loc - org[ir], axis=1)
+        # Cast in small batches: trimesh's fallback ray engine builds per-ray candidate arrays, and 1500 rays at once
+        # on a ~300k-face hollow model took many GB (the TorchC0 "too big or complex" 422 on ordinary 9 MB STLs).
+        ds = []
+        for i in range(0, len(org), 20):
+            loc, ir, _ = m.ray.intersects_location(org[i:i + 20], -nn[i:i + 20], multiple_hits=False)
+            ds.append(np.linalg.norm(loc - org[i:i + 20][ir], axis=1))
+        d = np.concatenate(ds) if ds else np.zeros(0)
         return (float(np.percentile(d, 1)), float(d.min())) if len(d) else None
     except Exception:
         return None
