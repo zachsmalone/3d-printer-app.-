@@ -66,6 +66,9 @@ def _points(raw: str, what: str):
 # Address-space budget for one TorchC0 prepare child. Hollow + supports + layer checks on an ordinary ~9 MB STL
 # (~180k triangles) peak around 1.4 GB resident, which the shared 1.5 GB default could not hold (422 / crash).
 RESIN_MEM_MB = int(os.environ.get("ZEIM_RESIN_MEM_MB", "2500"))
+# One visitor's preview + prepare run back to back; waiting only 20 s for a slot answered "busy" to a Prepare
+# pressed while a big model was still loading.
+ONE_WAIT_S = float(os.environ.get("ZEIM_RESIN_WAIT_S", "150"))
 _one = threading.BoundedSemaphore(1)      # one prepare at a time: two 2.5 GB children would not fit the 3 GB container
 
 
@@ -89,14 +92,55 @@ def _fit_faces(m):
                 "(the shape change is far smaller than a print layer).")
 
 
+def _lean_binary_stl(data):
+    """A big binary STL welded and simplified straight from its bytes, or None when it is not one.
+
+    trimesh's load + merge + simplify of a 2.1M-triangle STL peaks near 1.8 GB, which does not fit next to the
+    server (about 1.3 GB resident) inside the 3 GB container: the kernel killed the child and the user saw
+    "busy" then "too big, turn hollowing off". numpy + fast-simplification does the same job in about 1 GB."""
+    if len(data) < 84:
+        return None
+    n = int.from_bytes(data[80:84], "little")
+    if n <= RESIN_MAX_FACES or len(data) != 84 + 50 * n or n > meshedit.MAX_FACES:
+        return None
+    import numpy as np
+    import fast_simplification as fs
+    rec = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")])
+    tri = np.ascontiguousarray(np.frombuffer(data, rec, count=n, offset=84)["v"].reshape(-1, 3))
+    if not np.isfinite(tri).all():
+        raise meshedit.OpError("File contains invalid coordinates.")
+    u, inv = np.unique(tri.view(np.dtype((np.void, 12))).ravel(), return_inverse=True)
+    del tri
+    v, f = u.view("<f4").reshape(-1, 3).astype(np.float64), inv.reshape(-1, 3).astype(np.int64)
+    del u, inv
+    f = f[(f[:, 0] != f[:, 1]) & (f[:, 1] != f[:, 2]) & (f[:, 0] != f[:, 2])]
+    if len(f) > RESIN_MAX_FACES:
+        v, f = fs.simplify(v, f, target_reduction=1 - RESIN_MAX_FACES / len(f), agg=7)
+    m = meshedit._new(v, f)
+    m.remove_unreferenced_vertices()
+    return m, n, (f"This model has {n:,} triangles, so TorchC0 prepared a simplified copy with {len(m.faces):,} "
+                  "(the shape change is far smaller than a print layer).")
+
+
+def _load_fit(data, ext):
+    """(mesh with at most ~RESIN_MAX_FACES triangles, original triangle count, note)."""
+    lean = _lean_binary_stl(data) if ext == "stl" else None
+    if lean:
+        return lean
+    m, _ = meshedit.load_mesh(data, ext)
+    n = len(m.faces)
+    m, note = _fit_faces(m)
+    return m, n, note
+
+
 def _to_stl(data):
     m, _ = meshedit.load_mesh(data, "3mf")
     return m.export(file_type="stl")
 
 
-def _work(data, ext, s, bed, isl=None, drains=None):
-    m, _ = meshedit.load_mesh(data, ext)
-    m, note = _fit_faces(m)
+def _work(data, ext, s, bed, isl=None, drains=None, note=""):
+    m, _n, fit_note = _load_fit(data, ext)
+    note = note or fit_note
     out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains)
     if note:
         rep.setdefault("notes", []).insert(0, note)
@@ -107,14 +151,9 @@ PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
 
 
 def _preview(data, ext):
-    m, _ = meshedit.load_mesh(data, ext)
-    n = len(m.faces)
-    if n > PREVIEW_FACES:
-        try:
-            m, _ = meshedit.op_simplify(m, {"keep_ratio": max(0.02, PREVIEW_FACES / n)})
-        except meshedit.OpError:
-            pass
-    return m.export(file_type="stl"), n
+    """The model as prepare will use it (<= RESIN_MAX_FACES), for the view AND for prepare (see /preview)."""
+    m, n, note = _load_fit(data, ext)
+    return m.export(file_type="stl"), n, note
 
 
 def _read_upload(file, actor):
@@ -148,10 +187,10 @@ def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
     data, ext = _read_upload(file, actor)
     try:
         # same budget + one-at-a-time slot as prepare: a 2.1M-triangle STL needs ~2 GB to load and simplify
-        if not _one.acquire(timeout=guard.WAIT_S):
+        if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            stl, n = guard.run(_preview, data, ext, timeout=180, mem_mb=RESIN_MEM_MB)
+            stl, n, note = guard.run(_preview, data, ext, timeout=180, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -160,7 +199,26 @@ def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
         raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
     except guard.Tripped:
         raise HTTPException(422, "This model is too big or complex to load here. Simplify it first.")
-    return Response(stl, media_type="model/stl", headers={"X-Zeim-Faces": str(n), "Cache-Control": "no-store"})
+    # Keep the loaded copy so Prepare sends its id instead of uploading (and re-reading) a 100 MB file again.
+    uid = uuid.uuid4().hex
+    d = _dir()
+    (d / f"up{uid}.stl").write_bytes(stl)
+    (d / f"up{uid}.json").write_text(json.dumps({"sid": actor.sid, "note": note}))
+    return Response(stl, media_type="model/stl", headers={"X-Zeim-Faces": str(n), "X-Zeim-Upload": uid, "Cache-Control": "no-store"})
+
+
+def _picked(uid, actor):
+    """(stl bytes, note) of a model loaded by /preview for this visitor, or 410 when it expired / is not theirs."""
+    if not (len(uid) == 32 and all(c in "0123456789abcdef" for c in uid)):
+        raise HTTPException(400, "Bad upload id.")
+    d = _dir()
+    try:
+        meta = json.loads((d / f"up{uid}.json").read_text())
+        if meta.get("sid") != actor.sid:
+            raise FileNotFoundError
+        return (d / f"up{uid}.stl").read_bytes(), meta.get("note", "")
+    except (OSError, ValueError):
+        raise HTTPException(410, "That loaded model has expired. Choose the file again.")
 
 
 @router.post("/prepare")
@@ -168,7 +226,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
             lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
-            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
             "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg",
@@ -186,7 +244,11 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         if p["technology"] != "Resin":
             raise HTTPException(400, f"The {p['name']} is a filament printer. Use the Slicer for it; TorchC0 is for resin printers.")
         bed, pname = p["bed_mm"], p["name"]
-    if file is not None and file.filename:
+    note = ""
+    if upload_id:
+        data, note = _picked(upload_id, actor)
+        ext = "stl"
+    elif file is not None and file.filename:
         data, ext = _read_upload(file, actor)
     elif model_id:
         from .slice import resolve_model
@@ -198,10 +260,10 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
             # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
             data, ext = guard.run(_to_stl, data, timeout=120), "stl"
-        if not _one.acquire(timeout=guard.WAIT_S):
+        if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, timeout=240, mem_mb=RESIN_MEM_MB)
+            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, timeout=240, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -214,7 +276,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     d = _dir()
     (d / f"{rid}.stl").write_bytes(stl); (d / f"{rid}.3mf").write_bytes(tmf)
     from ..services import filenames as fnames
-    src = (file.filename.rsplit(".", 1)[0] if file is not None and file.filename else "") or "TorchC0 model"
+    src = ((file.filename if file is not None and file.filename else file_name).rsplit(".", 1)[0]) or "TorchC0 model"
     stem = fnames.default_stem(src, pname, s.get("layer_mm") if isinstance(s, dict) else None)
     (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid, "name": stem}))
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}

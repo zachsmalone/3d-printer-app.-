@@ -106,8 +106,11 @@ function wire() {
     if (!okType(f)) { st.textContent = `${nm}, ${kb(f.size)}. This doesn't look like an STL, 3MF or OBJ name, TorchC0 is checking the file itself…`; loadPick(f, nm); return; }
     st.textContent = `${nm}, ${kb(f.size)}, loading…`; loadPick(f, nm); };
   // Load the picked model into the view right away (any STL/3MF/OBJ, via the server), so a pick visibly loads.
-  let pickSeq = 0;
-  const loadPick = async (f, nm) => {
+  // pickLoad: the in-flight preview; picked: {f, id} once the server holds the loaded copy. Prepare waits for the
+  // preview and sends the id, so a big file is uploaded and read once (no "busy" from a second copy racing it).
+  let pickSeq = 0, pickLoad = null, picked = null;
+  const loadPick = (f, nm) => { picked = null; pickLoad = loadPick1(f, nm); return pickLoad; };
+  const loadPick1 = async (f, nm) => {
     const seq = ++pickSeq, pv = $("#rzPickView");
     try {
       const fd = new FormData(); fd.append("file", f);
@@ -116,7 +119,8 @@ function wire() {
       if (!r.ok) { let m = `HTTP ${r.status}`; try { m = (await r.json()).detail || m; } catch { }
         st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it. ${m}`; pv.hidden = true; return; }
       const buf = await r.arrayBuffer(); if (seq !== pickSeq) return;
-      const n = +r.headers.get("X-Zeim-Faces") || 0;
+      const n = +r.headers.get("X-Zeim-Faces") || 0, uid = r.headers.get("X-Zeim-Upload");
+      if (uid) picked = { f, id: uid };
       pv.hidden = false; await show3D(pv, null, null, buf); pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
       st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
     } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
@@ -154,13 +158,20 @@ function wire() {
   async function run() {
     const out = $("#torchOut"), { v, f } = last, fd = new FormData();
     saveP({ price: $("#rzCost").value === "" ? null : +$("#rzCost").value, unit: $("#rzCostU").value, currency: $("#rzCur").value });
-    Object.entries(v).forEach(([k, x]) => fd.append(k, x)); fd.append("file", f);
+    Object.entries(v).forEach(([k, x]) => fd.append(k, x));
+    if (pickLoad) { $("#torchOut").innerHTML = `<p class="help" role="status" aria-live="polite">Loading the model first…</p>`; await pickLoad.catch(() => { }); }
+    const uid = picked && picked.f === f ? picked.id : "";
+    if (uid) { fd.append("upload_id", uid); fd.append("file_name", f.name); } else fd.append("file", f);
     if (last.isl.length) fd.append("island_supports", JSON.stringify(last.isl));
     if (last.drains.length) fd.append("drains", JSON.stringify(last.drains));
     out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
-      const r = await api("/api/resin/prepare", { method: "POST", body: fd }), e = r.estimate;
+      let r;
+      try { r = await api("/api/resin/prepare", { method: "POST", body: fd }); }
+      catch (err) { if (err.status !== 410 || !uid) throw err;      // the loaded copy expired: send the file itself
+        picked = null; fd.delete("upload_id"); fd.delete("file_name"); fd.append("file", f); r = await api("/api/resin/prepare", { method: "POST", body: fd }); }
+      const e = r.estimate;
       last.rep = r; document.body.dataset.torchStl = r.downloads.stl;   // Send to… hands over the prepared model
       const lc = r.layer_check || { islands: [], suction: [] }, nI = lc.islands.length, nS = lc.suction.length;
       const costTxt = e.cost == null ? "<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> enter a price for a cost estimate" : `<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> about ${esc(money(e.cost, $("#rzCur").value))} (estimate)`;
