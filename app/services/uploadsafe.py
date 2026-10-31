@@ -40,9 +40,9 @@ MAX_IMAGE_PIXELS = 100_000_000        # width*height from the header, before any
 MAX_FACES = _MAX_FACES_DEFAULT        # mesh triangles (matches meshedit.MAX_FACES)
 MAX_VERTICES = 3_000_000              # mesh vertices (a watertight mesh has ~2 per face)
 MAX_ARCHIVE_MEMBERS = 200             # 3MF: files inside the zip
-MAX_MEMBER_BYTES = 64 * 1024 * 1024    # 3MF: one member, UNCOMPRESSED
+MAX_MEMBER_BYTES = 128 * 1024 * 1024   # 3MF: one member, UNCOMPRESSED
 MAX_ARCHIVE_BYTES = 128 * 1024 * 1024  # 3MF: whole archive, UNCOMPRESSED
-MAX_MODEL_XML_BYTES = 32 * 1024 * 1024  # the 3D model XML member specifically
+MAX_MODEL_XML_BYTES = 128 * 1024 * 1024 # the 3D model XML member specifically
 MAX_COMPONENT_DEPTH = 64               # 3MF: <components> nesting we will resolve before refusing
 
 MESSAGES = {

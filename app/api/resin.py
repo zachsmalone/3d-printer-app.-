@@ -7,6 +7,8 @@ Heavy geometry runs in core/guard.py's memory-capped child. Files are kept for a
 from __future__ import annotations
 
 import json
+import os
+import threading
 import time
 import uuid
 
@@ -61,9 +63,43 @@ def _points(raw: str, what: str):
     return pts
 
 
+# Address-space budget for one TorchC0 prepare child. Hollow + supports + layer checks on an ordinary ~9 MB STL
+# (~180k triangles) peak around 1.4 GB resident, which the shared 1.5 GB default could not hold (422 / crash).
+RESIN_MEM_MB = int(os.environ.get("ZEIM_RESIN_MEM_MB", "2500"))
+_one = threading.BoundedSemaphore(1)      # one prepare at a time: two 2.5 GB children would not fit the 3 GB container
+
+
+# Hollowing, supports and the layer checks grow with triangle count (trimesh ray/section queries): a 545k-triangle
+# model (an ordinary ~8 MB 3MF) peaked near 2.8 GB. Above this, prepare works on a simplified copy; on smooth or
+# finely meshed models the change is far below the 0.05 mm layer height.
+RESIN_MAX_FACES = int(os.environ.get("ZEIM_RESIN_MAX_FACES", "200000"))
+
+
+def _fit_faces(m):
+    n0 = len(m.faces)
+    if n0 <= RESIN_MAX_FACES:
+        return m, ""
+    try:
+        lo, r = meshedit.op_simplify(m, {"keep_ratio": max(0.02, RESIN_MAX_FACES / n0)})
+    except meshedit.OpError:
+        return m, ""
+    if len(lo.faces) >= n0 or not lo.is_watertight and m.is_watertight:
+        return m, ""
+    return lo, (f"This model has {n0:,} triangles, so TorchC0 prepared a simplified copy with {len(lo.faces):,} "
+                "(the shape change is far smaller than a print layer).")
+
+
+def _to_stl(data):
+    m, _ = meshedit.load_mesh(data, "3mf")
+    return m.export(file_type="stl")
+
+
 def _work(data, ext, s, bed, isl=None, drains=None):
     m, _ = meshedit.load_mesh(data, ext)
+    m, note = _fit_faces(m)
     out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains)
+    if note:
+        rep.setdefault("notes", []).insert(0, note)
     return out.export(file_type="stl"), out.export(file_type="3mf"), rep
 
 
@@ -114,7 +150,16 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     else:
         raise HTTPException(400, "Choose a model or upload an STL, 3MF or OBJ file.")
     try:
-        stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, timeout=240)
+        if ext == "3mf":
+            # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
+            # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
+            data, ext = guard.run(_to_stl, data, timeout=120), "stl"
+        if not _one.acquire(timeout=guard.WAIT_S):
+            raise guard.Busy()
+        try:
+            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, timeout=240, mem_mb=RESIN_MEM_MB)
+        finally:
+            _one.release()
     except meshedit.OpError as e:
         raise HTTPException(422, str(e))
     except guard.Busy:

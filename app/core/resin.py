@@ -232,7 +232,7 @@ def support_points(m: trimesh.Trimesh, spacing: float, max_angle_deg: float = 45
         return np.zeros((0, 3))
     p, nn = np.vstack(pts), np.vstack(nrm)
     if envelope is not None and len(p):
-        inner = envelope.contains(p + nn * 0.3)
+        inner = _in_batches(envelope.contains, p + nn * 0.3, n=2)
         p = p[~inner]
     if not len(p):
         return np.zeros((0, 3))
@@ -240,6 +240,14 @@ def support_points(m: trimesh.Trimesh, spacing: float, max_angle_deg: float = 45
     order = np.lexsort((p[:, 2], keys[:, 1], keys[:, 0]))        # lowest point per cell wins
     _, first = np.unique(keys[order], axis=0, return_index=True)
     return p[order[first]]
+
+
+def _in_batches(fn, *arrays, n=20):
+    """Run a per-row trimesh ray query in chunks. Its fallback ray engine builds (rays x candidate triangles) arrays,
+    so thousands of rays at once on an ordinary 9 MB STL took many GB and tripped the memory guard."""
+    if not len(arrays[0]):
+        return fn(*arrays)
+    return np.concatenate([np.asarray(fn(*(a[i:i + n] for a in arrays))) for i in range(0, len(arrays[0]), n)])
 
 
 def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None,
@@ -256,7 +264,7 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
     parts, skipped = [], 0
     if len(pts):
         org = pts - [0, 0, 0.05]
-        hit = m.ray.intersects_any(org, np.tile([0, 0, -1.0], (len(pts), 1)))
+        hit = _in_batches(m.ray.intersects_any, org, np.tile([0, 0, -1.0], (len(pts), 1)))
         tip_len = 1.2
         for p, h in zip(pts, hit):
             if h:
@@ -387,7 +395,11 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -
         return {"islands": [], "suction": []}
     step = max(step, (z1 - z0) / max_layers)
     zs = np.arange(z0 + step / 2, z1, step)
-    secs = m.section_multiplane([0, 0, 0], [0, 0, 1], zs)
+    # Section in batches: trimesh's multiplane builds a (vertices x planes) array, so 400 planes at once on a ~300k-face
+    # hollowed model took many GB and tripped the guard ("too big or complex") on ordinary 9 MB STLs.
+    secs = []
+    for i in range(0, len(zs), 20):
+        secs.extend(m.section_multiplane([0, 0, 0], [0, 0, 1], zs[i:i + 20]))
     layers = []
     for sec in secs:
         polys = []
