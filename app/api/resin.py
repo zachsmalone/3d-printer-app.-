@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 import uuid
 
@@ -65,6 +66,7 @@ def _points(raw: str, what: str):
 # Address-space budget for one TorchC0 prepare child. Hollow + supports + layer checks on an ordinary ~9 MB STL
 # (~180k triangles) peak around 1.4 GB resident, which the shared 1.5 GB default could not hold (422 / crash).
 RESIN_MEM_MB = int(os.environ.get("ZEIM_RESIN_MEM_MB", "2500"))
+_one = threading.BoundedSemaphore(1)      # one prepare at a time: two 2.5 GB children would not fit the 3 GB container
 
 
 # Hollowing, supports and the layer checks grow with triangle count (trimesh ray/section queries): a 545k-triangle
@@ -152,7 +154,12 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
             # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
             data, ext = guard.run(_to_stl, data, timeout=120), "stl"
-        stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, timeout=240, mem_mb=RESIN_MEM_MB)
+        if not _one.acquire(timeout=guard.WAIT_S):
+            raise guard.Busy()
+        try:
+            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, timeout=240, mem_mb=RESIN_MEM_MB)
+        finally:
+            _one.release()
     except meshedit.OpError as e:
         raise HTTPException(422, str(e))
     except guard.Busy:
