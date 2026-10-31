@@ -48,3 +48,22 @@ def test_preview_rejects_non_models(c):
 def test_pick_loads_the_model_into_the_view():
     js = (ROOT / "static/torchc0.js").read_text()
     assert 'id="rzPickView"' in js and '"/api/resin/preview"' in js and "loadPick(f, nm)" in js
+
+
+def test_big_binary_stl_is_not_refused_for_its_unwelded_vertex_count(c, monkeypatch):
+    """Binary STL counts 3 vertices per triangle: a 2.1M-triangle STL counted 6.3M (> the 3M vertex cap) -> 415 'file type'.
+    Shrink the shared vertex default so a small STL hits the same shape of refusal, and check resin still takes it."""
+    from app.services import uploadsafe
+    real = uploadsafe.check
+    monkeypatch.setattr(uploadsafe, "check", lambda data, **kw: real(data, **{"max_vertices": 900, **kw}))
+    data = trimesh.creation.icosphere(2, radius=10).export(file_type="stl")     # 320 faces -> 960 STL corners
+    with pytest.raises(uploadsafe.Rejected):
+        uploadsafe.check(data, max_bytes=1 << 30)                                   # the shared default refuses it
+    for url in ("/api/resin/preview", "/api/resin/prepare"):
+        r = c.post(url, files={"file": ("big.stl", data, "model/stl")})
+        assert r.status_code == 200, (url, r.text)
+
+
+def test_resin_uploads_allow_three_corners_per_face():
+    src = (ROOT / "app/api/resin.py").read_text()
+    assert "max_vertices=3 * uploadsafe.MAX_FACES" in src
