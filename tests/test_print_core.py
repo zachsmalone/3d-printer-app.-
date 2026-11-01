@@ -273,10 +273,12 @@ def test_willprint_worker_exits_when_the_server_dies(tmp_path):
     big = tmp_path / "big.stl"; big.write_bytes(trimesh.creation.icosphere(subdivisions=6).export(file_type="stl"))
     assert big.stat().st_size > 2_000_000
     code = ("import asyncio,os,sys; from app.services import willprint as w; asyncio.run(w.check_file_async(sys.argv[1]));"
-            "print([p.pid for p in w._pool._processes.values()][0], flush=True); os._exit(0)")
+            "print(([p.pid for p in w._pool._processes.values()] or [0])[0], flush=True); os._exit(0)")
     out = subprocess.run([sys.executable, "-c", code, str(big)], cwd=ROOT, capture_output=True, text=True, timeout=120,
                          env={**os.environ, "PHOTO3D_WILLPRINT_INLINE": ""})
     pid = int(out.stdout.strip().splitlines()[-1])
+    if pid == 0:                                   # max_tasks_per_child=1: the worker already exited after its one check
+        return
     for _ in range(50):
         try:
             os.kill(pid, 0); time.sleep(0.2)

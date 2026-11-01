@@ -33,6 +33,23 @@ def _gate(data: bytes, actor: Actor):
         raise HTTPException(e.status, e.message)
 
 
+def _fdm_lean(data: bytes):
+    """(data, note): a very big binary STL from the FDM tab simplified in a guarded child, else unchanged."""
+    from ..core import fdmlean, guard
+    if not fdmlean.faces_if_big(data):
+        return data, ""
+    try:
+        out, n, k = guard.run(fdmlean.shrink, data, timeout=240, mem_mb=fdmlean.FDM_MEM_MB)
+    except guard.Busy:
+        raise HTTPException(503, "The server is busy with another big model. Try again in a minute.")
+    except guard.Tripped:
+        raise HTTPException(413, "This model is too big for the server to simplify. Try a smaller or simplified file.")
+    except meshedit.OpError as e:
+        raise HTTPException(422, str(e))
+    return out, (f"This model has {n:,} triangles, so the slicer uses a simplified copy with {k:,} "
+                 "(the shape change is far smaller than a print layer).")
+
+
 def _edit_meta(bid: str, actor: Actor, owner_only=False) -> dict:
     meta = meta_for(bid, actor, owner_only=owner_only)
     if meta.get("kind") != "edit":
@@ -72,6 +89,7 @@ def new_project(
     width_mm: float = Form(100.0),
     photo_ack: bool = Form(False),
     keep_history: bool = Form(True),
+    fdm_big: bool = Form(False),                # FDM Slicer tab only: simplify very big binary STLs (core/fdmlean.py)
     select: str = Form(""),                     # Select mode: traced selection for a photo base (app/core/selectmask.py)
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
@@ -132,6 +150,10 @@ def new_project(
             bad = meshedit.sniff(data, ext)
             if bad:
                 raise HTTPException(415, bad)
+            if fdm_big and ext == "stl":
+                data, note = _fdm_lean(data)
+                if note:
+                    warnings.append(note)
             _gate(data, actor)
             try:
                 mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])     # warn on the converted size (B9)
