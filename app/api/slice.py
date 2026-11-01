@@ -13,7 +13,7 @@ from typing import Optional
 
 import numpy as np
 import trimesh
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 
 from app import config
@@ -81,6 +81,7 @@ def list_profiles():
 
 @router.post("")
 def slice_model(
+    background: BackgroundTasks,
     file: Optional[UploadFile] = File(None),
     model_id: Optional[str] = Form(None),
     profile: str = Form(eng.DEFAULT_PROFILE),
@@ -123,6 +124,8 @@ def slice_model(
     actor: Actor = Depends(get_actor),
 ):
     from app.services import filament_slots as fslots
+    from app.core import memtrim
+    background.add_task(memtrim.trim)      # big G-code strings / meshes: hand the freed heap back after the response
     try:
         # Only turned-on slots (with optional per-slot filament + colour) go into the plan.
         # Unused AMS/CFS/MMU ports are never referenced, heated, primed or purged.
@@ -241,6 +244,7 @@ def slice_model(
     finally:
         _slots.release()
         (work / "input.stl").unlink(missing_ok=True)
+        memtrim.trim()
     _g = work / "model.gcode"
     _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
     _g.write_text(fslots.gcode_header(slot_plan) + _body)
