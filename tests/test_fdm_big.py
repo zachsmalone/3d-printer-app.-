@@ -79,3 +79,11 @@ def test_heavy_fdm_requests_trim_the_heap():
     memtrim.trim()                                    # must never raise, glibc or not
     assert "background.add_task(memtrim.trim)" in (ROOT / "app/api/slice.py").read_text()
     assert "background.add_task(memtrim.trim)" in (ROOT / "app/api/edit.py").read_text()
+
+
+def test_shrink_runs_in_a_fresh_interpreter_not_a_server_fork(monkeypatch):
+    from app.core import fdmlean
+    monkeypatch.setattr(fdmlean, "FDM_MAX_FACES", 2000)
+    out, n, k = fdmlean.shrink_isolated(_ball().export(file_type="stl"))
+    assert n == len(_ball().faces) and 0 < k <= 2000 and len(out) == 84 + 50 * k
+    assert "guard.run(fdmlean" not in (ROOT / "app/api/edit.py").read_text()

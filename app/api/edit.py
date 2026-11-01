@@ -34,15 +34,15 @@ def _gate(data: bytes, actor: Actor):
 
 
 def _fdm_lean(data: bytes):
-    """(data, note): a very big binary STL from the FDM tab simplified in a guarded child, else unchanged."""
-    from ..core import fdmlean, guard
+    """(data, note): a very big binary STL from the FDM tab simplified in a fresh, memory-capped interpreter, else unchanged."""
+    from ..core import fdmlean
     if not fdmlean.faces_if_big(data):
         return data, ""
     try:
-        out, n, k = guard.run(fdmlean.shrink, data, timeout=240, mem_mb=fdmlean.FDM_MEM_MB)
-    except guard.Busy:
+        out, n, k = fdmlean.shrink_isolated(data)
+    except fdmlean.Busy:
         raise HTTPException(503, "The server is busy with another big model. Try again in a minute.")
-    except guard.Tripped:
+    except fdmlean.TooBig:
         raise HTTPException(413, "This model is too big for the server to simplify. Try a smaller or simplified file.")
     except meshedit.OpError as e:
         raise HTTPException(422, str(e))
