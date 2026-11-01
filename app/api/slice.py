@@ -220,8 +220,18 @@ def slice_model(
         parts = None
         if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
             parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
-        res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
-                                   bounds_stl=work / "model.stl", parts=parts)
+        try:
+            res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
+                                       bounds_stl=work / "model.stl", parts=parts)
+        except eng.SliceError as e:
+            # Sculptures that stand on a point (busts, figures) have an empty first layer with supports off and
+            # PrusaSlicer refuses them. Retry once with Supports: Auto and say so, instead of a dead end.
+            if e.code != "first_layer_empty" or (chosen.get("supports") or "off") != "off":
+                raise
+            prof, chosen = eng.profile_for(printer_id or profile, nozzle, {**opts, "supports": "auto"})
+            chosen = {**chosen, "temp_notes": [AUTO_SUPPORT_NOTE, *(chosen.get("temp_notes") or [])]}
+            res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
+                                       bounds_stl=work / "model.stl", parts=parts)
     except eng.SliceError as e:
         shutil.rmtree(work, ignore_errors=True)
         _fail(e.status, e.code, e.message)
@@ -278,6 +288,8 @@ def slice_model(
     }, actor, *slice_events)
 
 
+AUTO_SUPPORT_NOTE = ("Only a small point of this model touches the bed, so ZEIM turned Supports on (Auto) to give it a "
+                     "first layer. You can still choose Everywhere, or lay it flat in the Edit tab.")
 FIT_MARGIN_MM = 2.0      # kept clear on each side in X/Y and above the model in Z
 MIN_FIT_SCALE = 0.10     # shrinking further than this is almost always a units mix-up
 

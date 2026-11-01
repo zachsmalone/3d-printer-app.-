@@ -228,8 +228,8 @@ async def check_file_async(path, printer_id=None, nozzle=None, **kw) -> dict:
         if _pool is None:
             import multiprocessing as mp
             import atexit
-            _pool = ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("spawn"), initializer=_watch_parent, initargs=(os.getpid(),))
-            atexit.register(_shutdown)
+            _pool = ProcessPoolExecutor(max_workers=1, max_tasks_per_child=1, mp_context=mp.get_context("spawn"), initializer=_watch_parent, initargs=(os.getpid(),))
+            atexit.register(_shutdown)   # max_tasks_per_child=1: the worker exits after each check (an idle one held ~1.6 GB of the 3 GB container)
         res = await asyncio.get_running_loop().run_in_executor(_pool, _worker, str(path), printer_id, nozzle, kw)
     if len(_cache) > 500:
         _cache.clear()

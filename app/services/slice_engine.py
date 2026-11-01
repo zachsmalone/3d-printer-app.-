@@ -21,7 +21,7 @@ from typing import Optional
 log = logging.getLogger("zeim.slice")
 
 SLICE_TIMEOUT_S = int(os.environ.get("PHOTO3D_SLICE_TIMEOUT", "300"))
-SLICE_MEM_MB = int(os.environ.get("PHOTO3D_SLICE_MEM_MB", "2048"))
+SLICE_MEM_MB = int(os.environ.get("PHOTO3D_SLICE_MEM_MB", "2560"))   # address space, not RSS: a 2-core run of a 140 mm sculpture with supports peaks ~2.04 GB VSZ / 1.6 GB RSS
 FIT_TOLERANCE_MM = 0.05
 
 
@@ -191,7 +191,7 @@ def find_engine() -> Optional[str]:
 
 def _slice_rlimits():
     """Cap the slicer process's memory (RLIMIT_AS) so one huge mesh can't OOM the host.
-    Default 2048 MB, env-tunable (PHOTO3D_SLICE_MEM_MB, 0 = off)."""
+    Default 2560 MB, env-tunable (PHOTO3D_SLICE_MEM_MB, 0 = off)."""
     import resource
     mb = SLICE_MEM_MB
     if mb <= 0:
@@ -227,6 +227,9 @@ def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SL
             raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
         if "could not fit" in tail.lower():
             raise SliceError("too_big", "This model doesn't fit on the printer bed. Try scaling it down, or cut it into pieces with Edit → Split.", 422)
+        if "no extrusions in the first layer" in tail.lower():
+            raise SliceError("first_layer_empty", "Only a tiny point of this model touches the bed, so nothing prints on "
+                             "the first layer. Turn Supports on, or lay it flat in the Edit tab.", 422)
         raise SliceError("slice_failed", "The slicer couldn't process this model. If it has holes or "
                          "broken surfaces, run Fix in the Edit tab and try again.", 500)
 
