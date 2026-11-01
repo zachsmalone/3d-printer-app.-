@@ -72,3 +72,10 @@ def test_sources_wire_the_fdm_only_path():
     sl = (ROOT / "app/api/slice.py").read_text()
     assert 'e.code != "first_layer_empty"' in sl and '"supports": "auto"' in sl
     assert "max_tasks_per_child=1" in (ROOT / "app/services/willprint.py").read_text()
+
+
+def test_heavy_fdm_requests_trim_the_heap():
+    from app.core import memtrim
+    memtrim.trim()                                    # must never raise, glibc or not
+    assert "background.add_task(memtrim.trim)" in (ROOT / "app/api/slice.py").read_text()
+    assert "background.add_task(memtrim.trim)" in (ROOT / "app/api/edit.py").read_text()

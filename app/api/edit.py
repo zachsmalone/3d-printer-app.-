@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import trimesh
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 
 from ..community import badges, privacy, safety
@@ -78,6 +78,7 @@ def _full(actor):
 
 @router.post("/new")
 def new_project(
+    background: BackgroundTasks,
     actor: Actor = Depends(get_actor),
     file: UploadFile | None = File(None),
     from_build: str = Form(""),
@@ -150,6 +151,9 @@ def new_project(
             bad = meshedit.sniff(data, ext)
             if bad:
                 raise HTTPException(415, bad)
+            if fdm_big:
+                from ..core import memtrim
+                background.add_task(memtrim.trim)                # FDM tab: give the 100 MB upload's heap back afterwards
             if fdm_big and ext == "stl":
                 data, note = _fdm_lean(data)
                 if note:
