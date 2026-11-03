@@ -70,7 +70,9 @@ def test_process_sheet_groups_only_existing_slicer_choices():
     layout = (ROOT / "static" / "wslayout.js").read_text(encoding="utf-8")
     assert "Reset layout" not in layout and "data-zws-reset" not in layout
     assert "zeim:fdm-slice" in PRINTER
-    assert "body[data-view=slicer] .topbar .nav{position:static" in CSS
+    # The tab bar stays fixed at the bottom on the slicer too; the slicer tool bar sits just above it.
+    assert "body[data-view=slicer] .topbar .nav{position:static" not in CSS
+    assert "#viewEdit>.bed-sheet{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}" in CSS
     assert "Quarter cubic, octet, cross, cross 3D, and TPMS" in PRINTER
 
 
