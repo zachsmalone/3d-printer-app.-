@@ -95,5 +95,5 @@ See `local-https/README.md` (for trying the share sheet from an iPhone/iPad).
 6. **Off-site target and retention**: Backblaze B2 + `rclone` assumed; who holds the `age` private key? (Store it offline, not on the server.)
 7. **CSP**: report-only until tested in a browser against the UI (importmap + module scripts + `blob:` previews). Promote to enforcing after.
 8. **Staging**: reuse this compose file with a different `ZEIM_HOST_DIR`, domain and seed data. Never copy production data there.
-9. **Read-only mode / rollback**: not implemented. Rollback today = `docker compose up -d` with a previous image tag + `restore.sh`.
+9. **Read-only mode / rollback**: read-only mode is not implemented. Code rollback = `rollback.sh` (swaps in a `/opt/zeim.prev-*` copy; images are built, not tagged, so there is no previous image tag). Data rollback = `restore.sh`.
 10. **Secrets**: `.env` on the host is a stopgap; move to a secrets manager when there is one. `link.key` should leave `data/` (Engineering ask #6); until then it travels inside every backup.
