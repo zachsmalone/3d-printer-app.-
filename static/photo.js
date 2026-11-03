@@ -10,6 +10,25 @@ export const isPhone = () =>
   matchMedia("(pointer:coarse)").matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
   (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
 
+/* PERF1: big phone photos are shrunk in the browser before upload (longest side MAX_SIDE px). The server's models
+   use far fewer pixels than that. Anything that fails, or isn't a JPEG/PNG/WebP over SHRINK_OVER bytes, is sent unchanged. */
+export const MAX_SIDE = 3000, SHRINK_OVER = 1.5 * 1024 * 1024;
+export async function downscale(f) {
+  try {
+    if (!f || f.size <= SHRINK_OVER || !/^image\/(jpeg|png|webp)$/.test(f.type) || typeof createImageBitmap !== "function") return f;
+    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
+    const k = MAX_SIDE / Math.max(bmp.width, bmp.height);
+    if (!(k < 1)) { bmp.close?.(); return f; }
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height); bmp.close?.();
+    const type = f.type === "image/png" ? "image/png" : "image/jpeg";
+    const b = await new Promise(r => c.toBlob(r, type, 0.9));
+    if (!b || b.size >= f.size) return f;
+    return new File([b], f.name.replace(/\.(jpe?g|png|webp)$/i, "") + (type === "image/png" ? ".png" : ".jpg"), { type });
+  } catch { return f; }
+}
+
 export function photoBlock(p, { sample = true } = {}) {
   return `<div class="pp" id="${p}Pick">
   <div class="pp-actions">
@@ -49,7 +68,7 @@ export function mountPhoto(p, onFile) {
     ackBox.focus(); return false;
   };
   ackBox.addEventListener("change", () => { if (ackBox.checked) msg(""); });
-  const give = f => { if (!allowed(f)) return; msg(""); onFile(f); };
+  const give = async f => { if (!allowed(f)) return; msg(""); onFile(await downscale(f)); };
 
   el("Choose").onclick = () => el("File").click();
   el("File").onchange = e => { give(e.target.files[0]); e.target.value = ""; };
