@@ -12,7 +12,7 @@
   "use strict";
   var root = typeof globalThis !== "undefined" ? globalThis : window;
   var PKEY = "zeim.save", DEF = { mode: "auto", every: 5 }, savers = {}, dirty = {}, scopeProject = {}, projects = {}, held = {};
-  var lastAt = null, timer = null, reminded = false, saveFailed = false, lastResult = "empty", account = "", signedIn = null, typedEarly = false;
+  var lastAt = null, timer = null, nextAt = 0, lastLabel = "", reminded = false, saveFailed = false, lastResult = "empty", account = "", signedIn = null, typedEarly = false;
   function storage() { try { return root.localStorage; } catch (e) { return null; } }
   function readRaw(k) { var ls = storage(); if (!ls) return null; try { return ls.getItem(k); } catch (e) { return null; } }
   function removeRaw(k) { var ls = storage(); if (!ls) return; try { ls.removeItem(k); } catch (e) { } }
@@ -57,6 +57,12 @@
   function indicatorLabel() {
     var p = prefs();
     if (saveFailed) return "Not saved";
+    /* UX1: unsaved changes, with a minute-level countdown to the next auto-save (minutes, so the live region is not chatty). */
+    if (isDirty()) {
+      if (p.mode !== "auto" || !nextAt) return "Unsaved changes";
+      var m = Math.ceil((nextAt - Date.now()) / 60000);
+      return m <= 1 ? "Unsaved changes \u00b7 auto-save in under 1 min" : "Unsaved changes \u00b7 auto-save in " + m + " min";
+    }
     if (lastAt) return "Draft saved " + hhmm(lastAt);
     return p.mode === "auto" ? "Auto-save on" : p.mode === "remind" ? "Save reminders on" : "Auto-save off";
   }
@@ -84,7 +90,7 @@
   function paint() {
     if (!ind) return;
     var label = indicatorLabel();
-    ind.textContent = label;
+    if (label !== lastLabel || !ind.textContent) { lastLabel = label; ind.textContent = label; }
     if (ind.classList) { if (saveFailed) ind.classList.add("bad"); else ind.classList.remove("bad"); }
     var title = saveFailed
       ? "Not saved. The last draft did not store in this browser. This label is not a server confirmation. "
@@ -177,13 +183,15 @@
     document.body.appendChild(t);
   }
   function tick() {
+    nextAt = Date.now() + prefs().every * 60000;
     var p = prefs(); if (p.mode === "off" || !isDirty()) return;
     if (p.mode === "auto") saveNow(); else remind();
   }
   function schedule() {
     if (timer) clearInterval(timer); var p = prefs(); timer = null;
     if (p.mode !== "off") timer = setInterval(tick, p.every * 60000);
-    paint();
+    nextAt = p.mode !== "off" ? Date.now() + p.every * 60000 : 0;
+    lastLabel = ""; paint();
   }
   function setPrefs(p, push) {
     if (!valid(p)) return false; p = { mode: p.mode, every: +p.every };
@@ -296,6 +304,7 @@
   }
   function boot() {
     indicator(); wireForm(); schedule();
+    setInterval(paint, 5000);   /* UX1: picks up typing (dirty) and the countdown; paint() only writes when the label changes */
     if (document.addEventListener) { document.addEventListener("input", noteEarly, true); document.addEventListener("change", noteEarly, true); }
     var meDone = fetch("/api/me", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(applyMe).catch(function () { });
     fetch("/api/me/save-prefs", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
