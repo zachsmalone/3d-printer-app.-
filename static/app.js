@@ -624,10 +624,10 @@ function renderHistory() {
       <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.ai ? ' · <span class="ailbl">AI-made</span>' : ""}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · <svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg>"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
-        <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 7) + " days)"}">${b.favorite ? '<svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg>' : '<svg class=i aria-hidden=true focusable=false><use href=#i-star></use></svg>'}</button>
+        <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 30) + " days)"}">${b.favorite ? '<svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg>' : '<svg class=i aria-hidden=true focusable=false><use href=#i-star></use></svg>'}</button>
         <button data-del="${b.id}" aria-label="Delete this build"><svg class=i aria-hidden=true focusable=false><use href=#i-trash></use></svg></button></div></li>`);
   while (cards.length < Math.min(S.max, 5)) cards.push(`<li class="hslot">Empty slot</li>`);
-  const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 7} days. Tap the star to keep one.`;
+  const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 30} days. Starred builds and builds shared to the Showcase are kept until you delete them.`;
   $("#histList").innerHTML = cards.join("");
   document.dispatchEvent(new CustomEvent("zeim:history"));
 }

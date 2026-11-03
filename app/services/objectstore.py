@@ -6,7 +6,7 @@ server disk (OUT/<id>/...) exactly as today — no behavior change until you opt
 
 Retention note (deliberate): the ROADMAP says accounts and data are never deleted by the app.
 Build files keep their existing keep-time rules (services/retention.py: starred = never,
-saved = 30 days, others = 7 days). Object storage adds NO deletion policy of its own.
+saved = never, others = PHOTO3D_KEEP_UNSAVED_DAYS, 30 by default). Object storage adds NO deletion policy of its own.
 
 What this is NOT yet: the build pipeline still writes model files to disk. This module is the
 storage seam (put/get/signed URLs, tested against a live S3-compatible server shape); moving
