@@ -1431,3 +1431,7 @@ html[data-theme=dark] .zg-handle:hover,html[data-theme=dark] .zg-handle:focus-vi
 html[data-theme=dark] .zg-turn{background:transparent;color:#6AA6FF}
 html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6AA6FF}
 @media (prefers-reduced-motion:reduce){.zg-handle{transition:none}.zg-handle:hover,.zg-handle:focus-visible,.zg-handle:active,.zg-handle.zg-on{transition:none}}
+
+/* RET2: build about to be removed */
+.hcard .expsoon{color:var(--warn,#b45309);font-weight:600}
+.hcard .keepbtn{font-size:.8em;padding:1px 8px;margin-left:4px}
