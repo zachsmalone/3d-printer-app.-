@@ -354,8 +354,9 @@ def unfollow(uid: str, actor: Actor = Depends(get_actor)):
 
 # ---------------- showcase ----------------
 @router.get("/showcase")
-def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", ai: str = "show", printer: str = "", material: str = "", supports: str = "", licence: str = "", mature: str = "", actor: Actor = Depends(get_actor)):
+def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str = "", ai: str = "show", printer: str = "", material: str = "", supports: str = "", licence: str = "", mature: str = "", limit: int = 48, offset: int = 0, actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor)
+    limit = max(1, min(int(limit), 200)); offset = max(0, int(offset))   # one page at a time; the page asks for more
     if tab not in branding.SHOWCASE_TABS:
         raise HTTPException(400, "unknown tab")
     try:
@@ -380,7 +381,8 @@ def showcase(tab: str = "trending", q: str = "", category: str = "", sort: str =
     items = catalog.apply_filters(items, filters, actor)
     items = discovery.apply_sort(items, sort)
     out = {"categories": catalog.categories(actor), "category": category.strip()[:60],
-           "originals_notice": _originals_notice(),"tab": tab, "ai": ai, "filters": filters, "items": [catalog.public(i, actor) for i in items], "q": q, "result_count": len(items),
+           "originals_notice": _originals_notice(),"tab": tab, "ai": ai, "filters": filters, "items": [catalog.public(i, actor) for i in items[offset:offset + limit]], "q": q, "result_count": len(items),
+           "has_more": offset + limit < len(items), "limit": limit, "offset": offset,
            "subtitle": "Newest projects first." if tab == "free" else "",
            "example_notice": ""}
     if tab == "foryou" and not out["items"]:
