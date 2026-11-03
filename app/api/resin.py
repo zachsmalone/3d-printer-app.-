@@ -271,7 +271,9 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     except guard.Busy:
         raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
     except guard.Tripped:
-        raise HTTPException(422, "This model is too big or complex for TorchC0 here. Simplify it, or turn hollowing off.")
+        # UX2: the child hit its memory/time limit or died. Only suggest hollowing when it was on.
+        tip = " Simplify it, or turn hollowing off and try again." if s.get("hollow") else " Simplify it, or try a smaller file."
+        raise HTTPException(422, "Preparing this model ran out of memory or time on the server." + tip)
     rid = uuid.uuid4().hex
     d = _dir()
     (d / f"{rid}.stl").write_bytes(stl); (d / f"{rid}.3mf").write_bytes(tmf)

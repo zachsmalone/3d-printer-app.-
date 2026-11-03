@@ -148,6 +148,11 @@ def gate(data: bytes, actor_sid: str, source: str = "generate", **limits) -> upl
             # the sniff only fires on a structurally valid header (IHDR is validated first),
             # so this is a genuine oversized image: same 400 + message imagesafe gives
             raise GateError(400, TOO_BIG)
+        if e.reason in ("too_many_faces", "too_many_vertices"):
+            # UX2: a real model that is just too detailed used to get the "file type" message.
+            raise GateError(413, "This model has too much detail (too many triangles) to upload here. Simplify it in your 3D app and try again.")
+        if e.reason in ("archive_too_big", "archive_too_many_members"):
+            raise GateError(413, "This 3MF is too big once unpacked. Export it again with fewer parts or less detail and try again.")
         raise GateError(415, "That file type can't be used here. Upload a photo (or STL/OBJ/3MF where offered).")
     clean, signature, scan_state = scan_bytes(data)
     checked.scan_state = scan_state
