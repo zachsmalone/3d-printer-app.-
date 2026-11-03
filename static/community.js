@@ -3,6 +3,7 @@ import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML
 import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
 import { bindFlow, originOf, readFlow, reuseCopy, slicerHash } from "/static/project-flow.js";
 import { sendTo } from "/static/handoff.js";
+import { metricsOff, setMetricsOff } from "/static/metrics.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const SOC_LABEL = { tiktok: "TikTok", instagram: "Instagram", reddit: "Reddit", patreon: "Patreon", youtube: "YouTube", x: "X", website: "Website" };
@@ -1171,12 +1172,15 @@ async function openData() {
       <li>Projects you shared to Showcase: <b>${d.shared_count ?? 0}</b></li>
       ${pr}
       <li>Personalization (For You ranking): <b>${d.enabled ? "on" : "off"}</b></li>
+      <li>Anonymous usage count (time to your first print file, no account or IP): <b id="metricsState">${metricsOff() ? "off" : "on"}</b>
+        <button type="button" class="btn small ghost" id="btnMetrics">${metricsOff() ? "Turn on" : "Turn off"}</button></li>
     </ul>
     <h4>What ZEIM does <em>not</em> keep</h4>
     <p class="help">${(d.not_collected || []).map(esc).join(" · ")}</p>
     <h4>Interests</h4><p>${ints.map(([t, w]) => `<span class="tag">${esc(t)} · ${w}</span>`).join("") || "<span class='help'>none yet</span>"}</p>
     <h4>Recent searches</h4><p>${(d.searches || []).map(s => `<span class="tag">${esc(s)}</span>`).join("") || "<span class='help'>none</span>"}</p>
     <p class="help">Download my stuff saves a JSON file of this summary (no photo or model bytes). Delete everything I made removes your builds, photos and Showcase posts; your account stays so you can keep using ZEIM.</p>`;
+  $("#btnMetrics").onclick = () => { setMetricsOff(!metricsOff()); openData(); };
   $("#btnToggleP13n").textContent = d.enabled ? "Turn personalization off" : "Turn personalization on";
   $("#btnToggleP13n").onclick = async () => { await api("/api/me/personalization", J("PUT", { enabled: !d.enabled })); openData(); };
   $("#btnClearData").onclick = async () => { await api("/api/me/data", { method: "DELETE" }); toast("Personalization cleared", "ok"); openData(); };
