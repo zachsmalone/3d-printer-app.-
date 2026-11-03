@@ -47,7 +47,8 @@ services:
     security_opt:
       - no-new-privileges:true
     # Heavy jobs (meshing, hollow, slicing) must not take the whole VPS down. Tune after a load test.
-    mem_limit: 3g
+    # VM is e2-highmem-2 (16 GB): leave ~1.5 GB for the OS, Docker and Caddy.
+    mem_limit: 14g
     cpus: 2.0
     pids_limit: 512
     healthcheck:                           # same as the Dockerfile; repeated so it is visible/tunable here
