@@ -621,7 +621,7 @@ function renderHistory() {
   const cards = S.history.slice().reverse().map(b => `
     <li class="hcard ${S.current?.id === b.id ? "cur" : ""}" data-id="${b.id}">
       <button type="button" class="thumbbtn" data-open="${b.id}" aria-label="Open ${esc(b.title)}"><img src="${b.thumb}" alt=""></button>
-      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.ai ? ' · <span class="ailbl">AI-made</span>' : ""}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · <svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg>"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}${expSoon(b)}</span></div>
+      <div class="meta"><b>${esc(b.title)}</b><span>${MODE_LABEL[b.mode]}${b.ai ? ' · <span class="ailbl">AI-made</span>' : ""}${b.visibility && b.visibility !== "private" ? " · " + b.visibility : " · <svg class=i aria-hidden=true focusable=false><use href=#i-lock></use></svg>"} · ${b.beginner ? "Beginner" : "Experienced"} · ${ago(b.created)}</span></div>
       <div class="row2"><button data-open="${b.id}">Open</button>
         <button data-send="${b.id}" title="Save this build or send it somewhere">Send…</button>
         <button data-fav="${b.id}" class="star ${b.favorite ? "on" : ""}" aria-pressed="${!!b.favorite}" aria-label="${b.favorite ? "Starred: kept until you delete it. Tap to un-star" : "Star to keep this build"}" title="${b.favorite ? "Starred - kept until you delete it" : "Star to keep it (builds are removed after " + (S.keepDays || 30) + " days)"}">${b.favorite ? '<svg class="i i-fill" aria-hidden=true focusable=false><use href=#i-star></use></svg>' : '<svg class=i aria-hidden=true focusable=false><use href=#i-star></use></svg>'}</button>
@@ -630,14 +630,6 @@ function renderHistory() {
   const note = $("#histNote"); if (note) note.textContent = `Builds are removed after ${S.keepDays || 30} days. Starred builds and builds shared to the Showcase are kept until you delete them.`;
   $("#histList").innerHTML = cards.join("");
   document.dispatchEvent(new CustomEvent("zeim:history"));
-}
-// RET2: in-app warning for builds about to be removed (7 days or less); the Keep button stars it (same call as the star).
-function expSoon(b) {
-  if (b.favorite || !b.expires) return "";
-  const d = Math.ceil((Date.parse(b.expires) - Date.now()) / 86400000);
-  if (!(d <= 7)) return "";
-  const when = d <= 0 ? "today" : d === 1 ? "in 1 day" : `in ${d} days`;
-  return ` · <span class="expsoon">Removed ${when}</span> <button type="button" class="keepbtn" data-fav="${b.id}" title="Star it so it is kept until you delete it">Keep it</button>`;
 }
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 $("#histList").onclick = async e => {
