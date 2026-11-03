@@ -1269,13 +1269,11 @@ body[data-view=slicer] #sendToFab,body[data-view=slicer] .sitefoot,body[data-vie
   body[data-view=slicer] #viewEdit>.bed-head .btn{min-height:32px;height:32px;min-width:0}
 }
 @media (max-width:768px){
-  body[data-view=slicer] .topbar .nav{position:static;left:auto;right:auto;bottom:auto;z-index:auto;flex:1 0 100%;order:5;display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;margin:0;padding:0;background:transparent;border:0;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-  body[data-view=slicer] .topbar .nav button{flex:0 0 auto;flex-direction:row;min-height:36px;font-size:12px;padding:0 8px}
-  body[data-view=slicer] .topbar .nav button.on .i{width:18px;height:18px;padding:0;background:none}
-  body[data-view=slicer]{padding-bottom:env(safe-area-inset-bottom)}
+  /* The section tab bar stays fixed at the bottom like every other page; the slicer's tool bar and sheets sit on top of it. */
+  body[data-view=slicer]{padding-bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}
   body[data-view=slicer] #viewEdit>.bed-bar,
   body[data-view=slicer] #viewEdit>.proc-sheet,
-  body[data-view=slicer] #viewEdit>.bed-sheet{bottom:0}
+  body[data-view=slicer] #viewEdit>.bed-sheet{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}
 }
 #editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
