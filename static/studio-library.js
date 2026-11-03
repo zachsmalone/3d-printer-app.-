@@ -177,6 +177,15 @@ export function takeExit(storage, now) {
   return { url, changed: changedKeys(before, dump(storage)) };
 }
 
+/* RET2: unstarred builds removed within 7 days get a warning and a Keep it button (same call as Star). */
+export function expSoon(b, now = Date.now()) {
+  if (!b || b.favorite || !b.expires) return "";
+  const d = Math.ceil((Date.parse(b.expires) - now) / 86400000);
+  if (!(d <= 7)) return "";
+  const when = d <= 0 ? "today" : d === 1 ? "in 1 day" : `in ${d} days`;
+  return ` · <span class="expsoon">Removed ${when}</span> <button type="button" class="btn small keepbtn" data-lib="star" data-id="${esc(String(b.id || ""))}" title="Star it so it is kept until you delete it">Keep it</button>`;
+}
+
 export function libraryHTML(builds, opts) {
   const current = opts && opts.currentId ? String(opts.currentId) : "";
   const rows = (builds || []).slice().reverse().map(b => {
@@ -191,7 +200,7 @@ export function libraryHTML(builds, opts) {
     const openNow = id === current ? `<span class="pill">Open in this visit</span>` : "";
     return `<li class="hcard${here}" data-id="${esc(id)}">
       ${thumb}
-      <div class="meta"><b>${esc(title)}</b><span>${esc(label)}${kind === "edit" && mode !== "edit" ? " · Edited model" : ""}${openNow ? " · " + openNow : ""}</span></div>
+      <div class="meta"><b>${esc(title)}</b><span>${esc(label)}${kind === "edit" && mode !== "edit" ? " · Edited model" : ""}${openNow ? " · " + openNow : ""}${expSoon(b)}</span></div>
       <div class="row2">
         <button type="button" class="btn small" data-lib="open" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in the FDM Slicer" : "Open this photo design"}">Open</button>
         <button type="button" class="btn small" data-lib="edit" data-id="${esc(id)}" title="${kind === "edit" ? "Open this project in CAD" : "Open the slicer copy of this photo design. The first time, ZEIM makes that copy. The photo design stays on Account."}">Edit</button>
