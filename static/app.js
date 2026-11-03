@@ -11,9 +11,16 @@ const PRESET_HELP = {
   popart: { thin: "3 colour layers, small steps.", standard: "4 colour layers, medium steps.", thick: "5 colour layers, tall steps." } };
 
 function toast(msg, kind = "") {
-  const t = document.createElement("div"); t.className = "toast " + kind; t.textContent = msg;
+  const t = document.createElement("div"); t.className = "toast " + kind;
+  const m = document.createElement("span"); m.textContent = msg; t.append(m);
   $("#toasts").append(t); setTimeout(() => t.remove(), kind === "err" ? 8000 : 4500);
 }
+/* Every message can be closed: a Close button on each toast (also ones other scripts add). */
+(() => {
+  const host = document.getElementById("toasts"); if (!host) return;
+  const addX = t => { if (t.querySelector(".toast-x")) return; const x = document.createElement("button"); x.type = "button"; x.className = "toast-x"; x.setAttribute("aria-label", "Close message"); x.textContent = "\u00d7"; x.onclick = () => t.remove(); t.append(x); };
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => n.classList?.contains("toast") && addX(n)))).observe(host, { childList: true });
+})();
 /* A refusal belongs INSIDE the dialog, next to the button, and stays until the next try (toasts vanish behind the scrim). Typed text is never cleared. */
 function inlineMsg(near, msg, kind = "err") {
   if (!near) return toast(msg, kind);

@@ -88,7 +88,8 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(2px)}
 .soclinks a.soc svg{width:16px;height:16px}
 .fulllist{display:grid;gap:8px}.fl{display:flex;gap:10px;align-items:center;background:var(--panel2);border-radius:10px;padding:6px 10px}.fl img{width:56px;height:42px;object-fit:cover;border-radius:6px}.fl span{flex:1}
 #toasts{position:fixed;bottom:16px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:50}
-.toast{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--acc);padding:10px 14px;border-radius:9px;max-width:360px;box-shadow:0 8px 30px #0008}
+.toast{display:flex;align-items:flex-start;gap:8px;background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--acc);padding:10px 14px;border-radius:9px;max-width:360px;box-shadow:0 8px 30px #0008}
+.toast .toast-x{margin-left:auto;flex:0 0 auto;min-width:32px;min-height:32px;border:0;background:transparent;color:inherit;font:inherit;font-size:18px;line-height:1;cursor:pointer;border-radius:8px}.toast .toast-x:focus-visible{outline:3px solid var(--focus,#6AA6FF)}
 .toast.err{border-left-color:var(--bad)}.toast.ok{border-left-color:var(--ok)}
 /* ---- nav / pages / community ---- */
 .logoimg{height:36px;width:auto;display:block;background:none;border-radius:0;padding:0}
@@ -1274,6 +1275,14 @@ body[data-view=slicer] #sendToFab,body[data-view=slicer] .sitefoot,body[data-vie
   body[data-view=slicer] #viewEdit>.bed-bar,
   body[data-view=slicer] #viewEdit>.proc-sheet,
   body[data-view=slicer] #viewEdit>.bed-sheet{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}
+  /* Messages sit just above the bottom tools, never over the top bar or the FDM/Resin switch. */
+  body[data-view=slicer] #toasts{top:auto;bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom) + 60px)}
+  /* The step row fits 390px: tighter padding instead of clipped labels. */
+  body[data-view=slicer] #viewEdit>.bed-head{gap:2px;padding:0 4px}
+  body[data-view=slicer] #viewEdit>.bed-head .btn,body[data-view=slicer] #viewEdit>.bed-head .pflow-inline .path button{padding:0 6px;font-size:12px}
+  body[data-view=slicer] #viewEdit>.bed-head .pflow{gap:2px;padding:0}
+  /* The 3D view fills down to the tool row (52px) with no empty band. */
+  body[data-view=slicer] main.zws #editViewer{position:absolute;inset:0 0 52px 0;height:auto}
 }
 #editViewer{position:relative}
 .proc-tabs{display:flex;gap:6px;overflow-x:auto;margin:8px 0}

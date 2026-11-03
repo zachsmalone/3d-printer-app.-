@@ -106,3 +106,12 @@ def test_primary_actions_do_not_become_showcase():
     torch = _between(HTML, 'id="viewTorch"', 'id="viewAi3d"')
     assert 'data-go="rzGo"' in torch
     assert "sendToShowcase" not in torch
+
+
+def test_slicer_phone_polish_toasts_steps_and_view():
+    css = (ROOT / "static" / "style.css").read_text() if "ROOT" in globals() else open("static/style.css").read()
+    assert "body[data-view=slicer] #toasts{top:auto;" in css
+    assert "body[data-view=slicer] main.zws #editViewer{position:absolute;inset:0 0 52px 0" in css
+    assert ".toast .toast-x{" in css
+    js = open("static/app.js").read()
+    assert 'x.className = "toast-x"' in js and 'aria-label", "Close message"' in js
