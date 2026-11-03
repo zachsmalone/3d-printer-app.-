@@ -14,6 +14,8 @@ backup, restore-drill, retention and checksum-failure test on a fake tree (incl.
 | `caddy-run.sh` | Selects `Caddyfile` (default) or `Caddyfile.coming-soon` from `ZEIM_COMING_SOON`. |
 | `backup.sh` | Archives `data/` + `outputs/`, safe SQLite copies (`.backup`), sha256 sums, 14 daily + 8 weekly retention, optional `age` encryption and `rclone` off-site copy |
 | `restore.sh` | Verifies checksums, extracts to a scratch dir (the **restore drill**), `--apply` swaps it in and keeps the old dirs as `*.pre-restore-<ts>` |
+| `restore-drill.sh` | Monthly restore drill: restores the newest set (or a fresh scratch backup) with `restore.sh` dry-run, checks DB tables and file counts against live, logs PASS/FAIL. Never touches live. Not scheduled; a monthly cron is Zach's call |
+| `rollback.sh` | Code rollback to a `/opt/zeim.prev-*` copy, keeping the live `.env`; undoes itself if unhealthy |
 | `../../.env.example`, `../../.dockerignore` | Config template. The build context excludes runtime `data/` (accounts, uploads, keys), tests, and reports. Tracked catalogs are re-included and copied to `/app/data`. |
 
 ## Usage
