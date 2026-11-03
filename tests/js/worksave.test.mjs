@@ -150,3 +150,19 @@ test("exit with nothing dirty leaves without claiming a new save", () => {
   assert.equal(S.leave(() => { went = true; }), true);
   assert.equal(went, true);
 });
+
+test("UX1: dirty work says Unsaved changes, with an auto-save countdown in minutes", () => {
+  useStore();
+  S.setAccount("guest");
+  S.register("ux1", { collect: () => ({ a: 1 }), restore: () => true });
+  S.saveNow();
+  S._markDirty("ux1");
+  assert.match(S._label(), /^Unsaved changes/);
+  assert.equal(S.setPrefs({ mode: "auto", every: 5 }), true);
+  assert.equal(S._label(), "Unsaved changes \u00b7 auto-save in 5 min");
+  assert.equal(S.setPrefs({ mode: "remind", every: 5 }), true);
+  assert.equal(S._label(), "Unsaved changes");
+  assert.equal(S.setPrefs({ mode: "off", every: 5 }), true);
+  S.saveNow();
+  assert.doesNotMatch(S._label(), /Unsaved/);
+});
