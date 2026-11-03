@@ -461,6 +461,19 @@ export function wirePanel(getModelId) {
         ${HAS_GL ? gcodePreviewHTML() : r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
       wireCost();
+      // ONB4: first slice without a saved printer. Say which printer it used and offer the picker; never blocks the slice.
+      if (!P.chosen) {
+        out.insertAdjacentHTML("afterbegin", `<div class="help notice" id="spFirstPr" role="status"><p>This slice used the default printer, ${esc(prefLabel())}. Is that yours? Pick your printer so the next slice fits it.</p>${pickerHTML("spFirst")}<div class="row"><button type="button" class="btn small primary" id="spFirstSave">Save printer</button><button type="button" class="btn small" id="spFirstX">Not now</button></div></div>`);
+        wirePicker("spFirst");
+        $("#spFirstX").onclick = () => $("#spFirstPr").remove();
+        $("#spFirstSave").onclick = async () => {
+          const pref = readPicker("spFirst"); if (!pref) return;
+          try { await savePref(pref); } catch { /* saved on this device anyway */ }
+          if ($("#spPrinter")) $("#spPrinter").textContent = prefLabel();
+          $("#spFirstPr")?.remove();   // saving re-draws the panel for the new printer
+          toast(`Saved ${prefLabel()}. Press Slice again to slice for it.`, "ok");
+        };
+      }
       if ($("#spSkipX")) $("#spSkipX").onclick = () => $("#spSkipped").remove();
       if ($("#spSplit")) $("#spSplit").onclick = async () => {
         const b = $("#spSplit"); b.disabled = true;
