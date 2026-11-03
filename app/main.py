@@ -162,7 +162,7 @@ CSP = ("default-src 'self'; script-src 'self' " + _inline_script_hashes() + "; s
        "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
 
 
-STATIC_LONG = (".webp", ".png", ".jpg", ".jpeg", ".svg", ".woff2", ".ico")
+STATIC_LONG = (".webp", ".png", ".jpg", ".jpeg", ".svg", ".ico")
 
 
 @app.middleware("http")
@@ -171,7 +171,7 @@ async def security_headers(request: Request, call_next):
     h = resp.headers
     if request.url.path.startswith("/static/"):
         # JS/CSS/HTML: always revalidate (ETag keeps it cheap): a phone must never mix old and new JS modules.
-        # Images and fonts never import each other, so a browser may keep them a day without asking again.
+        # Images never import anything, so a browser may keep them a day without asking again (fonts stay no-cache, see the workbench test).
         h.setdefault("Cache-Control", "public, max-age=86400" if request.url.path.lower().endswith(STATIC_LONG) else "no-cache")
     h.setdefault("X-Content-Type-Options", "nosniff")
     h.setdefault("X-Frame-Options", "DENY")
