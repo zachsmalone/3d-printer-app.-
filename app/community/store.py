@@ -7,23 +7,35 @@ safe. The JSON files are backed up before any migration and remain as a rollback
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import threading
-import time
+import uuid
+from datetime import datetime
 from pathlib import Path
 
 from .. import config
 from ..config import DATA
 
 _lock = threading.RLock()
+log = logging.getLogger(__name__)
 
 
 def _backup_dir() -> Path:
-    ts = time.strftime("%Y%m%d-%H%M%S")
-    path = DATA / "backups" / f"json-backup-{ts}"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    """A new, never-reused snapshot directory: microsecond timestamp plus a random suffix, and
+    mkdir without exist_ok so an existing snapshot is never written into (a clash picks a new name)."""
+    root = DATA / "backups"
+    root.mkdir(parents=True, exist_ok=True)
+    for _ in range(5):
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        path = root / f"json-backup-{ts}-{uuid.uuid4().hex[:8]}"
+        try:
+            path.mkdir()
+            return path
+        except FileExistsError:
+            continue
+    raise FileExistsError("could not pick a new backup directory name")
 
 
 def backup_json_data() -> Path:
@@ -44,8 +56,9 @@ def freeze_json_fallback() -> list[Path]:
             if (p.stat().st_mode & 0o222) != 0:
                 os.chmod(p, p.stat().st_mode & ~0o222)
                 changed.append(p)
-        except OSError:
-            pass
+        except OSError as e:
+            log.error("freeze_json_fallback: could not make %s read-only: %s", p, e)
+            raise
     return changed
 
 
