@@ -1172,7 +1172,7 @@ async function openData() {
       <li>Projects you shared to Showcase: <b>${d.shared_count ?? 0}</b></li>
       ${pr}
       <li>Personalization (For You ranking): <b>${d.enabled ? "on" : "off"}</b></li>
-      <li>Anonymous usage count (time to your first print file, no account or IP): <b id="metricsState">${metricsOff() ? "off" : "on"}</b>
+      <li>Anonymous usage count and the occasional 0-10 question (no account or IP): <b id="metricsState">${metricsOff() ? "off" : "on"}</b>
         <button type="button" class="btn small ghost" id="btnMetrics">${metricsOff() ? "Turn on" : "Turn off"}</button></li>
     </ul>
     <h4>What ZEIM does <em>not</em> keep</h4>

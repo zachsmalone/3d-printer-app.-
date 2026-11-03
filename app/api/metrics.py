@@ -1,7 +1,9 @@
 """First-party usage counts (ONB1). Minimal by design.
 
-One event is accepted: "first_print", sent once per browser when someone downloads their first print file. It carries
-only a coarse time bucket (how long since this browser first opened ZEIM). Nothing else is stored: no account, session,
+Two events are accepted. "first_print" is sent once per browser when someone downloads their first print file and
+carries only a coarse time bucket (how long since this browser first opened ZEIM). "nps" (RET6) is the 0-10 answer to
+"how likely are you to recommend ZEIM", asked at most once every 90 days after a later print download; stored as
+{"d", "e": "nps", "s": score}. Nothing else is stored: no account, session,
 browser id, IP, file or model. Lines go to DATA/metrics/<YYYY-MM>.jsonl as {"d": day, "e": event, "b": bucket}.
 The browser does not send it when Do Not Track / Global Privacy Control is on, or when the person turned usage counts off.
 Read with: python -m app.api.metrics
@@ -37,7 +39,10 @@ def _folder():
 
 @router.post("/metrics")
 def post_metric(body: dict, request: Request):
-    if body.get("event") != "first_print":
+    ev = body.get("event")
+    if ev == "nps":
+        return _nps(body, request)
+    if ev != "first_print":
         raise HTTPException(400, "Unknown event.")
     try:
         secs = float(body.get("secs"))
@@ -55,9 +60,22 @@ def post_metric(body: dict, request: Request):
     return {"ok": True}
 
 
+def _nps(body: dict, request: Request):
+    s = body.get("score")
+    if not isinstance(s, int) or isinstance(s, bool) or not 0 <= s <= 10:
+        raise HTTPException(400, "score must be a whole number 0-10.")
+    if not config.TESTING_MODE and not ratelimit.hit("nps:" + client_ip(request), 5, 3600):
+        raise HTTPException(429, "Too many.")
+    f = _folder(); f.mkdir(parents=True, exist_ok=True)
+    rec = {"d": time.strftime("%Y-%m-%d", time.gmtime()), "e": "nps", "s": s}
+    with open(f / (rec["d"][:7] + ".jsonl"), "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(rec) + "\n")
+    return {"ok": True}
+
+
 def summary() -> dict:
     """Counts of first_print per time bucket, all months."""
-    c: Counter = Counter()
+    c: Counter = Counter(); scores: list[int] = []
     for p in sorted(_folder().glob("*.jsonl")) if _folder().exists() else []:
         for line in p.read_text(encoding="utf-8").splitlines():
             try:
@@ -66,8 +84,14 @@ def summary() -> dict:
                 continue
             if r.get("e") == "first_print":
                 c[r.get("b")] += 1
+            elif r.get("e") == "nps" and isinstance(r.get("s"), int):
+                scores.append(r["s"])
     order = [l for _, l in BUCKETS] + [">7d"]
-    return {"first_print": {k: c[k] for k in order if c[k]}, "total": sum(c.values())}
+    out = {"first_print": {k: c[k] for k in order if c[k]}, "total": sum(c.values())}
+    if scores:   # NPS = % promoters (9-10) minus % detractors (0-6)
+        n = len(scores)
+        out["nps"] = {"answers": n, "score": round(100 * (sum(x >= 9 for x in scores) - sum(x <= 6 for x in scores)) / n)}
+    return out
 
 
 if __name__ == "__main__":

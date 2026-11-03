@@ -30,3 +30,13 @@ test("print download detection", () => {
   assert.ok(!m.isPrintDownload(a(null, "/x.3mf")));
   assert.ok(!m.isPrintDownload(a("photo.png", "/x.png")));
 });
+
+test("nps asked only after first print, opt-in, every 90 days", () => {
+  store.clear(); navigator.globalPrivacyControl = false;
+  assert.equal(m.shouldAskNps(), false);                 // no print yet
+  store.set("zeim.firstPrintSent", "1");
+  assert.equal(m.shouldAskNps(), true);
+  store.set("zeim.npsAskedAt", String(Date.now() - 10 * 86400e3)); assert.equal(m.shouldAskNps(), false);
+  store.set("zeim.npsAskedAt", String(Date.now() - 91 * 86400e3)); assert.equal(m.shouldAskNps(), true);
+  m.setMetricsOff(true); assert.equal(m.shouldAskNps(), false);
+});

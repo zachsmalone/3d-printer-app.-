@@ -31,10 +31,39 @@ export function firstPrint(now = Date.now()) {
   return true;
 }
 
+/* RET6: NPS pulse. After a print download that is not this browser's first, at most once every 90 days, a small
+   card asks 0-10. Only the number is sent. Never shown when usage counts are off. */
+const K_NPS = "zeim.npsAskedAt", NPS_GAP = 90 * 86400e3;
+export function shouldAskNps(now = Date.now()) {
+  return !metricsOff() && !!ls.get(K_SENT) && !(now - (Number(ls.get(K_NPS)) || 0) < NPS_GAP);
+}
+export function sendNps(score) {
+  try { fetch("/api/metrics", { method: "POST", credentials: "omit", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event: "nps", score }) }).catch(() => {}); } catch {}
+}
+export function askNps() {
+  if (!shouldAskNps() || document.getElementById("npsCard")) return;
+  ls.set(K_NPS, String(Date.now()));          // asked, whether answered or dismissed
+  const c = document.createElement("div");
+  c.id = "npsCard"; c.className = "npscard"; c.setAttribute("role", "dialog"); c.setAttribute("aria-label", "Quick question");
+  c.innerHTML = `<button class="x" type="button" aria-label="No thanks">\u00d7</button>
+    <p>How likely are you to recommend ZEIM to a friend?</p>
+    <div class="npsrow">${Array.from({ length: 11 }, (_, i) => `<button type="button" class="btn small" data-s="${i}">${i}</button>`).join("")}</div>
+    <p class="help"><span>0 = not likely</span><span>10 = very likely</span></p>
+    <p class="help">Only the number is sent. Turn this off under Me, Your data.</p>`;
+  c.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.s != null) { sendNps(Number(b.dataset.s)); c.innerHTML = "<p>Thanks!</p>"; setTimeout(() => c.remove(), 1500); }
+    else c.remove();
+  });
+  document.body.append(c);
+}
+
 if (typeof document !== "undefined") {
   if (!ls.get(K_SEEN)) ls.set(K_SEEN, String(Date.now()));
   document.addEventListener("click", e => {
     const a = e.target && e.target.closest ? e.target.closest("a[download]") : null;
-    if (isPrintDownload(a)) firstPrint();
+    if (!isPrintDownload(a)) return;
+    if (!firstPrint() && shouldAskNps()) setTimeout(askNps, 2500);
   }, true);
 }
