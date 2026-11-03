@@ -198,3 +198,13 @@ def test_thirty_day_expiry_boundary_is_exact():
     assert _exists(bid)
     out = retention.purge_expired(store, now=created + 30 * day + 1)
     assert out["expired"] == 1 and not _exists(bid)                                  # 30d+1s: gone
+
+
+def test_saved_builds_are_never_aged_out_and_docs_say_so():
+    from app.services import retention
+    assert retention.keep_days({"saved": True, "created": "2020-01-01T00:00:00+00:00"}) is None
+    assert retention.keep_days({"created": "2020-01-01T00:00:00+00:00"}) == float(config.KEEP_UNSAVED_DAYS)
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1]
+    assert "others = 7 days" not in (root / "app/services/objectstore.py").read_text()
+    assert "S.keepDays || 7" not in (root / "static/app.js").read_text()
