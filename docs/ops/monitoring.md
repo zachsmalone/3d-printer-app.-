@@ -29,7 +29,10 @@ Cron sketch (the host, not the container):
 1. `docker compose ps` — are the containers up?
 2. `docker compose logs app --tail 100` — look for the startup failure (production fail-closed auth errors appear here).
 3. If disk full: `df -h`, free space (the retention sweep only removes unstarred builds — check `/outputs`).
-4. Rollback: `git log --oneline -5` in the deploy dir, check out the previous release, restart.
+4. Rollback: the deploy dir (`/opt/zeim`) is an unpacked tarball, not a git checkout. Each deploy keeps a copy as
+   `/opt/zeim.prev-<sha>-<hhmmss>`. Run `sudo reports/deploy/rollback.sh --list`, then
+   `sudo reports/deploy/rollback.sh /opt/zeim.prev-...`; it keeps the live `.env` (0600), rebuilds, health-checks and
+   puts the current version back if the old one is unhealthy. Code only; data rollback is `restore.sh`.
 
 **Error spike**
 1. Sentry (or `docker compose logs app --tail 500 | grep -i error`).
