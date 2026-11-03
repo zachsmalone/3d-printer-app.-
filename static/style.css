@@ -1433,3 +1433,10 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 /* RET2: build about to be removed */
 .hcard .expsoon{color:var(--warn,#b45309);font-weight:600}
 .hcard .keepbtn{font-size:.8em;padding:1px 8px;margin-left:4px}
+
+/* RET6 NPS pulse */
+.npscard{position:fixed;right:12px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:60;max-width:360px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 8px 30px #0008}
+.npscard p{margin:0 0 8px}.npscard .x{position:absolute;top:4px;right:8px;background:none;border:0;font-size:20px;cursor:pointer;color:inherit}
+.npscard .npsrow{display:flex;gap:3px}.npscard .npsrow .btn{flex:1 1 0;min-width:0;padding:6px 0;justify-content:center;text-align:center}
+.npscard .help{display:flex;justify-content:space-between;gap:8px;margin:6px 0 0}
+@media (max-width:600px){.npscard{left:12px;right:12px;max-width:none}}
