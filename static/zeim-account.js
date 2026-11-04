@@ -43,7 +43,7 @@
   function renderGuest(me, emailOk) {
     const body = $("#accBody");
     body.innerHTML = `
-      <p class="help">Accounts are for adults 18 and over. Sign in with a username or email and a password, or with a passkey. Anyone can build and download without an account.</p>
+      <p class="help">Sign in with a username or email and a password, or with a passkey. Anyone can build and download without an account.</p>
       <div id="accMsg" class="help" style="min-height:1.2em"></div>
       <div class="auth-stack">
         <h4>Sign in</h4>

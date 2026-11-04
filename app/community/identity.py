@@ -1,12 +1,10 @@
-"""Identity. ZEIM accounts are 18+ only (owner decision 2026-10-12). Age is computed server-side from the date of birth
-typed at sign-up; a refused sign-up stores nothing about the date.
+"""Identity. Sign-up needs no birth date (owner decision 2026-11-03: no 18+ gate).
 
 Identity = an account record in users.json, keyed by an internal "account key" (historically the `p3d_sid` cookie value).
   * passkey / email-code sign-in (app/auth, docs/auth.md): when a live `zeim_session` is present, the account is the one
     whose `id` equals the session's auth `owner_id` (legacy id for upgraded cookie accounts, else the auth account id).
     Builds, Showcase items, follows and favourites then belong to that account on every device.
   * otherwise the old cookie login: `p3d_sid` -> account record (kept working; recovery codes still apply).
-  * no accounts under MIN_SIGNUP_AGE (18). ZEIM is for adults only.
   * content is clean and safe for all, for everyone (see COMMUNITY_GUIDELINES.md)
   * an account is RESTRICTED (treated like signed out for sharing, its content shown to nobody else) while it is
     suspended by a moderator, or if it is a legacy account whose stored date of birth is under 18 (from the old 13+ rules)
