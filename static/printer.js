@@ -457,10 +457,25 @@ export function wirePanel(getModelId) {
         ${r.slots ? `<p class="help">Filament slots used: ${esc((r.slots || []).join(", "))}. Unused ports are not heated, primed or purged.</p>` : ""}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
+        ${firstPrintChecklistHTML(r.settings.material)}
         <div class="row"><a class="btn primary" href="${r.downloads.gcode}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> G-code</a><a class="btn" href="${r.downloads["3mf"]}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> 3MF</a><a class="btn" href="${r.downloads.stl}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> STL</a></div>
         ${HAS_GL ? gcodePreviewHTML() : r.downloads.layers ? layerPreviewHTML() : ""}
         ${openInHTML(r.downloads)}`;
       wireCost();
+      // ONB4: first slice without a saved printer. Say which printer it used and offer the picker; never blocks the slice.
+      if (!P.chosen) {
+        out.insertAdjacentHTML("afterbegin", `<div class="help notice" id="spFirstPr" role="status"><p>This slice used the default printer, ${esc(prefLabel())}. Is that yours? Pick your printer so the next slice fits it.</p>${pickerHTML("spFirst")}<div class="row"><button type="button" class="btn small primary" id="spFirstSave">Save printer</button><button type="button" class="btn small" id="spFirstX">Not now</button></div></div>`);
+        wirePicker("spFirst");
+        $("#spFirstX").onclick = () => $("#spFirstPr").remove();
+        $("#spFirstSave").onclick = async () => {
+          const pref = readPicker("spFirst"); if (!pref) return;
+          try { await savePref(pref); } catch { /* saved on this device anyway */ }
+          if ($("#spPrinter")) $("#spPrinter").textContent = prefLabel();
+          $("#spFirstPr")?.remove();   // saving re-draws the panel for the new printer
+          toast(`Saved ${prefLabel()}. Press Slice again to slice for it.`, "ok");
+        };
+      }
+      $("#fpCheck")?.addEventListener("toggle", e => { if (!e.target.open) try { localStorage.setItem("zeim.fpcheck.closed", "1"); } catch { } });
       if ($("#spSkipX")) $("#spSkipX").onclick = () => $("#spSkipped").remove();
       if ($("#spSplit")) $("#spSplit").onclick = async () => {
         const b = $("#spSplit"); b.disabled = true;
@@ -509,6 +524,24 @@ document.addEventListener("zeim:fdm-slice", () => {
   go.dataset.reveal = "1";
   go.click();
 });
+
+/* ONB7: a short first-print checklist under each slice result. Open until the maker closes it once (remembered per browser).
+   Plain checkboxes: nothing is saved or sent. */
+function firstPrintChecklistHTML(material) {
+  let closed = false;
+  try { closed = localStorage.getItem("zeim.fpcheck.closed") === "1"; } catch { }
+  const items = [
+    "The bed is clean: no dust or fingerprints (wipe it with isopropyl alcohol if your bed allows it).",
+    "The bed is level and the first-layer height (Z offset) is set, using your printer's own steps.",
+    `The filament in the printer is ${esc(material || "the material")}, the same as these settings.`,
+    "The nozzle is clean and filament comes out when you load it.",
+    "You will watch the first layer. If it doesn't stick, stop the print and check the bed.",
+    "You will stay nearby. Don't leave a first print alone.",
+  ];
+  return `<details class="fpcheck" id="fpCheck"${closed ? "" : " open"}><summary>Before you print: quick checklist</summary>
+    <ul>${items.map((t, i) => `<li><label class="inl"><input type="checkbox" id="fpc${i}"> ${t}</label></li>`).join("")}</ul>
+    <p class="help">Just for you. Nothing here is saved or sent.</p></details>`;
+}
 
 /* Changes the maker said yes to in the Failure photo doctor (Smart Fix): filled into Advanced once, shown with Undo. */
 function applySmartFix() {
