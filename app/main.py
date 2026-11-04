@@ -1,6 +1,6 @@
 """App factory. Run: uvicorn app.main:app --port 8765"""
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import branding
@@ -267,6 +267,27 @@ def builder_page():
 def sharetest():
     """SEND-0: hidden, unlinked page for finding out what the iOS share sheet accepts. Adults only (the page checks /api/me; the file endpoint enforces it)."""
     return FileResponse(STATIC / "sharetest.html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
+
+
+def _sw_version() -> str:
+    """Changes on every deploy: hash of the static files plus this process's start time."""
+    import hashlib, time
+    h = hashlib.sha256(str(time.time_ns()).encode())
+    for f in sorted(STATIC.rglob("*")):
+        if f.is_file():
+            st = f.stat(); h.update(f"{f.relative_to(STATIC)}:{st.st_size}:{st.st_mtime_ns}".encode())
+    return h.hexdigest()[:12]
+
+
+SW_VERSION = _sw_version()
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker():
+    """TASK26: offline cache worker. Served from / so it can see page loads; never cached itself."""
+    js = (STATIC / "sw.template.js").read_text(encoding="utf-8").replace("__VERSION__", SW_VERSION)
+    return Response(js, media_type="application/javascript",
+                    headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Service-Worker-Allowed": "/"})
 
 
 @app.get("/healthz", include_in_schema=False)
