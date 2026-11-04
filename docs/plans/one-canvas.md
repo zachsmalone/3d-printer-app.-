@@ -12,7 +12,7 @@ Direction from Zach: the model is the product. One persistent Three.js scene and
 
 ## Open questions
 
-1. Does the one design system replace the Japanese section themes? Pending Zach. PR9 waits on this.
+1. Does the one design system replace the Japanese section themes? Pending Zach. PR11 waits on this.
 2. Fully hiding the other process means it can't be forced from the switcher. That overrides the earlier "power users can force a mode" spec. Is that intended?
 
 ## (a) Current state (from the code)
