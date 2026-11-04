@@ -1346,7 +1346,7 @@ html[data-theme=dark] .proc-sheet .slicepanel>.row{background:color-mix(in srgb,
 .chcard h3{margin:0 0 6px;font-size:1rem;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .pill.prizefree{background:color-mix(in srgb, var(--acc2,#C24D6B) 14%, transparent);border:1px solid color-mix(in srgb, var(--acc2,#C24D6B) 40%, var(--line));color:var(--acc2,#C24D6B);font-size:12px}
 .chrules{margin:8px 0 12px;padding-left:1.2em}
-.prform input[capture],.prform #prCam{min-height:44px}
+
 .print-notes{margin:.25rem 0 0;white-space:pre-wrap}
 .showoff-stage{margin:0 0 8px;max-width:280px}
 .showoff-stage img{width:100%;height:auto;border-radius:10px;background:#eee}
@@ -1454,3 +1454,9 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 
 /* ONB7 first-print checklist */
 .fpcheck{margin:8px 0;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:10px}.fpcheck summary{cursor:pointer;font-weight:600}.fpcheck ul{list-style:none;margin:6px 0 0;padding:0}.fpcheck li{margin:4px 0}
+/* Print-photo picker: real buttons, hidden-but-focusable inputs, thumbnails */
+.prform .vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.prform .prpick .row{display:flex;gap:8px;flex-wrap:wrap}.prform .prpick label.btn{min-height:44px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.prform .prpick:focus-within label.btn{outline-offset:2px}
+.prthumbs{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:8px}.prthumbs li{display:flex;flex-direction:column;align-items:center;gap:4px;width:96px;font-size:12px;overflow-wrap:anywhere;text-align:center}
+.prthumbs img{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line,#ccc)}.prthumbs .noprev{font-size:11px;width:96px;height:96px;display:flex;align-items:center;border:1px dashed var(--line,#ccc);border-radius:8px;padding:4px;box-sizing:border-box}

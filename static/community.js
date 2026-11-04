@@ -774,8 +774,6 @@ async function openItem(id) {
       ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Add photos of your print</summary>
         <p class="help">Name this print, add print notes, and add photos of the finished object. Photos of the object only, please: no people, faces, names or addresses. Location data is removed. Each photo is checked by a moderator before anyone else can see it.</p>
         <div class="field"><label for="prName">Name this print</label><input id="prName" maxlength="80" placeholder="Desk lamp, first try"></div>
-        <div class="field"><label for="prFile">Photos</label><input type="file" id="prFile" accept="image/*" multiple></div>
-        <div class="field"><label for="prCam">Or take one with your phone camera</label><input type="file" id="prCam" accept="image/*" capture="environment"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
         <details class="pubps"><summary>Settings and notes <em>optional</em></summary>
           <div class="grid2">
@@ -789,6 +787,15 @@ async function openItem(id) {
           <div class="field"><label for="pr_name">Printer name</label><input id="pr_name" maxlength="60"></div>
           <div class="field"><label for="pr_notes">Print notes</label><input id="pr_notes" maxlength="400" placeholder="What settings worked"></div>
         </details>
+        <div class="field prpick"><span class="lbl" id="prPickL">Photos</span>
+          <div class="row" role="group" aria-labelledby="prPickL">
+            <label class="btn" for="prFile"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Choose photo</label>
+            <label class="btn" for="prCam"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Take photo</label>
+          </div>
+          <input type="file" id="prFile" class="vh" accept="image/*,image/heic,image/heif,.heic,.heif,.jpg,.jpeg,.png" multiple>
+          <input type="file" id="prCam" class="vh" accept="image/*" capture="environment">
+          <p class="help" id="prPicked" aria-live="polite">JPEG, PNG or iPhone HEIC. No photo chosen yet.</p>
+          <ul class="prthumbs" id="prThumbs"></ul></div>
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
         <fieldset class="reasons"><legend>Is this NSFW (mild nudity / mature art)? <em>required</em></legend>
           <label class="choice"><input type="radio" name="prNsfw" value="no"> <span>No</span></label><label class="choice"><input type="radio" name="prNsfw" value="yes"> <span>Yes</span></label></fieldset>
@@ -799,12 +806,22 @@ async function openItem(id) {
   loadPrints(id);
   loadShowoff(id);
   if ($("#itCols")) mountItemCollections($("#itCols"), id);
-  if ($("#prCam") && $("#prFile")) $("#prCam").onchange = () => { if ($("#prCam").files[0]) { const dt = new DataTransfer(); dt.items.add($("#prCam").files[0]); $("#prFile").files = dt.files; } };
+  /* Picked photos live here (both pickers add to it), so nothing depends on DataTransfer support. */
+  let prPicked = [];
+  const prShow = () => {
+    const ul = $("#prThumbs"); if (!ul) return;
+    ul.querySelectorAll("img").forEach(im => URL.revokeObjectURL(im.src));
+    ul.innerHTML = prPicked.map((f, k) => `<li><img alt="" data-k="${k}"><span>${esc(f.name || "photo")}</span><button type="button" class="btn sm" data-rm="${k}" aria-label="Remove ${esc(f.name || "photo")}">Remove</button></li>`).join("");
+    ul.querySelectorAll("img").forEach(im => { im.onerror = () => im.replaceWith(Object.assign(document.createElement("i"), { className: "noprev", textContent: "Preview not shown (HEIC). It will upload fine." })); im.src = URL.createObjectURL(prPicked[+im.dataset.k]); });
+    $("#prPicked").textContent = prPicked.length ? `${prPicked.length} photo${prPicked.length > 1 ? "s" : ""} ready.` : "JPEG, PNG or iPhone HEIC. No photo chosen yet.";
+    if (prPicked.length) clearInline($("#prSend"));
+  };
+  ["#prFile", "#prCam"].forEach(sel => { const el = $(sel); if (el) el.onchange = () => { prPicked.push(...el.files); el.value = ""; prShow(); }; });
+  if ($("#prThumbs")) $("#prThumbs").onclick = e => { const b = e.target.closest("[data-rm]"); if (b) { prPicked.splice(+b.dataset.rm, 1); prShow(); } };
   if ($("#prAcct")) $("#prAcct").onclick = () => { window.__prWantItem = id; openAccount("signup"); };
   if ($("#prSend")) $("#prSend").onclick = async () => {
-    const files = [...($("#prFile").files || [])];
-    if (!files.length && $("#prCam")?.files?.[0]) files.push($("#prCam").files[0]);
-    if (!files.length) return inlineMsg($("#prSend"), "Choose a photo or take one with your camera.");
+    const files = prPicked.slice();
+    if (!files.length) { $("#prPicked")?.scrollIntoView({ block: "center", behavior: "smooth" }); return inlineMsg($("#prSend"), "Choose a photo or take one with your camera (buttons above)."); }
     const nv = $("[name=prNsfw]:checked")?.value; if (!nv) return inlineMsg($("#prSend"), "Please answer: Is this NSFW (mild nudity / mature art)?");
     const name = ($("#prName")?.value || "").trim();
     $("#prSend").disabled = true;
@@ -821,7 +838,7 @@ async function openItem(id) {
       }
       clearInline($("#prSend"));
       toast(sent > 1 ? sent + " photos are waiting for review. Only you can see them until a moderator approves them." : "Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok");
-      $("#prFile").value = ""; if ($("#prCam")) $("#prCam").value = ""; $("#prCap").value = ""; if ($("#prName")) $("#prName").value = "";
+      prPicked = []; prShow(); $("#prCap").value = ""; if ($("#prName")) $("#prName").value = "";
       loadPrints(id);
     } catch (e) { inlineMsg($("#prSend"), sent ? sent + " saved. " + e.message : e.message); if (sent) loadPrints(id); }
     finally { $("#prSend").disabled = false; }

@@ -198,7 +198,7 @@ def test_camera_capture_in_community_js():
     js = open("static/community.js").read()
     assert 'capture="environment"' in js
     assert "prCam" in js
-    assert 'id="prName"' in js and 'accept="image/*" multiple' in js
+    assert 'id="prName"' in js and '.png" multiple>' in js
     assert "Print notes" in js and "showoff-pick" in js
     assert "Ask the creator" in js
     assert "Prize-free" in js or "prize-free" in js.lower()
