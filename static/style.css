@@ -1485,3 +1485,16 @@ a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width
 @media (min-width:769px) and (max-width:1499px){.topbar{flex-wrap:wrap;row-gap:4px}.topbar .nav{order:60;flex:1 0 100%;justify-content:space-between}.topbar .spacer{flex:1 1 0}.topbar .themetoggle,.topbar #lookBtn{order:5}}
 /* UX8: above 768px the fixed panel bar (52px) sat over "Send to…"; lift it clear while a bar is showing. */
 @media (min-width:769px){body:has(#viewCreate.has-model:not([hidden])>#lithoBar) .sendfab,body:has(#viewEdit:not([hidden])>.bed-bar) .sendfab{bottom:calc(64px + env(safe-area-inset-bottom))}}
+/* Uniform bottom tools: Lithophane's tool bar, sheets and view panel sit above the section tab bar like the slicer's; the save note sits above the bar. */
+@media (max-width:768px){
+  body[data-view=lithophane] #viewCreate.has-model{padding-bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + 64px + env(safe-area-inset-bottom))}
+  body[data-view=lithophane] #viewCreate.has-model>#lithoBar{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom));padding-bottom:0}
+  body[data-view=lithophane] #viewCreate.has-model.litho-sheet>aside.controls,
+  body[data-view=lithophane] #viewCreate.has-model.litho-sheet #zws-settings,
+  body[data-view=lithophane] #viewCreate.has-model[data-litho-cat=view] #vtools{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + 52px + env(safe-area-inset-bottom))}
+  body[data-view=lithophane]:has(#viewCreate.has-model) .saveind{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + 52px + 8px + env(safe-area-inset-bottom))}
+  body[data-view=lithophane]:has(#viewCreate.has-model) .sendfab{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + 52px + 44px + env(safe-area-inset-bottom))}
+}
+@media (min-width:769px){
+  body[data-view=lithophane]:has(#viewCreate.has-model) .saveind{bottom:calc(52px + 8px + env(safe-area-inset-bottom))}
+}
