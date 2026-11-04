@@ -7,6 +7,7 @@
 import { S, api, toast, $, esc } from "/static/app.js";
 import { isPublishUrl } from "/static/workspace-controls.js";
 import { readFlow, rememberCopy, reuseCopy } from "/static/project-flow.js";
+import * as veil from "/static/handoff-veil.js";
 
 const NAMES = { lithophane: "Photo", slicer: "FDM Slicer", torchc0: "TorchC0", cad: "CAD", ai3d: "2D→3D" };
 const DESC = { cad: "Design and edit it with exact sizes", slicer: "Slice it for your filament printer", torchc0: "Hollow, support and prepare it for resin" };
@@ -66,7 +67,7 @@ async function editIdFrom(src, explicit) {
   }
   throw new Error("Nothing to send.");
 }
-async function blobOf(url) { const r = await fetch(url, { credentials: "same-origin" }); if (!r.ok) throw new Error("Couldn't fetch the model. Try again."); return r.blob(); }
+async function blobOf(url, onFrac) { const { r, buf } = await veil.fetchBytes(url, null, onFrac); if (!r.ok) throw new Error("Couldn't fetch the model. Try again."); return new Blob([buf]); }
 async function torchFile() {
   const url = document.body.dataset.torchStl;                       // the prepared result, if there is one
   if (url) return new File([await blobOf(url)], "torchc0.stl", { type: "model/stl" });
@@ -74,7 +75,7 @@ async function torchFile() {
 }
 export async function fileFromEdit(id) {
   const p = await api("/api/edit/" + encodeURIComponent(id));
-  return new File([await blobOf(p.downloads.stl)], ((p.title || "model").replace(/[^\w.-]+/g, "_").slice(0, 40) || "model") + ".stl", { type: "model/stl" });
+  return new File([await blobOf(p.downloads.stl, veil.isOpen() ? veil.frac : null)], ((p.title || "model").replace(/[^\w.-]+/g, "_").slice(0, 40) || "model") + ".stl", { type: "model/stl" });
 }
 
 function remember(src) {
@@ -123,14 +124,18 @@ export async function sendTo(target, src = sourceNow(), opt) {
   const explicit = opt && typeof opt === "object" ? (opt.editId || "") : "";
   if (!explicit && !targetsFor(src).includes(target)) { toast(`${NAMES[target]} doesn't match your printer type. Change it with My printer at the top.`); return false; }
   document.dispatchEvent(new CustomEvent("zeim:save-now"));                    // nothing is lost
-  const root = document.documentElement; root.classList.add("handing");
+  // the target is covered by one opaque veil with a real % until its model is drawn (no empty-section flash)
+  const covered = target === "slicer" || target === "torchc0";
+  if (covered) veil.open(`Opening in ${NAMES[target]}…`, target === "slicer" ? ["zeim:edit-loaded", "zeim:edit-load-failed"] : ["zeim:torchc0-loaded"]);
   try {
     if (!explicit && src === "lithophane" && target === "torchc0" && S.current?.downloads?.stl) {
-      const f = new File([await blobOf(S.current.downloads.stl)], "studio.stl", { type: "model/stl" });
-      remember(src); location.hash = "torchc0";
+      veil.band(0, 40);
+      const f = new File([await blobOf(S.current.downloads.stl, veil.frac)], "studio.stl", { type: "model/stl" });
+      remember(src); veil.band(40, 98); location.hash = "torchc0";
       document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f }));
       return true;
     }
+    if (covered) veil.band(0, target === "slicer" ? 30 : 15);
     const id = await editIdFrom(src, explicit);
     remember(src);
     if (target === "cad") {
@@ -138,10 +143,9 @@ export async function sendTo(target, src = sourceNow(), opt) {
       location.href = `/static/cad.html?bid=${encodeURIComponent(id)}&from=${encodeURIComponent(NAMES[src])}&back=${encodeURIComponent("/#" + src)}`;
       return true;
     }
-    if (target === "slicer") { location.hash = tool ? "slicer/" + tool : "slicer"; document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })); return true; }
-    if (target === "torchc0") { const f = await fileFromEdit(id); location.hash = "torchc0"; document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f })); return true; }
-  } catch (e) { toast(e.message, "err"); return false; }
-  finally { setTimeout(() => root.classList.remove("handing"), 220); }
+    if (target === "slicer") { veil.band(30, 95); location.hash = tool ? "slicer/" + tool : "slicer"; document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })); return true; }
+    if (target === "torchc0") { veil.band(15, 45); const f = await fileFromEdit(id); veil.band(45, 98); location.hash = "torchc0"; document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f })); return true; }
+  } catch (e) { veil.close(); toast(e.message, "err"); return false; }
 }
 
 /* ---- the menu ---- */

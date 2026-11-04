@@ -4,6 +4,7 @@ import { openSend } from "/static/send.js";
 import { S, api, toast, inlineMsg, clearInline, $, $$, esc, openPrint, loadHistory, renderHistory, openFull, isExpert } from "/static/app.js";
 import { guardNewBuild } from "/static/workspace-bar.js";
 import { rememberCopy, readFlow, reuseCopy, forgetCopy } from "/static/project-flow.js";
+import { fetchBytes, progress as handoffProgress } from "/static/handoff-veil.js";
 import { photoBlock, mountPhoto } from "/static/photo.js";
 import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate, dropPlateGizmo } from "/static/plate.js";
 import { previewPlacement } from "/static/gizmo-math.js";
@@ -188,14 +189,22 @@ document.addEventListener("zeim:edit-from-build", e => {
     fromBuild(id);
   }
 });
+/* the project JSON (it carries the mesh preview, so it can be large): streamed, so the hand-off veil shows real bytes */
+async function getProject(id) {
+  const { r, buf } = await fetchBytes("/api/edit/" + encodeURIComponent(id), null, handoffProgress);
+  let j = null; try { j = JSON.parse(new TextDecoder().decode(buf)); } catch { }
+  if (!r.ok) { const er = new Error(window.__errText ? window.__errText(j, r) : `HTTP ${r.status}`); er.status = r.status; throw er; }
+  return j;
+}
 document.addEventListener("zeim:open-edit", async e => {
   const gen = ++editLoadGen;
   try {
-    const p = await api("/api/edit/" + encodeURIComponent(e.detail));
+    const p = await getProject(e.detail);
     if (gen !== editLoadGen) return;
     loadProject(p);
   } catch (er) {
     forgetCopy(sessionStorage, e.detail);
+    document.dispatchEvent(new CustomEvent("zeim:edit-load-failed"));
     if (gen === editLoadGen) toast(er.message, "err");
   }
 });

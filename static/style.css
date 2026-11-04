@@ -1518,3 +1518,13 @@ a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width
 /* Lithophane settings sheet reads as one piece with the bar: edge to edge, flush on top of it, same flat edge and top line. */
 #viewCreate.has-model.litho-sheet>#zws-settings{max-width:none!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;box-shadow:0 -6px 18px rgba(0,0,0,.12)!important;background:color-mix(in srgb,var(--panel) 96%,#fff)!important;margin:0!important}
 @media (min-width:769px){#viewCreate.has-model.litho-sheet>#zws-settings{border-right:1px solid var(--line)!important;border-radius:0!important}}
+/* hand-off veil (handoff-veil.js): opaque cover over the target section until its model is drawn */
+.handoff-veil{position:fixed;left:0;right:0;bottom:0;z-index:60;display:grid;place-items:center;background:var(--bg,#fff);color:var(--txt,#0a0a0a);opacity:1;transition:opacity .12s ease}
+.handoff-veil[hidden]{display:none}
+.handoff-veil.out{opacity:0;pointer-events:none}
+.handoff-veil .hv-box{width:min(320px,80vw);text-align:center}
+.handoff-veil .hv-label{margin:0 0 .6rem;font-weight:600}
+.handoff-veil .hv-bar{height:6px;border-radius:3px;background:color-mix(in srgb,currentColor 12%,transparent);overflow:hidden}
+.handoff-veil .hv-bar i{display:block;height:100%;width:0;background:var(--acc,#0066ff);transition:width .1s linear}
+.handoff-veil .hv-pct{margin:.5rem 0 0;font-variant-numeric:tabular-nums;opacity:.75}
+@media (prefers-reduced-motion:reduce){.handoff-veil,.handoff-veil .hv-bar i{transition:none}}

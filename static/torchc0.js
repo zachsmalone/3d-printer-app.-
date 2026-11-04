@@ -3,6 +3,7 @@
 import { api, esc, $ } from "/static/app.js";
 import { money } from "/static/cost.js";
 import * as THREE from "three";
+import { postForm, progress as handoffProgress } from "/static/handoff-veil.js";
 
 /* 3D result view: the prepared STL with island (red) and suction-cup (orange) markers. Lazy: only made after a result. */
 const views = new WeakMap();   // one viewer per element: the picked-model preview and the result each keep their own
@@ -117,16 +118,17 @@ function wire() {
     const seq = ++pickSeq, pv = $("#rzPickView");
     try {
       const fd = new FormData(); fd.append("file", f);
-      const r = await fetch("/api/resin/preview", { method: "POST", body: fd, credentials: "same-origin" });
+      const r = await postForm("/api/resin/preview", fd, handoffProgress);   // real upload/download % for the hand-off veil
       if (seq !== pickSeq) return;
-      if (!r.ok) { let m = `HTTP ${r.status}`; try { m = (await r.json()).detail || m; } catch { }
+      if (!r.ok) { let m = `HTTP ${r.status}`; try { m = JSON.parse(new TextDecoder().decode(r.buf)).detail || m; } catch { }
         st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it. ${m}`; pv.hidden = true; return; }
-      const buf = await r.arrayBuffer(); if (seq !== pickSeq) return;
+      const buf = r.buf; if (seq !== pickSeq) return;
       const n = +r.headers.get("X-Zeim-Faces") || 0, uid = r.headers.get("X-Zeim-Upload");
       if (uid) picked = { f, id: uid };
       pv.hidden = false; await show3D(pv, null, null, buf); pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
       st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
     } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
+    finally { if (seq === pickSeq) document.dispatchEvent(new CustomEvent("zeim:torchc0-loaded")); }   // the hand-off veil lifts
   };
   inp.addEventListener("change", () => { delete document.body.dataset.torchStl; show(); });   // a new model: Send to… uses it, not the old result
   // tapping anywhere on the drop zone opens the picker (phones can't drop); the input itself already does
