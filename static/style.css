@@ -1528,3 +1528,4 @@ a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width
 .handoff-veil .hv-bar i{display:block;height:100%;width:0;background:var(--acc,#0066ff);transition:width .1s linear}
 .handoff-veil .hv-pct{margin:.5rem 0 0;font-variant-numeric:tabular-nums;opacity:.75}
 @media (prefers-reduced-motion:reduce){.handoff-veil,.handoff-veil .hv-bar i{transition:none}}
+.handoff-veil .hv-stage{margin:.25rem 0 0;font-size:.85rem}

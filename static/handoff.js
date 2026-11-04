@@ -151,13 +151,13 @@ export async function sendTo(target, src = sourceNow(), opt) {
   if (covered) veil.open(`Opening in ${NAMES[target]}…`, target === "slicer" ? ["zeim:edit-loaded", "zeim:edit-load-failed"] : ["zeim:torchc0-loaded"]);
   try {
     if (!explicit && src === "lithophane" && target === "torchc0" && S.current?.downloads?.stl) {
-      veil.band(0, 40);
+      veil.band(0, 40, "Downloading the model…");
       const f = new File([await blobOf(S.current.downloads.stl, veil.frac)], "studio.stl", { type: "model/stl" });
-      remember(src); veil.band(40, 98); location.hash = "torchc0";
+      remember(src); veil.band(40, 98, "Loading it into TorchC0…"); location.hash = "torchc0";
       document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f }));
       return true;
     }
-    if (covered) veil.band(0, target === "slicer" ? 30 : 15);
+    if (covered) veil.band(0, target === "slicer" ? 30 : 15, "Saving and preparing your model…");
     const id = await editIdFrom(src, explicit);
     remember(src);
     if (target === "cad") {
@@ -165,8 +165,8 @@ export async function sendTo(target, src = sourceNow(), opt) {
       location.href = `/static/cad.html?bid=${encodeURIComponent(id)}&from=${encodeURIComponent(NAMES[src])}&back=${encodeURIComponent("/#" + src)}`;
       return true;
     }
-    if (target === "slicer") { veil.band(30, 95); location.hash = tool ? "slicer/" + tool : "slicer"; document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })); return true; }
-    if (target === "torchc0") { veil.band(15, 45); const f = await fileFromEdit(id); veil.band(45, 98); location.hash = "torchc0"; document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f })); return true; }
+    if (target === "slicer") { veil.band(30, 95, "Loading it into the Slicer…"); location.hash = tool ? "slicer/" + tool : "slicer"; document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: id })); return true; }
+    if (target === "torchc0") { veil.band(15, 45, "Downloading the model…"); const f = await fileFromEdit(id); veil.band(45, 98, "Loading it into TorchC0…"); location.hash = "torchc0"; document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: f })); return true; }
   } catch (e) { veil.close(); toast(e.message, "err"); return false; }
 }
 
