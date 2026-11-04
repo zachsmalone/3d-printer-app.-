@@ -8,13 +8,12 @@ Direction from Zach: the model is the product. One persistent Three.js scene and
 - **Fixed layout in Atelier.** The bed plate, the layout and the quick-button positions stay identical in every tool section. Only what the tools do changes, never where they sit.
 - **Real loading percentage.** When a section's tools load, show progress based on the actual tool modules and assets fetched (bytes or module count). Do not show a fake timer.
 - **CAD hides slicer tools.**
-- **Printer type set in Me controls the process.** With a resin printer, FDM tools are hidden, and so is the option to switch to FDM. With an FDM printer, resin is hidden the same way.
+- **Printer type set in Me controls the process.** With a resin printer, FDM tools are hidden, and so is the option to switch to FDM. With an FDM printer, resin is hidden the same way. **With both kinds or none selected, both processes show and the user can switch between them.** This was resolved by Zach.
 
 ## Open questions
 
-1. Printer type 'both' or 'none': the proposal is that 'both' shows both processes, with the last-used one as primary. 'none' (logged out or not set yet) shows both, plus a first-run picker. Zach to confirm.
-2. Does the one design system replace the Japanese section themes? Pending Zach. PR9 waits on this.
-3. Fully hiding the other process means it can't be forced from the switcher. That overrides the earlier "power users can force a mode" spec. Is that intended?
+1. Does the one design system replace the Japanese section themes? Pending Zach. PR9 waits on this.
+2. Fully hiding the other process means it can't be forced from the switcher. That overrides the earlier "power users can force a mode" spec. Is that intended?
 
 ## (a) Current state (from the code)
 
@@ -56,13 +55,13 @@ Size is relative only.
 2. **PR2 – Top nav becomes Showcase / Atelier / Me (S–M).** The old work sections become Atelier sub-modes. Old hashes such as `#slicer` and `#cad` map to them.
 3. **PR3 – Atelier fixed layout + shared stage for in-page modes (L).** Lithophane, FDM, TorchC0, sculpt and Edit get the same plate and quick-button slots.
 4. **PR4 – Lazy mode loading with a real % bar (S–M).** Uses dynamic `import()` progress and asset fetch progress.
-5. **PR5 – Process gate from the Me printer type (S–M).** Includes CAD hiding slicer tools. 'both' and 'none' follow whatever Zach decides on open question 1.
+5. **PR5 – Process gate from the Me printer type (S–M).** Includes CAD hiding slicer tools. 'both' and 'none' show both processes, with switching allowed.
 6. **PR6 – Repair + builder as modes (M).**
 7. **PR7 – CAD as an Atelier mode (L, may split).** Keep the `cad.html` redirect fallback.
 8. **PR8 – Global undo/redo (M).**
 9. **PR9 – Data-aware CTAs (S–M).** They respect the process gate.
 10. **PR10 – Showcase and Me as overlays that don't unload the model (M).**
-11. **PR11 – Design tokens (M).** Blocked on open question 2.
+11. **PR11 – Design tokens (M).** Blocked on open question 1.
 
 ## (d) Risks
 
