@@ -384,6 +384,32 @@ def goto(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     return _act(bid, actor, lambda: editproj.goto(bid, h))
 
 
+@router.get("/{bid}/versions")
+def list_versions(bid: str, actor: Actor = Depends(get_actor)):
+    _edit_meta(bid, actor, owner_only=True)
+    from ..services import versions
+    return {"versions": versions.list_versions(bid), "max": versions.MAX_VERSIONS}
+
+
+@router.post("/{bid}/versions")
+def save_version(bid: str, body: dict, actor: Actor = Depends(get_actor)):
+    from ..services import versions
+    _edit_meta(bid, actor, owner_only=True)
+    try:
+        v = versions.save(bid, str((body or {}).get("label") or ""))
+    except safety.ChatBlocked as e:
+        return JSONResponse(status_code=e.status, content=e.payload)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"version": v, "versions": versions.list_versions(bid)}
+
+
+@router.post("/{bid}/versions/{n}/restore")
+def restore_version(bid: str, n: int, actor: Actor = Depends(get_actor)):
+    from ..services import versions
+    return _act(bid, actor, lambda: versions.restore(bid, n) and None)
+
+
 @router.get("/{bid}/original")
 def original(bid: str, actor: Actor = Depends(get_actor)):
     """The upload exactly as received (never modified)."""
