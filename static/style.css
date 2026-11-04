@@ -1449,3 +1449,4 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 .npscard .npsrow{display:flex;gap:3px}.npscard .npsrow .btn{flex:1 1 0;min-width:0;padding:6px 0;justify-content:center;text-align:center}
 .npscard .help{display:flex;justify-content:space-between;gap:8px;margin:6px 0 0}
 @media (max-width:600px){.npscard{left:12px;right:12px;max-width:none}}
+.shmore{grid-column:1/-1;list-style:none;display:flex;justify-content:center;padding:8px 0}

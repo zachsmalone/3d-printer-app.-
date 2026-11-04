@@ -518,12 +518,13 @@ const origMoreHTML = i => {
   if (i.assembly_steps?.length) out.push(`<h4>Put it together</h4><ul class="orig-steps">${i.assembly_steps.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`);
   return out.length ? `<section class="orig-more" aria-label="About this ZEIM Original">${out.join("")}</section>` : "";
 };
+let shLimit = 48;   // one page; Show more asks for the next one
 async function loadShowcase() {
   const q = $("#shSearch").value.trim();
   $("#shClear").hidden = !q;
   let r;
   if (!$("#shGrid").children.length) $("#shGrid").innerHTML = '<li class="skel" aria-hidden="true"></li>'.repeat(4);      // loading skeletons (first load only)
-  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}&sort=${encodeURIComponent(shSortVal())}${shFilterQS()}`); } catch (e) { toast(e.message, "err"); return; }
+  try { r = await api(`/api/showcase?tab=${shTab}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(shCat)}&ai=${encodeURIComponent(shAiVal())}&sort=${encodeURIComponent(shSortVal())}${shFilterQS()}&limit=${shLimit}`); } catch (e) { toast(e.message, "err"); return; }
   $("#shNotice").textContent = r.originals_notice || "";
   if (r.filters && $("#shMature")) $("#shMature").value = r.filters.mature;
   // category filters: built from what THIS viewer may see (hidden categories never reach under-13s)
@@ -536,6 +537,8 @@ async function loadShowcase() {
   $("#shGrid").innerHTML = r.items.map(i => `<li class="pcard" data-item="${i.id}"><div class="ph${i.nsfw ? " nsfw" : ""}" aria-hidden="true">${i.thumb ? `<img src="${i.thumb}" alt="">` : (MODE_ICON[i.mode] || "<svg class=i aria-hidden=true focusable=false><use href=#i-cube></use></svg>")}${i.example ? '<span class="ex">EXAMPLE</span>' : ""}</div>${matLabel(i)}
     <div class="meta"><h2><a href="#" data-open="${i.id}">${esc(i.title)}</a></h2><span>${i.original ? esc(i.creator) : `<a class="creator-link" href="/u/${i.creator_id}">${esc(i.creator)}</a>`}${(i.creator_badges || []).some(b => b.id === "creator") ? ` <span class="pill">Creator</span>` : ""}${i.credit?.licence ? ` · ${esc(i.credit.licence)}` : ""}</span>${socHTML(i.creator_links)}${i.remix_chain?.length ? `<span class="pill">Remix</span>` : ""}${i.visibility && i.visibility !== "public" ? `<span class="pill">${esc(i.visibility)}</span>` : ""}${provHTML(i)}</div>
     ${i.original ? origHTML(i) : ""}<div class="cardfoot"><span class="wp" data-wp="${i.files?.length && !i.no_model && !i.example ? i.id : ""}"></span>${nzHTML(i, { uid: "g" })}${favHTML(i)}${i.downloads != null ? `<span class="dl"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${i.downloads}<span class="sr-only"> downloads</span></span>` : ""}</div></li>`).join("");
+  if (r.has_more) $("#shGrid").insertAdjacentHTML("beforeend", `<li class="shmore"><button type="button" class="btn" id="shMore">Show more (${r.result_count - r.items.length} more)</button></li>`);
+  $("#shMore")?.addEventListener("click", () => { shLimit += 48; loadShowcase(); });
   showcaseBadges();
   if (!r.items.length) {
     const filtered = !!(q || shCat || shAiVal() !== "show" || shNarrowed());
