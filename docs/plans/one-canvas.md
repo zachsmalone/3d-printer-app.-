@@ -8,7 +8,7 @@ Direction from Zach: the model is the product. One persistent Three.js scene and
 - **Fixed layout in Atelier.** The bed plate, the layout and the quick-button positions stay identical in every tool section. Only what the tools do changes, never where they sit.
 - **Real loading percentage.** When a section's tools load, show progress based on the actual tool modules and assets fetched (bytes or module count). Do not show a fake timer.
 - **CAD hides slicer tools.**
-- **Printer type set in Me controls the process.** With a resin printer, FDM tools are hidden, and so is the option to switch to FDM. With an FDM printer, resin is hidden the same way. **With both kinds or none selected, both processes show and the user can switch between them.** This was resolved by Zach.
+- **Printer type set in Me controls the process.** With a resin printer, FDM tools are hidden, and so is the option to switch to FDM. With an FDM printer, resin is hidden the same way. **With both kinds or none selected, the user must pick resin OR FDM before Atelier shows any process tools. Only the picked process shows, never both.** They can change it later in Me (printer / process setting). This was resolved by Zach.
 
 ## Open questions
 
@@ -55,7 +55,7 @@ Size is relative only.
 2. **PR2 – Top nav becomes Showcase / Atelier / Me (S–M).** The old work sections become Atelier sub-modes. Old hashes such as `#slicer` and `#cad` map to them.
 3. **PR3 – Atelier fixed layout + shared stage for in-page modes (L).** Lithophane, FDM, TorchC0, sculpt and Edit get the same plate and quick-button slots.
 4. **PR4 – Lazy mode loading with a real % bar (S–M).** Uses dynamic `import()` progress and asset fetch progress.
-5. **PR5 – Process gate from the Me printer type (S–M).** Includes CAD hiding slicer tools. 'both' and 'none' show both processes, with switching allowed.
+5. **PR5 – Process gate from the Me printer type (S–M).** Includes CAD hiding slicer tools. 'both' and 'none' get a required one-time picker before process tools appear, and the choice can be changed in Me.
 6. **PR6 – Repair + builder as modes (M).**
 7. **PR7 – CAD as an Atelier mode (L, may split).** Keep the `cad.html` redirect fallback.
 8. **PR8 – Global undo/redo (M).**
