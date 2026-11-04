@@ -60,9 +60,10 @@ _credits.assert_launch_ready()
 
 @app.on_event("startup")
 def _start_retention():
-    """Clean up expired build files now and every hour (starred builds are never touched; see services/retention.py)."""
-    from .services import retention
-    retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
+    """PERF10: retention clean-up and the nightly backup run at 03:00 / 03:30 Chicago time in one
+    low-priority thread (services/offpeak.py). Retention only acts when PHOTO3D_PUBLIC_LAUNCH=1."""
+    from .services import offpeak
+    offpeak.start_background()
 
 
 @app.on_event("startup")
@@ -78,10 +79,11 @@ from .api import ai3d as ai3d_api
 from .api import subscriptions as subscriptions_api
 from .api import feedback as feedback_api
 from .api import metrics as metrics_api
+from .api import email as email_api
 for r in (builds.router, edit.router, parts_api.router, cad_api.router, printing.router, printing.files_router, settings_api.router,
           showcase_extras.router, showcase_rest.router, collections_api.router,
           community.router, learn.router, learn.pages, slice_api.router, social_api.router, printsetup.router,
-          export_api.router, export_api.me_router, calibration_api.router, doctor_api.router, repair_api.router, resin_api.router, ai3d_api.router, subscriptions_api.router, feedback_api.router, metrics_api.router):
+          export_api.router, export_api.me_router, calibration_api.router, doctor_api.router, repair_api.router, resin_api.router, ai3d_api.router, subscriptions_api.router, feedback_api.router, metrics_api.router, email_api.router):
     app.include_router(r)
 
 # Passkey + email-code login (docs/auth.md). Localhost / ZEIM_ENV=dev get safe defaults.
