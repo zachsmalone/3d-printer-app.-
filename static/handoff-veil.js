@@ -9,7 +9,7 @@ function node() {
   if (el) return el;
   el = document.createElement("div"); el.id = "handoffVeil"; el.className = "handoff-veil"; el.hidden = true;
   el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
-  el.innerHTML = `<div class="hv-box"><p class="hv-label"></p><div class="hv-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="hv-pct">0%</p></div>`;
+  el.innerHTML = `<div class="hv-box"><p class="hv-label"></p><div class="hv-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"><i></i></div><p class="hv-pct">0%</p><p class="hv-stage help"></p></div>`;
   document.body.append(el); return el;
 }
 function paint(v) {
@@ -25,6 +25,7 @@ export function open(label, until) {
   const top = document.querySelector("header.topbar")?.getBoundingClientRect().bottom || 0;
   v.style.top = Math.max(0, Math.round(top)) + "px";
   v.querySelector(".hv-label").textContent = label;
+  v.querySelector(".hv-stage").textContent = "";
   v.classList.remove("out"); v.hidden = false; paint(0);
   const onP = e => frac(+e.detail || 0);
   const evs = until || [];
@@ -34,7 +35,7 @@ export function open(label, until) {
   done = () => { document.removeEventListener("zeim:handoff-progress", onP); evs.forEach(n => document.removeEventListener(n, fin)); done = null; };
   guard = setTimeout(close, 180000);                        // never leave the page covered
 }
-export const band = (a, b) => { lo = a; hi = b; paint(a); };
+export const band = (a, b, stage) => { lo = a; hi = b; paint(a); if (el && stage) el.querySelector(".hv-stage").textContent = stage; };
 export const frac = f => paint(lo + (hi - lo) * Math.max(0, Math.min(1, f)));
 export const isOpen = () => !!el && !el.hidden;
 export function close() {
