@@ -435,9 +435,14 @@ export function wirePanel(getModelId) {
     $("#spMatWarn").hidden = false;
     if (gcDispose) { gcDispose(); gcDispose = null; }
     out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}…</p>`; $("#spGo").disabled = true;
-    bedBusy(true, "Slicing…");
+    // UX4: show how long it has been and let the maker stop waiting (the page cannot stop the server's slice).
+    const ctl = new AbortController(), t0 = Date.now();
+    bedBusy(true, "Slicing… 0 s");
+    const tick = setInterval(() => bedBusy(true, `Slicing… ${Math.round((Date.now() - t0) / 1000)} s`), 1000);
+    const stop = document.getElementById("editBusyCancel");
+    if (stop) { stop.hidden = false; stop.onclick = () => ctl.abort(); }
     try {
-      const r = await api("/api/slice", { method: "POST", body: fd });
+      const r = await api("/api/slice", { method: "POST", body: fd, signal: ctl.signal });
       const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
       const paintNote = r.support_paint
         ? `<p class="help">Paint-on supports: ${r.support_paint.enforcers || 0} need / ${r.support_paint.blockers || 0} never. ${esc(r.support_paint.supports_note || r.support_paint.note || "")}</p>`
@@ -482,9 +487,10 @@ export function wirePanel(getModelId) {
         $("#spVentOk").onclick = () => doSlice(true);
         $("#spVentNo").onclick = () => { out.innerHTML = ""; $("#spMatWarn").hidden = false; $("#spMat").focus(); };
         $("#spVentOk").focus();
-      } else out.innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`;
+      } else if (e.name === "AbortError") out.innerHTML = `<p class="help" role="status">Stopped waiting for this slice. Nothing was sent to a printer. Press Slice to try again.</p>`;
+      else out.innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`;
     }
-    finally { $("#spGo").disabled = false; bedBusy(false); }
+    finally { clearInterval(tick); if (stop) { stop.hidden = true; stop.onclick = null; } $("#spGo").disabled = false; bedBusy(false); }
   };
   $("#spGo").onclick = () => doSlice(false);
   applySmartFix();
