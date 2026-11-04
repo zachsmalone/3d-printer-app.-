@@ -101,9 +101,16 @@
       <button type="button" class="cw-sheetbtn" id="cwSheetBtn" aria-controls="cwSide" aria-expanded="false" aria-label="Show more of History and Items"><span aria-hidden="true"></span></button>
       <button role="tab" id="tabHist" aria-selected="true" aria-controls="cwHist">History</button>
       <button role="tab" id="tabItems" aria-selected="false" aria-controls="cwItems">Items</button>
+      <button role="tab" id="tabVers" aria-selected="false" aria-controls="cwVers">Versions</button>
     </div>
     <ol class="cw-hist" id="cwHist" role="tabpanel" aria-labelledby="tabHist"></ol>
     <div class="cw-items" id="cwItems" role="tabpanel" aria-labelledby="tabItems" hidden></div>
+    <div class="cw-items" id="cwVers" role="tabpanel" aria-labelledby="tabVers" hidden>
+      <p class="help">Save the steps as they are now and come back to them later. Restoring first saves what you have, so you can undo it.</p>
+      <div class="kv"><label for="cvName">Name</label><input id="cvName" maxlength="60" placeholder="Optional"></div>
+      <button type="button" class="primary" id="cvSave">Save version</button>
+      <ol class="cw-hist" id="cvList"></ol>
+    </div>
     <p class="cw-msg" id="cwMsg" role="alert"></p>
   </aside>
 </main>

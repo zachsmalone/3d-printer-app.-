@@ -1045,8 +1045,24 @@ $("#cwItems").addEventListener("click", e => {
   const sk = e.target.closest("[data-skedit]"); if (sk) { const st = S.scene.ops[+sk.dataset.skedit - 1]; return startSketch(st.params.plane, st.params.sketch, st.i); }
   const b = e.target.closest("[data-body]"); if (b) { S.selBody = S.selBody === +b.dataset.body ? -1 : +b.dataset.body; drawSelection(); }
 });
-const tabs = [["#tabHist", "#cwHist"], ["#tabItems", "#cwItems"]];
-tabs.forEach(([t, p]) => $(t).onclick = () => tabs.forEach(([t2, p2]) => { $(t2).setAttribute("aria-selected", t2 === t); $(p2).hidden = t2 !== t; }));
+/* ---------------------------------------------------------------- FEAT5: saved versions */
+async function renderVers() {
+  const ol = $("#cvList"); if (!ol || !S.bid) return;
+  try {
+    const r = await api(`/api/edit/${S.bid}/versions`);
+    if (!r.versions.length) { ol.innerHTML = `<li><div class="hrow"><span class="nm" style="color:var(--mut)">No saved versions yet.</span></div></li>`; return; }
+    ol.innerHTML = r.versions.slice().reverse().map(v => `<li><div class="hrow"><span class="nm">${T(v.label)} <small>· ${v.head} of ${v.steps} steps · ${T(new Date(v.created).toLocaleString())}</small></span><button type="button" data-restore="${v.n}">Restore</button></div></li>`).join("");
+    fillTx(ol);
+  } catch (e) { ol.innerHTML = ""; msg(e.message); }
+}
+$("#cvSave").onclick = () => S.bid && run(async () => { await api(`/api/edit/${S.bid}/versions`, { method: "POST", json: { label: $("#cvName").value } }); $("#cvName").value = ""; await renderVers(); }, "Version saved.");
+$("#cvList").addEventListener("click", e => {
+  const b = e.target.closest("[data-restore]"); if (!b || !S.bid) return;
+  if (!confirm("Restore this version? What you have now is saved as a version first.")) return;
+  run(async () => { await api(`/api/edit/${S.bid}/versions/${b.dataset.restore}/restore`, { method: "POST" }); await load(true); await renderVers(); }, "Version restored.");
+});
+const tabs = [["#tabHist", "#cwHist"], ["#tabItems", "#cwItems"], ["#tabVers", "#cwVers"]];
+tabs.forEach(([t, p]) => $(t).onclick = () => { tabs.forEach(([t2, p2]) => { $(t2).setAttribute("aria-selected", t2 === t); $(p2).hidden = t2 !== t; }); if (t === "#tabVers") renderVers(); });
 
 /* ---------------------------------------------------------------- Section view + Measure */
 function sectionUpdate() {

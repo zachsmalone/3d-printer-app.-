@@ -53,6 +53,15 @@ CREATE TABLE IF NOT EXISTS upload_events(
     ts  REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_upload_events_sid ON upload_events(sid, ts);
+-- FEAT5 (additive only): saved versions of an edit project. Nothing existing is altered.
+CREATE TABLE IF NOT EXISTS build_versions(
+    bid      TEXT NOT NULL,
+    n        INTEGER NOT NULL,
+    created  TEXT NOT NULL,
+    label    TEXT NOT NULL,
+    snapshot TEXT NOT NULL,
+    PRIMARY KEY(bid, n)
+);
 """
 
 
@@ -205,6 +214,7 @@ def build_delete(bid: str) -> None:
     c = conn()
     with _TX_LOCK:
         c.execute("DELETE FROM builds WHERE id=?", (bid,))
+        c.execute("DELETE FROM build_versions WHERE bid=?", (bid,))   # a deleted build's saved versions go with it
         c.commit()
 
 
