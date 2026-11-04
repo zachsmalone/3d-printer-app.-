@@ -472,7 +472,7 @@ def zeim_account_created(account_id: str, display_name: str, birth_date: Optiona
                          username: Optional[str] = None) -> None:
     """A passkey or password sign-up finished: make its ZEIM account record (owner id == auth account id)."""
     from app.community import identity as idn
-    idn.link_auth_account(account_id, display_name or "", birth_date, username=username)
+    idn.link_auth_account(account_id, display_name or "", None, username=username)
 
 
 def zeim_signed_in(request: Request, session) -> None:

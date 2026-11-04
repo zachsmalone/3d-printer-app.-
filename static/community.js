@@ -341,7 +341,6 @@ function renderAccount() {
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 18 letters, numbers or underscores. Leave it empty and ZEIM makes you a friendly nickname you can change later. Not your real name, email or phone number.</small></div>
-      <div class="field"><label for="su_dob">Date of birth <em>used only to confirm you are 18 or over; not kept if you are not</em></label><input id="su_dob" type="date"></div>
       <details class="su-printer"><summary>Your printer <em>optional</em></summary><div id="su_printer"><p class="help">Loading printers…</p></div></details>
       <button class="btn primary" id="su_go">Create account</button>
       <details class="recover"><summary>Signed out before? Get your account back with a recovery code</summary>
@@ -358,7 +357,7 @@ function renderAccount() {
     loadCatalog().then(() => { if ($("#su_printer")) { $("#su_printer").innerHTML = pickerHTML("su", P.pref, { optional: true }); wirePicker("su"); } }).catch(() => { });
     $("#su_go").onclick = async () => {
       const pick = $("#su_pr") ? readPicker("su") : null;
-      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, dob: $("#su_dob").value, username: $("#su_user").value.trim(), ...(pick || {}) })); if (pick) savePref(pick).catch(() => { }); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
+      try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, username: $("#su_user").value.trim(), ...(pick || {}) })); if (pick) savePref(pick).catch(() => { }); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
         if (e.status === 403 && /^Sorry, ZEIM accounts are for adults/.test(e.message)) {     // the 18+ refusal: a calm panel instead of an unchanged form
           $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still build and use the ${esc(CFG.sections.learn)} lessons without an account.</p></div>`;

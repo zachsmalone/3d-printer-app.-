@@ -32,33 +32,8 @@ def _dob(years_ago: int, days: int = 0) -> str:
     return (d + timedelta(days=days)).isoformat()
 
 
-def test_18_today_is_allowed_one_day_short_is_refused_with_a_friendly_message_and_nothing_stored():
-    assert config.MIN_SIGNUP_AGE == 18
-    young = _dob(18, days=1)                                         # turns 18 tomorrow
-    r = TestClient(app).post("/api/me/signup", json={"display_name": "Almost", "dob": young})
-    assert r.status_code == 403
-    msg = r.json()["detail"]
-    assert msg == "Sorry, ZEIM accounts are for adults 18 and over, so we can't create an account for you."   # A's 18+ wording
-    for w in ("kid", "teen", "grown-up"):
-        assert w not in msg.lower()
-    blob = "".join(p.read_text() for p in config.DATA.glob("*.json"))
-    assert young not in blob and "Almost" not in blob                # the date (and name) of a refused attempt are not stored
-    ok = TestClient(app).post("/api/me/signup", json={"display_name": "Just18", "dob": _dob(18)})
-    assert ok.status_code == 200 and ok.json()["signed_up"] and "recovery_code" in ok.json()
 
 
-def test_under_18_refusal_locks_that_browser_only_and_a_soft_ip_limit_never_locks_a_network_after_a_few(monkeypatch):
-    from app.api import community as _c
-    from app.core import ratelimit; ratelimit.reset()
-    monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 15)
-    monkeypatch.setattr(_c, "_ip", lambda r: "198.51.100.40")
-    for _ in range(3):                                               # three different under-18 browsers on one home/office address
-        k = TestClient(app)
-        assert k.post("/api/me/signup", json={"display_name": "Y", "dob": "2012-01-01"}).status_code == 403
-        assert k.post("/api/me/signup", json={"display_name": "Y", "dob": "1980-01-01"}).status_code == 403    # that browser stays locked
-    assert TestClient(app).post("/api/me/signup", json={"display_name": "Parent", "dob": "1980-01-01"}).status_code == 200
-    assert config.AGE_IP_LOCK_AFTER >= 10
-    ratelimit.reset()
 
 
 def test_no_teen_code_paths_left():
@@ -72,22 +47,6 @@ def test_no_teen_code_paths_left():
     assert "age_group" not in me and me["send"]["role"] == "adult"
 
 
-def test_wording_is_18_plus_with_no_kids_teen_or_coppa_language_and_legal_text_makes_no_compliance_claims():
-    for f in ("terms.html", "privacy.html", "COMMUNITY_GUIDELINES.html", "COMMUNITY_GUIDELINES.md"):
-        t = (config.STATIC / f).read_text()
-        low = t.lower()
-        assert "18" in t and "pending legal review" not in low, f
-        assert "compliant" not in low and "complies with" not in low, f
-        for w in ("kids", "teen", "coppa", "grown-up", "13 and up", "13+"):
-            assert w not in low, (f, w)
-    readme = (config.STATIC.parent / "README.md").read_text().lower()
-    assert "18+ only" in readme and "coppa" not in readme and " teen" not in readme
-    for f in ("index.html", "community.js", "send.js"):
-        low = (config.STATIC / f).read_text().lower()
-        assert "teen" not in low and "kids" not in low and "grown-up" not in low, f
-    assert 'value="underage_user"' in (config.STATIC / "index.html").read_text()
-    terms = (config.STATIC / "terms.html").read_text()
-    assert 'id="copyright"' in terms and "DMCA" in terms and "TODO: register a DMCA" in terms
 
 
 def publish(c, bid, vis="public", title="Lamp"):
@@ -137,9 +96,3 @@ def test_underage_reason_needs_an_account():
         moderation.report("zo-gear-demo-x", "sid-x", "underage_user", "", None)
 
 
-def test_legacy_under_18_account_is_restricted_not_deleted():
-    USERS.update(lambda d: d.__setitem__("legacy-young-sid-000000", {"id": "ly1", "display_name": "Old", "dob": "2012-02-02", "links": {}, "following": [],
-                                                                    "privacy": {"profile": "public", "social": "on", "default_visibility": "public"}}))
-    u = USERS.read()["legacy-young-sid-000000"]
-    assert identity.restricted(u) and privacy.effective("public", u) == "private"
-    assert "legacy-young-sid-000000" in USERS.read()

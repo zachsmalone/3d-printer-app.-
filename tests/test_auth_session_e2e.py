@@ -84,7 +84,7 @@ def test_passkey_account_owns_builds_on_every_device(zapp):
     assert me["display_name"] == "Passkey Pat" and me["username"]
     assert guest_bid in ids(a)                         # signed-out builds on this browser follow the new account
     rec = next(u for u in USERS.read().values() if u["id"] == s.owner_id)
-    assert rec.get("dob") == "1990-01-01"              # 18+ was checked at sign-up; the record carries the date like cookie accounts
+    assert "dob" not in rec                              # no age check: no birth date is kept
 
     b = browser(app)                                   # a second device
     assert guest_bid not in ids(b)
@@ -213,8 +213,6 @@ def test_passkey_signup_runs_zeim_display_name_filter(zapp):
     a = browser(app)
     r = a.post("/api/auth/signup/begin", json={"display_name": "kid@example.com", "birth_date": "1990-01-01"}, headers=H)
     assert r.status_code == 422 and r.json()["detail"]["code"] == "bad_name"
-    r = a.post("/api/auth/signup/begin", json={"display_name": "Young", "birth_date": "2012-01-01"}, headers=H)
-    assert r.status_code == 403 and r.json()["detail"]["code"] == "too_young"
 
 
 def test_link_auth_account_is_idempotent():

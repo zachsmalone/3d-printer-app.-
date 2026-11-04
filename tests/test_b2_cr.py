@@ -156,7 +156,6 @@ def test_cr15_adult_signup_shows_a_recovery_code_once_and_stores_only_a_hash():
     assert code not in stored and code.replace("-", "") not in stored and "recovery" in stored       # only the hash is there
     assert "recovery_code" not in t.get("/api/me").json()
     assert t.get("/api/me").json()["recovery"]["has_code"] is True
-    young = client(); r = young.post("/api/me/signup", json=UNDER18); assert r.status_code == 403 and "recovery_code" not in r.json()   # under 18: no account at all
 
 
 def test_cr15_new_browser_regains_the_adult_account_and_the_old_one_loses_it():

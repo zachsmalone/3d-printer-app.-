@@ -53,17 +53,7 @@ def default_signup_validator(cfg: AuthConfig, now: float) -> Callable:
         name = display_name.strip() if isinstance(display_name, str) else ""
         if not 1 <= len(name) <= 40 or any(ord(c) < 32 for c in name):
             raise AuthError("bad_name", "Please choose a display name of 1 to 40 characters.", 422)
-        try:
-            born = date.fromisoformat(birth_date) if isinstance(birth_date, str) else None
-        except ValueError:
-            born = None
-        today = date.fromtimestamp(now)
-        if born is None or born > today:
-            raise AuthError("bad_birth_date", "Please enter your birth date as YYYY-MM-DD.", 422)
-        age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
-        if age < cfg.min_age:
-            raise AuthError("too_young", f"ZEIM accounts are for people aged {cfg.min_age} and over.", 403)
-        return name
+        return name   # no birth date or age check (age gate removed by the owner)
     return validate
 
 

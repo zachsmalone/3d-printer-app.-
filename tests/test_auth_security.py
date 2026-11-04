@@ -183,12 +183,6 @@ def _born_years_ago(years, days_offset=0):
     return (today.replace(year=today.year - years) + timedelta(days=days_offset)).isoformat()
 
 
-@pytest.mark.parametrize("born", [_born_years_ago(18, 1), _born_years_ago(13), _born_years_ago(17)])
-def test_under_18_signup_rejected(born):
-    c, svc, _ = client()
-    r = c.post("/api/auth/signup/begin", json={"display_name": "Kid", "birth_date": born}, headers=H)
-    assert r.status_code == 403 and r.json()["detail"]["code"] == "too_young" and "18" in r.json()["detail"]["message"]
-    assert svc.store.one("SELECT COUNT(*) AS n FROM accounts")["n"] == 0
 
 
 def test_18th_birthday_today_is_allowed():
