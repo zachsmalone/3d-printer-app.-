@@ -1469,3 +1469,6 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 .mestats-t tr{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);padding:6px 0}
 .mestats-t th[scope=row]{grid-column:1/-1;border:0;padding:4px 0}.mestats-t td{border:0;text-align:left;padding:2px 0;white-space:normal}
 .mestats-t td::before{content:attr(data-l);display:block;font-size:12px;color:var(--mut)}}
+/* ONB10: one-time quiet tip after the first save */
+.onb10{position:fixed;left:50%;bottom:calc(var(--tabbar-h,0px) + env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 24px));background:var(--panel2,var(--panel));color:var(--txt);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:12px 14px;font-size:14px}
+.onb10 p{margin:0 0 8px}.onb10 .row{display:flex;gap:8px;justify-content:flex-end}

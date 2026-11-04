@@ -57,6 +57,7 @@ function panelHTML() {
       <div class="field"><label for="rzCostU">Price per</label><select id="rzCostU"><option value="l" ${(loadP().unit || cat.default_price_unit) === "l" ? "selected" : ""}>litre</option><option value="kg" ${loadP().unit === "kg" ? "selected" : ""}>kg</option></select></div></div>
     <p class="help" id="rzPriceNote"></p>
     <label class="inl chk"><input type="checkbox" id="rzHollow" checked> Hollow (saves resin; needs a drain hole)</label>
+    <p class="help warn rzWarn" id="rzDrainWarn" role="status" hidden>Hollow with no drain hole: liquid resin stays trapped inside, and the part can crack or leak later. Set Drain hole Ø to 2 mm or more, or turn Hollow off.</p>
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
     <p class="help">${esc(cat.test_note)} ${esc(cat.formats_note)}</p>
     <details><summary>Resin safety</summary><ul id="rzSafety">${cat.safety.map(s => `<li>${esc(s)}</li>`).join("")}</ul></details>
@@ -90,6 +91,8 @@ function wire() {
   let wallOk = false;
   const wallWarn = () => { $("#rzWallWarn").hidden = wallOk || !($("#rzHollow").checked && +$("#rzWall").value > 0 && +$("#rzWall").value < 1); };
   $("#rzWall").addEventListener("input", () => { wallOk = false; wallWarn(); }); $("#rzHollow").addEventListener("change", wallWarn);
+  const drainWarn = () => { $("#rzDrainWarn").hidden = !($("#rzHollow").checked && !(+$("#rzDrain").value > 0)); };   // UX10
+  $("#rzDrain").addEventListener("input", drainWarn); $("#rzHollow").addEventListener("change", drainWarn);
   $("#rzWallDismiss").onclick = () => { wallOk = true; wallWarn(); };
   $("#rzWallAnyway").onclick = () => { wallOk = true; wallWarn(); $("#rzGo").click(); };
   // file pick / drop: show name + size right away; wrong types get a friendly note (never blocks anything else)

@@ -445,7 +445,19 @@ function fillLithMat() {
   const set = (k, v) => { const el = $(`#expertOpts [name="${k}"]`); if (el) el.value = v; };
   set("min_thickness", mn); set("max_thickness", mx); set("resolution", d.resolution);
 }
-$("#lithMaterial").onchange = fillLithMat; $("#lithThk").onchange = fillLithMat;
+/* UX10: one-line why when a lithophane wall is outside the usual range (filament 0.8–3.2 mm, resin 0.5–3.0 mm). */
+function lithThkWarn() {
+  const w = $("#lithThkWarn"); if (!w) return;
+  const resin = $("#lithMaterial")?.value === "resin", [lo, hi] = resin ? [0.5, 3.0] : [0.8, 3.2];
+  const mn = +($(`#expertOpts [name="min_thickness"]`)?.value), mx = +($(`#expertOpts [name="max_thickness"]`)?.value);
+  const msg = [];
+  if (mn > 0 && mn < lo) msg.push(`Min ${mn} mm is under ${lo} mm: the brightest parts can break or print with holes.`);
+  if (mx > hi) msg.push(`Max ${mx} mm is over ${hi} mm: little light gets through, so dark areas look solid black.`);
+  if (mn > 0 && mx > 0 && mn >= mx) msg.push("Min should be smaller than max, or the picture comes out flat.");
+  w.textContent = msg.join(" "); w.hidden = !msg.length;
+}
+$("#lithMaterial").onchange = () => { fillLithMat(); lithThkWarn(); }; $("#lithThk").onchange = () => { fillLithMat(); lithThkWarn(); };
+["min_thickness", "max_thickness"].forEach(k => $(`#expertOpts [name="${k}"]`)?.addEventListener("input", lithThkWarn));
 /* Memory box: four lithophane sides. The preview is the box together. Downloads and Send to Slicer are the separate parts. */
 $("#lithMaterial").addEventListener("change", () => { $("#mbClear").value = $("#lithMaterial").value === "resin" ? 0.1 : 0.2; });
 $("#mbHole").onchange = () => { $("#mbCustom").hidden = $("#mbHole").value !== "custom"; $("#mbLightH").value = $("#mbHole").value === "puck" ? 22 : 24; };

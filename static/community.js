@@ -1140,6 +1140,7 @@ function openShowcase(build) {
 }
 $("#btnPublish").onclick = () => openShowcase(S.current);
 window.zeimOpenShowcase = openShowcase;
+window.zeimOpenChallenge = cid => openChallenge(cid);
 function openPublishFromQuery() {
   const q = new URLSearchParams(location.search);
   const pub = q.get("publish") || "";
