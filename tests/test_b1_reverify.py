@@ -43,18 +43,6 @@ def test_local_mode_other_peer_address_is_not_the_owner(monkeypatch):
 
 
 # ------------------------------------------------------------------ S-04 per address
-def test_age_gate_holds_for_a_client_with_no_cookies_from_the_same_address(monkeypatch):
-    monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 30)
-    from app.api import community as _c
-    monkeypatch.setattr(_c, "_ip", lambda r: r.headers.get("x-test-ip", "10.0.0.1"))                # the TestClient has no real addresses
-    young = {"display_name": "kid", "dob": "2018-01-01"}; old = {"display_name": "Ada", "dob": "1985-05-05"}
-    for _ in range(config.AGE_IP_LOCK_AFTER + 1): a = TestClient(app).post("/api/me/signup", json=young); assert a.status_code == 403
-    b = TestClient(app).post("/api/me/signup", json=old)                                          # brand-new browser, same address
-    assert b.status_code == 403 and b.json() == a.json()                                           # identical neutral answer
-    other = TestClient(app, headers={"X-Test-Ip": "198.51.100.7"})                           # a different address is unaffected
-    assert other.post("/api/me/signup", json=old).status_code == 200
-    monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 0)
-    assert TestClient(app).post("/api/me/signup", json=old).status_code == 200                      # flag off -> no address lock
 
 
 def test_age_ip_lock_expires(monkeypatch):
@@ -65,18 +53,6 @@ def test_age_ip_lock_expires(monkeypatch):
     assert TestClient(app).post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"}).status_code == 200
 
 
-def test_one_under_18_refusal_does_not_lock_an_adult_on_the_same_shared_address(monkeypatch):
-    """A home, office or library sits behind one public address. A single refusal locks that browser only."""
-    monkeypatch.setattr(config, "AGE_IP_LOCK_MINUTES", 30)
-    from app.api import community as _c
-    from app.core import ratelimit; ratelimit.reset()
-    monkeypatch.setattr(_c, "_ip", lambda r: "203.0.113.9")
-    kid = TestClient(app)
-    assert kid.post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"}).status_code == 403
-    assert kid.post("/api/me/signup", json={"display_name": "kid", "dob": "1985-01-01"}).status_code == 403       # same browser stays locked (cookie + session)
-    assert TestClient(app).post("/api/me/signup", json={"display_name": "Alex", "dob": "2000-01-01"}).status_code == 200   # another adult, same address
-    assert TestClient(app).post("/api/me/signup", json={"display_name": "Ada", "dob": "1985-05-05"}).status_code == 200   # adult, same address
-    ratelimit.reset()
 
 
 # ------------------------------------------------------------------ admin token guessing
@@ -105,10 +81,6 @@ def test_cookie_secure_flag_can_be_forced(monkeypatch):
     assert "Secure" in TestClient(app).get("/api/config").headers["set-cookie"]
 
 
-def test_age_cookie_has_flags_too(monkeypatch):
-    r = TestClient(app, base_url="https://testserver").post("/api/me/signup", json={"display_name": "kid", "dob": "2018-01-01"})
-    sc = r.headers.get("set-cookie", "")
-    assert "p3d_ag" in sc and "Secure" in sc and "HttpOnly" in sc
 
 
 def test_security_headers_on_pages_api_and_files():

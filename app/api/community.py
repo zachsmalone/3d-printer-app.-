@@ -100,8 +100,6 @@ def _age_refusal(actor: Actor, lock: bool, ip: str = "", request: Request | None
 def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
     if not ratelimit.hit("signup:" + _ip(request), config.SIGNUP_ATTEMPTS_PER_HOUR_IP, 3600):
         raise HTTPException(429, "Too many tries from this network. Please wait a while.")
-    if not actor.user and idn.age_locked(actor.sid, request.cookies.get(idn.AGE_COOKIE), _ip(request)):
-        return _age_refusal(actor, lock=False, request=request)
     try:
         name = text_in(body.get("display_name", ""), 40, "Display name")
         safety.filter_only(name, "Display name")

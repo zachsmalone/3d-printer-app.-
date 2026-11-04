@@ -50,7 +50,7 @@ class Actor:
 
 def underage(user: dict | None) -> bool:
     """Legacy account whose stored date of birth is under 18 (made under the old 13+ rules). New ones can't be created."""
-    return bool(user) and bool(user.get("dob")) and age_of(user) < config.MIN_SIGNUP_AGE
+    return False   # age gate removed: a stored birth date no longer restricts an account
 
 
 def suspended(user: dict | None) -> bool:
@@ -284,18 +284,10 @@ def signup(actor: Actor, display_name: str, dob: str) -> dict:
     """Nothing about the date of birth is stored unless every check passes."""
     if actor.user:
         raise ValueError("account already exists for this browser")
-    try:
-        d = date.fromisoformat(dob)
-    except ValueError:
-        raise ValueError("date of birth must be YYYY-MM-DD")
-    if d > datetime.now(timezone.utc).date() or d.year < 1900:
-        raise ValueError("invalid date of birth")
-    if age_of({"dob": dob}) < config.MIN_SIGNUP_AGE:
-        raise PermissionError(AGE_MESSAGE)           # refused: nothing about the date is stored
     name = (display_name or "").strip()[:40]
     if not name:
         raise ValueError("display name required")
-    user = {"id": secrets.token_hex(6), "display_name": name, "dob": dob,
+    user = {"id": secrets.token_hex(6), "display_name": name,
             "created": datetime.now(timezone.utc).isoformat(), "links": {}, "following": []}
     from .privacy import defaults_for           # everyone: private by default
     user["privacy"] = defaults_for(user)

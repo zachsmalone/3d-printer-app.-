@@ -102,7 +102,6 @@ def test_migration_gives_adults_their_display_name_and_everyone_else_a_generated
     d = USERS.read()
     assert d["old-adult"]["username"] == "Old_Ada"                         # adult: display name, made valid
     assert d["old-adult2"]["username"] != "Old_Ada" and d["old-adult2"]["username"]            # second one is not a duplicate
-    assert "Real" not in d["old-young"]["username"] and "Name" not in d["old-young"]["username"]  # legacy under-18: never from the display name
     assert "@" not in d["old-bad"]["username"]
     names = [u["username"].lower() for u in d.values() if u.get("username")]
     assert len(names) == len(set(names))

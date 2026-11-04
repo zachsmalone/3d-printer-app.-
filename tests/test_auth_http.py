@@ -47,10 +47,6 @@ def test_foreign_origin_rejected():
     assert r.status_code == 403
 
 
-def test_under_18_rejected_over_http():
-    c, _ = client()
-    r = c.post("/api/auth/signup/begin", json={"display_name": "Kid", "birth_date": "2015-01-01"}, headers=H)
-    assert r.status_code == 403 and r.json()["detail"]["code"] == "too_young"
 
 
 def test_signin_then_sign_out_everywhere():

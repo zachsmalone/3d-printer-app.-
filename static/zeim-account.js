@@ -85,8 +85,6 @@
           <small class="help">At least 10 characters. A short phrase you can remember works well.</small></div>
         <div class="field"><label for="au_pw_new2">Password again</label>
           <input id="au_pw_new2" type="password" maxlength="128" autocomplete="new-password"></div>
-        <div class="field"><label for="au_dob">Date of birth <em>only to confirm you are 18 or over</em></label>
-          <input id="au_dob" type="date"></div>
         <button class="btn primary" type="button" id="pw_go">Create account</button>
         <button class="btn" type="button" id="au_go">Create my account with a passkey</button>
         <p class="mini">A passkey account uses the display name and birth date. ZEIM picks a username you can change later.</p>
@@ -109,13 +107,12 @@
       const name = $("#au_name").value.trim();
       const user = $("#au_user").value.trim();
       const pw = $("#au_pw_new").value;
-      const dob = $("#au_dob").value;
+      const dob = null;
       const email = $("#au_email") ? $("#au_email").value.trim() : "";
       if (!name) { say("Pick a display name first.", true); return; }
       if (!user) { say("Pick a username. You'll type it to sign in.", true); return; }
       if (!pw) { say("Choose a password of at least 10 characters.", true); return; }
       if (pw !== $("#au_pw_new2").value) { say("Those passwords don't match.", true); return; }
-      if (!dob) { say("Your date of birth confirms you are 18 or over — it is required.", true); return; }
       say("Creating your account…");
       try {
         const r = await root.ZeimAuth.registerWithPassword(name, dob, user, pw, email);
@@ -143,9 +140,8 @@
     };
     $("#au_go").onclick = async () => {
       const name = $("#au_name").value.trim();
-      const dob = $("#au_dob").value;
+      const dob = null;
       if (!name) { say("Pick a display name first.", true); return; }
-      if (!dob) { say("Your date of birth confirms you are 18 or over — it is required.", true); return; }
       if (needPasskey()) return;
       say("Your browser will ask you to save a passkey…");
       try {

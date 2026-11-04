@@ -5,13 +5,6 @@ from tests.b1 import client, ADULT
 from test_b1_ui import _spawn, ROOT
 
 
-def test_gate_markup_is_served_and_only_the_test_switch_turns_it_off(monkeypatch):
-    monkeypatch.setattr(config, "AGE_GATE", True)
-    h = client().get("/").text
-    assert 'id="ageGate"' in h and "/static/agegate.js" in h and 'data-agegate="off"' not in h
-    assert h.index('id="ageGate"') < h.index('id="mainNav"')            # covers the page before anything else paints
-    monkeypatch.setattr(config, "AGE_GATE", False)
-    assert 'data-agegate="off"' in client().get("/").text
 
 
 def test_default_is_on_outside_tests():

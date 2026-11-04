@@ -117,12 +117,6 @@ def test_legacy_cookie_account_can_add_a_password_without_a_new_signup(community
     assert fresh.get("/api/auth/account").json()["login_name"] == "leemaker"
 
 
-def test_under_18_password_signup_stores_nothing():
-    svc = make_service()
-    with pytest.raises(AuthError) as e:
-        _register(svc, born="2015-01-01")
-    assert e.value.code == "too_young"
-    assert svc.store.one("SELECT COUNT(*) AS n FROM accounts")["n"] == 0
 
 
 def test_login_failure_is_rate_limited():
@@ -287,9 +281,6 @@ def test_http_register_login_wrong_password_and_zeimapp_add(caplog, community_us
                      headers={"Origin": "https://zeim.test"})
     assert no_csrf.status_code == 403 and no_csrf.json()["detail"]["code"] == "csrf"
 
-    kid = c.post("/api/auth/password/register", json={"display_name": "Kid", "birth_date": "2015-01-01",
-                 "username": "KidMaker", "password": PW}, headers=H)
-    assert kid.status_code == 403 and kid.json()["detail"]["code"] == "too_young"
 
     reserved = c.post("/api/auth/password/register", json={"display_name": "Zach", "birth_date": "1990-01-01",
                       "username": "adminx", "password": PW}, headers=H)
