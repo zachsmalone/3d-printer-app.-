@@ -1460,6 +1460,12 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 .prform .prpick:focus-within label.btn{outline-offset:2px}
 .prthumbs{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:8px}.prthumbs li{display:flex;flex-direction:column;align-items:center;gap:4px;width:96px;font-size:12px;overflow-wrap:anywhere;text-align:center}
 .prthumbs img{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line,#ccc)}.prthumbs .noprev{font-size:11px;width:96px;height:96px;display:flex;align-items:center;border:1px dashed var(--line,#ccc);border-radius:8px;padding:4px;box-sizing:border-box}
+/* UX9 breadcrumb (index + CAD share this) */
+.zcrumb{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow:hidden;white-space:nowrap;font-size:13px;line-height:1.4;padding:4px 14px;color:var(--muted,#667);border-bottom:1px solid var(--line,#e3e3e8);background:var(--panel,transparent)}
+.zcrumb[hidden]{display:none}
+.zcrumb a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.zcrumb [aria-current]{color:var(--txt,#111);font-weight:600;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.zcrumb-sep{opacity:.6}
 /* RET8: private maker numbers */
 .mestats{margin-top:12px}.mestats summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center;gap:6px}
 .mestats .tablewrap{overflow-x:auto}.mestats-t{border-collapse:collapse;width:100%;font-size:14px}

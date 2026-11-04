@@ -343,3 +343,5 @@ body.cadws.cw-phone.has-work #zws-tool{bottom:calc(var(--peek,0px) + 52px)!impor
 body.cadws.has-work #zws-tool .cw-panel{position:static!important;width:100%!important;max-height:40dvh;box-shadow:none}
 body.cadws .cw-main{padding-bottom:56px;box-sizing:border-box}
 body.cadws.cw-phone .cw-stage{bottom:calc(var(--peek,48px) + 52px)!important}
+/* 390px: give the design name room (Exit keeps its icon and aria-label) */
+@media (max-width:480px){ .cw-btn.cw-exit{font-size:0;gap:0;padding:0 9px} .cw-title{min-width:96px} }
