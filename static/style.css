@@ -1466,6 +1466,9 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 .zcrumb a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .zcrumb [aria-current]{color:var(--txt,#111);font-weight:600;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .zcrumb-sep{opacity:.6}
+/* ONB8: one "?" per studio, same size everywhere, links to the matching Learn lesson */
+a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;padding:0 10px;border-radius:999px;font-weight:700;text-decoration:none}
+.learnq-row{margin:4px 0 0;display:flex;justify-content:flex-end}
 /* ONB10: one-time quiet tip after the first save */
 .onb10{position:fixed;left:50%;bottom:calc(var(--tabbar-h,0px) + env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 24px));background:var(--panel2,var(--panel));color:var(--txt);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:12px 14px;font-size:14px}
 .onb10 p{margin:0 0 8px}.onb10 .row{display:flex;gap:8px;justify-content:flex-end}
