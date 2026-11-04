@@ -642,7 +642,7 @@ function tipHTML(i) {
   if (!/^https:\/\//i.test(i.tip_url || "")) return "";
   let host = ""; try { host = new URL(i.tip_url).hostname.toLowerCase(); } catch { return ""; }
   const who = i.creator_username ? "@" + i.creator_username : i.creator;
-  return `<p class="help tiplink"><a href="${esc(i.tip_url)}" target="_blank" rel="noopener nofollow noreferrer">Tip link for ${esc(who)} (${esc(host)})</a></p>`;
+  return `<p class="help tiplink" data-item-id="${esc(i.id)}"><a href="${esc(i.tip_url)}" target="_blank" rel="noopener nofollow noreferrer">Tip link for ${esc(who)} (${esc(host)})</a></p>`;
 }
 $("#shCats").addEventListener("click", e => { const b = e.target.closest("[data-cat]"); if (!b) return; shCat = b.dataset.cat; loadShowcase(); });
 $("#shForm").onsubmit = e => { e.preventDefault(); loadShowcase(); };
@@ -1680,6 +1680,24 @@ async function loadMyShowcase() {
       <button type="button" class="btn small ghost danger" data-remove-show="${esc(i.id)}">Remove from Showcase</button>
     </li>`).join("") : `<li class="help">No Showcase projects yet. Send a saved project to Showcase when you want it public.</li>`;
 }
+$("#meStats")?.addEventListener("toggle", async e => {      // RET8: private maker numbers, loaded only when opened
+  if (!e.target.open) return;
+  const box = $("#meStatsBody");
+  if (!ME?.signed_up) { box.innerHTML = `<p class="help">Sign in to see numbers for projects you published.</p>`; return; }
+  let r; try { r = await api("/api/me/maker-stats"); } catch (er) { box.innerHTML = `<p class="help">${esc(er.message)}</p>`; return; }
+  const it = r.items || [];
+  box.innerHTML = it.length ? `<div class="tablewrap"><table class="mestats-t"><thead><tr><th scope="col">Project</th><th scope="col">Downloads</th><th scope="col">Likes</th><th scope="col">Favorites</th><th scope="col">Tip clicks</th></tr></thead><tbody>` +
+    it.map(i => `<tr><th scope="row">${esc(i.title)}</th><td data-l="Downloads">${i.downloads}</td><td data-l="Likes">${i.likes}</td><td data-l="Favorites">${i.favorites}</td><td data-l="Tip clicks">${i.has_tip || i.tip_clicks ? i.tip_clicks : "–"}</td></tr>`).join("") +
+    `</tbody></table></div>` : `<p class="help">No Showcase projects yet.</p>`;
+});
+document.addEventListener("click", e => {                     // RET8: count a tip-link open (skipped when usage counts are off)
+  const a = e.target.closest && e.target.closest(".tiplink a"); if (!a) return;
+  let off = navigator.globalPrivacyControl === true || navigator.doNotTrack === "1";
+  try { off = off || localStorage.getItem("zeim.metricsOff") === "1"; } catch {}
+  const id = a.closest("[data-item-id]")?.dataset.itemId;
+  if (off || !id) return;
+  try { fetch(`/api/showcase/${encodeURIComponent(id)}/tipclick`, { method: "POST", keepalive: true, credentials: "same-origin", headers: { "X-Requested-With": "zeim" } }).catch(() => {}); } catch {}
+}, true);
 $("#meShowList")?.addEventListener("click", async e => {
   const enter = e.target.closest("[data-send-ch]");
   const rm = e.target.closest("[data-remove-show]");
