@@ -1460,6 +1460,15 @@ html[data-theme=dark] .zg-read{background:#141414;color:#F2F2F2;border-color:#6A
 .prform .prpick:focus-within label.btn{outline-offset:2px}
 .prthumbs{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:8px}.prthumbs li{display:flex;flex-direction:column;align-items:center;gap:4px;width:96px;font-size:12px;overflow-wrap:anywhere;text-align:center}
 .prthumbs img{width:96px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--line,#ccc)}.prthumbs .noprev{font-size:11px;width:96px;height:96px;display:flex;align-items:center;border:1px dashed var(--line,#ccc);border-radius:8px;padding:4px;box-sizing:border-box}
+/* RET8: private maker numbers */
+.mestats{margin-top:12px}.mestats summary{cursor:pointer;font-weight:600;min-height:32px;display:flex;align-items:center;gap:6px}
+.mestats .tablewrap{overflow-x:auto}.mestats-t{border-collapse:collapse;width:100%;font-size:14px}
+.mestats-t th,.mestats-t td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.mestats-t th[scope=row],.mestats-t thead th:first-child{text-align:left;white-space:normal}
+@media (max-width:560px){.mestats-t thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.mestats-t tr{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);padding:6px 0}
+.mestats-t th[scope=row]{grid-column:1/-1;border:0;padding:4px 0}.mestats-t td{border:0;text-align:left;padding:2px 0;white-space:normal}
+.mestats-t td::before{content:attr(data-l);display:block;font-size:12px;color:var(--mut)}}
 /* ONB8: one "?" per studio, same size everywhere, links to the matching Learn lesson */
 a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;padding:0 10px;border-radius:999px;font-weight:700;text-decoration:none}
 .learnq-row{margin:4px 0 0;display:flex;justify-content:flex-end}
