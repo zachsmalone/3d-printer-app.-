@@ -1498,3 +1498,20 @@ a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width
 @media (min-width:769px){
   body[data-view=lithophane]:has(#viewCreate.has-model) .saveind{bottom:calc(52px + 8px + env(safe-area-inset-bottom))}
 }
+/* Lithophane bar categories: the chosen category's settings open as a sheet just above the bar, never minimized or empty. */
+#viewCreate.has-model{--litho-bar-b:env(safe-area-inset-bottom)}
+@media (max-width:768px){#viewCreate.has-model{--litho-bar-b:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}}
+#viewCreate.has-model.litho-sheet>#zws-settings{display:flex!important;flex-direction:column!important;position:fixed!important;left:0!important;right:0!important;top:auto!important;bottom:calc(var(--litho-bar-b) + 52px)!important;width:auto!important;height:auto!important;max-height:min(60dvh,520px)!important;transform:none!important;z-index:60!important;border-radius:16px 16px 0 0!important;padding:0!important}
+#viewCreate.has-model.litho-sheet>#zws-settings .zws-body{display:block!important;overflow:auto;padding:8px 12px}
+#viewCreate.has-model.litho-sheet>#zws-settings .zws-chip,#viewCreate.has-model.litho-sheet>#zws-settings .zws-rs,#viewCreate.has-model.litho-sheet>#zws-settings .zws-edge{display:none!important}
+#viewCreate.has-model.litho-sheet>#zws-settings .zws-t{display:block!important}
+#viewCreate.has-model.litho-sheet>#zws-settings .zws-body>.controls{width:auto!important}
+@media (min-width:769px){#viewCreate.has-model.litho-sheet>#zws-settings{right:auto!important;width:min(420px,100vw)!important;border-radius:16px 16px 0 0!important}}
+/* Every Lithophane category fits on a 390px bar: no button hidden off the side. */
+@media (max-width:768px){
+  #viewCreate.has-model>#lithoBar #lithoCats{gap:0}
+  #viewCreate.has-model>#lithoBar #lithoCats button{flex:1 1 auto;padding:0 6px;font-size:13px}
+  #viewCreate.has-model>#lithoBar #lithoTools>div:not([hidden]){display:flex;flex:1;min-width:0}
+  #viewCreate.has-model>#lithoBar #lithoTools button{flex:1 1 auto;min-width:0;padding:0 4px;font-size:12px;white-space:normal;line-height:1.15}
+  #viewCreate.has-model>#lithoBar .bed-pin{padding:0 8px;font-size:13px}
+}
