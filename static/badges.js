@@ -97,7 +97,12 @@
       box.innerHTML = tally + '<p class="help">No badges yet.</p>';
       return;
     }
-    box.innerHTML = tally + '<ul class="badgegrid">' + rows.map(function (b) {
+    // RET10: one quiet line with the count and the next badge to try. Only rows the server sent are counted.
+    var earnedN = rows.filter(function (b) { return b.earned; }).length;
+    var next = rows.filter(function (b) { return !b.earned && b.how; })[0];
+    var sum = '<p class="help badgesum">' + earnedN + " of " + rows.length + " earned." +
+      (next ? " Next: <strong>" + esc(next.name) + "</strong> — " + esc(next.how) : "") + "</p>";
+    box.innerHTML = tally + sum + '<ul class="badgegrid">' + rows.map(function (b) {
       var locked = !b.earned;
       var sub = locked ? (b.how || "") : (b.label || "");
       if (locked && b.need > 1 && b.progress) sub = (sub ? sub + " " : "") + b.progress + " of " + b.need + " so far.";
