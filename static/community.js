@@ -331,6 +331,7 @@ function renderAccount() {
           `<h4>Plans</h4><div id="accPlans" class="acc-plans"><p class="help">Loading plans…</p></div>`);
       }
       renderPlans();
+      mountDeleteAccount($("#accBody"));
     };
     if (done && typeof done.then === "function") done.then(showPlans).catch(showPlans);
     else showPlans();
@@ -390,6 +391,7 @@ function renderAccount() {
       <button class="btn small" id="so_open">Sign out…</button>`;
     renderPlans();
     $("#so_open").onclick = () => openSignout();
+    mountDeleteAccount($("#accBody"));
     if (window.ZeimAccount && ZeimAccount.wireUsername) {
       ZeimAccount.wireUsername(ME, ZeimAccount.DIALOG_UN, (next) => { ZeimAccount.publishUsername(next, "legacy"); });
     }
@@ -446,6 +448,24 @@ document.addEventListener("zeim:username", (ev) => {
   toast("Your username is now @" + ME.username, "ok");
 });
 
+/* ---------- Delete my account (owner decision 2026-11-03): confirm by typing DELETE; the in-app purge removes it within 7 days ---------- */
+function mountDeleteAccount(body) {
+  if (!body || !ME || !ME.signed_up || $("#da_open")) return;
+  body.insertAdjacentHTML("beforeend", `<h4>Delete my account</h4><p class="help">Removes your account and everything you made or saved here: builds, shared projects, print photos, collections and settings. It can't be undone.</p>
+    <button class="btn small ghost danger" id="da_open" aria-expanded="false" aria-controls="da_box">Delete my account…</button>
+    <div id="da_box" hidden><p>Sign-in stops straight away, and your account and its data are removed within 7 days. Shared projects disappear from the Showcase.</p>
+      <label for="da_txt">Type <b>DELETE</b> to confirm</label> <input id="da_txt" autocomplete="off" spellcheck="false">
+      <div class="row"><button class="btn small danger" id="da_go">Delete my account</button><button class="btn small ghost" id="da_cancel">Cancel</button></div><p id="da_msg" role="status"></p></div>`);
+  const show = on => { $("#da_box").hidden = !on; $("#da_open").setAttribute("aria-expanded", String(on)); if (on) $("#da_txt").focus(); };
+  $("#da_open").onclick = () => show(true);
+  $("#da_cancel").onclick = () => { $("#da_txt").value = ""; show(false); };
+  $("#da_go").onclick = async () => {
+    if ($("#da_txt").value.trim() !== "DELETE") { $("#da_msg").textContent = "Type DELETE in the box first."; return; }
+    try { await api("/api/me/delete-account", J("POST", { confirm: "DELETE" })); try { sessionStorage.zeimDeleted = "1"; } catch { } location.reload(); }
+    catch (e) { $("#da_msg").textContent = e.message; }
+  };
+}
+
 /* ---------- Sign out (there are no passwords yet, so say plainly how to get back in before anyone presses it) ---------- */
 function openSignout() {
   const adult = !!ME.recovery, body = $("#soBody"), go = $("#soGo");
@@ -492,6 +512,7 @@ document.addEventListener("keydown", e => {
   else if (!e.shiftKey && (i === -1 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
 });
 try { if (sessionStorage.zeimSignedOut) { delete sessionStorage.zeimSignedOut; setTimeout(() => toast("You're signed out. This browser no longer has your account.", "ok"), 300); } } catch { }
+try { if (sessionStorage.zeimDeleted) { delete sessionStorage.zeimDeleted; setTimeout(() => toast("Your account is being deleted. It and its data will be gone within 7 days.", "ok"), 300); } } catch { }
 
 /* ---------- showcase grid ---------- */
 const MODE_ICON = { lithophane: "<svg class=i aria-hidden=true focusable=false><use href=#i-image></use></svg>", relief: "<svg class=i aria-hidden=true focusable=false><use href=#i-mountain></use></svg>", popart: "<svg class=i aria-hidden=true focusable=false><use href=#i-palette></use></svg>", edit: "<svg class=i aria-hidden=true focusable=false><use href=#i-pencil></use></svg>" };

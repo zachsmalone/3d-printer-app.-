@@ -63,6 +63,13 @@ def _start_retention():
     """Clean up expired build files now and every hour (starred builds are never touched; see services/retention.py)."""
     from .services import retention
     retention.start_background()   # only acts when PHOTO3D_PUBLIC_LAUNCH=1 (credits contact must be filled in)
+
+
+@app.on_event("startup")
+def _start_account_purge():
+    """Remove accounts marked by 'Delete my account': now, then hourly (in-process; no cron)."""
+    from .community import account_delete
+    account_delete.start_background(app)
 from .api import parts as parts_api
 from .api import cad as cad_api
 from .api import repair as repair_api

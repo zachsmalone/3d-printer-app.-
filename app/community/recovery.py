@@ -70,7 +70,7 @@ def recover(actor: Actor, code: str, ip: str = "-") -> tuple[dict, str]:
     want = _hash(code)
     users = USERS.read()
     old = next((sid for sid, u in users.items() if u.get("recovery") and hmac.compare_digest(u["recovery"], want)), None)
-    if old is None:
+    if old is None or users[old].get("delete_requested_at"):   # an account being deleted can't be recovered
         _fail(actor.sid, ip); raise KeyError("code")
     if old == actor.sid:
         raise ValueError("This browser already has that account.")
