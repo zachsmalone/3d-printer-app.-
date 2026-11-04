@@ -2,6 +2,20 @@
 
 Direction from Zach: the model is the product. One persistent Three.js scene and one model store live for the whole session. Lithophane, CAD, FDM, TorchC0 and Fix are toolsets that swap in and out around it. Showcase and Me become overlays. Base: `zeim` @ 1e469bd.
 
+## Decisions (Zach, 2026-11-04)
+
+- **Only three top tabs: Showcase / Atelier / Me.** Atelier blends every work section: Lithophane, FDM, TorchC0 resin, CAD, sculpt and Fix.
+- **Fixed layout in Atelier.** The bed plate, the layout and the quick-button positions stay identical in every tool section. Only what the tools do changes, never where they sit.
+- **Real loading percentage.** When a section's tools load, show progress based on the actual tool modules and assets fetched (bytes or module count). Do not show a fake timer.
+- **CAD hides slicer tools.**
+- **Printer type set in Me controls the process.** With a resin printer, FDM tools are hidden, and so is the option to switch to FDM. With an FDM printer, resin is hidden the same way.
+
+## Open questions
+
+1. Printer type 'both' or 'none': the proposal is that 'both' shows both processes, with the last-used one as primary. 'none' (logged out or not set yet) shows both, plus a first-run picker. Zach to confirm.
+2. Does the one design system replace the Japanese section themes? Pending Zach. PR9 waits on this.
+3. Fully hiding the other process means it can't be forced from the switcher. That overrides the earlier "power users can force a mode" spec. Is that intended?
+
 ## (a) Current state (from the code)
 
 | Area | How it gets its viewport | Where friction happens |
@@ -36,20 +50,19 @@ Direction from Zach: the model is the product. One persistent Three.js scene and
 
 ## (c) Migration: small PRs, each one ships working
 
-Order follows Zach's priority. Size is relative only.
+Size is relative only.
 
-1. **PR1 – Store + stage shell (M).** Add `core/store.js` and `core/stage.js`. The `app.js` viewer starts writing into the store. Nothing visible changes. Add unit tests for the store and history.
-2. **PR2 – In-page modes fold onto the stage (L).** Lithophane, FDM, TorchC0, Edit and 2D→3D all use the one stage. Remove the extra `new Viewer` calls in `edit.js`, `torchc0.js` and `ai3d.js`. "Send to…" becomes a store mode switch with no fetch.
-3. **PR3 – Repair and builder in-canvas (M).** `repair.html` and `builder.html` logic become the Fix and CAD-primitives modes. The old URLs redirect to `/?mode=…`.
-4. **PR4 – CAD into the canvas (L, likely split in two).** Refactor `cad.js` (2.4k lines, plus `cad-*.js`) so it runs on the shared stage as a mode. Keep `cad.html` as a thin wrapper until everything matches, then redirect it.
-5. **PR5 – Context ribbon + side panel + status bar (M).** Built from the registry, with the 40–48px ribbon and a 280–320px collapsible panel.
-6. **PR6 – Global undo/redo (M).** Geometry-changing tools push to `store.history`.
-7. **PR7 – Data-aware CTAs (S–M).** `route.js` plus the preferred process setting (in Me and first-run, persisted).
-8. **PR8 – Kill nav sections → switcher + Cmd+K (S–M).** Old hashes such as `#slicer` and `#cad` map to modes.
-9. **PR9 – Design tokens (M).** CSS variables and fonts (Inter/Geist for UI, JetBrains Mono for numbers), applied everywhere. Remove the per-section themes.
-10. **PR10 – Showcase + Me as overlays (M).** Replace `location.reload()` in account flows with store-preserving refreshes. "Open from Showcase" loads into the canvas and picks the mode.
-
-PR1–2 are the core change. The later PRs depend on them.
+1. **PR1 – Store + stage shell (M).** Nothing visible changes.
+2. **PR2 – Top nav becomes Showcase / Atelier / Me (S–M).** The old work sections become Atelier sub-modes. Old hashes such as `#slicer` and `#cad` map to them.
+3. **PR3 – Atelier fixed layout + shared stage for in-page modes (L).** Lithophane, FDM, TorchC0, sculpt and Edit get the same plate and quick-button slots.
+4. **PR4 – Lazy mode loading with a real % bar (S–M).** Uses dynamic `import()` progress and asset fetch progress.
+5. **PR5 – Process gate from the Me printer type (S–M).** Includes CAD hiding slicer tools. 'both' and 'none' follow whatever Zach decides on open question 1.
+6. **PR6 – Repair + builder as modes (M).**
+7. **PR7 – CAD as an Atelier mode (L, may split).** Keep the `cad.html` redirect fallback.
+8. **PR8 – Global undo/redo (M).**
+9. **PR9 – Data-aware CTAs (S–M).** They respect the process gate.
+10. **PR10 – Showcase and Me as overlays that don't unload the model (M).**
+11. **PR11 – Design tokens (M).** Blocked on open question 2.
 
 ## (d) Risks
 
