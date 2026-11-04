@@ -344,7 +344,7 @@ function renderAccount() {
     return;
   }
   if (!ME.signed_up) {
-    $("#accBody").innerHTML = `<p class="help">Accounts are for adults 18 and over. An account lets you save your settings and share projects. You can build and learn in the ${esc(CFG.sections.learn)} without an account.</p>
+    $("#accBody").innerHTML = `<p class="help">An account lets you save your settings and share projects. You can build and learn in the ${esc(CFG.sections.learn)} without an account.</p>
       <div class="field"><label for="su_name">Display name (not your full name)</label><input id="su_name" maxlength="40"></div>
       <div class="field"><label for="su_user">Username <em>optional · this is the name your projects are credited to</em></label><input id="su_user" maxlength="18" autocomplete="off" autocapitalize="none" spellcheck="false">
         <small class="help">3 to 18 letters, numbers or underscores. Leave it empty and ZEIM makes you a friendly nickname you can change later. Not your real name, email or phone number.</small></div>
@@ -366,10 +366,7 @@ function renderAccount() {
       const pick = $("#su_pr") ? readPicker("su") : null;
       try { ME = await api("/api/me/signup", J("POST", { display_name: $("#su_name").value, username: $("#su_user").value.trim(), ...(pick || {}) })); if (pick) savePref(pick).catch(() => { }); await refreshMe(); renderAccount(); toast("Account created. Your username is @" + ME.username, "ok"); }
       catch (e) {
-        if (e.status === 403 && /^Sorry, ZEIM accounts are for adults/.test(e.message)) {     // the 18+ refusal: a calm panel instead of an unchanged form
-          $("#accBody").innerHTML = `<div class="calm" role="alert" tabindex="-1"><p>${esc(e.message)}</p><p class="help">You can still build and use the ${esc(CFG.sections.learn)} lessons without an account.</p></div>`;
-          $("#accBody .calm").focus();
-        } else inlineMsg($("#su_go"), e.message);
+        inlineMsg($("#su_go"), e.message);
       }
     };
   } else {
