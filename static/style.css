@@ -1515,3 +1515,6 @@ a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width
   #viewCreate.has-model>#lithoBar #lithoTools button{flex:1 1 auto;min-width:0;padding:0 4px;font-size:12px;white-space:normal;line-height:1.15}
   #viewCreate.has-model>#lithoBar .bed-pin{padding:0 8px;font-size:13px}
 }
+/* Lithophane settings sheet reads as one piece with the bar: edge to edge, flush on top of it, same flat edge and top line. */
+#viewCreate.has-model.litho-sheet>#zws-settings{max-width:none!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;box-shadow:0 -6px 18px rgba(0,0,0,.12)!important;background:color-mix(in srgb,var(--panel) 96%,#fff)!important;margin:0!important}
+@media (min-width:769px){#viewCreate.has-model.litho-sheet>#zws-settings{border-right:1px solid var(--line)!important;border-radius:0!important}}
