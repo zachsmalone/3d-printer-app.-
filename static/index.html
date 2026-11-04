@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/static/selectmode.css">
 <link rel="stylesheet" href="/static/zeim-themes.css">
 <script src="/static/boot.js"></script>
+<script>/* PERF4: the Resin studio (torchc0.js) loads only when it is opened */(function(){var p=null;function go(){if(!p)p=import("/static/torchc0.js").then(function(){document.dispatchEvent(new CustomEvent("zeim:torchc0-shown"))});return p}document.addEventListener("zeim:torchc0-shown",function(){if(!p)go()});document.addEventListener("zeim:torchc0-file",function(){if(!p)go()});if(/^#(torchc0|resin)/.test(location.hash))go();window.zeimLoadTorch=go})();</script>
 <script src="/static/zeim-auth.js" defer></script>
 <script src="/static/zeim-account.js" defer></script>
 <script src="/static/badges.js" defer></script>
@@ -1108,7 +1109,6 @@
 <script type="module" src="/static/metrics.js"></script>
 <script type="module" src="/static/edit.js"></script>
 <script type="module" src="/static/printer.js"></script>
-<script type="module" src="/static/torchc0.js"></script>
 <script type="module" src="/static/printkind.js"></script>
 <script type="module" src="/static/trace2d.js"></script>
 <script type="module" src="/static/selectmode.js"></script>
