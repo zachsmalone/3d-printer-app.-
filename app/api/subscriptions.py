@@ -39,7 +39,6 @@ def _me_body(actor: Actor) -> dict:
         "plans_enabled": cat["plans_enabled"],
         "stripe_mode": cat["stripe_mode"],
         "payment_note": cat["payment_note"],
-        "fee_note": cat["fee_note"],
         "processing_note": cat["processing_note"],
         "renewal_note": cat["renewal_note"],
         "tip_note": cat["tip_note"],

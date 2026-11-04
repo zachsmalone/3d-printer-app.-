@@ -9,10 +9,9 @@ stores only:
   * subscription status, so feature gates can read the account
 
 It does not use Connect, application fees, or destination charges. Creator tips
-and Showcase sales are not charged here. The ~1% ZEIM service fee is a second
-recurring line on the same subscription (nearest cent). Stripe's own processing
-fee is disclosed and is not guessed as an extra line, because it depends on the
-payment method.
+and Showcase sales are not charged here. The plan price is a flat amount that
+already includes Stripe's processing cost, so the buyer sees one number and
+no separate fee line is guessed.
 
 Checkout omits `payment_method_types` so the Stripe Dashboard decides which
 methods appear (card, Apple Pay, Google Pay, and optional PayPal / Cash App Pay).
@@ -41,8 +40,7 @@ from .entitlements import pro_comp
 log = logging.getLogger("zeim.billing")
 
 API_VERSION = "2026-09-30.endive"
-FEE_BPS = 100  # 1% = 100 basis points. Applied only to the plan price.
-PLAN_CENTS = {"semi_pro": 350, "pro": 550}
+PLAN_CENTS = {"semi_pro": 400, "pro": 600}
 PAID_PLANS = frozenset(PLAN_CENTS)
 GRANT_STATUS = frozenset({"active", "trialing", "past_due"})
 KNOWN_STATUS = frozenset({
@@ -61,9 +59,8 @@ _BILLING_KEYS = frozenset({
 
 CHECKOUT_DISCLOSURE = (
     "Optional ZEIM plan. It renews every month until you cancel in Stripe. "
-    "ZEIM adds a service fee of about 1% of the plan price, rounded to the nearest cent, "
-    "as its own line. That fee helps fund hosting and applies only to this plan charge. "
-    "Stripe's processing fee is separate: you cover it, and ZEIM does not keep it. "
+    "The price is flat: it already includes Stripe's processing cost, so there is no separate fee line. "
+    "That helps fund hosting and applies only to this plan charge. "
     "ZEIM never takes a cut of creator tips or Showcase sales. "
     "ZEIM does not see or store your card — Stripe does."
 )
@@ -98,13 +95,6 @@ _HANDLED = frozenset({
 })
 
 
-def service_fee_cents(plan_cents: int) -> int:
-    """About 1% of the plan, rounded half-up to the nearest cent. Never a tip or sale."""
-    if plan_cents <= 0:
-        return 0
-    return (int(plan_cents) * FEE_BPS + 5_000) // 10_000
-
-
 def secret_key() -> str:
     return (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
 
@@ -130,11 +120,6 @@ def key_mode(key: str | None = None) -> str:
 
 def plan_price_id(plan_id: str) -> str:
     env = {"semi_pro": "STRIPE_PRICE_SEMI_PRO", "pro": "STRIPE_PRICE_PRO"}.get(plan_id, "")
-    return (os.environ.get(env) or "").strip() if env else ""
-
-
-def fee_price_id(plan_id: str) -> str:
-    env = {"semi_pro": "STRIPE_PRICE_FEE_SEMI_PRO", "pro": "STRIPE_PRICE_FEE_PRO"}.get(plan_id, "")
     return (os.environ.get(env) or "").strip() if env else ""
 
 
@@ -175,29 +160,6 @@ def _integration_id() -> str:
     return "zeimplan" + suffix
 
 
-def _fee_line(plan_id: str) -> dict:
-    cents = service_fee_cents(PLAN_CENTS[plan_id])
-    configured = fee_price_id(plan_id)
-    if configured:
-        return {"price": configured, "quantity": 1}
-    return {
-        "quantity": 1,
-        "price_data": {
-            "currency": "usd",
-            "unit_amount": cents,
-            "recurring": {"interval": "month"},
-            "product_data": {
-                "name": "ZEIM service fee (about 1%)",
-                "description": (
-                    "Helps fund hosting. Charged only on this optional plan, "
-                    "not on creator tips or Showcase sales."
-                ),
-                "metadata": {"purpose": "zeim_service_fee"},
-            },
-        },
-    }
-
-
 def build_checkout_params(user_id: str, plan_id: str, customer_id: str,
                           success_url: str, cancel_url: str, mode: str) -> dict:
     """Hosted Checkout session params. No card fields. No Connect application fee.
@@ -219,7 +181,6 @@ def build_checkout_params(user_id: str, plan_id: str, customer_id: str,
         "origin_context": "web",
         "line_items": [
             {"price": plan_price_id(plan_id), "quantity": 1},
-            _fee_line(plan_id),
         ],
         "metadata": meta,
         "subscription_data": {
@@ -294,14 +255,6 @@ def open_checkout(user: dict, plan_id: str, base: str) -> dict:
                     f"(${PLAN_CENTS[plan_id] / 100:.2f}). Nothing was charged."
                 ),
             }
-        fee_id = fee_price_id(plan_id)
-        if fee_id:
-            fee = sc.v1.prices.retrieve(fee_id)
-            if not price_matches(fee, service_fee_cents(PLAN_CENTS[plan_id])):
-                return {
-                    "ok": False, "plan": plan_id,
-                    "message": "The Stripe service-fee price does not match about 1%. Nothing was charged.",
-                }
         customer_id = _existing_customer(user)
         if not customer_id:
             created = sc.v1.customers.create(
