@@ -1481,3 +1481,7 @@ a.learnq{display:inline-flex;align-items:center;justify-content:center;min-width
 /* ONB10: one-time quiet tip after the first save */
 .onb10{position:fixed;left:50%;bottom:calc(var(--tabbar-h,0px) + env(safe-area-inset-bottom,0px) + 12px);transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 24px));background:var(--panel2,var(--panel));color:var(--txt);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:12px 14px;font-size:14px}
 .onb10 p{margin:0 0 8px}.onb10 .row{display:flex;gap:8px;justify-content:flex-end}
+/* UX8 tablet and small laptop (769–1499px): controls share the first row and the main nav takes the full second row, so the header uses two rows instead of three. */
+@media (min-width:769px) and (max-width:1499px){.topbar{flex-wrap:wrap;row-gap:4px}.topbar .nav{order:60;flex:1 0 100%;justify-content:space-between}.topbar .spacer{flex:1 1 0}.topbar .themetoggle,.topbar #lookBtn{order:5}}
+/* UX8: above 768px the fixed panel bar (52px) sat over "Send to…"; lift it clear while a bar is showing. */
+@media (min-width:769px){body:has(#viewCreate.has-model:not([hidden])>#lithoBar) .sendfab,body:has(#viewEdit:not([hidden])>.bed-bar) .sendfab{bottom:calc(64px + env(safe-area-inset-bottom))}}
