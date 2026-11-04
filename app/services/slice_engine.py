@@ -220,6 +220,11 @@ def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SL
     except (OSError, ValueError, subprocess.SubprocessError):
         log.exception("could not start slicer: %s", cmd)
         raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
+    try:
+        from app.services import slicer_warm
+        slicer_warm.note_slice()
+    except Exception:
+        pass
     tail = (proc.stderr or "")[-600:] + (proc.stdout or "")[-600:]
     if proc.returncode != 0 or not out.exists() or out.stat().st_size == 0:
         log.error("slicer failed rc=%s: %s", proc.returncode, tail)

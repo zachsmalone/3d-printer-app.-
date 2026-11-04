@@ -67,6 +67,13 @@ def _start_retention():
 
 
 @app.on_event("startup")
+def _start_slicer_warm():
+    """PERF8: one tiny slice after start-up and after 20 quiet minutes keeps the engine in the page cache."""
+    from .services import slicer_warm
+    slicer_warm.start_background()
+
+
+@app.on_event("startup")
 def _start_account_purge():
     """Remove accounts marked by 'Delete my account': now, then hourly (in-process; no cron)."""
     from .community import account_delete
