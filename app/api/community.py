@@ -519,6 +519,20 @@ def _label_limit(actor: Actor):
         raise HTTPException(429, "You've changed tip links or AI labels a lot just now. Please try again in an hour.")
 
 
+@router.post("/showcase/{iid}/tipclick")
+def item_tip_click(iid: str, actor: Actor = Depends(get_actor)):
+    """RET8: count one tip-link click per visitor (anonymous hash), shown only to the project's owner."""
+    from ..community import makerstats
+    return {"ok": True, "counted": makerstats.record_tip_click(iid, actor.sid)}
+
+
+@router.get("/me/maker-stats")
+def my_maker_stats(actor: Actor = Depends(get_actor)):
+    """RET8: private numbers for the caller's own Showcase posts only."""
+    from ..community import makerstats
+    return {"items": makerstats.for_owner(actor)}
+
+
 @router.put("/showcase/{iid}/tip")
 def item_tip(iid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Owner only: one optional https tip link ('' removes it)."""
