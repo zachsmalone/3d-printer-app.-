@@ -225,6 +225,12 @@ function openAccount(focus) {
     if (el) { try { el.focus(); } catch { } }
   }
 }
+/* After signing up/in from "Sign up to add a photo", re-open the project so the photo form shows. */
+$("#dlgAccount").addEventListener("close", async () => {
+  const id = window.__prWantItem; if (!id) return; window.__prWantItem = null;
+  try { await refreshMe(); } catch { return; }
+  if (ME?.signed_up) { await openItem(id); const f = $(".prform"); if (f) { f.open = true; f.scrollIntoView({ block: "center" }); } }
+});
 $("#btnAccount").onclick = () => openAccount(ME?.signed_up ? "" : "signup");
 $("#btnLogin") && ($("#btnLogin").onclick = () => openAccount("signin"));
 $("#btnFeedback") && ($("#btnFeedback").onclick = () => { if ($("#fbMsg")) $("#fbMsg").textContent = ""; $("#dlgFeedback").showModal(); $("#fbText")?.focus(); });
@@ -789,7 +795,7 @@ async function openItem(id) {
         <label class="inl"><input type="checkbox" id="prAck"> This is my photo and there are no people in it</label>
         <fieldset class="reasons"><legend>Is this NSFW (mild nudity / mature art)? <em>required</em></legend>
           <label class="choice"><input type="radio" name="prNsfw" value="no"> <span>No</span></label><label class="choice"><input type="radio" name="prNsfw" value="yes"> <span>Yes</span></label></fieldset>
-        <div class="row"><button class="btn primary" id="prSend" type="button">Share photos</button></div></details>` : ""}
+        <div class="row"><button class="btn primary" id="prSend" type="button">Share photos</button></div></details>` : i.visibility === "public" && !i.example ? `<p class="help" id="prNeedAcct">Printed this? Make a free account (or sign in) to add a photo of your print.</p><button type="button" class="btn" id="prAcct"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Sign up to add a photo</button>` : ""}
     </section>
     <section class="qa" aria-labelledby="qaH"><h4 id="qaH">Ask the creator</h4><p class="help">Public questions the creator can answer on this page. There are no private messages in ZEIM.</p><ul class="qalist" id="qaList"></ul><div id="qaAsk"></div></section>`;
   if (i.remix_chain?.length) $("#itBody").insertAdjacentHTML("afterbegin", remixHTML(i.remix_chain));
@@ -797,6 +803,7 @@ async function openItem(id) {
   loadShowoff(id);
   if ($("#itCols")) mountItemCollections($("#itCols"), id);
   if ($("#prCam") && $("#prFile")) $("#prCam").onchange = () => { if ($("#prCam").files[0]) { const dt = new DataTransfer(); dt.items.add($("#prCam").files[0]); $("#prFile").files = dt.files; } };
+  if ($("#prAcct")) $("#prAcct").onclick = () => { window.__prWantItem = id; openAccount("signup"); };
   if ($("#prSend")) $("#prSend").onclick = async () => {
     const files = [...($("#prFile").files || [])];
     if (!files.length && $("#prCam")?.files?.[0]) files.push($("#prCam").files[0]);
