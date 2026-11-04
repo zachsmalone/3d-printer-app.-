@@ -48,6 +48,8 @@ document.addEventListener("zeim:torchc0-ready", async () => {      // the TorchC
   const st = $("#rzFileStatus"); if (st) st.textContent += " (kept from before)";
 });
 
+/* /api/edit/new already returns the whole project: hand it to the Slicer once, so it isn't fetched again */
+const fresh = p => { if (p?.id && p.preview) window.__zeimFreshEdit = { id: p.id, p, t: Date.now() }; };
 /* ---- the model of a section, as an edit-project id (CAD and the Slicer share these) ---- */
 async function editIdFrom(src, explicit) {
   if (explicit && /^[0-9a-f]{12}$/.test(explicit)) return explicit;
@@ -57,13 +59,14 @@ async function editIdFrom(src, explicit) {
     if (!S.current?.id) throw new Error("Make a model first, then send it.");
     const kept = reuseCopy(readFlow(sessionStorage), S.current.id);
     if (kept) return kept;
-    const id = (await api("/api/edit/new", { method: "POST", body: FD({ from_build: S.current.id, beginner: beginner() }) })).id;
-    rememberCopy(sessionStorage, S.current.id, id);
-    return id;
+    const p = await api("/api/edit/new", { method: "POST", body: FD({ from_build: S.current.id, beginner: beginner() }) });
+    rememberCopy(sessionStorage, S.current.id, p.id); fresh(p);
+    return p.id;
   }
   if (src === "torchc0") {
     const f = await torchFile(); if (!f) throw new Error("Choose a model in TorchC0 first.");
-    return (await api("/api/edit/new", { method: "POST", body: FD({ file: f, units: "mm", beginner: beginner() }) })).id;
+    const p = await api("/api/edit/new", { method: "POST", body: FD({ file: f, units: "mm", beginner: beginner() }) });
+    fresh(p); return p.id;
   }
   throw new Error("Nothing to send.");
 }
@@ -74,7 +77,8 @@ async function torchFile() {
   return $("#rzFile")?.files?.[0] || null;
 }
 export async function fileFromEdit(id) {
-  const p = await api("/api/edit/" + encodeURIComponent(id));
+  const open = window.__zeimEdit?.p;                                   // the Slicer already holds this project: skip its JSON
+  const p = open && open.id === id && open.downloads?.stl ? open : await api("/api/edit/" + encodeURIComponent(id));
   return new File([await blobOf(p.downloads.stl, veil.isOpen() ? veil.frac : null)], ((p.title || "model").replace(/[^\w.-]+/g, "_").slice(0, 40) || "model") + ".stl", { type: "model/stl" });
 }
 

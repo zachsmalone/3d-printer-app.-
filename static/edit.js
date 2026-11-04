@@ -191,6 +191,8 @@ document.addEventListener("zeim:edit-from-build", e => {
 });
 /* the project JSON (it carries the mesh preview, so it can be large): streamed, so the hand-off veil shows real bytes */
 async function getProject(id) {
+  const f = window.__zeimFreshEdit; window.__zeimFreshEdit = null;      // just made by /api/edit/new in the hand-off: use it as is
+  if (f && f.id === id && Date.now() - f.t < 60000) { handoffProgress(1); return f.p; }
   const { r, buf } = await fetchBytes("/api/edit/" + encodeURIComponent(id), null, handoffProgress);
   let j = null; try { j = JSON.parse(new TextDecoder().decode(buf)); } catch { }
   if (!r.ok) { const er = new Error(window.__errText ? window.__errText(j, r) : `HTTP ${r.status}`); er.status = r.status; throw er; }
