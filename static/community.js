@@ -271,13 +271,12 @@ async function renderPlans() {
   if (status.comp) extra.push("Lifetime Pro is complimentary. $0, no card, and it does not expire.");
   if (status.status === "past_due" && cur !== "free") extra.push("A renewal payment failed. Stripe will retry. This plan stays until Stripe cancels it.");
   if (status.cancel_at_period_end && cur !== "free") extra.push("This plan is set to cancel. It stays active until the period Stripe already billed ends.");
-  const note = [data.payment_note, data.fee_note, data.processing_note, data.renewal_note, data.tip_note, ...extra]
+  const note = [data.payment_note, data.processing_note, data.renewal_note, data.tip_note, ...extra]
     .filter(Boolean).map(t => `<p class="help">${esc(t)}</p>`).join("");
   const cards = (data.catalog || []).map(p => {
     const on = p.id === cur;
     const comped = !!(status.comp && p.id === "pro");
     const price = esc(comped ? "Lifetime, $0" : (p.price_label || ""));
-    const fee = !comped && p.fee_cents ? ` <span class="help">plus ${esc(String(p.fee_cents))}¢ ZEIM service fee</span>` : "";
     const go = p.id === "free"
       ? `<span class="pill">${on ? "Your plan" : "Always free"}</span>`
       : (comped

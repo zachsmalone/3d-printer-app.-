@@ -88,20 +88,19 @@ def _user(uid):
     return user
 
 
-def test_fee_is_one_percent_nearest_cent_and_catalog_discloses_it():
-    assert billing.service_fee_cents(350) == 4
-    assert billing.service_fee_cents(550) == 6
-    assert billing.service_fee_cents(0) == 0
+def test_flat_prices_and_catalog_have_no_fee_line():
+    assert billing.PLAN_CENTS == {"semi_pro": 400, "pro": 600}
+    assert not hasattr(billing, "service_fee_cents")
     cat = subs.catalog()
     assert cat["payment_live"] is False and cat["stripe_mode"] == "off"
     assert cat["stores_cards"] is False
-    assert "about 1%" in cat["fee_note"].lower() or "about 1%" in cat["fee_note"]
-    assert "4¢" in cat["fee_note"] and "6¢" in cat["fee_note"]
+    assert "fee_note" not in cat
     assert "processing" in cat["processing_note"].lower()
+    assert "flat" in cat["processing_note"].lower() and "includes" in cat["processing_note"].lower()
     assert "never takes a cut" in cat["tip_note"].lower()
     assert "paypal" in cat["processing_note"].lower() and "cash app" in cat["processing_note"].lower()
-    fees = {p["id"]: p["fee_cents"] for p in cat["plans"]}
-    assert fees["semi_pro"] == 4 and fees["pro"] == 6 and fees["free"] == 0
+    labels = {p["id"]: p["price_label"] for p in cat["plans"]}
+    assert labels["semi_pro"] == "$4.00 / month" and labels["pro"] == "$6.00 / month"
     assert all(p["coming"] for p in cat["plans"] if p["id"] != "free")
 
 
@@ -149,18 +148,15 @@ def test_checkout_params_are_hosted_subscription_without_connect_or_card_fields(
     blob = json.dumps(params).lower()
     for banned in ("cvc", "last4", "payment_method", "application_fee", "on_behalf_of"):
         assert banned not in blob
-    assert params["line_items"][0] == {"price": PRICE_SEMI, "quantity": 1}
-    fee = params["line_items"][1]["price_data"]
-    assert fee["unit_amount"] == 4 and fee["recurring"]["interval"] == "month"
-    assert "about 1%" in fee["product_data"]["name"].lower()
+    assert params["line_items"] == [{"price": PRICE_SEMI, "quantity": 1}]
     text = params["custom_text"]["submit"]["message"].lower()
-    assert "about 1%" in text and "processing" in text and "tips" in text and "test mode" in text
+    assert "flat" in text and "processing" in text and "tips" in text and "test mode" in text
+    assert "1%" not in text and "service fee" not in text
     assert params["metadata"]["zeim_user_id"] == "acc_user123"
     assert params["integration_identifier"].startswith("zeimplan")
     assert params["integration_identifier"][-8:].isalpha() and params["integration_identifier"][-8:].islower()
-    monkeypatch.setenv("STRIPE_PRICE_FEE_PRO", "price_feepro123")
     pro = billing.build_checkout_params("acc_user123", "pro", "cus_test123", "https://zeimapp.com/a", "https://zeimapp.com/b", "live")
-    assert pro["line_items"][1] == {"price": "price_feepro123", "quantity": 1}
+    assert pro["line_items"] == [{"price": PRICE_PRO, "quantity": 1}]
     assert "test mode" not in pro["custom_text"]["submit"]["message"].lower()
 
 
@@ -208,7 +204,7 @@ def test_open_checkout_checks_price_and_stores_customer_id_only(monkeypatch):
     _env(monkeypatch)
     _c, uid = _signup()
     sid, user = user_by_id(uid)
-    api = _API({PRICE_SEMI: 350})
+    api = _API({PRICE_SEMI: 400})
     monkeypatch.setattr(billing, "client", lambda: api)
     out = billing.open_checkout(user, "semi_pro", "http://localhost:8765")
     assert out["ok"] is True and out["url"].startswith("https://checkout.stripe.com/")

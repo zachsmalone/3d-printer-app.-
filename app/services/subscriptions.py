@@ -1,17 +1,17 @@
 """Optional Semi Pro / Pro plans. Core ZEIM stays free forever.
 
 Prices (USD / month):
-  Semi Pro  $3.50
-  Pro       $5.50
+  Semi Pro  $4.00
+  Pro       $6.00
 
 ZEIM_PLANS_ENABLED defaults off. Paid plans stay visible as Coming later and
 checkout does not start a payment, even if Stripe keys are present. Missing
 keys are normal and never an error. With the flag on, hosted Checkout runs
 only when the secret key, webhook secret, and both Price ids are set.
 
-ZEIM may add an honest ~1% service fee on those plan charges only (nearest cent:
-4¢ and 6¢). Stripe's processing fee is separate and disclosed. ZEIM never takes
-a cut of creator tips or Showcase sales.
+The plan price is flat and already includes Stripe's processing cost, so the
+buyer sees one number with no separate fee line. ZEIM never takes a cut of
+creator tips or Showcase sales.
 
 When checkout is allowed, it is hosted by Stripe (no card data on ZEIM).
 Webhooks write `plan` plus the Stripe Customer and Subscription ids. Feature
@@ -43,8 +43,8 @@ PLANS = (
     {
         "id": "semi_pro",
         "name": "Semi Pro",
-        "price_usd": 3.50,
-        "price_label": "$3.50 / month",
+        "price_usd": 4.00,
+        "price_label": "$4.00 / month",
         "summary": "Extras for makers who use ZEIM a lot. Optional. Helps fund hosting.",
         "includes": [
             "Everything in Free",
@@ -55,8 +55,8 @@ PLANS = (
     {
         "id": "pro",
         "name": "Pro",
-        "price_usd": 5.50,
-        "price_label": "$5.50 / month",
+        "price_usd": 6.00,
+        "price_label": "$6.00 / month",
         "summary": "All optional extras, including 2D→3D when Pro-gated after launch. Helps fund hosting.",
         "includes": [
             "Everything in Semi Pro",
@@ -81,15 +81,9 @@ OPEN_STUB_NOTE = (
     "Payment is not live yet. You can look at the plans below; "
     "choosing Semi Pro or Pro will say Coming until checkout is ready."
 )
-FEE_NOTE = (
-    "ZEIM adds a service fee of about 1% of the plan price, rounded to the nearest cent "
-    "(Semi Pro 4¢, Pro 6¢), on these plan charges only. It helps fund hosting. "
-    "It is a separate line on the Stripe bill, not a cut of creator tips or Showcase sales."
-)
 PROCESSING_NOTE = (
-    "Stripe's processing fee is separate from the plan price and from the ZEIM service fee. "
-    "You cover it, and Stripe keeps it — ZEIM does not. "
-    "The amount depends on the payment method, so ZEIM does not add a guessed processing charge. "
+    "The plan price is flat and already includes Stripe's processing cost — "
+    "there is no separate fee line at checkout. "
     "Card, Apple Pay, and Google Pay are offered when they are turned on for ZEIM's Stripe account. "
     "PayPal and Cash App Pay show up only if they are turned on in the Stripe Dashboard "
     "and Stripe allows them on a monthly plan."
@@ -148,12 +142,9 @@ def catalog() -> dict:
     for p in PLANS:
         row = dict(p)
         if p["id"] in PAID_IDS:
-            cents = billing.PLAN_CENTS[p["id"]]
-            row["fee_cents"] = billing.service_fee_cents(cents)
             row["purchasable"] = _purchasable(p["id"], mode)
             row["coming"] = not row["purchasable"]
         else:
-            row["fee_cents"] = 0
             row["purchasable"] = False
             row["coming"] = False
         plans.append(row)
@@ -162,7 +153,6 @@ def catalog() -> dict:
         "plans_enabled": plans_enabled(),
         "stripe_mode": mode,
         "payment_note": _payment_note(mode),
-        "fee_note": FEE_NOTE,
         "processing_note": PROCESSING_NOTE,
         "renewal_note": _renewal_note(mode),
         "tip_note": TIP_NOTE,

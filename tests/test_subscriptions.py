@@ -38,8 +38,8 @@ def test_catalog_is_honest():
     assert c["plans_enabled"] is False
     assert c["stripe_mode"] == "off"
     assert c["stores_cards"] is False
-    assert "about 1%" in c["fee_note"]
-    assert "4¢" in c["fee_note"] and "6¢" in c["fee_note"]
+    assert "fee_note" not in c
+    assert "flat" in c["processing_note"].lower() and "includes" in c["processing_note"].lower()
     assert "processing" in c["processing_note"].lower()
     assert "never takes a cut" in c["tip_note"].lower()
     assert "nothing on this page starts a payment" in c["payment_note"].lower()
@@ -47,8 +47,8 @@ def test_catalog_is_honest():
     assert ids == {"free", "semi_pro", "pro"}
     prices = {p["id"]: p["price_usd"] for p in c["plans"]}
     assert prices["free"] == 0
-    assert abs(prices["semi_pro"] - 3.5) < 1e-6
-    assert abs(prices["pro"] - 5.5) < 1e-6
+    assert abs(prices["semi_pro"] - 4.0) < 1e-6
+    assert abs(prices["pro"] - 6.0) < 1e-6
     for plan in c["plans"]:
         assert plan["purchasable"] is False
         if plan["id"] != "free":
