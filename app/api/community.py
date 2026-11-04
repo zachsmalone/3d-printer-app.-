@@ -204,6 +204,25 @@ def signout(request: Request, actor: Actor = Depends(get_actor)):
     return r
 
 
+@router.post("/me/delete-account")
+def delete_my_account(request: Request, body: dict, actor: Actor = Depends(get_actor)):
+    """Self-serve 'Delete my account'. Needs {"confirm": "DELETE"}. Login stops at once; the account and its data are
+    removed by the in-app purge (startup + hourly), within 7 days at most."""
+    if not actor.user:
+        raise HTTPException(400, "You're not signed in.")
+    if str(body.get("confirm", "")) != "DELETE":
+        raise HTTPException(400, "Type DELETE to confirm.")
+    from ..community import account_delete
+    svc = getattr(request.app.state, "auth_service", None)
+    account_delete.request(actor.sid, svc)
+    import secrets as _s
+    r = JSONResponse({"deletion_requested": True})
+    r.set_cookie(idn.COOKIE, _s.token_urlsafe(24), max_age=3600 * 24 * 365, **idn.cookie_args(request))
+    if svc is not None and request.cookies.get(svc.cfg.cookie_name):
+        r.delete_cookie(svc.cfg.cookie_name, path="/", secure=svc.cfg.secure_cookies, httponly=True, samesite="lax")
+    return r
+
+
 @router.post("/me/recovery-code")
 def new_recovery_code(actor: Actor = Depends(get_actor)):
     """Make a fresh recovery code (the old one stops working). Adult accounts only."""
