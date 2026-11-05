@@ -128,6 +128,24 @@ def test_header_motto_sits_beside_the_logo_without_the_seal():
     assert 'body[data-zsec="slicer"] .topbar::before' in CSS
 
 
+def test_me_marks_are_quiet_rectangles_and_fdm_quick_buttons_stay():
+    """Circles and pills in Me, and the active tab mark on every section, are a 7px rectangle.
+    Slicer quick buttons and the FDM/Resin switch are not restyled. Walnut grain stays."""
+    icon = CSS[CSS.index("body[data-zsec] .nav button svg.i"):CSS.index("body[data-zsec] .nav button svg.i") + 220]
+    assert "border-radius:7px!important" in icon
+    assert "50%" not in icon
+    assert "body[data-zsec] .topbar .nav button.on .i{border-radius:7px!important" in CSS
+    assert 'body[data-zsec] .nav button{font-family:var(--font)!important;border-radius:7px!important}' in CSS
+    me = CSS[CSS.index("Me: circles and pills"):CSS.index('body[data-zsec="torchc0"] .zt-band')]
+    assert 'body[data-zsec="account"] #viewAccount .badge .emblem' in me
+    assert "border-radius:7px!important" in me
+    assert ".ctxbar" not in me and ".kindpick" not in me and "proc-tabs" not in me
+    assert "grain-walnut.svg" in CSS
+    band = CSS[CSS.index('body[data-zsec="account"] .zt-band[data-zt=account]::after'):]
+    assert "border-radius:7px" in band[:320]
+    assert "radial-gradient(circle at 80% 45%" not in band[:320]
+
+
 def test_showcase_and_account_accents_override_hard_coded_washes():
     assert 'body[data-zsec="showcase"]' in CSS and "#F4A7B9" in CSS
     assert 'body[data-zsec="account"]' in CSS and "--gold:#C9A227" in CSS

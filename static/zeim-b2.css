@@ -94,10 +94,14 @@ body[data-zsec] .brand-motto-en{font-size:10px;letter-spacing:.08em;color:var(--
   body[data-zsec] .topbar .spacer{flex:1 1 0}
   body[data-zsec] .topbar .themetoggle,body[data-zsec] .topbar #lookBtn{order:5}
 }
-body[data-zsec] .nav button{font-family:var(--font)!important}
-body[data-zsec] .nav button svg.i{border:1px solid currentColor;border-radius:50%;box-sizing:border-box;opacity:.85}
+/* Active tab: one quiet rounded square on every section, including Me.
+   Phones paint a pill behind the active icon; this radius replaces that pill.
+   The section colour stays. No glow. Inactive rings use the same shape. */
+body[data-zsec] .nav button{font-family:var(--font)!important;border-radius:7px!important}
+body[data-zsec] .nav button svg.i{border:1px solid currentColor;border-radius:7px!important;box-sizing:border-box;opacity:.85;box-shadow:none!important}
 body[data-zsec] .nav button.on,body[data-zsec] .nav button[aria-current="page"]{color:var(--sec)!important;border-color:var(--sec)!important;box-shadow:inset 0 -2px 0 var(--sec)!important;background:#16140F!important}
-body[data-zsec] .nav button.on svg.i,body[data-zsec] .nav button[aria-current="page"] svg.i{background:var(--sec)!important;color:#0E0D0C!important;border-color:var(--sec)!important}
+body[data-zsec] .nav button.on svg.i,body[data-zsec] .nav button[aria-current="page"] svg.i{background:var(--sec)!important;color:#0E0D0C!important;border-color:var(--sec)!important;border-radius:7px!important;box-shadow:none!important}
+body[data-zsec] .topbar .nav button.on .i{border-radius:7px!important;box-shadow:none!important}
 body[data-zsec] .seg .on,body[data-zsec] .seg [aria-pressed="true"]{border-color:var(--sec)!important;box-shadow:inset 0 -2px 0 var(--sec)!important}
 
 /* Page washes that were hard-coded (Showcase pink, Me red) follow the section accent instead. */
@@ -120,11 +124,38 @@ body[data-zsec="showcase"] .challenges h2,body[data-zsec="showcase"] .qaitem .a,
 body[data-zsec="account"] .zt-band[data-zt=account] .zt-art{display:none!important}
 body[data-zsec="account"] .zt-ink{background:radial-gradient(circle at 42% 40%,rgba(201,162,39,.42),rgba(201,162,39,.08) 62%,transparent 74%)!important}
 body[data-zsec] .zt-cap{color:#EDE3D1!important}
-body[data-zsec="account"] .zt-band[data-zt=account]::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 80% 45%,transparent 46px,rgba(201,162,39,.55) 47px,rgba(201,162,39,.55) 49px,transparent 50px)}
+body[data-zsec="account"] .zt-band[data-zt=account]::after{content:"";position:absolute;right:14%;top:18%;width:96px;height:96px;border:1px solid rgba(201,162,39,.55);border-radius:7px;background:none;box-shadow:none;pointer-events:none}
 body[data-zsec="account"] #viewAccount .mestudio{border-left-color:var(--gold)!important}
 body[data-zsec="account"] #viewAccount .mestudio h2 .i{color:var(--gold)!important}
 body[data-zsec="account"] #viewAccount .btn.primary{background:var(--gold)!important;background-image:none!important;color:#0E0D0C!important;border-color:var(--gold)!important;-webkit-text-fill-color:#0E0D0C!important}
 body[data-zsec="account"] #viewAccount .btn.primary *{color:#0E0D0C!important;-webkit-text-fill-color:#0E0D0C!important}
+/* Me: circles and pills become one quiet rounded square. Sizes, taps, and colours stay.
+   The walnut grain is not touched. The FDM/Resin switch and slicer quick buttons are not in this list. */
+body[data-zsec="account"] #viewAccount .badge .emblem,
+body[data-zsec="account"] #viewAccount .pill,
+body[data-zsec="account"] #viewAccount .fav,
+body[data-zsec="account"] #viewAccount .colchip,
+body[data-zsec="account"] #viewAccount .soclinks a.soc,
+body[data-zsec="account"] #dlgAccount .pill,
+body[data-zsec="account"] #dlgAccount .plan-card .pill,
+body[data-zsec="account"] #dlgAccount .soclinks a.soc,
+body[data-zsec="account"] #dlgAccount .x,
+body[data-zsec="account"] #dlgSettings .tabs,
+body[data-zsec="account"] #dlgSettings .tabs button,
+body[data-zsec="account"] #dlgSettings .x,
+body[data-zsec="account"] #dlgData .x,
+body[data-zsec="account"] #dlgProfile .pill,
+body[data-zsec="account"] #dlgProfile .colchip,
+body[data-zsec="account"] #dlgProfile .soclinks a.soc,
+body[data-zsec="account"] #dlgProfile .x,
+body[data-zsec="account"] #dlgFeedback .x,
+body[data-zsec="account"] .zeim-auth-row button,
+body[data-zsec="account"] [class^="zeim-auth"] button,
+body[data-zsec="account"] .themetoggle,
+body[data-zsec="account"] .saveind{border-radius:7px!important}
+body[data-zsec="account"] #viewAccount .badge .emblem{border-width:1px;background-image:none!important;box-shadow:none!important}
+body[data-zsec="account"] #viewAccount .badge:not(.locked) .emblem{background-color:var(--emblem-bg,#14110C)}
+body[data-zsec="account"] .themetoggle{box-shadow:none!important}
 
 body[data-zsec="torchc0"] .zt-band[data-zt=torchc0]::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(100deg,transparent 0 22px,rgba(215,55,42,.2) 22px 23px)}
 body[data-zsec="lithophane"] .zt-band[data-zt=lithophane]{background-image:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDMyMCIgcHJlc2VydmVBc3BlY3RSYXRpbz0ieE1heFlNaWQgc2xpY2UiPjxkZWZzPjxyYWRpYWxHcmFkaWVudCBpZD0iZyIgY3g9Ijg4JSIgY3k9IjUwJSIgcj0iNTUlIj48c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNGRkQ3QTAiIHN0b3Atb3BhY2l0eT0iLjU1Ii8+PHN0b3Agb2Zmc2V0PSIuMzUiIHN0b3AtY29sb3I9IiNFMkI2NkMiIHN0b3Atb3BhY2l0eT0iLjIyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMUExNzEyIiBzdG9wLW9wYWNpdHk9IjAiLz48L3JhZGlhbEdyYWRpZW50PjxwYXR0ZXJuIGlkPSJrIiB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0wIDBINDBWNDBNMjAgMEwwIDIwIDIwIDQwIDQwIDIwWiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRURFM0QxIiBzdHJva2Utd2lkdGg9Ii42Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwMCIgaGVpZ2h0PSIzMjAiIGZpbGw9IiMxNDExMEMiLz48cmVjdCB3aWR0aD0iMTAwMCIgaGVpZ2h0PSIzMjAiIGZpbGw9InVybCgjZykiLz48cmVjdCB4PSI1MjAiIHk9IjAiIHdpZHRoPSI0ODAiIGhlaWdodD0iMzIwIiBmaWxsPSJ1cmwoI2spIiBvcGFjaXR5PSIuMTYiLz48ZyBzdHJva2U9IiNFREUzRDEiIHN0cm9rZS1vcGFjaXR5PSIuMjUiPjxsaW5lIHgxPSI1NDAiIHkxPSIwIiB4Mj0iNTQwIiB5Mj0iMzIwIi8+PGxpbmUgeDE9IjYzNiIgeTE9IjAiIHgyPSI2MzYiIHkyPSIzMjAiLz48bGluZSB4MT0iNzMyIiB5MT0iMCIgeDI9IjczMiIgeTI9IjMyMCIvPjxsaW5lIHgxPSI4MjgiIHkxPSIwIiB4Mj0iODI4IiB5Mj0iMzIwIi8+PGxpbmUgeDE9IjkyNCIgeTE9IjAiIHgyPSI5MjQiIHkyPSIzMjAiLz48bGluZSB4MT0iNTIwIiB5MT0iMTYwIiB4Mj0iMTAwMCIgeTI9IjE2MCIvPjwvZz48ZyBmaWxsPSJub25lIiBzdHJva2U9IiNFMkI2NkMiIHN0cm9rZS1vcGFjaXR5PSIuMzUiPjxwYXRoIGQ9Ik03NTAgMTYwYTExMCAxMTAgMCAwIDEgMjIwIDBhMTEwIDExMCAwIDAgMSAtMjIwIDAiLz48cGF0aCBkPSJNNzIwIDE2MGExNDAgMTQwIDAgMCAxIDI4MCAwYTE0MCAxNDAgMCAwIDEgLTI4MCAwIi8+PHBhdGggZD0iTTY4NSAxNjBhMTc1IDE3NSAwIDAgMSAzNTAgMGExNzUgMTc1IDAgMCAxIC0zNTAgMCIvPjwvZz48L3N2Zz4="),var(--washi-tex)!important;background-repeat:no-repeat,repeat!important;background-position:right center,0 0!important;background-size:cover,220px!important}
