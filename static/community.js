@@ -75,6 +75,7 @@ function show(view, tab) {
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === navTab); if (b.dataset.view === navTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
   document.body.dataset.view = view;
+  document.body.dataset.zsec = view;
   if (view === "slicer") document.dispatchEvent(new CustomEvent("zeim:edit-shown"));
   if (view === "torchc0") document.dispatchEvent(new CustomEvent("zeim:torchc0-shown"));
   if (view === "showcase") loadShowcase();
