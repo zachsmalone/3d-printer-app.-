@@ -64,13 +64,11 @@ body[data-zsec] input[type=number],body[data-zsec] output,body[data-zsec] .num,b
 body[data-zsec] .topbar{background:var(--sumi)!important;background-image:none!important;border-bottom:1px solid #2E2A22!important}
 body[data-zsec] .topbar > *{position:relative;z-index:1}
 body[data-zsec] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:6px;background:var(--asanoha) repeat-x;background-size:14px 24px;opacity:.35;pointer-events:none;z-index:2}
-body[data-zsec] .brand{position:relative}
-body[data-zsec] .brand::after{content:"\7CBE";position:absolute;right:-18px;top:6px;width:16px;height:16px;display:grid;place-items:center;font:700 11px/1 var(--serif);color:#FBEDE7;background:#B8261C;border-radius:3px;transform:rotate(-4deg);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);pointer-events:none;z-index:2}
-/* Motto sits where the header brush-writing was: immediately right of the logo and the 精 seal.
+/* Motto sits where the header brush-writing was: immediately right of the logo.
    Latin uses the heading face (Shippori Mincho). English is the line under it, hidden when the row is narrow. */
 .brand-motto{display:none}
-body[data-zsec] .brandlock{display:flex;align-items:center;flex-wrap:nowrap;min-width:0;flex:0 1 auto;position:relative;z-index:1}
-body[data-zsec] .brand-motto{display:flex;flex-direction:column;justify-content:center;gap:1px;margin:0;padding:1px 0 0 22px;min-width:0;line-height:1.05;pointer-events:none}
+body[data-zsec] .brandlock{display:flex;align-items:center;gap:8px;flex-wrap:nowrap;min-width:0;flex:0 1 auto;position:relative;z-index:1}
+body[data-zsec] .brand-motto{display:flex;flex-direction:column;justify-content:center;gap:1px;margin:0;padding:1px 0 0;min-width:0;line-height:1.05;pointer-events:none}
 body[data-zsec] .brand-motto-la,
 body[data-zsec] .brand-motto-en{font-family:var(--serif);font-weight:600;white-space:nowrap}
 body[data-zsec] .brand-motto-la{font-size:13px;letter-spacing:.045em;color:var(--gold,#C9A227)}

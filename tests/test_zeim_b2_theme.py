@@ -70,15 +70,18 @@ def test_fdm_wave_is_only_on_the_topbar_pseudo_element():
     assert "background-image:none!important" in CSS[CSS.index('body[data-zsec="slicer"] .viewer'):CSS.index('body[data-zsec="slicer"] .viewer') + 280]
 
 
-def test_header_motto_replaces_brush_writing_beside_the_seal():
+def test_header_motto_sits_beside_the_logo_without_the_seal():
     bar = HTML[HTML.index('<header class="topbar">'):HTML.index("</header>")]
     brand = bar[bar.index('<a class="brand"'):bar.index("</a>") + 4]
     assert "Uno loco aedificamus" not in brand
     assert 'class="brand-motto"' in bar
     assert "Uno loco aedificamus" in bar and "We build in one place" in bar
-    assert 'content:"\\7CBE"' in CSS
+    assert 'content:"\\7CBE"' not in CSS
+    assert "body[data-zsec] .brand::after" not in CSS
     motto = CSS[CSS.index(".brand-motto"):CSS.index(".brand-motto") + 900]
     assert "var(--serif)" in motto and "var(--gold" in motto
+    assert "padding:1px 0 0 22px" not in CSS
+    assert "gap:8px" in CSS[CSS.index(".brandlock"):CSS.index(".brandlock") + 180]
     phone = CSS[CSS.index("@media (max-width:768px)"):]
     assert ".brand-motto-en{display:none}" in phone[:500]
     # the FDM wave rule is still the only wave, on the topbar pseudo-element
