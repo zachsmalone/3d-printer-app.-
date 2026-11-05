@@ -66,6 +66,30 @@ body[data-zsec] .topbar > *{position:relative;z-index:1}
 body[data-zsec] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:6px;background:var(--asanoha) repeat-x;background-size:14px 24px;opacity:.35;pointer-events:none;z-index:2}
 body[data-zsec] .brand{position:relative}
 body[data-zsec] .brand::after{content:"\7CBE";position:absolute;right:-18px;top:6px;width:16px;height:16px;display:grid;place-items:center;font:700 11px/1 var(--serif);color:#FBEDE7;background:#B8261C;border-radius:3px;transform:rotate(-4deg);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);pointer-events:none;z-index:2}
+/* Motto sits where the header brush-writing was: immediately right of the logo and the 精 seal.
+   Latin uses the heading face (Shippori Mincho). English is the line under it, hidden when the row is narrow. */
+.brand-motto{display:none}
+body[data-zsec] .brandlock{display:flex;align-items:center;flex-wrap:nowrap;min-width:0;flex:0 1 auto;position:relative;z-index:1}
+body[data-zsec] .brand-motto{display:flex;flex-direction:column;justify-content:center;gap:1px;margin:0;padding:1px 0 0 22px;min-width:0;line-height:1.05;pointer-events:none}
+body[data-zsec] .brand-motto-la,
+body[data-zsec] .brand-motto-en{font-family:var(--serif);font-weight:600;white-space:nowrap}
+body[data-zsec] .brand-motto-la{font-size:13px;letter-spacing:.045em;color:var(--gold,#C9A227)}
+body[data-zsec] .brand-motto-en{font-size:10px;letter-spacing:.08em;color:var(--mut,#C4BEB6)}
+@media (max-width:768px){
+  body[data-zsec] .topbar .brand{margin-right:0}
+  body[data-zsec] .brandlock{margin-right:auto}
+  body[data-zsec] .brand-motto-en{display:none}
+  body[data-zsec] .brand-motto-la{font-size:12px;letter-spacing:.02em}
+}
+/* From 1500px the bar was one row and had no gap beside the logo.
+   The tabs take the same full-width row they already use below 1500,
+   and the colour controls stay on the first row (their order is 98/99 otherwise). */
+@media (min-width:1500px){
+  body[data-zsec] .topbar{flex-wrap:wrap;row-gap:4px}
+  body[data-zsec] .topbar .nav{order:60;flex:1 0 100%;justify-content:space-between}
+  body[data-zsec] .topbar .spacer{flex:1 1 0}
+  body[data-zsec] .topbar .themetoggle,body[data-zsec] .topbar #lookBtn{order:5}
+}
 body[data-zsec] .nav button{font-family:var(--font)!important}
 body[data-zsec] .nav button svg.i{border:1px solid currentColor;border-radius:50%;box-sizing:border-box;opacity:.85}
 body[data-zsec] .nav button.on,body[data-zsec] .nav button[aria-current="page"]{color:var(--sec)!important;border-color:var(--sec)!important;box-shadow:inset 0 -2px 0 var(--sec)!important;background:#16140F!important}
