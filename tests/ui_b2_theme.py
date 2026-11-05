@@ -41,7 +41,6 @@ def main():
         browser = p.chromium.launch(executable_path=CHROME, args=["--no-sandbox", "--disable-dev-shm-usage"])
         for name, w, h in (("desktop", 1280, 900), ("phone", 390, 844)):
             page = browser.new_page(viewport={"width": w, "height": h})
-            page.add_init_script("try{localStorage.setItem('zeim.adult','yes')}catch(e){}")
             page.goto(U + "/", wait_until="domcontentloaded")
             page.wait_for_function("() => window.__zeimStarted === true", timeout=20000)
             shots = [

@@ -58,7 +58,7 @@ def base():
             break
     d = tempfile.mkdtemp(prefix="zeim-pickup-")
     env = {**os.environ, "PORT": str(port), "HOST": "127.0.0.1", "PHOTO3D_DATA": d + "/d",
-           "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "local", "PHOTO3D_AGE_GATE": "0"}
+           "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "local"}
     logf = open(d + "/server.log", "w", encoding="utf-8")
     proc = subprocess.Popen([sys.executable, "-m", "app.serve"], cwd=ROOT, env=env,
                             stdout=logf, stderr=subprocess.STDOUT)

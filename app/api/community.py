@@ -745,7 +745,7 @@ def report_copy(iid: str, request: Request, body: dict | None = None, actor: Act
 
 @router.post("/users/{uid}/report")
 def report_user(uid: str, request: Request, body: dict, actor: Actor = Depends(get_actor)):
-    """Report an ACCOUNT (e.g. reason 'underage_user': ZEIM is 18+ only). Unknown / hidden profiles answer 404."""
+    """Report an ACCOUNT (e.g. reason 'underage_user'). Unknown / hidden profiles answer 404."""
     report_limit(request, actor)
     _, u = idn.user_by_id(uid)
     if not u or not privacy.can_view_profile(actor, uid):

@@ -38,7 +38,7 @@ async function load() {
       if (p.nsfw) card.append(el("p", { className: "help" }, "Tagged NSFW (shown blurred as Mature content)."));
       const acts = [["hide", "Hide"], ["restore", "Restore"], ["dismiss", "Dismiss"]];
       if (!r.item_id?.startsWith("user:")) acts.push(p.nsfw ? ["unmark_nsfw", "Remove NSFW tag"] : ["mark_nsfw", "Mark NSFW"], ["remove", "Remove (explicit)"]);
-      if (r.account_id) acts.push(["suspend", "Suspend account"]);     // e.g. 'underage_user': ZEIM is 18+ only. Data deletion: README "Underage accounts"
+      if (r.account_id) acts.push(["suspend", "Suspend account"]);     // e.g. 'underage_user'. Data deletion: README "Underage accounts"
       for (const [a, label] of acts) {
         const b = el("button", { type: "button", className: "btn small" + (a === "hide" || a === "suspend" || a === "remove" ? " danger" : "") }, label);
         b.onclick = async () => { b.disabled = true; try { await call(`/api/moderation/${r.id}/resolve`, { method: "POST", body: JSON.stringify({ action: a }) }); await load(); } catch (e) { $("#msg").textContent = e.message; b.disabled = false; } };

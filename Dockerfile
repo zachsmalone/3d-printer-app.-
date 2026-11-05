@@ -42,6 +42,8 @@ RUN pip install -r requirements.txt -c constraints.txt
 # PHOTO3D_DATA=/data is user state and is a different tree. Do not copy that volume into the image.
 COPY app ./app
 COPY static ./static
+# A release tarball unpacked over the old folder keeps files this release deleted. Drop the retired age gate if it is still in the context.
+RUN rm -f static/agegate.js
 COPY data ./data
 # Photo prep is imported at process start (app/core/ai3d_prep.py), even when ZEIM_2D3D_ENABLED=0.
 # Only this file. The TripoSR worker, weights, and torch stay in the separate workers/ai3d image.

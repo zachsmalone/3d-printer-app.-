@@ -19,9 +19,7 @@ for n, s in enumerate([(30, 30, 20), (20, 40, 15)]):
 with sync_playwright() as p:
     b = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader"])
     pg = b.new_page(viewport={"width": 1280, "height": 860})
-    pg.add_init_script("try { localStorage.setItem('zeim.age.ok','yes'); } catch(e) {}")
     pg.goto(URL + "/#slicer"); pg.wait_for_timeout(1000)
-    pg.evaluate("""() => { const g=document.getElementById('ageGate'); if(g)g.remove(); document.documentElement.classList.remove('gated'); }""")
     pg.set_input_files("#editFile", files)
     pg.wait_for_selector("#multiPlate", state="visible", timeout=60000)
     pg.click("#multiPlate", force=True)
