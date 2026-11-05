@@ -24,13 +24,10 @@ def open_build(pg, bid):
     pg.wait_for_function("id => window.__photo3d?.current?.id === id", arg=bid, timeout=15000)
 with sync_playwright() as p:
     br = p.chromium.launch()
-    # Age gate: server may run with PHOTO3D_AGE_GATE=0; also set the remembered answer.
     for tag, vp in (("desktop", {"width": 1280, "height": 860}), ("phone", {"width": 390, "height": 844})):
         ctx = br.new_context(viewport=vp, has_touch=tag == "phone", is_mobile=tag == "phone")
         pg = ctx.new_page(); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
-        pg.add_init_script("try { localStorage.setItem('zeim.adult','yes'); } catch (e) {}")
         pg.goto(U + "/#studio"); kind(pg, "fdm"); pg.reload(); pg.wait_for_timeout(1500)
-        pg.evaluate("""() => { const g=document.getElementById('ageGate'); if(g)g.remove(); document.documentElement.classList.remove('gated'); }""")
         bid = build(pg); open_build(pg, bid)
         ok(f"{tag}: Studio handoff row visible", pg.is_visible("#studioHandoff") and pg.is_visible("#btnSaveWork") and pg.is_visible("#btnSendSlicer") and pg.is_visible("#btnSendCad"))
         bbs = [pg.locator(s).bounding_box() for s in ("#btnSaveWork", "#btnSendSlicer", "#btnSendCad")]

@@ -26,7 +26,7 @@ def build(pg):
 
 def run(p, w, h, tag):
     b = p.chromium.launch(); pg = b.new_page(viewport={"width": w, "height": h})
-    pg.add_init_script("localStorage.level='expert'; localStorage.setItem('zeim.adult','yes')")
+    pg.add_init_script("localStorage.level='expert'")
     pg.goto(URL + "/#studio"); pg.wait_for_timeout(1500); pg.click("#sSample"); pg.wait_for_timeout(800)
     pg.click("[data-shape='rect']") if pg.is_visible("[data-shape='rect']") else None
     first = None

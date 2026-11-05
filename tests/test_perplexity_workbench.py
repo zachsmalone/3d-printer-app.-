@@ -11,12 +11,7 @@ def test_workbench_redirect_and_original_homepage():
     r = c.get("/workbench", follow_redirects=False)
     assert r.status_code == 307
     assert r.headers["location"] == "/workbench/"
-    # unchanged apart from A's test-only age-gate switch (conftest sets PHOTO3D_AGE_GATE=0)
-    from app import config
-    want = (STATIC / "index.html").read_bytes()
-    if not config.AGE_GATE:
-        want = want.replace(b'<html lang="en">', b'<html lang="en" data-agegate="off">', 1)
-    assert c.get("/").content == want
+    assert c.get("/").content == (STATIC / "index.html").read_bytes()
 
 
 def test_workbench_html_uses_only_same_origin_runtime_assets():

@@ -16,7 +16,6 @@ with sync_playwright() as p:
     for rm in ("no-preference", "reduce"):
         for w, h in ((1280, 900), (390, 844)):
             pg = b.new_page(viewport={"width": w, "height": h}, reduced_motion=rm, color_scheme="light")
-            pg.add_init_script("try{localStorage.setItem('zeim.adult','yes')}catch(e){}")
             for sec, zt in SECS.items():
                 pg.goto(U + "/#" + sec); pg.wait_for_timeout(900)
                 r = pg.evaluate(JS, sec)

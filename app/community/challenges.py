@@ -27,7 +27,7 @@ REMIX = {
         "Your entry must be a credited remix of a public Showcase project.",
         "Prize-free: ZEIM offers no cash or prizes for this challenge.",
         "Tip links stay optional. ZEIM never nags, and never takes a cut of tips or of sales a maker makes from their own link. Showcase downloads stay free.",
-        "18+ only. Keep it within the Community Guidelines.",
+        "Keep it within the Community Guidelines.",
     ],
     "prize_free": True,
     "status": "closed",
@@ -56,7 +56,7 @@ XMAS = {
         "No cash and no prizes. Badges only.",
         "If two entries have the same number of likes, the one entered earlier places higher.",
         "Tip links stay optional. ZEIM never nags, and never takes a cut of tips or of sales a maker makes from their own link. Showcase downloads stay free.",
-        "18+ only. Keep it within the Community Guidelines.",
+        "Keep it within the Community Guidelines.",
     ],
     "prize_free": True,
     "status": "open",
@@ -69,6 +69,8 @@ class Bad(ValueError):
 
 
 _OLD_TIP_RULE = "Tip links stay optional; ZEIM never nags and takes no cut of tips."
+_OLD_AGE_RULE = "18+ only. Keep it within the Community Guidelines."
+_AGE_RULE = "Keep it within the Community Guidelines."
 
 
 def current_time() -> datetime:
@@ -171,6 +173,9 @@ def _ensure_seed():
                 hit[key] = XMAS[key]
             hit["prize_free"] = True
         for c in rows:
+            rules = c.get("rules") or []
+            if _OLD_AGE_RULE in rules:
+                c["rules"] = [_AGE_RULE if r == _OLD_AGE_RULE else r for r in rules]
             if c.get("id") == REMIX_ID:
                 c["status"] = "closed"
                 if _OLD_TIP_RULE in (c.get("rules") or []):

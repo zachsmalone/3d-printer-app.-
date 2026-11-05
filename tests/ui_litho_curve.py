@@ -14,7 +14,7 @@ with sync_playwright() as p:
     b = p.chromium.launch()
     for name, vp, kw in (("w1280", {"width": 1280, "height": 900}, {}), ("w390", {"width": 390, "height": 844}, {"has_touch": True, "is_mobile": True, "device_scale_factor": 2})):
         pg = b.new_page(viewport=vp, **kw); errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
-        pg.add_init_script("localStorage.level='expert'; localStorage.setItem('zeim.adult','yes')")
+        pg.add_init_script("localStorage.level='expert'")
         pg.goto(URL + "/#studio"); pg.wait_for_timeout(1500)
         pg.click("#sSample"); pg.wait_for_timeout(1000)                       # Tango, the built-in sample
         card = pg.locator("[data-shape='curve']"); card.scroll_into_view_if_needed(); card.click(); pg.wait_for_timeout(300)

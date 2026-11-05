@@ -8,7 +8,7 @@ from app.services import accounts
 from tests.b1 import ADULT, client, photo_build
 
 ROOT = Path(__file__).resolve().parents[1]
-PAGES = ("/", "/static/app.js", "/static/community.js", "/static/send.js", "/static/agegate.js", "/workbench/")
+PAGES = ("/", "/static/app.js", "/static/community.js", "/static/send.js", "/workbench/")
 BANNED = ("PHOTO3D_", "restart the server", "Scaffolding", "not implemented", "Not configured")
 
 

@@ -16,7 +16,7 @@ def test_slicer_plate_drag_stays_after_orbit():
     s = socket.socket(); s.bind(("127.0.0.1", 0)); port = s.getsockname()[1]; s.close()
     d = tempfile.mkdtemp(prefix="zeim-ui-drag-")
     env = {**os.environ, "PORT": str(port), "HOST": "127.0.0.1", "PHOTO3D_DATA": d + "/d",
-           "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "local", "PHOTO3D_AGE_GATE": "0"}
+           "PHOTO3D_OUT": d + "/o", "PHOTO3D_MODE": "local"}
     p = subprocess.Popen([sys.executable, "-m", "app.serve"], cwd=ROOT, env=env,
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
