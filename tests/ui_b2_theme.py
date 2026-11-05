@@ -6,6 +6,14 @@ from playwright.sync_api import sync_playwright
 
 U = sys.argv[1].rstrip("/")
 SHOTS = sys.argv[2] if len(sys.argv) > 2 else "/workspace/redesign"
+GRAIN = {
+    "showcase": "grain-cherry.svg",
+    "slicer": "grain-cypress.svg",
+    "torchc0": "grain-maple.svg",
+    "cad": "grain-wenge.svg",
+    "lithophane": "grain-beech.svg",
+    "account": "grain-walnut.svg",
+}
 CHROME = "/usr/local/bin/google-chrome"
 
 PROBE = """() => {
@@ -31,6 +39,21 @@ PROBE = """() => {
     sticky: top ? getComputedStyle(top).position : '',
     shGo: (() => { const b = document.querySelector('#shGo'); return b ? getComputedStyle(b).backgroundColor : ''; })(),
     accPri: (() => { const b = document.querySelector('#viewAccount .btn.primary'); return b ? getComputedStyle(b).backgroundColor : ''; })(),
+    tex: getComputedStyle(document.body).getPropertyValue('--washi-tex'),
+    page: (() => {
+      const id = {showcase:'#viewShowcase', slicer:'#viewEdit', torchc0:'#viewTorch', cad:'#viewCad', lithophane:'#viewCreate', account:'#viewAccount'}[document.body.dataset.zsec];
+      const el = id && document.querySelector(id);
+      return el ? getComputedStyle(el).backgroundImage : '';
+    })(),
+    stage: (() => {
+      const z = document.body.dataset.zsec;
+      const el = z === 'slicer' ? document.querySelector('#editViewer')
+        : z === 'lithophane' ? document.querySelector('#viewer')
+        : z === 'torchc0' ? document.querySelector('.rzView')
+        : null;
+      return el ? getComputedStyle(el).backgroundImage : '';
+    })(),
+    side: (() => { const s = document.querySelector('#editSide'); return s ? getComputedStyle(s).backgroundImage : ''; })(),
   };
 }"""
 
@@ -68,15 +91,38 @@ def main():
                 )
                 page.wait_for_timeout(350)
                 if view == "slicer":
+                    # Empty plate first: cypress is on the start panel, the wave is in the banner.
+                    page.screenshot(path=f"{SHOTS}/live-b2-{label}-empty-{name}.png", full_page=False)
                     # Load the sample only after the other sections, so the bed-leave
                     # guard (unchanged behaviour) is not in the way of the click-through.
+                    # The viewer canvas exists before a model does; wait until the empty
+                    # start panel hides, which is when the mesh is on the plate.
                     page.locator("#editSample").click()
-                    page.wait_for_selector("#editViewer canvas", timeout=40000)
-                    page.wait_for_timeout(1000)
+                    page.wait_for_function(
+                        "() => { const s = document.querySelector('#editStart'); return !!s && s.hidden; }",
+                        timeout=40000,
+                    )
+                    page.wait_for_timeout(600)
                 info = page.evaluate(PROBE)
                 tag = f"{label}-{name}"
                 if info["zsec"] != view:
                     bad.append(f"{tag}: data-zsec {info['zsec']}")
+                wood = GRAIN.get(view)
+                if wood:
+                    if wood not in info["tex"]:
+                        bad.append(f"{tag}: --washi-tex {info['tex'][:160]}")
+                    if view == "slicer":
+                        if "grain-" in info["page"]:
+                            bad.append(f"{tag}: cypress on the slicer page field")
+                        if "grain-" in info["plate"] or "grain-" in info["stage"]:
+                            bad.append(f"{tag}: wood on the build plate")
+                        if wood not in info["side"]:
+                            bad.append(f"{tag}: side panel missing cypress ({info['side'][:120]})")
+                    else:
+                        if wood not in info["page"]:
+                            bad.append(f"{tag}: page wood missing ({info['page'][:120]})")
+                        if info["stage"] and "grain-" in info["stage"]:
+                            bad.append(f"{tag}: wood behind the model ({info['stage'][:120]})")
                 if info["overflow"] > 2:
                     bad.append(f"{tag}: horizontal overflow {info['overflow']}")
                 if "Inter" not in info["font"]:

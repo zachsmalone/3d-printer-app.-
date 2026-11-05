@@ -70,6 +70,45 @@ def test_fdm_wave_is_only_on_the_topbar_pseudo_element():
     assert "background-image:none!important" in CSS[CSS.index('body[data-zsec="slicer"] .viewer'):CSS.index('body[data-zsec="slicer"] .viewer') + 280]
 
 
+GRAINS = {
+    "showcase": ("grain-cherry.svg", "cherry"),
+    "slicer": ("grain-cypress.svg", "cypress"),
+    "torchc0": ("grain-maple.svg", "maple"),
+    "cad": ("grain-wenge.svg", "wenge"),
+    "lithophane": ("grain-beech.svg", "beech"),
+    "account": ("grain-walnut.svg", "walnut"),
+}
+
+
+def test_each_section_has_its_own_faint_wood():
+    """Original SVG tiles, one species per section, never on the FDM plate or resin preview."""
+    for sec, (name, wood) in GRAINS.items():
+        path = os.path.join(STATIC, "zt", name)
+        text = open(path, encoding="utf-8").read()
+        size = os.path.getsize(path)
+        assert 400 < size < 6000, (name, size)
+        assert f'data-wood="{wood}"' in text
+        assert "<script" not in text.lower()
+        assert "fonts.google" not in text and "fonts.gstatic" not in text
+        assert 'href="http' not in text and "url(http" not in text
+        assert text.count("http://") == 1 and "http://www.w3.org/2000/svg" in text
+        for n in re.findall(r'(?:stroke-opacity|fill-opacity)="([0-9.]+)"', text):
+            assert float(n) <= 0.16, (name, n)
+        nums = [float(x) for x in re.search(r'feColorMatrix values="([^"]+)"', text).group(1).split()]
+        assert len(nums) == 20 and nums[18] <= 0.16, name
+        i = CSS.index(f'body[data-zsec="{sec}"]')
+        assert name in CSS[i:i + 420], sec
+    field = CSS[CSS.index("Faint wood on the page field"):CSS.index("Resin preview canvas")]
+    assert "#viewEdit" not in field and "slicer" not in field
+    plate = CSS[CSS.index('body[data-zsec="slicer"] .viewer'):CSS.index('body[data-zsec="slicer"] .ctxbar')]
+    assert "grain-" not in plate
+    assert "background-image:none!important" in plate
+    resin = CSS[CSS.index("body[data-zsec] .rzView"):CSS.index("body[data-zsec] .rzView") + 180]
+    assert "background-image:none!important" in resin
+    # the old single fiber remains only as the fallback for sections without a named wood
+    assert CSS.count("--washi-tex:url(\"/static/zt/grain-") == 6
+
+
 def test_showcase_and_account_accents_override_hard_coded_washes():
     assert 'body[data-zsec="showcase"]' in CSS and "#F4A7B9" in CSS
     assert 'body[data-zsec="account"]' in CSS and "--gold:#C9A227" in CSS
