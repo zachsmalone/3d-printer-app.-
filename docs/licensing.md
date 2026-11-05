@@ -12,6 +12,12 @@ ZEIM follows the same model as MakerWorld, which slices in the cloud with Bambu 
 ### Rule for everyone working on ZEIM
 **Nobody may modify, patch, fork-and-ship, or link PrusaSlicer's code into ZEIM.** No copying its source files into this repo, no Python/C bindings to its libraries, no patched builds. PrusaSlicer is only ever called as a separate, unmodified program through its command line. If a change would need any of that, stop and ask Zach first; it would change these licence obligations.
 
+## Photo check (NudeNet 320n)
+
+Uploaded photos are checked in-process. The dependency is the PyPI package `nudenet` 3.4.2, whose package metadata says MIT, plus `onnxruntime` 1.23.2 (MIT). The weights are the bundled `320n.onnx` file (about 12 MB), the NudeNet v3.4 detector based on Ultralytics YOLOv8n. The NudeNet GitHub repository is AGPL-3.0, and YOLOv8 is AGPL-3.0. ZEIM does not copy that Python or the YOLOv8 training code into this repo. The check runs on the CPU. Photos are not sent to another service for it.
+
+This note is not legal advice.
+
 ## Copyright (DMCA) takedowns
 The Terms page has a copyright takedown section with a placeholder contact.
 TODO: register a DMCA designated agent with the US Copyright Office (small fee; needs Zach's OK before paying), then put the agent's contact in `static/terms.html#copyright`.

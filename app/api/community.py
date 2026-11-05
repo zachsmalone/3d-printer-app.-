@@ -1083,7 +1083,8 @@ def mod_escalate(report_id: str, request: Request, body: dict | None = None, x_a
 def _pending_prints():
     from ..community import social
     return [{"id": p["id"], "item_id": p["item_id"], "caption": p.get("caption", ""), "by": "@" + (p.get("username") or "?"), "created": p["created"],
-             "nsfw": bool(p.get("nsfw")), "thumb": f"/api/moderation/item/print:{p['id']}/thumb"} for p in social.pending()]
+             "nsfw": bool(p.get("nsfw")), "moderation": p.get("moderation") or "", "check_note": p.get("check_note") or "",
+             "thumb": f"/api/moderation/item/print:{p['id']}/thumb"} for p in social.pending()]
 
 
 @router.post("/moderation/prints/{pid}/{action}")

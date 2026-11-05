@@ -772,7 +772,7 @@ async function openItem(id) {
     <section class="showoff" aria-labelledby="soH"><h4 id="soH">Four sides</h4><div id="soViews"><p class="help">ZEIM draws the model from the front, right, back and left. These are not photos of a finished print.</p></div></section>
     <ul class="pgallery" id="prGallery"></ul>
       ${ME?.signed_up && i.visibility === "public" ? `<details class="prform"><summary class="btn"><svg class=i aria-hidden=true focusable=false><use href=#i-camera></use></svg> Add photos of your print</summary>
-        <p class="help">Name this print, add print notes, and add photos of the finished object. Photos of the object only, please: no people, faces, names or addresses. Location data is removed. Each photo is checked by a moderator before anyone else can see it.</p>
+        <p class="help">Name this print, add print notes, and add photos of the finished object. Photos of the object only, please: no people, faces, names or addresses. Location data is removed. Each photo is checked automatically on our server before anyone else can see it. If that check cannot run, only you can see it for now.</p>
         <div class="field"><label for="prName">Name this print</label><input id="prName" maxlength="80" placeholder="Desk lamp, first try"></div>
         <div class="field"><label for="prCap">Caption <em>optional</em></label><input id="prCap" maxlength="140" placeholder="Printed in PLA, came out great"></div>
         <details class="pubps"><summary>Settings and notes <em>optional</em></summary>
@@ -826,6 +826,7 @@ async function openItem(id) {
     const name = ($("#prName")?.value || "").trim();
     $("#prSend").disabled = true;
     let sent = 0;
+    const saved = [];
     try {
       for (const f of files) {
         const fd = new FormData(); fd.append("photo", f); fd.append("print_name", name); fd.append("caption", $("#prCap").value); fd.append("photo_ack", $("#prAck").checked); fd.append("nsfw", nv);
@@ -833,11 +834,16 @@ async function openItem(id) {
         if ($("#pr_layer")?.value) fd.append("layer_height_mm", $("#pr_layer").value);
         if ($("#pr_infill")?.value) fd.append("infill_pct", $("#pr_infill").value);
         if ($("#pr_nozzle")?.value) fd.append("nozzle_mm", $("#pr_nozzle").value);
-        await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd });
+        saved.push(await api(`/api/showcase/${id}/prints`, { method: "POST", body: fd }));
         sent++;
       }
       clearInline($("#prSend"));
-      toast(sent > 1 ? sent + " photos are waiting for review. Only you can see them until a moderator approves them." : "Thanks! Your photo is waiting for review. Only you can see it until a moderator approves it.", "ok");
+      const waiting = saved.filter(p => p.pending).length, live = saved.length - waiting;
+      const msg = waiting && live ? `${live} up, ${waiting} held for a check. Only you can see the held ones.`
+        : waiting ? (saved.length > 1 ? saved.length + " photos are waiting for review. Only you can see them until the check can finish." : "Thanks! Your photo is waiting for review. The automatic check could not finish, so only you can see it for now.")
+        : saved.some(p => p.nsfw) ? "Thanks! Your photo is up. It is shown blurred as mature content."
+        : (saved.length > 1 ? saved.length + " photos are up." : "Thanks! Your photo is up.");
+      toast(msg, "ok");
       prPicked = []; prShow(); $("#prCap").value = ""; if ($("#prName")) $("#prName").value = "";
       loadPrints(id);
     } catch (e) { inlineMsg($("#prSend"), sent ? sent + " saved. " + e.message : e.message); if (sent) loadPrints(id); }
@@ -886,20 +892,12 @@ async function openItem(id) {
   if ($("#itRemove")) $("#itRemove").onclick = () => removeShowcaseItem(i);
   if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => startRemix(i);
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
-  if ($("#itReport")) $("#itReport").onclick = () => {
-    $$("#dlgReport [name=repReason]").forEach(r => r.checked = false); $("#repDetails").value = ""; clearInline($("#repSend"));
-    $("#repSend").disabled = false; $("#dlgReport").showModal();
-    $("#repSend").onclick = async () => {
-      const reason = $("#dlgReport [name=repReason]:checked")?.value;
-      if (!reason) return inlineMsg($("#repSend"), "Please choose what the problem is.");
-      $("#repSend").disabled = true;
-      try {
-        const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details: $("#repDetails").value }));
-        $("#dlgReport").close(); toast(r.auto_hidden ? "Thank you. The project is hidden while a moderator looks at it." : "Thank you. We got your report.", "ok");
-        if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); }
-      } catch (e) { inlineMsg($("#repSend"), e.message); } finally { $("#repSend").disabled = false; }
-    };
-  };
+  if ($("#itReport")) $("#itReport").onclick = () => openReport("Report this project", async (reason, details) => {
+    const r = await api(`/api/showcase/${id}/report`, J("POST", { reason, details }));
+    $("#dlgReport").close();
+    toast(r.auto_hidden ? "Thank you. The project is hidden while it is reviewed." : "Thank you. We got your report.", "ok");
+    if (r.auto_hidden) { $("#dlgItem").close(); loadShowcase(); }
+  });
   if (!$("#dlgItem").open) $("#dlgItem").showModal();
 }
 
@@ -1429,6 +1427,24 @@ async function loadShowoff(id) {
   const first = host.querySelector(".showoff-pick"); if (first) show(first);
 }
 
+/* Report dialog shared by a project and by each print photo. */
+function openReport(title, send) {
+  const h = $("#repTitle"); if (h) h.textContent = title;
+  $$("#dlgReport [name=repReason]").forEach(r => r.checked = false);
+  $("#repDetails").value = "";
+  clearInline($("#repSend"));
+  $("#repSend").disabled = false;
+  $("#dlgReport").showModal();
+  $("#repSend").onclick = async () => {
+    const reason = $("#dlgReport [name=repReason]:checked")?.value;
+    if (!reason) return inlineMsg($("#repSend"), "Please choose what the problem is.");
+    $("#repSend").disabled = true;
+    try { await send(reason, $("#repDetails").value); }
+    catch (e) { inlineMsg($("#repSend"), e.message); }
+    finally { $("#repSend").disabled = false; }
+  };
+}
+
 /* ---------- 'I printed this' gallery ---------- */
 async function loadPrints(id) {
   const g = $("#prGallery"); if (!g) return;
@@ -1436,14 +1452,19 @@ async function loadPrints(id) {
   const psLine = s => { if (!s || !Object.keys(s).length) return ""; const bits = []; if (s.printer_name) bits.push(String(s.printer_name)); if (s.printer) bits.push(String(s.printer).toUpperCase()); if (s.material) bits.push(String(s.material).toUpperCase()); if (s.layer_height_mm != null) bits.push(s.layer_height_mm + " mm"); if (s.infill_pct != null) bits.push(s.infill_pct + "%"); if (s.supports === "yes") bits.push("supports"); if (s.supports === "no") bits.push("no supports"); const line = bits.length ? `<p class="help psline">${esc(bits.join(" · "))}</p>` : ""; const notes = s.notes ? `<p class="print-notes"><span class="help">Print notes</span> ${esc(s.notes)}</p>` : ""; return line + notes; };
   g.innerHTML = r.prints.length ? r.prints.map(p => `<li><figure${p.nsfw && !p.mine ? ' class="prmature"' : ""}><img src="${p.url}" alt="${p.nsfw ? "Photo of a print (mature content)" : `Photo of a print${p.name ? ": " + esc(p.name) : p.caption ? ": " + esc(p.caption) : ""}`}" loading="lazy">${p.nsfw && !p.mine ? `<button type="button" class="btn small mature-label" data-prshow="${p.id}">Mature content: show</button>` : ""}<figcaption>${p.name ? `<strong class="print-name">${esc(p.name)}</strong>` : ""}${p.pending ? '<span class="pill">Waiting for review</span> ' : ""}${p.caption && p.caption !== p.name ? esc(p.caption) + " " : ""}<span class="help">${esc(p.by)}</span>
       ${psLine(p.settings)}
-      ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : `<button type="button" class="btn small ghost danger" data-prrep="${p.id}"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button>`}</figcaption></figure></li>`).join("")
+      ${p.mine ? `<button type="button" class="btn small ghost" data-prdel="${p.id}">Delete</button>` : ""}<button type="button" class="btn small ghost danger" data-prrep="${p.id}" aria-label="Report this photo"><svg class=i aria-hidden=true focusable=false><use href=#i-flag></use></svg> Report</button></figcaption></figure></li>`).join("")
     : `<li class="help">No print photos yet.</li>`;
   g.onclick = async e => {
     const d = e.target.closest("[data-prdel]"), rp = e.target.closest("[data-prrep]"), sh = e.target.closest("[data-prshow]");
     if (sh) { if (await confirmMature()) { const f = sh.closest("figure"); f.classList.remove("prmature"); sh.remove(); } return; }
     try {
       if (d) { await api(`/api/prints/${d.dataset.prdel}`, { method: "DELETE" }); toast("Photo deleted", "ok"); loadPrints(id); }
-      if (rp) { const r2 = await api(`/api/prints/${rp.dataset.prrep}/report`, J("POST", { reason: "not_family_friendly", details: "" })); toast(r2.auto_hidden ? "Thank you. The photo is hidden while a moderator looks at it." : "Thank you. We got your report.", "ok"); }
+      if (rp) openReport("Report this photo", async (reason, details) => {
+        const r2 = await api(`/api/prints/${rp.dataset.prrep}/report`, J("POST", { reason, details }));
+        $("#dlgReport").close();
+        toast(r2.auto_removed ? "Thank you. That photo was removed." : r2.auto_hidden ? "Thank you. The photo is hidden while it is reviewed." : "Thank you. We got your report.", "ok");
+        if (r2.auto_hidden || r2.auto_removed) loadPrints(id);
+      });
     } catch (er) { toast(er.message, "err"); }
   };
 }

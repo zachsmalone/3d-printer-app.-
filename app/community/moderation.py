@@ -1,6 +1,9 @@
-"""Reporting + moderation queue (STUB-level but functional locally). Mild NSFW is allowed when tagged; explicit content is removed.
+"""Reporting + moderation queue (functional locally). Mild NSFW is allowed when tagged; explicit content is removed.
 
 Reports are stored; `minor_safety` reports hide the item immediately pending review.
+Print photos also have two automatic steps: at 10 distinct reporters a stricter local
+re-check can remove the photo, and at 100 distinct reporters it is removed. Other
+items are not auto-hidden by a count of ordinary reports.
 `underage_user` = "this account holder seems to be under 18" (a safety report). It names the ACCOUNT (account_id); a moderator
 can resolve it with action "suspend", which suspends the account (its content is then shown to nobody else, it can't share or send).
 Accounts and data are never deleted by this process; suspension is reversible.
@@ -19,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..config import DATA
+from . import imagemod, social
 from .store import MODERATION
 
 _audit = logging.getLogger("zeim.audit")
@@ -26,12 +30,22 @@ _who = lambda sid: hashlib.sha256(("rep:" + (sid or "")).encode()).hexdigest()[:
 REASONS = ["minor_safety", "underage_user", "not_family_friendly", "copyright", "harassment", "personal_info", "should_be_nsfw", "other", "stolen", "duplicate_hold"]
 # mark_nsfw / unmark_nsfw flip the item's mature tag; remove = take explicit content down (same as hide, logged as removal)
 ACTIONS = ("hide", "restore", "dismiss", "suspend", "mark_nsfw", "unmark_nsfw", "remove")
+# Print photos only. Distinct people, not repeat reports from the same person.
+IMAGE_DEEP_REPORTS = 10
+IMAGE_REMOVE_REPORTS = 100
+
+
+def _is_image(item_id: str) -> bool:
+    return bool(item_id) and item_id.startswith("print:")
 
 
 def report(item_id: str, sid: str, reason: str, details: str, account_id: str | None = None,
            ip: str = "", user_agent: str = "") -> dict:
-    """One OPEN report per (reporter, item, reason): a repeat returns the existing id. `minor_safety` hides the item at once (fail safe);
-    nothing else is ever auto-hidden by a count of reports (CR-11 f).
+    """One OPEN report per (reporter, item, reason): a repeat returns the existing id.
+    A print photo allows one report per person no matter the reason.
+    `minor_safety` hides the item at once (fail safe). Ordinary reports on a project
+    never auto-hide it (CR-11 f). Print photos are removed at IMAGE_REMOVE_REPORTS
+    distinct reporters, and re-checked locally at IMAGE_DEEP_REPORTS.
     ip/user_agent are recorded for moderation use ONLY (never shown publicly) — required context for
     NCMEC escalation (docs/legal/ncmec-procedure.md)."""
     if reason not in REASONS:
@@ -44,9 +58,19 @@ def report(item_id: str, sid: str, reason: str, details: str, account_id: str | 
     out = {}
 
     def f(m):
-        same = next((x for x in m["reports"] if x["status"] == "open" and x["reporter"] == sid and x["item_id"] == item_id and x["reason"] == reason), None)
+        if _is_image(item_id):
+            same = next((x for x in m["reports"] if x["reporter"] == sid and x["item_id"] == item_id), None)
+        else:
+            same = next((x for x in m["reports"] if x["status"] == "open" and x["reporter"] == sid and x["item_id"] == item_id and x["reason"] == reason), None)
         if same:
-            out.update(id=same["id"], status="open", auto_hidden=same["reason"] == "minor_safety", duplicate=True)
+            hid_now = False
+            if reason == "minor_safety" and item_id and item_id not in m["hidden"]:
+                m["hidden"].append(item_id)   # a later safety report still hides, even if this person already reported
+                hid_now = True
+                _audit.info("moderation auto-hide: item=%s report=%s reason=minor_safety reporter=%s at=%s", item_id, same["id"], _who(sid), same["created"])
+            out.update(id=same["id"], status="open" if same["status"] == "open" else same["status"],
+                       auto_hidden=hid_now or same.get("reason") == "minor_safety" or (reason == "minor_safety" and item_id in m["hidden"]),
+                       duplicate=True)
             return
         m["reports"].append(r)
         if reason == "minor_safety" and item_id not in m["hidden"]:
@@ -57,7 +81,74 @@ def report(item_id: str, sid: str, reason: str, details: str, account_id: str | 
     if not out.get("duplicate"):
         _audit.info("moderation report: item=%s report=%s reason=%s reporter=%s at=%s", item_id, out["id"], reason, _who(sid), r["created"])
         _log("report", report_id=out["id"], item=item_id, reason=reason)
+        if _is_image(item_id):
+            _image_report_thresholds(item_id, out)
     return out
+
+
+def _distinct_reporters(item_id: str) -> int:
+    return len({x.get("reporter") for x in MODERATION.read()["reports"] if x.get("item_id") == item_id and x.get("reporter")})
+
+
+def _hide_image(item_id: str) -> bool:
+    """Add the photo to the hidden list. Returns True only when this call hid it."""
+    added = {"ok": False}
+
+    def f(m):
+        if item_id not in m["hidden"]:
+            m["hidden"].append(item_id)
+            added["ok"] = True
+    MODERATION.update(f)
+    return added["ok"]
+
+
+def _image_report_thresholds(item_id: str, out: dict) -> None:
+    """10 distinct reporters: stricter local re-check, remove if it flags.
+    100 distinct reporters: remove. A check that errors does not remove the photo.
+    """
+    n = _distinct_reporters(item_id)
+    if n >= IMAGE_REMOVE_REPORTS:
+        if _hide_image(item_id):
+            out["auto_hidden"] = True
+            out["auto_removed"] = True
+            _audit.info("moderation auto-remove: item=%s reporters=%s why=report_count", item_id, n)
+            _log("auto_remove", item=item_id, reporters=n, why="report_count")
+        return
+    if n < IMAGE_DEEP_REPORTS or item_id in MODERATION.read()["hidden"]:
+        return
+    _deep_check_image(item_id, out)
+
+
+def _deep_check_image(item_id: str, out: dict) -> None:
+    """Run once per photo. An error leaves the photo up (the reports stay in the queue)."""
+    pid = item_id[6:]
+    photo = social.get_print(pid)
+    if not photo or photo.get("deep_checked") in ("clean", "flagged"):
+        return
+    path = social.print_path(photo)
+    if path is None:
+        return
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return
+    meta = {"deep": True, "item_id": photo.get("item_id"), "uid": photo.get("uid"), "kind": "print"}
+    verdict = imagemod.review_upload(data, meta)
+    if verdict == imagemod.NEEDS_HUMAN_REVIEW:
+        _log("deep_check_held", item=item_id)
+        return
+    flagged = verdict == imagemod.REJECT or bool(meta.get("force_nsfw"))
+
+    def mark(rows):
+        for rec in rows:
+            if rec.get("id") == pid:
+                rec["deep_checked"] = "flagged" if flagged else "clean"
+    social.PRINTS.update(mark)
+    if flagged and _hide_image(item_id):
+        out["auto_hidden"] = True
+        out["auto_removed"] = True
+        _audit.info("moderation auto-remove: item=%s why=deep_check", item_id)
+        _log("auto_remove", item=item_id, why="deep_check")
 
 
 def queue() -> list[dict]:

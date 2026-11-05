@@ -34,7 +34,8 @@ WORKDIR /app
 
 # Dependencies first for better layer caching. requirements.txt pins direct deps, constraints.txt pins the whole tree.
 COPY requirements.txt constraints.txt ./
-RUN pip install -r requirements.txt -c constraints.txt
+RUN pip install -r requirements.txt -c constraints.txt \
+ && python -c "import hashlib,os,nudenet; p=os.path.join(os.path.dirname(nudenet.__file__),'320n.onnx'); h=hashlib.sha256(open(p,'rb').read()).hexdigest(); assert h=='c15d8273adad2d0a92f014cc69ab2d6c311a06777a55545f2c4eb46f51911f0f', (p,h); print('nudenet 320n', os.path.getsize(p))"
 
 # Application code, plus the repo's read-only catalogs. tests/, reports/, outputs/, previews/,
 # and runtime files under data/ (accounts, uploads, keys) stay out via .dockerignore.
@@ -46,6 +47,10 @@ COPY data ./data
 # Photo prep is imported at process start (app/core/ai3d_prep.py), even when ZEIM_2D3D_ENABLED=0.
 # Only this file. The TripoSR worker, weights, and torch stay in the separate workers/ai3d image.
 COPY workers/ai3d/prep.py ./workers/ai3d/prep.py
+
+# The photo check must load on CPU during the build. A plain image is approved.
+# RSS here is the checker plus Python; the container cap is 14 GB.
+RUN python -c "import io; from PIL import Image; from app.community import imagemod; b=io.BytesIO(); Image.new('RGB',(320,240),(200,180,160)).save(b,'JPEG'); meta={}; assert imagemod.review_upload(b.getvalue(), meta)=='approve' and not meta.get('force_nsfw'); rss=int(next(l.split()[1] for l in open('/proc/self/status') if l.startswith('VmRSS:'))); print('photo-check rss_kb', rss); assert rss < 800000, rss"
 
 # State lives OUTSIDE the image. config.py reads PHOTO3D_DATA / PHOTO3D_OUT.
 ENV PHOTO3D_DATA=/data \
