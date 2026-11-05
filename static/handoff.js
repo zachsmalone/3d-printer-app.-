@@ -70,7 +70,25 @@ async function editIdFrom(src, explicit) {
   }
   throw new Error("Nothing to send.");
 }
-async function blobOf(url, onFrac) { const { r, buf } = await veil.fetchBytes(url, null, onFrac); if (!r.ok) throw new Error("Couldn't fetch the model. Try again."); return new Blob([buf]); }
+async function getBlob(url, onFrac) { const { r, buf } = await veil.fetchBytes(url, null, onFrac); if (!r.ok) throw new Error("Couldn't fetch the model. Try again."); return new Blob([buf]); }
+/* Prefetch: the mesh a Send-to would carry starts downloading when the button is hovered, focused or shown.
+   One model at a time (the newest), dropped if it fails, so memory stays bounded. */
+let pre = null;
+export function prefetch(url) {
+  if (!url || pre?.url === url) return;
+  const p = getBlob(url).catch(() => { if (pre?.p === p) pre = null; return null; });
+  pre = { url, p };
+}
+async function blobOf(url, onFrac) {
+  if (pre?.url === url) { const b = await pre.p; if (b) { onFrac?.(1); return b; } }
+  return getBlob(url, onFrac);
+}
+const srcStl = src => src === "lithophane" ? S.current?.downloads?.stl : src === "slicer" ? window.__zeimEdit?.p?.downloads?.stl : null;
+function warm(el, src, onlyTorch) {
+  if (!el || el.dataset.warm) return; el.dataset.warm = "1";
+  const go = () => { if (!onlyTorch || targetsFor(src).includes("torchc0")) prefetch(srcStl(src)); };
+  el.addEventListener("pointerenter", go); el.addEventListener("focus", go); el.addEventListener("touchstart", go, { passive: true });
+}
 async function torchFile() {
   const url = document.body.dataset.torchStl;                       // the prepared result, if there is one
   if (url) return new File([await blobOf(url)], "torchc0.stl", { type: "model/stl" });
@@ -174,6 +192,7 @@ function menu(src, anchor) {
     if (!ok) anchor?.focus();
   });
   d.addEventListener("close", () => anchor?.focus(), { once: true });
+  if (ts.includes("torchc0")) prefetch(srcStl(src));                 // the button is showing: start the mesh now
   d.showModal(); d.querySelector("[data-to]")?.focus();
 }
 
@@ -181,7 +200,7 @@ function menu(src, anchor) {
 function addBtn(id, after, src, cls = "btn") {
   if (!after || $("#" + id)) return;
   const b = document.createElement("button"); b.type = "button"; b.className = cls + " sendtobtn"; b.id = id; b.setAttribute("aria-haspopup", "dialog");
-  b.innerHTML = `${ICON} Send to…`; b.onclick = () => menu(src, b); after.after(b);
+  b.innerHTML = `${ICON} Send to…`; b.onclick = () => menu(src, b); after.after(b); warm(b, src, true);
 }
 /* Studio/Lithophane: Save work and Send to Slicer. Design CAD is a step, not a third button.
    Nozzle / multi-head controls stay out of this section — those live only in the FDM Slicer. */
@@ -209,6 +228,7 @@ function wireStudioHandoff() {
     try { await sendTo(target, "lithophane"); } finally { btn.disabled = false; btn.removeAttribute("aria-busy"); }
   };
   slicer.onclick = () => go(slicer, slicer.dataset.to || "slicer");
+  warm(slicer, "lithophane", true); warm($("#lithoGo"), "lithophane", true);
   if (cad) cad.onclick = () => go(cad, "cad");
   paint();
   new MutationObserver(paint).observe(document.body, { attributes: true, attributeFilter: ["data-print-kind"] });
@@ -234,7 +254,7 @@ function syncFab() {
   const need = !!inline && hasModel(v) && !(inline.offsetParent && inline.getClientRects().length);
   if (!need) { if (fab) fab.hidden = true; return; }
   if (!fab) { fab = document.createElement("button"); fab.type = "button"; fab.id = "sendToFab"; fab.className = "btn primary sendfab"; fab.setAttribute("aria-haspopup", "dialog");
-    fab.innerHTML = `${ICON} Send to…`; fab.onclick = () => menu(sourceNow(), fab); document.body.append(fab); }
+    fab.innerHTML = `${ICON} Send to…`; fab.onclick = () => menu(sourceNow(), fab); document.body.append(fab); fab.addEventListener("pointerenter", () => { if (targetsFor(sourceNow()).includes("torchc0")) prefetch(srcStl(sourceNow())); }); }
   fab.hidden = false;
 }
 const ro = new ResizeObserver(syncFab);
