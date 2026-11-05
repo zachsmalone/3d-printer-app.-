@@ -177,8 +177,8 @@ def add_print(iid: str, request: Request, actor: Actor = Depends(get_actor), pho
               infill_pct: str = Form(""), supports: str = Form(""), nozzle_mm: str = Form(""),
               printer_name: str = Form(""), notes: str = Form(""), print_name: str = Form("")):
     """Same pipeline as every other photo: permission box (CR-5), content sniffing, EXIF/GPS stripped by re-encoding, size caps;
-    the caption goes through the chat filter; the image-moderation hook runs (default: needs human review, never auto-approves);
-    every photo can be reported (minor_safety hides it at once) and reviewed in the queue."""
+    the caption goes through the chat filter; the local image check approves, rejects, or holds the photo;
+    every photo can be reported (minor_safety hides it at once) and a held photo can be reviewed in the queue."""
     if not actor.user:
         raise HTTPException(401, "Make a free account to share a photo of your print.")
     if not actor.is_adult:

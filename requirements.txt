@@ -11,6 +11,8 @@ mapbox-earcut==2.1.0
 matplotlib==3.11.2
 networkx==3.7
 numpy==2.5.3
+nudenet==3.4.2
+onnxruntime==1.23.2
 pillow-heif==1.8.0
 pillow==12.3.0
 python-multipart==0.0.32

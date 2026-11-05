@@ -151,4 +151,4 @@ Until the plans flag is on and the secret key, webhook secret, and both Price id
 
 ## Community rules
 
-ZEIM is for adults only (18+). Please read the [Community Guidelines](static/COMMUNITY_GUIDELINES.md).
+ZEIM is for adults only (18+). Mild NSFW is allowed only when it is tagged; explicit content is not. Uploaded photos are checked automatically on our server. Please read the [Community Guidelines](static/COMMUNITY_GUIDELINES.md).

@@ -47,13 +47,14 @@ async function load() {
       card.append(row); list.append(card);
       if (p.thumb) { fetch(p.thumb, { headers: { "X-Admin-Token": TOKEN } }).then(x => x.ok ? x.blob() : null).then(bl => { if (bl) { const im = el("img", { alt: "", width: 120 }); im.src = URL.createObjectURL(bl); card.prepend(im); } }); }
     }
-    // 'I printed this' photos waiting for review (all ages): approve shows it in the gallery, reject deletes it
+    // Print photos the automatic check held (it failed or could not run). Approve shows the photo, reject deletes it.
     const pl = $("#plist") || (() => { const d = el("div", { id: "plist" }); list.after(d); return d; })();
-    pl.replaceChildren(el("h2", {}, `Print photos waiting for review (${q.pending_prints.length})`));
+    pl.replaceChildren(el("h2", {}, `Print photos held for optional review (${q.pending_prints.length})`));
     for (const p of q.pending_prints) {
       const card = el("div", { className: "printer" });
       card.append(el("b", {}, "I printed this "), el("span", { className: "help" }, `${p.by} · project ${p.item_id}`));
       if (p.caption) card.append(el("p", {}, p.caption));
+      card.append(el("p", { className: "help" }, p.check_note || "The automatic check did not approve this photo, so only the uploader can see it."));
       card.append(el("p", { className: "help" }, p.nsfw ? "Tagged NSFW by the uploader (shown blurred)." : "Not tagged NSFW."));
       const row = el("div", { className: "row" });
       const tb = el("button", { type: "button", className: "btn small" }, p.nsfw ? "Remove NSFW tag" : "Mark NSFW");

@@ -51,7 +51,7 @@ def diagnose(request: Request, actor: Actor = Depends(get_actor), photo: Optiona
             raise HTTPException(415, str(e))
         from app.community import imagemod
         if imagemod.review_upload(clean, {"kind": "doctor", "uid": (actor.user or {}).get("id")}) == imagemod.REJECT:
-            raise HTTPException(415, "That photo was refused. Please try a different one.")
+            raise HTTPException(415, imagemod.REFUSED_MESSAGE)
         photo_checked = True                    # checked, then dropped: never written to disk
     if not picked and not words.strip():
         raise HTTPException(400, "Pick what went wrong, or describe it in a few words.")

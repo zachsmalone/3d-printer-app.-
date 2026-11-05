@@ -12,8 +12,8 @@ Rules:
   * the audit log DATA/uploads.log.jsonl records ts/sid/kind/format/size/verdict — never
     file bytes, never file content;
   * rejected files are NOT stored (keeping rejected — possibly illegal — content on disk
-    is worse than discarding it). "Quarantine until reviewed" applies to print photos,
-    which already land as review-pending, hidden until a moderator approves them;
+    is worse than discarding it). A print photo the local check cannot finish is stored
+    as review-pending (hidden from everyone but the uploader) until it is looked at;
   * optional malware scan is local clamd only (PHOTO3D_CLAMAV=1). If clamd is unreachable,
     uploads are allowed and the miss is logged — availability over false safety.
 """

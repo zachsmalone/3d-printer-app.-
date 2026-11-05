@@ -92,26 +92,37 @@ def clear_person(sid: str):
 # ---------------- "I printed this" photos ----------------
 def add_print(item_id: str, sid: str, uid: str, username: str | None, data: bytes, ext: str, caption: str, ack,
              mod_result: str | None = None, *, nsfw: bool = False, settings: dict | None = None, name: str = "") -> dict:
-    """Store a print photo. Always pending for a human — the image-moderation hook never auto-approves.
-    Optional `name` is the maker's name for this print. Optional `settings` (printer/material/layer/infill/supports/notes) are shown with the make."""
+    """Store a print photo after the local image check.
+
+    approve: visible immediately (Trending counts it). Mild nudity is stored with the NSFW tag.
+    reject: nothing is written. needs_human_review: only the uploader can see it (the check failed).
+    Optional `name` is the maker's name for this print. Optional `settings` are shown with the make.
+    """
     from . import imagemod, print_settings as ps
-    verdict = mod_result or imagemod.review_upload(data, {"item_id": item_id, "uid": uid})
+    meta: dict = {"item_id": item_id, "uid": uid}
+    verdict = mod_result if mod_result is not None else imagemod.review_upload(data, meta)
     if verdict == imagemod.REJECT:
-        raise ValueError("That photo was refused. Please try a different one.")
-    # Even if a future hook returns APPROVE, we still hold for a human (Zach: never auto-approve).
+        raise ValueError(imagemod.REFUSED_MESSAGE)
+    if verdict not in (imagemod.APPROVE, imagemod.NEEDS_HUMAN_REVIEW):
+        verdict = imagemod.NEEDS_HUMAN_REVIEW
     try:
         clean_settings = ps.check(settings or {})
     except ps.Bad as e:
         raise ValueError(str(e))
+    approved = verdict == imagemod.APPROVE
     pid = secrets.token_hex(6)
     (PDIR / f"{pid}.{ext}").write_bytes(data)
     rec = {"id": pid, "item_id": item_id, "owner_sid": sid, "uid": uid, "username": username, "ext": ext,
-           "caption": caption, "name": (name or "").strip()[:80], "created": time.time(), "photo_ack": ack, "status": "pending",
-           "moderation": imagemod.NEEDS_HUMAN_REVIEW if verdict == imagemod.APPROVE else verdict,
-           "nsfw": bool(nsfw)}
+           "caption": caption, "name": (name or "").strip()[:80], "created": time.time(), "photo_ack": ack,
+           "status": "approved" if approved else "pending", "moderation": verdict,
+           "nsfw": bool(nsfw) or bool(meta.get("force_nsfw"))}
+    if meta.get("check_note"):
+        rec["check_note"] = str(meta["check_note"])[:300]
     if clean_settings:
         rec["settings"] = clean_settings
-    PRINTS.update(lambda l: l.append(rec))      # held for moderator review (all ages); Trending counts it only once approved
+    PRINTS.update(lambda l: l.append(rec))
+    if approved:
+        record("printed", item_id, sid)       # same once-per-person count approve() uses
     return rec
 
 

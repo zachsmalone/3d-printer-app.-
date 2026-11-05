@@ -13,7 +13,9 @@
 6. Content that infringes someone else's copyright or trademark.
 7. Spam, scams, or attempts to move people to private channels.
 
-**Reporting:** use *Report* on any project or print photo. Reports of type "minor safety" hide the item instantly pending review. Reports of type "underage user" (the account holder seems to be under 18) go to a moderator, who can suspend the account; suspension is reversible and nothing is deleted.
+**Photos:** photos you upload, including "I printed this", are checked automatically on our server. The photo is not sent to another company for that check. Explicit content is not accepted. Mild nudity can stay up only when it is tagged NSFW, and then it is shown blurred. If the check cannot run, the photo stays hidden from everyone else.
+
+**Reporting:** use *Report* on any project or print photo. A report about someone's safety hides the item straight away. Reports from many different people can remove a photo. Reports that the account holder seems to be under 18 go to a moderator, who can suspend the account; suspension is reversible and nothing is deleted. The moderation queue is optional; we do not review every photo by hand.
 
 Copyright complaints follow the copyright (DMCA) process in the Terms (`terms.html#copyright`). Send notices to nightmareopsstudio@gmail.com.
 

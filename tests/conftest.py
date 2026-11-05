@@ -16,6 +16,15 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _print_photos_stay_held_unless_a_test_opts_in():
+    """Other tests keep the old 'hold this photo' hook. Tests of the real checker set the hook to None and mock detection."""
+    from app.community import imagemod
+    imagemod.set_review_hook(imagemod.default_review)
+    yield
+    imagemod.set_review_hook(None)
+
+
+@pytest.fixture(autouse=True)
 def _reset_rate_limits():
     from app.core import ratelimit
     ratelimit.reset()
