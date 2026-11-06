@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from .. import config
-from ..services import editproj, handoff, printers, settings, slicer
+from ..services import editproj, handoff, printers, quarantine, settings, slicer
 from ..services.history import store
 from ..community import badges, privacy
 from ..community.identity import Actor, get_actor
@@ -25,10 +25,15 @@ FILE_NAMES = ("model.stl", "model.obj", "model.3mf", "thumb.png", "model.gcode")
 
 
 def _send_file(bid: str, name: str):
-    from ..services import editproj, quarantine
     if name not in FILE_NAMES or not bid.isalnum():
         raise HTTPException(404)
     quarantine.guard(bid)                        # quarantined builds are not served
+    try:
+        meta = store.get(bid)
+    except KeyError:
+        meta = None
+    if meta and name.startswith("model.") and editproj.not_ready(meta):
+        raise HTTPException(status_code=409, detail={"code": "model_pending", "message": editproj.not_ready(meta)})
     if name.startswith("model.") and name != "model.gcode":
         editproj.ensure_exports(bid)
     p = store.dir(bid) / name

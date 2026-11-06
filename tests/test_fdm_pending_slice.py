@@ -83,6 +83,35 @@ def test_view_arrives_while_the_check_is_blocked(c, monkeypatch):
     editproj.ensure_stl(pid)
     editproj.ensure_exports(pid)
     assert not (store.dir(pid) / "model.stl").is_file()
+    missing_flag = store.get(pid)
+    missing_flag.pop("slice_ready", None)
+    store.save(missing_flag)
+    again = c.post("/api/slice", data={"model_id": pid, "printer_id": "creality_k1"})
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "model_pending"
+    filed = c.get(f"/files/{pid}/model.stl")
+    assert filed.status_code == 409 and filed.json()["detail"]["code"] == "model_pending"
+    gate.set()
+
+
+def test_missing_record_does_not_slice(c, monkeypatch):
+    """store.get raising KeyError used to return from the guard and the slicer continued."""
+    _data, _faces, lines, _elapsed, _entered, gate = _open(c, monkeypatch, block_finish=True)
+    pid = lines[-1]["project"]["id"]
+    from app.services import slice_engine as eng
+    from app.services.history import store
+    called = []
+    monkeypatch.setattr(eng, "slice_model_path", lambda *a, **k: called.append("engine"))
+    real = store.get
+
+    def missing(bid):
+        if bid == pid:
+            raise KeyError(bid)
+        return real(bid)
+
+    monkeypatch.setattr(store, "get", missing)
+    r = c.post("/api/slice", data={"model_id": pid})
+    assert r.status_code == 404
+    assert called == []
     gate.set()
 
 
@@ -254,3 +283,52 @@ def test_stream_through_a_buffering_proxy_is_not_gated_on_the_check(monkeypatch)
     assert last["phase"] == "interactive" and last["slice_ready"] is False
     assert last["project"]["analysis"]["triangles"] == faces
     assert all("percent" not in e for e in lines)
+
+
+def test_app_serve_urlencoded_model_id_stays_pending(monkeypatch, tmp_path):
+    """Same entrypoint as the container: python -m app.serve. Same body as the live script: urlencoded model_id only."""
+    import httpx
+    from app.services.history import store
+    monkeypatch.setattr(store, "list", lambda *a, **k: time.sleep(1) or [])
+    app_sock = socket.socket()
+    app_sock.bind(("127.0.0.1", 0))
+    app_port = app_sock.getsockname()[1]
+    app_sock.close()
+    import uvicorn
+    from app.main import app
+    from app.core import fdmlean
+    monkeypatch.setattr(fdmlean, "FDM_MAX_FACES", 200)
+    srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=app_port, log_level="error"))
+    threading.Thread(target=srv.run, daemon=True).start()
+    for _ in range(100):
+        if srv.started:
+            break
+        time.sleep(0.05)
+    assert srv.started
+    data = _ball().export(file_type="stl")
+    base = f"http://127.0.0.1:{app_port}"
+    with httpx.Client(base_url=base, timeout=10) as client:
+        t0 = time.perf_counter()
+        with client.stream("POST", "/api/edit/new", files={"file": ("ball.stl", data, "model/stl")},
+                           data={"progress": "1", "fdm_big": "true"}) as resp:
+            assert resp.status_code == 200
+            last = None
+            interactive_at = None
+            for line in resp.iter_lines():
+                if not line.strip():
+                    continue
+                ev = json.loads(line)
+                if ev.get("phase") == "interactive":
+                    interactive_at = time.perf_counter() - t0
+                    last = ev
+                    break
+        assert last and interactive_at is not None and interactive_at < 1, interactive_at
+        pid = last["project"]["id"]
+        raw = json.loads((store.dir(pid) / "meta.json").read_text())
+        assert raw.get("slice_ready") is False
+        sliced = client.post("/api/slice", data={"model_id": pid})
+        assert sliced.status_code == 409 and sliced.json()["detail"]["code"] == "model_pending"
+        resin = client.post("/api/resin/prepare", data={"model_id": pid, "hollow": "false", "supports": "false"})
+        assert resin.status_code == 409 and resin.json()["detail"]["code"] == "model_pending"
+        filed = client.get(f"/files/{pid}/model.stl")
+        assert filed.status_code == 409 and filed.json()["detail"]["code"] == "model_pending"

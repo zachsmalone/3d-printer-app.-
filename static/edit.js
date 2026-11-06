@@ -130,7 +130,8 @@ async function create(fd, retry) {
       r = out.project;
     } else r = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
     if (ctl.signal.aborted || ctl !== importCtl) return;
-    S.history = r.history; renderHistory(); loadProject(r);
+    if (Array.isArray(r.history)) { S.history = r.history; renderHistory(); }
+    loadProject(r);
     if (copyFromPhoto && r.id) { rememberCopy(sessionStorage, copyFromPhoto, r.id); copyFromPhoto = ""; document.dispatchEvent(new CustomEvent("zeim:flow")); }
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
