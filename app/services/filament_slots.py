@@ -214,10 +214,10 @@ _TOOL_LINE = re.compile(
 )
 
 
-def strip_unused_heads(gcode: str, p: dict) -> str:
-    """Drop heat / prime / purge / tool-change lines that target a slot not in the plan.
+def keep_gcode_line(line: str, p: dict) -> bool:
+    """False when this line heats, primes, purges, or selects a slot that is not in the plan.
 
-    Single used slot (the common ZEIM path): strip every tool-change and filament-change macro so unused
+    Single used slot (the common ZEIM path): drop every tool-change and filament-change macro so unused
     AMS/CFS/MMU ports are never selected, heated with a tool index, primed or purged. Bare M104/M109
     without a T index stay (single-extruder start G-code).
 
@@ -231,30 +231,26 @@ def strip_unused_heads(gcode: str, p: dict) -> str:
     def tool_ok(t: int) -> bool:
         return t in used or t in used_0
 
-    out = []
-    for line in gcode.splitlines(keepends=True):
-        bare = line.split(";", 1)[0].strip()
-        if re.match(r"^T\d+\b", bare, re.I):
-            if single:
-                continue
-            t = int(re.match(r"^T(\d+)", bare, re.I).group(1))
-            if not tool_ok(t):
-                continue
-            out.append(line)
-            continue
-        if re.match(r"^M10[49]\b", bare, re.I):
-            tm = re.search(r"\bT(\d+)\b", bare, re.I)
-            if tm and (single or not tool_ok(int(tm.group(1)))):
-                continue
-            out.append(line)
-            continue
-        if re.match(r"^(M600|M601|M602|M701|M702)\b", bare, re.I):
-            if single:
-                continue
-            tm = re.search(r"\bT(\d+)\b", bare, re.I)
-            if not tm or not tool_ok(int(tm.group(1))):
-                continue
-            out.append(line)
-            continue
-        out.append(line)
-    return "".join(out)
+    bare = line.split(";", 1)[0].strip()
+    if re.match(r"^T\d+\b", bare, re.I):
+        if single:
+            return False
+        t = int(re.match(r"^T(\d+)", bare, re.I).group(1))
+        return tool_ok(t)
+    if re.match(r"^M10[49]\b", bare, re.I):
+        tm = re.search(r"\bT(\d+)\b", bare, re.I)
+        if tm and (single or not tool_ok(int(tm.group(1)))):
+            return False
+        return True
+    if re.match(r"^(M600|M601|M602|M701|M702)\b", bare, re.I):
+        if single:
+            return False
+        tm = re.search(r"\bT(\d+)\b", bare, re.I)
+        return bool(tm and tool_ok(int(tm.group(1))))
+    return True
+
+
+def strip_unused_heads(gcode: str, p: dict) -> str:
+    """Drop lines keep_gcode_line rejects. The remaining text, including newlines, is unchanged."""
+    return "".join(line for line in gcode.splitlines(keepends=True) if keep_gcode_line(line, p))
+

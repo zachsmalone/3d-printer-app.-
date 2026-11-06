@@ -217,7 +217,40 @@ def ensure_exports(bid: str):
         (d / "model.gcode").unlink(missing_ok=True)       # stale slice
         Image.fromarray(meshthumb.render(m.vertices, m.faces)).save(d / "thumb.png")
         meta["exports_rev"] = rev
+        meta["stl_rev"] = rev
         meta.pop("exports_head", None)
+        store.save(meta)
+
+
+def ensure_stl(bid: str):
+    """Write model.stl for the current geometry. Slice uses this.
+
+    OBJ, 3MF and the thumbnail stay on ensure_exports (import and download). Building them
+    rewrites every triangle as text and is not part of producing G-code.
+    """
+    try:
+        meta = store.get(bid)
+    except KeyError:
+        return
+    if meta.get("kind") != "edit":
+        return
+    d = store.dir(bid)
+    rev = geometry_revision(meta)
+    stl = d / "model.stl"
+    if meta.get("stl_rev") == rev and stl.is_file():
+        return
+    with _lock:
+        meta = store.get(bid)
+        if meta.get("kind") != "edit":
+            return
+        d = store.dir(bid)
+        rev = geometry_revision(meta)
+        stl = d / "model.stl"
+        if meta.get("stl_rev") == rev and stl.is_file():
+            return
+        m = printable_at(bid, meta)
+        stl.write_bytes(exporters.to_stl(as_model(m, meta["title"])))
+        meta["stl_rev"] = rev
         store.save(meta)
 
 
