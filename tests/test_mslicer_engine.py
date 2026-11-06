@@ -3,6 +3,7 @@
 Nothing here was sent to a printer.
 """
 import struct
+import subprocess
 import tempfile
 import time
 from pathlib import Path
@@ -83,3 +84,30 @@ def test_ctb_v4_and_v5_magics():
     )
     assert report["ctb_container"] == "v5"
     assert resin_fileid.identify(out.read_bytes(), "ctb")["magic"] == "CTB-v5"
+
+
+def _cli(stl: Path, out: Path, extents):
+    binary = mslicer_engine.mslicer_bin()
+    mesh = trimesh.creation.box(extents=extents)
+    stl.write_bytes(mesh.export(file_type="stl"))
+    proc = subprocess.run(
+        [str(binary), "--quiet",
+         "--platform-resolution", "64, 48",
+         "--platform-size", "32, 24, 40",
+         "--layer-height", "0.2",
+         "--ctb", "legacy",
+         "--mesh", str(stl), str(out)],
+        capture_output=True, text=True, check=False,
+    )
+    return proc
+
+
+def test_volume_warning_uses_the_placed_mesh(tmp_path):
+    """A model that fits must not be reported as cut off. One that does not fit must be."""
+    fits = _cli(tmp_path / "fits.stl", tmp_path / "fits.goo", (8, 8, 1))
+    assert fits.returncode == 0, fits.stderr
+    assert "cut off" not in fits.stdout
+    assert '"layers":5' in fits.stdout
+    hangs = _cli(tmp_path / "hangs.stl", tmp_path / "hangs.goo", (40, 8, 1))
+    assert hangs.returncode == 0, hangs.stderr
+    assert "cut off" in hangs.stdout

@@ -7,6 +7,6 @@ Licence: GNU GPL-3.0 only, the text in `LICENSE`. These changes are GPL-3.0 as w
 ## What changed
 
 - `slicer/bin/slicer/args.rs`: added `--ctb legacy|v5` (default `legacy`).
-- `slicer/bin/slicer/main.rs`: `.ctb` used to select `CtbFormat::Unknown`, and the exporter then hit `unreachable!`. The flag now selects unencrypted v4 (`0x12FD0106`) or mslicer's encrypted v5 (`0x12FD0107`). After a successful slice the CLI prints one JSON line with layer count and plate pixels.
+- `slicer/bin/slicer/main.rs`: `.ctb` used to select `CtbFormat::Unknown`, and the exporter then hit `unreachable!`. The flag now selects unencrypted v4 (`0x12FD0106`) or mslicer's encrypted v5 (`0x12FD0107`). After a successful slice the CLI prints one JSON line with layer count and plate pixels. The out-of-volume warning now uses the mesh after it is seated, centered, and scaled into pixels. The previous check used the pre-placement bounds, so a centered model (negative millimetres) was always reported as cut off.
 
 No other crate was edited. The GUI, remote print, and format crates are the upstream sources.

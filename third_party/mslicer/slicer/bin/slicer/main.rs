@@ -62,13 +62,16 @@ fn main() -> Result<()> {
         mesh.set_scale(model.scale);
         mesh.set_rotation(model.rotation.map(f32::to_radians));
 
-        // Center the model
-        let bounds = Bounds3D::from_mesh(&mesh);
+        // Seat Z on the bed and center XY, then move that bottom-center to the
+        // plate center. Measure the volume only after the pixel scale, or a
+        // centered mesh (negative millimetres) is reported as cut off.
+        let seated = Bounds3D::from_mesh(&mesh);
         let center = (slice_config.platform_resolution / 2).cast::<f32>();
-        mesh.set_position((center - bounds.center().xy()).to_homogeneous() + model.position);
+        mesh.set_position((center - seated.center().xy()).to_homogeneous() + model.position);
 
-        // Scale the model into printer-space (mm => px)
+        // Scale the model into printer-space (mm => px). Z scale stays 1.
         mesh.set_scale(model.scale.component_mul(&mm_to_px));
+        let bounds = Bounds3D::from_mesh(&mesh);
 
         println!(
             "Loaded `{}`. {{ vert: {}, face: {} }}",
@@ -153,13 +156,17 @@ fn load_mesh<T: Read + Seek + Send + 'static>(reader: T, format: &str) -> Result
 }
 
 fn is_oob(bounds: &Bounds3D, slice_config: &SliceConfig) -> bool {
+    // X and Y are pixels after mm_to_px. Z stays millimetres (mm_to_px.z is 1).
     let Bounds3D { min, max } = bounds;
-    min.x < 0.0
-        || min.y < 0.0
-        || min.z < 0.0
-        || max.x > slice_config.platform_resolution.x as f32
-        || max.y > slice_config.platform_resolution.y as f32
-        || max.z > slice_config.platform_size.z.get::<Milimeter>()
+    let width = slice_config.platform_resolution.x as f32;
+    let depth = slice_config.platform_resolution.y as f32;
+    let height = slice_config.platform_size.z.get::<Milimeter>();
+    min.x < -1e-3
+        || min.y < -1e-3
+        || min.z < -1e-3
+        || max.x > width + 1e-3
+        || max.y > depth + 1e-3
+        || max.z > height + 1e-3
 }
 
 fn monitor_progress(progress: Progress, callback: impl Fn(f32, u64) -> String) -> Result<()> {

@@ -61,6 +61,71 @@ def test_production_3mf_loads():
     assert np.allclose(mesh.extents, [10, 10, 10])
 
 
+def _unit_cube_parts():
+    m = trimesh.creation.box(extents=(1, 1, 1))
+    m.apply_translation((0.5, 0.5, 0.5))
+    vs = "".join(f'<vertex x="{a}" y="{b}" z="{c}"/>' for a, b, c in m.vertices)
+    ts = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in m.faces)
+    return vs, ts, len(m.faces)
+
+
+def test_component_transforms_units_and_instances_survive_import():
+    """Synthetic production 3MF. Not a stand-in for a user model.
+
+    A centimetre unit cube is shifted +2 by its component, then one build item
+    scales it by 2 and moves it to x=10. A second build item keeps the component
+    shift only. Slicer metadata names a second plate and a support type; that
+    text is not another mesh and is not applied as a repair or a fit.
+    """
+    vs, ts, faces = _unit_cube_parts()
+    ns = 'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"'
+    pns = 'xmlns:p="http://schemas.microsoft.com/3dmanufacturing/production/2015/06"'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("[Content_Types].xml", '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>')
+        z.writestr("3D/3dmodel.model", f'''<?xml version="1.0"?>
+<model unit="centimeter" {ns} {pns} requiredextensions="p">
+ <resources>
+  <object id="2" type="model"><components>
+   <component p:path="/3D/Objects/object_1.model" objectid="1" transform="1 0 0 0 1 0 0 0 1 0 0 2"/>
+  </components></object>
+ </resources>
+ <build>
+  <item objectid="2" transform="2 0 0 0 2 0 0 0 2 10 0 0" printable="1"/>
+  <item objectid="2" transform="1 0 0 0 1 0 0 0 1 0 0 0" printable="1"/>
+ </build>
+</model>''')
+        z.writestr("3D/Objects/object_1.model", f'<?xml version="1.0"?><model unit="centimeter" {ns}><resources><object id="1" type="model"><mesh><vertices>{vs}</vertices><triangles>{ts}</triangles></mesh></object></resources><build/></model>')
+        z.writestr("3D/_rels/3dmodel.model.rels", '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/Objects/object_1.model" Id="rel1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>')
+        z.writestr("Metadata/model_settings.config", '''<?xml version="1.0"?>
+<config>
+ <plate><metadata key="plater_id" value="1"/><model_instance><metadata key="object_id" value="2"/></model_instance></plate>
+ <plate><metadata key="plater_id" value="2"/><metadata key="plater_name" value="not-a-mesh"/></plate>
+ <object id="99"><metadata key="support_type" value="tree(auto)"/><metadata key="name" value="phantom"/></object>
+</config>''')
+    mesh, warnings = meshedit.load_mesh(buf.getvalue(), "3mf")
+    assert len(mesh.faces) == faces * 2
+    assert any("2 objects were merged" in w for w in warnings)
+    assert all("simplify" not in w.lower() for w in warnings)
+    # centimetres -> millimetres after both transforms. Neither instance is dropped.
+    assert np.allclose(mesh.bounds[0], [0, 0, 20], atol=1e-4)
+    assert np.allclose(mesh.bounds[1], [120, 20, 60], atol=1e-4)
+    assert any("converted to mm" in w and "10" in w for w in warnings)
+
+
+def test_inch_3mf_converts_to_millimetres():
+    vs, ts, faces = _unit_cube_parts()
+    ns = 'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"'
+    xml = f'<?xml version="1.0"?><model unit="inch" {ns}><resources><object id="1" type="model"><mesh><vertices>{vs}</vertices><triangles>{ts}</triangles></mesh></object></resources><build><item objectid="1"/></build></model>'
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("3D/3dmodel.model", xml)
+    mesh, warnings = meshedit.load_mesh(buf.getvalue(), "3mf")
+    assert len(mesh.faces) == faces
+    assert np.allclose(mesh.extents, [25.4, 25.4, 25.4], atol=1e-4)
+    assert any("25.4" in w for w in warnings)
+
+
 def _clear(c):
     for b in c.get("/api/builds").json()["builds"]:
         c.delete("/api/builds/" + b["id"])
