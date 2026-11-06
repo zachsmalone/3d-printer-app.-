@@ -31,11 +31,15 @@ def test_preview_loads_every_format(c, name, kind):
     assert _faces(r.content) == 12 and r.headers["x-zeim-faces"] == "12"
 
 
-def test_preview_simplifies_big_models_for_display(c, monkeypatch):
+def test_preview_keeps_every_triangle_unless_simplify_is_asked(c, monkeypatch):
     from app.api import resin as api
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=30, count=[80, 80])
-    r = c.post("/api/resin/preview", files={"file": ("ball.3mf", m.export(file_type="3mf"), "model/3mf")})
+    data = m.export(file_type="3mf")
+    r = c.post("/api/resin/preview", files={"file": ("ball.3mf", data, "model/3mf")})
+    assert r.status_code == 200, r.text
+    assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) == len(m.faces)
+    r = c.post("/api/resin/preview", data={"simplify": "true"}, files={"file": ("ball.3mf", data, "model/3mf")})
     assert r.status_code == 200, r.text
     assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) < len(m.faces)
 
@@ -51,14 +55,14 @@ def test_pick_loads_the_model_into_the_view():
 
 
 def test_big_binary_stl_is_not_refused_for_its_unwelded_vertex_count(c, monkeypatch):
-    """Binary STL counts 3 vertices per triangle: a 2.1M-triangle STL counted 6.3M (> the 3M vertex cap) -> 415 'file type'.
-    Shrink the shared vertex default so a small STL hits the same shape of refusal, and check resin still takes it."""
+    """Binary STL counts 3 corners per triangle. Those corners are not the vertex cap, so a file
+    under the face cap is accepted by the shared check and by TorchC0."""
     from app.services import uploadsafe
     real = uploadsafe.check
     monkeypatch.setattr(uploadsafe, "check", lambda data, **kw: real(data, **{"max_vertices": 900, **kw}))
     data = trimesh.creation.icosphere(2, radius=10).export(file_type="stl")     # 320 faces -> 960 STL corners
-    with pytest.raises(uploadsafe.Rejected):
-        uploadsafe.check(data, max_bytes=1 << 30)                                   # the shared default refuses it
+    checked = uploadsafe.check(data, max_bytes=1 << 30)
+    assert checked.mesh["faces"] == 320 and checked.mesh["vertices"] == 960
     for url in ("/api/resin/preview", "/api/resin/prepare"):
         r = c.post(url, files={"file": ("big.stl", data, "model/stl")})
         assert r.status_code == 200, (url, r.text)
@@ -69,28 +73,26 @@ def test_resin_uploads_allow_three_corners_per_face():
     assert "max_vertices=3 * uploadsafe.MAX_FACES" in src
 
 
-def test_big_binary_stl_loads_lean_and_prepare_reuses_it_by_id(c, monkeypatch):
-    """A 2.1M-triangle STL went through trimesh load + merge + simplify (~1.8 GB) in preview AND again in prepare, next to
-    a ~1.3 GB server in a 3 GB container: the kernel killed the child ('busy', then 'too big, turn hollowing off').
-    Big binary STLs are now welded + simplified from their bytes, and Prepare reuses preview's copy by id."""
+def test_big_binary_stl_keeps_every_triangle_and_prepare_reuses_it(c, monkeypatch):
+    """A large binary STL used to be simplified before preview and again before prepare.
+    The default path keeps the triangle count. Prepare reuses the loaded copy by id."""
     from app.api import resin as api
-    from app.core import meshedit
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
-    real = meshedit.load_mesh
-    def no_trimesh(data, ext, *a, **k):
-        assert len(data) <= 84 + 50 * 2000, "big binary STL went through the heavy trimesh loader"
-        return real(data, ext, *a, **k)
-    monkeypatch.setattr(meshedit, "load_mesh", no_trimesh)
     m = trimesh.creation.uv_sphere(radius=20, count=[80, 80])
     m.apply_translation((0, 0, 20))
     data = m.export(file_type="stl")
     r = c.post("/api/resin/preview", files={"file": ("big.stl", data, "model/stl")})
     assert r.status_code == 200, r.text
-    assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) <= 2000
+    assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) == len(m.faces)
     uid = r.headers["x-zeim-upload"]
-    r = c.post("/api/resin/prepare", data={"upload_id": uid, "file_name": "big.stl", "hollow": "false"})
+    r = c.post("/api/resin/prepare", data={"upload_id": uid, "file_name": "big.stl", "hollow": "false", "supports": "false"})
     assert r.status_code == 200, r.text
-    assert any("simplified copy" in n for n in r.json().get("notes", [])) and "big" in r.json()["export"]["name"]
+    body = r.json()
+    assert not any("simplified copy" in n for n in body.get("notes", []))
+    assert body.get("triangles_in") == len(m.faces) and body.get("simplified") is False
+    r = c.post("/api/resin/prepare", data={"upload_id": uid, "file_name": "big.stl", "hollow": "false", "supports": "false", "simplify": "true"})
+    assert r.status_code == 200, r.text
+    assert any("simplified copy" in n for n in r.json().get("notes", [])) and r.json().get("simplified") is True
 
 
 def test_prepare_upload_id_is_checked(c):

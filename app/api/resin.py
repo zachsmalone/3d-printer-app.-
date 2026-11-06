@@ -80,8 +80,8 @@ _one = threading.BoundedSemaphore(1)      # one prepare at a time: two 2.5 GB ch
 
 
 # Hollowing, supports and the layer checks grow with triangle count (trimesh ray/section queries): a 545k-triangle
-# model (an ordinary ~8 MB 3MF) peaked near 2.8 GB. Above this, prepare works on a simplified copy; on smooth or
-# finely meshed models the change is far below the 0.05 mm layer height.
+# model (an ordinary ~8 MB 3MF) peaked near 2.8 GB. Prepare keeps every triangle unless the request sets simplify.
+# That cap is used only for an explicit simplify.
 RESIN_MAX_FACES = int(os.environ.get("ZEIM_RESIN_MAX_FACES", "200000"))
 
 
@@ -129,8 +129,14 @@ def _lean_binary_stl(data):
                   "(the shape change is far smaller than a print layer).")
 
 
-def _load_fit(data, ext):
-    """(mesh with at most ~RESIN_MAX_FACES triangles, original triangle count, note)."""
+def _load_fit(data, ext, simplify=False):
+    """(mesh, original triangle count, note).
+
+    Every triangle is kept unless `simplify` is true. A mesh that does not fit is not reduced on its own.
+    """
+    if not simplify:
+        m, _ = meshedit.load_mesh(data, ext)
+        return m, len(m.faces), ""
     lean = _lean_binary_stl(data) if ext == "stl" else None
     if lean:
         return lean
@@ -145,21 +151,25 @@ def _to_stl(data):
     return m.export(file_type="stl")
 
 
-def _work(data, ext, s, bed, isl=None, drains=None, note=""):
-    m, _n, fit_note = _load_fit(data, ext)
+def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False):
+    m, n_in, fit_note = _load_fit(data, ext, simplify)
     note = note or fit_note
     out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains)
     if note:
         rep.setdefault("notes", []).insert(0, note)
+    rep["triangles_in"] = int(n_in)
+    rep["triangles"] = int(len(out.faces))
+    rep["simplified"] = bool(fit_note)
     return out.export(file_type="stl"), out.export(file_type="3mf"), rep
 
 
 PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
 
 
-def _preview(data, ext, bed=None):
-    """The model prepare will turn from. Centred on the bed with the file's own orientation, not a second copy of a later turn."""
-    m, n, note = _load_fit(data, ext)
+def _preview(data, ext, bed=None, simplify=False):
+    """The model prepare will turn from. Centred on the bed with the file's own orientation, not a second copy of a later turn.
+    Simplified only when `simplify` is true, so the view and Prepare share the same triangle count."""
+    m, n, note = _load_fit(data, ext, simplify)
     m = resin.place_on_bed(m, 0.0, 0.0, bed)
     return m.export(file_type="stl"), n, note
 
@@ -189,7 +199,7 @@ def _read_upload(file, actor):
 
 
 @router.post("/preview")
-def preview(file: UploadFile = File(...), printer_id: str = Form(""), actor: Actor = Depends(get_actor)):
+def preview(file: UploadFile = File(...), printer_id: str = Form(""), simplify: str = Form("false"), actor: Actor = Depends(get_actor)):
     """Load a picked model for the TorchC0 view right away (any STL/3MF/OBJ -> binary STL, simplified for display)."""
     from fastapi import Response
     data, ext = _read_upload(file, actor)
@@ -207,7 +217,8 @@ def preview(file: UploadFile = File(...), printer_id: str = Form(""), actor: Act
                         bed = p["bed_mm"]
                 except ps.SetupError:
                     bed = None
-            stl, n, note = guard.run(_preview, data, ext, bed, timeout=180, mem_mb=RESIN_MEM_MB)
+            do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
+            stl, n, note = guard.run(_preview, data, ext, bed, do_simplify, timeout=180, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -241,7 +252,7 @@ def _picked(uid, actor):
 @router.post("/prepare")
 def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str = Form(""), preset: str = Form(""), layer_mm: str = Form(""),
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
-            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), tilt_y_deg: str = Form(""), hollow: str = Form("true"),
+            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), tilt_y_deg: str = Form(""), simplify: str = Form("false"), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
             base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
@@ -276,11 +287,13 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         if ext == "3mf":
             # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
             # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
-            data, ext = guard.run(_to_stl, data, timeout=120), "stl"
+            # A package whose mesh is a separate large part needs the same budget as prepare. This does not raise the process-wide cap.
+            data, ext = guard.run(_to_stl, data, timeout=120, mem_mb=RESIN_MEM_MB), "stl"
         if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, timeout=240, mem_mb=RESIN_MEM_MB)
+            do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
+            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, do_simplify, timeout=240, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
