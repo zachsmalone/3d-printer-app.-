@@ -90,7 +90,10 @@ def require_format_plate(plate: dict, fmt: str) -> str:
 
 
 def slice_file(stl: Path, out: Path, plate: dict, settings: dict, fmt: str, *, aa: bool,
-               cancel: threading.Event | None = None) -> dict:
+               cancel: threading.Event | None = None, placed: bool = False) -> dict:
+    blocked = resin_slice.block_reason(plate, fmt)
+    if blocked:
+        raise MSlicerError(blocked)
     binary = mslicer_bin()
     if binary is None:
         raise MSlicerError(
@@ -120,6 +123,7 @@ def slice_file(stl: Path, out: Path, plate: dict, settings: dict, fmt: str, *, a
         "--first-retract-speed", str(settings["lift_speed_mm_min"]),
         "--supersample", "8" if aa else "1",
         "--ctb", ctb,
+        *(["--placed"] if placed else []),
         "--mesh", str(stl),
         str(out),
     ]

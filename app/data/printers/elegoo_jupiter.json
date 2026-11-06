@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "brand": {"value": "ELEGOO", "unit": "text", "sources": ["https://www.elegoo.com/blogs/news/new-release-elegoo-jupiter-12-8-6k-mono-lcd-3d-printer"], "note": "Manufacturer identity on the cited release note."},
+    "model": {"value": "Jupiter", "unit": "text", "sources": ["https://www.elegoo.com/blogs/news/new-release-elegoo-jupiter-12-8-6k-mono-lcd-3d-printer"], "note": "The 12.8 inch 6K machine named Jupiter on that page, not Jupiter SE and not the later 16K Jupiter."},
+    "technology": {"value": "Resin", "unit": "enum", "sources": ["https://www.elegoo.com/blogs/news/new-release-elegoo-jupiter-12-8-6k-mono-lcd-3d-printer"], "note": "LCD resin printer. Normalised to Resin."},
+    "bed_size_mm": {"value": [277.848, 156.264, 300], "unit": "mm", "sources": ["https://www.elegoo.com/blogs/news/new-release-elegoo-jupiter-12-8-6k-mono-lcd-3d-printer"], "note": "The page states 277.848 by 156.06 by 300 mm, a 5448 by 3064 panel, and 51 µm. Y stored here is 3064 times 0.051 mm, which is 156.264. The page rounds that edge to 156.06. This matches the Jupiter plate row. Not a measured machine."},
+    "firmware": {"value": "resin", "unit": "enum", "sources": ["https://www.elegoo.com/blogs/news/new-release-elegoo-jupiter-12-8-6k-mono-lcd-3d-printer"], "note": "Resin printer: no G-code pause. The layer file is the plate's stock container when that file is actually written."}
+  },
+  "notes": [
+    "Reviewed from the 24 August 2021 ELEGOO release note. Y is the stated 3064 by 51 µm panel, not the page's rounded 156.06 mm.",
+    "No hardware validation. The slice plate is elegoo-jupiter-ctb. Jupiter SE is a different catalog row even though the bed numbers match."
+  ]
+}

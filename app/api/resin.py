@@ -48,7 +48,7 @@ def catalog():
             "default_material": resin.DEFAULT_MATERIAL, "materials": resin.public_materials(),
             "presets": [{"id": k, **v} for k, v in resin.PRESETS.items()], "limits": resin.LIMITS,
             "safety": resin.SAFETY, "default_price": resin.DEFAULT_PRICE, "default_price_unit": resin.DEFAULT_PRICE_UNIT, "test_note": resin.TEST_NOTE,
-            "lumen_plates": plates["plates"], "lumen_max_pixels": plates["max_pixels"],
+            "lumen_plates": [resin_slice.plate_for_ui(p) for p in plates["plates"]], "lumen_max_pixels": plates["max_pixels"],
             "mslicer_max_pixels": resin_slice.MSLICER_MAX_PIXELS,
             "lumen": {"format": "lumen", "version": plates["format_version"], "commit": plates["lumen_commit"],
                       "hardware_tested": False, "native_formats_written": []},
@@ -265,7 +265,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
     isl, drn = _points(island_supports, "Island supports"), _points(drains, "Drain holes")
-    bed, pname = None, None
+    bed, pname, printer_meta = None, None, None
     if printer_id:
         try:
             pid, _ = ps.resolve(printer_id, None)
@@ -275,6 +275,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         if p["technology"] != "Resin":
             raise HTTPException(400, f"The {p['name']} is a filament printer. Use the Slicer for it; TorchC0 is for resin printers.")
         bed, pname = p["bed_mm"], p["name"]
+        printer_meta = {"id": pid, "brand": p["brand"], "model": p["model"], "bed_mm": bed, "name": pname}
     note = ""
     if upload_id:
         data, note = _picked(upload_id, actor)
@@ -313,7 +314,10 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     from ..services import filenames as fnames
     src = ((file.filename if file is not None and file.filename else file_name).rsplit(".", 1)[0]) or "TorchC0 model"
     stem = fnames.default_stem(src, pname, s.get("layer_mm") if isinstance(s, dict) else None)
-    (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid, "name": stem}))
+    meta = {"sid": actor.sid, "name": stem}
+    if printer_meta:
+        meta["printer"] = printer_meta
+    (d / f"{rid}.json").write_text(json.dumps(meta))
     (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}

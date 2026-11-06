@@ -95,6 +95,11 @@ pub struct Args {
     #[arg(long, short)]
     /// Don't show the animated progress bars or the timing breakdown.
     pub quiet: bool,
+    /// The mesh is already in this plate's millimetres, with the origin at the
+    /// minimum corner and Z on the bed. Do not recenter it.
+    /// ZEIM addition. Supports are part of that mesh; recentering would move them.
+    #[arg(long, default_value_t = false)]
+    pub placed: bool,
 }
 
 #[derive(clap::Args, Debug)]

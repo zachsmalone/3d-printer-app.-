@@ -117,6 +117,132 @@ def require_sliceable(plate: dict, *, engine: str = "lumen") -> None:
         )
 
 
+# Advertised bed sizes and the geometry table can differ by a rounded millimetre.
+# Saturn 3 is 250 mm in the printer list and 249.7 mm in the plate row.
+BED_MATCH_MM = 0.35
+
+
+def plate_bed_mm(plate: dict) -> tuple[float, float, float]:
+    return (
+        float(plate["build_width_um"]) / 1000.0,
+        float(plate["build_depth_um"]) / 1000.0,
+        float(plate["build_height_um"]) / 1000.0,
+    )
+
+
+def beds_match(bed_mm, plate: dict) -> bool:
+    if not bed_mm or len(bed_mm) < 3:
+        return False
+    return all(abs(float(a) - b) <= BED_MATCH_MM for a, b in zip(bed_mm, plate_bed_mm(plate)))
+
+
+def plates_for_printer(brand: str, model: str, bed_mm) -> list[dict]:
+    """Plates whose manufacturer, model name, and bed are this printer.
+
+    Mars 5 and Mars 5 Ultra are not the same plate. Jupiter and Jupiter SE share a bed
+    and stay apart because the model name has to match.
+    """
+    want_brand = (brand or "").casefold()
+    want_model = model or ""
+    found = []
+    for plate in load_plates()["plates"]:
+        if plate.get("kind") == "inspection":
+            continue
+        if (plate.get("manufacturer") or "").casefold() != want_brand:
+            continue
+        if (plate.get("name") or "") != want_model:
+            continue
+        if not beds_match(bed_mm, plate):
+            continue
+        found.append(plate)
+    return found
+
+
+def block_reason(plate: dict, fmt: str) -> str:
+    """Why this file must not be written for this plate. Empty when it may.
+
+    A mirror flag is a refusal. mslicer's own GOO header marks those bits untested,
+    and this process does not flip pixels it has not checked. Writing the file with
+    the bits left off would be a different orientation from the one the catalog records.
+    """
+    key = (fmt or "").strip().lower().lstrip(".")
+    if key == "lmn":
+        key = "lumen"
+    parts: list[str] = []
+    if plate.get("kind") != "inspection":
+        axes = []
+        if plate.get("mirror_x"):
+            axes.append("X")
+        if plate.get("mirror_y"):
+            axes.append("Y")
+        if axes:
+            parts.append(
+                f"{plate['name']} is listed with a mirrored image ({' and '.join(axes)}). "
+                "mslicer marks the GOO mirror bits untested, and TorchC0 has not verified a pixel flip, "
+                "so it will not write this file."
+            )
+    native = (plate.get("native_format") or "").lstrip(".").lower()
+    version = (plate.get("native_version") or "").lower()
+    width, height = int(plate["width_px"]), int(plate["height_px"])
+    pixels = width * height
+    if key == "lumen":
+        if pixels > MAX_PIXELS:
+            stock = plate.get("native_format") or "its stock file"
+            parts.append(
+                f"{plate['name']} is {width}×{height} px ({pixels:,} pixels). "
+                f"TorchC0 slices plates up to {MAX_PIXELS:,} pixels into .lumen, and it does not write {stock}."
+            )
+    elif key in ("goo", "ctb", "nanodlp"):
+        if plate.get("kind") != "inspection" and native and native != key:
+            parts.append(
+                f"{plate['name']} stock file is .{native}. "
+                f"TorchC0 will not write a .{key} and call it that printer's file."
+            )
+        if key == "ctb" and version == "v2":
+            parts.append(
+                f"{plate['name']} is listed as CTB v2. mslicer writes unencrypted v4 or encrypted v5, not v2."
+            )
+        if pixels > MSLICER_MAX_PIXELS:
+            parts.append(
+                f"{plate['name']} is {width}×{height} px ({pixels:,} pixels), "
+                f"above the {MSLICER_MAX_PIXELS:,} pixel cap, so it is not sliced."
+            )
+    else:
+        parts.append(f".{key} is not a slice file TorchC0 writes.")
+    return " ".join(parts)
+
+
+def plate_for_ui(plate: dict) -> dict:
+    row = dict(plate)
+    row["blocks"] = {fmt: block_reason(plate, fmt) for fmt in ("lumen", "goo", "ctb", "nanodlp")}
+    return row
+
+
+def refuse_for_printer(plate: dict, fmt: str, printer: dict | None) -> None:
+    """The slice plate has to be the printer the mesh was prepared on."""
+    if printer:
+        matches = plates_for_printer(printer.get("brand") or "", printer.get("model") or "", printer.get("bed_mm"))
+        if plate.get("id") not in {row["id"] for row in matches}:
+            who = f"{printer.get('brand', '')} {printer.get('model', '')}".strip() or "The selected printer"
+            if not matches:
+                raise ResinSliceError(
+                    f"{who} has no slice plate with this name and bed. "
+                    "TorchC0 will not write a file for a different machine."
+                )
+            theirs = ", ".join(row["name"] for row in matches)
+            raise ResinSliceError(
+                f"{who} uses {theirs}. {plate.get('manufacturer', '')} {plate.get('name', '')} is a different machine. "
+                "TorchC0 will not write that file."
+            )
+    elif plate.get("kind") != "inspection":
+        raise ResinSliceError(
+            "Choose the printer this file is for. TorchC0 will not slice a commercial plate without that printer."
+        )
+    reason = block_reason(plate, fmt)
+    if reason:
+        raise ResinSliceError(reason)
+
+
 def reject_format(fmt: str) -> None:
     key = (fmt or "").strip().lower().lstrip(".")
     if key in ("", "lumen", "lmn", "goo", "ctb", "nanodlp"):
@@ -238,6 +364,9 @@ def slice_mesh(mesh: trimesh.Trimesh, settings: dict, plate: dict, out_path: Pat
     binary = lumen_bin()
     if binary is None:
         raise ResinSliceError("The LUMEN encoder is not built on this machine (tools/zeim-lumen).")
+    blocked = block_reason(plate, "lumen")
+    if blocked:
+        raise ResinSliceError(blocked)
     if len(mesh.faces) > MAX_FACES:
         raise ResinSliceError(f"This mesh has {len(mesh.faces):,} triangles. The slice limit is {MAX_FACES:,}.")
     if not np.isfinite(mesh.vertices).all():

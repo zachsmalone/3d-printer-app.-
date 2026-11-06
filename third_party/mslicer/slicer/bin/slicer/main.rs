@@ -10,6 +10,7 @@ use args::{Args, Model};
 use clap::{CommandFactory, FromArgMatches};
 use clone_macro::clone;
 use image::{ImageReader, RgbaImage};
+use nalgebra::Vector3;
 
 use common::{
     progress::Progress,
@@ -57,17 +58,26 @@ fn main() -> Result<()> {
         let ext = model.path.extension().unwrap().to_string_lossy();
         let buf = BufReader::new(File::open(&model.path)?);
 
-        let mut mesh = load_mesh(buf, &ext)?;
+        let mut mesh = if args.placed {
+            load_mesh_placed(buf, &ext)?
+        } else {
+            load_mesh(buf, &ext)?
+        };
 
         mesh.set_scale(model.scale);
         mesh.set_rotation(model.rotation.map(f32::to_radians));
 
-        // Seat Z on the bed and center XY, then move that bottom-center to the
-        // plate center. Measure the volume only after the pixel scale, or a
-        // centered mesh (negative millimetres) is reported as cut off.
-        let seated = Bounds3D::from_mesh(&mesh);
-        let center = (slice_config.platform_resolution / 2).cast::<f32>();
-        mesh.set_position((center - seated.center().xy()).to_homogeneous() + model.position);
+        if args.placed {
+            // Bed coordinates are already the plate. Pixel 0 is the minimum corner.
+            mesh.set_position(model.position);
+        } else {
+            // Seat Z on the bed and center XY, then move that bottom-center to the
+            // plate center. Measure the volume only after the pixel scale, or a
+            // centered mesh (negative millimetres) is reported as cut off.
+            let seated = Bounds3D::from_mesh(&mesh);
+            let center = (slice_config.platform_resolution / 2).cast::<f32>();
+            mesh.set_position((center - seated.center().xy()).to_homogeneous() + model.position);
+        }
 
         // Scale the model into printer-space (mm => px). Z scale stays 1.
         mesh.set_scale(model.scale.component_mul(&mm_to_px));
@@ -149,10 +159,23 @@ fn main() -> Result<()> {
 }
 
 fn load_mesh<T: Read + Seek + Send + 'static>(reader: T, format: &str) -> Result<Mesh> {
+    let (verts, faces) = read_mesh(reader, format)?;
+    Ok(Mesh::new_boxed_centered(verts, faces))
+}
+
+fn load_mesh_placed<T: Read + Seek + Send + 'static>(reader: T, format: &str) -> Result<Mesh> {
+    let (verts, faces) = read_mesh(reader, format)?;
+    Ok(Mesh::new_boxed(verts, faces))
+}
+
+fn read_mesh<T: Read + Seek + Send + 'static>(
+    reader: T,
+    format: &str,
+) -> Result<(Box<[Vector3<f32>]>, Box<[[u32; 3]]>)> {
     let des = ReaderDeserializer::new(reader);
     let format = mesh_format::Format::from_extension(format).context("Unknown mesh extension.")?;
     let mesh = mesh_format::load_mesh(des, format, &Progress::new())?;
-    Ok(Mesh::new_boxed_centered(mesh.verts, mesh.faces))
+    Ok((mesh.verts, mesh.faces))
 }
 
 fn is_oob(bounds: &Bounds3D, slice_config: &SliceConfig) -> bool {

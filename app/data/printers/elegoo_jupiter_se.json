@@ -1,0 +1,13 @@
+{
+  "settings": {
+    "brand": {"value": "ELEGOO", "unit": "text", "sources": ["https://us.elegoo.com/products/jupiter-se"], "note": "Manufacturer identity."},
+    "model": {"value": "Jupiter SE", "unit": "text", "sources": ["https://us.elegoo.com/products/jupiter-se"], "note": "Exact model as named on the cited page. Not the original Jupiter and not Jupiter 2."},
+    "technology": {"value": "Resin", "unit": "enum", "sources": ["https://us.elegoo.com/products/jupiter-se"], "note": "MSLA resin printer. Normalised to Resin."},
+    "bed_size_mm": {"value": [277.848, 156.264, 300], "unit": "mm", "sources": ["https://us.elegoo.com/products/jupiter-se"], "note": "Advertised build volume on the cited page, 5448 by 3064 at 51 µm. Same numbers as the original Jupiter plate. The machines are not interchangeable."},
+    "firmware": {"value": "resin", "unit": "enum", "sources": ["https://us.elegoo.com/products/jupiter-se"], "note": "Resin printer: no G-code pause. The catalog lists a mirrored image for this model, so TorchC0 does not write its layer file."}
+  },
+  "notes": [
+    "Reviewed from the cited ELEGOO US product page. Bed figures are the ones printed there.",
+    "No hardware validation. A mirrored catalog row is refused rather than written with the mirror bits left off."
+  ]
+}

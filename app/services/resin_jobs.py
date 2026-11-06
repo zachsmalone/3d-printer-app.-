@@ -97,10 +97,6 @@ def public(job: dict) -> dict:
 def start(rid: str, sid: str, plate_id: str, *, aa: bool, aa_level: int, fmt: str) -> dict:
     kind = mslicer_engine.output_format(fmt)
     plate = resin_slice.plate_by_id(plate_id)
-    if kind == "lumen":
-        resin_slice.require_sliceable(plate, engine="lumen")
-    else:
-        mslicer_engine.require_format_plate(plate, kind)
     d = _dir()
     try:
         info = json.loads((d / f"{rid}.json").read_text())
@@ -108,12 +104,17 @@ def start(rid: str, sid: str, plate_id: str, *, aa: bool, aa_level: int, fmt: st
         raise resin_slice.ResinSliceError("That prepared model has expired. Prepare it again.")
     if info.get("sid") != sid or not (d / f"{rid}.stl").is_file() or not (d / f"{rid}.settings.json").is_file():
         raise resin_slice.ResinSliceError("That prepared model has expired. Prepare it again.")
+    printer = info.get("printer")
+    resin_slice.refuse_for_printer(plate, kind, printer if isinstance(printer, dict) else None)
+    if kind != "lumen":
+        mslicer_engine.require_format_plate(plate, kind)
     job_id = uuid.uuid4().hex
     job = {
         "job_id": job_id, "rid": rid, "sid": sid, "name": info.get("name") or "torchc0",
         "status": "queued", "progress": 0,
         "phase": "queued", "layers": None, "done_layers": 0, "error": "", "download": None,
         "plate_id": plate_id, "aa": aa, "aa_level": aa_level, "format": kind, "created": time.time(),
+        "placed": bool(printer),
     }
     cancel = threading.Event()
     with _lock:
@@ -225,6 +226,7 @@ def _run(job_id: str, plate: dict) -> None:
             _write(job)
             report = mslicer_engine.slice_file(
                 stl_path, out, plate, settings, kind, aa=bool(job["aa"]), cancel=ev,
+                placed=bool(job.get("placed")),
             )
             report["plate_name"] = plate["name"]
             report["plate_id"] = plate["id"]
