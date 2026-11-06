@@ -62,4 +62,4 @@ jobs:
       - name: Build the LUMEN encoder
         run: cargo build --release --manifest-path tools/zeim-lumen/Cargo.toml
       - name: Slice tests
-        run: pytest tests/test_mslicer_engine.py tests/test_rea_boundary.py tests/test_resin_lumen.py -q
+        run: PYTHONPATH=. pytest tests/test_mslicer_engine.py tests/test_rea_boundary.py tests/test_resin_lumen.py -q
