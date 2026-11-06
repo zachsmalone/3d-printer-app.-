@@ -1,0 +1,122 @@
+use std::{
+    collections::{HashMap, HashSet},
+    hash::Hash,
+};
+
+// look into union find data structure for faster cluster merging.
+
+/// Disjoint set.
+///
+/// Lets you insert items, then mark pairs of items as being connected. You can
+/// then iterate the items in each 'cluster' of connected items.
+///
+/// This data structure is often implemented as a tree to avoid moving items in
+/// memory when a connection is made, but this one uses two hash maps. Unsure of
+/// the performance implications.
+#[derive(Default)]
+pub struct Clusters<T: Hash + PartialEq + Eq + Copy> {
+    runs: HashMap<T, u32>,              // maps runs to clusters
+    clusters: HashMap<u32, HashSet<T>>, // maps clusters to runs
+    next_id: u32,
+}
+
+impl<T: Hash + PartialEq + Eq + Copy> Clusters<T> {
+    fn next_id(&mut self) -> u32 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
+    }
+
+    pub fn runs(&self, cluster: u32) -> &HashSet<T> {
+        &self.clusters[&cluster]
+    }
+
+    pub fn cluster(&self, run: T) -> u32 {
+        self.runs[&run]
+    }
+
+    pub fn clusters(&self) -> impl Iterator<Item = (&u32, &HashSet<T>)> {
+        self.clusters.iter()
+    }
+
+    pub fn cluster_count(&self) -> usize {
+        self.clusters.len()
+    }
+
+    // Finds the cluster that contains a given run, creating a new one of
+    // needed.
+    pub fn insert(&mut self, run: T) -> u32 {
+        if let Some(&cluster) = self.runs.get(&run) {
+            return cluster;
+        }
+
+        let cluster = self.next_id();
+        self.runs.insert(run, cluster);
+        self.clusters.entry(cluster).or_default().insert(run);
+        cluster
+    }
+
+    pub fn mark_adjacency(&mut self, a: T, b: T) {
+        // Find (or make) cluster id's for each run.
+        let a = self.insert(a);
+        let b = self.insert(b);
+        if a == b {
+            return;
+        }
+
+        // Merge both clusters by moving all the runs in cluster b into cluster a.
+        for run in &self.clusters[&b] {
+            *self.runs.get_mut(run).unwrap() = a;
+        }
+
+        let old = self.clusters.remove(&b).unwrap();
+        self.clusters.get_mut(&a).unwrap().extend(old);
+    }
+}
+
+/// Reference: <https://people.engr.tamu.edu/djimenez/ut/utsa/cs3343/lecture18.html>
+pub struct ArrayCluster {
+    arr: Vec<u32>,
+}
+
+impl ArrayCluster {
+    pub fn new(size: usize) -> Self {
+        Self {
+            arr: (0..size as u32).collect::<Vec<_>>(),
+        }
+    }
+
+    fn parent(&self, id: u32) -> u32 {
+        self.arr[id as usize]
+    }
+
+    fn parent_mut(&mut self, id: u32) -> &mut u32 {
+        &mut self.arr[id as usize]
+    }
+
+    pub fn find(&mut self, mut id: u32) -> u32 {
+        let start = id;
+        let mut parent = self.parent(id);
+        while id != parent {
+            id = parent;
+            parent = self.parent(id);
+        }
+
+        *self.parent_mut(start) = id;
+        id
+    }
+
+    pub fn union(&mut self, a: u32, b: u32) {
+        let (a, b) = (self.find(a), self.find(b));
+        *self.parent_mut(a) = b;
+    }
+
+    pub fn clusters(mut self) -> impl Iterator<Item = HashSet<u32>> {
+        let mut out = HashMap::<_, HashSet<_>>::new();
+        for i in 0..self.arr.len() as u32 {
+            out.entry(self.find(i)).or_default().insert(i);
+        }
+
+        out.into_values().filter(|x| x.len() > 1)
+    }
+}

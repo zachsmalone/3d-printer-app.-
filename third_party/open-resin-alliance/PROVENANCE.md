@@ -21,15 +21,15 @@ The three requested sources are Open Resin Alliance, connorslade/mslicer, and mo
 |---|---|---|---|
 | [LumenFormat](https://github.com/Open-Resin-Alliance/LumenFormat) crate `lumen-format` 1.0.0 | `4f25f7bcf77c487447e28b8918eb8017e986cc78` | MIT OR Apache-2.0 (see `lumen-format/LICENSE-MIT` and `LICENSE-APACHE`) | Unmodified reference encoder and decoder. `tools/zeim-lumen` depends on the vendored crate and writes `.lumen` v1. |
 | [df-plugin-elegoo](https://github.com/Open-Resin-Alliance/df-plugin-elegoo) printer geometry | `be59b1597ac5f5551ddbdae97145f584f05be056` | MIT (`df-plugin-elegoo-LICENSE`) | Resolution, pixel pitch and Z height only, copied into `app/core/lumen_plates.json`. No preview images. |
+| [mslicer](https://github.com/connorslade/mslicer) `slicer` v0.10.1 | `2d639519eedf4269a341fb6d5508901e06d99d48` | GPL-3.0 (`third_party/mslicer/LICENSE`) | Separate program. Source tree is vendored. ZEIM's only edits are the `--ctb` flag and the summary line in `ZEIM-CHANGES.md`. Python executes the binary. |
 
-The Elegoo plugin's encoder is not compiled. It is a module of the AGPL DragonFruit slicer, and its stock output is `.goo` / `.ctb`, which TorchC0 does not write.
+The Elegoo plugin's own encoder is not compiled. `.goo` and `.ctb` come from mslicer.
 
 ## Not used
 
 | Component | Licence | Why it is not in this tree |
 |---|---|---|
-| DragonFruit | AGPL-3.0-or-later | The slicer and its Rust engine. Serving a modified copy would be a new decision about publishing ZEIM source. |
-| connorslade/mslicer `v0.10.1` | GPL-3.0 | The resin slicer (`.ctb`, `.goo`, `.nanodlp`, `.svg`). Linking or shipping it inside ZEIM is a separate licensing choice. Not approved by the PrusaSlicer CLI decision. |
+| DragonFruit | AGPL-3.0-or-later | Slicing engine and GUI. AGPL section 13 would attach if a modified copy is what remote users interact with. mslicer already writes `.goo` and `.ctb`, so this engine is not the one TorchC0 runs. |
 | df-plugin-ctb | MIT | Encoder for CTB, including AES key material for the encrypted container. Not copied. |
 | df-plugin-chitubox | MIT | ChiTuBox project import. Not copied. |
 | df-plugin-lys | MIT | Lychee project import. Not copied. |

@@ -1,0 +1,195 @@
+use common::{
+    container::{
+        Clusters, Image, ImageRuns,
+        rle::{
+            self, Run, intersperse_runs,
+            png::{ColorType, PngEncoder},
+        },
+    },
+    serde::DynamicSerializer,
+    slice::{EncodableLayer, ExposureConfig, SliceConfig},
+    units::Milimeters,
+};
+use image::{GrayImage, RgbImage};
+use nalgebra::{Vector2, Vector3};
+
+use crate::{decode_png, types::LayerInfo};
+
+/// Layer data with its associated info.
+pub struct Layer {
+    pub inner: Vec<u8>, // png encoded
+    pub info: LayerInfo,
+}
+
+/// Encodes a series of runs into the internal layer format.
+pub struct LayerEncoder {
+    platform: Vector2<u32>,
+    runs: Vec<Run>,
+}
+
+/// Decodes the internal layer format to a series of runs.
+pub struct LayerDecoder {
+    image: RgbImage,
+}
+
+impl LayerEncoder {
+    pub fn from_gray_image(gray_image: GrayImage) -> Self {
+        let platform = Vector2::new(gray_image.width(), gray_image.height());
+        let image = Image::from_raw(platform.cast(), gray_image.into_raw());
+        Self::from_image(image)
+    }
+
+    pub fn from_image(image: Image) -> Self {
+        let mut out = LayerEncoder::new(image.size.cast());
+        (image.runs()).for_each(|run| out.add_run(run.length, run.value));
+        out
+    }
+
+    // Note that the handling of encoding layers in the NanoDLP format where
+    // the horizontal size is not a multiple of three is undefined by the
+    // documentation. In fact NanoDLP's own slicer crashes in that case.
+    //
+    // I've decided to pad the extra subpixels in when size.x % 3 != 0, but
+    // these files will probably not be able to be loaded with most other
+    // software.
+    pub fn image_data(mut self) -> Vec<u8> {
+        let mut ser = DynamicSerializer::new();
+
+        let width = self.platform.x as u64;
+        let sub_pad = 3 - width % 3;
+        if sub_pad != 3 {
+            let run = Run::new(sub_pad, 0);
+            intersperse_runs(&mut self.runs, run, width, width);
+            self.runs.push(run);
+        }
+
+        let resolution = Vector2::new(self.platform.x.div_ceil(3), self.platform.y);
+        let mut encoder = PngEncoder::new(&mut ser, ColorType::Truecolor, resolution);
+        encoder.write_pixel_dimensions(3, 1);
+        encoder.write_image_data(self.runs);
+        encoder.write_end();
+        ser.into_inner()
+    }
+}
+
+impl EncodableLayer for LayerEncoder {
+    type Output = Layer;
+
+    fn new(platform: Vector2<u32>) -> Self {
+        Self {
+            platform,
+            runs: Vec::new(),
+        }
+    }
+
+    fn add_run(&mut self, length: u64, value: u8) {
+        self.runs.push(Run { length, value });
+    }
+
+    fn finish(
+        self,
+        config: &SliceConfig,
+        _exposure: &ExposureConfig,
+        _height: Milimeters,
+    ) -> Self::Output {
+        let nonzero = rle::bits::from_runs(&self.runs);
+        let chunks = rle::bits::chunks(&nonzero, config.platform_resolution.x as u64);
+
+        let mut min = Vector2::repeat(u64::MAX);
+        let mut max = Vector2::repeat(u64::MIN);
+        let mut islands = Clusters::default();
+
+        let width = config.platform_resolution.x as u64;
+        for row in 1..chunks.len() {
+            row_bounds(&chunks[row], width, row, &mut min, &mut max);
+            rle::bits::cluster_row_adjacency(&mut islands, &chunks, row - 1, row);
+        }
+
+        let islands = (islands.clusters())
+            .map(|(_, runs)| runs.iter().map(|r| r.size).sum::<u64>())
+            .collect::<Vec<_>>();
+        let smallest_area = islands.iter().min().copied().unwrap_or_default();
+        let largest_area = islands.iter().max().copied().unwrap_or_default();
+        let total_area = islands.iter().sum::<u64>();
+
+        let pixel_area = config.pixel_area();
+        Layer {
+            info: LayerInfo {
+                total_solid_area: total_area as f32 * pixel_area,
+                largest_area: largest_area as f32 * pixel_area,
+                smallest_area: smallest_area as f32 * pixel_area,
+                min_x: min.x as u32,
+                min_y: min.y as u32,
+                max_x: max.x as u32,
+                max_y: max.y as u32,
+                area_count: islands.len() as u32,
+            },
+            inner: self.image_data(),
+        }
+    }
+}
+
+impl LayerDecoder {
+    pub fn new(data: &[u8]) -> Self {
+        Self {
+            image: decode_png(data).unwrap().to_rgb8(),
+        }
+    }
+
+    pub fn runs(&self) -> impl Iterator<Item = Run> {
+        ImageRuns::new(self.image.as_raw())
+    }
+
+    pub fn into_inner(self) -> RgbImage {
+        self.image
+    }
+}
+
+pub fn layers_bounds(
+    config: &SliceConfig,
+    layers: &[LayerInfo],
+) -> (Vector3<Milimeters>, Vector3<Milimeters>) {
+    let (mut min, mut max) = (Vector3::repeat(u32::MAX), Vector3::repeat(u32::MIN));
+    for (i, layer) in (layers.iter())
+        .enumerate()
+        .filter(|(_, l)| l.area_count > 0)
+    {
+        let i = i as u32;
+        min = Vector3::new(min.x.min(layer.min_x), min.y.min(layer.min_y), min.z.min(i));
+        max = Vector3::new(max.x.max(layer.max_x), max.y.max(layer.max_y), max.z.max(i));
+    }
+
+    let half_size = config.platform_resolution.xy().cast::<f32>() / 2.0;
+    let layer_to_world = |v: Vector3<u32>| {
+        let xy = (v.xy().cast::<f32>() - half_size)
+            .component_div(&config.platform_resolution.cast())
+            .component_mul(&config.platform_size.xy().map(|x| x.raw()))
+            .map(Milimeters::new);
+        xy.push(v.z as f32 * config.slice_height)
+    };
+
+    (layer_to_world(min), layer_to_world(max))
+}
+
+fn row_bounds(row: &[u64], width: u64, y: usize, min: &mut Vector2<u64>, max: &mut Vector2<u64>) {
+    if row.len() <= 1 {
+        return;
+    }
+
+    // If len>1 then there is at least one non-zero voxel in that layer, which
+    // will extend the bounding box's y component.
+    min.y = min.y.min(y as u64);
+    max.y = max.y.max(y as u64);
+
+    // The left side of the first run starts at row[0] pixels in and the right
+    // side ends row[-1] pixels in from the right (when the last run is
+    // nonzero).
+    let offset = if row.len() % 2 == 1 {
+        *row.last().unwrap()
+    } else {
+        0
+    };
+
+    min.x = min.x.min(row[0]);
+    max.x = max.x.max(width - offset);
+}

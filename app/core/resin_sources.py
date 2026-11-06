@@ -36,9 +36,13 @@ SOURCES = (
         "commit": "",
         "version": "v0.10.1",
         "license": "GPL-3.0",
-        "used": False,
-        "role": "Resin slicer for .ctb, .goo, .nanodlp and .svg. Not linked or shipped. GPL-3.0 was not approved for ZEIM the way unmodified PrusaSlicer was.",
-        "outputs": [".ctb", ".goo", ".nanodlp", ".svg"],
+        "used": True,
+        "role": (
+            "Separate program. TorchC0 runs third_party/mslicer `slicer` (v0.10.1, commit "
+            "2d639519eedf4269a341fb6d5508901e06d99d48, plus the --ctb flag in ZEIM-CHANGES.md). "
+            "That directory is the Corresponding Source. It is not compiled into the Python modules."
+        ),
+        "outputs": [".goo", ".ctb", ".nanodlp"],
     },
     {
         "id": "dragonfruit",
@@ -72,10 +76,10 @@ SOURCES = (
 )
 
 SOURCES_NOTE = (
-    "The layer file is .lumen from the Open Resin Alliance reference encoder. "
-    "Elegoo plate sizes come from that alliance's MIT plugin and are not .goo or .ctb files. "
-    "mslicer (GPL-3.0) is not included. REA 6.8.0 is a reverse-engineering tool, not a resin slicer, "
-    "and it is not pointed at a proprietary slicer."
+    "Open Resin .lumen uses the MIT/Apache reference encoder. "
+    ".goo, .ctb, and .nanodlp are written by the separate mslicer program (GPL-3.0), whose source is shipped beside it. "
+    "A plate's stock extension has to match the file. CTB v2 is not written. "
+    "REA is a reverse-engineering tool, not a slicer, and it is not pointed at a proprietary program."
 )
 
 

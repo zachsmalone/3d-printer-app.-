@@ -1,0 +1,197 @@
+use common::{
+    container::{
+        Run,
+        rle::downsample::{downsample, downsample_adjacent},
+    },
+    slice::Layer,
+    units::Milimeter,
+};
+use itertools::Itertools;
+use nalgebra::Vector2;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+
+use crate::{
+    geometry::partitioning::Segments1D,
+    slicer::{
+        SEGMENT_LAYERS, Slicer,
+        raster::edge_table::{global_edge_table, update_active_edges},
+    },
+};
+
+pub mod edge_table;
+
+pub struct Segment {
+    pub endpoints: [Vector2<f32>; 2],
+    pub entering: bool,
+    pub priority: u8,
+    pub exposure: u8,
+}
+
+impl Slicer {
+    /// Actually runs the slicing operation, it is multithreaded.
+    pub fn slice_raster(&self) -> Vec<Layer> {
+        let supersample = self.slice_config.supersample;
+        let remap = self.slice_config.exposure_remap.table();
+
+        let real_platform = self.slice_config.platform_resolution;
+        let platform = real_platform * supersample.xy as u32;
+        let pixels = platform.x as u64 * platform.y as u64;
+
+        // A segment contains a reference to all of the triangles it contains. By
+        // splitting the mesh into segments, not all triangles need to be tested
+        // to find all intersections. This massively speeds up the slicing
+        // operation and actually makes it faster than most other slicers. :p
+        let segments = (self.models.iter())
+            .map(|model| Segments1D::from_mesh(&model.mesh, &model.bounds, SEGMENT_LAYERS))
+            .collect::<Vec<_>>();
+
+        (0..self.layers * supersample.z as u32)
+            .into_par_iter()
+            .map(|i| {
+                let height = i as f32 / supersample.z as f32
+                    * self.slice_config.slice_height.get::<Milimeter>();
+
+                // Gets all the intersections between the slice plane and the
+                // model. Because all the faces are triangles, every triangle
+                // intersection will return two points. These can then be
+                // interpreted as line segments making up a polygon.
+                let segments = self.models.iter().enumerate().flat_map(|(idx, model)| {
+                    let intersections = segments[idx].intersect_plane(&model.mesh, height);
+                    intersections.into_iter().map(|(pos, dir)| Segment {
+                        endpoints: pos.map(|x| x * supersample.xy as f32),
+                        entering: dir,
+                        priority: model.exposure,
+                        exposure: model.exposure,
+                    })
+                });
+
+                layer(supersample.xy, real_platform, segments)
+            })
+            .chunks(supersample.z as usize)
+            .enumerate()
+            .map(|(i, mut chunk)| {
+                let (mut data, errors) = if supersample.z > 1 {
+                    let data = downsample_to_vec(&chunk, pixels);
+                    let errors = chunk.iter().map(|x| x.1).sum();
+                    (data, errors)
+                } else {
+                    chunk.pop().unwrap()
+                };
+
+                data.iter_mut()
+                    .filter(|x| x.value > 0)
+                    .for_each(|x| x.value = remap[x.value as usize]);
+
+                let exposure = self.slice_config.exposure_config(i as u32).into_owned();
+                let height = (i + 1) as f32 * self.slice_config.slice_height;
+                Layer::new(data, height, exposure).with_defects(errors)
+            })
+            .inspect(|_| self.progress.add_complete(1))
+            .collect::<Vec<_>>()
+    }
+}
+
+pub fn layer(
+    supersample: u8,
+    real_platform: Vector2<u32>,
+    segments: impl Iterator<Item = Segment>,
+) -> (Vec<Run>, u64) {
+    let platform = real_platform * supersample as u32;
+
+    let mut edges = global_edge_table(segments);
+    let mut active = Vec::new();
+    let first_y = edges
+        .front()
+        .map(|e| (e.p_min.y - 0.5).ceil().max(0.0) as u32)
+        .unwrap_or_default();
+    let mut runs = Vec::new();
+    let padding = (first_y as u64 / supersample as u64) * real_platform.x as u64;
+
+    // In the case that there is geometry in the first row this padding value
+    // will be zero and shouldn't be pushed as it could cause problems in later
+    // processing stages.
+    (padding > 0).then(|| runs.push(Run::new(padding, 0)));
+
+    let mut rows = vec![Vec::new(); supersample as usize];
+    let mut row = Vec::new();
+    let mut errors = 0;
+    let mut y = first_y;
+
+    while (!edges.is_empty() || !active.is_empty()) && y < platform.y {
+        update_active_edges(&mut edges, &mut active, y);
+        let out = if supersample > 1 { &mut row } else { &mut runs };
+
+        // Convert the intersections into runs of voxels to be
+        // encoded into the layer.
+        let mut depth = 0;
+        let mut exposures = [(0, 0); 256];
+        let mut last = 0;
+        for (a, b) in active.iter().tuple_windows() {
+            let delta = 1 - (a.entering as i32) * 2;
+            depth += delta;
+
+            let exposure = &mut exposures[a.priority as usize];
+            exposure.1 += delta;
+
+            if a.entering {
+                (exposure.1 == 0).then(|| exposure.0 = 0);
+            } else {
+                exposure.0 = a.exposure;
+            }
+
+            let [a, b] = [a.x, b.x].map(|x| {
+                let pixel_x = (x - 0.5).ceil().max(0.0) as u64;
+                pixel_x.min(platform.x as u64)
+            });
+            if depth != 0 && b != a {
+                let (start, length) = (a, b - a);
+                (start > last).then(|| out.push(Run::new(start - last, 0)));
+
+                let exposure = (exposures.iter().copied())
+                    .rfind(|&x| x.1 > 0)
+                    .map(|x| x.0)
+                    .unwrap_or(255);
+                out.push(Run::new(length, exposure));
+                last = start + length;
+            }
+        }
+
+        if let Some(last) = active.last() {
+            errors += ((depth + 1 - (last.entering as i32) * 2) != 0) as u64;
+        }
+
+        // Fill the empty space at the end of the row
+        let padding = platform.x as u64 - last;
+        (padding > 0).then(|| out.push(Run::new(padding, 0)));
+
+        if supersample > 1 {
+            let ss_row = ((y - first_y) % supersample as u32) as usize;
+            downsample_adjacent(supersample, &row, &mut rows[ss_row]);
+            row.clear();
+
+            if (y + 1).is_multiple_of(supersample as u32) {
+                downsample(rows.iter(), platform.x as u64, &mut runs);
+                rows.iter_mut().for_each(Vec::clear);
+            }
+        }
+
+        y += 1;
+    }
+
+    // Turns out that on my printer, the buffer that each layer is
+    // decoded into is just uninitialized memory. So if the last run
+    // doesn't fill the buffer, the printer will just print whatever
+    // was in the buffer before which just makes a huge mess.
+    if y < platform.y {
+        let rows = (real_platform.y - y / supersample as u32) as u64;
+        runs.push(Run::new(rows * real_platform.x as u64, 0));
+    }
+
+    (runs, errors)
+}
+
+fn downsample_to_vec(chunks: &[(Vec<Run>, u64)], width: u64) -> Vec<Run> {
+    let mut out = Vec::new();
+    downsample(chunks.iter().map(|x| &x.0), width, &mut out);
+    out
+}

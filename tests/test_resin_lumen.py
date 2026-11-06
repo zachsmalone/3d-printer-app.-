@@ -58,7 +58,7 @@ def test_independent_head_rejects_zip_and_garbage():
 
 
 def test_rejected_formats_name_the_format():
-    for fmt, needle in (("ctb", "CHITUBOX"), ("goo", ".goo"), ("lys", "Lychee"), ("zip", "zip"), ("photon", "Photon")):
+    for fmt, needle in (("lys", "Lychee"), ("zip", "zip"), ("photon", "Photon"), ("ctbx", "ctbx")):
         with pytest.raises(resin_slice.ResinSliceError) as exc:
             resin_slice.reject_format(fmt)
         assert needle.lower() in str(exc.value).lower()
@@ -170,11 +170,13 @@ def test_api_slice_download_and_layer_preview(c):
     body = prep.json()
     assert "lumen" in body["estimate"]["slice_note"].lower()
     rid = body["export"]["rid"]
-    bad = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "zeim-inspection", "file_format": "ctb"})
-    assert bad.status_code == 400 and "CHITUBOX" in bad.json()["detail"]
+    bad = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "zeim-inspection", "file_format": "lys"})
+    assert bad.status_code == 400 and "Lychee" in bad.json()["detail"]
     assert bad.content[:2] != b"PK"
-    goo = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-5-goo", "file_format": "goo"})
-    assert goo.status_code == 400 and ".goo" in goo.json()["detail"]
+    mismatch = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-2-ctb", "file_format": "goo"})
+    assert mismatch.status_code == 400 and ".goo" in mismatch.json()["detail"]
+    v2 = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-2-ctb", "file_format": "ctb"})
+    assert v2.status_code == 400 and "v2" in v2.json()["detail"]
     huge = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-5-ultra-ctb", "file_format": "lumen"})
     assert huge.status_code == 400 and ".ctb" in huge.json()["detail"]
     cat = c.get("/api/resin/catalog").json()

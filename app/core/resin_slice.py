@@ -39,9 +39,7 @@ MAX_FACES = 400_000
 AA_LEVELS = (2, 4)
 STRIP_ROWS = 32
 REJECTED_FORMATS = {
-    "ctb": "CHITUBOX .ctb is not written. The open CTB encoder we inspected carries AES key material for a protected container, and TorchC0 does not bypass that.",
-    "ctbx": "CHITUBOX .ctbx is not written.",
-    "goo": "Elegoo .goo is not written. Plate geometry from the Elegoo plugin can size a .lumen file; the .goo bytes are a different format.",
+    "ctbx": "CHITUBOX .ctbx is not written. mslicer writes .ctb v4 or v5, not .ctbx.",
     "lys": "Lychee .lys is not written.",
     "lyt": "Lychee .lyt is not written.",
     "photon": "Photon .photon is not written.",
@@ -107,8 +105,8 @@ def reject_format(fmt: str) -> None:
     if detail:
         raise ResinSliceError(detail)
     raise ResinSliceError(
-        f".{key} is not a file TorchC0 writes. The layer file it writes is .lumen "
-        "(Open Resin Alliance LUMEN v1). It is not a CHITUBOX, Lychee, GOO, Photon or zip file."
+        f".{key} is not a file TorchC0 writes. It writes .lumen, and, through the separate mslicer program, .goo, .ctb, or .nanodlp. "
+        "It does not write Lychee, Photon, .ctbx, or a zip renamed as a printer file."
     )
 
 

@@ -16,6 +16,7 @@ import trimesh
 
 from app import config
 from app.core import resin_slice
+from app.services import mslicer_engine
 
 _lock = threading.Lock()
 _cancel: dict[str, threading.Event] = {}
@@ -57,7 +58,7 @@ def public(job: dict) -> dict:
         "download": job.get("download"),
         "plate_id": job.get("plate_id"),
         "name": job.get("name") or "torchc0",
-        "format": "lumen",
+        "format": job.get("format") or "lumen",
     }
     if report:
         out["report"] = {
@@ -76,7 +77,10 @@ def public(job: dict) -> dict:
             "aa_level": report.get("aa_level"),
             "plate_name": report.get("plate_name"),
             "native_format": report.get("native_format"),
-            "native_format_written": False,
+            "native_format_written": bool(report.get("native_format_written")),
+            "engine": report.get("engine") or "lumen-format",
+            "ctb_container": report.get("ctb_container") or "",
+            "file_magic": report.get("file_magic") or "",
             "hardware_tested": False,
             "mirror_applied": False,
             "bytes": report.get("bytes"),
@@ -88,9 +92,11 @@ def public(job: dict) -> dict:
 
 
 def start(rid: str, sid: str, plate_id: str, *, aa: bool, aa_level: int, fmt: str) -> dict:
-    resin_slice.reject_format(fmt)
+    kind = mslicer_engine.output_format(fmt)
     plate = resin_slice.plate_by_id(plate_id)
     resin_slice.require_sliceable(plate)
+    if kind != "lumen":
+        mslicer_engine.require_format_plate(plate, kind)
     d = _dir()
     try:
         info = json.loads((d / f"{rid}.json").read_text())
@@ -103,7 +109,7 @@ def start(rid: str, sid: str, plate_id: str, *, aa: bool, aa_level: int, fmt: st
         "job_id": job_id, "rid": rid, "sid": sid, "name": info.get("name") or "torchc0",
         "status": "queued", "progress": 0,
         "phase": "queued", "layers": None, "done_layers": 0, "error": "", "download": None,
-        "plate_id": plate_id, "aa": aa, "aa_level": aa_level, "created": time.time(),
+        "plate_id": plate_id, "aa": aa, "aa_level": aa_level, "format": kind, "created": time.time(),
     }
     cancel = threading.Event()
     with _lock:
@@ -138,6 +144,8 @@ def file_for(job_id: str, sid: str, kind: str, index: int | None = None) -> Path
     d = _dir()
     if kind == "lumen":
         path = d / f"job{job_id}.lumen"
+    elif kind in ("goo", "ctb", "nanodlp"):
+        path = d / f"job{job_id}.{kind}"
     elif kind == "png":
         path = d / f"job{job_id}" / f"{index:04d}.png"
     else:
@@ -171,10 +179,12 @@ def _run(job_id: str, plate: dict) -> None:
             return
         d = _dir()
         settings = json.loads((d / f"{job['rid']}.settings.json").read_text())["settings"]
-        mesh = trimesh.load(str(d / f"{job['rid']}.stl"), file_type="stl", force="mesh")
+        stl_path = d / f"{job['rid']}.stl"
+        mesh = trimesh.load(str(stl_path), file_type="stl", force="mesh")
+        kind = job.get("format") or "lumen"
         thumb = d / f"job{job_id}"
         thumb.mkdir(exist_ok=True)
-        out = d / f"job{job_id}.lumen"
+        out = d / f"job{job_id}.{kind if kind != 'lumen' else 'lumen'}"
         job["status"] = "running"
         job["phase"] = "raster"
         _write(job)
@@ -192,10 +202,29 @@ def _run(job_id: str, plate: dict) -> None:
             job["phase"] = phase
             _write(job)
 
-        report = resin_slice.slice_mesh(
-            mesh, settings, plate, out, aa=bool(job["aa"]), aa_level=int(job["aa_level"]),
-            thumb_dir=thumb, cancel=ev, progress=progress,
-        )
+        if kind != "lumen":
+            ext = mesh.extents
+            sx = plate["build_width_um"] / 1000.0
+            sy = plate["build_depth_um"] / 1000.0
+            sz = plate["build_height_um"] / 1000.0
+            if ext[0] > sx + 1e-3 or ext[1] > sy + 1e-3 or ext[2] > sz + 1e-3:
+                raise resin_slice.ResinSliceError(
+                    f"The model is {ext[0]:.1f} × {ext[1]:.1f} × {ext[2]:.1f} mm. "
+                    f"{plate['name']} is {sx:.1f} × {sy:.1f} × {sz:.1f} mm."
+                )
+        if kind == "lumen":
+            report = resin_slice.slice_mesh(
+                mesh, settings, plate, out, aa=bool(job["aa"]), aa_level=int(job["aa_level"]),
+                thumb_dir=thumb, cancel=ev, progress=progress,
+            )
+        else:
+            job["phase"] = "mslicer"
+            _write(job)
+            report = mslicer_engine.slice_file(
+                stl_path, out, plate, settings, kind, aa=bool(job["aa"]), cancel=ev,
+            )
+            report["plate_name"] = plate["name"]
+            report["plate_id"] = plate["id"]
         # Drop the per-layer hashes from the status file. The download is the artifact.
         report.pop("sha256", None)
         report.pop("head", None)
@@ -205,7 +234,8 @@ def _run(job_id: str, plate: dict) -> None:
         job["layers"] = report["layers"]
         job["done_layers"] = report["layers"]
         job["report"] = report
-        job["download"] = f"/api/resin/jobs/{job_id}/print.lumen"
+        ext = "lumen" if kind == "lumen" else kind
+        job["download"] = f"/api/resin/jobs/{job_id}/print.{ext}"
         _write(job)
     except resin_slice.ResinSliceCancelled:
         _finish_cancel(job)
@@ -241,9 +271,10 @@ def _finish_cancel(job: dict) -> None:
 
 def _cleanup_partial(job_id: str) -> None:
     d = _dir()
-    lumen = d / f"job{job_id}.lumen"
-    if lumen.exists():
-        lumen.unlink()
+    for ext in ("lumen", "goo", "ctb", "nanodlp"):
+        path = d / f"job{job_id}.{ext}"
+        if path.exists():
+            path.unlink()
     thumb = d / f"job{job_id}"
     if thumb.is_dir():
         for child in thumb.iterdir():

@@ -1,0 +1,563 @@
+use std::{
+    fmt::{self, Debug},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use anyhow::{Result, ensure};
+use common::{
+    progress::Progress,
+    serde::{Deserializer, DynamicSerializer, Serializer, SliceDeserializer},
+    slice::{self, ExposureConfig, Height, SliceConfig, SliceMode, SlicedFile},
+    units::{Milimeters, MilimetersPerMinute, Seconds},
+};
+use image::RgbaImage;
+use nalgebra::{Vector2, Vector3, Vector4};
+use sha2::{Digest, Sha256};
+
+use crate::{
+    shared::{
+        DEFAULT_XOR_KEY, DISCLAIMER, PAGE_SIZE, PreviewImage, Section, read_string, scale_preview,
+    },
+    v5::{
+        decrypt, encrypt, encrypt_in_place,
+        layer::{Layer, LayerRef},
+        resin::ResinParameters,
+    },
+};
+
+const MAGIC: u32 = 0x12FD0107;
+const VERSION: u32 = 5;
+
+/// A ChituBox file.
+pub struct File {
+    pub layers: Vec<Layer>,
+
+    // Misc
+    pub checksum: u64,
+    pub disclaimer: String,
+    pub modified: u32, // Timestamp in minutes
+
+    // Printer properties
+    pub size: Vector3<Milimeters>,
+    pub resolution: Vector2<u32>,
+    pub machine_name: String,
+    pub projector_type: u32,
+    pub resin_parameters: ResinParameters,
+
+    // Operation properties
+    pub total_height: Milimeters,
+    pub layer_height: Milimeters,
+    pub last_layer_index: u32,
+    pub transition_layer_count: u32,
+    pub anti_alias_flag: u8, // 7(0x7) [No AA] / 15(0x0F) [AA]
+    pub anti_alias_level: u32,
+    pub per_layer_settings: u8, // 0 to not support, 0x40 to 0x50 to allow per layer parameters
+
+    // Derived values
+    pub print_time: u32,
+    pub material_milliliters: f32,
+    pub material_grams: f32,
+    pub material_cost: f32,
+
+    // Preview Images
+    pub large_preview: PreviewImage,
+    pub small_preview: PreviewImage,
+
+    // Layer config
+    pub exposure_time: Seconds,
+    pub bottom_exposure_time: Seconds,
+    pub light_off_delay: Seconds,
+    pub bottom_layer_count: u32,
+    pub bottom_lift_height: Milimeters,
+    pub bottom_lift_speed: MilimetersPerMinute,
+    pub lift_height: Milimeters,
+    pub lift_speed: MilimetersPerMinute,
+    pub retract_speed: MilimetersPerMinute,
+    pub bottom_light_off_delay: Seconds,
+    pub light_pwm: u16,
+    pub bottom_light_pwm: u16,
+    pub bottom_lift_height_2: Milimeters,
+    pub bottom_lift_speed_2: MilimetersPerMinute,
+    pub lift_height_2: Milimeters,
+    pub lift_speed_2: MilimetersPerMinute,
+    pub retract_height_2: Milimeters,
+    pub retract_speed_2: MilimetersPerMinute,
+    pub rest_time_after_lift: Seconds,
+    pub bottom_retract_speed: MilimetersPerMinute,
+    pub bottom_retract_speed_2: MilimetersPerMinute,
+    pub rest_time_after_retract_2: Seconds,
+    pub rest_time_after_lift_3: Seconds,
+    pub rest_time_before_lift: Seconds,
+    pub bottom_retract_height_2: Milimeters,
+    pub rest_time_after_retract: Seconds,
+    pub rest_time_after_lift_2: Seconds,
+}
+
+impl File {
+    pub fn deserialize(main_des: &mut SliceDeserializer) -> Result<Self> {
+        assert_eq!(main_des.read_u32_le(), MAGIC);
+        let settings = Section::deserialize_rev(main_des)?;
+
+        main_des.advance_by(4);
+        let version = main_des.read_u32_le();
+        ensure!(version == VERSION);
+        let signature = Section::deserialize_rev(main_des)?;
+
+        main_des.jump_to(settings.offset as usize);
+        let bytes = decrypt(main_des.read_slice(settings.size as usize));
+        let mut des = SliceDeserializer::new(&bytes);
+
+        let checksum = des.read_u64_le();
+        let hash = Sha256::digest(checksum.to_le_bytes());
+        let signature = main_des.execute_at(signature.offset as usize, |des| {
+            des.read_slice(signature.size as usize)
+        });
+        ensure!(&encrypt(&hash) == signature);
+
+        let layer_offset = des.read_u32_le();
+        let layer_count;
+
+        Ok(Self {
+            checksum,
+            size: Vector3::new(des.read_f32_le(), des.read_f32_le(), des.read_f32_le())
+                .map(Milimeters::new),
+            total_height: {
+                des.advance_by(4 * 2);
+                Milimeters::new(des.read_f32_le())
+            },
+            layer_height: Milimeters::new(des.read_f32_le()),
+            exposure_time: Seconds::new(des.read_f32_le()),
+            bottom_exposure_time: Seconds::new(des.read_f32_le()),
+            light_off_delay: Seconds::new(des.read_f32_le()),
+            bottom_layer_count: des.read_u32_le(),
+            resolution: Vector2::new(des.read_u32_le(), des.read_u32_le()),
+            large_preview: {
+                layer_count = des.read_u32_le();
+                main_des.jump_to(des.read_u32_le() as usize);
+                PreviewImage::deserialize(main_des)?
+            },
+            small_preview: {
+                main_des.jump_to(des.read_u32_le() as usize);
+                PreviewImage::deserialize(main_des)?
+            },
+            print_time: des.read_u32_le(),
+            projector_type: des.read_u32_le(),
+            bottom_lift_height: Milimeters::new(des.read_f32_le()),
+            bottom_lift_speed: MilimetersPerMinute::new(des.read_f32_le()),
+            lift_height: Milimeters::new(des.read_f32_le()),
+            lift_speed: MilimetersPerMinute::new(des.read_f32_le()),
+            retract_speed: MilimetersPerMinute::new(des.read_f32_le()),
+            material_milliliters: des.read_f32_le(),
+            material_grams: des.read_f32_le(),
+            material_cost: des.read_f32_le(),
+            bottom_light_off_delay: Seconds::new(des.read_f32_le()),
+            light_pwm: {
+                des.advance_by(4);
+                des.read_u16_le()
+            },
+            bottom_light_pwm: des.read_u16_le(),
+            layers: {
+                let xor_key = des.read_u32_le();
+                let mut layers = Vec::with_capacity(layer_count as usize);
+
+                main_des.jump_to(layer_offset as usize);
+
+                for i in 0..layer_count {
+                    let refrence = LayerRef::deserialize(main_des)?;
+                    let position = refrence.page_number as usize * PAGE_SIZE as usize
+                        + refrence.layer_offset as usize;
+
+                    let layer =
+                        main_des.execute_at(position, |des| Layer::deserialize(des, xor_key, i))?;
+                    layers.push(layer);
+                }
+
+                layers
+            },
+            bottom_lift_height_2: Milimeters::new(des.read_f32_le()),
+            bottom_lift_speed_2: MilimetersPerMinute::new(des.read_f32_le()),
+            lift_height_2: Milimeters::new(des.read_f32_le()),
+            lift_speed_2: MilimetersPerMinute::new(des.read_f32_le()),
+            retract_height_2: Milimeters::new(des.read_f32_le()),
+            retract_speed_2: MilimetersPerMinute::new(des.read_f32_le()),
+            rest_time_after_lift: Seconds::new(des.read_f32_le()),
+            machine_name: {
+                let section = Section::deserialize(&mut des)?;
+                read_string(main_des, section)
+                    .trim_end_matches('\0')
+                    .to_owned()
+            },
+            anti_alias_flag: des.read_u8(),
+            per_layer_settings: {
+                des.advance_by(2);
+                des.read_u8()
+            },
+            modified: des.read_u32_le(),
+            anti_alias_level: des.read_u32_le(),
+            rest_time_after_retract: Seconds::new(des.read_f32_le()),
+            rest_time_after_lift_2: Seconds::new(des.read_f32_le()),
+            transition_layer_count: des.read_u32_le(),
+            bottom_retract_speed: MilimetersPerMinute::new(des.read_f32_le()),
+            bottom_retract_speed_2: MilimetersPerMinute::new(des.read_f32_le()),
+            rest_time_after_retract_2: {
+                des.advance_by(4 * 4);
+                Seconds::new(des.read_f32_le())
+            },
+            rest_time_after_lift_3: Seconds::new(des.read_f32_le()),
+            rest_time_before_lift: Seconds::new(des.read_f32_le()),
+            bottom_retract_height_2: Milimeters::new(des.read_f32_le()),
+            last_layer_index: {
+                des.advance_by(4 * 3);
+                des.read_u32_le()
+            },
+            disclaimer: {
+                des.advance_by(4 * 4);
+                let section = Section::deserialize(&mut des)?;
+                read_string(main_des, section).into_owned()
+            },
+            resin_parameters: {
+                des.advance_by(4);
+                let address = des.read_u32_le();
+                main_des.execute_at(address as usize, |des| ResinParameters::deserialize(des))?
+            },
+        })
+    }
+
+    pub fn serialize<T: Serializer>(&self, main_ser: &mut T) {
+        main_ser.write_u32_le(0x12FD0107);
+        let settings_section = main_ser.reserve(8);
+        main_ser.write_u32_le(0);
+        main_ser.write_u32_le(VERSION);
+        let signature = main_ser.reserve(8);
+        main_ser.write_u32_le(0);
+        main_ser.write_u16_le(1);
+        main_ser.write_u16_le(1);
+        main_ser.write_u32_le(0);
+        main_ser.write_u32_le(0x2A);
+        main_ser.write_u32_le(0);
+
+        let pos = main_ser.pos();
+
+        let mut ser = DynamicSerializer::new();
+        ser.write_u64_le(self.checksum);
+        let layer_offset = ser.reserve(4);
+        ser.write_f32_le(self.size.x.raw());
+        ser.write_f32_le(self.size.y.raw());
+        ser.write_f32_le(self.size.z.raw());
+        ser.write_u32_le(0);
+        ser.write_u32_le(0);
+        ser.write_f32_le(self.total_height.raw());
+        ser.write_f32_le(self.layer_height.raw());
+        ser.write_f32_le(self.exposure_time.raw());
+        ser.write_f32_le(self.bottom_exposure_time.raw());
+        ser.write_f32_le(self.light_off_delay.raw());
+        ser.write_u32_le(self.bottom_layer_count);
+        ser.write_u32_le(self.resolution.x);
+        ser.write_u32_le(self.resolution.y);
+        ser.write_u32_le(self.layers.len() as u32);
+        let large_preview = ser.reserve(4);
+        let small_preview = ser.reserve(4);
+        ser.write_u32_le(self.print_time);
+        ser.write_u32_le(self.projector_type);
+        ser.write_f32_le(self.bottom_lift_height.raw());
+        ser.write_f32_le(self.bottom_lift_speed.raw());
+        ser.write_f32_le(self.lift_height.raw());
+        ser.write_f32_le(self.lift_speed.raw());
+        ser.write_f32_le(self.retract_speed.raw());
+        ser.write_f32_le(self.material_milliliters);
+        ser.write_f32_le(self.material_grams);
+        ser.write_f32_le(self.material_cost);
+        ser.write_f32_le(self.bottom_light_off_delay.raw());
+        ser.write_u32_le(1);
+        ser.write_u16_le(self.light_pwm);
+        ser.write_u16_le(self.bottom_light_pwm);
+        ser.write_u32_le(DEFAULT_XOR_KEY);
+        ser.write_f32_le(self.bottom_lift_height_2.raw());
+        ser.write_f32_le(self.bottom_lift_speed_2.raw());
+        ser.write_f32_le(self.lift_height_2.raw());
+        ser.write_f32_le(self.lift_speed_2.raw());
+        ser.write_f32_le(self.retract_height_2.raw());
+        ser.write_f32_le(self.retract_speed_2.raw());
+        ser.write_f32_le(self.rest_time_after_lift.raw());
+        let machine_name = ser.reserve(8);
+        ser.write_u8(self.anti_alias_flag);
+        ser.write_u16_le(0);
+        ser.write_u8(self.per_layer_settings);
+        ser.write_u32_le(self.modified);
+        ser.write_u32_le(self.anti_alias_level);
+        ser.write_f32_le(self.rest_time_after_retract.raw());
+        ser.write_f32_le(self.rest_time_after_lift_2.raw());
+        ser.write_u32_le(self.transition_layer_count);
+        ser.write_f32_le(self.bottom_retract_speed.raw());
+        ser.write_f32_le(self.bottom_retract_speed_2.raw());
+        ser.write_u32_le(0);
+        ser.write_f32_le(4.0);
+        ser.write_u32_le(0);
+        ser.write_f32_le(4.0);
+        ser.write_f32_le(self.rest_time_after_retract_2.raw());
+        ser.write_f32_le(self.rest_time_after_lift_3.raw());
+        ser.write_f32_le(self.rest_time_before_lift.raw());
+        ser.write_f32_le(self.bottom_retract_height_2.raw());
+        ser.reserve(4 * 2);
+        ser.write_u32_le(4);
+        ser.write_u32_le(self.last_layer_index);
+        ser.reserve(4 * 4);
+        let disclaimer = ser.reserve(8);
+        ser.write_u32_le(0);
+        let resin = ser.reserve(4);
+        ser.reserve(4 * 2);
+
+        let settings = main_ser.reserve(ser.pos().next_multiple_of(32));
+
+        let mut machine_name_bytes = self.machine_name.as_bytes().to_vec();
+        machine_name_bytes.push(0);
+
+        let machine_name_pos = main_ser.pos();
+        main_ser.write_bytes(&machine_name_bytes);
+        ser.execute_at(machine_name, |ser| {
+            Section::new(machine_name_pos, machine_name_bytes.len()).serialize(ser);
+        });
+
+        let disclaimer_bytes = self.disclaimer.as_bytes();
+        ser.execute_at(disclaimer, |ser| {
+            Section::new(main_ser.pos(), disclaimer_bytes.len()).serialize(ser);
+        });
+        main_ser.write_bytes(disclaimer_bytes);
+
+        ser.execute_at(resin, |ser| ser.write_u32_le(main_ser.pos() as u32));
+        self.resin_parameters.serialize(main_ser);
+
+        ser.execute_at(large_preview, |ser| ser.write_u32_le(main_ser.pos() as u32));
+        self.large_preview.serialize(main_ser);
+
+        ser.execute_at(small_preview, |ser| ser.write_u32_le(main_ser.pos() as u32));
+        self.small_preview.serialize(main_ser);
+
+        ser.execute_at(layer_offset, |ser| ser.write_u32_le(main_ser.pos() as u32));
+        let layer_refs = main_ser.reserve(16 * self.layers.len());
+
+        let mut settings_bytes = ser.into_inner();
+        encrypt_in_place(&mut settings_bytes);
+        main_ser.execute_at(settings, |ser| {
+            ser.write_bytes(&settings_bytes);
+        });
+
+        main_ser.execute_at(settings_section, |ser| {
+            Section::new(pos, settings_bytes.len()).serialize_rev(ser)
+        });
+
+        let hash = Sha256::digest(self.checksum.to_le_bytes());
+        let bytes = encrypt(&hash);
+
+        main_ser.write_u32_le(0x422052FA);
+        main_ser.write_u32_le(0);
+
+        let pos = main_ser.pos();
+        main_ser.write_bytes(&bytes);
+        main_ser.execute_at(signature, |ser| {
+            Section::new(pos, bytes.len()).serialize_rev(ser);
+        });
+
+        main_ser.write_u32_le(0x6D4232B3);
+
+        for (i, layer) in self.layers.iter().enumerate() {
+            let cursor = main_ser.pos() as u64;
+
+            let page_number = (cursor / PAGE_SIZE) as u32;
+            let refrence = LayerRef {
+                layer_offset: (cursor % PAGE_SIZE) as u32,
+                page_number,
+            };
+            main_ser.execute_at(layer_refs + i * 16, |ser| refrence.serialize(ser));
+
+            layer.serialize(main_ser, DEFAULT_XOR_KEY, page_number, i as u32);
+        }
+    }
+}
+
+impl File {
+    pub fn from_layers(config: &SliceConfig, layers: Vec<Layer>) -> Self {
+        let layer_count = layers.len();
+
+        let epoch = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let (first_layers, transition_layers) = config.layer_counts();
+        Self {
+            layers,
+            checksum: 0,
+            disclaimer: DISCLAIMER.into(),
+            modified: (epoch / 60) as u32,
+            size: config.platform_size,
+            resolution: config.platform_resolution,
+            machine_name: "Unknown".into(),
+            projector_type: 1,
+            resin_parameters: ResinParameters {
+                resin_color: Vector4::zeros(),
+                machine_name: "Unknown".into(),
+                resin_type: "Normal".into(),
+                resin_name: "Standard".into(),
+                resin_density: 1.1,
+            },
+            total_height: config.slice_height * layer_count as f32, // WRONG!
+            layer_height: config.slice_height,
+            last_layer_index: layer_count.saturating_sub(1) as u32,
+            transition_layer_count: transition_layers,
+            anti_alias_flag: 7,
+            anti_alias_level: 0,
+            per_layer_settings: 0x40,
+            print_time: 0,
+            material_milliliters: 0.0,
+            material_grams: 0.0,
+            material_cost: 0.0,
+            large_preview: PreviewImage::default(),
+            small_preview: PreviewImage::default(),
+            exposure_time: config.exposure_config.exposure_time,
+            bottom_exposure_time: config.first_exposure_config.exposure_time,
+            light_off_delay: Seconds::new(0.0),
+            bottom_layer_count: first_layers,
+            bottom_lift_height: config.first_exposure_config.lift_distance,
+            bottom_lift_speed: config.first_exposure_config.lift_speed.convert(),
+            lift_height: config.exposure_config.lift_distance,
+            lift_speed: config.exposure_config.lift_speed.convert(),
+            retract_speed: config.exposure_config.retract_speed.convert(),
+            bottom_light_off_delay: Seconds::new(0.0),
+            light_pwm: config.exposure_config.pwm as u16,
+            bottom_light_pwm: config.first_exposure_config.pwm as u16,
+            bottom_lift_height_2: Milimeters::new(4.0), // make a setting
+            bottom_lift_speed_2: MilimetersPerMinute::new(320.0), // make a setting
+            lift_height_2: Milimeters::new(0.0),
+            lift_speed_2: MilimetersPerMinute::new(0.0),
+            retract_height_2: Milimeters::new(0.0),
+            retract_speed_2: MilimetersPerMinute::new(0.0),
+            rest_time_after_lift: Seconds::new(0.0),
+            bottom_retract_speed: config.first_exposure_config.retract_speed.convert(),
+            bottom_retract_speed_2: MilimetersPerMinute::new(90.0), // make a setting
+            rest_time_after_retract_2: config.first_exposure_config.exposure_delay,
+            rest_time_after_lift_3: Seconds::new(0.0),
+            rest_time_before_lift: Seconds::new(0.0),
+            bottom_retract_height_2: Milimeters::new(1.5),
+            rest_time_after_retract: config.exposure_config.exposure_delay,
+            rest_time_after_lift_2: Seconds::new(0.0),
+        }
+    }
+}
+
+impl SlicedFile for File {
+    fn serialize(&self, ser: &mut DynamicSerializer, progress: &Progress) {
+        progress.set_total(1);
+        self.serialize(ser);
+        progress.set_finished();
+    }
+
+    fn set_preview(&mut self, preview: &image::RgbaImage) {
+        let (large, small) = scale_preview(preview);
+        self.large_preview = large;
+        self.small_preview = small;
+    }
+
+    fn slice_config(&self) -> SliceConfig {
+        SliceConfig {
+            mode: SliceMode::Raster,
+            supersample: Default::default(),
+            exposure_remap: Default::default(),
+            platform_resolution: self.resolution,
+            platform_size: self.size,
+            slice_height: self.layer_height,
+            exposure_config: ExposureConfig {
+                exposure_time: self.exposure_time,
+                exposure_delay: self.rest_time_after_retract,
+                pwm: self.light_pwm as u8,
+                lift_distance: self.lift_height,
+                lift_speed: self.lift_speed.convert(),
+                retract_speed: self.retract_speed.convert(),
+            },
+            first_exposure_config: ExposureConfig {
+                exposure_time: self.bottom_exposure_time,
+                exposure_delay: self.rest_time_after_retract_2,
+                pwm: self.bottom_light_pwm as u8,
+                lift_distance: self.bottom_lift_height,
+                lift_speed: self.bottom_lift_speed.convert(),
+                retract_speed: self.bottom_retract_speed.convert(),
+            },
+            first_layers: Height::Layers(self.bottom_layer_count),
+            transition_layers: Height::Layers(self.transition_layer_count),
+        }
+    }
+
+    fn layer_count(&self) -> usize {
+        self.layers.len()
+    }
+
+    fn layers(&self, progress: &Progress) -> Vec<slice::Layer> {
+        progress.set_total(self.layers.len() as u64);
+        (self.layers.iter())
+            .map(|l| l.into_layer())
+            .inspect(|_| progress.add_complete(1))
+            .collect()
+    }
+
+    fn previews(&self) -> Vec<RgbaImage> {
+        [&self.large_preview, &self.small_preview]
+            .map(|x| x.into_image())
+            .to_vec()
+    }
+}
+
+impl Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("File")
+            .field("layers", &self.layers.len())
+            .field("checksum", &self.checksum)
+            .field("disclaimer", &self.disclaimer)
+            .field("modified", &self.modified)
+            .field("size", &self.size.as_slice())
+            .field("resolution", &self.resolution.as_slice())
+            .field("machine_name", &self.machine_name)
+            .field("projector_type", &self.projector_type)
+            .field("resin_parameters", &self.resin_parameters)
+            .field("total_height", &self.total_height)
+            .field("layer_height", &self.layer_height)
+            .field("last_layer_index", &self.last_layer_index)
+            .field("transition_layer_count", &self.transition_layer_count)
+            .field("anti_alias_flag", &self.anti_alias_flag)
+            .field("anti_alias_level", &self.anti_alias_level)
+            .field("per_layer_settings", &self.per_layer_settings)
+            .field("print_time", &self.print_time)
+            .field("material_milliliters", &self.material_milliliters)
+            .field("material_grams", &self.material_grams)
+            .field("material_cost", &self.material_cost)
+            .field("large_preview", &self.large_preview)
+            .field("small_preview", &self.small_preview)
+            .field("exposure_time", &self.exposure_time)
+            .field("bottom_exposure_time", &self.bottom_exposure_time)
+            .field("light_off_delay", &self.light_off_delay)
+            .field("bottom_layer_count", &self.bottom_layer_count)
+            .field("bottom_lift_height", &self.bottom_lift_height)
+            .field("bottom_lift_speed", &self.bottom_lift_speed)
+            .field("lift_height", &self.lift_height)
+            .field("lift_speed", &self.lift_speed)
+            .field("retract_speed", &self.retract_speed)
+            .field("bottom_light_off_delay", &self.bottom_light_off_delay)
+            .field("light_pwm", &self.light_pwm)
+            .field("bottom_light_pwm", &self.bottom_light_pwm)
+            .field("bottom_lift_height_2", &self.bottom_lift_height_2)
+            .field("bottom_lift_speed_2", &self.bottom_lift_speed_2)
+            .field("lift_height_2", &self.lift_height_2)
+            .field("lift_speed_2", &self.lift_speed_2)
+            .field("retract_height_2", &self.retract_height_2)
+            .field("retract_speed_2", &self.retract_speed_2)
+            .field("rest_time_after_lift", &self.rest_time_after_lift)
+            .field("bottom_retract_speed", &self.bottom_retract_speed)
+            .field("bottom_retract_speed_2", &self.bottom_retract_speed_2)
+            .field("rest_time_after_retract_2", &self.rest_time_after_retract_2)
+            .field("rest_time_after_lift_3", &self.rest_time_after_lift_3)
+            .field("rest_time_before_lift", &self.rest_time_before_lift)
+            .field("bottom_retract_height_2", &self.bottom_retract_height_2)
+            .field("rest_time_after_retract", &self.rest_time_after_retract)
+            .field("rest_time_after_lift_2", &self.rest_time_after_lift_2)
+            .finish()
+    }
+}

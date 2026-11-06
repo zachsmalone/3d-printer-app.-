@@ -1,0 +1,26 @@
+[package]
+name = "tools"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "repair"
+path = "bin/repair.rs"
+
+[dependencies]
+common.workspace = true
+mesh_format.workspace = true
+slicer.workspace = true
+
+anyhow.workspace = true
+gerber_parser.workspace = true
+hound.workspace = true
+image.workspace = true
+itertools.workspace = true
+nalgebra.workspace = true
+ordered-float.workspace = true
+parking_lot.workspace = true
+rand.workspace = true
+rayon.workspace = true
+svg.workspace = true
+tracing.workspace = true

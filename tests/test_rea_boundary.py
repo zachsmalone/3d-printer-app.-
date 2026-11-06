@@ -25,7 +25,7 @@ def test_catalog_names_the_three_sources_without_claiming_rea_slices():
     by_id = {row["id"]: row for row in body["sources"]}
     assert by_id["lumen-format"]["used"] is True and ".lumen" in by_id["lumen-format"]["outputs"]
     assert by_id["df-plugin-elegoo"]["used"] is True and by_id["df-plugin-elegoo"]["outputs"] == []
-    assert by_id["mslicer"]["used"] is False and by_id["mslicer"]["license"] == "GPL-3.0"
+    assert by_id["mslicer"]["used"] is True and by_id["mslicer"]["license"] == "GPL-3.0"
     assert by_id["dragonfruit"]["license"] == "AGPL-3.0-or-later" and by_id["dragonfruit"]["used"] is False
     rea = by_id["rea"]
     assert rea["version"] == "6.8.0" and rea["license"] == "MIT" and rea["used"] is False

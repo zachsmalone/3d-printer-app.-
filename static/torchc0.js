@@ -172,7 +172,8 @@ function wire() {
     fd.append("plate_id", $("#rzPlate").value);
     fd.append("anti_alias", $("#rzAA") && $("#rzAA").checked ? "true" : "false");
     fd.append("aa_level", "4");
-    fd.append("file_format", "lumen");
+    const sliceFmt = ($("#rzSliceFmt") && $("#rzSliceFmt").value) || "lumen";
+    fd.append("file_format", sliceFmt);
     const btn = $("#rzSlice"); if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
     box.innerHTML = `<p class="help" role="status">Slicing…</p>`;
     try {
@@ -185,14 +186,23 @@ function wire() {
           keep = false;
           stopSlicePoll();
           const layers = j.layers || 1;
-          const native = (j.report && j.report.native_format) || "stock";
-          box.innerHTML = `<p class="help">${layers} layers in a .lumen file. This is not a ${esc(native)} file and it has not been printed on a machine.</p>
-            <img id="rzLayerImg" alt="Sliced layer preview" style="width:100%;max-width:320px;height:auto;background:#111;border-radius:8px">
-            <div class="field"><label for="rzLayerN">Layer preview</label><input id="rzLayerN" type="range" min="0" max="${layers - 1}" value="0" style="width:100%;min-height:44px"></div>
-            <div class="row"><a class="btn primary" id="rzLumen" href="${j.download}" download style="min-height:44px">Download .lumen</a></div>`;
-          const show = i => { const img = $("#rzLayerImg"); if (img) img.src = `/api/resin/jobs/${sliceJob}/layer/${i}.png`; };
-          show(0);
-          const range = $("#rzLayerN"); if (range) range.oninput = ev => show(ev.target.value);
+          const ext = j.format || "lumen";
+          const native = (j.report && j.report.native_format) || "";
+          const engine = (j.report && j.report.engine) || "lumen-format";
+          const hw = "It has not been printed on a machine.";
+          const kind = ext === "lumen"
+            ? `${layers} layers in a .lumen file. ${native ? `Stock files for this plate are ${native}. ` : ""}${hw}`
+            : `${layers} layers in a .${ext} file from ${esc(engine)}. ${hw}`;
+          const preview = ext === "lumen" ? `<img id="rzLayerImg" alt="Sliced layer preview" style="width:100%;max-width:320px;height:auto;background:#111;border-radius:8px">
+            <div class="field"><label for="rzLayerN">Layer preview</label><input id="rzLayerN" type="range" min="0" max="${layers - 1}" value="0" style="width:100%;min-height:44px"></div>` : "";
+          box.innerHTML = `<p class="help">${kind}</p>
+            ${preview}
+            <div class="row"><a class="btn primary" id="rzLumen" href="${j.download}" download style="min-height:44px">Download .${esc(ext)}</a></div>`;
+          if (ext === "lumen") {
+            const show = i => { const img = $("#rzLayerImg"); if (img) img.src = `/api/resin/jobs/${sliceJob}/layer/${i}.png`; };
+            show(0);
+            const range = $("#rzLayerN"); if (range) range.oninput = ev => show(ev.target.value);
+          }
           return;
         }
         if (j.status === "error" || j.status === "cancelled") {
@@ -252,9 +262,10 @@ function wire() {
         <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers, estimate</span>${r.material && r.material.id !== "standard" ? `<span class="pill">${esc(r.material.label)}</span>` : ""}${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
         <p class="help">${esc(e.slice_note || "Slice to .lumen writes the layer masks. CHITUBOX, Lychee, GOO and Photon files are not written here.")}</p>
         <div class="row rzSliceRow">
-          <div class="field"><label for="rzPlate">LUMEN plate</label><select id="rzPlate">${plateOptions(r.size_mm)}</select></div>
+          <div class="field"><label for="rzPlate">Plate</label><select id="rzPlate">${plateOptions(r.size_mm)}</select></div>
+          <div class="field"><label for="rzSliceFmt">Layer file</label><select id="rzSliceFmt"><option value="lumen">.lumen</option><option value="goo">.goo</option><option value="ctb">.ctb</option></select></div>
           <label class="inl chk" style="min-height:44px"><input type="checkbox" id="rzAA"> Anti-alias edges</label>
-          <button type="button" class="btn primary" id="rzSlice" style="min-height:44px">Slice to .lumen</button>
+          <button type="button" class="btn primary" id="rzSlice" style="min-height:44px">Slice</button>
         </div>
         <p class="help" id="rzPlateNote"></p>
         <div id="rzSliceOut"></div>

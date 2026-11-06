@@ -1,0 +1,269 @@
+use std::collections::HashMap;
+
+use common::units::Milimeter;
+use const_format::concatcp;
+use egui::{Button, ComboBox, Context, DragValue, Ui, Widget};
+use egui_phosphor::regular::{LINE_SEGMENT, SELECTION_INVERSE, SPARKLE, TRASH};
+use slicer::geometry::mesh::MeshBuilder;
+use tools::supports::{auto::route_support, mesh::SupportPreset};
+
+use crate::{
+    core::App,
+    interface::components::grid,
+    task::{BuildAccelerationStructures, GenerateSupports},
+};
+
+const IN_DEV_WARNING: &str = "Support generation and placement is still in development. For the time being consider using RuneBrace for support placement.\n\nAt the moment supports are not saved into the project file!";
+
+pub fn ui(app: &mut App, ui: &mut Ui, _ctx: &Context) {
+    ui.horizontal_wrapped(|ui| {
+        prepare(app, ui);
+
+        ui.menu_button(concatcp!(SPARKLE, " Auto"), |ui| {
+            ui.set_width(200.0);
+
+            let mut any = false;
+            for idx in 0..app.project.models.len() {
+                let model = &app.project.models[idx];
+                if model.has_acceleration_structures() {
+                    any = true;
+                    if ui.button(&model.name).clicked() {
+                        generate_support(app, idx);
+                    }
+                }
+            }
+
+            if !any {
+                ui.label("No models have been prepared for supports.");
+            }
+        });
+    });
+
+    let selected = &mut app.state.selected_supports;
+    let selected_count = selected.count();
+    if selected_count > 0 {
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+
+        let models = selected.model_count();
+        ui.label(format!(
+            "{selected_count} support{} selected across {models} model{}.",
+            ["", "s"][(selected_count != 1) as usize],
+            ["", "s"][(models != 1) as usize],
+        ));
+
+        ui.add_space(8.0);
+        ui.horizontal_wrapped(|ui| {
+            if ui.button(concatcp!(TRASH, " Delete")).clicked() {
+                for support in selected.iter() {
+                    let model = app.project.model(support.model).unwrap();
+                    model.supports.remove(support.support);
+                    model.supports.invalidate_cache();
+                }
+                selected.clear();
+            }
+
+            ui.button(concatcp!(SELECTION_INVERSE, " Deselect"))
+                .clicked()
+                .then(|| selected.clear());
+        });
+
+        ui.add_space(4.0);
+        ui.separator();
+        ui.add_space(4.0);
+    } else {
+        ui.add_space(8.0);
+    }
+
+    ui.collapsing("Support", |ui| {
+        ui.label("Preset");
+        ui.horizontal(|ui| {
+            ComboBox::from_id_salt("preset")
+                .selected_text("todo")
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut app.project.support_config.preset,
+                        SupportPreset::LIGHT,
+                        "Light",
+                    );
+                    ui.selectable_value(
+                        &mut app.project.support_config.preset,
+                        SupportPreset::MDEIUM,
+                        "Medium",
+                    );
+                    ui.selectable_value(
+                        &mut app.project.support_config.preset,
+                        SupportPreset::HEAVY,
+                        "Heavy",
+                    );
+                });
+            ui.take_available_width();
+        });
+        ui.end_row();
+    });
+
+    let config = &mut app.project.support_config.auto_placement;
+    ui.collapsing("Auto Placement", |ui| {
+        grid("auto_placement").show(ui, |ui| {
+            ui.label("Default Lift");
+            (app.project.support_config.default_lift)
+                .with::<Milimeter, _>(|x| DragValue::new(x).suffix(" mm").ui(ui));
+            ui.end_row();
+
+            ui.label("Max Angle");
+            DragValue::new(&mut config.max_angle).speed(0.01).ui(ui);
+            ui.end_row();
+
+            ui.label("Face Support Spacing");
+            DragValue::new(&mut config.face_support_spacing)
+                .suffix(" mm")
+                .speed(0.01)
+                .ui(ui);
+            ui.end_row();
+
+            ui.label("Edge Angle Delta");
+            DragValue::new(&mut config.edge_angle_delta).ui(ui);
+            ui.end_row();
+
+            ui.label("Edge Support Spacing");
+            DragValue::new(&mut config.edge_support_spacing).ui(ui);
+            ui.end_row();
+
+            ui.label("Minimum Support Spacing");
+            ui.horizontal(|ui| {
+                DragValue::new(&mut config.min_spacing).ui(ui);
+                ui.take_available_width();
+            });
+            ui.end_row();
+        });
+    });
+
+    ui.collapsing("Mesh", |ui| {
+        grid("mesh").show(ui, |ui| {
+            ui.label("Resolution");
+            DragValue::new(&mut app.project.support_config.mesh_resolution).ui(ui);
+            ui.end_row();
+        });
+    });
+
+    ui.collapsing("Raft", |ui| {
+        grid("raft").show(ui, |ui| {
+            let config = &mut app.project.support_config;
+
+            ui.label("Height");
+            config.raft_height.with::<Milimeter, _>(|x| {
+                DragValue::new(x).suffix(" mm").speed(0.1).ui(ui);
+            });
+            ui.end_row();
+
+            ui.label("Offset");
+            ui.horizontal(|ui| {
+                config.raft_offset.with::<Milimeter, _>(|x| {
+                    DragValue::new(x).suffix(" mm").speed(0.1).ui(ui);
+                });
+                ui.take_available_width();
+            });
+            ui.end_row();
+        });
+    });
+
+    ui.add_space(4.0);
+    ui.separator();
+    ui.add_space(4.0);
+    ui.label(IN_DEV_WARNING);
+}
+
+fn generate_support(app: &mut App, model: usize) {
+    let default_lift = app.project.support_config.default_lift.get::<Milimeter>();
+
+    let model = &mut app.project.models[model];
+    let pos = model.mesh.position();
+    model.set_position(
+        &app.project.slice_config.platform_size,
+        pos.xy().push(pos.z.max(default_lift)),
+    );
+
+    let placement = app.project.support_config.auto_placement.clone();
+    let support = app.project.support_config.preset.clone();
+    let platform = app.project.slice_config.platform_size.map(|x| x.convert());
+
+    if let Some(task) = GenerateSupports::new(platform, placement, support, model) {
+        app.tasks.add(task);
+    }
+}
+
+pub fn manual_support_placement(app: &mut App, clicked: bool) {
+    let workspace = &app.state.workspace;
+    if workspace.is_moving {
+        return;
+    }
+
+    let Some((pos, dir)) = app.hovered_ray() else {
+        return;
+    };
+
+    let mut builder = MeshBuilder::new();
+    for model in app.project.models.iter_mut() {
+        let Some(bvh) = model.bvh.as_ref() else {
+            continue;
+        };
+
+        let Some(intersection) = bvh.intersect_ray(&model.mesh, pos, dir) else {
+            continue;
+        };
+
+        let config = &app.project.support_config.preset;
+        let tip_r = config.tip_radius.get::<Milimeter>();
+
+        let normal = (model.mesh).transform_normal(&model.mesh.normal(intersection.face));
+        if normal.z > 0.0 {
+            continue;
+        }
+
+        let intersection = model.mesh.transform(&intersection.position);
+        let start = intersection + normal * config.tip_length.get::<Milimeter>();
+
+        let radius = (config.radius + config.margin).get::<Milimeter>();
+        if let Some(middle) = route_support(&model.mesh, bvh, radius, start) {
+            let (r, p) = (config.radius.get::<Milimeter>(), 100);
+            builder.add_cylinder((intersection, start), (tip_r, r), p);
+            builder.add_cylinder((start, middle), (r, r), p);
+            builder.add_cylinder((middle, middle.xy().push(0.0)), (r, r), p);
+
+            builder.add_sphere(intersection, 0.2, p);
+            builder.add_sphere(start, r, p);
+            builder.add_sphere(middle, r, p);
+
+            if clicked {
+                let support = [intersection, start, middle];
+                model.supports.add_manual(config, support);
+            }
+        }
+    }
+
+    app.state.support_preview = (!builder.is_empty()).then(|| builder.build());
+}
+
+fn prepare(app: &mut App, ui: &mut Ui) {
+    let active = (app.project.models.iter()).any(|model| !model.has_acceleration_structures());
+    let button = Button::new(concatcp!(LINE_SEGMENT, " Prepare All"));
+    if ui.add_enabled(active, button).clicked() {
+        let mut meshes = HashMap::new();
+        for model in app.project.models.iter() {
+            if !model.has_acceleration_structures() {
+                meshes.entry(model.mesh.mesh_id()).or_insert(&model.mesh);
+            }
+        }
+
+        for mesh in meshes.into_values() {
+            app.tasks.add(BuildAccelerationStructures::new_mesh(
+                mesh.mesh_id(),
+                mesh.inner().clone(),
+            ));
+        }
+    }
+}
+
+// NO DRUGS
+// remember that.

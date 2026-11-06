@@ -1,0 +1,161 @@
+use anyhow::{Result, ensure};
+
+use common::{
+    serde::{Deserializer, Serializer, SliceDeserializer},
+    slice::ExposureConfig,
+    units::{Milimeters, MilimetersPerMinute, Seconds},
+};
+
+use crate::{DELIMITER, LayerDecoder};
+
+/// Layer data with it's print parameters.
+pub struct Layer {
+    /// If printing should be paused on current layer.
+    pub pause: bool,
+    /// The Z position to to if paused.
+    pub pause_position_z: Milimeters,
+    /// The Z position of the layer.
+    /// `(layer_height * (i + 1))`.
+    pub layer_position_z: Milimeters,
+    /// Exposure time for the layer.
+    pub layer_exposure_time: Seconds,
+    /// Time to wait after the layer is done when exposure delay mode is 0.
+    pub layer_off_time: Seconds,
+    /// Time to wait before lifting the platform when exposure delay mode is 1.
+    pub before_lift_time: Seconds,
+    /// Time to wait after lifting the platform when exposure delay mode is 1.
+    pub after_lift_time: Seconds,
+    /// Time to wait after retracting the platform when exposure delay mode is 1.
+    pub after_retract_time: Seconds,
+    /// Distance to lift the platform.
+    pub lift_distance: Milimeters,
+    /// Speed to lift the platform.
+    pub lift_speed: MilimetersPerMinute,
+    /// Distance to lift the platform a second time.
+    pub second_lift_distance: Milimeters,
+    /// Speed to lift the platform a second time.
+    pub second_lift_speed: MilimetersPerMinute,
+    /// Distance to retract the platform.
+    pub retract_distance: Milimeters,
+    /// Speed to retract the platform.
+    pub retract_speed: MilimetersPerMinute,
+    /// Distance to retract the platform a second time.
+    pub second_retract_distance: Milimeters,
+    /// Speed to retract the platform a second time.
+    pub second_retract_speed: MilimetersPerMinute,
+    /// Brightness of the light, 0-255.
+    pub light_pwm: u8,
+    /// The actual layer data.
+    pub data: Vec<u8>,
+    /// Negative wrapping sum of all bytes in `data`.
+    pub checksum: u8,
+}
+
+impl Layer {
+    pub fn serialize<T: Serializer>(&self, ser: &mut T) {
+        ser.write_u16_be(self.pause as u16);
+        ser.write_f32_be(self.pause_position_z.raw());
+        ser.write_f32_be(self.layer_position_z.raw());
+        ser.write_f32_be(self.layer_exposure_time.raw());
+        ser.write_f32_be(self.layer_off_time.raw());
+        ser.write_f32_be(self.before_lift_time.raw());
+        ser.write_f32_be(self.after_lift_time.raw());
+        ser.write_f32_be(self.after_retract_time.raw());
+        ser.write_f32_be(self.lift_distance.raw());
+        ser.write_f32_be(self.lift_speed.raw());
+        ser.write_f32_be(self.second_lift_distance.raw());
+        ser.write_f32_be(self.second_lift_speed.raw());
+        ser.write_f32_be(self.retract_distance.raw());
+        ser.write_f32_be(self.retract_speed.raw());
+        ser.write_f32_be(self.second_retract_distance.raw());
+        ser.write_f32_be(self.second_retract_speed.raw());
+        ser.write_u16_be(self.light_pwm as u16);
+        ser.write_bytes(DELIMITER);
+        ser.write_u32_be(self.data.len() as u32 + 2);
+        ser.write_bytes(&[0x55]);
+        ser.write_bytes(&self.data);
+        ser.write_u8(calculate_checksum(&self.data));
+        ser.write_bytes(DELIMITER);
+    }
+
+    pub fn deserialize(des: &mut SliceDeserializer) -> Result<Self> {
+        Ok(Self {
+            pause: des.read_u16_be() != 0,
+            pause_position_z: Milimeters::new(des.read_f32_be()),
+            layer_position_z: Milimeters::new(des.read_f32_be()),
+            layer_exposure_time: Seconds::new(des.read_f32_be()),
+            layer_off_time: Seconds::new(des.read_f32_be()),
+            before_lift_time: Seconds::new(des.read_f32_be()),
+            after_lift_time: Seconds::new(des.read_f32_be()),
+            after_retract_time: Seconds::new(des.read_f32_be()),
+            lift_distance: Milimeters::new(des.read_f32_be()),
+            lift_speed: MilimetersPerMinute::new(des.read_f32_be()),
+            second_lift_distance: Milimeters::new(des.read_f32_be()),
+            second_lift_speed: MilimetersPerMinute::new(des.read_f32_be()),
+            retract_distance: Milimeters::new(des.read_f32_be()),
+            retract_speed: MilimetersPerMinute::new(des.read_f32_be()),
+            second_retract_distance: Milimeters::new(des.read_f32_be()),
+            second_retract_speed: MilimetersPerMinute::new(des.read_f32_be()),
+            light_pwm: des.read_u16_be().min(255) as u8,
+            data: {
+                ensure!(des.read_slice(2) == DELIMITER);
+                let data_len = des.read_u32_be() as usize - 2;
+                ensure!(des.read_u8() == 0x55);
+                des.read_slice(data_len).to_vec() // ehhh its fiiiine (its not fine)
+            },
+            checksum: {
+                let checksum = des.read_u8();
+                ensure!(des.read_slice(2) == DELIMITER);
+                checksum
+            },
+        })
+    }
+
+    pub fn into_layer(&self) -> common::slice::Layer {
+        let data = LayerDecoder::new(&self.data).collect();
+        let exposure = ExposureConfig {
+            exposure_time: self.layer_exposure_time,
+            exposure_delay: self.after_retract_time,
+            pwm: self.light_pwm,
+            lift_distance: self.lift_distance,
+            lift_speed: self.lift_speed.convert(),
+            retract_speed: self.retract_speed.convert(),
+        };
+
+        common::slice::Layer::new(data, self.layer_position_z, exposure)
+    }
+}
+
+pub fn calculate_checksum(data: &[u8]) -> u8 {
+    let mut out = 0u8;
+    for &byte in data {
+        out = out.wrapping_add(byte);
+    }
+    !out
+}
+
+impl Default for Layer {
+    fn default() -> Self {
+        Self {
+            pause: false,
+            pause_position_z: Milimeters::new(200.0),
+            layer_position_z: Milimeters::new(0.05),
+            layer_exposure_time: Seconds::new(50.0),
+            layer_off_time: Seconds::new(0.0),
+            before_lift_time: Seconds::new(0.0),
+            after_lift_time: Seconds::new(0.0),
+            after_retract_time: Seconds::new(0.0),
+            lift_distance: Milimeters::new(5.0),
+            lift_speed: MilimetersPerMinute::new(65.0),
+            second_lift_distance: Milimeters::new(0.0),
+            second_lift_speed: MilimetersPerMinute::new(0.0),
+            retract_distance: Milimeters::new(5.0),
+            retract_speed: MilimetersPerMinute::new(150.0),
+            second_retract_distance: Milimeters::new(0.0),
+            second_retract_speed: MilimetersPerMinute::new(0.0),
+            light_pwm: 255,
+            data: Vec::new(),
+            checksum: 0,
+        }
+    }
+}
