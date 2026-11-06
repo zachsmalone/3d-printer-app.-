@@ -68,7 +68,7 @@ def ctb_kind_for(plate: dict) -> str:
 
 def require_format_plate(plate: dict, fmt: str) -> str:
     """Return the mslicer --ctb value. Raise when the plate's stock file is a different extension."""
-    resin_slice.require_sliceable(plate)
+    resin_slice.require_sliceable(plate, engine="mslicer")
     native = (plate.get("native_format") or "").lstrip(".").lower()
     inspection = plate.get("kind") == "inspection" or not native
     if fmt == "goo":
@@ -175,7 +175,8 @@ def slice_file(stl: Path, out: Path, plate: dict, settings: dict, fmt: str, *, a
         "note": (
             "Sliced by the separate mslicer program (GPL-3.0). "
             "Retract speed is the same as the lift speed because TorchC0 has one travel speed. "
-            "Transition layers are 0. Not printed on a machine."
+            "Transition layers are 0. Not printed on a machine. "
+            "The container name is the catalog label, not a firmware test."
         ),
     }
 

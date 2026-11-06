@@ -34,6 +34,10 @@ from skimage.draw import polygon as sk_polygon
 from app.core.lumen_head import LumenHeadError, read_head
 
 MAX_PIXELS = 12_000_000
+# Separate from the in-process LUMEN cap. Saturn 2 is 33,177,600 px and peaked
+# near 520 MB on a 910,180-triangle mesh, inside the 4096 MB mslicer limit.
+# The next catalog plates are above this and stay refused until they are measured.
+MSLICER_MAX_PIXELS = 34_000_000
 MAX_LAYERS = 2500
 MAX_FACES = 400_000
 AA_LEVELS = (2, 4)
@@ -85,15 +89,33 @@ def plate_by_id(plate_id: str) -> dict:
     raise ResinSliceError("Unknown plate. Pick one from the LUMEN plate list.")
 
 
-def require_sliceable(plate: dict) -> None:
-    """Reject a plate TorchC0 will not raster, before any file is written."""
+def require_sliceable(plate: dict, *, engine: str = "lumen") -> None:
+    """Reject a plate this engine will not raster, before any file is written.
+
+    `.lumen` is rasterised in this process and stays at `MAX_PIXELS`.
+    mslicer is a separate process with its own pixel ceiling and the same
+    memory and time limits. A plate mslicer can run is not refused because
+    the LUMEN cap is lower.
+    """
     width, height = int(plate["width_px"]), int(plate["height_px"])
     pixels = width * height
-    if pixels <= 0 or pixels > MAX_PIXELS:
+    if engine == "lumen":
+        cap = MAX_PIXELS
+    elif engine == "mslicer":
+        cap = MSLICER_MAX_PIXELS
+    else:
+        raise ResinSliceError(f"Unknown slice engine {engine}.")
+    if pixels <= 0 or pixels > cap:
+        if engine == "mslicer":
+            raise ResinSliceError(
+                f"{plate['name']} is {width}×{height} px ({pixels:,} pixels). "
+                f"mslicer slices are capped at {cap:,} pixels so they stay inside the memory limit. "
+                f"The .lumen cap is {MAX_PIXELS:,} and does not apply to this file."
+            )
         native = plate.get("native_format") or "its stock file"
         raise ResinSliceError(
             f"{plate['name']} is {width}×{height} px ({pixels:,} pixels). "
-            f"TorchC0 slices plates up to {MAX_PIXELS:,} pixels into .lumen, and it does not write {native}."
+            f"TorchC0 slices plates up to {cap:,} pixels into .lumen, and it does not write {native}."
         )
 
 

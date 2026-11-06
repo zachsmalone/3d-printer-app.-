@@ -48,7 +48,10 @@ impl Slicer {
         (0..self.layers * supersample.z as u32)
             .into_par_iter()
             .map(|i| {
-                let height = i as f32 / supersample.z as f32
+                // Middle of this sub-slab. The file labels layer n at (n+1)*height,
+                // the top of slab [n*h, (n+1)*h). Sampling at n*h hits the bed for
+                // n = 0, and a flat bottom face is dropped, so that layer is empty.
+                let height = (i as f32 + 0.5) / supersample.z as f32
                     * self.slice_config.slice_height.get::<Milimeter>();
 
                 // Gets all the intersections between the slice plane and the

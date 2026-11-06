@@ -39,12 +39,26 @@ let cat = null;
 let sliceTimer = null;
 let sliceJob = "";
 function stopSlicePoll() { if (sliceTimer) { clearInterval(sliceTimer); sliceTimer = null; } }
-function plateOptions(size) {
+function plateOptions(size, fmt) {
   const plates = (cat && cat.lumen_plates) || [];
-  const max = (cat && cat.lumen_max_pixels) || 1e12;
-  const fits = p => size && size[0] <= p.build_width_um / 1000 + 1e-3 && size[1] <= p.build_depth_um / 1000 + 1e-3 && size[2] <= p.build_height_um / 1000 + 1e-3 && p.pixels <= max;
+  const kind = fmt || "lumen";
+  const lumenMax = (cat && cat.lumen_max_pixels) || 1e12;
+  const mslicerMax = (cat && cat.mslicer_max_pixels) || lumenMax;
+  const max = kind === "lumen" ? lumenMax : mslicerMax;
+  const nativeOf = p => (p.native_format || "").replace(/^\./, "");
+  const why = p => {
+    if (p.pixels > max) return kind === "lumen" ? " (above the .lumen pixel cap)" : " (above the mslicer pixel cap)";
+    const native = nativeOf(p);
+    if (kind !== "lumen" && p.kind !== "inspection" && native && native !== kind) return ` (stock file is .${native})`;
+    if (size && (size[0] > p.build_width_um / 1000 + 1e-3 || size[1] > p.build_depth_um / 1000 + 1e-3 || size[2] > p.build_height_um / 1000 + 1e-3)) return " (model does not fit)";
+    return "";
+  };
+  const fits = p => !why(p);
   const chosen = plates.find(p => p.id === "zeim-inspection" && fits(p)) || plates.find(fits) || plates.find(p => p.id === "zeim-inspection") || plates[0];
-  return plates.map(p => `<option value="${esc(p.id)}"${chosen && p.id === chosen.id ? " selected" : ""}${p.pixels > max ? " disabled" : ""}>${esc(p.manufacturer)} ${esc(p.name)}${p.pixels > max ? " (too many pixels for a slice)" : ""}</option>`).join("");
+  return plates.map(p => {
+    const reason = why(p);
+    return `<option value="${esc(p.id)}"${chosen && p.id === chosen.id ? " selected" : ""}${reason ? " disabled" : ""}>${esc(p.manufacturer)} ${esc(p.name)}${esc(reason)}</option>`;
+  }).join("");
 }
 const num = (id, label, v, min, max, step, unit) => `<div class="field"><label for="${id}">${label} <em>${unit}</em></label><input type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" inputmode="decimal"></div>`;
 
@@ -61,7 +75,7 @@ function panelHTML() {
     <p class="help" id="rzMatNote"></p><div id="rzMatExtra"></div>
     <details class="rzAdv" id="rzAdv"${document.body.dataset.level === "expert" ? " open" : ""}><summary>Advanced resin settings</summary><div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
       ${num("rzBL", "Bottom layers", 5, 1, 15, 1, "")}${num("rzLift", "Lift distance", 6, 1, 15, 0.5, "mm")}${num("rzLiftS", "Lift speed", 65, 10, 300, 5, "mm/min")}
-      ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
+      ${num("rzTilt", "Tilt", 0, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
     <p class="help warn rzWarn" id="rzWallWarn" hidden>Walls under 1 mm crack easily in resin. Use 1 mm or more, or prepare anyway.
       <button type="button" class="btn small" id="rzWallAnyway">Prepare anyway</button> <button type="button" class="btn small" id="rzWallDismiss" aria-label="Dismiss this warning">Dismiss</button></p>
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
@@ -69,6 +83,7 @@ function panelHTML() {
       <div class="field"><label for="rzCostU">Price per</label><select id="rzCostU"><option value="l" ${(loadP().unit || cat.default_price_unit) === "l" ? "selected" : ""}>litre</option><option value="kg" ${loadP().unit === "kg" ? "selected" : ""}>kg</option></select></div></div>
     <p class="help" id="rzPriceNote"></p>
     <label class="inl chk"><input type="checkbox" id="rzHollow" checked> Hollow (saves resin; needs a drain hole)</label>
+    <label class="inl chk"><input type="checkbox" id="rzSimplify"> Simplify the mesh (fewer triangles)</label>
     <p class="help warn rzWarn" id="rzDrainWarn" role="status" hidden>Hollow with no drain hole: liquid resin stays trapped inside, and the part can crack or leak later. Set Drain hole Ø to 2 mm or more, or turn Hollow off.</p>
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
     <p class="help">${esc(cat.test_note)} ${esc(cat.formats_note)}</p>
@@ -158,6 +173,7 @@ function wire() {
     const v = { printer_id: $("#rzPrinter").value, material: $("#rzMaterial").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,
       tilt_deg: $("#rzTilt").value, wall_mm: $("#rzWall").value, drain_mm: $("#rzDrain").value, hollow: $("#rzHollow").checked, supports: $("#rzSup").checked,
+      simplify: $("#rzSimplify").checked,
       price: $("#rzCost").value, price_unit: $("#rzCostU").value };
     last = { v, f, isl: [], drains: [] };
     await run();
@@ -242,7 +258,7 @@ function wire() {
     if (uid) { fd.append("upload_id", uid); fd.append("file_name", f.name); } else fd.append("file", f);
     if (last.isl.length) fd.append("island_supports", JSON.stringify(last.isl));
     if (last.drains.length) fd.append("drains", JSON.stringify(last.drains));
-    out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
+    out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… Larger models can take a minute.</p>`;
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
       let r;
@@ -262,7 +278,7 @@ function wire() {
         <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers, estimate</span>${r.material && r.material.id !== "standard" ? `<span class="pill">${esc(r.material.label)}</span>` : ""}${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
         <p class="help">${esc(e.slice_note || "Slice to .lumen writes the layer masks. CHITUBOX, Lychee, GOO and Photon files are not written here.")}</p>
         <div class="row rzSliceRow">
-          <div class="field"><label for="rzPlate">Plate</label><select id="rzPlate">${plateOptions(r.size_mm)}</select></div>
+          <div class="field"><label for="rzPlate">Plate</label><select id="rzPlate">${plateOptions(r.size_mm, "lumen")}</select></div>
           <div class="field"><label for="rzSliceFmt">Layer file</label><select id="rzSliceFmt"><option value="lumen">.lumen</option><option value="goo">.goo</option><option value="ctb">.ctb</option></select></div>
           <label class="inl chk" style="min-height:44px"><input type="checkbox" id="rzAA"> Anti-alias edges</label>
           <button type="button" class="btn primary" id="rzSlice" style="min-height:44px">Slice</button>
@@ -276,12 +292,22 @@ function wire() {
         <div class="row"><button type="button" class="btn primary" id="rzExport" data-export-rid="${esc(r.export?.rid || "")}" data-export-name="${esc(r.export?.name || "")}" aria-haspopup="dialog"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Export…</button><a class="btn" href="${r.downloads.stl}" download id="rzQuickStl">Quick STL</a><button type="button" class="btn" id="rzPublishResult" title="Open the Showcase form for this prepared model. Nothing is published until you confirm in that form.">Send to Showcase</button></div>`;
       out.classList.add("rzResult");
       out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
-      const plateSel = $("#rzPlate");
+      const plateSel = $("#rzPlate"), fmtSel = $("#rzSliceFmt");
       const sayPlate = () => { const p = (cat.lumen_plates || []).find(x => x.id === plateSel.value); const note = $("#rzPlateNote");
         if (!p || !note) return;
-        const native = p.native_format ? ` Stock files for this plate are ${p.native_format}, which this slice does not write.` : " This grid is not a commercial printer.";
-        note.textContent = `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um/1000).toFixed(1)} × ${(p.build_depth_um/1000).toFixed(1)} × ${(p.build_height_um/1000).toFixed(1)} mm. Output is .lumen.${native} Not hardware-tested.`; };
-      if (plateSel) { plateSel.onchange = sayPlate; sayPlate(); }
+        const fmt = (fmtSel && fmtSel.value) || "lumen";
+        const native = (p.native_format || "").replace(/^\./, "");
+        const stock = native ? ` Catalog stock file is .${native}.` : " This grid is not a commercial printer.";
+        note.textContent = `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um/1000).toFixed(1)} × ${(p.build_depth_um/1000).toFixed(1)} × ${(p.build_height_um/1000).toFixed(1)} mm. This slice writes .${fmt}.${stock} Not printed on a machine.`; };
+      const paintPlates = () => {
+        const prev = plateSel.value;
+        plateSel.innerHTML = plateOptions(r.size_mm, fmtSel.value);
+        const still = [...plateSel.options].find(o => o.value === prev && !o.disabled);
+        const open = still || [...plateSel.options].find(o => !o.disabled);
+        if (open) plateSel.value = open.value;
+        sayPlate();
+      };
+      if (plateSel) { plateSel.onchange = sayPlate; if (fmtSel) fmtSel.onchange = paintPlates; sayPlate(); }
       show3D($("#rzView"), r.downloads.stl, lc);
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }

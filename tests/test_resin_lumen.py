@@ -145,6 +145,21 @@ def test_mars_4_dlp_geometry_encodes_lumen_not_goo(tmp_path):
     assert elapsed < 30
 
 
+def test_mslicer_pixel_cap_is_not_the_lumen_cap():
+    jupiter = resin_slice.plate_by_id("elegoo-jupiter-ctb")
+    assert resin_slice.MAX_PIXELS < jupiter["pixels"] <= resin_slice.MSLICER_MAX_PIXELS
+    resin_slice.require_sliceable(jupiter, engine="mslicer")
+    with pytest.raises(resin_slice.ResinSliceError) as low:
+        resin_slice.require_sliceable(jupiter, engine="lumen")
+    assert ".lumen" in str(low.value)
+    over = next(p for p in resin_slice.load_plates()["plates"] if p["pixels"] > resin_slice.MSLICER_MAX_PIXELS)
+    with pytest.raises(resin_slice.ResinSliceError) as high:
+        resin_slice.require_sliceable(over, engine="mslicer")
+    assert f"{resin_slice.MSLICER_MAX_PIXELS:,}" in str(high.value)
+    js = (ROOT / "static/torchc0.js").read_text()
+    assert "mslicer_max_pixels" in js and 'id="rzSimplify"' in js and 'num("rzTilt", "Tilt", 0,' in js
+
+
 def test_oversized_plate_is_rejected_and_not_relabelled():
     plate = resin_slice.plate_by_id("elegoo-mars-5-ultra-ctb")
     assert plate["native_format"] == ".ctb"

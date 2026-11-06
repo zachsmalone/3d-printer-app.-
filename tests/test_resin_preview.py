@@ -31,13 +31,17 @@ def test_preview_loads_every_format(c, name, kind):
     assert _faces(r.content) == 12 and r.headers["x-zeim-faces"] == "12"
 
 
-def test_preview_simplifies_big_models_for_display(c, monkeypatch):
+def test_preview_keeps_triangles_unless_simplify_is_asked(c, monkeypatch):
     from app.api import resin as api
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=30, count=[80, 80])
-    r = c.post("/api/resin/preview", files={"file": ("ball.3mf", m.export(file_type="3mf"), "model/3mf")})
-    assert r.status_code == 200, r.text
-    assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) < len(m.faces)
+    raw = m.export(file_type="3mf")
+    kept = c.post("/api/resin/preview", files={"file": ("ball.3mf", raw, "model/3mf")})
+    assert kept.status_code == 200, kept.text
+    assert int(kept.headers["x-zeim-faces"]) == len(m.faces) and _faces(kept.content) == len(m.faces)
+    cut = c.post("/api/resin/preview", data={"simplify": "true"}, files={"file": ("ball.3mf", raw, "model/3mf")})
+    assert cut.status_code == 200, cut.text
+    assert int(cut.headers["x-zeim-faces"]) == len(m.faces) and _faces(cut.content) < len(m.faces)
 
 
 def test_preview_rejects_non_models(c):
@@ -84,11 +88,11 @@ def test_big_binary_stl_loads_lean_and_prepare_reuses_it_by_id(c, monkeypatch):
     m = trimesh.creation.uv_sphere(radius=20, count=[80, 80])
     m.apply_translation((0, 0, 20))
     data = m.export(file_type="stl")
-    r = c.post("/api/resin/preview", files={"file": ("big.stl", data, "model/stl")})
+    r = c.post("/api/resin/preview", data={"simplify": "true"}, files={"file": ("big.stl", data, "model/stl")})
     assert r.status_code == 200, r.text
     assert int(r.headers["x-zeim-faces"]) == len(m.faces) and _faces(r.content) <= 2000
     uid = r.headers["x-zeim-upload"]
-    r = c.post("/api/resin/prepare", data={"upload_id": uid, "file_name": "big.stl", "hollow": "false"})
+    r = c.post("/api/resin/prepare", data={"upload_id": uid, "file_name": "big.stl", "hollow": "false", "simplify": "true"})
     assert r.status_code == 200, r.text
     assert any("simplified copy" in n for n in r.json().get("notes", [])) and "big" in r.json()["export"]["name"]
 

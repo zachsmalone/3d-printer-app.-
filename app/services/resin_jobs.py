@@ -94,8 +94,9 @@ def public(job: dict) -> dict:
 def start(rid: str, sid: str, plate_id: str, *, aa: bool, aa_level: int, fmt: str) -> dict:
     kind = mslicer_engine.output_format(fmt)
     plate = resin_slice.plate_by_id(plate_id)
-    resin_slice.require_sliceable(plate)
-    if kind != "lumen":
+    if kind == "lumen":
+        resin_slice.require_sliceable(plate, engine="lumen")
+    else:
         mslicer_engine.require_format_plate(plate, kind)
     d = _dir()
     try:

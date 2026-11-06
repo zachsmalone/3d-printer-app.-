@@ -49,11 +49,14 @@ def catalog():
             "presets": [{"id": k, **v} for k, v in resin.PRESETS.items()], "limits": resin.LIMITS,
             "safety": resin.SAFETY, "default_price": resin.DEFAULT_PRICE, "default_price_unit": resin.DEFAULT_PRICE_UNIT, "test_note": resin.TEST_NOTE,
             "lumen_plates": plates["plates"], "lumen_max_pixels": plates["max_pixels"],
+            "mslicer_max_pixels": resin_slice.MSLICER_MAX_PIXELS,
             "lumen": {"format": "lumen", "version": plates["format_version"], "commit": plates["lumen_commit"],
                       "hardware_tested": False, "native_formats_written": []},
             "sources": resin_sources.public_sources(),
-            "formats_note": "TorchC0 still exports STL and 3MF. Slice writes an Open Resin .lumen file for Odyssey firmware. "
-                            "It does not write CHITUBOX, Lychee, GOO, Photon or a zip. " + resin_sources.SOURCES_NOTE}
+            "formats_note": "TorchC0 still exports STL and 3MF. "
+                            "Slice writes .lumen here, or .goo, .ctb and .nanodlp through the separate mslicer program when the plate's stock file matches. "
+                            "It does not write Lychee, Photon, .ctbx, or a zip renamed as a printer file. "
+                            "A written .ctb or .goo is not a firmware test. " + resin_sources.SOURCES_NOTE}
 
 
 def _points(raw: str, what: str):
@@ -129,8 +132,16 @@ def _lean_binary_stl(data):
                   "(the shape change is far smaller than a print layer).")
 
 
-def _load_fit(data, ext):
-    """(mesh with at most ~RESIN_MAX_FACES triangles, original triangle count, note)."""
+def _load_fit(data, ext, simplify=False):
+    """(mesh, original triangle count, note).
+
+    Simplification runs only when `simplify` is true. Otherwise every triangle
+    is kept, up to the editor's face cap, and a mesh that does not fit fails
+    instead of being reduced.
+    """
+    if not simplify:
+        m, _ = meshedit.load_mesh(data, ext)
+        return m, len(m.faces), ""
     lean = _lean_binary_stl(data) if ext == "stl" else None
     if lean:
         return lean
@@ -145,21 +156,24 @@ def _to_stl(data):
     return m.export(file_type="stl")
 
 
-def _work(data, ext, s, bed, isl=None, drains=None, note=""):
-    m, _n, fit_note = _load_fit(data, ext)
+def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False):
+    m, n_in, fit_note = _load_fit(data, ext, simplify)
     note = note or fit_note
     out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains)
     if note:
         rep.setdefault("notes", []).insert(0, note)
+    rep["triangles_in"] = int(n_in)
+    rep["triangles"] = int(len(out.faces))
+    rep["simplified"] = bool(fit_note)
     return out.export(file_type="stl"), out.export(file_type="3mf"), rep
 
 
 PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
 
 
-def _preview(data, ext):
-    """The model as prepare will use it (<= RESIN_MAX_FACES), for the view AND for prepare (see /preview)."""
-    m, n, note = _load_fit(data, ext)
+def _preview(data, ext, simplify=False):
+    """The model prepare will use. The viewer and prepare share this file, so it is simplified only when asked."""
+    m, n, note = _load_fit(data, ext, simplify)
     return m.export(file_type="stl"), n, note
 
 
@@ -188,7 +202,7 @@ def _read_upload(file, actor):
 
 
 @router.post("/preview")
-def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
+def preview(file: UploadFile = File(...), simplify: str = Form("false"), actor: Actor = Depends(get_actor)):
     """Load a picked model for the TorchC0 view right away (any STL/3MF/OBJ -> binary STL, simplified for display)."""
     from fastapi import Response
     data, ext = _read_upload(file, actor)
@@ -197,7 +211,8 @@ def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
         if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            stl, n, note = guard.run(_preview, data, ext, timeout=180, mem_mb=RESIN_MEM_MB)
+            do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
+            stl, n, note = guard.run(_preview, data, ext, do_simplify, timeout=180, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -231,12 +246,12 @@ def _picked(uid, actor):
 @router.post("/prepare")
 def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str = Form(""), preset: str = Form(""), layer_mm: str = Form(""),
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
-            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), hollow: str = Form("true"),
+            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), simplify: str = Form("false"), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
             base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
-            "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg",
+            "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg", "simplify",
             "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "price", "price_unit")})
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
@@ -266,11 +281,13 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         if ext == "3mf":
             # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
             # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
-            data, ext = guard.run(_to_stl, data, timeout=120), "stl"
+            # A production package whose mesh is a separate ~75 MB part needs the same 2500 MB budget as prepare.
+            # The default 1500 MB child cannot hold it. This does not raise the process-wide cap.
+            data, ext = guard.run(_to_stl, data, timeout=120, mem_mb=RESIN_MEM_MB), "stl"
         if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, timeout=240, mem_mb=RESIN_MEM_MB)
+            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, s["simplify"], timeout=240, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:

@@ -3,7 +3,8 @@ pillar supports with a raft, print estimates, and STL/3MF export for any resin s
 Workshop, VoxelDance Tango, PrusaSlicer SLA, PreForm). Pure ZEIM code (trimesh / numpy / manifold3d); no GPL code.
 
 TorchC0 writes an Open Resin Alliance .lumen layer file from the prepared mesh (see resin_slice.py).
-It does not write CHITUBOX, Lychee, Elegoo .goo, Anycubic Photon, or a zip renamed as a printer file."""
+.goo, .ctb and .nanodlp are written by the separate mslicer program. It does not write Lychee,
+Photon, .ctbx, or a zip renamed as a printer file."""
 from __future__ import annotations
 
 import math
@@ -169,7 +170,8 @@ def _material_price(o, material):
 
 def settings(opts: dict | None = None) -> dict:
     """Material, then preset, then explicit values. A silicone profile replaces the quality preset's exposure and lift.
-    Defaults: 30° tilt, 2 mm hollow wall, 3 mm drain + vent holes, supports on."""
+    Tilt and mesh simplification stay off unless the request sets them. Hollow wall starts at 2 mm,
+    drain holes at 3 mm, and supports default on."""
     o = dict(opts or {})
     material = o.get("material") or DEFAULT_MATERIAL
     if material not in MATERIALS:
@@ -183,7 +185,8 @@ def settings(opts: dict | None = None) -> dict:
     for k in ("layer_mm", "exposure_s", "bottom_exposure_s", "lift_mm", "lift_speed_mm_min"):
         s[k] = _num(o, k, base[k])
     s["bottom_layers"] = _num(o, "bottom_layers", base["bottom_layers"], int)
-    s["tilt_deg"] = _num(o, "tilt_deg", 30.0)
+    s["tilt_deg"] = _num(o, "tilt_deg", 0.0)
+    s["simplify"] = str(o.get("simplify", "false")).lower() in ("1", "true", "on", "yes")
     s["wall_mm"] = _num(o, "wall_mm", 2.0)
     s["drain_mm"] = _num(o, "drain_mm", 3.0)
     s["support_spacing_mm"] = _num(o, "support_spacing_mm", 4.0)

@@ -66,6 +66,22 @@ def test_orient_tilts_and_sits_on_plate():
     assert abs(o.bounds[0][2]) < 1e-6 and o.extents[2] > 10
 
 
+def test_prepare_leaves_tilt_and_triangles_alone_unless_asked(c):
+    m = trimesh.creation.box(extents=[20, 20, 5])
+    data = _stl(m)
+    kept = c.post("/api/resin/prepare", data={"hollow": "false", "supports": "false"},
+                  files={"file": ("box.stl", data, "model/stl")})
+    assert kept.status_code == 200, kept.text
+    body = kept.json()
+    assert body["settings"]["tilt_deg"] == 0 and body["settings"]["simplify"] is False
+    assert body["simplified"] is False and body["triangles"] == 12 and body["triangles_in"] == 12
+    assert body["size_mm"][2] == pytest.approx(5, abs=0.2)
+    tilted = c.post("/api/resin/prepare", data={"hollow": "false", "supports": "false", "tilt_deg": "30"},
+                    files={"file": ("box.stl", data, "model/stl")})
+    assert tilted.status_code == 200, tilted.text
+    assert tilted.json()["size_mm"][2] > 10
+
+
 def test_supports_reach_raft_and_skip_inside():
     m = resin.orient(trimesh.creation.box(extents=[20, 20, 5]), 30)
     out, rep = resin.build_supports(m, 4.0, 5.0)
