@@ -268,6 +268,12 @@ def test_vertex_limit_enforced():
     assert uploadsafe.check(obj(v=5, f=1), max_vertices=5).mesh["vertices"] == 5
 
 
+def test_stl_corner_records_are_not_the_vertex_cap():
+    # 12 triangles report 36 corner records. That must not be treated as 36 unique vertices.
+    checked = uploadsafe.check(binary_stl(faces=12), max_vertices=10, max_faces=100)
+    assert checked.mesh["faces"] == 12 and checked.mesh["vertices"] == 36
+
+
 def test_face_limit_matches_meshedit():
     from app.core import meshedit
     assert uploadsafe.MAX_FACES == meshedit.MAX_FACES       # upload cap == editor cap

@@ -11,6 +11,7 @@ import numpy as np
 import trimesh
 
 MAX_OBJECTS = 60
+MAX_SPLIT_FACES = 400_000          # above this, splitting into pieces is slower than opening the file
 DEFAULT_BED = (220.0, 220.0, 250.0)
 ACTIONS = {"transform", "duplicate", "delete", "center", "arrange", "group", "ungroup", "merge", "separate",
            "lay_flat", "hide", "show", "cut", "text"}
@@ -57,7 +58,11 @@ def valid(layout, m) -> bool:
 def objects(m, layout) -> list[trimesh.Trimesh]:
     """Split the mesh into its objects. A missing/stale layout -> connected components (in a stable order)."""
     if not valid(layout, m):
+        if len(m.faces) > MAX_SPLIT_FACES:
+            return [m]
         return _components(m)
+    if len(layout.get("counts") or []) == 1 and int(layout["counts"][0]) == len(m.faces):
+        return [m]
     out, a = [], 0
     for c in layout["counts"]:
         out.append(_sub(m, a, a + int(c))); a += int(c)

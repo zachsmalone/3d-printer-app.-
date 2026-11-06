@@ -142,6 +142,14 @@ def slice_model(
     plate_objs, skipped = None, []
     if bool(file) == bool(model_id):
         _fail(400, "bad_request", "Send either an STL file or a model id (not both, not neither).")
+    if model_id:
+        from app.services.history import store as _store
+        try:
+            _pending = _store.get(model_id)
+        except Exception:
+            _pending = None
+        if _pending and _pending.get("slice_ready") is False:
+            _fail(409, "model_pending", "The full model is still being checked. Slice stays off until that finishes. The view is only a preview.")
     opts = {"preset": preset, "layer_height": layer_height, "walls": walls, "top_bottom": top_bottom, "infill": infill,
             "infill_pattern": infill_pattern, "supports": supports, "brim": brim, "speed": speed,
             "nozzle_temp": nozzle_temp, "bed_temp": bed_temp, "material": material, "line_width": line_width,
