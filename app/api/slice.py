@@ -55,7 +55,7 @@ def resolve_model(model_id: str, actor: Actor) -> Path:
         meta_for(model_id, actor, owner_only=True)
     except HTTPException:
         _fail(404, "model_not_found", "We couldn't find that model. It may have expired. Please rebuild it.")
-    editproj.ensure_exports(model_id)  # edit-workspace builds write model.stl lazily
+    editproj.ensure_stl(model_id)  # G-code needs the STL only; OBJ/3MF/thumbnail stay on download
     stl = store.dir(model_id) / "model.stl"
     if not stl.is_file():
         _fail(404, "model_not_found", "That build has no STL file to slice.")
@@ -248,7 +248,7 @@ def slice_model(
     _g = work / "model.gcode"
     _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
     _g.write_text(fslots.gcode_header(slot_plan) + _body)
-    (work / "slots.json").write_text(__import__("json").dumps(slot_plan))
+    (work / "slots.json").write_text(json.dumps(slot_plan))
     from app.services import slicer as _sl, willprint
     stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
     try:
@@ -315,6 +315,10 @@ def plate_on_bed(model_id: str, prof) -> tuple[list | None, list[str]]:
     try:
         meta = store.get(model_id)
         if not meta or meta.get("kind") != "edit":
+            return None, []
+        # No stored plate: the single exported STL is the slice. Loading the source mesh here
+        # only to discover that repeated a full OBJ/3MF parse on every Slice click.
+        if not (meta.get("plate_layouts") or {}).get(str(meta.get("head"))):
             return None, []
         m = editproj.mesh_at(model_id, meta)
         L = editproj.layout_at(meta, m)

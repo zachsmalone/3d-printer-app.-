@@ -199,24 +199,46 @@ def _slice_rlimits():
     resource.setrlimit(resource.RLIMIT_AS, (mb * 1024 * 1024, mb * 1024 * 1024))
 
 
-def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110),
-               parts: list[Path] | None = None) -> None:
+_STAGE_LINE = re.compile(r"\d+\s*=>\s*(.+)")
+
+
+def _engine_cmd(engine: str, ini: Path, model: Path, out: Path, center, parts: list[Path] | None) -> list[str]:
     # Argument list, no shell: nothing user-controlled is interpreted.
     # model is an STL or a PrusaSlicer-friendly 3MF (paint-on support enforcers/blockers).
     # parts: a multi-object plate, one STL per object already placed in bed coordinates -> one plate,
     # --merge --dont-arrange keeps ZEIM's own layout (PrusaSlicer is only called, never copied).
     if parts:
-        cmd = [engine, "--export-gcode", "--merge", "--dont-arrange", "--load", str(ini), "--output", str(out), *map(str, parts)]
-    else:
-        cmd = [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
+        return [engine, "--export-gcode", "--merge", "--dont-arrange", "--load", str(ini), "--output", str(out), *map(str, parts)]
+    return [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
+
+
+def _last_stage(output: str) -> str:
+    stage = ""
+    for line in (output or "").splitlines():
+        m = _STAGE_LINE.search(line)
+        if m:
+            stage = m.group(1).strip()
+    return stage
+
+
+def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110),
+               parts: list[Path] | None = None) -> None:
+    cmd = _engine_cmd(engine, ini, model, out, center, parts)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, preexec_fn=_slice_rlimits)
     except subprocess.TimeoutExpired as e:
         log.error("slicer timed out after %ss: %s", timeout, cmd)
-        if not (e.stdout or e.stderr):                     # no output at all: it hung before slicing anything
+        output = (e.stderr or "") + (e.stdout or "")
+        if not output.strip():                     # no output at all: it hung before slicing anything
             raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
-        raise SliceError("slice_timeout", "Slicing took too long and was stopped. Try a smaller or "
-                         "simpler model.", 504)
+        stage = _last_stage(output)
+        if stage:
+            raise SliceError("slice_timeout",
+                             f"Slicing was stopped at the time limit while the slicer was still {stage}. "
+                             "The model was not changed and nothing was sent to a printer.", 504)
+        raise SliceError("slice_timeout",
+                         "Slicing was stopped at the time limit. The model was not changed and nothing was sent to a printer.",
+                         504)
     except (OSError, ValueError, subprocess.SubprocessError):
         log.exception("could not start slicer: %s", cmd)
         raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)

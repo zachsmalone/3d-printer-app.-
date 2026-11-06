@@ -434,7 +434,7 @@ export function wirePanel(getModelId) {
     if (ventOk) fd.append("ventilation_ok", "true");
     $("#spMatWarn").hidden = false;
     if (gcDispose) { gcDispose(); gcDispose = null; }
-    out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}…</p>`; $("#spGo").disabled = true;
+    out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}. The triangles are not reduced. Checks finish before a result is shown. The preview starts after that.</p>`; $("#spGo").disabled = true;
     // UX4: show how long it has been and let the maker stop waiting (the page cannot stop the server's slice).
     const ctl = new AbortController(), t0 = Date.now();
     bedBusy(true, "Slicing… 0 s");
