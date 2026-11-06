@@ -60,6 +60,21 @@ export class Viewer {
     this.camera.far = r * 20; this.camera.updateProjectionMatrix();
     this.controls.target.copy(c); this.controls.update();
   }
+  /* A plate in real millimetres, from (0, 0) to (width, depth), just under z=0. The model is not moved. */
+  setBed(mm) {
+    for (const child of [...this.group.children]) {
+      if (child.userData && child.userData.bed) { this.group.remove(child); child.geometry.dispose(); child.material.dispose(); }
+    }
+    if (!mm || mm.length < 2) return;
+    const w = +mm[0], d = +mm[1];
+    if (!(w > 0) || !(d > 0)) return;
+    const g = new THREE.PlaneGeometry(w, d);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6b5344, roughness: 1, metalness: 0, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.position.set(w / 2, d / 2, -0.05);
+    mesh.userData.bed = true;
+    this.group.add(mesh);
+  }
   /* Top, front, or a three-quarter view. Z stays up, same as the bed. */
   look(which) {
     const box = new THREE.Box3().setFromObject(this.group);

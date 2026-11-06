@@ -157,9 +157,10 @@ def _work(data, ext, s, bed, isl=None, drains=None, note=""):
 PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
 
 
-def _preview(data, ext):
-    """The model as prepare will use it (<= RESIN_MAX_FACES), for the view AND for prepare (see /preview)."""
+def _preview(data, ext, bed=None):
+    """The model prepare will turn from. Centred on the bed with the file's own orientation, not a second copy of a later turn."""
     m, n, note = _load_fit(data, ext)
+    m = resin.place_on_bed(m, 0.0, 0.0, bed)
     return m.export(file_type="stl"), n, note
 
 
@@ -188,7 +189,7 @@ def _read_upload(file, actor):
 
 
 @router.post("/preview")
-def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
+def preview(file: UploadFile = File(...), printer_id: str = Form(""), actor: Actor = Depends(get_actor)):
     """Load a picked model for the TorchC0 view right away (any STL/3MF/OBJ -> binary STL, simplified for display)."""
     from fastapi import Response
     data, ext = _read_upload(file, actor)
@@ -197,7 +198,16 @@ def preview(file: UploadFile = File(...), actor: Actor = Depends(get_actor)):
         if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            stl, n, note = guard.run(_preview, data, ext, timeout=180, mem_mb=RESIN_MEM_MB)
+            bed = None
+            if printer_id:
+                try:
+                    pid, _ = ps.resolve(printer_id, None)
+                    p = ps.printer_public(pid)
+                    if p["technology"] == "Resin":
+                        bed = p["bed_mm"]
+                except ps.SetupError:
+                    bed = None
+            stl, n, note = guard.run(_preview, data, ext, bed, timeout=180, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -231,12 +241,12 @@ def _picked(uid, actor):
 @router.post("/prepare")
 def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str = Form(""), preset: str = Form(""), layer_mm: str = Form(""),
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
-            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), hollow: str = Form("true"),
+            lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), tilt_y_deg: str = Form(""), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
             base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
-            "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg",
+            "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg", "tilt_y_deg",
             "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "price", "price_unit")})
     except resin.ResinError as e:
         raise HTTPException(400, str(e))

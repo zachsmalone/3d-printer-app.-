@@ -3,6 +3,7 @@ import io
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pytest
 import trimesh
 
@@ -18,6 +19,14 @@ def _stl(m):
     return m.export(file_type="stl")
 
 
+def _resin_printer():
+    from app.services import print_setup as ps
+    for p in ps.public()["printers"]:
+        if p["technology"] == "Resin":
+            return p["id"]
+    raise AssertionError("no resin printer in the catalog")
+
+
 @pytest.fixture
 def c():
     return client(ADULT)
@@ -30,7 +39,8 @@ def test_settings_presets_and_limits():
     detail = resin.settings({"preset": "detail"})
     assert detail["layer_mm"] == 0.03 and detail["exposure_s"] == 2.0 and detail["material"] == "standard"
     assert resin.settings({"layer_mm": "0.04", "hollow": "false"})["layer_mm"] == 0.04
-    for bad in ({"preset": "x"}, {"material": "x"}, {"layer_mm": 1}, {"exposure_s": "abc"}, {"tilt_deg": 90}):
+    assert s["tilt_deg"] == 0 and s["tilt_y_deg"] == 0
+    for bad in ({"preset": "x"}, {"material": "x"}, {"layer_mm": 1}, {"exposure_s": "abc"}, {"tilt_deg": 181}, {"tilt_y_deg": -181}):
         with pytest.raises(resin.ResinError):
             resin.settings(bad)
 
@@ -64,6 +74,102 @@ def test_orient_tilts_and_sits_on_plate():
     m = trimesh.creation.box(extents=[20, 20, 5])
     o = resin.orient(m, 30)
     assert abs(o.bounds[0][2]) < 1e-6 and o.extents[2] > 10
+
+
+def _offset_pair():
+    """Body, a nub on its +X side, and a second part 40 mm toward -X. The group starts far from the origin."""
+    body = trimesh.creation.box(extents=(20, 10, 8))
+    nub = trimesh.creation.box(extents=(4, 4, 4))
+    nub.apply_translation((14, 0, 0))
+    other = trimesh.creation.box(extents=(10, 10, 8))
+    other.apply_translation((-40, 0, 0))
+    m = trimesh.util.concatenate([body, nub, other])
+    m.apply_translation((400, 80, 30))
+    return m
+
+
+def test_place_centres_the_group_and_keeps_offsets():
+    m = _offset_pair()
+    bed = [200, 120, 150]
+    # Vertex blocks stay in concatenate order: 8, 8, 8.
+    before = [m.vertices[i:i + 8].mean(axis=0) for i in (0, 8, 16)]
+    placed = resin.place_on_bed(m, 0, 0, bed)
+    after = [placed.vertices[i:i + 8].mean(axis=0) for i in (0, 8, 16)]
+    assert abs(placed.bounds[0][2]) < 1e-4
+    mid = (placed.bounds[0] + placed.bounds[1]) / 2
+    assert mid[0] == pytest.approx(bed[0] / 2, abs=1e-3)
+    assert mid[1] == pytest.approx(bed[1] / 2, abs=1e-3)
+    assert placed.extents == pytest.approx(m.extents, abs=1e-4)
+    for a, b in zip(before, after):
+        assert np.linalg.norm(a[:2] - before[0][:2]) == pytest.approx(np.linalg.norm(b[:2] - after[0][:2]), abs=1e-3)
+    # The nub stays on the +X side of the body.
+    assert after[1][0] > after[0][0]
+    again = resin.place_on_bed(placed, 0, 0, bed)
+    assert np.allclose(again.vertices, placed.vertices, atol=1e-4)
+    turned = resin.place_on_bed(m, 0, 90, bed)
+    assert abs(turned.bounds[0][2]) < 1e-4
+    # +90° about Y brings the +X nub down onto the plate.
+    turned_cent = [turned.vertices[i:i + 8].mean(axis=0) for i in (0, 8, 16)]
+    assert turned_cent[1][2] < turned_cent[0][2]
+
+
+def _small_nub():
+    body = trimesh.creation.box(extents=(8, 6, 4))
+    nub = trimesh.creation.box(extents=(2, 2, 2))
+    nub.apply_translation((5, 0, 0))
+    m = trimesh.util.concatenate([body, nub])
+    m.apply_translation((120, -40, 15))
+    return m
+
+
+def test_orientation_changes_supports_and_invalidates_the_slice(c):
+    """Turn the model, prepare supports, export, slice, then turn again. The new file matches the new pose."""
+    m = _small_nub()
+    raw = _stl(m)
+    common = {"hollow": "false", "supports": "true", "printer_id": _resin_printer()}
+    flat = c.post("/api/resin/prepare", data={**common, "tilt_deg": "0", "tilt_y_deg": "0"},
+                  files={"file": ("off.stl", raw, "model/stl")})
+    assert flat.status_code == 200, flat.text
+    a = flat.json()
+    assert a["settings"]["tilt_deg"] == 0 and "not turned" in a["placement"]
+    stl_a = c.get(a["downloads"]["stl"]).content
+    mesh_a = trimesh.load(io.BytesIO(stl_a), file_type="stl")
+    assert mesh_a.bounds[0][2] >= -1e-3
+    assert len(mesh_a.faces) > len(m.faces)
+    side = c.post("/api/resin/prepare", data={**common, "tilt_deg": "0", "tilt_y_deg": "90"},
+                  files={"file": ("off.stl", raw, "model/stl")})
+    assert side.status_code == 200, side.text
+    b = side.json()
+    assert b["export"]["rid"] != a["export"]["rid"]
+    assert "not removed" in b["placement"]
+    mesh_b = trimesh.load(io.BytesIO(c.get(b["downloads"]["stl"]).content), file_type="stl")
+    assert mesh_b.bounds[0][2] >= -1e-3
+    assert not np.allclose(mesh_a.extents, mesh_b.extents, atol=0.5)
+    # The first slice, if the encoder is built, must not be reused after the turn.
+    started = c.post(f"/api/resin/{b['export']['rid']}/slice", data={"plate_id": "zeim-inspection", "anti_alias": "false"})
+    if started.status_code == 200:
+        import time
+        job = started.json()["job_id"]
+        status = {"status": "queued"}
+        deadline = time.time() + 60
+        while time.time() < deadline and status["status"] in ("queued", "running"):
+            time.sleep(0.05)
+            status = c.get(f"/api/resin/jobs/{job}").json()
+        assert status["status"] == "done", status
+        assert status["layers"] and status["layers"] > 0
+    else:
+        assert started.status_code in (400, 422)
+
+
+def test_camera_hint_matches_orbit_bindings():
+    oc = (ROOT / "static/vendor/OrbitControls.js").read_text()
+    js = (ROOT / "static/torchc0.js").read_text()
+    assert "LEFT: MOUSE.ROTATE" in oc and "RIGHT: MOUSE.PAN" in oc and "MIDDLE: MOUSE.DOLLY" in oc
+    assert "scope.domElement.addEventListener( 'wheel', onMouseWheel" in oc
+    assert "left drag orbits" in js and "right drag pans" in js and "middle drag zooms" in js
+    assert "Dragging does not turn the model." in js
+    assert "These angles turn the model" in js and 'num("rzTiltY"' in js and 'id="rzOri0"' in js
+    assert "Orientation or printer changed" in js
 
 
 def test_supports_reach_raft_and_skip_inside():
@@ -347,7 +453,9 @@ def test_floating_island_marker_and_add_supports():
     fl = trimesh.util.concatenate([_box([10, 10, 10], [0, 0, 5]), _box([5, 5, 2], [20, 0, 6])])
     _, rep = resin.prepare(fl, resin.settings(FLAT))
     isl = rep["layer_check"]["islands"]
-    assert len(isl) == 1 and isl[0]["xyz"][0] == pytest.approx(20, abs=1) and isl[0]["at"]
+    # The group is centred on the bed, so the marker is no longer at the file's x=20.
+    shift = resin.place_on_bed(fl, 0, 0).bounds[0][0] - fl.bounds[0][0]
+    assert len(isl) == 1 and isl[0]["xyz"][0] == pytest.approx(20 + shift, abs=1) and isl[0]["at"]
     out, fixed = resin.prepare(fl, resin.settings(FLAT), island_supports=[i["at"] for i in isl])
     assert fixed["layer_check"]["islands"] == [] and fixed["support"]["island_supports"] == 1
     assert out.bounds[0][2] == pytest.approx(0, abs=1e-6)          # model still on the plate (no lift with supports off)
@@ -373,7 +481,7 @@ def test_hollow_with_drain_has_no_suction():
 
 
 def test_thinnest_wall_one_value_everywhere():
-    _, rep = resin.prepare(trimesh.creation.box(extents=[40, 30, 25]), resin.settings({"supports": "false"}))
+    _, rep = resin.prepare(trimesh.creation.box(extents=[40, 30, 25]), resin.settings({"supports": "false", "tilt_deg": 30}))
     note = next(n for n in rep["notes"] if n.startswith("Thin wall"))
     assert f"{rep['hollow']['thinnest_wall_mm']:.2f} mm" in note
 
@@ -381,7 +489,7 @@ def test_thinnest_wall_one_value_everywhere():
 def test_touching_parts_are_one_body():
     fig = trimesh.boolean.union([trimesh.creation.cylinder(4, 14).apply_translation([0, 0, 7]),
                                  trimesh.creation.icosphere(3, 3.5).apply_translation([0, 0, 17.5])], engine="manifold")
-    out, rep = resin.prepare(fig, resin.settings())
+    out, rep = resin.prepare(fig, resin.settings({"tilt_deg": 30}))
     assert rep["support"]["bodies"] == 1 and resin.bodies(out) == 1
 
 
