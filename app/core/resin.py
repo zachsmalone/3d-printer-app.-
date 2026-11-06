@@ -2,9 +2,8 @@
 pillar supports with a raft, print estimates, and STL/3MF export for any resin slicer (CHITUBOX, Lychee, Photon
 Workshop, VoxelDance Tango, PrusaSlicer SLA, PreForm). Pure ZEIM code (trimesh / numpy / manifold3d); no GPL code.
 
-TorchC0 does not write native layer files (.ctb/.pwmx/.goo): those formats are vendor-specific and the public
-encoders we know of are GPL/AGPL, so the export is a supported, oriented mesh that the printer's own slicer
-turns into layers with the exposure numbers shown here."""
+TorchC0 writes an Open Resin Alliance .lumen layer file from the prepared mesh (see resin_slice.py).
+It does not write CHITUBOX, Lychee, Elegoo .goo, Anycubic Photon, or a zip renamed as a printer file."""
 from __future__ import annotations
 
 import math
@@ -550,7 +549,7 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
             "layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
             "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film.",
             "machine_file": False,
-            "slice_note": "This is an estimate of layers and time. TorchC0 does not write the printer's layer file. Export the mesh and slice it in the resin printer's own slicer."}
+            "slice_note": "This is an estimate until you slice. Slice to .lumen writes the layer masks for firmware that reads LUMEN (Odyssey). CHITUBOX, Lychee, GOO and Photon files are not written here."}
 
 
 def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None) -> tuple[trimesh.Trimesh, dict]:

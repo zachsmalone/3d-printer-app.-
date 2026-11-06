@@ -1,5 +1,6 @@
 /* TorchC0: ZEIM's resin program, its own main tab (#torchc0). Resin only: no nozzle, filament or gcode settings here.
-   Upload a model -> POST /api/resin/prepare (hollow + drain hole, tilt, supports + raft) -> STL / 3MF for the resin slicer. */
+   Upload a model -> POST /api/resin/prepare (hollow + drain hole, tilt, supports + raft) -> STL / 3MF,
+   then POST /api/resin/{id}/slice writes a .lumen layer file. Not CTB, GOO, Lychee or Photon. */
 import { api, esc, $ } from "/static/app.js";
 import { money } from "/static/cost.js";
 import * as THREE from "three";
@@ -35,6 +36,16 @@ const loadP = () => { try { return JSON.parse(localStorage.getItem(PKEY)) || {};
 const saveP = v => { try { localStorage.setItem(PKEY, JSON.stringify(v)); } catch { } };
 
 let cat = null;
+let sliceTimer = null;
+let sliceJob = "";
+function stopSlicePoll() { if (sliceTimer) { clearInterval(sliceTimer); sliceTimer = null; } }
+function plateOptions(size) {
+  const plates = (cat && cat.lumen_plates) || [];
+  const max = (cat && cat.lumen_max_pixels) || 1e12;
+  const fits = p => size && size[0] <= p.build_width_um / 1000 + 1e-3 && size[1] <= p.build_depth_um / 1000 + 1e-3 && size[2] <= p.build_height_um / 1000 + 1e-3 && p.pixels <= max;
+  const chosen = plates.find(p => p.id === "zeim-inspection" && fits(p)) || plates.find(fits) || plates.find(p => p.id === "zeim-inspection") || plates[0];
+  return plates.map(p => `<option value="${esc(p.id)}"${chosen && p.id === chosen.id ? " selected" : ""}${p.pixels > max ? " disabled" : ""}>${esc(p.manufacturer)} ${esc(p.name)}${p.pixels > max ? " (too many pixels for a slice)" : ""}</option>`).join("");
+}
 const num = (id, label, v, min, max, step, unit) => `<div class="field"><label for="${id}">${label} <em>${unit}</em></label><input type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" inputmode="decimal"></div>`;
 
 function panelHTML() {
@@ -66,7 +77,7 @@ function panelHTML() {
 }
 
 function wire() {
-  const pr = $("#rzPreset"), info = () => { const p = cat.printers.find(x => x.id === $("#rzPrinter").value); $("#rzInfo").textContent = p ? `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. Make the layer file in ${p.official_slicer || "the printer's own resin slicer"}.` : ""; };
+  const pr = $("#rzPreset"), info = () => { const p = cat.printers.find(x => x.id === $("#rzPrinter").value); $("#rzInfo").textContent = p ? `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. Slice writes .lumen. ${p.official_slicer || "The printer's own slicer"} still makes this machine's stock file.` : ""; };
   const matOf = () => (cat.materials || []).find(m => m.id === $("#rzMaterial").value) || (cat.materials || [])[0];
   const applyPrint = n => { if (!n) return; $("#rzLayer").value = n.layer_mm; $("#rzExp").value = n.exposure_s; $("#rzBExp").value = n.bottom_exposure_s; $("#rzBL").value = n.bottom_layers; $("#rzLift").value = n.lift_mm; $("#rzLiftS").value = n.lift_speed_mm_min; };
   const paintMaterial = apply => {
@@ -152,8 +163,59 @@ function wire() {
     await run();
   };
   let last = null;
+  async function startSlice() {
+    stopSlicePoll();
+    const box = $("#rzSliceOut");
+    const rid = last && last.rep && last.rep.export && last.rep.export.rid;
+    if (!rid) { box.innerHTML = `<p class="help warn" role="alert">Prepare the model first.</p>`; return; }
+    const fd = new FormData();
+    fd.append("plate_id", $("#rzPlate").value);
+    fd.append("anti_alias", $("#rzAA") && $("#rzAA").checked ? "true" : "false");
+    fd.append("aa_level", "4");
+    fd.append("file_format", "lumen");
+    const btn = $("#rzSlice"); if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+    box.innerHTML = `<p class="help" role="status">Slicing…</p>`;
+    try {
+      const job = await api(`/api/resin/${rid}/slice`, { method: "POST", body: fd });
+      sliceJob = job.job_id;
+      let keep = true;
+      const tick = async () => {
+        const j = await api(`/api/resin/jobs/${sliceJob}`);
+        if (j.status === "done") {
+          keep = false;
+          stopSlicePoll();
+          const layers = j.layers || 1;
+          const native = (j.report && j.report.native_format) || "stock";
+          box.innerHTML = `<p class="help">${layers} layers in a .lumen file. This is not a ${esc(native)} file and it has not been printed on a machine.</p>
+            <img id="rzLayerImg" alt="Sliced layer preview" style="width:100%;max-width:320px;height:auto;background:#111;border-radius:8px">
+            <div class="field"><label for="rzLayerN">Layer preview</label><input id="rzLayerN" type="range" min="0" max="${layers - 1}" value="0" style="width:100%;min-height:44px"></div>
+            <div class="row"><a class="btn primary" id="rzLumen" href="${j.download}" download style="min-height:44px">Download .lumen</a></div>`;
+          const show = i => { const img = $("#rzLayerImg"); if (img) img.src = `/api/resin/jobs/${sliceJob}/layer/${i}.png`; };
+          show(0);
+          const range = $("#rzLayerN"); if (range) range.oninput = ev => show(ev.target.value);
+          return;
+        }
+        if (j.status === "error" || j.status === "cancelled") {
+          keep = false;
+          stopSlicePoll();
+          box.innerHTML = `<p class="help ${j.status === "error" ? "warn" : ""}" role="status">${esc(j.error || "Slice cancelled.")}</p>`;
+          return;
+        }
+        const n = j.layers ? `${j.done_layers || 0} of ${j.layers}` : "starting";
+        box.innerHTML = `<p class="help" role="status">Slicing, ${esc(String(n))}.</p><button type="button" class="btn" id="rzSliceCancel" style="min-height:44px">Cancel slice</button>`;
+      };
+      await tick();
+      if (keep) sliceTimer = setInterval(() => tick().catch(err => { stopSlicePoll(); box.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }), 400);
+    } catch (err) {
+      box.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`;
+    } finally {
+      const b = $("#rzSlice"); if (b) { b.disabled = false; b.removeAttribute("aria-busy"); }
+    }
+  }
   $("#torchOut").addEventListener("click", async e => {      // one-click fixes re-run the same job with the extra points
     if (e.target.closest("#rzPublishResult")) { document.dispatchEvent(new CustomEvent("zeim:send-showcase", { detail: { src: "torchc0" } })); return; }
+    if (e.target.closest("#rzSlice")) { await startSlice(); return; }
+    if (e.target.closest("#rzSliceCancel") && sliceJob) { await api(`/api/resin/jobs/${sliceJob}/cancel`, { method: "POST" }).catch(() => {}); return; }
     const b = e.target.closest("#rzFixIsl,#rzFixCup"); if (!b || !last || !last.rep) return;
     const lc = last.rep.layer_check;
     if (b.id === "rzFixIsl") last.isl = last.isl.concat(lc.islands.map(i => i.at).filter(Boolean));
@@ -161,6 +223,7 @@ function wire() {
     await run();
   });
   async function run() {
+    stopSlicePoll();
     const out = $("#torchOut"), { v, f } = last, fd = new FormData();
     saveP({ price: $("#rzCost").value === "" ? null : +$("#rzCost").value, unit: $("#rzCostU").value, currency: $("#rzCur").value });
     Object.entries(v).forEach(([k, x]) => fd.append(k, x));
@@ -187,7 +250,14 @@ function wire() {
         <p class="help ${nS ? "warn rzWarn" : ""}" id="rzCups"><span class="pill"><svg class=i i-amber aria-hidden=true focusable=false><use href=#i-dot></use></svg> ${nS} suction cup${nS === 1 ? "" : "s"}</span> ${nS ? "Hollows sealed on the plate side trap resin and pull a vacuum (orange dots)." : "No suction cups found."}
           ${nS ? `<button type="button" class="btn small" id="rzFixCup" style="min-height:44px">Add drain hole${nS === 1 ? "" : "s"}</button> <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss the suction cup warning">Dismiss</button>` : ""}</p></div>
         <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers, estimate</span>${r.material && r.material.id !== "standard" ? `<span class="pill">${esc(r.material.label)}</span>` : ""}${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
-        <p class="help">${esc(e.slice_note || "TorchC0 prepares a mesh. It does not write the printer's layer file. Export it and slice that file in the resin printer's own slicer.")}</p>
+        <p class="help">${esc(e.slice_note || "Slice to .lumen writes the layer masks. CHITUBOX, Lychee, GOO and Photon files are not written here.")}</p>
+        <div class="row rzSliceRow">
+          <div class="field"><label for="rzPlate">LUMEN plate</label><select id="rzPlate">${plateOptions(r.size_mm)}</select></div>
+          <label class="inl chk" style="min-height:44px"><input type="checkbox" id="rzAA"> Anti-alias edges</label>
+          <button type="button" class="btn primary" id="rzSlice" style="min-height:44px">Slice to .lumen</button>
+        </div>
+        <p class="help" id="rzPlateNote"></p>
+        <div id="rzSliceOut"></div>
         ${r.hollow ? `<p class="help">${esc(r.hollow.message)}</p>` : ""}
         ${(r.material_notes || []).map(n => `<p class="help">${esc(n)}</p>`).join("")}
         ${r.notes.filter(n => !/ island\(s\)| suction cup\(s\)/.test(n)).map(n => `<p class="help warn rzWarn">${esc(n)} <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss this warning">Dismiss</button></p>`).join("")}
@@ -195,6 +265,12 @@ function wire() {
         <div class="row"><button type="button" class="btn primary" id="rzExport" data-export-rid="${esc(r.export?.rid || "")}" data-export-name="${esc(r.export?.name || "")}" aria-haspopup="dialog"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Export…</button><a class="btn" href="${r.downloads.stl}" download id="rzQuickStl">Quick STL</a><button type="button" class="btn" id="rzPublishResult" title="Open the Showcase form for this prepared model. Nothing is published until you confirm in that form.">Send to Showcase</button></div>`;
       out.classList.add("rzResult");
       out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
+      const plateSel = $("#rzPlate");
+      const sayPlate = () => { const p = (cat.lumen_plates || []).find(x => x.id === plateSel.value); const note = $("#rzPlateNote");
+        if (!p || !note) return;
+        const native = p.native_format ? ` Stock files for this plate are ${p.native_format}, which this slice does not write.` : " This grid is not a commercial printer.";
+        note.textContent = `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um/1000).toFixed(1)} × ${(p.build_depth_um/1000).toFixed(1)} × ${(p.build_height_um/1000).toFixed(1)} mm. Output is .lumen.${native} Not hardware-tested.`; };
+      if (plateSel) { plateSel.onchange = sayPlate; sayPlate(); }
       show3D($("#rzView"), r.downloads.stl, lc);
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }
@@ -217,6 +293,7 @@ document.addEventListener("zeim:new-build", e => {
   const st = $("#rzFileStatus"); if (st) { st.textContent = ""; st.classList.remove("warn"); }
   const pv = $("#rzPickView"); if (pv) pv.hidden = true;
   delete document.body.dataset.torchStl;
+  stopSlicePoll();
   const out = $("#torchOut"); if (out) { out.innerHTML = ""; out.classList.remove("rzResult"); }
   document.dispatchEvent(new CustomEvent("zeim:torchc0-forget"));
 });

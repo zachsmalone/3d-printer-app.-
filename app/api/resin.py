@@ -13,13 +13,15 @@ import time
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from .. import config
 from ..community import badges
 from ..community.identity import Actor, get_actor
-from ..core import guard, meshedit, resin
+from ..core import guard, meshedit, resin, resin_slice, resin_sources
+from ..services import resin_jobs
 from ..services import editproj
+from ..services import filenames as fnames
 from ..services import print_setup as ps
 
 router = APIRouter(prefix="/api/resin", tags=["resin"])
@@ -41,12 +43,17 @@ def _dir():
 @router.get("/catalog")
 def catalog():
     printers = [p for p in ps.public()["printers"] if p["technology"] == "Resin"]
+    plates = resin_slice.load_plates()
     return {"program": resin.NAME, "printers": printers, "default_preset": resin.DEFAULT_PRESET,
             "default_material": resin.DEFAULT_MATERIAL, "materials": resin.public_materials(),
             "presets": [{"id": k, **v} for k, v in resin.PRESETS.items()], "limits": resin.LIMITS,
             "safety": resin.SAFETY, "default_price": resin.DEFAULT_PRICE, "default_price_unit": resin.DEFAULT_PRICE_UNIT, "test_note": resin.TEST_NOTE,
-            "formats_note": "TorchC0 exports STL and 3MF for your printer's own resin slicer (CHITUBOX, Lychee, Photon Workshop, "
-                            "VoxelDance Tango, PrusaSlicer, PreForm), which makes the layer file."}
+            "lumen_plates": plates["plates"], "lumen_max_pixels": plates["max_pixels"],
+            "lumen": {"format": "lumen", "version": plates["format_version"], "commit": plates["lumen_commit"],
+                      "hardware_tested": False, "native_formats_written": []},
+            "sources": resin_sources.public_sources(),
+            "formats_note": "TorchC0 still exports STL and 3MF. Slice writes an Open Resin .lumen file for Odyssey firmware. "
+                            "It does not write CHITUBOX, Lychee, GOO, Photon or a zip. " + resin_sources.SOURCES_NOTE}
 
 
 def _points(raw: str, what: str):
@@ -281,12 +288,79 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     src = ((file.filename if file is not None and file.filename else file_name).rsplit(".", 1)[0]) or "TorchC0 model"
     stem = fnames.default_stem(src, pname, s.get("layer_mm") if isinstance(s, dict) else None)
     (d / f"{rid}.json").write_text(json.dumps({"sid": actor.sid, "name": stem}))
+    (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
     return badges.merge(rep, actor, "resin_slice")
 
 
 RESIN_FORMATS = ("stl", "3mf", "obj", "ply", "glb", "amf")
+
+
+def _rid_ok(rid: str) -> bool:
+    return len(rid) == 32 and all(c in "0123456789abcdef" for c in rid)
+
+
+@router.post("/{rid}/slice")
+def slice_start(rid: str, plate_id: str = Form("zeim-inspection"), anti_alias: str = Form("false"),
+                aa_level: str = Form("4"), file_format: str = Form("lumen"), actor: Actor = Depends(get_actor)):
+    """Start a background .lumen slice of a prepared mesh. Returns immediately."""
+    if not _rid_ok(rid):
+        raise HTTPException(404, "Not found")
+    try:
+        level = int(aa_level or "4")
+    except ValueError:
+        raise HTTPException(400, "Anti-aliasing is 2× or 4×, or off.")
+    try:
+        return resin_jobs.start(
+            rid, actor.sid, plate_id,
+            aa=str(anti_alias).lower() in ("1", "true", "on", "yes"),
+            aa_level=level, fmt=file_format or "lumen",
+        )
+    except resin_slice.ResinSliceError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.get("/jobs/{job_id}")
+def slice_status(job_id: str, actor: Actor = Depends(get_actor)):
+    try:
+        return resin_jobs.get(job_id, actor.sid)
+    except resin_slice.ResinSliceError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@router.post("/jobs/{job_id}/cancel")
+def slice_cancel(job_id: str, actor: Actor = Depends(get_actor)):
+    try:
+        return resin_jobs.cancel(job_id, actor.sid)
+    except resin_slice.ResinSliceError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@router.get("/jobs/{job_id}/print.lumen")
+def slice_download(job_id: str, actor: Actor = Depends(get_actor)):
+    try:
+        path = resin_jobs.file_for(job_id, actor.sid, "lumen")
+        job = resin_jobs.get(job_id, actor.sid)
+    except resin_slice.ResinSliceError as exc:
+        raise HTTPException(404, str(exc))
+    data = path.read_bytes()
+    if data[:4] != b"LUMN":
+        raise HTTPException(404, "That slice file is not a LUMEN file.")
+    fname = fnames.file_name(job.get("name") or "torchc0", "lumen")
+    return Response(content=data, media_type="application/vnd.openresin.lumen",
+                    headers={"Content-Disposition": fnames.disposition(fname), "Cache-Control": "no-store"})
+
+
+@router.get("/jobs/{job_id}/layer/{index}.png")
+def slice_layer(job_id: str, index: int, actor: Actor = Depends(get_actor)):
+    if index < 0 or index > resin_slice.MAX_LAYERS:
+        raise HTTPException(404, "No such layer.")
+    try:
+        path = resin_jobs.file_for(job_id, actor.sid, "png", index)
+    except resin_slice.ResinSliceError as exc:
+        raise HTTPException(404, str(exc))
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @router.get("/{rid}/torchc0.{fmt}")
