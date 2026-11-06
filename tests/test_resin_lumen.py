@@ -125,6 +125,26 @@ def test_anti_alias_writes_gray_edge_pixels(tmp_path):
     assert a["anti_aliasing"]["mode"] == "coverage"
 
 
+def test_mars_4_dlp_geometry_encodes_lumen_not_goo(tmp_path):
+    """Plate numbers come from the MIT Elegoo plugin. The file is still .lumen."""
+    plate = resin_slice.plate_by_id("elegoo-mars-4-dlp-goo")
+    assert plate["width_px"] == 2560 and plate["height_px"] == 1440
+    assert plate["native_format"] == ".goo"
+    mesh = resin.orient(trimesh.creation.box(extents=[8, 8, 1.0]), 0)
+    out = tmp_path / "mars.lumen"
+    t0 = time.perf_counter()
+    report = resin_slice.slice_mesh(mesh, _settings(), plate, out, aa=False)
+    elapsed = time.perf_counter() - t0
+    print(f"\nMars 4 DLP geometry slice {elapsed:.3f}s raster {report['seconds_raster']}s bytes {report['bytes']}")
+    assert report["layers"] == 5
+    assert report["width_px"] == 2560 and report["height_px"] == 1440
+    assert report["native_format_written"] is False and report["hardware_tested"] is False
+    # 8 mm / 0.051875 mm ≈ 154.2 px. Boundary fill lands on 155×155.
+    assert report["lit"][0] == 155 * 155
+    assert out.read_bytes()[:4] == b"LUMN"
+    assert elapsed < 30
+
+
 def test_oversized_plate_is_rejected_and_not_relabelled():
     plate = resin_slice.plate_by_id("elegoo-mars-5-ultra-ctb")
     assert plate["native_format"] == ".ctb"
