@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse, Response
 from app import config
 from app.community import badges
 from app.community.identity import Actor, get_actor
+from app.services import editproj
 from app.core.exporters import mesh_3mf
 from app.services import filament_slots as fslots
 from app.services import slice_engine as eng
@@ -41,20 +42,35 @@ def slices_root() -> Path:
     return config.DATA / "slices"
 
 
+def _block_until_ready(model_id: str) -> None:
+    """Refuse to slice while the authoritative check is still pending. A read error stays closed."""
+    from app.services.history import store as _store
+    try:
+        meta = _store.get(model_id)
+    except KeyError:
+        return
+    except Exception:
+        _fail(503, "model_unread", "The model record could not be read. Slice stays off.")
+    reason = editproj.not_ready(meta)
+    if reason:
+        _fail(409, "model_pending", reason)
+
+
 def resolve_model(model_id: str, actor: Actor) -> Path:
     """STL of an existing build the actor OWNS (store.dir(<id>)/model.stl, same as /files/<id>/model.stl).
 
     Owner-only, like POST /api/slice/{bid} and /api/print/{bid}/links: other people's builds (even public ones) are 404.
     """
     from app.api.builds import meta_for
-    from app.services import editproj
     from app.services.history import store
     if not _MODEL_ID.match(model_id) or not model_id.isalnum():
         _fail(400, "bad_model_id", "That model id isn't valid.")
+    _block_until_ready(model_id)
     try:
         meta_for(model_id, actor, owner_only=True)
     except HTTPException:
         _fail(404, "model_not_found", "We couldn't find that model. It may have expired. Please rebuild it.")
+    _block_until_ready(model_id)
     editproj.ensure_stl(model_id)  # G-code needs the STL only; OBJ/3MF/thumbnail stay on download
     stl = store.dir(model_id) / "model.stl"
     if not stl.is_file():
@@ -143,13 +159,7 @@ def slice_model(
     if bool(file) == bool(model_id):
         _fail(400, "bad_request", "Send either an STL file or a model id (not both, not neither).")
     if model_id:
-        from app.services.history import store as _store
-        try:
-            _pending = _store.get(model_id)
-        except Exception:
-            _pending = None
-        if _pending and _pending.get("slice_ready") is False:
-            _fail(409, "model_pending", "The full model is still being checked. Slice stays off until that finishes. The view is only a preview.")
+        _block_until_ready(model_id)
     opts = {"preset": preset, "layer_height": layer_height, "walls": walls, "top_bottom": top_bottom, "infill": infill,
             "infill_pattern": infill_pattern, "supports": supports, "brim": brim, "speed": speed,
             "nozzle_temp": nozzle_temp, "bed_temp": bed_temp, "material": material, "line_width": line_width,

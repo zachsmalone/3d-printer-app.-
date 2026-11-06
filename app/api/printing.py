@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
 from .. import config
-from ..services import handoff, printers, settings, slicer
+from ..services import editproj, handoff, printers, settings, slicer
 from ..services.history import store
 from ..community import badges, privacy
 from ..community.identity import Actor, get_actor
@@ -83,8 +83,18 @@ def print_links(bid: str, request: Request, actor: Actor = Depends(get_actor)):
                     "is remote). Links are signed, work for one file only, and expire after 10 minutes, so a private build stays private."}
 
 
+def _refuse_pending(meta: dict) -> None:
+    reason = editproj.not_ready(meta)
+    if reason:
+        raise HTTPException(status_code=409, detail={"code": "model_pending", "message": reason})
+
+
 def _slice(bid, layer_height, fill_density, upright, supports, brim, bed, profile_ini=None, **chosen):
     from ..services import slicestats
+    try:
+        _refuse_pending(store.get(bid))
+    except KeyError:
+        raise HTTPException(404, "unknown build")
     t0 = time.time()
     st = slicer.status()
     if not st["available"]:
@@ -118,7 +128,7 @@ def _slice_inner(bid, layer_height, fill_density, upright, supports, brim, bed, 
 def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float = Form(0.2), fill_density: int = Form(15),
                 upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0), printer_id: str = Form(""),
                 catalog_printer: str = Form(""), nozzle: str = Form("")):
-    meta_for(bid, actor, owner_only=True)
+    _refuse_pending(meta_for(bid, actor, owner_only=True))
     pr = settings.get_printer(printer_id) if printer_id else None      # same bed/profile the "Send" of that printer will use
     user_pr = (actor.user.get("printer") or {}) if actor.user else {}
     if not catalog_printer and not printer_id and user_pr.get("printer_id"):
@@ -152,7 +162,7 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
                     layer_height: float = Form(0.2), fill_density: int = Form(15),
                     upright: bool = Form(False), supports: bool = Form(False), brim: float = Form(0.0)):
     guards.require_send(request, actor)
-    meta_for(bid, actor, owner_only=True)
+    _refuse_pending(meta_for(bid, actor, owner_only=True))
     if not printers.direct_control_enabled():
         raise HTTPException(410, printers.DIRECT_OFF_MESSAGE)
     from ..services import quarantine

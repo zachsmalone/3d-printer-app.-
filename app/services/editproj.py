@@ -10,11 +10,15 @@ The current mesh = replay of ops[:head] on the original. Undo/redo move `head`; 
 from __future__ import annotations
 
 import base64
+import copy
+import ctypes
 import hashlib
 import json
+import logging
 import threading
 import uuid
 from collections import OrderedDict
+from pathlib import Path
 
 import numpy as np
 import trimesh
@@ -189,7 +193,7 @@ def ensure_exports(bid: str):
         meta = store.get(bid)
     except KeyError:
         return
-    if meta.get("kind") != "edit":
+    if meta.get("kind") != "edit" or not_ready(meta):
         return
     d = store.dir(bid)
     rev = geometry_revision(meta)
@@ -197,7 +201,7 @@ def ensure_exports(bid: str):
         return
     with _lock:
         meta = store.get(bid)
-        if meta.get("kind") != "edit":
+        if meta.get("kind") != "edit" or not_ready(meta):
             return
         d = store.dir(bid)
         rev = geometry_revision(meta)
@@ -232,7 +236,7 @@ def ensure_stl(bid: str):
         meta = store.get(bid)
     except KeyError:
         return
-    if meta.get("kind") != "edit":
+    if meta.get("kind") != "edit" or not_ready(meta):
         return
     d = store.dir(bid)
     rev = geometry_revision(meta)
@@ -241,7 +245,7 @@ def ensure_stl(bid: str):
         return
     with _lock:
         meta = store.get(bid)
-        if meta.get("kind") != "edit":
+        if meta.get("kind") != "edit" or not_ready(meta):
             return
         d = store.dir(bid)
         rev = geometry_revision(meta)
@@ -371,14 +375,34 @@ def iter_binary_stl_preview(data: bytes, max_faces: int = MAX_PREVIEW_FACES):
                                    "indices": base64.b64encode(idx.tobytes()).decode()}]}}
 
 
-def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes,
+PENDING_SLICE = ("The full model is still being checked. Slice stays off until that finishes. "
+                 "The view is only a preview.")
+CHECK_FAILED = "The full model could not be checked. Slice stays off. The view is only a preview."
+
+
+def not_ready(meta: dict | None) -> str | None:
+    """Why Slice must refuse this project, or None when it may run.
+
+    Only an explicit pending flag blocks. Older projects do not have one.
+    """
+    if not meta or meta.get("slice_ready") is not False:
+        return None
+    return str(meta.get("check_error") or PENDING_SLICE)
+
+
+def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes | None,
                        beginner: bool, warnings: list[str], preview: dict, size_mm: list, triangles: int,
                        import_scale: float = 1.0, import_units: str = "mm") -> dict:
-    """Save the original STL unchanged and a lighter preview. The full check runs afterwards."""
+    """Save a lighter preview and mark Slice off. The original bytes are written when given.
+
+    The open path passes original=None and writes the file after the view response has finished,
+    so a slow disk does not hold the preview behind the full file.
+    """
     bid = uuid.uuid4().hex[:12]
     d = store.dir(bid)
     d.mkdir(parents=True)
-    (d / "original.stl").write_bytes(original)
+    if original is not None:
+        (d / "original.stl").write_bytes(original)
     (d / "preview.json").write_text(json.dumps(preview))
     ops = []
     if import_scale != 1.0:
@@ -423,53 +447,161 @@ def quick_payload(meta: dict) -> dict:
             "original": f"/api/edit/{meta['id']}/original", "capabilities": capabilities()}
 
 
+def _mark_check_failed(bid: str) -> None:
+    try:
+        with store.lock:
+            meta = store.get(bid)
+            if meta.get("slice_ready") is True:
+                return
+            meta["check_error"] = CHECK_FAILED
+            meta["slice_ready"] = False
+            meta["quality_gate"] = {"ok": None, "pending": True, "message": CHECK_FAILED}
+            store.save(meta)
+    except KeyError:
+        return
+
+
+def _one_core():
+    """Keep the full-mesh load from pinning every core the web worker needs.
+
+    NumPy's OpenBLAS wheel exports a thread setter. Missing symbol or a different
+    BLAS leaves the process alone. The previous count is restored afterwards.
+    """
+    libs = list(Path(np.__file__).resolve().parent.glob(".libs/libscipy_openblas*.so*"))
+    libs += list(Path(np.__file__).resolve().parent.glob(".libs/libopenblas*.so*"))
+    for lib_path in libs:
+        try:
+            lib = ctypes.CDLL(str(lib_path))
+        except OSError:
+            continue
+        setter = None
+        for name in ("openblas_set_num_threads", "scipy_openblas_set_num_threads64_", "openblas_set_num_threads64_"):
+            if hasattr(lib, name):
+                setter = getattr(lib, name)
+                break
+        getter = None
+        for name in ("openblas_get_num_threads", "scipy_openblas_get_num_threads64_", "openblas_get_num_threads64_"):
+            if hasattr(lib, name):
+                getter = getattr(lib, name)
+                break
+        if setter is None:
+            continue
+        prev = int(getter()) if getter is not None else 0
+        setter(1)
+        return lib, setter, prev
+    return None
+
+
+def _restore_cores(token) -> None:
+    if not token:
+        return
+    _lib, setter, prev = token
+    setter(prev if prev > 0 else 0)
+
+
+def store_original_and_check(bid: str, original: bytes) -> None:
+    """Write the untouched STL, then start the check. Slice stays off if either step fails."""
+    try:
+        d = store.dir(bid)
+        if not d.is_dir():
+            return
+        meta = store.get(bid)
+        if meta.get("slice_ready") is not False:
+            return
+        partial = d / "original.stl.partial"
+        partial.write_bytes(original)
+        partial.replace(d / "original.stl")
+    except Exception:
+        _mark_check_failed(bid)
+        return
+    start_full_check(bid)
+
+
 def start_full_check(bid: str) -> None:
     """Load, check, and write the slice STL off the view path. Failures leave Slice off."""
     def run():
         try:
             finish_full_check(bid)
         except Exception:
-            import logging
             logging.getLogger("zeim.import").exception("full model check failed")
-            try:
-                with store.lock:
-                    meta = store.get(bid)
-                    meta["check_error"] = "The full model could not be checked. Slice stays off. The view is only a preview."
-                    meta["slice_ready"] = False
-                    store.save(meta)
-            except Exception:
-                pass
+            _mark_check_failed(bid)
     threading.Thread(target=run, name=f"zeim-stl-{bid}", daemon=True).start()
 
 
 def finish_full_check(bid: str) -> None:
-    """Authoritative mesh: every triangle from the original STL, then the quality check, then Slice may run."""
-    with store.lock:
-        meta = store.get(bid)
-        if meta.get("slice_ready"):
+    """Authoritative mesh: every triangle from the original STL, then the quality check, then Slice may run.
+
+    The mesh load does not hold the history lock. A project deleted or edited while that runs
+    is not marked ready from the stale mesh.
+    """
+    for _attempt in range(3):
+        with store.lock:
+            try:
+                meta = store.get(bid)
+            except KeyError:
+                return
+            if meta.get("slice_ready") is not False:
+                return
+            d = store.dir(bid)
+            original_path = d / "original.stl"
+            if not original_path.is_file():
+                meta["check_error"] = CHECK_FAILED
+                meta["slice_ready"] = False
+                meta["quality_gate"] = {"ok": None, "pending": True, "message": CHECK_FAILED}
+                store.save(meta)
+                return
+            snapshot = {"created": meta.get("created"), "head": meta.get("head"),
+                        "ops": copy.deepcopy(meta.get("ops")), "dims": copy.deepcopy(meta.get("dims")),
+                        "title": meta.get("title") or "Untitled"}
+        cores = _one_core()
+        try:
+            original = original_path.read_bytes()
+            mesh, warns = meshedit.load_mesh(original, "stl")
+            del original
+            with _lock:
+                try:
+                    held = store.get(bid)
+                except KeyError:
+                    return
+                _BASES[bid] = mesh
+                m = mesh_at(bid, held)
+                analysis = meshedit.analyze(m)
+                quality = quality_from_analysis(analysis)
+                stl_bytes = exporters.to_stl(as_model(m, snapshot["title"]))
+                face_count = int(len(m.faces))
+        except Exception:
+            _restore_cores(cores)
+            _mark_check_failed(bid)
             return
-        d = store.dir(bid)
-        original = (d / "original.stl").read_bytes()
-        mesh, warns = meshedit.load_mesh(original, "stl")
-        _BASES[bid] = mesh
-        m = mesh_at(bid, meta)
-        analysis = meshedit.analyze(m)
-        quality = quality_from_analysis(analysis)
-        (d / "model.stl").write_bytes(exporters.to_stl(as_model(m, meta["title"])))
-        head = int(meta.get("head") or 0)
-        layouts = dict(meta.get("plate_layouts") or {})
-        layouts[str(head)] = {"counts": [int(len(m.faces))], "groups": [0], "hidden": [False]}
-        meta["plate_layouts"] = layouts
-        meta["analysis"] = analysis
-        meta["analysis_rev"] = geometry_revision(meta)
-        meta["quality_gate"] = quality
-        meta["stats"] = _stats_from(analysis, meta["title"])
-        meta["stl_rev"] = meta["analysis_rev"]
-        meta["slice_ready"] = True
-        meta.pop("check_error", None)
-        if warns:
-            meta["warnings"] = list(dict.fromkeys([*(meta.get("warnings") or []), *warns]))
-        store.save(meta)
+        _restore_cores(cores)
+        with store.lock:
+            try:
+                meta = store.get(bid)
+            except KeyError:
+                return
+            if meta.get("slice_ready") is True or meta.get("created") != snapshot["created"]:
+                return
+            if (meta.get("head"), meta.get("ops"), meta.get("dims")) != (snapshot["head"], snapshot["ops"], snapshot["dims"]):
+                continue
+            if not original_path.is_file() or not store.dir(bid).is_dir():
+                return
+            (d / "model.stl").write_bytes(stl_bytes)
+            head = int(meta.get("head") or 0)
+            layouts = dict(meta.get("plate_layouts") or {})
+            layouts[str(head)] = {"counts": [face_count], "groups": [0], "hidden": [False]}
+            meta["plate_layouts"] = layouts
+            meta["analysis"] = analysis
+            meta["analysis_rev"] = geometry_revision(meta)
+            meta["quality_gate"] = quality
+            meta["stats"] = _stats_from(analysis, meta["title"])
+            meta["stl_rev"] = meta["analysis_rev"]
+            meta["slice_ready"] = True
+            meta.pop("check_error", None)
+            if warns:
+                meta["warnings"] = list(dict.fromkeys([*(meta.get("warnings") or []), *warns]))
+            store.save(meta)
+            return
+    _mark_check_failed(bid)
 
 
 def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner: bool) -> dict:
@@ -477,7 +609,6 @@ def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner
     up to the current head (the redo tail is dropped, like a new step would), named dimensions, plate layouts and
     the display appearance are copied, so v2's earlier steps stay editable. The source project is not changed.
     Caller must already hold `store.lock`, have reserved a history slot and checked that the caller owns `src_bid`."""
-    import copy
     import shutil
     src = store.get(src_bid)
     sd = store.dir(src_bid)

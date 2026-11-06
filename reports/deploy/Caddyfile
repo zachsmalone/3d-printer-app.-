@@ -48,6 +48,13 @@
 	handle @downloads {
 		import zeim_proxy
 	}
+	# /api/edit/new streams NDJSON (view progress, then the preview). `encode` buffers the whole
+	# body, so those lines would sit here until the response ended. This path is uncompressed
+	# and the app sends X-Accel-Buffering: no for the same reason.
+	@preview path /api/edit/new
+	handle @preview {
+		import zeim_proxy
+	}
 	handle {
 		encode zstd gzip
 		import zeim_proxy
