@@ -49,7 +49,8 @@ function ensureViewer() {
 /* ---------- opening / creating projects ---------- */
 async function postUpload(url, fd, signal, onUpload, onEvent) {
   const xhr = new XMLHttpRequest();
-  let buf = "", shown = false, project = null;
+  let buf = "", shown = false, project = null, settled = false;
+  let finish = () => {}, fail = () => {};
   const take = (text) => {
     buf += text;
     const lines = buf.split("\n");
@@ -65,10 +66,17 @@ async function postUpload(url, fd, signal, onUpload, onEvent) {
         if (ev.done >= ev.total) onEvent({ phase: "draw" });
         else onEvent({ phase: "view", pct: Math.min(99, Math.floor(100 * ev.done / ev.total)) });
       }
-      if (ev.phase === "interactive" && ev.project) { project = ev.project; onEvent({ phase: "draw" }); }
+      if (ev.phase === "interactive" && ev.project && !settled) {
+        project = ev.project;
+        settled = true;
+        onEvent({ phase: "draw" });
+        finish(project);
+      }
     }
   };
   const done = new Promise((resolve, reject) => {
+    finish = resolve;
+    fail = reject;
     xhr.open("POST", url);
     xhr.withCredentials = true;
     xhr.upload.onprogress = ev => { if (ev.lengthComputable) onUpload(ev.loaded, ev.total); };
@@ -76,12 +84,13 @@ async function postUpload(url, fd, signal, onUpload, onEvent) {
     let read = 0;
     xhr.onprogress = () => {
       const text = xhr.responseText || "";
-      try { take(text.slice(read)); } catch (e) { reject(e); xhr.abort(); }
+      try { take(text.slice(read)); } catch (e) { if (!settled) { settled = true; fail(e); xhr.abort(); } }
       read = text.length;
     };
     xhr.onerror = () => reject(Object.assign(new Error("The upload didn't finish. Check the connection and try again."), { name: "UploadError" }));
     xhr.onabort = () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
     xhr.onload = () => {
+      if (settled) return;
       const ct = xhr.getResponseHeader("content-type") || "";
       if (xhr.status < 200 || xhr.status >= 300) {
         let j = null; try { j = JSON.parse(xhr.responseText || ""); } catch { }

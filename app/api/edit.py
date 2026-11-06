@@ -54,8 +54,12 @@ def _fdm_lean(data: bytes):
 
 
 def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_delete_oldest: bool,
-                    base: dict, warnings: list, scale: float, units: str, stream: bool):
-    """Show a lighter view quickly. The original STL is stored unchanged. Slice waits for the full check."""
+                    base: dict, warnings: list, scale: float, units: str, stream: bool, background: BackgroundTasks):
+    """Show a lighter view quickly. The original STL is stored unchanged. Slice waits for the full check.
+
+    The full file and the mesh check are a background task that runs after this response is finished.
+    Starting them earlier holds the preview behind the disk write and the mesh load.
+    """
     from .builds import disk_guard
 
     def commit(preview: dict, size_mm: list, triangles: int):
@@ -71,10 +75,10 @@ def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_
             except HistoryFull:
                 return _full(actor)
             meta = editproj.create_pending_stl(
-                actor.sid, privacy.default_level(actor), title=title, base=base, original=data,
+                actor.sid, privacy.default_level(actor), title=title, base=base, original=None,
                 beginner=beginner, warnings=warnings, preview=preview, size_mm=size_mm, triangles=triangles,
                 import_scale=scale, import_units=units)
-        editproj.start_full_check(meta["id"])
+        background.add_task(editproj.store_original_and_check, meta["id"], data)
         return {**editproj.quick_payload(meta), "history": [summary(m) for m in store.list(actor.sid)]}
 
     if not stream:
@@ -103,7 +107,10 @@ def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_
             logging.getLogger("zeim.import").exception("large STL view failed")
             yield json.dumps({"phase": "error", "message": "The model could not be opened. Nothing was simplified."}) + "\n"
 
-    return StreamingResponse(body(), media_type="application/x-ndjson")
+    return StreamingResponse(body(), media_type="application/x-ndjson", headers={
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",
+    })
 
 
 def _edit_meta(bid: str, actor: Actor, owner_only=False) -> dict:
@@ -218,7 +225,7 @@ def new_project(
                 base = {"type": "upload", "format": "stl", "units": units}
                 fast_title = title or sample_title or "My model"
                 return _open_large_stl(data, actor, fast_title, beginner, auto_delete_oldest, base, warnings,
-                                       scale, units, progress == "1")
+                                       scale, units, progress == "1", background)
             _gate(data, actor)
             try:
                 mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])     # warn on the converted size (B9)
