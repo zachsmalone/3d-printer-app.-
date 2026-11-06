@@ -1,0 +1,45 @@
+name: Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-26, macos-26-intel]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo b -r -p mslicer -p slicer
+
+      - name: Package
+        run: |
+          mkdir out
+          TOOLCHAIN=$(rustup show active-toolchain | sed 's/^[^-]*-\(.*\) (.*)/\1/')
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            cp target/release/mslicer out/mslicer-$TOOLCHAIN
+            cp target/release/slicer out/slicer-$TOOLCHAIN
+          elif [ "$RUNNER_OS" == "Windows" ]; then
+            cp target/release/mslicer.exe out/mslicer-$TOOLCHAIN.exe
+            cp target/release/slicer.exe out/slicer-$TOOLCHAIN.exe
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            cp -r dist/mslicer.app out/mslicer.app
+            mkdir out/mslicer.app/Contents/MacOS
+            cp target/release/mslicer out/mslicer.app/Contents/MacOS
+            cp target/release/slicer out/slicer-$TOOLCHAIN
+          else
+            echo "$RUNNER_OS not supported"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: mslicer-${{ matrix.os }}
+          path: out/*

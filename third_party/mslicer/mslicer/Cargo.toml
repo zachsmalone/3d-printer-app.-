@@ -1,0 +1,61 @@
+[package]
+name = "mslicer"
+version = "0.10.1"
+edition = "2024"
+
+[dependencies]
+common.workspace = true
+experimental = { workspace = true, optional = true }
+mesh_format.workspace = true
+remote_print.workspace = true
+slicer.workspace = true
+tools.workspace = true
+
+ab_glyph.workspace = true
+anyhow.workspace = true
+bitflags.workspace = true
+bytemuck.workspace = true
+chrono.workspace = true
+clone-macro.workspace = true
+concat-idents.workspace = true
+const_format.workspace = true
+dirs.workspace = true
+eframe.workspace = true
+egui-phosphor.workspace = true
+egui-wgpu.workspace = true
+egui.workspace = true
+egui_dock.workspace = true
+egui_extras.workspace = true
+egui_plot.workspace = true
+egui_tracing.workspace = true
+encase.workspace = true
+epaint_default_fonts.workspace = true
+image.workspace = true
+imageproc.workspace = true
+itertools.workspace = true
+nalgebra.workspace = true
+notify-rust.workspace = true
+num-integer.workspace = true
+open.workspace = true
+parking_lot.workspace = true
+poll-promise.workspace = true
+rand.workspace = true
+rayon.workspace = true
+rfd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+ureq.workspace = true
+wgpu.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-registry.workspace = true
+
+[target.'cfg(windows)'.build-dependencies]
+winres.workspace = true
+
+[features]
+experimental = ["dep:experimental"]
+brep = ["experimental", "experimental/brep"]

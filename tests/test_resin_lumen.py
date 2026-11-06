@@ -58,11 +58,13 @@ def test_independent_head_rejects_zip_and_garbage():
 
 
 def test_rejected_formats_name_the_format():
-    for fmt, needle in (("ctb", "CHITUBOX"), ("goo", ".goo"), ("lys", "Lychee"), ("zip", "zip"), ("photon", "Photon")):
+    for fmt, needle in (("lys", "Lychee"), ("ctbx", ".ctbx"), ("zip", "zip"), ("photon", "Photon")):
         with pytest.raises(resin_slice.ResinSliceError) as exc:
             resin_slice.reject_format(fmt)
         assert needle.lower() in str(exc.value).lower()
     resin_slice.reject_format("lumen")
+    resin_slice.reject_format("goo")
+    resin_slice.reject_format("ctb")
     resin_slice.reject_format("")
 
 
@@ -125,24 +127,16 @@ def test_anti_alias_writes_gray_edge_pixels(tmp_path):
     assert a["anti_aliasing"]["mode"] == "coverage"
 
 
-def test_mars_4_dlp_geometry_encodes_lumen_not_goo(tmp_path):
-    """Plate numbers come from the MIT Elegoo plugin. The file is still .lumen."""
+def test_mars_4_dlp_mirror_is_not_written(tmp_path):
+    """The plate's pixel pitch is real. Its mirror flag is unresolved, so no file is written."""
     plate = resin_slice.plate_by_id("elegoo-mars-4-dlp-goo")
     assert plate["width_px"] == 2560 and plate["height_px"] == 1440
-    assert plate["native_format"] == ".goo"
-    mesh = resin.orient(trimesh.creation.box(extents=[8, 8, 1.0]), 0)
+    assert plate["native_format"] == ".goo" and plate["mirror_x"] is True
     out = tmp_path / "mars.lumen"
-    t0 = time.perf_counter()
-    report = resin_slice.slice_mesh(mesh, _settings(), plate, out, aa=False)
-    elapsed = time.perf_counter() - t0
-    print(f"\nMars 4 DLP geometry slice {elapsed:.3f}s raster {report['seconds_raster']}s bytes {report['bytes']}")
-    assert report["layers"] == 5
-    assert report["width_px"] == 2560 and report["height_px"] == 1440
-    assert report["native_format_written"] is False and report["hardware_tested"] is False
-    # 8 mm / 0.051875 mm ≈ 154.2 px. Boundary fill lands on 155×155.
-    assert report["lit"][0] == 155 * 155
-    assert out.read_bytes()[:4] == b"LUMN"
-    assert elapsed < 30
+    with pytest.raises(resin_slice.ResinSliceError) as exc:
+        resin_slice.slice_mesh(resin.orient(trimesh.creation.box(extents=[8, 8, 1.0]), 0), _settings(), plate, out)
+    assert "mirror" in str(exc.value).lower()
+    assert not out.exists()
 
 
 def test_oversized_plate_is_rejected_and_not_relabelled():
@@ -170,13 +164,13 @@ def test_api_slice_download_and_layer_preview(c):
     body = prep.json()
     assert "lumen" in body["estimate"]["slice_note"].lower()
     rid = body["export"]["rid"]
-    bad = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "zeim-inspection", "file_format": "ctb"})
-    assert bad.status_code == 400 and "CHITUBOX" in bad.json()["detail"]
+    bad = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "zeim-inspection", "file_format": "lys"})
+    assert bad.status_code == 400 and "Lychee" in bad.json()["detail"]
     assert bad.content[:2] != b"PK"
-    goo = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-5-goo", "file_format": "goo"})
-    assert goo.status_code == 400 and ".goo" in goo.json()["detail"]
+    mismatch = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-5-goo", "file_format": "ctb"})
+    assert mismatch.status_code == 400 and "printer" in mismatch.json()["detail"].lower()
     huge = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-5-ultra-ctb", "file_format": "lumen"})
-    assert huge.status_code == 400 and ".ctb" in huge.json()["detail"]
+    assert huge.status_code == 400 and "printer" in huge.json()["detail"].lower()
     cat = c.get("/api/resin/catalog").json()
     assert cat["lumen"]["hardware_tested"] is False
     assert any(p["id"] == "zeim-inspection" for p in cat["lumen_plates"])

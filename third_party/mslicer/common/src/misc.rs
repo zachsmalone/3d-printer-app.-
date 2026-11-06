@@ -1,0 +1,131 @@
+use std::{
+    iter,
+    ops::{Add, Mul},
+};
+
+use rand::{RngExt, distr::Alphanumeric};
+
+use crate::units::Miliseconds;
+
+pub const IMAGE_FORMATS: [&str; 23] = [
+    "avif", "jpg", "jpeg", "jfif", "png", "apng", "gif", "webp", "tif", "tiff", "tga", "dds",
+    "bmp", "ico", "hdr", "exr", "pbm", "pam", "ppm", "pgm", "ff", "qoi", "pcx",
+];
+
+pub fn human_duration(duration: Miliseconds) -> String {
+    let ms = duration.raw();
+    if ms < 1000.0 {
+        format!("{ms}ms")
+    } else if ms < 60_000.0 {
+        format!("{:.2}s", ms / 1000.0)
+    } else if ms < 3_600_000.0 {
+        let minutes = ms / 60_000.0;
+        let seconds = (minutes - minutes.floor()) * 60.0;
+        format!("{:.0}m {:.2}s", minutes.floor(), seconds)
+    } else {
+        let hours = ms / 3_600_000.0;
+        let minutes = (hours - hours.floor()) * 60.0;
+        let seconds = (minutes - minutes.floor()) * 60.0;
+        format!(
+            "{:.0}h {:.0}m {:.2}s",
+            hours.floor(),
+            minutes.floor(),
+            seconds
+        )
+    }
+}
+
+pub fn separate_thousands(number: impl TryInto<u64>) -> String {
+    let str = number.try_into().unwrap_or(u64::MAX).to_string();
+    let separators = [None, None, Some(',')]
+        .into_iter()
+        .cycle()
+        .skip(3 - str.len() % 3);
+
+    (str.chars().map(Some))
+        .zip(iter::once(None).chain(separators))
+        .flat_map(|(a, b)| [b, a])
+        .flatten()
+        .collect()
+}
+
+pub fn subscript_number(num: impl Into<u64>) -> String {
+    const SUBSCRIPT: [char; 10] = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+
+    let mut num = num.into();
+    let mut out = String::new();
+    while num > 0 {
+        out.push(SUBSCRIPT[(num % 10) as usize]);
+        num /= 10;
+    }
+
+    out
+}
+
+pub fn random_string(len: usize) -> String {
+    rand::rng()
+        .sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect()
+}
+
+pub fn lerp<T>(a: T, b: T, t: f32) -> T
+where
+    T: Mul<f32, Output = T> + Add<Output = T>,
+{
+    a * (1.0 - t) + b * t
+}
+
+pub trait IteratorExt {
+    fn all_equal_float(&mut self, epsilon: f32) -> bool;
+}
+
+impl<I> IteratorExt for I
+where
+    I: Iterator<Item = f32>,
+{
+    fn all_equal_float(&mut self, epsilon: f32) -> bool {
+        match self.next() {
+            None => true,
+            Some(a) => self.all(|x| (x - a).abs() < epsilon),
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! id_type {
+    ($name:ident, $inner:ty) => {
+        #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Hash)]
+        pub struct $name {
+            id: $inner,
+        }
+
+        mod id_type_impl {
+            use super::$name;
+
+            static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            const MEMORY_ORDER: std::sync::atomic::Ordering = std::sync::atomic::Ordering::Relaxed;
+
+            impl $name {
+                pub fn new() -> Self {
+                    Self {
+                        id: NEXT_ID.fetch_add(1, MEMORY_ORDER) as _,
+                    }
+                }
+
+                pub fn bump_past(raw: $inner) {
+                    NEXT_ID.fetch_max(1 + raw as u64, MEMORY_ORDER);
+                }
+
+                pub fn from_raw(raw: $inner) -> Self {
+                    Self { id: raw }
+                }
+
+                pub fn raw(&self) -> $inner {
+                    self.id
+                }
+            }
+        }
+    };
+}

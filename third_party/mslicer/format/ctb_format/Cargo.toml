@@ -1,0 +1,23 @@
+[package]
+name = "ctb_format"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "ctb5_format"
+path = "bin/main.rs"
+
+[[bin]]
+name = "ctb4_format"
+path = "bin/ctb4.rs"
+
+[dependencies]
+common.workspace = true
+
+aes.workspace = true
+anyhow.workspace = true
+cbc.workspace = true
+clap.workspace = true
+image.workspace = true
+nalgebra.workspace = true
+sha2.workspace = true

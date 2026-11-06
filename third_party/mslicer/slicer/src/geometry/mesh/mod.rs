@@ -1,0 +1,287 @@
+use std::{collections::HashMap, mem, sync::Arc};
+
+use common::progress::Progress;
+use nalgebra::{Matrix4, Vector3};
+use serde::{Deserialize, Serialize};
+
+mod builder;
+mod half_edge;
+
+use crate::geometry::bounds::Bounds3D;
+pub use {
+    builder::{MeshBuilder, orthogonal_basis},
+    half_edge::{HalfEdge, HalfEdgeMesh},
+};
+
+/// A mesh made of vertices and triangular faces. It can be scaled, translated,
+/// and rotated.
+#[derive(Debug, Clone)]
+pub struct Mesh {
+    inner: Arc<MeshInner>,
+
+    transform: Matrix4<f32>,
+    inv_transform: Matrix4<f32>,
+    inv_t_transform: Matrix4<f32>,
+
+    position: Vector3<f32>,
+    scale: Vector3<f32>,
+    rotation: Vector3<f32>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MeshInner {
+    pub vertices: Box<[Vector3<f32>]>,
+    pub faces: Box<[[u32; 3]]>,
+}
+
+// todo: mesh ids may not be unique through time (not sure if that could be a problem)
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct MeshId(usize);
+
+impl Mesh {
+    /// Creates a new mesh from the given vertices and faces. The
+    /// transformations are all 0 by default.
+    pub fn new(vertices: Vec<Vector3<f32>>, faces: Vec<[u32; 3]>) -> Self {
+        Self {
+            inner: Arc::new(MeshInner {
+                vertices: vertices.into_boxed_slice(),
+                faces: faces.into_boxed_slice(),
+            }),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_centered(mut vertices: Vec<Vector3<f32>>, faces: Vec<[u32; 3]>) -> Self {
+        center_vertices(&mut vertices);
+        Self::new(vertices, faces)
+    }
+
+    pub fn new_boxed(vertices: Box<[Vector3<f32>]>, faces: Box<[[u32; 3]]>) -> Self {
+        Self {
+            inner: Arc::new(MeshInner { vertices, faces }),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_boxed_centered(mut vertices: Box<[Vector3<f32>]>, faces: Box<[[u32; 3]]>) -> Self {
+        center_vertices(&mut vertices);
+        Self::new_boxed(vertices, faces)
+    }
+
+    pub fn from_inner(inner: Arc<MeshInner>) -> Self {
+        Self {
+            inner,
+            ..Default::default()
+        }
+    }
+
+    pub fn mesh_id(&self) -> MeshId {
+        MeshId::for_mesh_inner(&self.inner)
+    }
+
+    pub fn inner(&self) -> &Arc<MeshInner> {
+        &self.inner
+    }
+
+    pub fn vertices(&self) -> &[Vector3<f32>] {
+        self.inner.vertices.as_ref()
+    }
+
+    pub fn faces(&self) -> &[[u32; 3]] {
+        self.inner.faces.as_ref()
+    }
+
+    pub fn face(&self, index: usize) -> &[u32; 3] {
+        self.faces().get(index).unwrap()
+    }
+
+    pub fn face_verts_raw(&self, index: usize) -> [Vector3<f32>; 3] {
+        let (v, f) = (self.vertices(), self.face(index));
+        [v[f[0] as usize], v[f[1] as usize], v[f[2] as usize]]
+    }
+
+    pub fn face_verts(&self, index: usize) -> [Vector3<f32>; 3] {
+        self.face_verts_raw(index).map(|x| self.transform(&x))
+    }
+
+    pub fn normal(&self, index: usize) -> Vector3<f32> {
+        let (v, f) = (self.vertices(), self.face(index));
+        let edge1 = v[f[2] as usize] - v[f[1] as usize];
+        let edge2 = v[f[0] as usize] - v[f[1] as usize];
+        edge1.cross(&edge2).normalize()
+    }
+
+    pub fn vertex_count(&self) -> usize {
+        self.vertices().len()
+    }
+
+    pub fn face_count(&self) -> usize {
+        self.faces().len()
+    }
+
+    pub fn is_defective(&self, progress: Progress) -> bool {
+        let mut edges = HashMap::<_, u32>::new();
+
+        progress.set_total(self.face_count() as u64);
+        for [a, b, c] in self.faces() {
+            progress.add_complete(1);
+            for (a, b) in [(a, b), (b, c), (c, a)] {
+                *edges.entry((a.min(b), a.max(b))).or_default() += 1;
+            }
+        }
+
+        progress.set_finished();
+        for count in edges.values() {
+            // Allows edges to be connected to an even number of triangle faces.
+            // In these cases the mesh is not manifold but will still slice.
+            if *count % 2 != 0 {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Updates the internal transformation matrices. This is called
+    /// automatically if you use [`Mesh::set_position`], [`Mesh::set_scale`], or
+    /// [`Mesh::set_rotation`], but you will need to call it manually if you use
+    /// the unchecked variants of those methods.
+    pub fn update_transformation_matrix(&mut self) {
+        let scale = Matrix4::new_nonuniform_scaling(&self.scale);
+        let rotation =
+            Matrix4::from_euler_angles(self.rotation.x, self.rotation.y, self.rotation.z);
+        let translation = Matrix4::new_translation(&self.position);
+
+        self.transform = translation * scale * rotation;
+        self.inv_transform = self.transform.try_inverse().unwrap();
+        self.inv_t_transform = self.inv_transform.transpose();
+    }
+
+    /// Transforms a point according to the models translation, scale, and rotation.
+    pub fn transform(&self, pos: &Vector3<f32>) -> Vector3<f32> {
+        (self.transform * pos.push(1.0)).xyz()
+    }
+
+    /// Transforms a normal according to the models scale and rotation.
+    pub fn transform_normal(&self, normal: &Vector3<f32>) -> Vector3<f32> {
+        (self.inv_t_transform * normal.to_homogeneous()).xyz()
+    }
+
+    /// Undoes the transformation of a point from the models translation, scale, and rotation.
+    pub fn inv_transform(&self, pos: &Vector3<f32>) -> Vector3<f32> {
+        (self.inv_transform * pos.push(1.0)).xyz()
+    }
+
+    pub fn inv_transform_normal(&self, normal: &Vector3<f32>) -> Vector3<f32> {
+        (self.inv_transform * normal.to_homogeneous()).xyz()
+    }
+
+    pub fn memory_size(&self) -> usize {
+        self.face_count() * mem::size_of::<[u32; 3]>()
+            + self.vertex_count() * mem::size_of::<Vector3<f32>>()
+    }
+}
+
+impl Mesh {
+    /// Gets the current transformation matrix of the model.
+    pub fn transformation_matrix(&self) -> &Matrix4<f32> {
+        &self.transform
+    }
+
+    /// Gets the inverse of the current transformation matrix of the model.
+    pub fn inv_transformation_matrix(&self) -> &Matrix4<f32> {
+        &self.inv_transform
+    }
+
+    /// Changes the position of the model, automatically updating the internal
+    /// transformation matrix.
+    pub fn set_position(&mut self, pos: Vector3<f32>) {
+        self.position = pos;
+        self.update_transformation_matrix();
+    }
+
+    /// Changes the position of the model without updating the internal
+    /// transformation matrix. You will need to manually call
+    /// [`Mesh::update_transformation_matrix`] at some point.
+    pub fn set_position_unchecked(&mut self, pos: Vector3<f32>) {
+        self.position = pos;
+    }
+
+    /// Gets the current position of the model.
+    pub fn position(&self) -> Vector3<f32> {
+        self.position
+    }
+
+    /// Changes the current scale of the model, automatically updating the
+    /// internal transformation matrix.
+    pub fn set_scale(&mut self, scale: Vector3<f32>) {
+        self.scale = scale;
+        self.update_transformation_matrix();
+    }
+
+    /// Changes the current scale of the model without updating the internal
+    /// transformation matrix. You will need to manually call
+    /// [`Mesh::update_transformation_matrix`] at some point.
+    pub fn set_scale_unchecked(&mut self, scale: Vector3<f32>) {
+        self.scale = scale;
+    }
+
+    /// Gets the current scale of the model.
+    pub fn scale(&self) -> Vector3<f32> {
+        self.scale
+    }
+
+    /// Changes the current rotation of the model, using [Euler
+    /// angles](https://en.wikipedia.org/wiki/Euler_angles). The internal
+    /// transformation matrix is automatically updated.
+    pub fn set_rotation(&mut self, rotation: Vector3<f32>) {
+        self.rotation = rotation;
+        self.update_transformation_matrix();
+    }
+
+    /// Changes the current rotation of the model (see [`Mesh::set_rotation`]),
+    /// without updating the internal transformation matrix. You will need to
+    /// manually call [`Mesh::update_transformation_matrix`] at some point.
+    pub fn set_rotation_unchecked(&mut self, rotation: Vector3<f32>) {
+        self.rotation = rotation;
+    }
+
+    /// Gets the current rotation of the model.
+    pub fn rotation(&self) -> Vector3<f32> {
+        self.rotation
+    }
+}
+
+impl MeshId {
+    pub fn for_mesh_inner(mesh: &Arc<MeshInner>) -> Self {
+        Self(Arc::as_ptr(mesh) as usize)
+    }
+}
+
+impl Default for Mesh {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(MeshInner {
+                vertices: Box::new([]),
+                faces: Box::new([]),
+            }),
+
+            transform: Matrix4::identity(),
+            inv_transform: Matrix4::identity(),
+            inv_t_transform: Matrix4::identity(),
+
+            position: Vector3::repeat(0.0),
+            scale: Vector3::repeat(1.0),
+            rotation: Vector3::repeat(0.0),
+        }
+    }
+}
+
+/// Moves the model to have its origin at its center point.
+fn center_vertices(vertices: &mut [Vector3<f32>]) {
+    let bounds = Bounds3D::from_verts(vertices);
+    let center = bounds.center();
+
+    let offset = Vector3::new(center.x, center.y, bounds.min.z);
+    vertices.iter_mut().for_each(|v| *v -= offset);
+}

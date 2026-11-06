@@ -8,7 +8,7 @@
   "elegoo_geometry_commit": "be59b1597ac5f5551ddbdae97145f584f05be056",
   "elegoo_geometry_license": "MIT",
   "max_pixels": 12000000,
-  "note": "Plate rows copy resolution and pixel pitch from the MIT Elegoo plugin. TorchC0 writes .lumen only. native_format is the stock file that plugin targets and is not written.",
+  "note": "Plate rows copy resolution and pixel pitch from the MIT Elegoo plugin. native_format is that row's stock container. TorchC0 writes it only for the selected printer of the same name and bed, and only when both mirror flags are false and the pixel cap allows. A written file is not a firmware test. A mirror flag is a refusal: the GOO bits are untested and no pixel flip is applied.",
   "plates": [
     {
       "id": "zeim-inspection",

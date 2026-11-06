@@ -569,7 +569,7 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
             "layers": layers, "print_seconds": round(secs), "print_time_human": f"{int(secs // 3600)} h {int(secs % 3600 // 60)} min",
             "resin_ml": round(ml, 1), "resin_note": "Resin volume of the model (plus supports); add ~10% for spills and the vat film.",
             "machine_file": False,
-            "slice_note": "This is an estimate until you slice. Slice to .lumen writes the layer masks for firmware that reads LUMEN (Odyssey). CHITUBOX, Lychee, GOO and Photon files are not written here."}
+            "slice_note": "This is an estimate until you slice. Slice writes .lumen, or .goo and .ctb through the separate mslicer program when the plate's stock file matches. Not printed on a machine."}
 
 
 def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None) -> tuple[trimesh.Trimesh, dict]:

@@ -1,0 +1,179 @@
+use std::path::PathBuf;
+
+use crate::{
+    core::project::model::{Model, ModelId},
+    task::{FileDialog, ProjectLoad, ProjectSave, Task, TaskApp},
+};
+use common::{
+    id_type,
+    progress::CombinedProgress,
+    slice::{Layer, SliceConfig},
+    units::Milimeters,
+};
+use slicer::post_process::{
+    elephant_foot_fixer::ElephantFootFixer, variable_layer_height::VariableLayerHeight,
+};
+use tools::supports::{auto::PlacementConfig, mesh::SupportPreset};
+
+pub mod model;
+pub mod storage;
+pub mod supports;
+
+#[derive(Default, Clone)]
+pub struct Project {
+    pub path: Option<PathBuf>,
+    pub notes: String,
+    pub slice_config: SliceConfig,
+    pub support_config: SupportConfig,
+    pub post_processing: PostProcessing,
+    pub models: Vec<Model>,
+    pub collections: Vec<Collection>,
+}
+
+#[derive(Clone)]
+pub struct SupportConfig {
+    pub auto_placement: PlacementConfig,
+    pub preset: SupportPreset,
+    pub mesh_resolution: u32,
+
+    pub default_lift: Milimeters,
+    pub raft_height: Milimeters,
+    pub raft_offset: Milimeters,
+}
+
+#[derive(Default, Clone)]
+pub struct Collection {
+    pub id: CollectionId,
+    pub name: String,
+    pub collapsed: bool,
+
+    pub rename: RenameState, // not persistent
+}
+
+#[derive(Default, Clone)]
+pub struct PostProcessing {
+    pub variable_layer_height: VariableLayerHeight,
+    pub elephant_foot_fixer: ElephantFootFixer,
+}
+
+#[derive(Default, Clone)]
+pub enum RenameState {
+    #[default]
+    None,
+    Starting,
+    Editing,
+}
+
+impl Project {
+    pub fn with_path(self, path: PathBuf) -> Self {
+        Self {
+            path: Some(path),
+            ..self
+        }
+    }
+
+    pub fn reset(&mut self, default_config: &SliceConfig) {
+        self.path = None;
+        self.notes.clear();
+        self.slice_config = default_config.clone();
+        self.post_processing = Default::default();
+        self.models.clear();
+        self.collections.clear();
+    }
+
+    pub fn model(&mut self, id: ModelId) -> Option<&mut Model> {
+        self.models.iter_mut().find(|x| x.id == id)
+    }
+
+    pub fn collection(&mut self, id: CollectionId) -> Option<&mut Collection> {
+        self.collections.iter_mut().find(|x| x.id == id)
+    }
+
+    pub fn update(&mut self) {
+        let res = self.support_config.mesh_resolution;
+        (self.models.iter_mut()).for_each(|x| x.supports.set_resolution(res));
+    }
+}
+
+impl Project {
+    pub fn load() -> FileDialog {
+        FileDialog::pick_file(("mslicer project", &["mslicer"]), |_app, path, tasks| {
+            tasks.push(Box::new(ProjectLoad::new(path.to_path_buf())))
+        })
+    }
+
+    pub fn save(
+        &self,
+        callback: impl FnOnce(&mut TaskApp) -> Vec<Box<dyn Task>> + 'static,
+    ) -> Box<dyn Task> {
+        if let Some(path) = self.path.clone() {
+            Box::new(ProjectSave::new(self.clone(), path.to_path_buf()).with_callback(callback))
+        } else {
+            Box::new(self.save_as(callback))
+        }
+    }
+
+    pub fn save_as(
+        &self,
+        callback: impl FnOnce(&mut TaskApp) -> Vec<Box<dyn Task>> + 'static,
+    ) -> FileDialog {
+        FileDialog::save_file(("mslicer project", &["mslicer"]), |app, path, tasks| {
+            let path = path.with_extension("mslicer");
+            tasks.push(Box::new(
+                ProjectSave::new(app.project.clone(), path.to_path_buf()).with_callback(callback),
+            ));
+            app.project.path = Some(path);
+        })
+    }
+}
+
+impl Collection {
+    pub fn new(name: String) -> Self {
+        Self {
+            id: CollectionId::new(),
+            name,
+            collapsed: false,
+            rename: RenameState::None,
+        }
+    }
+
+    pub fn new_unnamed() -> Self {
+        Self::new("Collection".into())
+    }
+}
+
+impl PostProcessing {
+    pub fn process(
+        &self,
+        config: &SliceConfig,
+        layers: &mut Vec<Layer>,
+        progress: CombinedProgress<2>,
+    ) {
+        self.variable_layer_height
+            .post_slice(config, layers, progress[0].clone());
+        self.elephant_foot_fixer
+            .post_slice(config, layers, progress[1].clone());
+    }
+}
+
+id_type!(CollectionId, u32);
+
+impl PartialEq for Collection {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Default for SupportConfig {
+    fn default() -> Self {
+        Self {
+            auto_placement: PlacementConfig::default(),
+            preset: SupportPreset::MDEIUM,
+            mesh_resolution: 20,
+
+            default_lift: Milimeters::new(5.0),
+            raft_height: Milimeters::new(1.0),
+            raft_offset: Milimeters::new(1.0),
+        }
+    }
+}

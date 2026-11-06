@@ -1,0 +1,57 @@
+use std::sync::Arc;
+
+use clone_macro::clone;
+use common::{progress::Progress, slice::Layer};
+use nalgebra::Vector2;
+use slicer::post_process::island_detection::detect_islands;
+
+use crate::{
+    core::slice::annotations::{Annotation, Annotations},
+    task::{PollResult, Task, TaskApp, TaskStatus, thread::TaskThread},
+};
+
+pub struct IslandDetection {
+    progress: Progress,
+    handle: TaskThread<()>,
+}
+
+impl IslandDetection {
+    pub fn new(
+        resolution: Vector2<u32>,
+        layers: Vec<Layer>,
+        annotations: Arc<Annotations>,
+    ) -> Self {
+        let progress = Progress::new();
+        Self {
+            handle: TaskThread::spawn(clone!([layers, progress], move || {
+                let islands = detect_islands(resolution, &layers, progress, true);
+
+                let mut annotations = annotations.lock();
+                for (layer, runs) in islands
+                    .into_iter()
+                    .enumerate()
+                    .filter(|(_, runs)| runs.len() > 1)
+                {
+                    annotations.insert_layer(Annotation::Island, layer + 1, &runs);
+                }
+            })),
+            progress,
+        }
+    }
+}
+
+impl Task for IslandDetection {
+    fn poll(&mut self, app: &mut TaskApp) -> PollResult {
+        self.handle
+            .poll(app, "Unexpected Error Detecting Islands")
+            .into_poll_result(|_| PollResult::complete())
+    }
+
+    fn status(&self) -> Option<TaskStatus<'_>> {
+        Some(TaskStatus {
+            name: "Detecting Islands".into(),
+            details: None,
+            progress: self.progress.progress(),
+        })
+    }
+}

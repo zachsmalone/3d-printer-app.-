@@ -37,3 +37,4 @@ backups/
 /library/
 zeimcad/target/
 tools/zeim-lumen/target/
+third_party/mslicer/target/

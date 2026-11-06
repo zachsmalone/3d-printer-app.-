@@ -36,5 +36,7 @@ tests
 **/__pycache__
 .pytest_cache
 *.log
+third_party/mslicer/target
+tools/zeim-lumen/target
 server.pid
 backups

@@ -1,0 +1,245 @@
+use std::{any::Any, path::PathBuf, str::FromStr};
+
+use anyhow::{Context, Ok, Result};
+use clap::{ArgMatches, Parser};
+use common::{
+    slice::{ExposureConfig, Height, SliceConfig, SliceMode, Supersample},
+    units::{Milimeters, MilimetersPerMinute, Seconds},
+};
+use nalgebra::{ArrayStorage, Const, Matrix, Scalar, U1, Vector2, Vector3};
+use num_integer::cbrt;
+
+/// mslicer command line interface.
+#[derive(Debug, Parser)]
+pub struct Args {
+    #[arg(long, default_value_t = 1)]
+    /// Supersampling anti-aliasing (SSAA) factor.
+    // todo: allow configuring anisotropic AA
+    pub supersample: u8,
+    #[arg(long, default_value = "11520, 5120", value_parser = vector_value_parser::<u32, 2>, )]
+    /// Resolution of the printer mask display in pixels.
+    pub platform_resolution: Vector2<u32>,
+    #[arg(long, default_value = "218.88, 122.904, 260.0", value_parser = vector_value_parser::<f32, 3>)]
+    /// Size of the printer display / platform in mm.
+    pub platform_size: Vector3<f32>,
+    #[arg(long, default_value_t = 0.05)]
+    /// Layer height in mm.
+    pub layer_height: f32,
+    #[arg(long, default_value_t = 3)]
+    /// Number of 'first layers'. These are layers that obey the --first-
+    /// exposure config flags.
+    pub first_layers: u32,
+    #[arg(long, default_value_t = 10)]
+    /// Number of transition layers. These are layers that interpolate from the
+    /// first layer config to the default config.
+    pub transition_layers: u32,
+
+    #[arg(long, default_value_t = 3.0)]
+    /// Layer exposure time in seconds.
+    pub exposure_time: f32,
+    #[arg(long, default_value_t = 1.0)]
+    /// Time between build plate stopping and the exposure, in seconds.
+    pub exposure_delay: f32,
+    #[arg(long, default_value_t = 100.0)]
+    /// Layer exposure PWM (overall brightness). 0%–100%.
+    pub exposure_pwm: f32,
+    #[arg(long, default_value_t = 5.0)]
+    /// Distance to lift the platform after exposing each regular layer, in mm.
+    pub lift_distance: f32,
+    #[arg(long, default_value_t = 65.0)]
+    /// The speed to lift the platform after exposing each regular layer, in
+    /// mm/min.
+    pub lift_speed: f32,
+    #[arg(long, default_value_t = 150.0)]
+    /// The speed to retract (move down) the platform after exposing each
+    /// regular layer, in mm/min.
+    pub retract_speed: f32,
+
+    #[arg(long, default_value_t = 30.0)]
+    /// First layer exposure time in seconds.
+    pub first_exposure_time: f32,
+    #[arg(long, default_value_t = 1.0)]
+    /// Time between build plate stopping and the exposure for first layers, in seconds.
+    pub first_exposure_delay: f32,
+    #[arg(long, default_value_t = 100.0)]
+    /// First layer exposure PWM (overall brightness). 0%–100%.
+    pub first_exposure_pwm: f32,
+    #[arg(long, default_value_t = 5.0)]
+    /// Distance to lift the platform after exposing each first layer, in mm.
+    pub first_lift_distance: f32,
+    #[arg(long, default_value_t = 65.0)]
+    /// The speed to lift the platform after exposing each first layer, in
+    /// mm/min.
+    pub first_lift_speed: f32,
+    #[arg(long, default_value_t = 150.0)]
+    /// The speed to retract (move down) the platform after exposing each first
+    /// layer, in mm/min.
+    pub first_retract_speed: f32,
+
+    #[arg(long)]
+    /// Path to a preview image, will be scaled as needed.
+    pub preview: Option<PathBuf>,
+
+    #[command(flatten)]
+    pub model: ModelArgs,
+
+    /// File to save sliced result to. The extension must be .goo, .ctb, or
+    /// .nanodlp.
+    pub output: PathBuf,
+    /// When the output is .ctb: `legacy` is unencrypted v4 (magic 0x12FD0106),
+    /// `v5` is mslicer's encrypted v5 container (magic 0x12FD0107).
+    /// ZEIM addition. Upstream v0.10.1 mapped `.ctb` to CtbFormat::Unknown,
+    /// which the exporter treats as unreachable.
+    #[arg(long, default_value = "legacy")]
+    pub ctb: String,
+    #[arg(long, short)]
+    /// Don't show the animated progress bars or the timing breakdown.
+    pub quiet: bool,
+    /// The mesh is already in this plate's millimetres, with the origin at the
+    /// minimum corner and Z on the bed. Do not recenter it.
+    /// ZEIM addition. Supports are part of that mesh; recentering would move them.
+    #[arg(long, default_value_t = false)]
+    pub placed: bool,
+}
+
+#[derive(clap::Args, Debug)]
+#[group(required = true)]
+pub struct ModelArgs {
+    #[arg(long)]
+    /// Path to a .stl or .obj file
+    pub mesh: Vec<PathBuf>,
+
+    #[arg(long, value_parser = vector_value_parser::<f32, 3>)]
+    /// Location of the bottom center of model bounding box. The origin is the
+    /// center of the build plate.
+    pub position: Vec<Vector3<f32>>,
+
+    #[arg(long, value_parser = vector_value_parser::<f32, 3>)]
+    /// Rotation of the model in degrees, roll, pitch, yaw.
+    pub rotation: Vec<Vector3<f32>>,
+
+    #[arg(long, value_parser = vector_value_parser::<f32, 3>)]
+    /// Scale of the model along the X, Y, and Z axes.
+    pub scale: Vec<Vector3<f32>>,
+}
+
+#[derive(Debug)]
+pub struct Model {
+    pub path: PathBuf,
+    pub position: Vector3<f32>,
+    pub rotation: Vector3<f32>,
+    pub scale: Vector3<f32>,
+}
+
+impl Args {
+    pub fn slice_config(&self) -> Result<SliceConfig> {
+        Ok(SliceConfig {
+            mode: SliceMode::Raster,
+            supersample: Supersample::splat(cbrt(self.supersample) as u8),
+            exposure_remap: Default::default(), // todo
+            platform_resolution: self.platform_resolution,
+            platform_size: self.platform_size.map(Milimeters::new),
+            slice_height: Milimeters::new(self.layer_height),
+            exposure_config: ExposureConfig {
+                exposure_time: Seconds::new(self.exposure_time),
+                exposure_delay: Seconds::new(self.exposure_delay),
+                pwm: (self.exposure_pwm.clamp(0.0, 100.0) * 2.55) as u8,
+                lift_distance: Milimeters::new(self.lift_distance),
+                lift_speed: MilimetersPerMinute::new(self.lift_speed).convert(),
+                retract_speed: MilimetersPerMinute::new(self.retract_speed).convert(),
+            },
+            first_exposure_config: ExposureConfig {
+                exposure_time: Seconds::new(self.first_exposure_time),
+                exposure_delay: Seconds::new(self.first_exposure_delay),
+                pwm: (self.first_exposure_pwm.clamp(0.0, 100.0) * 2.55) as u8,
+                lift_distance: Milimeters::new(self.first_lift_distance),
+                lift_speed: MilimetersPerMinute::new(self.first_lift_speed).convert(),
+                retract_speed: MilimetersPerMinute::new(self.first_retract_speed).convert(),
+            },
+            first_layers: Height::Layers(self.first_layers),
+            transition_layers: Height::Layers(self.transition_layers),
+        })
+    }
+
+    pub fn mm_to_px(&self) -> Vector3<f32> {
+        Vector3::new(
+            self.platform_resolution.x as f32 / self.platform_size.x,
+            self.platform_resolution.y as f32 / self.platform_size.y,
+            1.0,
+        )
+    }
+}
+
+impl Model {
+    fn new(path: PathBuf) -> Self {
+        Self {
+            path,
+            ..Default::default()
+        }
+    }
+
+    pub fn from_matches(matches: &ArgMatches) -> Vec<Self> {
+        let mut meshes = matches
+            .get_many::<PathBuf>("mesh")
+            .expect("No meshes defined")
+            .zip(matches.indices_of("mesh").unwrap())
+            .map(|x| (x.1, Model::new(x.0.to_owned())))
+            .collect::<Vec<_>>();
+
+        fn model_parameter<T: Any + Clone + Send + Sync + 'static>(
+            matches: &clap::ArgMatches,
+            meshes: &mut [(usize, Model)],
+            key: &str,
+            value: impl Fn(&mut Model) -> &mut T,
+        ) {
+            let Some(instances) = matches.get_many::<T>(key) else {
+                return;
+            };
+
+            for (instance, idx) in instances.zip(matches.indices_of(key).unwrap()) {
+                let mesh = meshes
+                    .iter_mut()
+                    .rfind(|x| idx > x.0)
+                    .expect("Mesh parameter before mesh");
+                *value(&mut mesh.1) = instance.to_owned();
+            }
+        }
+
+        model_parameter(matches, &mut meshes, "scale", |mesh| &mut mesh.scale);
+        model_parameter(matches, &mut meshes, "rotation", |mesh| &mut mesh.rotation);
+        model_parameter(matches, &mut meshes, "position", |mesh| &mut mesh.position);
+
+        meshes.into_iter().map(|x| x.1).collect()
+    }
+}
+
+impl Default for Model {
+    fn default() -> Self {
+        Self {
+            path: PathBuf::default(),
+            position: Vector3::zeros(),
+            rotation: Vector3::zeros(),
+            scale: Vector3::repeat(1.0),
+        }
+    }
+}
+
+fn vector_value_parser<T, const N: usize>(
+    raw: &str,
+) -> Result<Matrix<T, Const<N>, U1, ArrayStorage<T, N, 1>>>
+where
+    T: FromStr + Scalar + Default,
+    T::Err: Send + Sync + std::error::Error,
+{
+    let mut vec = Matrix::<T, Const<N>, U1, ArrayStorage<T, N, 1>>::repeat(T::default());
+
+    let mut parts = raw.splitn(N, ',');
+    for i in 0..N {
+        let element = parts.next().context("Missing vector element")?.trim();
+        vec[i] = element
+            .parse()
+            .context("Can't convert element from string")?;
+    }
+
+    Ok(vec)
+}

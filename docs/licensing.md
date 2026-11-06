@@ -43,13 +43,12 @@ The CAD workspace (`static/cad.html`, `static/cad.js`, `static/cad.css`, `app/co
 
 ## Resin layer files (2026-11-05)
 
-TorchC0 writes `.lumen` v1 with the unmodified Open Resin Alliance reference crate `lumen-format` 1.0.0, commit `4f25f7bcf77c487447e28b8918eb8017e986cc78`, licence MIT OR Apache-2.0. The crate is vendored under `third_party/open-resin-alliance/lumen-format/` with its licence files. ZEIM code does not modify it. Plate width, height and pixel pitch for the Elegoo rows in `app/core/lumen_plates.json` are copied from `df-plugin-elegoo` commit `be59b1597ac5f5551ddbdae97145f584f05be056` (MIT). Preview images from that plugin are not copied. The output is still `.lumen`, not `.goo` or `.ctb`.
+TorchC0 writes `.lumen` v1 with the unmodified Open Resin Alliance reference crate `lumen-format` 1.0.0, commit `4f25f7bcf77c487447e28b8918eb8017e986cc78`, licence MIT OR Apache-2.0. The crate is vendored under `third_party/open-resin-alliance/lumen-format/` with its licence files. ZEIM code does not modify it. Plate width, height and pixel pitch for the Elegoo rows in `app/core/lumen_plates.json` are copied from `df-plugin-elegoo` commit `be59b1597ac5f5551ddbdae97145f584f05be056` (MIT). Preview images from that plugin are not copied. `.goo`, `.ctb`, and `.nanodlp` are written by a separate program, connorslade/mslicer v0.10.1, commit `2d639519eedf4269a341fb6d5508901e06d99d48`, licence GPL-3.0 only (not or-later). The source is vendored at `third_party/mslicer/` with `LICENSE` and `ZEIM-CHANGES.md` (the `--ctb` flag and the mid-slab sample). ZEIM's Python starts that binary and reads the file it writes. It does not copy the slicer into `app/`, and it does not relicense `app/`. Shipping the binary is not a claim that running it in another process removes GPL-3.0 obligations for that program. The corresponding source for the program ZEIM runs is the vendored tree.
 
-Not incorporated, because each one would be a new decision about publishing ZEIM's source or about a protected container:
+Not incorporated:
 
-- DragonFruit, AGPL-3.0-or-later, including its Rust slicing engine.
-- mslicer (connorslade/mslicer v0.10.1), GPL-3.0. The separate-process pattern Zach approved for unmodified PrusaSlicer was not extended to mslicer.
-- `df-plugin-ctb` (MIT) because it includes AES key material for encrypted CTB.
+- DragonFruit, AGPL-3.0-or-later, including its Rust slicing engine. It is not run.
+- `df-plugin-ctb` (MIT) because it includes AES key material for encrypted CTB. mslicer's own `.ctb` writer is the one ZEIM runs. That is not a copy of the plugin's key routine, and a written file is not a claim that a printer's firmware accepts it.
 - ChiTuBox and Lychee importers, Anycubic encoders, and VoxelShift's encrypted-CTB conversion.
 - morluto/rea (`rea-agents` 6.8.0, commit `a7574d4274728fcb0a13414d6ae43f1597864d94`) is MIT, but it is a reverse-engineering tool rather than a slicer. Its disclaimer refuses circumvention of technical protection and copying of proprietary code and assets. Optional analysis engines it can launch include GPL and LGPL programs that ZEIM does not bundle. It was run only on ZEIM's own `zeim-lumen` binary and on a `.lumen` file ZEIM wrote. It is not run on Lychee, CHITUBOX, or the copyleft slicers.
 
