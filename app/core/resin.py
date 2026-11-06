@@ -31,7 +31,7 @@ PRESETS = {
 }
 DEFAULT_PRESET = "standard"
 LIMITS = {"layer_mm": (0.01, 0.2), "exposure_s": (0.5, 30.0), "bottom_exposure_s": (5.0, 120.0), "bottom_layers": (1, 15),
-          "lift_mm": (1.0, 15.0), "lift_speed_mm_min": (10.0, 300.0), "tilt_deg": (0.0, 60.0), "wall_mm": (0.0, 6.0),
+          "lift_mm": (1.0, 15.0), "lift_speed_mm_min": (10.0, 300.0), "tilt_deg": (-180.0, 180.0), "tilt_y_deg": (-180.0, 180.0), "wall_mm": (0.0, 6.0),
           "drain_mm": (0.0, 10.0), "price": (0.0, 10000.0), "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0)}
 SAFETY = ["Wear nitrile gloves and eye protection; uncured resin irritates skin and eyes.",
           "Print and wash in a ventilated room; keep resin away from pets, food areas and anyone not wearing gloves.",
@@ -169,7 +169,8 @@ def _material_price(o, material):
 
 def settings(opts: dict | None = None) -> dict:
     """Material, then preset, then explicit values. A silicone profile replaces the quality preset's exposure and lift.
-    Defaults: 30° tilt, 2 mm hollow wall, 3 mm drain + vent holes, supports on."""
+    Model turn angles stay 0 unless the request sets them. Hollow wall starts at 2 mm,
+    drain holes at 3 mm, and supports default on."""
     o = dict(opts or {})
     material = o.get("material") or DEFAULT_MATERIAL
     if material not in MATERIALS:
@@ -183,7 +184,8 @@ def settings(opts: dict | None = None) -> dict:
     for k in ("layer_mm", "exposure_s", "bottom_exposure_s", "lift_mm", "lift_speed_mm_min"):
         s[k] = _num(o, k, base[k])
     s["bottom_layers"] = _num(o, "bottom_layers", base["bottom_layers"], int)
-    s["tilt_deg"] = _num(o, "tilt_deg", 30.0)
+    s["tilt_deg"] = _num(o, "tilt_deg", 0.0)
+    s["tilt_y_deg"] = _num(o, "tilt_y_deg", 0.0)
     s["wall_mm"] = _num(o, "wall_mm", 2.0)
     s["drain_mm"] = _num(o, "drain_mm", 3.0)
     s["support_spacing_mm"] = _num(o, "support_spacing_mm", 4.0)
@@ -198,14 +200,32 @@ def settings(opts: dict | None = None) -> dict:
     return s
 
 
-def orient(m: trimesh.Trimesh, tilt_deg: float) -> trimesh.Trimesh:
-    """Tilt about X so no big flat area meets the screen in one layer (smaller peel force, fewer suction cups),
-    then sit the lowest point on z=0."""
+def place_on_bed(m: trimesh.Trimesh, tilt_x_deg: float = 0.0, tilt_y_deg: float = 0.0, bed_mm=None) -> trimesh.Trimesh:
+    """Turn the model about its own centre, then sit that pose on the bed.
+
+    The turn is only the angles given here. Zero leaves the file's orientation.
+    After the turn, one translation puts the lowest point on z=0 and the footprint
+    centre on the bed centre (the origin when the bed size is unknown). Parts keep
+    their distances from each other. The mesh is not scaled.
+    """
     m = m.copy()
-    if tilt_deg:
-        m.apply_transform(trimesh.transformations.rotation_matrix(math.radians(tilt_deg), [1, 0, 0], m.centroid))
-    m.apply_translation(-m.bounds[0] * [0, 0, 1])
+    if tilt_x_deg:
+        m.apply_transform(trimesh.transformations.rotation_matrix(math.radians(float(tilt_x_deg)), [1, 0, 0], m.centroid))
+    if tilt_y_deg:
+        m.apply_transform(trimesh.transformations.rotation_matrix(math.radians(float(tilt_y_deg)), [0, 1, 0], m.centroid))
+    m.apply_translation([0, 0, -float(m.bounds[0][2])])
+    mid = (m.bounds[0] + m.bounds[1]) / 2.0
+    if bed_mm is not None and len(bed_mm) >= 2:
+        cx, cy = float(bed_mm[0]) / 2.0, float(bed_mm[1]) / 2.0
+    else:
+        cx, cy = 0.0, 0.0
+    m.apply_translation([cx - float(mid[0]), cy - float(mid[1]), 0.0])
     return m
+
+
+def orient(m: trimesh.Trimesh, tilt_deg: float, tilt_y_deg: float = 0.0, bed_mm=None) -> trimesh.Trimesh:
+    """Same placement as `place_on_bed`. `tilt_deg` is the turn about X."""
+    return place_on_bed(m, tilt_deg, tilt_y_deg, bed_mm)
 
 
 def support_points(m: trimesh.Trimesh, spacing: float, max_angle_deg: float = 45.0, envelope=None) -> np.ndarray:
@@ -559,7 +579,15 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
     rep = {"program": NAME, "settings": s, "notes": [], "safety": list(SAFETY) + list(mat["safety"]), "test_note": TEST_NOTE,
            "material": {"id": s.get("material") or DEFAULT_MATERIAL, "label": mat["label"]},
            "material_notes": list(mat["notes"])}
-    work = orient(m, s["tilt_deg"])
+    work = orient(m, s["tilt_deg"], s.get("tilt_y_deg") or 0.0, bed_mm)
+    if s["tilt_deg"] == 0 and (s.get("tilt_y_deg") or 0) == 0:
+        rep["placement"] = "File orientation kept. The model is moved onto the bed, centred, and not turned."
+    else:
+        rep["placement"] = (
+            f"Model turned {s['tilt_deg']:g}° about X and {s.get('tilt_y_deg') or 0:g}° about Y, then sat on the bed. "
+            "Supports grow on surfaces that face the plate. Turning the model chooses that side. "
+            "Supports the print still needs are not removed."
+        )
     shells = work.split(only_watertight=False)
     if len(shells) > 1:
         # overlapping bodies: join them FIRST, so hollowing sees one solid (not shells inside shells) and the shared

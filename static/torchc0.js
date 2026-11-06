@@ -6,9 +6,13 @@ import { money } from "/static/cost.js";
 import * as THREE from "three";
 import { postForm, progress as handoffProgress } from "/static/handoff-veil.js";
 
+/* OrbitControls in static/vendor/OrbitControls.js: LEFT rotate, MIDDLE dolly, RIGHT pan.
+   Ctrl, Shift, or Meta swaps the left and right actions. The wheel dollies. */
+const CAM_HINT = "Camera: left drag orbits, right drag pans, scroll wheel or middle drag zooms. Ctrl, Shift, or ⌘ with the left button pans instead. Dragging does not turn the model.";
+
 /* 3D result view: the prepared STL with island (red) and suction-cup (orange) markers. Lazy: only made after a result. */
 const views = new WeakMap();   // one viewer per element: the picked-model preview and the result each keep their own
-async function show3D(el, url, lc, buf) {
+async function show3D(el, url, lc, buf, bed) {
   try {
     const { Viewer } = await import("/static/viewer.js");
     let viewer = views.get(el);
@@ -20,6 +24,7 @@ async function show3D(el, url, lc, buf) {
     for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(84 + i * 50 + 12 + k * 4, true);
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.computeVertexNormals();
     viewer.group.clear();
+    viewer.setBed(bed);
     viewer.group.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: "#8fb0e0", roughness: 0.6, transparent: true, opacity: 0.85 })));
     g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
     const mark = (p, color) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color, depthTest: false }));
@@ -54,20 +59,26 @@ function panelHTML() {
     <div class="grid2 rzRow"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
     <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p>
-      <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div></div></div>
+      <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div>
+      <p class="help" id="rzCamHint">${CAM_HINT}</p></div></div>
     <p class="help" id="rzInfo"></p>
     <div class="grid2"><div class="field"><label for="rzMaterial">Resin</label><select id="rzMaterial">${(cat.materials || []).map(m => `<option value="${m.id}" ${m.id === cat.default_material ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
     <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div></div>
     <p class="help" id="rzMatNote"></p><div id="rzMatExtra"></div>
     <details class="rzAdv" id="rzAdv"${document.body.dataset.level === "expert" ? " open" : ""}><summary>Advanced resin settings</summary><div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
       ${num("rzBL", "Bottom layers", 5, 1, 15, 1, "")}${num("rzLift", "Lift distance", 6, 1, 15, 0.5, "mm")}${num("rzLiftS", "Lift speed", 65, 10, 300, 5, "mm/min")}
-      ${num("rzTilt", "Tilt", 30, 0, 60, 5, "°")}${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
+      ${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
     <p class="help warn rzWarn" id="rzWallWarn" hidden>Walls under 1 mm crack easily in resin. Use 1 mm or more, or prepare anyway.
       <button type="button" class="btn small" id="rzWallAnyway">Prepare anyway</button> <button type="button" class="btn small" id="rzWallDismiss" aria-label="Dismiss this warning">Dismiss</button></p>
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
       ${num("rzCost", "Resin price", loadP().price ?? cat.default_price ?? "", 0, 10000, 0.5, "")}
       <div class="field"><label for="rzCostU">Price per</label><select id="rzCostU"><option value="l" ${(loadP().unit || cat.default_price_unit) === "l" ? "selected" : ""}>litre</option><option value="kg" ${loadP().unit === "kg" ? "selected" : ""}>kg</option></select></div></div>
     <p class="help" id="rzPriceNote"></p>
+    <fieldset class="rzOrient"><legend>Model on the plate</legend>
+      <p class="help">These angles turn the model before supports are built. They are not the camera. Supports grow on surfaces that face the plate, so turn the side you want unmarked away from the plate. Supports the print still needs stay.</p>
+      <div class="grid2">${num("rzTilt", "Turn about X", 0, -180, 180, 5, "°")}${num("rzTiltY", "Turn about Y", 0, -180, 180, 5, "°")}</div>
+      <div class="row"><button type="button" class="btn small" id="rzOriXp">+90° X</button><button type="button" class="btn small" id="rzOriXn">−90° X</button><button type="button" class="btn small" id="rzOriYp">+90° Y</button><button type="button" class="btn small" id="rzOriYn">−90° Y</button><button type="button" class="btn small" id="rzOri0">File orientation</button></div>
+    </fieldset>
     <label class="inl chk"><input type="checkbox" id="rzHollow" checked> Hollow (saves resin; needs a drain hole)</label>
     <p class="help warn rzWarn" id="rzDrainWarn" role="status" hidden>Hollow with no drain hole: liquid resin stays trapped inside, and the part can crack or leak later. Set Drain hole Ø to 2 mm or more, or turn Hollow off.</p>
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
@@ -94,7 +105,8 @@ function wire() {
     const kg = mat.density_g_ml == null && $("#rzCostU").value === "kg";
     $("#rzPriceNote").textContent = kg ? "Silicone has no single density here, so a per-kg price cannot be turned into a cost. Enter a price per litre." : "";
   };
-  $("#rzPrinter").onchange = info; info();
+  const bedNow = () => { const p = cat.printers.find(x => x.id === $("#rzPrinter").value); return p && p.bed_mm; };
+  $("#rzPrinter").onchange = () => { info(); const f = $("#rzFile") && $("#rzFile").files[0]; if (f) show(); onPose(); }; info();
   pr.onchange = () => { const mat = matOf(); if (mat && mat.settings) return; applyPrint(cat.presets.find(x => x.id === pr.value)); };
   $("#rzMaterial").onchange = () => paintMaterial(true);
   $("#rzCostU").onchange = () => paintMaterial(false);
@@ -128,7 +140,7 @@ function wire() {
   const loadPick1 = async (f, nm) => {
     const seq = ++pickSeq, pv = $("#rzPickView");
     try {
-      const fd = new FormData(); fd.append("file", f);
+      const fd = new FormData(); fd.append("file", f); fd.append("printer_id", $("#rzPrinter").value);
       const r = await postForm("/api/resin/preview", fd, handoffProgress);   // real upload/download % for the hand-off veil
       if (seq !== pickSeq) return;
       if (!r.ok) { let m = `HTTP ${r.status}`; try { m = JSON.parse(new TextDecoder().decode(r.buf)).detail || m; } catch { }
@@ -136,7 +148,7 @@ function wire() {
       const buf = r.buf; if (seq !== pickSeq) return;
       const n = +r.headers.get("X-Zeim-Faces") || 0, uid = r.headers.get("X-Zeim-Upload");
       if (uid) picked = { f, id: uid };
-      pv.hidden = false; await show3D(pv, null, null, buf); pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      pv.hidden = false; await show3D(pv, null, null, buf, bedNow()); pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
       st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
     } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
     finally { if (seq === pickSeq) document.dispatchEvent(new CustomEvent("zeim:torchc0-loaded")); }   // the hand-off veil lifts
@@ -157,12 +169,34 @@ function wire() {
     const fd = new FormData();
     const v = { printer_id: $("#rzPrinter").value, material: $("#rzMaterial").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,
-      tilt_deg: $("#rzTilt").value, wall_mm: $("#rzWall").value, drain_mm: $("#rzDrain").value, hollow: $("#rzHollow").checked, supports: $("#rzSup").checked,
+      tilt_deg: $("#rzTilt").value, tilt_y_deg: $("#rzTiltY").value, wall_mm: $("#rzWall").value, drain_mm: $("#rzDrain").value, hollow: $("#rzHollow").checked, supports: $("#rzSup").checked,
       price: $("#rzCost").value, price_unit: $("#rzCostU").value };
     last = { v, f, isl: [], drains: [] };
     await run();
   };
   let last = null;
+  let preparedKey = "";
+  const poseKey = () => `${$("#rzPrinter").value}|${$("#rzTilt").value}|${$("#rzTiltY").value}`;
+  const dropResult = (msg) => {
+    if (!last || !last.rep) return;
+    stopSlicePoll();
+    last.rep = null; last.isl = []; last.drains = [];
+    delete document.body.dataset.torchStl;
+    const box = $("#torchOut");
+    if (box) { box.classList.remove("rzResult"); box.innerHTML = `<p class="help warn" id="rzStale" role="status">${msg}</p>`; }
+  };
+  const onPose = () => { if (last && last.rep && poseKey() !== preparedKey) dropResult("Orientation or printer changed. Prepare again so the supports, island marks, and slice match this placement."); };
+  const bump = (id, delta) => {
+    const el = $(id); let v = Math.round((+el.value || 0) + delta);
+    if (v > 180) v -= 360; if (v < -180) v += 360; el.value = String(v); onPose();
+  };
+  $("#rzOriXp").onclick = () => bump("#rzTilt", 90);
+  $("#rzOriXn").onclick = () => bump("#rzTilt", -90);
+  $("#rzOriYp").onclick = () => bump("#rzTiltY", 90);
+  $("#rzOriYn").onclick = () => bump("#rzTiltY", -90);
+  $("#rzOri0").onclick = () => { $("#rzTilt").value = "0"; $("#rzTiltY").value = "0"; onPose(); };
+  $("#rzTilt").addEventListener("input", onPose);
+  $("#rzTiltY").addEventListener("input", onPose);
   async function startSlice() {
     stopSlicePoll();
     const box = $("#rzSliceOut");
@@ -240,7 +274,7 @@ function wire() {
       catch (err) { if (err.status !== 410 || !uid) throw err;      // the loaded copy expired: send the file itself
         picked = null; fd.delete("upload_id"); fd.delete("file_name"); fd.append("file", f); r = await api("/api/resin/prepare", { method: "POST", body: fd }); }
       const e = r.estimate;
-      last.rep = r; document.body.dataset.torchStl = r.downloads.stl;   // Send to… hands over the prepared model
+      last.rep = r; preparedKey = poseKey(); document.body.dataset.torchStl = r.downloads.stl;   // Send to… hands over the prepared model
       const lc = r.layer_check || { islands: [], suction: [] }, nI = lc.islands.length, nS = lc.suction.length;
       const costTxt = e.cost == null ? "<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> enter a price for a cost estimate" : `<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> about ${esc(money(e.cost, $("#rzCur").value))} (estimate)`;
       out.innerHTML = `<h2 class="rzResHead">Result</h2><div id="rzView" class="rzView" role="img" aria-label="3D view of the prepared model: red dots are islands, orange dots are suction cups" style="position:relative;width:100%;height:min(60vw,360px);min-height:220px;border-radius:8px;overflow:hidden"></div>
@@ -250,7 +284,9 @@ function wire() {
         <p class="help ${nS ? "warn rzWarn" : ""}" id="rzCups"><span class="pill"><svg class=i i-amber aria-hidden=true focusable=false><use href=#i-dot></use></svg> ${nS} suction cup${nS === 1 ? "" : "s"}</span> ${nS ? "Hollows sealed on the plate side trap resin and pull a vacuum (orange dots)." : "No suction cups found."}
           ${nS ? `<button type="button" class="btn small" id="rzFixCup" style="min-height:44px">Add drain hole${nS === 1 ? "" : "s"}</button> <button type="button" class="btn small rzDismiss" style="min-height:44px" aria-label="Dismiss the suction cup warning">Dismiss</button>` : ""}</p></div>
         <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers, estimate</span>${r.material && r.material.id !== "standard" ? `<span class="pill">${esc(r.material.label)}</span>` : ""}${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
+        <p class="help">${esc(r.placement || "")}</p>
         <p class="help">${esc(e.slice_note || "Slice to .lumen writes the layer masks. CHITUBOX, Lychee, GOO and Photon files are not written here.")}</p>
+        <p class="help">${CAM_HINT}</p>
         <div class="row rzSliceRow">
           <div class="field"><label for="rzPlate">LUMEN plate</label><select id="rzPlate">${plateOptions(r.size_mm)}</select></div>
           <label class="inl chk" style="min-height:44px"><input type="checkbox" id="rzAA"> Anti-alias edges</label>
@@ -271,7 +307,7 @@ function wire() {
         const native = p.native_format ? ` Stock files for this plate are ${p.native_format}, which this slice does not write.` : " This grid is not a commercial printer.";
         note.textContent = `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um/1000).toFixed(1)} × ${(p.build_depth_um/1000).toFixed(1)} × ${(p.build_height_um/1000).toFixed(1)} mm. Output is .lumen.${native} Not hardware-tested.`; };
       if (plateSel) { plateSel.onchange = sayPlate; sayPlate(); }
-      show3D($("#rzView"), r.downloads.stl, lc);
+      show3D($("#rzView"), r.downloads.stl, lc, null, bedNow());
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }
   }
