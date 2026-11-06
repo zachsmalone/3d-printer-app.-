@@ -383,27 +383,35 @@ CHECK_FAILED = "The full model could not be checked. Slice stays off. The view i
 def not_ready(meta: dict | None) -> str | None:
     """Why Slice must refuse this project, or None when it may run.
 
-    Only an explicit pending flag blocks. Older projects do not have one.
+    A large STL stays blocked until `slice_ready` is true. A missing flag on that
+    project is still pending: the editor reports it as not ready. Older projects
+    have neither `header_triangles` nor `stats.pending`, so they still slice.
     """
-    if not meta or meta.get("slice_ready") is not False:
+    if not isinstance(meta, dict):
+        return PENDING_SLICE
+    if meta.get("slice_ready") is True:
+        return None
+    pending = meta.get("slice_ready") is False or (meta.get("stats") or {}).get("pending") is True or bool(meta.get("header_triangles"))
+    if not pending:
         return None
     return str(meta.get("check_error") or PENDING_SLICE)
 
 
 def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes | None,
-                       beginner: bool, warnings: list[str], preview: dict, size_mm: list, triangles: int,
-                       import_scale: float = 1.0, import_units: str = "mm") -> dict:
-    """Save a lighter preview and mark Slice off. The original bytes are written when given.
+                       beginner: bool, warnings: list[str], preview: dict | None, size_mm: list, triangles: int,
+                       import_scale: float = 1.0, import_units: str = "mm", write_preview: bool = True) -> dict:
+    """Save the pending record and mark Slice off. The original bytes are written when given.
 
-    The open path passes original=None and writes the file after the view response has finished,
-    so a slow disk does not hold the preview behind the full file.
+    `write_preview` false keeps the large preview JSON off this call. The open path yields the
+    in-memory preview first, then writes that file. A slow disk must not sit in front of the view.
     """
     bid = uuid.uuid4().hex[:12]
     d = store.dir(bid)
     d.mkdir(parents=True)
     if original is not None:
         (d / "original.stl").write_bytes(original)
-    (d / "preview.json").write_text(json.dumps(preview))
+    if write_preview and preview is not None:
+        (d / "preview.json").write_text(json.dumps(preview))
     ops = []
     if import_scale != 1.0:
         ops.append({"op": "scale", "params": {"factor": import_scale, "pivot": "origin"},
@@ -420,11 +428,23 @@ def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dic
     return store.get(bid)
 
 
-def quick_payload(meta: dict) -> dict:
+def write_preview(bid: str, preview: dict) -> None:
+    """Store the view mesh. Missing file stays a pending project; Slice does not run."""
+    d = store.dir(bid)
+    if not d.is_dir():
+        return
+    (d / "preview.json").write_text(json.dumps(preview))
+
+
+def quick_payload(meta: dict, preview: dict | None = None) -> dict:
     """Project JSON for a large STL whose full check has not finished. Does not load the mesh."""
     from ..api.builds import summary
     d = store.dir(meta["id"])
-    preview = json.loads((d / "preview.json").read_text())
+    if preview is None:
+        path = d / "preview.json"
+        preview = json.loads(path.read_text()) if path.is_file() else {
+            "decimated": True, "authoritative": False, "note": "Preview only. The saved file keeps every triangle.",
+            "bodies": []}
     n = int(meta.get("header_triangles") or meta.get("stats", {}).get("triangles") or 0)
     size = (meta.get("stats") or {}).get("size_mm") or [0, 0, 0]
     if meta.get("slice_ready") and meta.get("analysis"):

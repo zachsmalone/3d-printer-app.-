@@ -43,12 +43,16 @@ def slices_root() -> Path:
 
 
 def _block_until_ready(model_id: str) -> None:
-    """Refuse to slice while the authoritative check is still pending. A read error stays closed."""
+    """Refuse to slice while the authoritative check is still pending.
+
+    A missing record is not treated as ready. KeyError used to return and the
+    caller continued into the slicer.
+    """
     from app.services.history import store as _store
     try:
         meta = _store.get(model_id)
     except KeyError:
-        return
+        _fail(404, "model_not_found", "We couldn't find that model. It may have expired. Please rebuild it.")
     except Exception:
         _fail(503, "model_unread", "The model record could not be read. Slice stays off.")
     reason = editproj.not_ready(meta)

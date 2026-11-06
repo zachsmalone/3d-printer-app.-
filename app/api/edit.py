@@ -62,31 +62,37 @@ def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_
     """
     from .builds import disk_guard
 
-    def commit(preview: dict, size_mm: list, triangles: int):
+    def commit(preview: dict, size_mm: list, triangles: int, *, persist_preview: bool):
         if scale != 1.0:
             raw = base64.b64decode(preview["bodies"][0]["positions"])
             arr = np.frombuffer(raw, dtype="<f4").copy() * np.float32(scale)
             preview["bodies"][0]["positions"] = base64.b64encode(np.ascontiguousarray(arr.astype("<f4")).tobytes()).decode()
             size_mm = [round(float(v) * scale, 3) for v in size_mm]
+        # The small record is written here so a slice that arrives with the view already sees slice_ready false.
+        # The preview file, the history scan, and the disk sweep are not on this side of the yield.
+        meta = editproj.create_pending_stl(
+            actor.sid, privacy.default_level(actor), title=title, base=base, original=None,
+            beginner=beginner, warnings=warnings, preview=preview if persist_preview else None,
+            size_mm=size_mm, triangles=triangles,
+            import_scale=scale, import_units=units, write_preview=persist_preview)
+        background.add_task(editproj.store_original_and_check, meta["id"], data)
+        body = {**editproj.quick_payload(meta, preview), "history": None}
+        return meta["id"], body
+
+    if not stream:
         disk_guard()
         with store.lock:
             try:
                 store.reserve(actor.sid, auto_delete_oldest)
             except HistoryFull:
                 return _full(actor)
-            meta = editproj.create_pending_stl(
-                actor.sid, privacy.default_level(actor), title=title, base=base, original=None,
-                beginner=beginner, warnings=warnings, preview=preview, size_mm=size_mm, triangles=triangles,
-                import_scale=scale, import_units=units)
-        background.add_task(editproj.store_original_and_check, meta["id"], data)
-        return {**editproj.quick_payload(meta), "history": [summary(m) for m in store.list(actor.sid)]}
-
-    if not stream:
         ready = {}
         for ev in editproj.iter_binary_stl_preview(data):
             if ev.get("phase") == "preview_ready":
                 ready = ev
-        return commit(ready["preview"], ready["size_mm"], ready["triangles"])
+        _bid, project = commit(ready["preview"], ready["size_mm"], ready["triangles"], persist_preview=True)
+        project["history"] = [summary(m) for m in store.list(actor.sid)]
+        return project
 
     def body():
         try:
@@ -96,12 +102,16 @@ def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_
                     ready = ev
                 else:
                     yield json.dumps(ev) + "\n"
-            project = commit(ready["preview"], ready["size_mm"], ready["triangles"])
-            if isinstance(project, JSONResponse):
-                yield json.dumps({"phase": "error", "status": project.status_code,
-                                  "body": json.loads(project.body.decode())}) + "\n"
-                return
+            bid, project = commit(ready["preview"], ready["size_mm"], ready["triangles"], persist_preview=False)
             yield json.dumps({"phase": "interactive", "slice_ready": False, "project": project}) + "\n"
+            # After the view line: capacity sweep and the preview file. A slow disk stays behind the line.
+            try:
+                disk_guard()
+                with store.lock:
+                    store.reserve(actor.sid, auto_delete_oldest)
+            except HistoryFull:
+                pass
+            editproj.write_preview(bid, ready["preview"])
         except Exception:
             import logging
             logging.getLogger("zeim.import").exception("large STL view failed")
