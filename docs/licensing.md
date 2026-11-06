@@ -40,3 +40,16 @@ The CAD workspace (`static/cad.html`, `static/cad.js`, `static/cad.css`, `app/co
   | trimesh | MIT | mesh handling, body splitting |
   | three.js (+ OrbitControls) | MIT | 3D view in the browser |
   No new dependency was added.
+
+## Resin layer files (2026-11-05)
+
+TorchC0 writes `.lumen` v1 with the unmodified Open Resin Alliance reference crate `lumen-format` 1.0.0, commit `4f25f7bcf77c487447e28b8918eb8017e986cc78`, licence MIT OR Apache-2.0. The crate is vendored under `third_party/open-resin-alliance/lumen-format/` with its licence files. ZEIM code does not modify it. Plate width, height and pixel pitch for the Elegoo rows in `app/core/lumen_plates.json` are copied from `df-plugin-elegoo` commit `be59b1597ac5f5551ddbdae97145f584f05be056` (MIT). Preview images from that plugin are not copied. The output is still `.lumen`, not `.goo` or `.ctb`.
+
+Not incorporated, because each one would be a new decision about publishing ZEIM's source or about a protected container:
+
+- DragonFruit, AGPL-3.0-or-later, including its Rust slicing engine.
+- mslicer (connorslade/mslicer v0.10.1), GPL-3.0. The separate-process pattern Zach approved for unmodified PrusaSlicer was not extended to mslicer.
+- `df-plugin-ctb` (MIT) because it includes AES key material for encrypted CTB.
+- ChiTuBox and Lychee importers, Anycubic encoders, and VoxelShift's encrypted-CTB conversion.
+
+This note is not legal advice.

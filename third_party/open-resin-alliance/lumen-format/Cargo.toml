@@ -1,0 +1,47 @@
+[package]
+name = "lumen-format"
+version = "1.0.0"
+edition = "2021"
+# 1.85, not the 1.78 this first claimed: a transitive proc-macro dependency
+# (zeroize_derive 1.5.0, via the RustCrypto stack) uses edition 2024, which Cargo
+# cannot parse before 1.85. The number is verified, not estimated - CI runs the
+# whole suite on it with the committed lock.
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+description = "Reference encoder, decoder and validator for the LUMEN resin print file format (v1.0)"
+readme = "README.md"
+repository = "https://github.com/Open-Resin-Alliance/LumenFormat"
+keywords = ["lumen", "msla", "3d-printing", "resin", "slicer"]
+categories = ["encoding", "parser-implementations"]
+
+[lib]
+name = "lumen"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zstd = "0.13"
+crc32c = "0.6"
+sha2 = "0.10"
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+aes-kw = "0.2"
+argon2 = "0.5"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+hkdf = "0.12"
+rand = "0.8"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# `wasm32-unknown-unknown` has no OS entropy source, and `getrandom` refuses to
+# guess one: its `js` backend is the only implementation that exists there, so a
+# crate that must build for wasm has to select it. This is scoped to wasm32 and
+# changes nothing on other targets.
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }

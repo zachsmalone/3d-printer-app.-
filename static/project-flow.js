@@ -6,7 +6,7 @@
    A photo design and its slicer copy are different records. The copy is remembered
    for this browser tab (zeim.flow) so the next stage does not import the photo again.
    A repaired file that is not a project yet is remembered the same way: one slicer
-   project per repair id. Resin layer files are made in the printer's own slicer.
+   project per repair id. TorchC0 can write a .lumen layer file. CTB, GOO and Lychee files stay in the printer's slicer.
    TorchC0 only prepares. */
 import { LIBRARY_HASH } from "./studio-library.js";
 export const FLOW_KEY = "zeim.flow";
@@ -278,10 +278,10 @@ export function planHop(stage, ctx) {
   if (stage === "prepare" && kind === "resin") {
     const meshId = meshOf(c);
     const note = meshId && photoId && meshId === c.copyId
-      ? "Prepare copies the slicer copy of this photo design into TorchC0. The photo design stays on Account. The layer file is made in your resin printer's slicer."
+      ? "Prepare copies the slicer copy of this photo design into TorchC0. The photo design stays on Account. TorchC0 can slice a .lumen file. The printer's own slicer still makes CTB, GOO and Lychee files."
       : (meshId
-        ? "Prepare copies this project's mesh into TorchC0. This project stays as it is. The layer file is made in your resin printer's slicer."
-        : "Prepare copies this photo model into TorchC0. The photo design stays on Account. The layer file is made in your resin printer's slicer.");
+        ? "Prepare copies this project's mesh into TorchC0. This project stays as it is. TorchC0 can slice a .lumen file. The printer's own slicer still makes CTB, GOO and Lychee files."
+        : "Prepare copies this photo model into TorchC0. The photo design stays on Account. TorchC0 can slice a .lumen file. The printer's own slicer still makes CTB, GOO and Lychee files.");
     return Object.assign({ stage }, torchPlan(c, note, c.view === "torchc0" ? "" : meshId));
   }
   if (stage === "slice" && kind === "fdm") {
@@ -296,7 +296,7 @@ export function planHop(stage, ctx) {
   }
   if (stage === "slice" && kind === "resin") {
     const meshId = meshOf(c);
-    const note = "Export/Print for resin is the layer file in your resin printer's slicer. TorchC0 prepares the model. Export that file, then open it in the printer's slicer.";
+    const note = "Export/Print for resin can be a .lumen layer file from TorchC0. CTB, GOO, Lychee and Photon files are still made in the printer's own slicer.";
     if (c.view === "torchc0") return { stage, stay: false, open: "focus", focus: "#rzExport", note };
     return Object.assign({ stage }, torchPlan(c, note, meshId));
   }

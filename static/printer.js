@@ -67,7 +67,7 @@ export function wirePicker(uid, onChange) {
   const info = () => {
     const p = printerOf(pr.value);
     $(`#${uid}_nzf`).hidden = !p || p.technology === "Resin";
-    $(`#${uid}_info`).innerHTML = !p ? "" : `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. ` + (p.technology === "Resin" ? "Resin printer: no nozzle. Prepare it in the TorchC0 tab, then make the layer file in " + esc(p.official_slicer || "its own resin slicer") + "." : mfrHTML(p.id, +nz.value));
+    $(`#${uid}_info`).innerHTML = !p ? "" : `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. ` + (p.technology === "Resin" ? "Resin printer: no nozzle. Prepare it in the TorchC0 tab. TorchC0 can write a .lumen layer file. " + esc(p.official_slicer || "The printer's own slicer") + " still makes this machine's stock file." : mfrHTML(p.id, +nz.value));
   };
   pr.onchange = () => { const p = printerOf(pr.value); if (p) nz.innerHTML = nozOptions(p.id, pickNozzle(p.id, +nz.value)); info(); onChange?.(readPicker(uid)); };
   nz.onchange = () => { info(); onChange?.(readPicker(uid)); };

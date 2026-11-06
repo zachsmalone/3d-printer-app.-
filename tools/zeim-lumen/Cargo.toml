@@ -1,0 +1,13 @@
+[package]
+name = "zeim-lumen"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "ZEIM TorchC0 encoder and inspector for Open Resin Alliance LUMEN v1 files"
+license = "LicenseRef-ZEIM-proprietary"
+
+[dependencies]
+lumen = { path = "../../third_party/open-resin-alliance/lumen-format", package = "lumen-format" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
