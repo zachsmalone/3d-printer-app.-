@@ -174,7 +174,15 @@ async def _ck(mesh_path, printer_id, nozzle, run_slice=False):
 @router.get("/api/willprint/build/{bid}")
 async def willprint_build(bid: str, printer_id: str = "", nozzle: str = "", slice: bool = False, actor: Actor = Depends(get_actor)):
     from app.api.slice import resolve_model
+    from app.services.history import store
     from starlette.concurrency import run_in_threadpool
+    try:
+        meta = store.get(bid)
+    except Exception:
+        meta = None
+    if meta and meta.get("slice_ready") is False:
+        return {"verdict": "unchecked", "label": "Full model still being checked", "checks": {},
+                "tips": ["Slice stays off until the check finishes. The view is a lighter preview."]}
     return await _ck(await run_in_threadpool(resolve_model, bid, actor), printer_id or None, nozzle or None, slice)
 
 

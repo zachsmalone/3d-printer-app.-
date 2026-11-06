@@ -373,8 +373,9 @@ def check(data: bytes, *, max_bytes: int = MAX_BYTES, max_pixels: int = MAX_IMAG
         _, faces, verts = stl
         if faces > max_faces:
             raise Rejected("too_many_faces", faces=faces, limit=max_faces)
-        if verts > max_vertices:
-            raise Rejected("too_many_vertices", vertices=verts, limit=max_vertices)
+        # STL corner records are three per triangle, not unique vertices. A 1.6M-triangle
+        # binary file would report ~4.8M corners and be refused even though it is under the
+        # triangle cap. OBJ and 3MF still use the unique-vertex cap.
         return Checked("mesh", "stl", len(data), mesh={"vertices": verts, "faces": faces})
     obj = _sniff_obj(data)
     if obj:

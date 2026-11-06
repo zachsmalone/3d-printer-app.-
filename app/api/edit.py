@@ -6,7 +6,10 @@ from pathlib import Path
 import numpy as np
 import trimesh
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+
+import base64
+import json
 
 from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
@@ -50,6 +53,59 @@ def _fdm_lean(data: bytes):
                  "(the shape change is far smaller than a print layer).")
 
 
+def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_delete_oldest: bool,
+                    base: dict, warnings: list, scale: float, units: str, stream: bool):
+    """Show a lighter view quickly. The original STL is stored unchanged. Slice waits for the full check."""
+    from .builds import disk_guard
+
+    def commit(preview: dict, size_mm: list, triangles: int):
+        if scale != 1.0:
+            raw = base64.b64decode(preview["bodies"][0]["positions"])
+            arr = np.frombuffer(raw, dtype="<f4").copy() * np.float32(scale)
+            preview["bodies"][0]["positions"] = base64.b64encode(np.ascontiguousarray(arr.astype("<f4")).tobytes()).decode()
+            size_mm = [round(float(v) * scale, 3) for v in size_mm]
+        disk_guard()
+        with store.lock:
+            try:
+                store.reserve(actor.sid, auto_delete_oldest)
+            except HistoryFull:
+                return _full(actor)
+            meta = editproj.create_pending_stl(
+                actor.sid, privacy.default_level(actor), title=title, base=base, original=data,
+                beginner=beginner, warnings=warnings, preview=preview, size_mm=size_mm, triangles=triangles,
+                import_scale=scale, import_units=units)
+        editproj.start_full_check(meta["id"])
+        return {**editproj.quick_payload(meta), "history": [summary(m) for m in store.list(actor.sid)]}
+
+    if not stream:
+        ready = {}
+        for ev in editproj.iter_binary_stl_preview(data):
+            if ev.get("phase") == "preview_ready":
+                ready = ev
+        return commit(ready["preview"], ready["size_mm"], ready["triangles"])
+
+    def body():
+        try:
+            ready = {}
+            for ev in editproj.iter_binary_stl_preview(data):
+                if ev.get("phase") == "preview_ready":
+                    ready = ev
+                else:
+                    yield json.dumps(ev) + "\n"
+            project = commit(ready["preview"], ready["size_mm"], ready["triangles"])
+            if isinstance(project, JSONResponse):
+                yield json.dumps({"phase": "error", "status": project.status_code,
+                                  "body": json.loads(project.body.decode())}) + "\n"
+                return
+            yield json.dumps({"phase": "interactive", "slice_ready": False, "project": project}) + "\n"
+        except Exception:
+            import logging
+            logging.getLogger("zeim.import").exception("large STL view failed")
+            yield json.dumps({"phase": "error", "message": "The model could not be opened. Nothing was simplified."}) + "\n"
+
+    return StreamingResponse(body(), media_type="application/x-ndjson")
+
+
 def _edit_meta(bid: str, actor: Actor, owner_only=False) -> dict:
     meta = meta_for(bid, actor, owner_only=owner_only)
     if meta.get("kind") != "edit":
@@ -90,7 +146,8 @@ def new_project(
     width_mm: float = Form(100.0),
     photo_ack: bool = Form(False),
     keep_history: bool = Form(True),
-    fdm_big: bool = Form(False),                # FDM Slicer tab only: simplify very big binary STLs (core/fdmlean.py)
+    fdm_big: bool = Form(False),                # FDM tab still sends this. Large STLs are no longer replaced with a simpler mesh.
+    progress: str = Form(""),                   # "1": newline JSON phases while the view is built
     select: str = Form(""),                     # Select mode: traced selection for a photo base (app/core/selectmask.py)
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
@@ -153,11 +210,15 @@ def new_project(
                 raise HTTPException(415, bad)
             if fdm_big:
                 from ..core import memtrim
-                background.add_task(memtrim.trim)                # FDM tab: give the 100 MB upload's heap back afterwards
-            if fdm_big and ext == "stl":
-                data, note = _fdm_lean(data)
-                if note:
-                    warnings.append(note)
+                background.add_task(memtrim.trim)                # FDM tab: give the big upload's heap back afterwards
+            from ..core import fdmlean
+            if ext == "stl" and fdmlean.faces_if_big(data):
+                _gate(data, actor)
+                scale = meshedit.UNIT_MM.get(units, 1.0)
+                base = {"type": "upload", "format": "stl", "units": units}
+                fast_title = title or sample_title or "My model"
+                return _open_large_stl(data, actor, fast_title, beginner, auto_delete_oldest, base, warnings,
+                                       scale, units, progress == "1")
             _gate(data, actor)
             try:
                 mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])     # warn on the converted size (B9)

@@ -47,12 +47,79 @@ function ensureViewer() {
 }
 
 /* ---------- opening / creating projects ---------- */
+async function postUpload(url, fd, signal, onUpload, onEvent) {
+  const xhr = new XMLHttpRequest();
+  let buf = "", shown = false, project = null;
+  const take = (text) => {
+    buf += text;
+    const lines = buf.split("\n");
+    buf = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let ev; try { ev = JSON.parse(line); } catch { continue; }
+      if (ev.phase === "error") {
+        const e = new Error(ev.message || ev.body?.message || "The model could not be opened.");
+        e.status = ev.status || 400; e.body = ev.body || {}; throw e;
+      }
+      if (ev.phase === "view" && ev.total) {
+        if (ev.done >= ev.total) onEvent({ phase: "draw" });
+        else onEvent({ phase: "view", pct: Math.min(99, Math.floor(100 * ev.done / ev.total)) });
+      }
+      if (ev.phase === "interactive" && ev.project) { project = ev.project; onEvent({ phase: "draw" }); }
+    }
+  };
+  const done = new Promise((resolve, reject) => {
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = ev => { if (ev.lengthComputable) onUpload(ev.loaded, ev.total); };
+    xhr.upload.onload = () => onEvent({ phase: "uploaded" });
+    let read = 0;
+    xhr.onprogress = () => {
+      const text = xhr.responseText || "";
+      try { take(text.slice(read)); } catch (e) { reject(e); xhr.abort(); }
+      read = text.length;
+    };
+    xhr.onerror = () => reject(Object.assign(new Error("The upload didn't finish. Check the connection and try again."), { name: "UploadError" }));
+    xhr.onabort = () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+    xhr.onload = () => {
+      const ct = xhr.getResponseHeader("content-type") || "";
+      if (xhr.status < 200 || xhr.status >= 300) {
+        let j = null; try { j = JSON.parse(xhr.responseText || ""); } catch { }
+        const detail = j && j.detail;
+        const msg = typeof detail === "string" ? detail : (detail && detail.message) || (j && j.message) || `HTTP ${xhr.status}`;
+        const e = new Error(msg); e.status = xhr.status; e.body = j; reject(e); return;
+      }
+      if (!ct.includes("ndjson")) {
+        try { resolve(JSON.parse(xhr.responseText || "")); } catch { reject(new Error("The model could not be opened.")); }
+        return;
+      }
+      try { take((xhr.responseText || "").slice(read)); if (buf.trim()) take(buf + "\n"); } catch (e) { reject(e); return; }
+      if (!project) { reject(new Error("The model could not be opened.")); return; }
+      resolve(project);
+    };
+  });
+  if (signal) signal.addEventListener("abort", () => xhr.abort());
+  xhr.send(fd);
+  return done.then(p => ({ project: project || p, shown }));
+}
+const mbOf = n => (n / (1024 * 1024)).toFixed(1);
 async function create(fd, retry) {
   if (importCtl) importCtl.abort();
   const ctl = importCtl = new AbortController();
-  busy(true, "Importing…", () => ctl.abort());
+  const streaming = typeof fd?.has === "function" && fd.has("progress");
+  busy(true, streaming ? "Uploading…" : "Importing…", () => ctl.abort());
   try {
-    const r = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
+    let r;
+    if (streaming) {
+      const out = await postUpload("/api/edit/new", fd, ctl.signal,
+        (loaded, total) => busy(true, `Uploading… ${mbOf(loaded)} MB of ${mbOf(total)} MB`, () => ctl.abort()),
+        (ev) => {
+          if (ev.phase === "uploaded") busy(true, "Upload finished. Preparing the view…", () => ctl.abort());
+          else if (ev.phase === "view") busy(true, `Preparing the view… ${ev.pct}%`, () => ctl.abort());
+          else if (ev.phase === "draw") busy(true, "Drawing the model…", () => ctl.abort());
+        });
+      r = out.project;
+    } else r = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
     if (ctl.signal.aborted || ctl !== importCtl) return;
     S.history = r.history; renderHistory(); loadProject(r);
     if (copyFromPhoto && r.id) { rememberCopy(sessionStorage, copyFromPhoto, r.id); copyFromPhoto = ""; document.dispatchEvent(new CustomEvent("zeim:flow")); }
@@ -85,7 +152,7 @@ function fromFile(file) {
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
-  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked()); fd.append("beginner", !isExpert()); fd.append("fdm_big", "true"); return fd; };   // FDM tab: server simplifies huge STLs
+  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked());   fd.append("beginner", !isExpert()); fd.append("fdm_big", "true"); fd.append("progress", "1"); return fd; };   // view first; the full check does not replace triangles
   create(mk(), mk);
 }
 const drop = $("#editDrop");
@@ -222,11 +289,16 @@ function loadProject(p, keepCamera = false) {
   else delete document.body.dataset.bedSel;
   document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
   ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
-  const a = p.analysis;
+  const a = p.analysis || {};
+  const pending = p.slice_ready === false || a.pending;
   const q = p.quality_gate || { ok: true, issues: [], message: "Closed mesh. You can export the geometry. Slice it before printing." };
-  $("#editStats").innerHTML = `<span class="pill">${a.size_mm.map(x => fmt(x)).join(" × ")} ${E.unit}</span><span class="pill">${a.triangles.toLocaleString()} triangles</span>` +
-    `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span><span class="pill ${q.ok ? "ok" : "bad"}" title="${q.ok ? "Watertight mesh you can export. Slice it before printing." : "This mesh still needs a fix before export."}">${q.ok ? "✔ closed mesh" : "✖ needs repair"}</span>` +
-    (a.internal_voids ? `<span class="pill bad" title="A sealed hollow inside the model. Hollow with a drain hole is intended; unexpected voids trap air or resin">${a.internal_voids} sealed void${a.internal_voids > 1 ? "s" : ""}</span>` : "") + (a.components > 1 ? `<span class="pill" title="Separate pieces in this model">${a.components} pieces</span>` : "") + (p.preview.decimated ? `<span class="pill" title="Exports use the full mesh">preview simplified</span>` : "");
+  const vol = a.volume_mm3 == null ? "" : `<span class="pill">${(a.volume_mm3 / 1000).toFixed(2)} cm³</span>`;
+  $("#editStats").innerHTML = `<span class="pill">${(a.size_mm || []).map(x => fmt(x)).join(" × ")} ${E.unit}</span><span class="pill">${(a.triangles || 0).toLocaleString()} triangles</span>` +
+    vol +
+    (pending
+      ? `<span class="pill">Checking the full model</span>`
+      : `<span class="pill ${q.ok ? "ok" : "bad"}" title="${q.ok ? "Watertight mesh you can export. Slice it before printing." : "This mesh still needs a fix before export."}">${q.ok ? "✔ closed mesh" : "✖ needs repair"}</span>`) +
+    (a.internal_voids ? `<span class="pill bad" title="A sealed hollow inside the model. Hollow with a drain hole is intended; unexpected voids trap air or resin">${a.internal_voids} sealed void${a.internal_voids > 1 ? "s" : ""}</span>` : "") + (a.components > 1 ? `<span class="pill" title="Separate pieces in this model">${a.components} pieces</span>` : "") + (p.preview?.decimated ? `<span class="pill" title="This view uses fewer triangles. The saved file and Slice use every triangle.">preview only</span>` : "");
   $("#editVis").value = p.visibility || "private";
   $("#eUndo").disabled = !p.can_undo; $("#eRedo").disabled = !p.can_redo;
   const msgs = [...(p.warnings || [])]; if (!q.ok && q.message) msgs.unshift(q.message); if (p.report?.message) msgs.unshift(p.report.message);
@@ -240,6 +312,29 @@ function loadProject(p, keepCamera = false) {
   renderSlicePanel();
   syncMeshGizmo();
 }
+let sliceWatch = 0;
+function watchSliceReady(id) {
+  const gen = ++sliceWatch;
+  const tick = async () => {
+    if (gen !== sliceWatch || !E.p || E.p.id !== id || E.p.slice_ready !== false) return;
+    try {
+      const p = await api("/api/edit/" + encodeURIComponent(id));
+      if (gen !== sliceWatch || !E.p || E.p.id !== id) return;
+      if (p.slice_ready !== false) {
+        E.p = p;
+        loadProject(p, true);
+        return;
+      }
+      if (p.quality_gate?.message && /could not be checked/.test(p.quality_gate.message)) {
+        const out = $("#spOut");
+        if (out) out.innerHTML = `<p class="help warn">${esc(p.quality_gate.message)}</p>`;
+        return;
+      }
+    } catch { /* keep the view; Slice stays off */ }
+    setTimeout(tick, 1000);
+  };
+  setTimeout(tick, 1000);
+}
 async function renderSlicePanel() {
   if (!E.p) return;
   const id = E.p.id;
@@ -247,6 +342,14 @@ async function renderSlicePanel() {
   const lithoHint = (E.p.mode === "lithophane" || E.p.base?.photo_mode === "lithophane" || E.p.base?.from_mode === "lithophane") ? "lithophane" : "";
   if (window.zeimSave && window.zeimSave.hold) window.zeimSave.hold("slicer");
   $("#slicePanel").innerHTML = panelHTML(lithoHint); wirePanel(() => E.p.id);
+  if (E.p.slice_ready === false) {
+    const go = document.getElementById("spGo");
+    if (go) { go.disabled = true; go.title = "Slice stays off until the full model check finishes."; }
+    const out = $("#spOut");
+    if (out) out.innerHTML = `<p class="help">Checking the full model. Slice stays off until that finishes. This view is a lighter preview. The saved file keeps every triangle.</p>`;
+    watchSliceReady(id);
+    return;
+  }
   if (window.zeimSave && window.zeimSave.setProject) window.zeimSave.setProject("slicer", id, { restore: true });
   $("#editWill").innerHTML = "";
   try { const r = await checkBuild(id); if (E.p?.id === id) $("#editWill").innerHTML = badgeHTML(r, { detail: true }); } catch { }

@@ -327,6 +327,151 @@ def create(owner_sid: str, visibility: str, *, title: str, base: dict, original:
     return store.get(bid)
 
 
+def _stats_from(a: dict, title: str) -> dict:
+    return {"bodies": [{"name": title, "triangles": a["triangles"], "watertight": a["watertight"], "volume_mm3": a["volume_mm3"]}],
+            "watertight": a["watertight"], "size_mm": a["size_mm"], "triangles": a["triangles"]}
+
+
+def iter_binary_stl_preview(data: bytes, max_faces: int = MAX_PREVIEW_FACES):
+    """Walk a binary STL and yield view progress, then one preview_ready event.
+
+    Progress counts source triangles visited. The preview keeps at most max_faces triangles.
+    The bytes of `data` are not modified. This is not the mesh Slice or export will use.
+    """
+    n = int.from_bytes(data[80:84], "little")
+    if len(data) != 84 + 50 * n or n <= 0:
+        raise meshedit.OpError("That file doesn't look like a binary STL.")
+    rec = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")])
+    tris = np.frombuffer(data, dtype=rec, count=n, offset=84)["v"]
+    flat = tris.reshape(-1, 3)
+    lo = np.min(flat, axis=0)
+    hi = np.max(flat, axis=0)
+    step = 1 if n <= max_faces else int(np.ceil(n / max_faces))
+    picks = []
+    chunk = max(step, n // 8)
+    done = 0
+    while done < n:
+        nxt = min(n, done + chunk)
+        sl = tris[done:nxt:step]
+        if len(sl):
+            picks.append(np.array(sl, copy=True))
+        done = nxt
+        yield {"phase": "view", "done": done, "total": n, "unit": "triangles"}
+    chosen = np.concatenate(picks) if picks else np.zeros((0, 3, 3), np.float32)
+    if len(chosen) > max_faces:
+        chosen = chosen[:max_faces]
+    pos = np.ascontiguousarray(chosen.reshape(-1, 3).astype("<f4"))
+    idx = np.arange(len(pos), dtype="<u4")
+    yield {"phase": "preview_ready", "triangles": int(n),
+           "size_mm": [round(float(x), 3) for x in (hi - lo)],
+           "preview": {"decimated": bool(step != 1), "authoritative": False,
+                       "note": "Preview only. The saved file keeps every triangle.",
+                       "bodies": [{"name": "model", "color": None,
+                                   "positions": base64.b64encode(pos.tobytes()).decode(),
+                                   "indices": base64.b64encode(idx.tobytes()).decode()}]}}
+
+
+def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes,
+                       beginner: bool, warnings: list[str], preview: dict, size_mm: list, triangles: int,
+                       import_scale: float = 1.0, import_units: str = "mm") -> dict:
+    """Save the original STL unchanged and a lighter preview. The full check runs afterwards."""
+    bid = uuid.uuid4().hex[:12]
+    d = store.dir(bid)
+    d.mkdir(parents=True)
+    (d / "original.stl").write_bytes(original)
+    (d / "preview.json").write_text(json.dumps(preview))
+    ops = []
+    if import_scale != 1.0:
+        ops.append({"op": "scale", "params": {"factor": import_scale, "pivot": "origin"},
+                    "label": f"Units: {import_units} → mm"})
+    note = (f"This view uses fewer triangles so it can open. The saved file keeps all {triangles:,} triangles. "
+            "Slice stays off until the full check finishes.")
+    meta = {"id": bid, "kind": "edit", "mode": "edit", "beginner": beginner, "title": title[:60] or "Untitled",
+            "base": base, "ops": ops, "head": len(ops), "warnings": list(dict.fromkeys([*warnings, note])),
+            "source": "", "params": {}, "auto_notes": [], "info": {}, "owner_sid": owner_sid, "visibility": visibility,
+            "slice_ready": False, "header_triangles": triangles,
+            "stats": {"triangles": triangles, "watertight": None, "size_mm": size_mm, "pending": True,
+                      "bodies": [{"name": title[:60] or "Untitled", "triangles": triangles, "watertight": None, "volume_mm3": None}]}}
+    store.save(meta)
+    return store.get(bid)
+
+
+def quick_payload(meta: dict) -> dict:
+    """Project JSON for a large STL whose full check has not finished. Does not load the mesh."""
+    from ..api.builds import summary
+    d = store.dir(meta["id"])
+    preview = json.loads((d / "preview.json").read_text())
+    n = int(meta.get("header_triangles") or meta.get("stats", {}).get("triangles") or 0)
+    size = (meta.get("stats") or {}).get("size_mm") or [0, 0, 0]
+    if meta.get("slice_ready") and meta.get("analysis"):
+        analysis = meta["analysis"]
+        quality = meta.get("quality_gate") or {"ok": None, "pending": True, "message": "Checking the full model."}
+    else:
+        analysis = {"triangles": n, "vertices": None, "watertight": None, "size_mm": size, "volume_mm3": None,
+                    "pending": True, "boundary_edges": None, "components": None, "min_mm": None, "max_mm": None}
+        err = meta.get("check_error") or ""
+        quality = {"ok": None, "pending": True,
+                   "message": err or "Checking the full model. Slice stays off until this finishes. The view is a lighter preview."}
+    ops = [{"i": i + 1, "op": o["op"], "label": o["label"], "name": o.get("name") or "",
+            "params": {k: v for k, v in (o.get("params") or {}).items() if isinstance(v, (str, int, float, bool, dict, list, type(None)))},
+            "editable": o["op"] not in ("plate", "import")} for i, o in enumerate(meta.get("ops") or [])]
+    return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": preview, "plate": None,
+            "dims": meta.get("dims") or {}, "ops": ops, "head": meta.get("head") or 0,
+            "can_undo": (meta.get("head") or 0) > 0, "can_redo": (meta.get("head") or 0) < len(meta.get("ops") or []),
+            "analysis": analysis, "quality_gate": quality, "base": meta.get("base"), "warnings": meta.get("warnings", []),
+            "slice_ready": bool(meta.get("slice_ready")), "report": meta.get("last_report"),
+            "original": f"/api/edit/{meta['id']}/original", "capabilities": capabilities()}
+
+
+def start_full_check(bid: str) -> None:
+    """Load, check, and write the slice STL off the view path. Failures leave Slice off."""
+    def run():
+        try:
+            finish_full_check(bid)
+        except Exception:
+            import logging
+            logging.getLogger("zeim.import").exception("full model check failed")
+            try:
+                with store.lock:
+                    meta = store.get(bid)
+                    meta["check_error"] = "The full model could not be checked. Slice stays off. The view is only a preview."
+                    meta["slice_ready"] = False
+                    store.save(meta)
+            except Exception:
+                pass
+    threading.Thread(target=run, name=f"zeim-stl-{bid}", daemon=True).start()
+
+
+def finish_full_check(bid: str) -> None:
+    """Authoritative mesh: every triangle from the original STL, then the quality check, then Slice may run."""
+    with store.lock:
+        meta = store.get(bid)
+        if meta.get("slice_ready"):
+            return
+        d = store.dir(bid)
+        original = (d / "original.stl").read_bytes()
+        mesh, warns = meshedit.load_mesh(original, "stl")
+        _BASES[bid] = mesh
+        m = mesh_at(bid, meta)
+        analysis = meshedit.analyze(m)
+        quality = quality_from_analysis(analysis)
+        (d / "model.stl").write_bytes(exporters.to_stl(as_model(m, meta["title"])))
+        head = int(meta.get("head") or 0)
+        layouts = dict(meta.get("plate_layouts") or {})
+        layouts[str(head)] = {"counts": [int(len(m.faces))], "groups": [0], "hidden": [False]}
+        meta["plate_layouts"] = layouts
+        meta["analysis"] = analysis
+        meta["analysis_rev"] = geometry_revision(meta)
+        meta["quality_gate"] = quality
+        meta["stats"] = _stats_from(analysis, meta["title"])
+        meta["stl_rev"] = meta["analysis_rev"]
+        meta["slice_ready"] = True
+        meta.pop("check_error", None)
+        if warns:
+            meta["warnings"] = list(dict.fromkeys([*(meta.get("warnings") or []), *warns]))
+        store.save(meta)
+
+
 def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner: bool) -> dict:
     """'Save as a new version' of an edit project WITH its history (QA B12): the untouched original file, every step
     up to the current head (the redo tail is dropped, like a new step would), named dimensions, plate layouts and
@@ -740,38 +885,48 @@ _GATE_PREFIX = "Fix the model before export: "
 _REPLAY_PREFIX = "Left out of the model: "
 
 
-def export_quality(m: trimesh.Trimesh) -> dict:
-    """Fast print-ready gate before export: refuse silent bad geometry and explain the fix."""
-    a = meshedit.analyze(m)
+def quality_from_analysis(a: dict) -> dict:
+    """Print-ready gate from an analysis dict. Does not scan the mesh again."""
     issues = []
-    if not a["watertight"]:
+    if not a.get("watertight"):
         issues.append("not watertight")
-    if a["boundary_edges"] > 0:
+    if a.get("boundary_edges"):
         issues.append(f"{a['boundary_edges']} open boundary edge(s)")
-    if a["nonmanifold_edges"] > 0:
+    if a.get("nonmanifold_edges"):
         issues.append(f"{a['nonmanifold_edges']} non-manifold edge(s)")
-    if a["triangles"] < 4:
+    if (a.get("triangles") or 0) < 4:
         issues.append("too few triangles")
-    max_dim = max(a["size_mm"], default=0.0)
+    size = a.get("size_mm") or [0, 0, 0]
+    max_dim = max(size, default=0.0)
     if max_dim <= 0 or not np.isfinite(max_dim):
         issues.append("invalid geometry")
     elif max_dim > 1000:
         issues.append("model is too large for a practical print")
-    if a["volume_mm3"] <= 0 and a["watertight"]:
+    if a.get("watertight") and (a.get("volume_mm3") or 0) <= 0:
         issues.append("zero or negative volume")
     return {
         "ok": not issues,
         "issues": issues,
         "message": "Closed mesh. You can export the geometry. Slice it before printing." if not issues else _GATE_PREFIX + "; ".join(issues) + ". Run Repair or simplify the mesh, then validate again.",
-        "watertight": a["watertight"],
-        "size_mm": a["size_mm"],
-        "triangles": a["triangles"],
+        "watertight": a.get("watertight"),
+        "size_mm": size,
+        "triangles": a.get("triangles"),
     }
+
+
+def export_quality(m: trimesh.Trimesh) -> dict:
+    """Fast print-ready gate before export: refuse silent bad geometry and explain the fix."""
+    return quality_from_analysis(meshedit.analyze(m))
 
 
 def payload(bid: str, report=None) -> dict:
     from ..api.builds import summary
     meta = store.get(bid)
+    if meta.get("header_triangles"):
+        body = quick_payload(meta)
+        if report is not None:
+            body["report"] = report
+        return body
     m = mesh_at(bid, meta)
     ensure_exports(bid)
     meta = store.get(bid)
