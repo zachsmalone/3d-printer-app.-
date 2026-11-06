@@ -1,6 +1,19 @@
-# Open Resin Alliance components used by TorchC0
+# Resin sources inspected for TorchC0
 
 This is a record of what was copied or linked, and what was left out. It is not legal advice.
+The three requested sources are Open Resin Alliance, connorslade/mslicer, and morluto/rea.
+
+## morluto/rea
+
+| | |
+|---|---|
+| Repository | https://github.com/morluto/rea |
+| Commit read | `a7574d4274728fcb0a13414d6ae43f1597864d94` |
+| Package | `rea-agents` 6.8.0, MIT, copyright 2026 morluto |
+| What it is | A reverse-engineering CLI and MCP. Targets include native binaries, JavaScript, .NET, Android, firmware, and several container types. |
+| Resin output | None. The tree has no resin slicer, no layer-mask encoder, and no `.ctb` / `.goo` / `.lumen` writer. |
+| Checked locally | `rea inspect-rust-binary` on `zeim-lumen` reported ELF amd64 and rustc commit `4d91de4e48198da2e33413efdcd9cd2cc0c46688` (Rust 1.85.0). `rea inspect-artifact` on a generated `.lumen` file returned `unsupported binary format`. |
+| Not done | REA was not aimed at Lychee, CHITUBOX, encrypted CTB, DragonFruit, or mslicer. Its disclaimer refuses DRM circumvention and copying protected code and assets. Optional GPL/LGPL engines (GDB, Unicorn, Frida) are not bundled. The npm package is not vendored. |
 
 ## Used
 

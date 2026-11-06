@@ -51,5 +51,6 @@ Not incorporated, because each one would be a new decision about publishing ZEIM
 - mslicer (connorslade/mslicer v0.10.1), GPL-3.0. The separate-process pattern Zach approved for unmodified PrusaSlicer was not extended to mslicer.
 - `df-plugin-ctb` (MIT) because it includes AES key material for encrypted CTB.
 - ChiTuBox and Lychee importers, Anycubic encoders, and VoxelShift's encrypted-CTB conversion.
+- morluto/rea (`rea-agents` 6.8.0, commit `a7574d4274728fcb0a13414d6ae43f1597864d94`) is MIT, but it is a reverse-engineering tool rather than a slicer. Its disclaimer refuses circumvention of technical protection and copying of proprietary code and assets. Optional analysis engines it can launch include GPL and LGPL programs that ZEIM does not bundle. It was run only on ZEIM's own `zeim-lumen` binary and on a `.lumen` file ZEIM wrote. It is not run on Lychee, CHITUBOX, or the copyleft slicers.
 
 This note is not legal advice.

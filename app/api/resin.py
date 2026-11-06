@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, Response
 from .. import config
 from ..community import badges
 from ..community.identity import Actor, get_actor
-from ..core import guard, meshedit, resin, resin_slice
+from ..core import guard, meshedit, resin, resin_slice, resin_sources
 from ..services import resin_jobs
 from ..services import editproj
 from ..services import filenames as fnames
@@ -51,8 +51,9 @@ def catalog():
             "lumen_plates": plates["plates"], "lumen_max_pixels": plates["max_pixels"],
             "lumen": {"format": "lumen", "version": plates["format_version"], "commit": plates["lumen_commit"],
                       "hardware_tested": False, "native_formats_written": []},
+            "sources": resin_sources.public_sources(),
             "formats_note": "TorchC0 still exports STL and 3MF. Slice writes an Open Resin .lumen file for Odyssey firmware. "
-                            "It does not write CHITUBOX, Lychee, GOO, Photon or a zip."}
+                            "It does not write CHITUBOX, Lychee, GOO, Photon or a zip. " + resin_sources.SOURCES_NOTE}
 
 
 def _points(raw: str, what: str):
