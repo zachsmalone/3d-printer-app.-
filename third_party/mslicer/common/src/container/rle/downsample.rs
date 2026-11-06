@@ -1,0 +1,211 @@
+use std::mem;
+
+use nalgebra::Vector2;
+
+use crate::container::Run;
+
+#[derive(Clone)]
+pub struct RunQueue<'a, T> {
+    pub runs: &'a [Run<T>],
+    pub next: usize,
+    pub active: Run<T>,
+}
+
+pub struct RunFlatten<I> {
+    iter: I,
+    prev: Option<Run>,
+}
+
+pub fn downsample_adjacent(factor: u8, runs: &[Run], out: &mut Vec<Run>) {
+    let mut queue = RunQueue::new(runs);
+    let factor = factor as u64;
+
+    let mut i = 0;
+    while queue.remaining() {
+        let run = queue.advance();
+        i += run.length;
+
+        let length = run.length / factor;
+        let mut remaining = i % factor;
+        if length > 0 {
+            out.push(Run {
+                length,
+                value: run.value,
+            });
+        }
+
+        if remaining == 0 {
+            continue;
+        }
+
+        // if not a clean split, we will need to do some averaging
+        let mut interp = remaining * run.value as u64;
+        while remaining != factor {
+            // try to complete remaining by pulling from next run
+            let next = queue.take_up_to(factor - remaining);
+            interp += next.length * next.value as u64;
+            remaining += next.length;
+            i += next.length;
+        }
+
+        out.push(Run {
+            length: 1,
+            value: (interp / factor) as u8,
+        });
+    }
+}
+
+pub fn downsample<'a>(chunks: impl Iterator<Item = &'a Vec<Run>>, width: u64, out: &mut Vec<Run>) {
+    let mut len = 0;
+    let mut queues = chunks
+        .map(|x| RunQueue::new_fallback(x, width))
+        .inspect(|_| len += 1)
+        .collect::<Vec<_>>();
+    while queues[0].remaining() {
+        let length = queues.iter().map(|x| x.active.length).min().unwrap();
+
+        let mut value = 0;
+        for chunk in queues.iter_mut() {
+            let front = chunk.take_up_to(length);
+            value += front.value as u64;
+        }
+
+        out.push(Run::new(length, (value / len) as u8));
+    }
+}
+
+pub fn chunks(runs: &[Run], width: u64) -> Vec<Vec<Run>> {
+    let mut out = Vec::new();
+    let mut working = Vec::new();
+    let mut working_len = 0;
+
+    let mut queue = RunQueue::new(runs);
+    while queue.remaining() {
+        let run = queue.take_up_to(width - working_len);
+        working.push(run);
+        working_len += run.length;
+
+        if working_len == width {
+            out.push(mem::take(&mut working));
+            working_len = 0;
+        }
+    }
+
+    (!working.is_empty()).then(|| out.push(working));
+    out
+}
+
+pub fn pad_2d(
+    runs: &[Run],
+    size: Vector2<u32>,
+    factor: u8,
+    pad_value: u8,
+) -> (Vec<Run>, Vector2<u32>) {
+    let factor = factor as u32;
+    let padded_x = size.x.div_ceil(factor) * factor;
+    let padded_y = size.y.div_ceil(factor) * factor;
+
+    let mut out = Vec::new();
+    for mut row in chunks(runs, size.x as u64) {
+        let row_len: u64 = row.iter().map(|r| r.length).sum();
+        if row_len < padded_x as u64 {
+            row.push(Run {
+                length: padded_x as u64 - row_len,
+                value: pad_value,
+            });
+        }
+        out.extend(row);
+    }
+
+    if size.y < padded_y {
+        out.push(Run {
+            length: (padded_y - size.y) as u64 * padded_x as u64,
+            value: pad_value,
+        });
+    }
+
+    (out, Vector2::new(padded_x, padded_y))
+}
+
+impl<'a, T: Copy + Default> RunQueue<'a, T> {
+    pub fn new(runs: &'a [Run<T>]) -> Self {
+        Self {
+            runs,
+            next: 1,
+            active: runs[0],
+        }
+    }
+
+    pub fn new_fallback(runs: &'a [Run<T>], fallback: u64) -> Self {
+        if runs.is_empty() {
+            Self {
+                runs,
+                next: 1,
+                active: Run::new(fallback, T::default()),
+            }
+        } else {
+            Self::new(runs)
+        }
+    }
+
+    pub fn remaining(&self) -> bool {
+        self.active.length > 0
+    }
+
+    pub fn advance(&mut self) -> Run<T> {
+        let out = self.active;
+        if self.next < self.runs.len() {
+            self.active = self.runs[self.next];
+            self.next += 1;
+        } else {
+            self.active.length = 0;
+        }
+        out
+    }
+
+    pub fn take_up_to(&mut self, n: u64) -> Run<T> {
+        if self.active.length <= n {
+            self.advance()
+        } else {
+            self.active.length -= n;
+            Run::new(n, self.active.value)
+        }
+    }
+}
+
+impl<I: Iterator<Item = Run>> RunFlatten<I> {
+    pub fn new(iter: I) -> Self {
+        Self { iter, prev: None }
+    }
+}
+
+impl<I: Iterator<Item = Run>> Iterator for RunFlatten<I> {
+    type Item = Run;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.prev.is_none() {
+            self.prev = Some(self.iter.next()?);
+        }
+
+        let prev = self.prev.as_mut().unwrap();
+        for next in self.iter.by_ref() {
+            if next.value == prev.value {
+                prev.length += next.length;
+            } else {
+                let out = *prev;
+                *prev = next;
+                return Some(out);
+            }
+        }
+
+        mem::take(&mut self.prev)
+    }
+}
+
+pub trait RunFlattenExt: Iterator<Item = Run> + Sized {
+    fn run_flatten(self) -> RunFlatten<Self> {
+        RunFlatten::new(self)
+    }
+}
+
+impl<I: Iterator<Item = Run>> RunFlattenExt for I {}

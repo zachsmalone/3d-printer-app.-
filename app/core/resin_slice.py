@@ -34,14 +34,16 @@ from skimage.draw import polygon as sk_polygon
 from app.core.lumen_head import LumenHeadError, read_head
 
 MAX_PIXELS = 12_000_000
+# mslicer is a separate process. Saturn 2 is 33,177,600 px and peaked near 520 MB
+# on a 910,180-triangle mesh, inside the 4096 MB mslicer address limit.
+# Plates above this stay refused until they are measured. This is not a global uncap.
+MSLICER_MAX_PIXELS = 34_000_000
 MAX_LAYERS = 2500
 MAX_FACES = 400_000
 AA_LEVELS = (2, 4)
 STRIP_ROWS = 32
 REJECTED_FORMATS = {
-    "ctb": "CHITUBOX .ctb is not written. The open CTB encoder we inspected carries AES key material for a protected container, and TorchC0 does not bypass that.",
-    "ctbx": "CHITUBOX .ctbx is not written.",
-    "goo": "Elegoo .goo is not written. Plate geometry from the Elegoo plugin can size a .lumen file; the .goo bytes are a different format.",
+    "ctbx": "CHITUBOX .ctbx is not written. mslicer writes .ctb v4 or v5, not .ctbx.",
     "lys": "Lychee .lys is not written.",
     "lyt": "Lychee .lyt is not written.",
     "photon": "Photon .photon is not written.",
@@ -52,8 +54,7 @@ REJECTED_FORMATS = {
     "pmx2": "Anycubic .pmx2 is not written.",
     "aff": "Anycubic .aff is not written.",
     "afz": "Anycubic .afz is not written.",
-    "zip": "TorchC0 does not pack a zip and call it a printer file. The resin layer file it writes is .lumen.",
-    "nanodlp": "NanoDLP is not written.",
+    "zip": "TorchC0 does not pack a zip and call it a printer file.",
     "svg": "An SVG layer stack is not written.",
 }
 
@@ -87,28 +88,45 @@ def plate_by_id(plate_id: str) -> dict:
     raise ResinSliceError("Unknown plate. Pick one from the LUMEN plate list.")
 
 
-def require_sliceable(plate: dict) -> None:
-    """Reject a plate TorchC0 will not raster, before any file is written."""
+def require_sliceable(plate: dict, *, engine: str = "lumen") -> None:
+    """Reject a plate this engine will not raster, before any file is written.
+
+    `.lumen` is rasterised in this process and stays at `MAX_PIXELS`.
+    mslicer has its own pixel ceiling and its own memory limit. A plate mslicer
+    can run is not refused because the in-process cap is lower.
+    """
     width, height = int(plate["width_px"]), int(plate["height_px"])
     pixels = width * height
-    if pixels <= 0 or pixels > MAX_PIXELS:
+    if engine == "lumen":
+        cap = MAX_PIXELS
+    elif engine == "mslicer":
+        cap = MSLICER_MAX_PIXELS
+    else:
+        raise ResinSliceError(f"Unknown slice engine {engine}.")
+    if pixels <= 0 or pixels > cap:
+        if engine == "mslicer":
+            raise ResinSliceError(
+                f"{plate['name']} is {width}×{height} px ({pixels:,} pixels). "
+                f"mslicer slices are capped at {cap:,} pixels so they stay inside the memory limit. "
+                f"The .lumen cap is {MAX_PIXELS:,} and does not apply to this file."
+            )
         native = plate.get("native_format") or "its stock file"
         raise ResinSliceError(
             f"{plate['name']} is {width}×{height} px ({pixels:,} pixels). "
-            f"TorchC0 slices plates up to {MAX_PIXELS:,} pixels into .lumen, and it does not write {native}."
+            f"TorchC0 slices plates up to {cap:,} pixels into .lumen, and it does not write {native}."
         )
 
 
 def reject_format(fmt: str) -> None:
     key = (fmt or "").strip().lower().lstrip(".")
-    if key in ("", "lumen", "lmn"):
+    if key in ("", "lumen", "lmn", "goo", "ctb", "nanodlp"):
         return
     detail = REJECTED_FORMATS.get(key)
     if detail:
         raise ResinSliceError(detail)
     raise ResinSliceError(
-        f".{key} is not a file TorchC0 writes. The layer file it writes is .lumen "
-        "(Open Resin Alliance LUMEN v1). It is not a CHITUBOX, Lychee, GOO, Photon or zip file."
+        f".{key} is not a file TorchC0 writes. It writes .lumen, and, through the separate mslicer program, .goo, .ctb, or .nanodlp. "
+        "It does not write Lychee, Photon, .ctbx, or a zip renamed as a printer file."
     )
 
 

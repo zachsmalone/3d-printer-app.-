@@ -1,0 +1,162 @@
+use std::{collections::HashMap, f32::consts::TAU, sync::Arc};
+
+use common::geometry::convex_hull;
+use itertools::Itertools;
+use nalgebra::{Rotation2, Vector2};
+use slicer::geometry::{
+    bounds::Bounds2D,
+    mesh::{Mesh, MeshId},
+};
+
+use crate::auto_layout::StaticTransformation;
+
+const OFFSET_PRECISION: usize = 6;
+const ROTATION_RESLUTION: f32 = 1.0_f32.to_radians();
+
+// todo: cache line friendly ordering!
+pub struct LayoutCache {
+    hulls: HashMap<CacheEntry, Arc<Hull>>,
+    nfps: HashMap<(CacheEntry, CacheEntry), Arc<Nfp>>,
+
+    padding: f32,
+}
+
+pub struct Hull {
+    pub hull: Vec<Vector2<f32>>,
+    pub bounds: Bounds2D,
+}
+
+pub struct Nfp {
+    pub points: Vec<Vector2<f32>>,
+    pub bounds: Bounds2D,
+}
+
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct CacheEntry {
+    pub(super) mesh: MeshId,
+    pub(super) transformation: StaticTransformation,
+
+    pub(super) rotation: u32,
+}
+
+impl Hull {
+    pub fn new(hull: Vec<Vector2<f32>>) -> Self {
+        Self {
+            bounds: Bounds2D::<f32>::new_containing(&hull),
+            hull,
+        }
+    }
+}
+
+impl Nfp {
+    pub fn new(points: Vec<Vector2<f32>>) -> Self {
+        Self {
+            bounds: Bounds2D::<f32>::new_containing(&points),
+            points,
+        }
+    }
+}
+
+impl LayoutCache {
+    pub fn new(padding: f32) -> Self {
+        Self {
+            hulls: HashMap::new(),
+            nfps: HashMap::new(),
+            padding,
+        }
+    }
+
+    pub fn populate_hull(&mut self, entry: CacheEntry, hull: impl FnOnce() -> Hull) {
+        self.hulls.entry(entry).or_insert_with(|| Arc::new(hull()));
+    }
+
+    pub fn hull(&mut self, entry: &CacheEntry) -> Arc<Hull> {
+        if let Some(hull) = self.hulls.get(entry) {
+            return hull.clone();
+        }
+
+        if let Some(hull) = self.hulls.get(&entry.with_rotation(0.0)) {
+            let rotation = Rotation2::new(entry.rotation());
+
+            let hull = hull.hull.iter().map(|x| rotation * *x).collect::<Vec<_>>();
+            let bounds = Bounds2D::<f32>::new_containing(&hull);
+
+            let new = Arc::new(Hull { hull, bounds });
+            self.hulls.insert(*entry, new.clone());
+            return new;
+        }
+
+        panic!("Hull not found!")
+    }
+
+    pub fn nfp(&mut self, a: CacheEntry, b: CacheEntry) -> Arc<Nfp> {
+        if let Some(nfp) = self.nfps.get(&(a, b)) {
+            return nfp.clone();
+        }
+
+        let (hull_a, hull_b) = (self.hull(&a), self.hull(&b));
+        let points = non_fitting_polygon(hull_a.hull.iter(), hull_b.hull.iter());
+        let points = offset(&points, self.padding, OFFSET_PRECISION);
+        let nfp = Arc::new(Nfp::new(points));
+
+        self.nfps.insert((a, b), nfp.clone());
+        nfp
+    }
+}
+
+impl CacheEntry {
+    pub fn new(mesh: MeshId, transformation: StaticTransformation) -> Self {
+        Self {
+            mesh,
+            transformation,
+            rotation: 0,
+        }
+    }
+
+    pub fn from_mesh(mesh: &Mesh) -> Self {
+        Self {
+            mesh: mesh.mesh_id(),
+            transformation: StaticTransformation::from_mesh(mesh),
+            rotation: 0,
+        }
+    }
+
+    pub fn with_rotation(self, rotation: f32) -> Self {
+        Self {
+            rotation: (rotation / ROTATION_RESLUTION).round() as u32,
+            ..self
+        }
+    }
+
+    pub fn rotation(&self) -> f32 {
+        self.rotation as f32 * ROTATION_RESLUTION
+    }
+}
+
+fn non_fitting_polygon<'a>(
+    a: impl Iterator<Item = &'a Vector2<f32>>,
+    b: impl Iterator<Item = &'a Vector2<f32>> + Clone,
+) -> Vec<Vector2<f32>> {
+    let points = a
+        .cartesian_product(b)
+        .map(|(i, j)| *i - *j)
+        .collect::<Vec<_>>();
+    convex_hull(&points)
+}
+
+fn offset(points: &[Vector2<f32>], d: f32, n: usize) -> Vec<Vector2<f32>> {
+    let points = (points.iter())
+        .cartesian_product(disk(n, d).iter())
+        .map(|(i, j)| *i + *j)
+        .collect::<Vec<_>>();
+    convex_hull(&points)
+}
+
+fn disk(n: usize, r: f32) -> Vec<Vector2<f32>> {
+    (0..n)
+        .map(|i| {
+            let (y, x) = (i as f32 / n as f32 * TAU).sin_cos();
+            Vector2::new(x, y) * r
+        })
+        .collect()
+}

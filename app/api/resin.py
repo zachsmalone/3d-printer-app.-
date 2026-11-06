@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, Response
 from .. import config
 from ..community import badges
 from ..community.identity import Actor, get_actor
-from ..core import guard, meshedit, resin, resin_slice, resin_sources
+from ..core import guard, meshedit, resin, resin_fileid, resin_slice, resin_sources
 from ..services import resin_jobs
 from ..services import editproj
 from ..services import filenames as fnames
@@ -49,11 +49,14 @@ def catalog():
             "presets": [{"id": k, **v} for k, v in resin.PRESETS.items()], "limits": resin.LIMITS,
             "safety": resin.SAFETY, "default_price": resin.DEFAULT_PRICE, "default_price_unit": resin.DEFAULT_PRICE_UNIT, "test_note": resin.TEST_NOTE,
             "lumen_plates": plates["plates"], "lumen_max_pixels": plates["max_pixels"],
+            "mslicer_max_pixels": resin_slice.MSLICER_MAX_PIXELS,
             "lumen": {"format": "lumen", "version": plates["format_version"], "commit": plates["lumen_commit"],
                       "hardware_tested": False, "native_formats_written": []},
             "sources": resin_sources.public_sources(),
-            "formats_note": "TorchC0 still exports STL and 3MF. Slice writes an Open Resin .lumen file for Odyssey firmware. "
-                            "It does not write CHITUBOX, Lychee, GOO, Photon or a zip. " + resin_sources.SOURCES_NOTE}
+            "formats_note": "TorchC0 still exports STL and 3MF. "
+                            "Slice writes .lumen here, or .goo, .ctb and .nanodlp through the separate mslicer program when the plate's stock file matches. "
+                            "It does not write Lychee, Photon, .ctbx, or a zip renamed as a printer file. "
+                            "A written .ctb or .goo is the catalog container, not a firmware test. " + resin_sources.SOURCES_NOTE}
 
 
 def _points(raw: str, what: str):
@@ -373,6 +376,37 @@ def slice_download(job_id: str, actor: Actor = Depends(get_actor)):
     fname = fnames.file_name(job.get("name") or "torchc0", "lumen")
     return Response(content=data, media_type="application/vnd.openresin.lumen",
                     headers={"Content-Disposition": fnames.disposition(fname), "Cache-Control": "no-store"})
+
+
+def _printer_download(job_id: str, actor: Actor, ext: str):
+    try:
+        path = resin_jobs.file_for(job_id, actor.sid, ext)
+        job = resin_jobs.get(job_id, actor.sid)
+    except resin_slice.ResinSliceError as exc:
+        raise HTTPException(404, str(exc))
+    data = path.read_bytes()
+    try:
+        resin_fileid.identify(data, ext)
+    except resin_fileid.FileIdError as exc:
+        raise HTTPException(404, str(exc))
+    fname = fnames.file_name(job.get("name") or "torchc0", ext)
+    return Response(content=data, media_type="application/octet-stream",
+                    headers={"Content-Disposition": fnames.disposition(fname), "Cache-Control": "no-store"})
+
+
+@router.get("/jobs/{job_id}/print.goo")
+def slice_download_goo(job_id: str, actor: Actor = Depends(get_actor)):
+    return _printer_download(job_id, actor, "goo")
+
+
+@router.get("/jobs/{job_id}/print.ctb")
+def slice_download_ctb(job_id: str, actor: Actor = Depends(get_actor)):
+    return _printer_download(job_id, actor, "ctb")
+
+
+@router.get("/jobs/{job_id}/print.nanodlp")
+def slice_download_nanodlp(job_id: str, actor: Actor = Depends(get_actor)):
+    return _printer_download(job_id, actor, "nanodlp")
 
 
 @router.get("/jobs/{job_id}/layer/{index}.png")

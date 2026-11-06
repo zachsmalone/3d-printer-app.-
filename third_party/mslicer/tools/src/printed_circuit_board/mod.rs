@@ -1,0 +1,221 @@
+use std::{fs::File, io::BufReader, iter, path::Path, sync::Arc};
+
+use common::{
+    progress::Progress,
+    slice::{ExposureConfig, Layer, SliceConfig},
+    units::{Micrometers, Milimeter, Milimeters, Minutes, Seconds},
+};
+use gerber_parser::{
+    GerberDoc,
+    gerber_types::{Command, ExtendedCode, FileAttribute, FileFunction},
+};
+use itertools::Itertools;
+use nalgebra::Vector2;
+
+use polygons::Polygons;
+use slicer::{
+    geometry::bounds::Bounds2D,
+    slicer::raster::{self, Segment},
+};
+
+use crate::{misc::alignment::Alignment, printed_circuit_board::polygons::Mode};
+
+mod gerber;
+pub mod polygons;
+
+#[derive(Clone)]
+pub struct PrintedCircuitBoard {
+    pub layers: Vec<GerberLayer>,
+    pub flip: Flip,
+
+    pub exposure_time: Seconds,
+    pub alignment: Alignment,
+    pub invert: bool,
+    pub max_circle_error: Milimeters,
+
+    pub pre_offset: Vector2<Milimeters>,
+    pub post_offset: Vector2<Milimeters>,
+}
+
+pub struct Gerber {
+    document: GerberDoc,
+    pub name: Option<String>,
+    pub layer: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct GerberLayer {
+    pub gerber: Arc<Gerber>,
+    pub mode: Mode,
+}
+
+#[derive(Clone, Default)]
+pub struct Flip {
+    pub enabled: bool,
+    pub angle: f32,
+    pub alignment: Alignment,
+    pub offset: Milimeters,
+}
+
+impl PrintedCircuitBoard {
+    pub fn slice_config(&self, config: &mut SliceConfig) {
+        config.first_exposure_config.exposure_time = self.exposure_time;
+        config.exposure_config.exposure_time = self.exposure_time;
+    }
+
+    pub fn generate(&self, config: &SliceConfig, progress: &Progress) -> Vec<Layer> {
+        let command_count = (self.layers.iter())
+            .map(|x| x.gerber.document.commands.len())
+            .sum::<usize>() as u64;
+        progress.set_total(command_count);
+
+        let mut polygons = Polygons::new();
+        polygons.set_max_circle_error(self.max_circle_error.get::<Milimeter>() as f64);
+
+        for gerber in self.layers.iter() {
+            polygons.set_mode(gerber.mode);
+            gerber::tessellate(&gerber.gerber, &mut polygons, progress);
+        }
+        progress.set_finished();
+
+        let segments = self.screen_segments(config, polygons);
+
+        let platform = config.platform_resolution;
+        let mut runs = raster::layer(config.supersample.xy, platform, segments.into_iter()).0;
+
+        if self.invert {
+            runs.iter_mut().for_each(|run| run.value = 255 - run.value);
+        }
+
+        let exposure = ExposureConfig {
+            exposure_time: self.exposure_time,
+            exposure_delay: Seconds::new(0.0),
+            pwm: 255,
+            ..config.exposure_config(0).into_owned()
+        };
+        vec![Layer::new(runs, config.default_height(0), exposure)]
+    }
+
+    pub fn load(&mut self, path: &Path) {
+        let reader = BufReader::new(File::open(path).unwrap());
+        let document = gerber_parser::parse(reader).unwrap();
+
+        let mut name = None;
+        let mut layer = None;
+        for command in document.commands.iter() {
+            if let Ok(Command::ExtendedCode(ExtendedCode::FileAttribute(attr))) = command {
+                match attr {
+                    FileAttribute::FileFunction(function) => {
+                        layer = Some(match function {
+                            FileFunction::Copper { pos, .. } => format!("{pos:?} Copper"),
+                            FileFunction::Legend { pos, .. } => format!("{pos:?} Silkscreen"),
+                            FileFunction::SolderMask { pos, .. } => format!("{pos:?} Solder Mask"),
+                            FileFunction::Paste(pos) => format!("{pos:?} Solder Paste"),
+                            FileFunction::Profile(_) => "Edge Cuts".into(),
+                            x => format!("{x:?}"),
+                        })
+                    }
+                    FileAttribute::ProjectId { id, .. } => name = Some(id.to_owned()),
+                    _ => {}
+                }
+            }
+        }
+
+        self.layers.push(GerberLayer {
+            gerber: Arc::new(Gerber {
+                document,
+                name,
+                layer,
+            }),
+            mode: Mode {
+                polygon: true,
+                bounds: true,
+            },
+        });
+    }
+
+    pub fn svg(&self) -> String {
+        let mut polygons = Polygons::new();
+        (self.layers.iter())
+            .for_each(|g| gerber::tessellate(&g.gerber, &mut polygons, &Progress::new()));
+        polygons.svg()
+    }
+
+    fn screen_segments(&self, config: &SliceConfig, mut polygons: Polygons) -> Vec<Segment> {
+        let platform = (config.platform_size.xy()).map(|x| x.get::<Milimeter>() as f64);
+        let scale = (config.platform_resolution.cast::<f64>()).component_div(&platform);
+
+        let offset = self.alignment.offset(platform, polygons.bounds)
+            + self.pre_offset.map(|x| x.get::<Milimeter>() as f64);
+        polygons.translate_mut(offset);
+
+        if self.flip.enabled {
+            let (sin, cos) = (self.flip.angle as f64).to_radians().sin_cos();
+            let bounds = Bounds2D::new_point(Vector2::zeros());
+            let anchor = self.flip.alignment.offset(platform, bounds);
+
+            let normal = Vector2::new(sin, -cos);
+            let center = anchor + normal * (self.flip.offset.get::<Milimeter>() as f64);
+
+            for polygon in polygons.polygons.iter_mut() {
+                for point in polygon.iter_mut() {
+                    let distance = (*point - center).dot(&normal);
+                    *point -= 2.0 * distance * normal;
+                }
+            }
+        }
+
+        polygons.translate_mut(self.post_offset.map(|x| x.get::<Milimeter>() as f64));
+        polygons.nonuniform_scale_mut(scale * config.supersample.xy as f64); // screen space to pixel space
+
+        let mut out = Vec::new();
+        for polygon in polygons.polygons.iter_mut() {
+            let winding = winding_order(polygon);
+
+            let close = (polygon.last().unwrap(), polygon.first().unwrap());
+            for (&a, &b) in polygon.iter().tuple_windows().chain(iter::once(close)) {
+                let segment = [a, b].map(|x| x.cast());
+                let normal = (b.y - a.y) * winding > 0.0;
+                out.push(Segment {
+                    endpoints: segment,
+                    entering: normal,
+                    priority: 255,
+                    exposure: 255,
+                });
+            }
+        }
+
+        out
+    }
+}
+
+// Reference: https://stackoverflow.com/a/1180256
+fn winding_order(polygon: &[Vector2<f64>]) -> f64 {
+    // Find a point on the convex hull
+    let min = (polygon.iter())
+        .position_min_by(|a, b| a.y.total_cmp(&b.y).then_with(|| a.x.total_cmp(&b.x)))
+        .unwrap();
+
+    let a = polygon[(min + polygon.len() - 1) % polygon.len()];
+    let b = polygon[min];
+    let c = polygon[(min + 1) % polygon.len()];
+
+    (b - a).perp(&(c - a)).signum()
+}
+
+impl Default for PrintedCircuitBoard {
+    fn default() -> Self {
+        Self {
+            layers: Default::default(),
+            flip: Default::default(),
+
+            exposure_time: Minutes::new(5.0).convert(),
+            alignment: Default::default(),
+            invert: Default::default(),
+            max_circle_error: Micrometers::new(10.0).convert(),
+
+            pre_offset: Default::default(),
+            post_offset: Default::default(),
+        }
+    }
+}

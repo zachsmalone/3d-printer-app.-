@@ -1,0 +1,19 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2024"
+
+[[bench]]
+name = "benchmark"
+harness = false
+
+[dependencies]
+anyhow.workspace = true
+crc32fast.workspace = true
+image.workspace = true
+nalgebra.workspace = true
+rand.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true

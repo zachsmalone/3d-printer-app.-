@@ -1,7 +1,18 @@
+# The engine stage builds two slicer binaries:
+#   mslicer `slicer` (GPL-3.0, source copied to /usr/local/share/zeim/mslicer-source)
+#   zeim-lumen (calls the MIT/Apache lumen-format crate)
+# nalgebra 0.34, which mslicer v0.10.1 depends on, needs Rust 1.87 or newer.
+FROM rust:1-bookworm AS engine-build
+WORKDIR /src/zeim
+COPY third_party/mslicer /src/zeim/third_party/mslicer
+COPY third_party/open-resin-alliance/lumen-format /src/zeim/third_party/open-resin-alliance/lumen-format
+COPY tools/zeim-lumen /src/zeim/tools/zeim-lumen
+RUN cargo build --release --manifest-path /src/zeim/third_party/mslicer/Cargo.toml -p slicer --bin slicer \
+ && cargo build --release --manifest-path /src/zeim/tools/zeim-lumen/Cargo.toml
+
 # ZEIM (photo3d) container image. Build from the repo root:
 #   docker build -t zeim:dev .
-# NOTE (Engineering): this file has NOT been built in CI or on the dev box yet (no docker available there). Treat as
-# reviewed-but-unbuilt until Ops runs the first build.
+# The engine stage above is part of this image. A plain `docker build` produces mslicer-slicer and zeim-lumen.
 #
 # Debian 13 "trixie" is used on purpose: its prusa-slicer package is 2.9.2 (same as the dev box).
 # Debian 12 ships 2.5.x, which may behave differently. Pin by digest before production.
@@ -49,6 +60,12 @@ COPY data ./data
 # Photo prep is imported at process start (app/core/ai3d_prep.py), even when ZEIM_2D3D_ENABLED=0.
 # Only this file. The TripoSR worker, weights, and torch stay in the separate workers/ai3d image.
 COPY workers/ai3d/prep.py ./workers/ai3d/prep.py
+COPY --from=engine-build /src/zeim/third_party/mslicer/target/release/slicer /usr/local/bin/mslicer-slicer
+COPY --from=engine-build /src/zeim/tools/zeim-lumen/target/release/zeim-lumen /usr/local/bin/zeim-lumen
+COPY third_party/mslicer /usr/local/share/zeim/mslicer-source
+RUN rm -rf /usr/local/share/zeim/mslicer-source/target
+ENV ZEIM_MSLICER_BIN=/usr/local/bin/mslicer-slicer \
+    ZEIM_LUMEN_BIN=/usr/local/bin/zeim-lumen
 
 # The photo check must load on CPU during the build. A plain image is approved.
 # RSS here is the checker plus Python; the container cap is 14 GB.

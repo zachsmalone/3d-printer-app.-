@@ -1,0 +1,22 @@
+[package]
+name = "experimental"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+slicer.workspace = true
+common.workspace = true
+
+clone-macro.workspace = true
+itertools.workspace = true
+nalgebra.workspace = true
+rayon.workspace = true
+tracing.workspace = true
+
+glam = { version = "0.24", optional = true }
+opencascade = { version = "0.3.0", optional = true }
+opencascade-sys = { version = "0.3.0", optional = true }
+cxx = { version = "1.0", optional = true }
+
+[features]
+brep = ["glam", "opencascade", "opencascade-sys", "cxx"]

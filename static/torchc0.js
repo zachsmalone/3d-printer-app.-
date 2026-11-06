@@ -44,12 +44,27 @@ let cat = null;
 let sliceTimer = null;
 let sliceJob = "";
 function stopSlicePoll() { if (sliceTimer) { clearInterval(sliceTimer); sliceTimer = null; } }
-function plateOptions(size) {
+function plateOptions(size, fmt) {
   const plates = (cat && cat.lumen_plates) || [];
-  const max = (cat && cat.lumen_max_pixels) || 1e12;
-  const fits = p => size && size[0] <= p.build_width_um / 1000 + 1e-3 && size[1] <= p.build_depth_um / 1000 + 1e-3 && size[2] <= p.build_height_um / 1000 + 1e-3 && p.pixels <= max;
+  const kind = fmt || "lumen";
+  const lumenMax = (cat && cat.lumen_max_pixels) || 1e12;
+  const mslicerMax = (cat && cat.mslicer_max_pixels) || lumenMax;
+  const max = kind === "lumen" ? lumenMax : mslicerMax;
+  const nativeOf = p => (p.native_format || "").replace(/^\./, "");
+  const why = p => {
+    if (p.pixels > max) return kind === "lumen" ? " (above the .lumen pixel cap)" : " (above the mslicer pixel cap)";
+    const native = nativeOf(p);
+    if (kind !== "lumen" && p.kind !== "inspection" && native && native !== kind) return ` (stock file is .${native})`;
+    if (kind === "ctb" && String(p.native_version || "").toLowerCase() === "v2") return " (CTB v2 is not written)";
+    if (size && (size[0] > p.build_width_um / 1000 + 1e-3 || size[1] > p.build_depth_um / 1000 + 1e-3 || size[2] > p.build_height_um / 1000 + 1e-3)) return " (model does not fit)";
+    return "";
+  };
+  const fits = p => !why(p);
   const chosen = plates.find(p => p.id === "zeim-inspection" && fits(p)) || plates.find(fits) || plates.find(p => p.id === "zeim-inspection") || plates[0];
-  return plates.map(p => `<option value="${esc(p.id)}"${chosen && p.id === chosen.id ? " selected" : ""}${p.pixels > max ? " disabled" : ""}>${esc(p.manufacturer)} ${esc(p.name)}${p.pixels > max ? " (too many pixels for a slice)" : ""}</option>`).join("");
+  return plates.map(p => {
+    const reason = why(p);
+    return `<option value="${esc(p.id)}"${chosen && p.id === chosen.id ? " selected" : ""}${reason ? " disabled" : ""}>${esc(p.manufacturer)} ${esc(p.name)}${esc(reason)}</option>`;
+  }).join("");
 }
 const num = (id, label, v, min, max, step, unit) => `<div class="field"><label for="${id}">${label} <em>${unit}</em></label><input type="number" id="${id}" value="${v}" min="${min}" max="${max}" step="${step}" inputmode="decimal"></div>`;
 
@@ -206,7 +221,8 @@ function wire() {
     fd.append("plate_id", $("#rzPlate").value);
     fd.append("anti_alias", $("#rzAA") && $("#rzAA").checked ? "true" : "false");
     fd.append("aa_level", "4");
-    fd.append("file_format", "lumen");
+    const sliceFmt = ($("#rzSliceFmt") && $("#rzSliceFmt").value) || "lumen";
+    fd.append("file_format", sliceFmt);
     const btn = $("#rzSlice"); if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
     box.innerHTML = `<p class="help" role="status">Slicing…</p>`;
     try {
@@ -219,14 +235,22 @@ function wire() {
           keep = false;
           stopSlicePoll();
           const layers = j.layers || 1;
-          const native = (j.report && j.report.native_format) || "stock";
-          box.innerHTML = `<p class="help">${layers} layers in a .lumen file. This is not a ${esc(native)} file and it has not been printed on a machine.</p>
-            <img id="rzLayerImg" alt="Sliced layer preview" style="width:100%;max-width:320px;height:auto;background:#111;border-radius:8px">
-            <div class="field"><label for="rzLayerN">Layer preview</label><input id="rzLayerN" type="range" min="0" max="${layers - 1}" value="0" style="width:100%;min-height:44px"></div>
-            <div class="row"><a class="btn primary" id="rzLumen" href="${j.download}" download style="min-height:44px">Download .lumen</a></div>`;
-          const show = i => { const img = $("#rzLayerImg"); if (img) img.src = `/api/resin/jobs/${sliceJob}/layer/${i}.png`; };
-          show(0);
-          const range = $("#rzLayerN"); if (range) range.oninput = ev => show(ev.target.value);
+          const ext = j.format || "lumen";
+          const native = (j.report && j.report.native_format) || "";
+          const hw = "It has not been printed on a machine.";
+          const kind = ext === "lumen"
+            ? `${layers} layers in a .lumen file. ${native ? `Stock files for this plate are ${native}. ` : ""}${hw}`
+            : `${layers} layers in a .${ext} file from mslicer. ${native ? `Catalog stock file is ${native}. ` : ""}That name is not a firmware test. ${hw}`;
+          const preview = ext === "lumen" ? `<img id="rzLayerImg" alt="Sliced layer preview" style="width:100%;max-width:320px;height:auto;background:#111;border-radius:8px">
+            <div class="field"><label for="rzLayerN">Layer preview</label><input id="rzLayerN" type="range" min="0" max="${layers - 1}" value="0" style="width:100%;min-height:44px"></div>` : "";
+          box.innerHTML = `<p class="help">${kind}</p>
+            ${preview}
+            <div class="row"><a class="btn primary" id="rzLumen" href="${j.download}" download style="min-height:44px">Download .${esc(ext)}</a></div>`;
+          if (ext === "lumen") {
+            const show = i => { const img = $("#rzLayerImg"); if (img) img.src = `/api/resin/jobs/${sliceJob}/layer/${i}.png`; };
+            show(0);
+            const range = $("#rzLayerN"); if (range) range.oninput = ev => show(ev.target.value);
+          }
           return;
         }
         if (j.status === "error" || j.status === "cancelled") {
@@ -288,9 +312,10 @@ function wire() {
         <p class="help">${esc(e.slice_note || "Slice to .lumen writes the layer masks. CHITUBOX, Lychee, GOO and Photon files are not written here.")}</p>
         <p class="help">${CAM_HINT}</p>
         <div class="row rzSliceRow">
-          <div class="field"><label for="rzPlate">LUMEN plate</label><select id="rzPlate">${plateOptions(r.size_mm)}</select></div>
+          <div class="field"><label for="rzPlate">Plate</label><select id="rzPlate">${plateOptions(r.size_mm, "lumen")}</select></div>
+          <div class="field"><label for="rzSliceFmt">Layer file</label><select id="rzSliceFmt"><option value="lumen">.lumen</option><option value="goo">.goo</option><option value="ctb">.ctb</option></select></div>
           <label class="inl chk" style="min-height:44px"><input type="checkbox" id="rzAA"> Anti-alias edges</label>
-          <button type="button" class="btn primary" id="rzSlice" style="min-height:44px">Slice to .lumen</button>
+          <button type="button" class="btn primary" id="rzSlice" style="min-height:44px">Slice</button>
         </div>
         <p class="help" id="rzPlateNote"></p>
         <div id="rzSliceOut"></div>
@@ -301,12 +326,22 @@ function wire() {
         <div class="row"><button type="button" class="btn primary" id="rzExport" data-export-rid="${esc(r.export?.rid || "")}" data-export-name="${esc(r.export?.name || "")}" aria-haspopup="dialog"><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> Export…</button><a class="btn" href="${r.downloads.stl}" download id="rzQuickStl">Quick STL</a><button type="button" class="btn" id="rzPublishResult" title="Open the Showcase form for this prepared model. Nothing is published until you confirm in that form.">Send to Showcase</button></div>`;
       out.classList.add("rzResult");
       out.querySelectorAll(".rzDismiss").forEach(b => b.onclick = () => b.closest(".rzWarn").remove());   // warnings never block: the files are already made
-      const plateSel = $("#rzPlate");
+      const plateSel = $("#rzPlate"), fmtSel = $("#rzSliceFmt");
       const sayPlate = () => { const p = (cat.lumen_plates || []).find(x => x.id === plateSel.value); const note = $("#rzPlateNote");
         if (!p || !note) return;
-        const native = p.native_format ? ` Stock files for this plate are ${p.native_format}, which this slice does not write.` : " This grid is not a commercial printer.";
-        note.textContent = `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um/1000).toFixed(1)} × ${(p.build_depth_um/1000).toFixed(1)} × ${(p.build_height_um/1000).toFixed(1)} mm. Output is .lumen.${native} Not hardware-tested.`; };
-      if (plateSel) { plateSel.onchange = sayPlate; sayPlate(); }
+        const fmt = (fmtSel && fmtSel.value) || "lumen";
+        const native = (p.native_format || "").replace(/^\./, "");
+        const stock = native ? ` Catalog stock file is .${native}.` : " This grid is not a commercial printer.";
+        note.textContent = `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um/1000).toFixed(1)} × ${(p.build_depth_um/1000).toFixed(1)} × ${(p.build_height_um/1000).toFixed(1)} mm. This slice writes .${fmt}.${stock} Not printed on a machine.`; };
+      const paintPlates = () => {
+        const prev = plateSel.value;
+        plateSel.innerHTML = plateOptions(r.size_mm, fmtSel.value);
+        const still = [...plateSel.options].find(o => o.value === prev && !o.disabled);
+        const open = still || [...plateSel.options].find(o => !o.disabled);
+        if (open) plateSel.value = open.value;
+        sayPlate();
+      };
+      if (plateSel) { plateSel.onchange = sayPlate; if (fmtSel) fmtSel.onchange = paintPlates; sayPlate(); }
       show3D($("#rzView"), r.downloads.stl, lc, null, bedNow());
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }
