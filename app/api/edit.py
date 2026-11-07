@@ -309,6 +309,18 @@ def get_project(bid: str, actor: Actor = Depends(get_actor)):
     return editproj.payload(bid)
 
 
+@router.put("/{bid}/support-paint")
+def put_support_paint(bid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Remember paint-on support strokes for this shape. The mesh is not modified."""
+    from ..services.support_paint import PaintError, parse_strokes
+    _edit_meta(bid, actor, owner_only=True)
+    try:
+        strokes = parse_strokes(body.get("strokes") if isinstance(body, dict) else None)
+    except PaintError as e:
+        raise HTTPException(400, str(e))
+    return editproj.save_support_paint(bid, strokes)
+
+
 @router.get("/{bid}/thickness")
 def thickness(bid: str, min_wall: float = 0.8, actor: Actor = Depends(get_actor)):
     """Where the model is thinner than `min_wall` mm (read-only, sampled estimate)."""
