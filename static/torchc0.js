@@ -60,7 +60,7 @@ function supportStatus() {
   const notice = supportEdit.notice ? `${supportEdit.notice} ` : "";
   el.textContent = notice + (n || a
     ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. A green mark is where the pillar will touch. A red mark is the keep-clear point. Automatic supports skip keep-clear marks. An unsupported island is still reported.`
-    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. A tap on a face that does not point at the plate moves the mark to the underside below it. Drag orbits, right-drag pans.`);
+    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. A support tap on a face that does not point at the plate moves the green mark to the underside below it. A keep-clear tap stays on the point you tapped. Drag orbits, right-drag pans.`);
 }
 async function show3D(el, url, lc, buf, bed, opts) {
   opts = opts || {};
@@ -197,7 +197,7 @@ function panelHTML() {
       <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div>
       <p class="help" id="rzCamHint">${CAM_HINT}</p>
       <fieldset class="rzOrient" id="rzSupEdit" hidden><legend>Supports on the model</legend>
-        <p class="help" id="rzSupRule">A green mark is where the pillar will touch. A red mark is the keep-clear point automatic supports skip. A tap on a face that does not point at the plate moves the mark to the underside below the tap, and the line under this says so.</p>
+        <p class="help" id="rzSupRule">A green mark is where the pillar will touch. A red mark is the keep-clear point you tapped. A support tap on a face that does not point at the plate moves only the green mark to the underside below the tap, and the line under this says so.</p>
         <p class="help" id="rzSupStatus"></p>
         <div class="row"><button type="button" class="btn small" id="rzModeOrbit" aria-pressed="true">Orbit</button><button type="button" class="btn small" id="rzModeAdd">Add support</button><button type="button" class="btn small" id="rzModeErase">Erase</button><button type="button" class="btn small" id="rzModeAvoid">Keep clear</button><button type="button" class="btn small" id="rzSupUndo">Undo</button><button type="button" class="btn small" id="rzSupReset">Reset</button></div>
       </fieldset></div></div>
@@ -303,41 +303,39 @@ function wire() {
     pv.dataset.kind = kind;
   }
   async function recontactMarks() {
-    const items = supportEdit.manual.map(p => ({ kind: "manual", p })).concat(supportEdit.avoid.map(p => ({ kind: "avoid", p })));
-    if (!items.length || !picked) { supportStatus(); return; }
-    const M = supportEdit.matrix || eye4();
-    const placed = items.map(item => applyPoint(M, item.p).map(round3));
-    const kinds = items.map(item => item.kind === "avoid" ? "avoid" : "support");
-    let contacts;
-    try { contacts = await askContacts(placed, kinds); }
-    catch (e) {
-      supportEdit.notice = `The pose changed and the contact check failed (${e.message}). The marks were cleared so they cannot sit away from the pillars.`;
-      supportEdit.manual = []; supportEdit.avoid = [];
-      saveSupportLocal();
-      await redrawPick(true);
-      return;
+    if (!picked) { supportStatus(); return; }
+    const manuals = supportEdit.manual.map(p => p.slice());
+    if (manuals.length) {
+      const M = supportEdit.matrix || eye4();
+      const placed = manuals.map(p => applyPoint(M, p).map(round3));
+      let contacts;
+      try { contacts = await askContacts(placed, placed.map(() => "support")); }
+      catch (e) {
+        supportEdit.notice = `The pose changed and the contact check failed (${e.message}). The green marks were cleared so they cannot sit away from the pillars. Red keep-clear marks stay where they were tapped.`;
+        supportEdit.manual = [];
+        saveSupportLocal();
+        await redrawPick(true);
+        return;
+      }
+      const nextM = [];
+      let moved = 0, dropped = 0;
+      const mat = threeMatrix(M);
+      for (let i = 0; i < manuals.length; i++) {
+        const c = contacts[i];
+        if (!c || !c.ok || !c.point) { dropped++; continue; }
+        const prev = placed[i];
+        if (Math.abs(prev[0] - c.point[0]) > 0.4 || Math.abs(prev[1] - c.point[1]) > 0.4 || Math.abs(prev[2] - c.point[2]) > 0.4) moved++;
+        nextM.push(storePlaced(c.point, mat));
+      }
+      if (moved || dropped) {
+        pushUndo();
+        supportEdit.manual = nextM;
+        supportEdit.notice = dropped
+          ? `The pose or printer changed. ${dropped} green mark${dropped === 1 ? "" : "s"} had no pillar contact and ${dropped === 1 ? "was" : "were"} removed. Each remaining green mark is where a pillar will touch. Red keep-clear marks stay on the tapped points.`
+          : "The pose or printer changed. The green marks moved to the undersides that face the plate, where the pillars will touch. Red keep-clear marks stay on the tapped points.";
+        saveSupportLocal();
+      }
     }
-    const nextM = [], nextA = [];
-    let moved = 0, dropped = 0;
-    const mat = threeMatrix(M);
-    for (let i = 0; i < items.length; i++) {
-      const c = contacts[i];
-      if (!c || !c.ok || !c.point) { dropped++; continue; }
-      const prev = placed[i];
-      if (Math.abs(prev[0] - c.point[0]) > 0.4 || Math.abs(prev[1] - c.point[1]) > 0.4 || Math.abs(prev[2] - c.point[2]) > 0.4) moved++;
-      (items[i].kind === "avoid" ? nextA : nextM).push(storePlaced(c.point, mat));
-    }
-    if (moved || dropped) {
-      pushUndo();
-      supportEdit.manual = nextM;
-      supportEdit.avoid = nextA;
-      supportEdit.notice = dropped
-        ? `The pose or printer changed. ${dropped} mark${dropped === 1 ? "" : "s"} had no pillar contact and ${dropped === 1 ? "was" : "were"} removed. Each remaining green mark is where a pillar will touch, and each red mark is the keep-clear point.`
-        : "The pose or printer changed. The marks moved to the undersides that face the plate, where the pillars will touch.";
-      saveSupportLocal();
-    }
-    const last = contacts.filter(c => c && c.ok && c.point).pop();
-    if (last) rememberContact(placed[contacts.lastIndexOf(last)] || last.point, Object.assign(last.point, { moved: last.moved }), last.kind);
     await redrawPick(true);
   }
   async function onSupportPick(ev) {
@@ -356,7 +354,20 @@ function wire() {
     contactBusy = true;
     const tap = [round3(ev.hit.point.x), round3(ev.hit.point.y), round3(ev.hit.point.z)];
     const kind = supportEdit.mode === "avoid" ? "avoid" : "support";
+    const nrm = ev.hit.face && ev.hit.face.normal ? ev.hit.face.normal.clone().transformDirection(ev.matrix) : new THREE.Vector3(0, 0, 1);
+    const pv = $("#rzPickView");
+    if (pv) pv.dataset.normal = [round3(nrm.x), round3(nrm.y), round3(nrm.z)].join(",");
     try {
+      if (kind === "avoid") {
+        pushUndo();
+        supportEdit.avoid.push(storePlaced(tap, ev.matrix));
+        if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
+        rememberContact(tap, Object.assign(tap.slice(), { moved: false }), "avoid");
+        supportEdit.notice = "The red mark is the keep-clear point you tapped. Automatic supports near it are skipped.";
+        saveSupportLocal();
+        await redrawPick(true);
+        return;
+      }
       const contacts = await askContacts([tap], [kind]);
       const c = contacts[0];
       if (!c || !c.ok || !c.point) {
@@ -375,12 +386,8 @@ function wire() {
       if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
       rememberContact(tap, Object.assign(c.point.slice(), { moved: !!c.moved }), kind);
       supportEdit.notice = c.moved
-        ? (kind === "avoid"
-          ? "The tap was not on a downward face. The red mark is the keep-clear point, on the underside below the tap."
-          : "The tap was not on a downward face. The green mark is the underside below it, where the pillar will touch.")
-        : (kind === "avoid"
-          ? "The red mark is the keep-clear point automatic supports skip."
-          : "The green mark is where the pillar will touch.");
+        ? "The tap was not on a downward face. The green mark is the underside below it, where the pillar will touch."
+        : "The green mark is where the pillar will touch.";
       saveSupportLocal();
       await redrawPick(true);
     } catch (e) {

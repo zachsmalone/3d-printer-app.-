@@ -290,6 +290,12 @@ def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y
     contacts = []
     for i, p in enumerate(raw):
         kind = kind_list[i] if i < len(kind_list) and kind_list[i] in ("support", "avoid") else "support"
+        if kind == "avoid":
+            contacts.append({
+                "ok": True, "on_plate": False, "blocked": False, "moved": False,
+                "point": [round(float(x), 3) for x in p], "kind": kind,
+            })
+            continue
         hit, moved = resin.contact_point(mesh, p)
         if hit is None:
             contacts.append({"ok": False, "on_plate": False, "blocked": False, "moved": False, "point": None, "kind": kind})
@@ -297,13 +303,10 @@ def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y
         reaches = resin.pillar_reaches(float(hit[2]), lift, raft)
         clear = resin.pillar_path_clear(mesh, hit)
         point = [round(float(x), 3) for x in hit]
-        if kind == "avoid":
-            contacts.append({"ok": True, "on_plate": False, "blocked": False, "moved": bool(moved), "point": point, "kind": kind})
-        else:
-            contacts.append({
-                "ok": bool(reaches and clear), "on_plate": not reaches, "blocked": bool(reaches and not clear),
-                "moved": bool(moved) and bool(reaches and clear), "point": point, "kind": kind,
-            })
+        contacts.append({
+            "ok": bool(reaches and clear), "on_plate": not reaches, "blocked": bool(reaches and not clear),
+            "moved": bool(moved) and bool(reaches and clear), "point": point, "kind": kind,
+        })
     return {"contacts": contacts}
 
 

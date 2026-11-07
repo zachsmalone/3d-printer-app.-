@@ -628,6 +628,20 @@ def test_support_contact_endpoint_returns_the_underside(c):
     assert avoid.status_code == 200, avoid.text
     mark = avoid.json()["contacts"][0]
     assert mark["ok"] is True and mark["moved"] is False and mark["point"] == hit["point"]
+    side_vs = loaded.vertices[np.abs(loaded.vertices[:, 0] - loaded.bounds[1][0]) < 0.05]
+    side = [round(float(side_vs[:, 0].mean()), 3), round(float(side_vs[:, 1].mean()), 3), round(float(side_vs[:, 2].mean()), 3)]
+    side_support = c.post("/api/resin/support-contact", data={
+        "upload_id": uid, "tilt_deg": "0", "supports": "true",
+        "points": json.dumps([side]), "kinds": json.dumps(["support"]),
+    })
+    side_avoid = c.post("/api/resin/support-contact", data={
+        "upload_id": uid, "tilt_deg": "0", "supports": "true",
+        "points": json.dumps([side]), "kinds": json.dumps(["avoid"]),
+    })
+    projected = side_support.json()["contacts"][0]
+    kept = side_avoid.json()["contacts"][0]
+    assert projected["moved"] is True and projected["point"][2] < side[2] - 1
+    assert kept["moved"] is False and kept["point"] == side
     floor = loaded.vertices[loaded.vertices[:, 2] < 0.2]
     plate_pt = [round(float(floor[:, 0].mean()), 3), round(float(floor[:, 1].mean()), 3), 0.0]
     plate = c.post("/api/resin/support-contact", data={
