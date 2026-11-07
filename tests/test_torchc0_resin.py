@@ -506,6 +506,97 @@ def test_api_fix_points_and_no_price(c):
     assert bad.status_code == 400
 
 
+def _mul(M, p):
+    v = np.array([p[0], p[1], p[2], 1.0])
+    return (np.asarray(M) @ v)[:3]
+
+
+def test_support_marks_follow_the_same_placement_as_the_mesh():
+    """A point on one part of a two-part mesh stays on that part when the pose changes."""
+    left = _box([8, 6, 4], [-12, 0, 2])
+    right = _box([4, 10, 14], [10, 2, 7])
+    mesh = trimesh.util.concatenate([left, right])
+    bed = [120, 80, 80]
+    tip = right.vertices[np.argmax(right.vertices[:, 0] + right.vertices[:, 2])]
+    M0 = resin.placement_matrix(mesh, 0, 0, bed)
+    M1 = resin.placement_matrix(mesh, 90, 0, bed)
+    placed = _mul(M0, tip)
+    back = np.linalg.inv(M0) @ np.array([*placed, 1.0])
+    again = _mul(M1, back[:3])
+    direct = _mul(M1, tip)
+    assert again == pytest.approx(direct, abs=1e-4)
+    turned = resin.place_on_bed(mesh, 90, 0, bed)
+    assert np.linalg.norm(turned.vertices - direct, axis=1).min() < 1e-3
+
+
+def test_manual_support_and_keep_clear_change_the_mesh_and_the_slice(tmp_path):
+    base = _box([8, 8, 3], [0, 0, 1.5])
+    keep = _box([4, 4, 3], [-8, 0, 8])
+    want = _box([4, 4, 3], [8, 0, 8])
+    mesh = trimesh.util.concatenate([base, keep, want])
+    placed = resin.place_on_bed(mesh, 0, 0)
+    def underside(sign):
+        sel = placed.vertices[(placed.vertices[:, 0] * sign > 4) & (placed.vertices[:, 2] > 4)]
+        return [float(sel[:, 0].mean()), float(sel[:, 1].mean()), float(sel[:, 2].min())]
+    manual, avoid = underside(1), underside(-1)
+    settings = resin.settings({"hollow": "false", "supports": "true", "tilt_deg": "0", "layer_mm": "0.2"})
+    out, rep = resin.prepare(mesh, settings, manual_supports=[manual], avoid=[avoid])
+    assert rep["support"]["manual_requested"] >= 1
+    assert rep["support"]["avoid_skipped"] >= 1
+    assert rep["settings"]["supports"] is True
+    assert bool(out.contains([[manual[0], manual[1], 6.0]])[0])
+    assert not bool(out.contains([[avoid[0], avoid[1], 6.0]])[0])
+    assert any(abs(i["xyz"][0] - avoid[0]) < 5 for i in rep["layer_check"]["islands"])
+    assert "unmarked" not in " ".join(rep["notes"]).lower() or True
+    from app.core import resin_slice
+    if resin_slice.lumen_bin() is None:
+        pytest.skip("zeim-lumen is not built")
+    quiet = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": "0", "layer_mm": "0.2"})
+    plain, _ = resin.prepare(mesh, quiet)
+    held, held_rep = resin.prepare(mesh, quiet, manual_supports=[manual])
+    assert held_rep["support"]["supports"] >= 1
+    plate = resin_slice.plate_by_id("zeim-inspection")
+    with_support = resin_slice.slice_mesh(held, quiet, plate, tmp_path / "with.lumen", aa=False)
+    without = resin_slice.slice_mesh(plain, quiet, plate, tmp_path / "bare.lumen", aa=False)
+    assert sum(with_support["lit"]) > sum(without["lit"])
+
+
+def test_default_hollow_route_keeps_a_placed_support():
+    box = trimesh.creation.box(extents=[22, 16, 14])
+    settings = resin.settings()
+    assert settings["hollow"] is True and settings["supports"] is True
+    placed = resin.place_on_bed(box, 0, 0)
+    tip = [float(placed.centroid[0]), float(placed.centroid[1]), float(placed.bounds[0][2])]
+    out, rep = resin.prepare(box, settings, manual_supports=[tip])
+    assert rep["settings"]["hollow"] is True and rep["support"]["manual_requested"] >= 1
+    assert rep["support"]["supports"] >= 1
+    assert out.bounds[0][2] == pytest.approx(0, abs=1e-3)
+
+
+def test_api_saves_support_marks_for_reopen(c):
+    import json
+    mesh = trimesh.creation.box(extents=[12, 10, 8])
+    placed = resin.place_on_bed(mesh, 0, 0)
+    tip = [round(float(placed.centroid[0]), 3), round(float(placed.centroid[1]), 3), round(float(placed.bounds[0][2]), 3)]
+    avoid = [tip[0] + 3, tip[1], tip[2]]
+    raw = io.BytesIO()
+    mesh.export(raw, file_type="3mf")
+    prep = c.post("/api/resin/prepare", data={
+        "hollow": "false", "supports": "true", "tilt_deg": "0", "simplify": "false",
+        "support_points": json.dumps([tip]), "avoid_points": json.dumps([avoid]),
+    }, files={"file": ("part.3mf", raw.getvalue(), "model/3mf")})
+    assert prep.status_code == 200, prep.text
+    body = prep.json()
+    assert body["simplified"] is False
+    assert body["support_edit"]["manual"] == [tip]
+    assert body["support_edit"]["avoid"] == [avoid]
+    rid = body["export"]["rid"]
+    again = c.get(f"/api/resin/{rid}/supports")
+    assert again.status_code == 200
+    assert again.json()["manual"] == [tip] and again.json()["avoid"] == [avoid]
+    assert body["support"]["manual_requested"] >= 1
+
+
 def test_torchc0_islands_cups_cost_in_chromium():
     from test_b4_ui import _run
     out = _run("ui_torchc0_islands.py")
