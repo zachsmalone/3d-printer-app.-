@@ -12,6 +12,7 @@ import threading
 import time
 import uuid
 
+import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, Response
 
@@ -154,10 +155,10 @@ def _to_stl(data):
     return m.export(file_type="stl")
 
 
-def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False):
+def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False, manual=None, avoid=None):
     m, n_in, fit_note = _load_fit(data, ext, simplify)
     note = note or fit_note
-    out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains)
+    out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains, manual_supports=manual, avoid=avoid)
     if note:
         rep.setdefault("notes", []).insert(0, note)
     rep["triangles_in"] = int(n_in)
@@ -175,6 +176,23 @@ def _preview(data, ext, bed=None, simplify=False):
     m, n, note = _load_fit(data, ext, simplify)
     m = resin.place_on_bed(m, 0.0, 0.0, bed)
     return m.export(file_type="stl"), n, note
+
+
+def _bed_for(printer_id: str):
+    if not printer_id:
+        return None
+    try:
+        pid, _ = ps.resolve(printer_id, None)
+        p = ps.printer_public(pid)
+    except ps.SetupError:
+        return None
+    if p["technology"] != "Resin":
+        return None
+    return p["bed_mm"]
+
+
+def _matrix_numbers(M) -> list[float]:
+    return [round(float(x), 6) for x in M.reshape(-1)]
 
 
 def _read_upload(file, actor):
@@ -211,15 +229,7 @@ def preview(file: UploadFile = File(...), printer_id: str = Form(""), simplify: 
         if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
-            bed = None
-            if printer_id:
-                try:
-                    pid, _ = ps.resolve(printer_id, None)
-                    p = ps.printer_public(pid)
-                    if p["technology"] == "Resin":
-                        bed = p["bed_mm"]
-                except ps.SetupError:
-                    bed = None
+            bed = _bed_for(printer_id)
             do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
             stl, n, note = guard.run(_preview, data, ext, bed, do_simplify, timeout=180, mem_mb=RESIN_MEM_MB)
         finally:
@@ -235,7 +245,23 @@ def preview(file: UploadFile = File(...), printer_id: str = Form(""), simplify: 
     d = _dir()
     (d / f"up{uid}.stl").write_bytes(stl)
     (d / f"up{uid}.json").write_text(json.dumps({"sid": actor.sid, "note": note}))
-    return Response(stl, media_type="model/stl", headers={"X-Zeim-Faces": str(n), "X-Zeim-Upload": uid, "Cache-Control": "no-store"})
+    ident = ",".join(f"{1.0 if i in (0, 5, 10, 15) else 0.0:.1f}" for i in range(16))
+    return Response(stl, media_type="model/stl", headers={
+        "X-Zeim-Faces": str(n), "X-Zeim-Upload": uid, "X-Zeim-Matrix": ident, "Cache-Control": "no-store"})
+
+
+@router.post("/placement")
+def placement(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y_deg: str = Form("0"),
+              printer_id: str = Form(""), actor: Actor = Depends(get_actor)):
+    """Matrix from the loaded preview mesh into the pose and bed Prepare will use."""
+    data, _note = _picked(upload_id, actor)
+    try:
+        s = resin.settings({"tilt_deg": tilt_deg or "0", "tilt_y_deg": tilt_y_deg or "0", "hollow": "false", "supports": "false"})
+    except resin.ResinError as e:
+        raise HTTPException(400, str(e))
+    mesh = trimesh.load(trimesh.util.wrap_as_stream(data), file_type="stl", force="mesh")
+    M = resin.placement_matrix(mesh, s["tilt_deg"], s["tilt_y_deg"], _bed_for(printer_id))
+    return {"matrix": _matrix_numbers(M)}
 
 
 def _picked(uid, actor):
@@ -257,7 +283,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
             lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), tilt_y_deg: str = Form(""), simplify: str = Form("false"), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
-            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), support_points: str = Form(""), avoid_points: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
             "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg", "tilt_y_deg",
@@ -265,6 +291,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
     isl, drn = _points(island_supports, "Island supports"), _points(drains, "Drain holes")
+    manual, avoid = _points(support_points, "Support points"), _points(avoid_points, "Keep-clear points")
     bed, pname, printer_meta = None, None, None
     if printer_id:
         try:
@@ -297,7 +324,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             raise guard.Busy()
         try:
             do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
-            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, do_simplify, timeout=240, mem_mb=RESIN_MEM_MB)
+            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, do_simplify, manual, avoid, timeout=240, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -319,6 +346,10 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         meta["printer"] = printer_meta
     (d / f"{rid}.json").write_text(json.dumps(meta))
     (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
+    (d / f"{rid}.supports.json").write_text(json.dumps({
+        "manual": manual, "avoid": avoid, "sid": actor.sid,
+    }))
+    rep["support_edit"] = {"manual": manual, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
     return badges.merge(rep, actor, "resin_slice")
@@ -329,6 +360,21 @@ RESIN_FORMATS = ("stl", "3mf", "obj", "ply", "glb", "amf")
 
 def _rid_ok(rid: str) -> bool:
     return len(rid) == 32 and all(c in "0123456789abcdef" for c in rid)
+
+
+@router.get("/{rid}/supports")
+def saved_supports(rid: str, actor: Actor = Depends(get_actor)):
+    """The support marks saved with this prepare, so a reopen can place the same points."""
+    if not _rid_ok(rid):
+        raise HTTPException(404, "Not found")
+    path = _dir() / f"{rid}.supports.json"
+    try:
+        body = json.loads(path.read_text())
+    except (OSError, ValueError):
+        raise HTTPException(404, "Those support marks have expired.")
+    if body.get("sid") != actor.sid:
+        raise HTTPException(404, "Those support marks have expired.")
+    return {"manual": body.get("manual") or [], "avoid": body.get("avoid") or []}
 
 
 @router.post("/{rid}/slice")

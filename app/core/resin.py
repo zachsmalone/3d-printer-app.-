@@ -200,6 +200,34 @@ def settings(opts: dict | None = None) -> dict:
     return s
 
 
+def placement_matrix(m: trimesh.Trimesh, tilt_x_deg: float = 0.0, tilt_y_deg: float = 0.0, bed_mm=None) -> np.ndarray:
+    """4×4 taking `m` into the placed frame. Same steps as `place_on_bed`. Does not change `m`.
+
+    A point saved on the unturned mesh is `inverse(matrix) @ placed_point`. Applying a new
+    matrix puts that same material point on the new pose and bed.
+    """
+    work = m.copy()
+    M = np.eye(4)
+    if tilt_x_deg:
+        R = trimesh.transformations.rotation_matrix(math.radians(float(tilt_x_deg)), [1, 0, 0], work.centroid)
+        work.apply_transform(R)
+        M = R @ M
+    if tilt_y_deg:
+        R = trimesh.transformations.rotation_matrix(math.radians(float(tilt_y_deg)), [0, 1, 0], work.centroid)
+        work.apply_transform(R)
+        M = R @ M
+    T = trimesh.transformations.translation_matrix([0, 0, -float(work.bounds[0][2])])
+    work.apply_transform(T)
+    M = T @ M
+    mid = (work.bounds[0] + work.bounds[1]) / 2.0
+    if bed_mm is not None and len(bed_mm) >= 2:
+        cx, cy = float(bed_mm[0]) / 2.0, float(bed_mm[1]) / 2.0
+    else:
+        cx, cy = 0.0, 0.0
+    T2 = trimesh.transformations.translation_matrix([cx - float(mid[0]), cy - float(mid[1]), 0.0])
+    return T2 @ M
+
+
 def place_on_bed(m: trimesh.Trimesh, tilt_x_deg: float = 0.0, tilt_y_deg: float = 0.0, bed_mm=None) -> trimesh.Trimesh:
     """Turn the model about its own centre, then sit that pose on the bed.
 
@@ -208,19 +236,9 @@ def place_on_bed(m: trimesh.Trimesh, tilt_x_deg: float = 0.0, tilt_y_deg: float 
     centre on the bed centre (the origin when the bed size is unknown). Parts keep
     their distances from each other. The mesh is not scaled.
     """
-    m = m.copy()
-    if tilt_x_deg:
-        m.apply_transform(trimesh.transformations.rotation_matrix(math.radians(float(tilt_x_deg)), [1, 0, 0], m.centroid))
-    if tilt_y_deg:
-        m.apply_transform(trimesh.transformations.rotation_matrix(math.radians(float(tilt_y_deg)), [0, 1, 0], m.centroid))
-    m.apply_translation([0, 0, -float(m.bounds[0][2])])
-    mid = (m.bounds[0] + m.bounds[1]) / 2.0
-    if bed_mm is not None and len(bed_mm) >= 2:
-        cx, cy = float(bed_mm[0]) / 2.0, float(bed_mm[1]) / 2.0
-    else:
-        cx, cy = 0.0, 0.0
-    m.apply_translation([cx - float(mid[0]), cy - float(mid[1]), 0.0])
-    return m
+    out = m.copy()
+    out.apply_transform(placement_matrix(m, tilt_x_deg, tilt_y_deg, bed_mm))
+    return out
 
 
 def orient(m: trimesh.Trimesh, tilt_deg: float, tilt_y_deg: float = 0.0, bed_mm=None) -> trimesh.Trimesh:
@@ -269,17 +287,43 @@ def _in_batches(fn, *arrays, n=20):
     return np.concatenate([np.asarray(fn(*(a[i:i + n] for a in arrays))) for i in range(0, len(arrays[0]), n)])
 
 
+def _away_from(pts: np.ndarray, blocked, radius: float) -> np.ndarray:
+    """Drop points within `radius` mm of any blocked point. Manual marks are not passed through here."""
+    if pts is None or not len(pts) or blocked is None:
+        return pts
+    block = np.asarray(blocked, dtype=float).reshape(-1, 3)
+    if not len(block):
+        return pts
+    dist = np.linalg.norm(pts[:, None, :] - block[None, :, :], axis=2)
+    return pts[dist.min(axis=1) > float(radius)]
+
+
 def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None,
-                   extra=None, auto=True):
+                   extra=None, auto=True, avoid=None, manual=None):
     """Model raised by base_lift; a cone tip + cylinder pillar to a raft under each support point.
-    Points whose straight path down hits the model itself are skipped (counted) instead of piercing it."""
+    Points whose straight path down hits the model itself are skipped (counted) instead of piercing it.
+    `avoid` points (pre-lift frame) stop automatic supports only. `manual` points are always requested."""
     m = m.copy(); m.apply_translation([0, 0, base_lift + raft_mm])
     if envelope is not None:
         envelope = envelope.copy(); envelope.apply_translation([0, 0, base_lift + raft_mm])
+    lift = np.array([0, 0, base_lift + raft_mm], dtype=float)
     pts = support_points(m, spacing, envelope=envelope) if auto else np.zeros((0, 3))
+    avoided = 0
+    if avoid is not None and len(np.asarray(avoid)):
+        before = len(pts)
+        pts = _away_from(pts, np.asarray(avoid, dtype=float).reshape(-1, 3) + lift, max(float(spacing), 1.5))
+        avoided = before - len(pts)
+    manual_pts = np.zeros((0, 3))
+    if manual is not None and len(np.asarray(manual)):
+        manual_pts = _surface_below(m, np.asarray(manual, dtype=float).reshape(-1, 3) + lift)
+        pts = _away_from(pts, manual_pts, max(float(spacing) * 0.75, 1.0))
     if extra is not None and len(extra):          # user-asked points (islands), given before the lift
-        ex = _surface_below(m, np.asarray(extra, dtype=float) + [0, 0, base_lift + raft_mm])
-        pts = np.vstack([pts, ex]) if len(pts) else ex
+        ex = _surface_below(m, np.asarray(extra, dtype=float) + lift)
+        pts = _away_from(pts, ex, max(float(spacing) * 0.75, 1.0))
+        manual_pts = np.vstack([manual_pts, ex]) if len(manual_pts) else ex
+    n_manual = len(manual_pts)
+    if len(manual_pts):
+        pts = np.vstack([manual_pts, pts]) if len(pts) else manual_pts
     parts, skipped = [], 0
     if len(pts):
         org = pts - [0, 0, 0.05]
@@ -318,7 +362,7 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
         out, extra, merged = u, float(abs(u.volume)) - float(abs(m.volume)), True
     else:
         out, extra, merged = trimesh.util.concatenate([m, *rafts, *parts]), float(sum(r.volume for r in rafts) + sum(abs(q.volume) for q in parts)), False
-    return out, {"_volume": extra, "merged": merged, "bodies": bodies(out), "watertight": bool(merged or _weld_check(out)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d}
+    return out, {"_volume": extra, "merged": merged, "bodies": bodies(out), "watertight": bool(merged or _weld_check(out)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d, "avoid_skipped": avoided, "manual_requested": int(n_manual)}
 
 
 def _surface_below(m, pts, reach=2.0):
@@ -572,7 +616,7 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
             "slice_note": "This is an estimate until you slice. Slice writes .lumen, or .goo and .ctb through the separate mslicer program when the plate's stock file matches. Not printed on a machine."}
 
 
-def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None) -> tuple[trimesh.Trimesh, dict]:
+def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None, manual_supports=None, avoid=None) -> tuple[trimesh.Trimesh, dict]:
     """The TorchC0 pipeline: tilt -> hollow -> drain + vent holes -> supports + raft -> layer check (islands, suction cups).
     Warnings never block: they are notes; the files are always made."""
     mat = MATERIALS[s.get("material") or DEFAULT_MATERIAL]
@@ -641,14 +685,23 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
                                 "above the plate there); tilt the model or turn supports on so the cup lifts off the plate.")
     lift = 0.0
     vol = float(abs(work.volume))
-    if s["supports"] or island_supports:
-        # supports off + island pillars only: the model stays on the plate (no lift, no raft); pillars stand on the plate
+    manual_list = [list(map(float, p)) for p in (manual_supports or [])][:200]
+    avoid_list = [list(map(float, p)) for p in (avoid or [])][:200]
+    if s["supports"] or island_supports or manual_list:
+        # supports off + named pillars only: the model stays on the plate (no lift, no raft); pillars stand on the plate
         bl, raft = (s["base_lift_mm"], 1.0) if s["supports"] else (0.0, 0.0)
         lift = bl + raft
         work, sr = build_supports(work, s["support_spacing_mm"], bl, raft_mm=raft, envelope=envelope,
-                                  extra=island_supports[:200] if island_supports else None, auto=s["supports"])
+                                  extra=island_supports[:200] if island_supports else None, auto=s["supports"],
+                                  avoid=avoid_list if s["supports"] else None, manual=manual_list or None)
         if island_supports:
             sr["island_supports"] = len(island_supports[:200])
+        sr["manual"] = manual_list
+        sr["avoid"] = avoid_list
+        sr["note"] = ("Placed supports are built. Keep-clear marks are skipped by automatic supports only. "
+                      "An unsupported island is still reported. A placed support does not promise an unmarked face.")
+        if manual_list or avoid_list:
+            rep["notes"].append(sr["note"])
         rep["support"] = sr
         vol += sr.pop("_volume")
         if not sr["merged"]:
@@ -657,7 +710,7 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
         if sr["skipped_inside"]:
             rep["notes"].append(f"{sr['skipped_inside']} overhang spot(s) sit above other parts of the model and got no support; "
                                 "check them in your slicer and add supports there if needed.")
-    if not s["supports"] and not island_supports:
+    if not s["supports"] and not island_supports and not manual_list:
         rep["notes"].append("Supports are off: only flat-bottomed models print without them. Add supports in your slicer otherwise.")
     try:
         lc = layer_check(work, step=s["layer_mm"])      # sliced at the chosen layer height (capped at 400 slices)

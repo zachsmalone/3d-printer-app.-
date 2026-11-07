@@ -1,6 +1,6 @@
 /* TorchC0: ZEIM's resin program, its own main tab (#torchc0). Resin only: no nozzle, filament or gcode settings here.
-   Upload a model -> POST /api/resin/prepare (hollow + drain hole, tilt, supports + raft) -> STL / 3MF,
-   then POST /api/resin/{id}/slice writes a .lumen layer file. Not CTB, GOO, Lychee or Photon. */
+   Upload a model -> place supports on that mesh -> POST /api/resin/prepare -> STL / 3MF,
+   then POST /api/resin/{id}/slice writes the layer file for the selected printer. */
 import { api, esc, $ } from "/static/app.js";
 import { money } from "/static/cost.js";
 import * as THREE from "three";
@@ -10,9 +10,59 @@ import { postForm, progress as handoffProgress } from "/static/handoff-veil.js";
    Ctrl, Shift, or Meta swaps the left and right actions. The wheel dollies. */
 const CAM_HINT = "Camera: left drag orbits, right drag pans, scroll wheel or middle drag zooms. Ctrl, Shift, or ⌘ with the left button pans instead. Dragging does not turn the model.";
 
-/* 3D result view: the prepared STL with island (red) and suction-cup (orange) markers. Lazy: only made after a result. */
-const views = new WeakMap();   // one viewer per element: the picked-model preview and the result each keep their own
-async function show3D(el, url, lc, buf, bed) {
+/* 3D view of the real STL (every triangle in the buffer, not a stand-in). Optional matrix puts the
+   loaded mesh into the pose Prepare will use. Marks and a click handler live here so viewer.js stays shared. */
+const views = new WeakMap();
+const supportEdit = {
+  mode: "orbit", manual: [], avoid: [], undo: [], matrix: null, buf: null, bed: null, name: "", size: 0,
+};
+const SUPPORT_KEY = "zeim.resinSupports.v1";
+function eye4() { const m = new Array(16).fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m; }
+function parseMatrix(text) {
+  if (!text) return eye4();
+  const n = String(text).split(",").map(Number);
+  return n.length === 16 && n.every(v => Number.isFinite(v)) ? n : eye4();
+}
+function applyPoint(M, p) {
+  return [
+    M[0] * p[0] + M[1] * p[1] + M[2] * p[2] + M[3],
+    M[4] * p[0] + M[5] * p[1] + M[6] * p[2] + M[7],
+    M[8] * p[0] + M[9] * p[1] + M[10] * p[2] + M[11],
+  ];
+}
+function threeMatrix(M) {
+  const e = new THREE.Matrix4();
+  e.set(M[0], M[1], M[2], M[3], M[4], M[5], M[6], M[7], M[8], M[9], M[10], M[11], M[12], M[13], M[14], M[15]);
+  return e;
+}
+function saveSupportLocal() {
+  try {
+    localStorage.setItem(SUPPORT_KEY, JSON.stringify({
+      name: supportEdit.name, size: supportEdit.size, manual: supportEdit.manual, avoid: supportEdit.avoid,
+    }));
+  } catch { /* the prepare response still keeps the marks */ }
+}
+function loadSupportLocal(name, size) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SUPPORT_KEY) || "null");
+    if (!raw || raw.name !== name || raw.size !== size) return false;
+    supportEdit.manual = Array.isArray(raw.manual) ? raw.manual : [];
+    supportEdit.avoid = Array.isArray(raw.avoid) ? raw.avoid : [];
+    supportEdit.undo = [];
+    return true;
+  } catch { return false; }
+}
+function supportStatus() {
+  const el = $("#rzSupStatus");
+  if (!el) return;
+  const n = supportEdit.manual.length, a = supportEdit.avoid.length;
+  const mode = { orbit: "Orbit", add: "Add support", erase: "Erase", avoid: "Keep clear" }[supportEdit.mode] || "Orbit";
+  el.textContent = n || a
+    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. Automatic supports skip keep-clear marks. An unsupported island is still reported. Drag still orbits; a tap places or erases.`
+    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. Drag orbits, right-drag pans. Nothing here promises an unmarked face.`;
+}
+async function show3D(el, url, lc, buf, bed, opts) {
+  opts = opts || {};
   try {
     const { Viewer } = await import("/static/viewer.js");
     let viewer = views.get(el);
@@ -25,13 +75,59 @@ async function show3D(el, url, lc, buf, bed) {
     const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.computeVertexNormals();
     viewer.group.clear();
     viewer.setBed(bed);
-    viewer.group.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: "#8fb0e0", roughness: 0.6, transparent: true, opacity: 0.85 })));
+    const model = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: "#8fb0e0", roughness: 0.6, transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
+    model.userData.model = true;
+    const M = opts.matrix || eye4();
+    model.matrixAutoUpdate = false;
+    model.matrix.copy(threeMatrix(M));
+    model.updateMatrixWorld(true);
+    viewer.group.add(model);
     g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
-    const mark = (p, color) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), new THREE.MeshBasicMaterial({ color, depthTest: false }));
-      m.position.set(...p); m.renderOrder = 2; viewer.group.add(m); };
+    const mark = (p, color, kind, index) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: kind === "avoid" ? 0.55 : 1 }));
+      m.position.set(p[0], p[1], p[2]); m.renderOrder = 2; m.userData.mark = kind; m.userData.index = index; viewer.group.add(m);
+    };
     ((lc && lc.islands) || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
     ((lc && lc.suction) || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
-    viewer.reset(); el.dataset.markers = String(viewer.group.children.length - 1);
+    (opts.manual || []).forEach((p, i) => mark(applyPoint(M, p), "#3dd68c", "manual", i));
+    (opts.avoid || []).forEach((p, i) => mark(applyPoint(M, p), "#e5484d", "avoid", i));
+    if (!opts.keepCamera) {
+      const box = new THREE.Box3().setFromObject(model);
+      const c = box.getCenter(new THREE.Vector3());
+      const s = box.getSize(new THREE.Vector3());
+      const rad = Math.max(s.x, s.y, s.z, 8);
+      viewer.camera.position.set(c.x + rad * 0.2, c.y - rad * 1.6, c.z + rad);
+      viewer.camera.far = rad * 40;
+      viewer.camera.updateProjectionMatrix();
+      viewer.controls.target.copy(c);
+      viewer.controls.update();
+    }
+    const marks = viewer.group.children.filter(c => c.userData && (c.userData.mark || (lc && (c.userData.mark === undefined)))).length;
+    el.dataset.markers = String(((lc && lc.islands) || []).filter(i => i.xyz).length + ((lc && lc.suction) || []).filter(i => i.xyz).length);
+    el.dataset.supports = String((opts.manual || []).length);
+    el.dataset.avoid = String((opts.avoid || []).length);
+    const canvas = viewer.renderer.domElement;
+    if (viewer._resinPick) canvas.removeEventListener("pointerup", viewer._resinPick);
+    if (viewer._resinDownFn) canvas.removeEventListener("pointerdown", viewer._resinDownFn);
+    viewer._resinDown = null;
+    const down = ev => { viewer._resinDown = { x: ev.clientX, y: ev.clientY }; };
+    const up = ev => {
+      const start = viewer._resinDown; viewer._resinDown = null;
+      if (!start || !opts.onPick || supportEdit.mode === "orbit") return;
+      const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
+      if (dx * dx + dy * dy > 64) return;
+      const rect = viewer.renderer.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+      const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, viewer.camera);
+      const marksHit = ray.intersectObjects(viewer.group.children.filter(c => c.userData && c.userData.mark), false);
+      const modelHit = ray.intersectObject(model, false);
+      opts.onPick({ mark: marksHit[0] || null, hit: modelHit[0] || null, matrix: model.matrix });
+    };
+    viewer._resinDownFn = down;
+    viewer._resinPick = up;
+    canvas.addEventListener("pointerdown", down);
+    canvas.addEventListener("pointerup", up);
+    void marks;
   } catch (e) { el.innerHTML = `<p class="help">3D preview unavailable here (${esc(e.message)}). The files below are still ready.</p>`; }
 }
 
@@ -98,7 +194,11 @@ function panelHTML() {
     <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p>
       <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div>
-      <p class="help" id="rzCamHint">${CAM_HINT}</p></div></div>
+      <p class="help" id="rzCamHint">${CAM_HINT}</p>
+      <fieldset class="rzOrient" id="rzSupEdit" hidden><legend>Supports on the model</legend>
+        <p class="help" id="rzSupStatus"></p>
+        <div class="row"><button type="button" class="btn small" id="rzModeOrbit" aria-pressed="true">Orbit</button><button type="button" class="btn small" id="rzModeAdd">Add support</button><button type="button" class="btn small" id="rzModeErase">Erase</button><button type="button" class="btn small" id="rzModeAvoid">Keep clear</button><button type="button" class="btn small" id="rzSupUndo">Undo</button><button type="button" class="btn small" id="rzSupReset">Reset</button></div>
+      </fieldset></div></div>
     <p class="help" id="rzInfo"></p>
     <div class="grid2"><div class="field"><label for="rzMaterial">Resin</label><select id="rzMaterial">${(cat.materials || []).map(m => `<option value="${m.id}" ${m.id === cat.default_material ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select></div>
     <div class="field"><label for="rzPreset">Preset</label><select id="rzPreset">${cat.presets.map(x => `<option value="${x.id}" ${x.id === cat.default_preset ? "selected" : ""}>${esc(x.label)} · ${x.layer_mm} mm</option>`).join("")}</select></div></div>
@@ -157,7 +257,56 @@ function wire() {
     $("#rzPriceNote").textContent = kg ? "Silicone has no single density here, so a per-kg price cannot be turned into a cost. Enter a price per litre." : "";
   };
   const bedNow = () => { const p = cat.printers.find(x => x.id === $("#rzPrinter").value); return p && p.bed_mm; };
-  $("#rzPrinter").onchange = () => { info(); const f = $("#rzFile") && $("#rzFile").files[0]; if (f) show(); onPose(); }; info();
+  const round3 = n => Math.round(n * 1000) / 1000;
+  const pushUndo = () => { supportEdit.undo.push({ manual: supportEdit.manual.map(p => p.slice()), avoid: supportEdit.avoid.map(p => p.slice()) }); if (supportEdit.undo.length > 40) supportEdit.undo.shift(); };
+  const setMode = mode => {
+    supportEdit.mode = mode;
+    for (const [id, key] of [["rzModeOrbit", "orbit"], ["rzModeAdd", "add"], ["rzModeErase", "erase"], ["rzModeAvoid", "avoid"]]) {
+      const b = $(id); if (b) b.setAttribute("aria-pressed", key === mode ? "true" : "false");
+    }
+    supportStatus();
+  };
+  const redrawPick = keep => {
+    const pv = $("#rzPickView");
+    if (!pv || !supportEdit.buf) return;
+    return show3D(pv, null, null, supportEdit.buf, supportEdit.bed || bedNow(), {
+      matrix: supportEdit.matrix || eye4(), manual: supportEdit.manual, avoid: supportEdit.avoid,
+      keepCamera: !!keep, onPick: onSupportPick,
+    }).then(supportStatus);
+  };
+  function onSupportPick(ev) {
+    if (supportEdit.mode === "erase") {
+      if (!ev.mark) { const s = $("#rzSupStatus"); if (s) s.textContent = "Tap a green or red mark to remove it. Drag still orbits."; return; }
+      pushUndo();
+      const kind = ev.mark.object.userData.mark, i = ev.mark.object.userData.index;
+      (kind === "avoid" ? supportEdit.avoid : supportEdit.manual).splice(i, 1);
+      saveSupportLocal(); redrawPick(true); return;
+    }
+    if (supportEdit.mode !== "add" && supportEdit.mode !== "avoid") return;
+    if (!ev.hit) { const s = $("#rzSupStatus"); if (s) s.textContent = "That tap missed the model. Tap the part itself. Drag orbits."; return; }
+    let point = ev.hit.point.clone();
+    const normal = ev.hit.face && ev.hit.face.normal ? ev.hit.face.normal.clone().transformDirection(ev.matrix) : new THREE.Vector3(0, 0, -1);
+    if (normal.z > -0.2) {
+      const ray = new THREE.Raycaster(point.clone().add(new THREE.Vector3(0, 0, 0.5)), new THREE.Vector3(0, 0, -1));
+      const under = ray.intersectObject(ev.hit.object, false).find(h => h.face && h.face.normal.clone().transformDirection(ev.matrix).z < -0.2);
+      if (under) point = under.point.clone();
+    }
+    const inv = ev.matrix.clone().invert();
+    const base = new THREE.Vector3(point.x, point.y, point.z).applyMatrix4(inv);
+    const stored = [round3(base.x), round3(base.y), round3(base.z)];
+    pushUndo();
+    (supportEdit.mode === "avoid" ? supportEdit.avoid : supportEdit.manual).push(stored);
+    if (supportEdit.manual.length > 200) supportEdit.manual.length = 200;
+    if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
+    saveSupportLocal(); redrawPick(true);
+  }
+  $("#rzModeOrbit").onclick = () => setMode("orbit");
+  $("#rzModeAdd").onclick = () => setMode("add");
+  $("#rzModeErase").onclick = () => setMode("erase");
+  $("#rzModeAvoid").onclick = () => setMode("avoid");
+  $("#rzSupUndo").onclick = () => { const prev = supportEdit.undo.pop(); if (!prev) return; supportEdit.manual = prev.manual; supportEdit.avoid = prev.avoid; saveSupportLocal(); redrawPick(true); };
+  $("#rzSupReset").onclick = () => { pushUndo(); supportEdit.manual = []; supportEdit.avoid = []; saveSupportLocal(); redrawPick(true); };
+  $("#rzPrinter").onchange = () => { info(); const f = $("#rzFile") && $("#rzFile").files[0]; if (f) show(); if (last && last.rep) dropResult("Printer changed. Prepare again so the supports and the slice match this bed."); }; info();
   pr.onchange = () => { const mat = matOf(); if (mat && mat.settings) return; applyPrint(cat.presets.find(x => x.id === pr.value)); };
   $("#rzMaterial").onchange = () => paintMaterial(true);
   $("#rzCostU").onchange = () => paintMaterial(false);
@@ -199,7 +348,25 @@ function wire() {
       const buf = r.buf; if (seq !== pickSeq) return;
       const n = +r.headers.get("X-Zeim-Faces") || 0, uid = r.headers.get("X-Zeim-Upload");
       if (uid) picked = { f, id: uid };
-      pv.hidden = false; await show3D(pv, null, null, buf, bedNow()); pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const bed = bedNow();
+      const sameFile = supportEdit.name === nm && supportEdit.size === f.size;
+      if (sameFile && supportEdit.bed && bed) {
+        const dx = bed[0] / 2 - supportEdit.bed[0] / 2, dy = bed[1] / 2 - supportEdit.bed[1] / 2;
+        if (dx || dy) {
+          const shift = p => [round3(p[0] + dx), round3(p[1] + dy), p[2]];
+          supportEdit.manual = supportEdit.manual.map(shift);
+          supportEdit.avoid = supportEdit.avoid.map(shift);
+        }
+      } else if (!sameFile) {
+        supportEdit.manual = []; supportEdit.avoid = []; supportEdit.undo = [];
+        loadSupportLocal(nm, f.size);
+      }
+      supportEdit.name = nm; supportEdit.size = f.size; supportEdit.bed = bed; supportEdit.buf = buf;
+      supportEdit.matrix = parseMatrix(r.headers.get("X-Zeim-Matrix"));
+      pv.hidden = false; $("#rzSupEdit").hidden = false;
+      await show3D(pv, null, null, buf, bed, { matrix: supportEdit.matrix, manual: supportEdit.manual, avoid: supportEdit.avoid, onPick: onSupportPick });
+      supportStatus();
+      pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
       st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
     } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
     finally { if (seq === pickSeq) document.dispatchEvent(new CustomEvent("zeim:torchc0-loaded")); }   // the hand-off veil lifts
@@ -236,7 +403,31 @@ function wire() {
     const box = $("#torchOut");
     if (box) { box.classList.remove("rzResult"); box.innerHTML = `<p class="help warn" id="rzStale" role="status">${msg}</p>`; }
   };
-  const onPose = () => { if (last && last.rep && poseKey() !== preparedKey) dropResult("Orientation or printer changed. Prepare again so the supports, island marks, and slice match this placement."); };
+  const refreshPlacement = async () => {
+    if (!picked) return;
+    const fd = new FormData();
+    fd.append("upload_id", picked.id);
+    fd.append("tilt_deg", $("#rzTilt").value || "0");
+    fd.append("tilt_y_deg", $("#rzTiltY").value || "0");
+    fd.append("printer_id", $("#rzPrinter").value || "");
+    try {
+      const body = await api("/api/resin/placement", { method: "POST", body: fd });
+      supportEdit.matrix = body.matrix || eye4();
+      supportEdit.bed = bedNow();
+      if (supportEdit.buf) await redrawPick(true);
+      const note = $("#rzSupStatus");
+      if (note && (supportEdit.manual.length || supportEdit.avoid.length)) note.textContent = `The model moved. ${supportEdit.manual.length} placed support${supportEdit.manual.length === 1 ? "" : "s"} and ${supportEdit.avoid.length} keep-clear mark${supportEdit.avoid.length === 1 ? "" : "s"} followed it. Prepare again so the built supports match.`;
+    } catch (e) {
+      supportEdit.manual = []; supportEdit.avoid = [];
+      if (supportEdit.buf) await redrawPick(true);
+      const note = $("#rzSupStatus");
+      if (note) note.textContent = `The model moved and the support marks were cleared (${e.message}). Place them again on this pose.`;
+    }
+  };
+  const onPose = () => {
+    refreshPlacement();
+    if (last && last.rep && poseKey() !== preparedKey) dropResult("Orientation or printer changed. Prepare again so the supports, island marks, and slice match this placement.");
+  };
   const bump = (id, delta) => {
     const el = $(id); let v = Math.round((+el.value || 0) + delta);
     if (v > 180) v -= 360; if (v < -180) v += 360; el.value = String(v); onPose();
@@ -326,6 +517,11 @@ function wire() {
     if (uid) { fd.append("upload_id", uid); fd.append("file_name", f.name); } else fd.append("file", f);
     if (last.isl.length) fd.append("island_supports", JSON.stringify(last.isl));
     if (last.drains.length) fd.append("drains", JSON.stringify(last.drains));
+    const M = supportEdit.matrix || eye4();
+    const placed = supportEdit.manual.map(p => applyPoint(M, p).map(n => Math.round(n * 1000) / 1000));
+    const kept = supportEdit.avoid.map(p => applyPoint(M, p).map(n => Math.round(n * 1000) / 1000));
+    if (placed.length) fd.append("support_points", JSON.stringify(placed));
+    if (kept.length) fd.append("avoid_points", JSON.stringify(kept));
     out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
