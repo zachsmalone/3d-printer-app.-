@@ -464,6 +464,7 @@ def quick_payload(meta: dict, preview: dict | None = None) -> dict:
             "can_undo": (meta.get("head") or 0) > 0, "can_redo": (meta.get("head") or 0) < len(meta.get("ops") or []),
             "analysis": analysis, "quality_gate": quality, "base": meta.get("base"), "warnings": meta.get("warnings", []),
             "slice_ready": bool(meta.get("slice_ready")), "report": meta.get("last_report"),
+            "support_paint": support_paint_view(meta),
             "original": f"/api/edit/{meta['id']}/original", "capabilities": capabilities()}
 
 
@@ -1070,6 +1071,26 @@ def export_quality(m: trimesh.Trimesh) -> dict:
     return quality_from_analysis(meshedit.analyze(m))
 
 
+def support_paint_view(meta: dict) -> dict:
+    """Strokes for this exact shape. A move, scale, or other step hides them until undo returns that shape."""
+    rec = meta.get("support_paint") if isinstance(meta.get("support_paint"), dict) else {}
+    strokes = rec.get("strokes") if isinstance(rec.get("strokes"), list) else []
+    fresh = rec.get("rev") == geometry_revision(meta) and bool(strokes)
+    return {"strokes": strokes if fresh else [], "stale": bool(strokes) and not fresh}
+
+
+def save_support_paint(bid: str, strokes: list[dict]) -> dict:
+    """Store paint against the current geometry. Does not change the mesh."""
+    with store.lock:
+        meta = store.get(bid)
+        if strokes:
+            meta["support_paint"] = {"rev": geometry_revision(meta), "strokes": strokes}
+        else:
+            meta.pop("support_paint", None)
+        store.save(meta)
+    return support_paint_view(meta)
+
+
 def payload(bid: str, report=None) -> dict:
     from ..api.builds import summary
     meta = store.get(bid)
@@ -1094,4 +1115,5 @@ def payload(bid: str, report=None) -> dict:
             "dims": meta.get("dims") or {}, "ops": ops, "head": meta["head"], "can_undo": meta["head"] > 0, "can_redo": meta["head"] < len(meta["ops"]),
             "analysis": analysis, "quality_gate": quality, "base": meta["base"], "warnings": meta.get("warnings", []),
             "report": report if report is not None else meta.get("last_report"),
+            "support_paint": support_paint_view(meta),
             "original": f"/api/edit/{bid}/original", "capabilities": capabilities()}

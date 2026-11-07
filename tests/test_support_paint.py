@@ -11,6 +11,56 @@ from app.main import app
 from app.services import support_paint as sp
 
 
+def test_painted_column_meets_the_hit_point():
+    """The enforcer and the blocker are volumes around the point that was hit, not a mark on an empty bed."""
+    hit = {"kind": "enforce", "x": 4.0, "y": -2.0, "z": 18.0, "r": 3, "h": 8, "thickness": 2, "tip_r": 1}
+    enf = sp.stroke_mesh(hit)
+    assert enf.bounds[0][2] <= 18.0 <= enf.bounds[1][2]
+    assert abs(enf.centroid[0] - 4.0) < 3 and abs(enf.centroid[1] + 2.0) < 3
+    blk = sp.stroke_mesh({**hit, "kind": "block", "z": 3.0})
+    assert blk.bounds[0][2] <= 3.0 <= blk.bounds[1][2]
+    with pytest.raises(sp.PaintError):
+        sp.parse_strokes([{"kind": "erase", "x": 0, "y": 0}])
+
+
+def test_view_sample_is_made_of_original_vertices():
+    """The on-screen mesh is a subset of the file's own triangles, so a hit on it is a point on the real surface."""
+    import base64
+    import numpy as np
+    from app.services.editproj import iter_binary_stl_preview
+    mesh = trimesh.creation.icosphere(2, radius=12)
+    data = mesh.export(file_type="stl")
+    ready = [e for e in iter_binary_stl_preview(data, max_faces=20) if e["phase"] == "preview_ready"][-1]
+    pos = np.frombuffer(base64.b64decode(ready["preview"]["bodies"][0]["positions"]), dtype="<f4").reshape(-1, 3)
+    src = np.asarray(mesh.vertices, dtype=np.float32)
+    # Every preview vertex is an original vertex (same coordinates, not a shrunk stand-in).
+    for p in pos[:: max(1, len(pos) // 30)]:
+        d = np.linalg.norm(src - p, axis=1).min()
+        assert d < 1e-3, d
+
+
+def test_paint_persists_for_this_shape_and_hides_after_a_move():
+    from tests.b1 import ADULT, client
+    c = client(ADULT)
+    stl = trimesh.creation.box((12, 10, 8)).export(file_type="stl")
+    made = c.post("/api/edit/new", files={"file": ("box.stl", stl, "model/stl")})
+    assert made.status_code == 200, made.text
+    bid = made.json()["id"]
+    strokes = [{"kind": "enforce", "x": 1, "y": 2, "z": 4, "r": 2, "h": 6},
+               {"kind": "block", "x": 3, "y": 1, "z": 4, "r": 2, "h": 6}]
+    put = c.put(f"/api/edit/{bid}/support-paint", json={"strokes": strokes})
+    assert put.status_code == 200, put.text
+    view = c.get(f"/api/edit/{bid}").json()["support_paint"]
+    assert view["stale"] is False and len(view["strokes"]) == 2
+    moved = c.post(f"/api/edit/{bid}/op", json={"op": "translate", "params": {"dz": 3}})
+    assert moved.status_code == 200, moved.text
+    hidden = c.get(f"/api/edit/{bid}").json()["support_paint"]
+    assert hidden["strokes"] == [] and hidden["stale"] is True
+    assert c.post(f"/api/edit/{bid}/undo").status_code == 200
+    back = c.get(f"/api/edit/{bid}").json()["support_paint"]
+    assert back["stale"] is False and len(back["strokes"]) == 2
+
+
 def test_parse_rejects_bad_kind_and_too_many():
     with pytest.raises(sp.PaintError, match="enforce"):
         sp.parse_strokes([{"kind": "maybe", "x": 0, "y": 0}])

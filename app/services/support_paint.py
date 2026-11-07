@@ -112,7 +112,8 @@ def stroke_mesh(s: dict) -> trimesh.Trimesh:
         m = trimesh.util.concatenate([shaft, tip])
     except Exception:
         m = shaft
-    m.apply_translation([s["x"], s["y"], s["z"]])
+    # Centre the column on the painted point so it meets the surface that was hit, not only the bed.
+    m.apply_translation([s["x"], s["y"], s["z"] - h / 2.0])
     return m
 
 

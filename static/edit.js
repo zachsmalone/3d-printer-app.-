@@ -10,6 +10,7 @@ import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as pa
 import { previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo } from "/static/gizmo-view.js";
 import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
+import { bindViewer, bindProject, setStrokes } from "/static/supportpaint.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
@@ -37,6 +38,8 @@ const A = () => E.p.analysis;
 function ensureViewer() {
   if (viewer) return viewer;
   try { viewer = new Viewer($("#editViewer")); } catch (e) { console.warn("WebGL unavailable", e); return null; }
+  bindViewer(viewer);
+  bindProject(() => E.p && E.p.id);
   const grid = new THREE.GridHelper(300, 30, 0x3b4a6b, 0x26314a); grid.rotation.x = Math.PI / 2; grid.position.set(0, 0, -0.05);
   viewer.scene.add(grid);
   const el = viewer.renderer.domElement; let down = null;
@@ -320,6 +323,8 @@ function loadProject(p, keepCamera = false) {
   renderTools();
   renderHistoryCard();
   renderSlicePanel();
+  const paint = p.support_paint || {};
+  setStrokes(paint.strokes || [], { stale: !!paint.stale });
   syncMeshGizmo();
 }
 let sliceWatch = 0;
