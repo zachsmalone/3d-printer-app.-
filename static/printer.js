@@ -344,6 +344,17 @@ export function wirePanel(getModelId) {
   const mat = $("#spMat");
   if (!mat) return;
   mountPaint($("#spPaintHost"));
+  const syncSupportSheet = () => {
+    const edit = document.getElementById("viewEdit");
+    const sheet = document.getElementById("processSheet");
+    const tab = document.getElementById("procTab-support");
+    if (!edit) return;
+    const open = !!(sheet && !sheet.hidden && tab && tab.getAttribute("aria-selected") === "true");
+    edit.classList.toggle("support-live", open);
+    if (open) edit.classList.add("paint-ready");
+    requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+  };
+  document.addEventListener("zeim:proc-tab", syncSupportSheet);
   const slotBox = $("#spSlots");
   if (slotBox) {
     // Multi-head: per-slot material replaces the single Material field (slot 1 is primary).
@@ -390,6 +401,8 @@ export function wirePanel(getModelId) {
       const pane = document.getElementById(b.getAttribute("aria-controls"));
       if (pane) pane.hidden = !on;
     });
+    if (id === "support") document.getElementById("procPane-support")?.scrollIntoView({ block: "start" });
+    document.dispatchEvent(new CustomEvent("zeim:proc-tab"));
   };
   document.querySelectorAll("#slicePanel [data-proc]").forEach(b => { b.onclick = () => showProc(b.dataset.proc); });
   const paintProcess = () => {

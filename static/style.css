@@ -1237,6 +1237,34 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #viewEdit>.zt-band{display:none}
 #viewEdit:not(.zws)>aside.controls,#viewEdit:not(.zws)>.stage{padding-bottom:84px}
 #viewEdit>.proc-sheet,#viewEdit>.bed-sheet{position:fixed;left:0;right:0;bottom:0;top:max(var(--fdm-head-bottom,30dvh),30dvh);height:auto;z-index:60;display:flex;flex-direction:column;background:var(--panel);border-radius:18px 18px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.22);overflow:hidden}
+/* Support paint: the process sheet must not cover the model. Desktop keeps it beside the view. A phone keeps a short sheet. Paint tools stay on the model after Done. */
+#viewEdit.support-live>#editViewer,
+#viewEdit.support-live>.stage>#editViewer{position:absolute!important;left:0!important;top:0!important;right:min(348px,40vw)!important;bottom:52px!important;width:auto!important;height:auto!important}
+#viewEdit.support-live>.proc-sheet{top:max(8px,var(--fdm-head-bottom,72px));left:auto;right:0;bottom:52px;width:min(340px,38vw);height:auto;max-height:none;border-radius:16px 0 0 16px}
+#viewEdit.support-live .slicepanel>.row{position:static}
+#spPaintDock{display:none}
+#viewEdit.paint-ready #spPaintDock{display:block;position:absolute;z-index:8;left:8px;top:8px;width:min(300px,calc(100% - 64px));max-height:min(46%,280px);overflow:auto;padding:8px;border-radius:14px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 94%,transparent);box-shadow:0 8px 22px rgba(0,0,0,.18);pointer-events:auto}
+#spPaintDock .row{flex-wrap:wrap;gap:6px}
+#spPaintDock .segmented{display:flex;flex-wrap:wrap;gap:4px}
+#spPaintDock .segmented button,#spPaintDock .btn{min-height:44px}
+#spPaintDock .help{margin:0 0 6px}
+@media (max-width:900px){
+  #viewEdit.support-live>#editViewer,
+  #viewEdit.support-live>.stage>#editViewer{right:0!important;bottom:212px!important}
+  #viewEdit.support-live>.proc-sheet{left:0;right:0;top:auto;width:auto;height:auto;max-height:200px;bottom:52px;border-radius:16px 16px 0 0}
+  #viewEdit.paint-ready #spPaintDock{top:auto;bottom:8px;left:8px;right:8px;width:auto;max-height:56px;overflow:hidden;padding:4px 6px}
+  #spPaintLead,#spPaintDock #spPaintCount,#spPaintDock details{display:none}
+  #spPaintDock .row{flex-wrap:nowrap;overflow-x:auto}
+  #viewEdit.paint-ready:not(.support-live) #spPaintDock{bottom:calc(60px + env(safe-area-inset-bottom))}
+}
+@media (max-width:768px){
+  body[data-view=slicer] #viewEdit.paint-ready:not(.support-live) #spPaintDock{bottom:calc(var(--tabbar-h) + 64px + env(safe-area-inset-bottom))}
+}
+@media (max-width:768px){
+  body[data-view=slicer] #viewEdit.support-live>.proc-sheet{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}
+  body[data-view=slicer] #viewEdit.support-live>#editViewer,
+  body[data-view=slicer] #viewEdit.support-live>.stage>#editViewer{right:0!important;bottom:calc(200px + var(--tabbar-h) + env(safe-area-inset-bottom))!important}
+}
 #viewEdit>.proc-sheet[hidden],#viewEdit>.bed-sheet[hidden]{display:none!important}
 #viewEdit .bed-sheet-body{padding:12px 16px;overflow:auto}
 #viewEdit .bed-check{min-width:44px;font-size:18px}
