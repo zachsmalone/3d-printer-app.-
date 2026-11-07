@@ -298,6 +298,22 @@ def _away_from(pts: np.ndarray, blocked, radius: float) -> np.ndarray:
     return pts[dist.min(axis=1) > float(radius)]
 
 
+SUPPORT_TIP_LEN = 1.2
+
+
+def pillar_reaches(contact_z: float, base_lift: float, raft_mm: float, tip_len: float = SUPPORT_TIP_LEN) -> bool:
+    """True when a pillar from this contact down to the raft is long enough to be built."""
+    top = float(contact_z) + float(base_lift) + float(raft_mm)
+    return top - float(tip_len) > float(raft_mm) * 0.5 + 0.2
+
+
+def pillar_path_clear(mesh: trimesh.Trimesh, contact) -> bool:
+    """True when the pillar just below this contact does not run into the model."""
+    origin = np.asarray(contact, dtype=float).reshape(3) - np.array([0.0, 0.0, 0.05])
+    hit = np.asarray(mesh.ray.intersects_any([origin], [[0.0, 0.0, -1.0]])).reshape(-1)
+    return not bool(hit[0]) if len(hit) else True
+
+
 def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None,
                    extra=None, auto=True, avoid=None, manual=None):
     """Model raised by base_lift; a cone tip + cylinder pillar to a raft under each support point.
@@ -314,8 +330,21 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
         pts = _away_from(pts, np.asarray(avoid, dtype=float).reshape(-1, 3) + lift, max(float(spacing), 1.5))
         avoided = before - len(pts)
     manual_pts = np.zeros((0, 3))
+    manual_contact = []
+    plate_skipped = 0
     if manual is not None and len(np.asarray(manual)):
-        manual_pts = _surface_below(m, np.asarray(manual, dtype=float).reshape(-1, 3) + lift)
+        snapped = []
+        for src in np.asarray(manual, dtype=float).reshape(-1, 3):
+            hit, _moved = contact_point(m, src + lift)
+            if hit is None:
+                continue
+            pre = hit - lift
+            if not pillar_reaches(float(pre[2]), base_lift, raft_mm) or not pillar_path_clear(m, hit):
+                plate_skipped += 1
+                continue
+            snapped.append(hit)
+            manual_contact.append([round(float(x), 3) for x in (hit - lift)])
+        manual_pts = np.array(snapped, dtype=float).reshape(-1, 3)
         pts = _away_from(pts, manual_pts, max(float(spacing) * 0.75, 1.0))
     if extra is not None and len(extra):          # user-asked points (islands), given before the lift
         ex = _surface_below(m, np.asarray(extra, dtype=float) + lift)
@@ -328,12 +357,12 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
     if len(pts):
         org = pts - [0, 0, 0.05]
         hit = _in_batches(m.ray.intersects_any, org, np.tile([0, 0, -1.0], (len(pts), 1)))
-        tip_len = 1.2
+        tip_len = SUPPORT_TIP_LEN
         for p, h in zip(pts, hit):
             if h:
                 skipped += 1; continue
             top = p[2]; bot = raft_mm * 0.5
-            if top - tip_len <= bot + 0.2:
+            if not pillar_reaches(float(p[2]) - float(lift[2]), base_lift, raft_mm, tip_len):
                 continue
             # taper: wide end on the pillar, point up into the contact tip (the old cone pointed down and met the
             # pillar at a single vertex, which is not a solid joint and fell apart into pieces after export)
@@ -362,7 +391,30 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0
         out, extra, merged = u, float(abs(u.volume)) - float(abs(m.volume)), True
     else:
         out, extra, merged = trimesh.util.concatenate([m, *rafts, *parts]), float(sum(r.volume for r in rafts) + sum(abs(q.volume) for q in parts)), False
-    return out, {"_volume": extra, "merged": merged, "bodies": bodies(out), "watertight": bool(merged or _weld_check(out)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d, "avoid_skipped": avoided, "manual_requested": int(n_manual)}
+    return out, {"_volume": extra, "merged": merged, "bodies": bodies(out), "watertight": bool(merged or _weld_check(out)), "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm, "tip_mm": tip_d, "shaft_mm": shaft_d, "avoid_skipped": avoided, "manual_requested": int(n_manual), "manual_contact": manual_contact, "plate_skipped": int(plate_skipped)}
+
+
+def contact_point(mesh: trimesh.Trimesh, point, downward: float = 0.2):
+    """Where a pillar will touch for this tap, in the same frame as `point`.
+
+    A tap already on a downward face stays there. Any other tap uses the nearest
+    downward face straight below it. Returns (point, moved) or (None, False) when
+    nothing below the tap faces the plate.
+    """
+    p = np.asarray(point, dtype=float).reshape(3)
+    closest, dist, face_id = trimesh.proximity.closest_point(mesh, [p])
+    normal = mesh.face_normals[int(face_id[0])]
+    if float(dist[0]) <= 0.35 and float(normal[2]) < -downward:
+        return np.asarray(closest[0], dtype=float), False
+    origin = np.array([p[0], p[1], float(mesh.bounds[1][2]) + 1.0], dtype=float)
+    loc, _, idx = mesh.ray.intersects_location([origin], [[0.0, 0.0, -1.0]])
+    below = [np.asarray(q, dtype=float) for q, fi in zip(loc, idx)
+             if mesh.face_normals[int(fi)][2] < -downward and float(q[2]) <= float(p[2]) + 0.05]
+    if not below:
+        return None, False
+    contact = max(below, key=lambda q: float(q[2]))
+    moved = float(np.linalg.norm(contact - p)) > 0.35
+    return contact, moved
 
 
 def _surface_below(m, pts, reach=2.0):

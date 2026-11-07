@@ -264,6 +264,52 @@ def placement(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y_deg: 
     return {"matrix": _matrix_numbers(M)}
 
 
+@router.post("/support-contact")
+def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y_deg: str = Form("0"),
+                    printer_id: str = Form(""), supports: str = Form("true"),
+                    points: str = Form("[]"), kinds: str = Form("[]"), actor: Actor = Depends(get_actor)):
+    """The point a mark will store. A support point is where the pillar will touch. A keep-clear point is the exclusion coordinate."""
+    raw = _points(points, "Support contact")
+    try:
+        kind_list = json.loads(kinds) if kinds else []
+        if not isinstance(kind_list, list):
+            raise ValueError
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Support contact kinds must be a list.")
+    data, _note = _picked(upload_id, actor)
+    try:
+        s = resin.settings({
+            "tilt_deg": tilt_deg or "0", "tilt_y_deg": tilt_y_deg or "0",
+            "hollow": "false", "supports": supports,
+        })
+    except resin.ResinError as e:
+        raise HTTPException(400, str(e))
+    mesh = trimesh.load(trimesh.util.wrap_as_stream(data), file_type="stl", force="mesh")
+    mesh = resin.place_on_bed(mesh, s["tilt_deg"], s["tilt_y_deg"], _bed_for(printer_id))
+    lift, raft = (s["base_lift_mm"], 1.0) if s["supports"] else (0.0, 0.0)
+    contacts = []
+    for i, p in enumerate(raw):
+        kind = kind_list[i] if i < len(kind_list) and kind_list[i] in ("support", "avoid") else "support"
+        if kind == "avoid":
+            contacts.append({
+                "ok": True, "on_plate": False, "blocked": False, "moved": False,
+                "point": [round(float(x), 3) for x in p], "kind": kind,
+            })
+            continue
+        hit, moved = resin.contact_point(mesh, p)
+        if hit is None:
+            contacts.append({"ok": False, "on_plate": False, "blocked": False, "moved": False, "point": None, "kind": kind})
+            continue
+        reaches = resin.pillar_reaches(float(hit[2]), lift, raft)
+        clear = resin.pillar_path_clear(mesh, hit)
+        point = [round(float(x), 3) for x in hit]
+        contacts.append({
+            "ok": bool(reaches and clear), "on_plate": not reaches, "blocked": bool(reaches and not clear),
+            "moved": bool(moved) and bool(reaches and clear), "point": point, "kind": kind,
+        })
+    return {"contacts": contacts}
+
+
 def _picked(uid, actor):
     """(stl bytes, note) of a model loaded by /preview for this visitor, or 410 when it expired / is not theirs."""
     if not (len(uid) == 32 and all(c in "0123456789abcdef" for c in uid)):
@@ -346,10 +392,12 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         meta["printer"] = printer_meta
     (d / f"{rid}.json").write_text(json.dumps(meta))
     (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
+    reported = (rep.get("support") or {}).get("manual_contact")
+    contact = manual if reported is None else reported
     (d / f"{rid}.supports.json").write_text(json.dumps({
-        "manual": manual, "avoid": avoid, "sid": actor.sid,
+        "manual": contact, "avoid": avoid, "sid": actor.sid,
     }))
-    rep["support_edit"] = {"manual": manual, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
+    rep["support_edit"] = {"manual": contact, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
     return badges.merge(rep, actor, "resin_slice")
