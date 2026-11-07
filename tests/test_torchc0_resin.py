@@ -561,6 +561,97 @@ def test_manual_support_and_keep_clear_change_the_mesh_and_the_slice(tmp_path):
     assert sum(with_support["lit"]) > sum(without["lit"])
 
 
+def test_top_tap_mark_is_the_pillar_contact_and_keep_clear_is_not_moved():
+    """A click on an upward face is not the green mark. The mark and the pillar meet the underside below it.
+    A keep-clear point is stored as given once it is already that underside."""
+    base = _box([10, 10, 2], [0, 0, 1])
+    wing = _box([6, 6, 4], [8, 0, 10])
+    raw = trimesh.util.concatenate([base, wing])
+    placed = resin.place_on_bed(raw, 0, 0)
+    top_z = float(placed.bounds[1][2])
+    crown = placed.vertices[placed.vertices[:, 2] > top_z - 0.2]
+    top = [float(crown[:, 0].mean()), float(crown[:, 1].mean()), top_z]
+    hit, moved = resin.contact_point(placed, top)
+    assert moved is True
+    assert hit[2] == pytest.approx(8, abs=0.15)
+    assert abs(hit[0] - top[0]) < 0.2 and abs(hit[1] - top[1]) < 0.2
+    quiet = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": "0", "layer_mm": "0.2"})
+    out, rep = resin.prepare(raw, quiet, manual_supports=[top])
+    contact = rep["support"]["manual_contact"][0]
+    assert contact[2] == pytest.approx(float(hit[2]), abs=0.05)
+    assert abs(contact[0] - top[0]) < 0.3 and abs(contact[1] - top[1]) < 0.3
+    xy = np.linalg.norm(out.vertices[:, :2] - contact[:2], axis=1)
+    band = out.vertices[(xy < 0.6) & (out.vertices[:, 2] < contact[2] - 0.3) & (out.vertices[:, 2] > contact[2] - 2.0)]
+    bare_xy = np.linalg.norm(placed.vertices[:, :2] - contact[:2], axis=1)
+    bare = placed.vertices[(bare_xy < 0.6) & (placed.vertices[:, 2] < contact[2] - 0.3) & (placed.vertices[:, 2] > contact[2] - 2.0)]
+    assert len(band) > 0 and len(bare) == 0
+    avoid = [round(contact[0] + 1.5, 3), round(contact[1], 3), round(contact[2], 3)]
+    _, kept = resin.prepare(raw, quiet, manual_supports=[contact], avoid=[avoid])
+    assert kept["support"]["avoid"] == [avoid]
+    assert kept["support"]["manual_contact"][0] == pytest.approx(contact, abs=0.05)
+    turned = resin.place_on_bed(placed, 90, 0)
+    sent = _mul(resin.placement_matrix(placed, 90, 0), hit)
+    again, _moved_again = resin.contact_point(turned, sent)
+    posed = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": "90", "layer_mm": "0.2"})
+    _, posed_rep = resin.prepare(placed, posed, manual_supports=[sent.tolist()])
+    posed_contact = posed_rep["support"]["manual_contact"][0]
+    assert posed_contact == pytest.approx(list(again), abs=0.08)
+    closest, dist, face_id = trimesh.proximity.closest_point(turned, [sent])
+    faces_down = float(dist[0]) <= 0.35 and float(turned.face_normals[int(face_id[0])][2]) < -0.2
+    if not faces_down:
+        assert np.linalg.norm(np.asarray(posed_contact) - sent) > 0.5
+
+
+def test_support_contact_endpoint_returns_the_underside(c):
+    import json
+    base = _box([10, 10, 2], [0, 0, 1])
+    wing = _box([6, 6, 4], [8, 0, 10])
+    mesh = trimesh.util.concatenate([base, wing])
+    prev = c.post("/api/resin/preview", files={"file": ("wing.stl", _stl(mesh), "model/stl")})
+    assert prev.status_code == 200, prev.text
+    uid = prev.headers["x-zeim-upload"]
+    loaded = trimesh.load(io.BytesIO(prev.content), file_type="stl", force="mesh")
+    top_z = float(loaded.bounds[1][2])
+    crown = loaded.vertices[loaded.vertices[:, 2] > top_z - 0.2]
+    top = [round(float(crown[:, 0].mean()), 3), round(float(crown[:, 1].mean()), 3), round(top_z, 3)]
+    body = c.post("/api/resin/support-contact", data={
+        "upload_id": uid, "tilt_deg": "0", "supports": "true",
+        "points": json.dumps([top]), "kinds": json.dumps(["support"]),
+    })
+    assert body.status_code == 200, body.text
+    hit = body.json()["contacts"][0]
+    assert hit["ok"] is True and hit["moved"] is True and hit["point"][2] < top[2] - 1
+    avoid = c.post("/api/resin/support-contact", data={
+        "upload_id": uid, "tilt_deg": "0", "supports": "true",
+        "points": json.dumps([hit["point"]]), "kinds": json.dumps(["avoid"]),
+    })
+    assert avoid.status_code == 200, avoid.text
+    mark = avoid.json()["contacts"][0]
+    assert mark["ok"] is True and mark["moved"] is False and mark["point"] == hit["point"]
+    floor = loaded.vertices[loaded.vertices[:, 2] < 0.2]
+    plate_pt = [round(float(floor[:, 0].mean()), 3), round(float(floor[:, 1].mean()), 3), 0.0]
+    plate = c.post("/api/resin/support-contact", data={
+        "upload_id": uid, "tilt_deg": "0", "supports": "false",
+        "points": json.dumps([plate_pt]), "kinds": json.dumps(["support"]),
+    })
+    refused = plate.json()["contacts"][0]
+    assert refused["ok"] is False and refused["on_plate"] is True
+    covered = _box([6, 6, 4], [0, 0, 10])
+    covered_mesh = trimesh.util.concatenate([base, covered])
+    blocked_up = c.post("/api/resin/preview", files={"file": ("covered.stl", _stl(covered_mesh), "model/stl")})
+    assert blocked_up.status_code == 200, blocked_up.text
+    covered_stl = trimesh.load(io.BytesIO(blocked_up.content), file_type="stl", force="mesh")
+    covered_top = float(covered_stl.bounds[1][2])
+    crown2 = covered_stl.vertices[covered_stl.vertices[:, 2] > covered_top - 0.2]
+    over = [round(float(crown2[:, 0].mean()), 3), round(float(crown2[:, 1].mean()), 3), round(covered_top, 3)]
+    blocked = c.post("/api/resin/support-contact", data={
+        "upload_id": blocked_up.headers["x-zeim-upload"], "tilt_deg": "0", "supports": "true",
+        "points": json.dumps([over]), "kinds": json.dumps(["support"]),
+    })
+    denied = blocked.json()["contacts"][0]
+    assert denied["ok"] is False and denied["blocked"] is True
+
+
 def test_default_hollow_route_keeps_a_placed_support():
     box = trimesh.creation.box(extents=[22, 16, 14])
     settings = resin.settings()
