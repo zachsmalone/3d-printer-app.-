@@ -14,10 +14,18 @@ const CAM_HINT = "Camera: left drag orbits, right drag pans, scroll wheel or mid
    loaded mesh into the pose Prepare will use. Marks and a click handler live here so viewer.js stays shared. */
 const views = new WeakMap();
 const supportEdit = {
-  mode: "orbit", manual: [], avoid: [], undo: [], matrix: null, buf: null, bed: null, name: "", size: 0,
+  mode: "orbit", manual: [], avoid: [], undo: [], matrix: null, buf: null, bed: null, name: "", size: 0, notice: "",
 };
 const SUPPORT_KEY = "zeim.resinSupports.v1";
 function eye4() { const m = new Array(16).fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m; }
+function revealPick(pv) {
+  const bar = document.querySelector("header.topbar");
+  const top = Math.max(8, (bar ? bar.getBoundingClientRect().bottom : 0) + 8);
+  const rect = pv.getBoundingClientRect();
+  const bottom = window.innerHeight - 8;
+  if (rect.top >= top - 2 && rect.bottom <= bottom + 2) return;
+  window.scrollBy(0, rect.top - top);
+}
 function parseMatrix(text) {
   if (!text) return eye4();
   const n = String(text).split(",").map(Number);
@@ -57,9 +65,10 @@ function supportStatus() {
   if (!el) return;
   const n = supportEdit.manual.length, a = supportEdit.avoid.length;
   const mode = { orbit: "Orbit", add: "Add support", erase: "Erase", avoid: "Keep clear" }[supportEdit.mode] || "Orbit";
-  el.textContent = n || a
-    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. Automatic supports skip keep-clear marks. An unsupported island is still reported. Drag still orbits; a tap places or erases.`
-    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. Drag orbits, right-drag pans. Nothing here promises an unmarked face.`;
+  const notice = supportEdit.notice ? `${supportEdit.notice} ` : "";
+  el.textContent = notice + (n || a
+    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. A green mark is where the pillar will touch. A red mark is the keep-clear point. Automatic supports skip keep-clear marks. An unsupported island is still reported.`
+    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. A support tap on a face that does not point at the plate moves the green mark to the underside below it. A keep-clear tap stays on the point you tapped. Drag orbits, right-drag pans.`);
 }
 async function show3D(el, url, lc, buf, bed, opts) {
   opts = opts || {};
@@ -84,8 +93,17 @@ async function show3D(el, url, lc, buf, bed, opts) {
     viewer.group.add(model);
     g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
     const mark = (p, color, kind, index) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: kind === "avoid" ? 0.55 : 1 }));
-      m.position.set(p[0], p[1], p[2]); m.renderOrder = 2; m.userData.mark = kind; m.userData.index = index; viewer.group.add(m);
+      const solid = kind === "avoid" ? "#ff2d3a" : color;
+      const add = (radius, tint, order) => {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10), new THREE.MeshBasicMaterial({
+          color: tint, depthTest: false, depthWrite: false, transparent: true,
+        }));
+        mesh.position.set(p[0], p[1], p[2]); mesh.renderOrder = order;
+        mesh.userData.mark = kind; mesh.userData.index = index; viewer.group.add(mesh);
+      };
+      // The model is translucent and draws after opaque meshes, which hid a mark that sat on a face.
+      if (kind === "manual" || kind === "avoid") add(r * 1.55, "#ffffff", 10);
+      add(r, solid, 11);
     };
     ((lc && lc.islands) || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
     ((lc && lc.suction) || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
@@ -196,6 +214,7 @@ function panelHTML() {
       <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div>
       <p class="help" id="rzCamHint">${CAM_HINT}</p>
       <fieldset class="rzOrient" id="rzSupEdit" hidden><legend>Supports on the model</legend>
+        <p class="help" id="rzSupRule">A green mark is where the pillar will touch. A red mark is the keep-clear point you tapped. A support tap on a face that does not point at the plate moves only the green mark to the underside below the tap, and the line under this says so.</p>
         <p class="help" id="rzSupStatus"></p>
         <div class="row"><button type="button" class="btn small" id="rzModeOrbit" aria-pressed="true">Orbit</button><button type="button" class="btn small" id="rzModeAdd">Add support</button><button type="button" class="btn small" id="rzModeErase">Erase</button><button type="button" class="btn small" id="rzModeAvoid">Keep clear</button><button type="button" class="btn small" id="rzSupUndo">Undo</button><button type="button" class="btn small" id="rzSupReset">Reset</button></div>
       </fieldset></div></div>
@@ -274,31 +293,124 @@ function wire() {
       keepCamera: !!keep, onPick: onSupportPick,
     }).then(supportStatus);
   };
-  function onSupportPick(ev) {
+  let contactBusy = false;
+  async function askContacts(placedPoints, kinds) {
+    const fd = new FormData();
+    fd.append("upload_id", picked.id);
+    fd.append("tilt_deg", $("#rzTilt").value || "0");
+    fd.append("tilt_y_deg", $("#rzTiltY").value || "0");
+    fd.append("printer_id", $("#rzPrinter").value || "");
+    fd.append("supports", $("#rzSup") && $("#rzSup").checked ? "true" : "false");
+    fd.append("points", JSON.stringify(placedPoints));
+    fd.append("kinds", JSON.stringify(kinds || placedPoints.map(() => "support")));
+    const body = await api("/api/resin/support-contact", { method: "POST", body: fd });
+    return body.contacts || [];
+  }
+  function storePlaced(point, matrix) {
+    const inv = (matrix || threeMatrix(supportEdit.matrix || eye4())).clone().invert();
+    const v = new THREE.Vector3(point[0], point[1], point[2]).applyMatrix4(inv);
+    return [round3(v.x), round3(v.y), round3(v.z)];
+  }
+  function rememberContact(tap, contact, kind) {
+    const pv = $("#rzPickView");
+    if (!pv || !contact) return;
+    pv.dataset.tap = tap.join(",");
+    pv.dataset.contact = contact.join(",");
+    pv.dataset.moved = contact.moved ? "1" : "0";
+    pv.dataset.kind = kind;
+  }
+  async function recontactMarks() {
+    if (!picked) { supportStatus(); return; }
+    const manuals = supportEdit.manual.map(p => p.slice());
+    if (manuals.length) {
+      const M = supportEdit.matrix || eye4();
+      const placed = manuals.map(p => applyPoint(M, p).map(round3));
+      let contacts;
+      try { contacts = await askContacts(placed, placed.map(() => "support")); }
+      catch (e) {
+        supportEdit.notice = `The pose changed and the contact check failed (${e.message}). The green marks were cleared so they cannot sit away from the pillars. Red keep-clear marks stay where they were tapped.`;
+        supportEdit.manual = [];
+        saveSupportLocal();
+        await redrawPick(true);
+        return;
+      }
+      const nextM = [];
+      let moved = 0, dropped = 0;
+      const mat = threeMatrix(M);
+      for (let i = 0; i < manuals.length; i++) {
+        const c = contacts[i];
+        if (!c || !c.ok || !c.point) { dropped++; continue; }
+        const prev = placed[i];
+        if (Math.abs(prev[0] - c.point[0]) > 0.4 || Math.abs(prev[1] - c.point[1]) > 0.4 || Math.abs(prev[2] - c.point[2]) > 0.4) moved++;
+        nextM.push(storePlaced(c.point, mat));
+      }
+      if (moved || dropped) {
+        pushUndo();
+        supportEdit.manual = nextM;
+        supportEdit.notice = dropped
+          ? `The pose or printer changed. ${dropped} green mark${dropped === 1 ? "" : "s"} had no pillar contact and ${dropped === 1 ? "was" : "were"} removed. Each remaining green mark is where a pillar will touch. Red keep-clear marks stay on the tapped points.`
+          : "The pose or printer changed. The green marks moved to the undersides that face the plate, where the pillars will touch. Red keep-clear marks stay on the tapped points.";
+        saveSupportLocal();
+      }
+    }
+    await redrawPick(true);
+  }
+  async function onSupportPick(ev) {
     if (supportEdit.mode === "erase") {
-      if (!ev.mark) { const s = $("#rzSupStatus"); if (s) s.textContent = "Tap a green or red mark to remove it. Drag still orbits."; return; }
+      if (!ev.mark) { supportEdit.notice = "Tap a green or red mark to remove it. Drag still orbits."; supportStatus(); return; }
       pushUndo();
       const kind = ev.mark.object.userData.mark, i = ev.mark.object.userData.index;
       (kind === "avoid" ? supportEdit.avoid : supportEdit.manual).splice(i, 1);
+      supportEdit.notice = "Removed that mark.";
       saveSupportLocal(); redrawPick(true); return;
     }
     if (supportEdit.mode !== "add" && supportEdit.mode !== "avoid") return;
-    if (!ev.hit) { const s = $("#rzSupStatus"); if (s) s.textContent = "That tap missed the model. Tap the part itself. Drag orbits."; return; }
-    let point = ev.hit.point.clone();
-    const normal = ev.hit.face && ev.hit.face.normal ? ev.hit.face.normal.clone().transformDirection(ev.matrix) : new THREE.Vector3(0, 0, -1);
-    if (normal.z > -0.2) {
-      const ray = new THREE.Raycaster(point.clone().add(new THREE.Vector3(0, 0, 0.5)), new THREE.Vector3(0, 0, -1));
-      const under = ray.intersectObject(ev.hit.object, false).find(h => h.face && h.face.normal.clone().transformDirection(ev.matrix).z < -0.2);
-      if (under) point = under.point.clone();
-    }
-    const inv = ev.matrix.clone().invert();
-    const base = new THREE.Vector3(point.x, point.y, point.z).applyMatrix4(inv);
-    const stored = [round3(base.x), round3(base.y), round3(base.z)];
-    pushUndo();
-    (supportEdit.mode === "avoid" ? supportEdit.avoid : supportEdit.manual).push(stored);
-    if (supportEdit.manual.length > 200) supportEdit.manual.length = 200;
-    if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
-    saveSupportLocal(); redrawPick(true);
+    if (!ev.hit) { supportEdit.notice = "That tap missed the model. Tap the part itself. Drag orbits."; supportStatus(); return; }
+    if (!picked) { supportEdit.notice = "The model is still loading. No mark was placed."; supportStatus(); return; }
+    if (contactBusy) return;
+    contactBusy = true;
+    const tap = [round3(ev.hit.point.x), round3(ev.hit.point.y), round3(ev.hit.point.z)];
+    const kind = supportEdit.mode === "avoid" ? "avoid" : "support";
+    const nrm = ev.hit.face && ev.hit.face.normal ? ev.hit.face.normal.clone().transformDirection(ev.matrix) : new THREE.Vector3(0, 0, 1);
+    const pv = $("#rzPickView");
+    if (pv) pv.dataset.normal = [round3(nrm.x), round3(nrm.y), round3(nrm.z)].join(",");
+    try {
+      if (kind === "avoid") {
+        pushUndo();
+        supportEdit.avoid.push(storePlaced(tap, ev.matrix));
+        if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
+        rememberContact(tap, Object.assign(tap.slice(), { moved: false }), "avoid");
+        supportEdit.notice = "The red mark is the keep-clear point you tapped. Automatic supports near it are skipped.";
+        saveSupportLocal();
+        await redrawPick(true);
+        return;
+      }
+      const contacts = await askContacts([tap], [kind]);
+      const c = contacts[0];
+      if (!c || !c.ok || !c.point) {
+        supportEdit.notice = c && c.blocked
+          ? "A pillar there would run into the model. No green mark was placed."
+          : c && c.on_plate
+            ? "That spot is too close to the plate for a pillar. No green mark was placed."
+            : "No underside below that tap faces the plate. No mark was placed.";
+        supportStatus();
+        return;
+      }
+      pushUndo();
+      const stored = storePlaced(c.point, ev.matrix);
+      (kind === "avoid" ? supportEdit.avoid : supportEdit.manual).push(stored);
+      if (supportEdit.manual.length > 200) supportEdit.manual.length = 200;
+      if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
+      rememberContact(tap, Object.assign(c.point.slice(), { moved: !!c.moved }), kind);
+      supportEdit.notice = c.moved
+        ? "The tap was not on a downward face. The green mark is the underside below it, where the pillar will touch."
+        : "The green mark is where the pillar will touch.";
+      saveSupportLocal();
+      await redrawPick(true);
+    } catch (e) {
+      supportEdit.notice = `Could not find where a support would touch (${e.message}). No mark was placed.`;
+      supportStatus();
+    } finally { contactBusy = false; }
   }
   $("#rzModeOrbit").onclick = () => setMode("orbit");
   $("#rzModeAdd").onclick = () => setMode("add");
@@ -317,6 +429,7 @@ function wire() {
   $("#rzWall").addEventListener("input", () => { wallOk = false; wallWarn(); }); $("#rzHollow").addEventListener("change", wallWarn);
   const drainWarn = () => { $("#rzDrainWarn").hidden = !($("#rzHollow").checked && !(+$("#rzDrain").value > 0)); };   // UX10
   $("#rzDrain").addEventListener("input", drainWarn); $("#rzHollow").addEventListener("change", drainWarn);
+  $("#rzSup").addEventListener("change", () => { recontactMarks(); });
   $("#rzWallDismiss").onclick = () => { wallOk = true; wallWarn(); };
   $("#rzWallAnyway").onclick = () => { wallOk = true; wallWarn(); $("#rzGo").click(); };
   // file pick / drop: show name + size right away; wrong types get a friendly note (never blocks anything else)
@@ -365,8 +478,9 @@ function wire() {
       supportEdit.matrix = parseMatrix(r.headers.get("X-Zeim-Matrix"));
       pv.hidden = false; $("#rzSupEdit").hidden = false;
       await show3D(pv, null, null, buf, bed, { matrix: supportEdit.matrix, manual: supportEdit.manual, avoid: supportEdit.avoid, onPick: onSupportPick });
-      supportStatus();
-      pv.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      if (supportEdit.manual.length || supportEdit.avoid.length || +($("#rzTilt") && $("#rzTilt").value) || +($("#rzTiltY") && $("#rzTiltY").value)) await refreshPlacement();
+      else supportStatus();
+      revealPick(pv);
       st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
     } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
     finally { if (seq === pickSeq) document.dispatchEvent(new CustomEvent("zeim:torchc0-loaded")); }   // the hand-off veil lifts
@@ -414,9 +528,8 @@ function wire() {
       const body = await api("/api/resin/placement", { method: "POST", body: fd });
       supportEdit.matrix = body.matrix || eye4();
       supportEdit.bed = bedNow();
-      if (supportEdit.buf) await redrawPick(true);
-      const note = $("#rzSupStatus");
-      if (note && (supportEdit.manual.length || supportEdit.avoid.length)) note.textContent = `The model moved. ${supportEdit.manual.length} placed support${supportEdit.manual.length === 1 ? "" : "s"} and ${supportEdit.avoid.length} keep-clear mark${supportEdit.avoid.length === 1 ? "" : "s"} followed it. Prepare again so the built supports match.`;
+      if (supportEdit.manual.length || supportEdit.avoid.length) await recontactMarks();
+      else if (supportEdit.buf) await redrawPick(true);
     } catch (e) {
       supportEdit.manual = []; supportEdit.avoid = [];
       if (supportEdit.buf) await redrawPick(true);
@@ -522,6 +635,8 @@ function wire() {
     const kept = supportEdit.avoid.map(p => applyPoint(M, p).map(n => Math.round(n * 1000) / 1000));
     if (placed.length) fd.append("support_points", JSON.stringify(placed));
     if (kept.length) fd.append("avoid_points", JSON.stringify(kept));
+    const sentManual = placed.map(p => p.slice());
+    const sentAvoid = kept.map(p => p.slice());
     out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
@@ -531,6 +646,21 @@ function wire() {
         picked = null; fd.delete("upload_id"); fd.delete("file_name"); fd.append("file", f); r = await api("/api/resin/prepare", { method: "POST", body: fd }); }
       const e = r.estimate;
       last.rep = r; preparedKey = poseKey(); document.body.dataset.torchStl = r.downloads.stl;   // Send to… hands over the prepared model
+      const built = (r.support_edit && r.support_edit.manual) || [];
+      const keptBack = (r.support_edit && r.support_edit.avoid) || [];
+      if (r.support_edit) {
+        const inv = threeMatrix(M).invert();
+        const toBase = p => { const v = new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(inv); return [Math.round(v.x * 1000) / 1000, Math.round(v.y * 1000) / 1000, Math.round(v.z * 1000) / 1000]; };
+        const far = (a, b) => !b || Math.abs(a[0] - b[0]) > 0.4 || Math.abs(a[1] - b[1]) > 0.4 || Math.abs(a[2] - b[2]) > 0.4;
+        const supportMoved = sentManual.length !== built.length || sentManual.some((p, i) => far(p, built[i]));
+        const avoidMoved = sentAvoid.length !== keptBack.length || sentAvoid.some((p, i) => far(p, keptBack[i]));
+        supportEdit.manual = built.map(toBase);
+        supportEdit.avoid = keptBack.map(toBase);
+        if (supportMoved) supportEdit.notice = "The green marks are where the pillars will touch. A tap that was not on a downward face was moved to that underside.";
+        if (avoidMoved) supportEdit.notice = "The red marks were moved onto the keep-clear points that automatic supports skip.";
+        saveSupportLocal();
+        if (supportEdit.buf) await redrawPick(true);
+      }
       const lc = r.layer_check || { islands: [], suction: [] }, nI = lc.islands.length, nS = lc.suction.length;
       const costTxt = e.cost == null ? "<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> enter a price for a cost estimate" : `<svg class=i aria-hidden=true focusable=false><use href=#i-coin></use></svg> about ${esc(money(e.cost, $("#rzCur").value))} (estimate)`;
       out.innerHTML = `<h2 class="rzResHead">Result</h2><div id="rzView" class="rzView" role="img" aria-label="3D view of the prepared model: red dots are islands, orange dots are suction cups" style="position:relative;width:100%;height:min(60vw,360px);min-height:220px;border-radius:8px;overflow:hidden"></div>
