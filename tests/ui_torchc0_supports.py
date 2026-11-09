@@ -122,20 +122,6 @@ def box_stl(folder):
     return path
 
 
-def place_canvas(page, top=150):
-    page.wait_for_function("() => (document.querySelector('#rzFileStatus') || {}).textContent.includes('loaded')", timeout=20000)
-    page.wait_for_timeout(250)
-    height = page.viewport_size["height"]
-    box = page.locator("#rzPickView canvas").bounding_box()
-    for _ in range(5):
-        if 48 < box["y"] < height - box["height"] - 16 and abs(box["y"] - top) < 20:
-            return box
-        page.evaluate("(dy) => window.scrollBy(0, dy)", box["y"] - top)
-        page.wait_for_timeout(80)
-        box = page.locator("#rzPickView canvas").bounding_box()
-    return box
-
-
 def colored_centroid(path, box, pred):
     from PIL import Image
     im = Image.open(path).convert("RGB")
@@ -155,7 +141,7 @@ def colored_centroid(path, box, pred):
 
 
 def run_jupiter(page, label, width):
-    """Real TorchC0 page: nav, Jupiter, load, then page scroll. Not a bare viewer."""
+    """Real TorchC0 page: nav, Jupiter, load. The page keeps the model on screen. Not a bare viewer."""
     errs = []
     page.on("pageerror", lambda e: errs.append(str(e)))
     page.goto(URL + "/#torchc0")
@@ -166,8 +152,17 @@ def run_jupiter(page, label, width):
     page.wait_for_function("() => !document.querySelector('#rzSupEdit').hidden", timeout=20000)
     page.wait_for_timeout(300)
     ok(f"{label}: Jupiter selected", page.locator("#rzPrinter option:checked").inner_text() == "ELEGOO Jupiter")
-    anchor = 240 if page.viewport_size["height"] < 900 else 170
-    box = place_canvas(page, anchor)
+    page.wait_for_function("() => (document.querySelector('#rzFileStatus') || {}).textContent.includes('loaded')", timeout=20000)
+    page.wait_for_timeout(250)
+    def canvas_in_view():
+        rect = page.locator("#rzPickView canvas").bounding_box()
+        chrome = page.evaluate("() => { const b = document.querySelector('header.topbar'); return b ? b.getBoundingClientRect().bottom : 0; }")
+        vh = page.viewport_size["height"]
+        return rect, chrome, rect["y"] >= chrome - 2 and rect["y"] + rect["height"] <= vh + 2
+    box, chrome, shown = canvas_in_view()
+    ok(f"{label}: model stays on screen after load", shown, f"box={box} header={chrome}")
+    if not shown:
+        return
     shot = os.path.join(SHOTS, f"torchc0-jupiter-before-{width}.png")
     page.screenshot(path=shot)
     model = colored_centroid(shot, box, lambda p: 80 < p[0] < 200 and p[1] > 100 and p[2] > 140 and p[2] > p[0] + 25)
@@ -197,10 +192,17 @@ def run_jupiter(page, label, width):
         contact = [float(x) for x in page.get_attribute("#rzPickView", "data-contact").split(",")]
         tap = [float(x) for x in page.get_attribute("#rzPickView", "data-tap").split(",")]
         ok(f"{label}: green contact is below the tap", contact[2] < tap[2] - 1, f"{contact} vs {tap}")
+        green_shot = os.path.join(SHOTS, f"torchc0-support-jupiter-{width}.png")
+        page.screenshot(path=green_shot)
+        vivid_green = colored_centroid(green_shot, box, lambda p: p[1] > 190 and p[1] > p[0] + 60 and p[1] > p[2] + 40)
+        ok(f"{label}: green mark is clearly visible", vivid_green is not None and vivid_green[2] > 12, str(vivid_green))
     page.evaluate("document.getElementById('rzSupReset').click()")
     page.wait_for_function("() => document.querySelector('#rzPickView').dataset.supports === '0'", timeout=5000)
     page.evaluate("document.getElementById('rzModeAvoid').click()")
-    box = place_canvas(page, anchor + 36)
+    box, chrome, shown = canvas_in_view()
+    ok(f"{label}: model still on screen for keep-clear", shown, f"box={box} header={chrome}")
+    if not shown:
+        return
     page.screenshot(path=shot)
     model = colored_centroid(shot, box, lambda p: 80 < p[0] < 200 and p[1] > 100 and p[2] > 140 and p[2] > p[0] + 25)
     if model is None:
@@ -227,7 +229,7 @@ def run_jupiter(page, label, width):
     marked = os.path.join(SHOTS, f"torchc0-keepclear-jupiter-{width}.png")
     box = page.locator("#rzPickView canvas").bounding_box()
     page.screenshot(path=marked)
-    red = colored_centroid(marked, box, lambda p: 145 < p[0] < 210 and p[0] > p[1] + 40 and p[1] < 140 and p[0] > p[2] + 20)
+    red = colored_centroid(marked, box, lambda p: p[0] > 220 and p[0] > p[1] + 80 and p[0] > p[2] + 80)
     if red is None:
         ok(f"{label}: red mark is visible", False, status)
         return

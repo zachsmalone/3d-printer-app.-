@@ -18,6 +18,14 @@ const supportEdit = {
 };
 const SUPPORT_KEY = "zeim.resinSupports.v1";
 function eye4() { const m = new Array(16).fill(0); m[0] = m[5] = m[10] = m[15] = 1; return m; }
+function revealPick(pv) {
+  const bar = document.querySelector("header.topbar");
+  const top = Math.max(8, (bar ? bar.getBoundingClientRect().bottom : 0) + 8);
+  const rect = pv.getBoundingClientRect();
+  const bottom = window.innerHeight - 8;
+  if (rect.top >= top - 2 && rect.bottom <= bottom + 2) return;
+  window.scrollBy(0, rect.top - top);
+}
 function parseMatrix(text) {
   if (!text) return eye4();
   const n = String(text).split(",").map(Number);
@@ -85,8 +93,17 @@ async function show3D(el, url, lc, buf, bed, opts) {
     viewer.group.add(model);
     g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
     const mark = (p, color, kind, index) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: kind === "avoid" ? 0.55 : 1 }));
-      m.position.set(p[0], p[1], p[2]); m.renderOrder = 2; m.userData.mark = kind; m.userData.index = index; viewer.group.add(m);
+      const solid = kind === "avoid" ? "#ff2d3a" : color;
+      const add = (radius, tint, order) => {
+        const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10), new THREE.MeshBasicMaterial({
+          color: tint, depthTest: false, depthWrite: false, transparent: true,
+        }));
+        mesh.position.set(p[0], p[1], p[2]); mesh.renderOrder = order;
+        mesh.userData.mark = kind; mesh.userData.index = index; viewer.group.add(mesh);
+      };
+      // The model is translucent and draws after opaque meshes, which hid a mark that sat on a face.
+      if (kind === "manual" || kind === "avoid") add(r * 1.55, "#ffffff", 10);
+      add(r, solid, 11);
     };
     ((lc && lc.islands) || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
     ((lc && lc.suction) || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
@@ -463,7 +480,7 @@ function wire() {
       await show3D(pv, null, null, buf, bed, { matrix: supportEdit.matrix, manual: supportEdit.manual, avoid: supportEdit.avoid, onPick: onSupportPick });
       if (supportEdit.manual.length || supportEdit.avoid.length || +($("#rzTilt") && $("#rzTilt").value) || +($("#rzTiltY") && $("#rzTiltY").value)) await refreshPlacement();
       else supportStatus();
-      pv.scrollIntoView({ block: "center", behavior: "instant" });
+      revealPick(pv);
       st.textContent = `${nm}, ${kb(f.size)}${n ? `, ${n.toLocaleString()} triangles` : ""}, loaded. Press Prepare for resin.`;
     } catch (e) { if (seq !== pickSeq) return; st.classList.add("warn"); st.textContent = `${nm}, ${kb(f.size)}: couldn't load it (${e.message}). You can still press Prepare for resin.`; }
     finally { if (seq === pickSeq) document.dispatchEvent(new CustomEvent("zeim:torchc0-loaded")); }   // the hand-off veil lifts
