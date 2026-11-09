@@ -207,7 +207,9 @@ def write_paint_3mf(model: trimesh.Trimesh, strokes: list[dict], path: Path) -> 
         "blockers": n_blk,
         "filament_slots": summ.get("filament_slots") or {},
         "note": "Painted supports use PrusaSlicer SupportEnforcer / SupportBlocker volumes. "
-                "Not tested on a real K1. Brushes are shaft+tip columns (thickness / contact tip / attachment height). Support filament slot is recorded for multi-material setups (PVA etc.); PrusaSlicer still needs matching filament profiles. Not a facet paint like the PrusaSlicer GUI.",
+                "Not tested on a real K1. Brushes are shaft+tip columns (thickness / contact tip / attachment height). "
+                "zeim:support_filament_slot only records what was asked. It does not choose a PrusaSlicer support extruder. "
+                "Not a facet paint like the PrusaSlicer GUI.",
     }
 
 
@@ -222,5 +224,5 @@ def summary(strokes: list[dict]) -> dict:
         "blockers": sum(1 for s in strokes if s["kind"] == "block"),
         "filament_slots": slots,
         "tested": "not K1-tested",
-        "note": "Adjustable supports: tip size, shaft thickness, attachment height, and support filament slot (same as print or another slot e.g. PVA).",
+        "note": "Adjustable supports: tip size, shaft thickness, and attachment height. A filament slot on a stroke is only a record until the slice profile has that extruder.",
     }

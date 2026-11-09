@@ -23,6 +23,8 @@ from app.services import editproj
 from app.core.exporters import mesh_3mf
 from app.services import filament_slots as fslots
 from app.services import slice_engine as eng
+from app.services import support_extruder
+from app.services.print_setup import printer_public
 
 router = APIRouter(prefix="/api/slice", tags=["slice"])
 
@@ -35,6 +37,30 @@ _slots = threading.BoundedSemaphore(int(os.environ.get("PHOTO3D_SLICE_CONCURRENC
 
 def _fail(status: int, code: str, message: str):
     raise HTTPException(status_code=status, detail={"code": code, "message": message})
+
+
+def _with_support_extruder(prof, strokes: list):
+    """Set PrusaSlicer support extruders from paint, or leave the ini alone when this profile has one extruder."""
+    if not strokes:
+        return prof, None
+    slots = int(printer_public(prof.id).get("filament_slots") or 1)
+    return support_extruder.apply(prof, strokes, filament_slots=slots)
+
+
+def _keep_support_toolchange(slot_plan: dict, info: dict | None) -> dict:
+    """A support extruder that was actually set must stay in the G-code. Stripping its tool change would undo it."""
+    if not info or not info.get("applied"):
+        return slot_plan
+    extra = info.get("extruder")
+    if not isinstance(extra, int) or extra < 2 or extra in slot_plan["slots"]:
+        return slot_plan
+    old = list(slot_plan["slots"])
+    slots = sorted(set(old) | {extra})
+    mats = list(slot_plan.get("materials") or [])
+    cols = list(slot_plan.get("colours") or slot_plan.get("colour_of_filament") or [])
+    mat_of = {slot: mats[i] if i < len(mats) and mats[i] else "PLA" for i, slot in enumerate(old)}
+    col_of = {slot: cols[i] if i < len(cols) and cols[i] else "#FFFFFF" for i, slot in enumerate(old)}
+    return fslots.plan_heads(slots, [mat_of.get(s, "PLA") for s in slots], [col_of.get(s, "#FFFFFF") for s in slots])
 
 
 def slices_root() -> Path:
@@ -143,7 +169,6 @@ def slice_model(
     slot_colours: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
-    from app.services import filament_slots as fslots
     from app.core import memtrim
     background.add_task(memtrim.trim)      # big G-code strings / meshes: hand the freed heap back after the response
     try:
@@ -221,6 +246,7 @@ def slice_model(
                 stl.write_bytes(_tm.util.concatenate(plate_objs).export(file_type="stl"))
         fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit or fit, info=(scaling := {}))
         paint_info = None
+        paint_strokes: list = []
         model_for_engine = work / "model.stl"
         if support_paint:
             from app.services import support_paint as spaint
@@ -230,6 +256,7 @@ def slice_model(
             except spaint.PaintError as e:
                 _fail(400, "bad_paint", str(e))
             if strokes:
+                paint_strokes = strokes
                 mesh = trimesh.load(str(work / "model.stl"), force="mesh")
                 paint_info = spaint.write_paint_3mf(mesh, strokes, work / "model_paint.3mf")
                 model_for_engine = work / "model_paint.3mf"
@@ -242,6 +269,11 @@ def slice_model(
                         _fail(e.status, e.code, e.message)
                     paint_info = {**paint_info, "supports_forced": "auto",
                                   "supports_note": "You painted areas that need supports, so ZEIM turned Supports on (Auto). You can still pick Everywhere."}
+        if paint_strokes:
+            prof, filament_info = _with_support_extruder(prof, paint_strokes)
+            slot_plan = _keep_support_toolchange(slot_plan, filament_info)
+            if paint_info is not None:
+                paint_info = {**paint_info, "support_filament": filament_info}
         parts = None
         if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
             parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
@@ -255,6 +287,9 @@ def slice_model(
                 raise
             prof, chosen = eng.profile_for(printer_id or profile, nozzle, {**opts, "supports": "auto"})
             chosen = {**chosen, "temp_notes": [AUTO_SUPPORT_NOTE, *(chosen.get("temp_notes") or [])]}
+            prof, filament_info = _with_support_extruder(prof, paint_strokes)
+            if paint_info is not None and filament_info is not None:
+                paint_info = {**paint_info, "support_filament": filament_info}
             res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
                                        bounds_stl=work / "model.stl", parts=parts)
     except eng.SliceError as e:

@@ -20,6 +20,33 @@ let onStale = () => {};
 const MAX = 200;
 const $ = (s, el = document) => el.querySelector(s);
 const savedButtons = { mouse: null, touch: null };
+const ONE_EXTRUDER = "This printer has one extruder. Supports use the same filament as the print.";
+
+function escText(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[ch]));
+}
+
+/* The select exists only when the loaded profile has a second extruder.
+   A slot name (PVA, HIPS) is not an extruder. One nozzle stays one extruder. */
+function supportFilamentField(info) {
+  const choices = info && Array.isArray(info.choices) ? info.choices : [];
+  const drive = !!(info && info.can_drive && info.extruder_count > 1 && choices.length > 1);
+  filamentSlot = "same";
+  if (!drive) {
+    return `<p class="help" id="spPaintSlotNote">${escText((info && info.message) || ONE_EXTRUDER)}</p>`;
+  }
+  const opts = choices.map(v => {
+    const value = String(v);
+    const label = value === "same" ? "Same as print" : `Extruder ${value}`;
+    return `<option value="${escText(value)}">${escText(label)}</option>`;
+  }).join("");
+  return `<div class="field" style="margin-top:6px">
+        <label for="spPaintSlot">Support filament</label>
+        <select id="spPaintSlot">${opts}</select>
+      </div>`;
+}
 
 export function getStrokes() { return strokes.filter(s => s.kind === "enforce" || s.kind === "block").map(s => ({ ...s })); }
 export function clearStrokes() { strokes = []; drawMarks(); saveSoon(); }
@@ -323,7 +350,7 @@ function listen() {
   listening = true;
 }
 
-export function mountPaint(host) {
+export function mountPaint(host, supportFilament) {
   if (host) {
     host.innerHTML = `<p class="help" id="spPaintNote">Paint tools stay on the model, including after this panel closes. The colour is a flat patch on the face. Slice builds a vertical column at that point (shaft and tip). The column is not cut to the face.</p>`;
   }
@@ -353,18 +380,7 @@ export function mountPaint(host) {
         <label class="inl">Tip radius <input type="range" id="spPaintTip" min="0.4" max="6" step="0.2" value="1.2"> <span id="spPaintTiplbl">1.2 mm</span></label>
         <label class="inl">Shaft radius <input type="range" id="spPaintTh" min="1" max="10" step="0.5" value="2.5"> <span id="spPaintThlbl">2.5 mm</span></label>
       </div>
-      <div class="field" style="margin-top:6px">
-        <label for="spPaintSlot">Support filament</label>
-        <select id="spPaintSlot">
-          <option value="same">Same as print</option>
-          <option value="2">Slot 2</option>
-          <option value="3">Slot 3</option>
-          <option value="4">Slot 4</option>
-          <option value="5">Slot 5</option>
-          <option value="pva">PVA (dissolve)</option>
-          <option value="hips">HIPS</option>
-        </select>
-      </div>
+      ${supportFilamentField(supportFilament)}
       <p class="help">Brush radius is the patch you see. Tip and shaft are the column PrusaSlicer receives. The column stands upright through the mark and can extend past the silhouette.</p>
     </details>
     <p class="help" id="spPaintCount" aria-live="polite">0 marks</p>`;
@@ -382,7 +398,8 @@ export function mountPaint(host) {
   $("#spPaintR").oninput = () => { brushR = +$("#spPaintR").value; $("#spPaintRlbl").textContent = brushR + " mm"; };
   $("#spPaintTip").oninput = () => { tipR = +$("#spPaintTip").value; $("#spPaintTiplbl").textContent = tipR + " mm"; };
   $("#spPaintTh").oninput = () => { thickness = +$("#spPaintTh").value; $("#spPaintThlbl").textContent = thickness + " mm"; };
-  $("#spPaintSlot").onchange = () => { filamentSlot = $("#spPaintSlot").value; };
+  const slot = $("#spPaintSlot");
+  if (slot) slot.onchange = () => { filamentSlot = slot.value; };
   $("#spPaintClear").onclick = () => clearStrokes();
   onStale = () => {
     const n = $("#spPaintCount");

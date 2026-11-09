@@ -343,7 +343,7 @@ export function openInHTML(dl) {
 export function wirePanel(getModelId) {
   const mat = $("#spMat");
   if (!mat) return;
-  mountPaint($("#spPaintHost"));
+  mountPaint($("#spPaintHost"), printerOf(pref.printer_id)?.support_filament);
   const syncSupportSheet = () => {
     const edit = document.getElementById("viewEdit");
     const sheet = document.getElementById("processSheet");
@@ -457,8 +457,9 @@ export function wirePanel(getModelId) {
     try {
       const r = await api("/api/slice", { method: "POST", body: fd, signal: ctl.signal });
       const notes = [...(r.temp_notes || []), r.material_warning ? `${r.material_warning.title}: ventilate the room and use an enclosure while it prints.` : ""].filter(Boolean);
+      const filMsg = r.support_paint?.support_filament?.message;
       const paintNote = r.support_paint
-        ? `<p class="help">Paint-on supports: ${r.support_paint.enforcers || 0} need / ${r.support_paint.blockers || 0} never. ${esc(r.support_paint.supports_note || r.support_paint.note || "")}</p>`
+        ? `<p class="help">Paint-on supports: ${r.support_paint.enforcers || 0} need / ${r.support_paint.blockers || 0} never. ${esc(r.support_paint.supports_note || r.support_paint.note || "")}</p>${filMsg ? `<p class="help">${esc(filMsg)}</p>` : ""}`
         : "";
       out.innerHTML = `<p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> ${esc(r.print_time_human || "time unknown")}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-spool></use></svg> ${r.filament_grams != null ? "about " + r.filament_grams + " g" : "?"}${r.filament_mm ? ` · ${(r.filament_mm / 1000).toFixed(2)} m` : ""}</span>${r.scaled_pct ? `<span class="pill warn">Scaled to ${r.scaled_pct}%</span>` : ""}</p>
         <p class="help">Estimates read from the G-code. ${esc(r.settings.material)}, ${r.settings.layer_height} mm layers, ${r.settings.infill}% ${esc(r.settings.infill_pattern)}.</p>
