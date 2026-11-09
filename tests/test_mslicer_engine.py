@@ -28,11 +28,14 @@ def _stl():
 
 
 def _wait(c, job_id):
-    deadline = time.time() + 60
+    deadline = time.time() + 90
     status = {"status": "queued"}
-    while time.time() < deadline and status["status"] in ("queued", "running"):
+    while time.time() < deadline and status.get("status") in ("queued", "running", None):
         time.sleep(0.05)
-        status = c.get(f"/api/resin/jobs/{job_id}").json()
+        body = c.get(f"/api/resin/jobs/{job_id}").json()
+        if "status" not in body:
+            continue
+        status = body
     return status
 
 
@@ -67,7 +70,8 @@ def test_ctb_v4_and_v5_magics():
     assert started.status_code == 200, started.text
     status = _wait(c, started.json()["job_id"])
     assert status["status"] == "done", status
-    assert status["report"]["ctb_container"] == "legacy"
+    container = status["report"]["ctb_container"]
+    assert container == ("v4" if status["report"]["engine"] == "dragonfruit" else "legacy")
     data = c.get(status["download"]).content
     assert resin_fileid.identify(data, "ctb")["magic"] == "CTB-v4"
     assert struct.unpack_from("<I", data, 0)[0] == resin_fileid.CTB_V4
@@ -245,12 +249,15 @@ def test_jupiter_ctb_is_reachable_through_the_api():
     assert status["status"] == "done", status
     report = status["report"]
     assert report["hardware_tested"] is False and report["native_format_written"] is True
+    assert report["engine"] == resin_slice.writer_for("ctb")
     assert report["file_magic"] == "CTB-v5"
     assert report["layer_height_um"] == 200 and report["normal_exposure_ms"] == 2500
     assert report["bottom_exposure_ms"] == 30000 and report["bottom_layer_count"] == 5
     assert report["mirror_applied"] is False
     assert "not printed" in report["note"].lower()
-    data = c.get(status["download"]).content
+    down = c.get(status["download"])
+    assert report["engine"] in down.headers["content-disposition"]
+    data = down.content
     assert resin_fileid.identify(data, "ctb")["magic"] == "CTB-v5"
 
 
@@ -293,7 +300,9 @@ def test_selected_printer_rejects_a_different_machine():
     own = c.post(f"/api/resin/{rid}/slice", data={"plate_id": "elegoo-mars-5-ultra-ctb", "file_format": "ctb"})
     assert own.status_code == 400
     detail = own.text.lower()
-    assert "mirror" in detail and "pixel" in detail
+    assert "pixel" in detail
+    if resin_slice.writer_for("ctb") != "dragonfruit":
+        assert "mirror" in detail
     photon = c.post("/api/resin/prepare", data={"printer_id": "anycubic_photon_mono_m7", "hollow": "false", "supports": "false", "tilt_deg": "0"},
                     files={"file": ("box.stl", stl, "model/stl")})
     refused = c.post(f"/api/resin/{photon.json()['export']['rid']}/slice", data={"plate_id": "elegoo-jupiter-ctb", "file_format": "ctb"})
@@ -304,7 +313,15 @@ def test_selected_printer_rejects_a_different_machine():
     crossed = c.post(f"/api/resin/{se_rid}/slice", data={"plate_id": "elegoo-jupiter-ctb", "file_format": "ctb"})
     assert crossed.status_code == 400 and "different machine" in crossed.text.lower()
     mirrored = c.post(f"/api/resin/{se_rid}/slice", data={"plate_id": "elegoo-jupiter-se-ctb", "file_format": "ctb"})
-    assert mirrored.status_code == 400 and "mirror" in mirrored.text.lower()
+    if resin_slice.writer_for("ctb") == "dragonfruit":
+        assert mirrored.status_code == 200, mirrored.text
+        mirrored_status = _wait(c, mirrored.json()["job_id"])
+        assert mirrored_status["status"] == "done", mirrored_status
+        assert mirrored_status["report"]["engine"] == "dragonfruit"
+        assert mirrored_status["report"]["mirror_applied"] is True
+        assert mirrored_status["report"]["mirror_y"] is True
+    else:
+        assert mirrored.status_code == 400 and "mirror" in mirrored.text.lower()
 
 
 def _arrow():
@@ -374,8 +391,71 @@ def _ctb_runs(data):
         yield length, value
 
 
+def _ctb_v4_runs(data):
+    """Gray runs in an unencrypted CTB layer. High bit means a length follows."""
+    offset = 0
+    while offset < len(data):
+        code = data[offset]
+        offset += 1
+        value = (code & 0x7F) << 1
+        if code & 0x80 == 0:
+            length = 1
+        else:
+            b0 = data[offset]
+            offset += 1
+            if b0 & 0x80 == 0:
+                length = b0
+            elif b0 & 0xC0 == 0x80:
+                length = ((b0 & 0x7F) << 8) | data[offset]
+                offset += 1
+            elif b0 & 0xE0 == 0xC0:
+                length = ((b0 & 0x1F) << 16) | (data[offset] << 8) | data[offset + 1]
+                offset += 2
+            elif b0 & 0xF0 == 0xE0:
+                length = ((b0 & 0x0F) << 24) | (data[offset] << 16) | (data[offset + 1] << 8) | data[offset + 2]
+                offset += 3
+            else:
+                raise AssertionError("bad ctb run")
+        yield length, value
+
+
+def _ctb_v4_view(raw):
+    """Unencrypted CTB (magic 0x12FD0106), including DragonFruit's version-5 file."""
+    size = struct.unpack_from("<3f", raw, 8)
+    _total_h, layer_h, exposure, bottom = struct.unpack_from("<4f", raw, 28)
+    bottom_layers = struct.unpack_from("<I", raw, 48)[0]
+    width, height = struct.unpack_from("<2I", raw, 52)
+    layers_off, count = struct.unpack_from("<2I", raw, 64)
+    params_off = struct.unpack_from("<I", raw, 84)[0]
+    lift = struct.unpack_from("<f", raw, params_off + 8)[0]
+    xor_key = struct.unpack_from("<I", raw, 100)[0]
+    layers = []
+    for i in range(count):
+        rec = layers_off + i * 0x24
+        address, data_len, page = struct.unpack_from("<III", raw, rec + 12)
+        pos = page * (1 << 32) + address
+        blob = raw[pos:pos + data_len]
+        if xor_key:
+            blob = _xor(blob, xor_key, i)
+        box = [10**9, 10**9, -1, -1]
+        seen = 0
+        for length, value in _ctb_v4_runs(blob):
+            if value:
+                _cover(seen, length, width, box)
+            seen += length
+        assert seen == width * height, (i, seen, width * height)
+        z = struct.unpack_from("<f", raw, pos - 0x54)[0]
+        exp = struct.unpack_from("<f", raw, pos - 0x54 + 4)[0]
+        layers.append({"z": z, "exposure": exp, "origin": [box[0], box[1]], "end": [box[2], box[3]]})
+    return {"plate": size, "total_h": _total_h, "layer_h": layer_h, "exposure": exposure,
+            "bottom": bottom, "bottom_layers": bottom_layers, "lift": lift, "width": width,
+            "height": height, "layers": layers}
+
+
 def _ctb_view(raw):
     """Header fields and each layer's lit bbox. The key is read from the vendored writer, not copied here."""
+    if struct.unpack_from("<I", raw, 0)[0] == 0x12FD0106:
+        return _ctb_v4_view(raw)
     assert struct.unpack_from("<I", raw, 0)[0] == 0x12FD0107
     settings_size, settings_off = struct.unpack_from("<II", raw, 4)
     sig_size, sig_off = struct.unpack_from("<II", raw, 20)
@@ -504,10 +584,11 @@ def test_default_hollow_and_supports_keep_the_settings(tmp_path):
     lit = [layer for layer in view["layers"] if layer["end"][0] >= 0]
     union = [min(layer["origin"][0] for layer in lit), min(layer["origin"][1] for layer in lit),
              max(layer["end"][0] for layer in lit), max(layer["end"][1] for layer in lit)]
-    assert union[0] == pytest.approx(stl.bounds[0][0] * ppm_x, abs=2)
-    assert union[1] == pytest.approx(stl.bounds[0][1] * ppm_y, abs=2)
-    assert union[2] == pytest.approx(stl.bounds[1][0] * ppm_x, abs=2)
-    assert union[3] == pytest.approx(stl.bounds[1][1] * ppm_y, abs=2)
+    # DragonFruit maps the bed onto width-1 pixels, so an edge can sit about two pixels off mslicer's scale.
+    assert union[0] == pytest.approx(stl.bounds[0][0] * ppm_x, abs=4)
+    assert union[1] == pytest.approx(stl.bounds[0][1] * ppm_y, abs=4)
+    assert union[2] == pytest.approx(stl.bounds[1][0] * ppm_x, abs=4)
+    assert union[3] == pytest.approx(stl.bounds[1][1] * ppm_y, abs=4)
     assert lit[-1]["z"] == pytest.approx(stl.bounds[1][2], abs=view["layer_h"] + 1e-3)
 
 

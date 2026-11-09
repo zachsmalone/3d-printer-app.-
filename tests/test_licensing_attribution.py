@@ -15,7 +15,10 @@ def _plain(html):
 def test_attribution_on_credits_page_and_footer():
     r = client().get("/credits"); assert r.status_code == 200
     for html in (r.text, (ROOT / "static/index.html").read_text()):
-        assert TEXT in _plain(html) and LINK in html
+        plain = _plain(html)
+        assert TEXT in plain and LINK in html
+        assert "DragonFruit" in plain and "AGPL-3.0-or-later" in plain
+        assert "97596a55882cb139bbcf96bb98b211f82ae4c5f0" in html
 
 
 def test_docs_no_longer_say_zeim_source_must_be_public():

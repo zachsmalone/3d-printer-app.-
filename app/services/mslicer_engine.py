@@ -94,6 +94,11 @@ def slice_file(stl: Path, out: Path, plate: dict, settings: dict, fmt: str, *, a
     blocked = resin_slice.block_reason(plate, fmt)
     if blocked:
         raise MSlicerError(blocked)
+    if plate.get("kind") != "inspection" and (plate.get("mirror_x") is True or plate.get("mirror_y") is True):
+        raise MSlicerError(
+            f"{plate['name']} is listed with a mirrored image. "
+            "mslicer does not flip pixels, and TorchC0 will not write an unmirrored file for that catalog."
+        )
     binary = mslicer_bin()
     if binary is None:
         raise MSlicerError(

@@ -1,8 +1,9 @@
 """Rasterise a prepared TorchC0 mesh into layer masks and write a LUMEN v1 file.
 
 The file container is the Open Resin Alliance `lumen-format` crate (MIT OR Apache-2.0),
-invoked as `tools/zeim-lumen`. The mesh-to-mask step is ZEIM code: DragonFruit's
-slicer is AGPL-3.0-or-later and mslicer is GPL-3.0, so those engines are not linked.
+invoked as `tools/zeim-lumen`. The mesh-to-mask step is ZEIM code. `.ctb` and
+`.nanodlp` are written by the separate unmodified DragonFruit CLI. `.goo` stays
+on the separate mslicer program. Neither engine is linked into this process.
 
 Physical units: the mesh is millimetres, Z up, plate at the minimum Z. LUMEN stores
 micrometres, milliseconds and micrometres per minute. One TorchC0 lift becomes the
@@ -67,6 +68,46 @@ class ResinSliceCancelled(ResinSliceError):
     pass
 
 
+def dragonfruit_bin() -> Path | None:
+    env = os.environ.get("ZEIM_DRAGONFRUIT_BIN", "").strip()
+    candidates = []
+    if env:
+        candidates.append(Path(env))
+    candidates.append(Path("/usr/local/bin/dragonfruit-cli"))
+    for path in candidates:
+        if path.is_file():
+            return path
+    return None
+
+
+def configured_resin_engine() -> str:
+    """`ZEIM_RESIN_ENGINE=dragonfruit|mslicer`. Anything else stays on the default."""
+    choice = os.environ.get("ZEIM_RESIN_ENGINE", "dragonfruit").strip().lower()
+    if choice in ("dragonfruit", "mslicer"):
+        return choice
+    return "dragonfruit"
+
+
+def writer_for(fmt: str) -> str:
+    """Which separate program writes this printer file.
+
+    `.lumen` is ZEIM's own encoder. `.goo` stays on mslicer because DragonFruit's
+    GOO header is version V1.2 and mslicer's is V3.0, and that has not been
+    accepted by a printer here. `.ctb` and `.nanodlp` use DragonFruit when it is
+    the selected engine and the binary is installed.
+    """
+    key = (fmt or "").strip().lower().lstrip(".")
+    if key in ("", "lmn"):
+        key = "lumen"
+    if key == "lumen":
+        return "lumen"
+    if key == "goo":
+        return "mslicer"
+    if key in ("ctb", "nanodlp") and configured_resin_engine() == "dragonfruit" and dragonfruit_bin() is not None:
+        return "dragonfruit"
+    return "mslicer"
+
+
 def lumen_bin() -> Path | None:
     env = os.environ.get("ZEIM_LUMEN_BIN", "").strip()
     if env:
@@ -99,15 +140,15 @@ def require_sliceable(plate: dict, *, engine: str = "lumen") -> None:
     pixels = width * height
     if engine == "lumen":
         cap = MAX_PIXELS
-    elif engine == "mslicer":
+    elif engine in ("mslicer", "dragonfruit"):
         cap = MSLICER_MAX_PIXELS
     else:
         raise ResinSliceError(f"Unknown slice engine {engine}.")
     if pixels <= 0 or pixels > cap:
-        if engine == "mslicer":
+        if engine in ("mslicer", "dragonfruit"):
             raise ResinSliceError(
                 f"{plate['name']} is {width}×{height} px ({pixels:,} pixels). "
-                f"mslicer slices are capped at {cap:,} pixels so they stay inside the memory limit. "
+                f"Printer-file slices are capped at {cap:,} pixels so they stay inside the memory limit. "
                 f"The .lumen cap is {MAX_PIXELS:,} and does not apply to this file."
             )
         native = plate.get("native_format") or "its stock file"
@@ -158,28 +199,44 @@ def plates_for_printer(brand: str, model: str, bed_mm) -> list[dict]:
     return found
 
 
+def _mirror_axes(plate: dict) -> tuple[list[str], bool]:
+    """Catalog axes that are true, and whether either flag is not a boolean."""
+    axes = []
+    uncertain = False
+    for key, label in (("mirror_x", "X"), ("mirror_y", "Y")):
+        value = plate.get(key)
+        if not isinstance(value, bool):
+            uncertain = True
+        elif value:
+            axes.append(label)
+    return axes, uncertain
+
+
 def block_reason(plate: dict, fmt: str) -> str:
     """Why this file must not be written for this plate. Empty when it may.
 
-    A mirror flag is a refusal. mslicer's own GOO header marks those bits untested,
-    and this process does not flip pixels it has not checked. Writing the file with
-    the bits left off would be a different orientation from the one the catalog records.
+    DragonFruit can mirror `.ctb` and `.nanodlp` when both catalog flags are
+    booleans. `.goo` stays on mslicer, which does not flip pixels, so a mirrored
+    GOO plate is still refused. A flag that is not true or false is refused for
+    every format.
     """
     key = (fmt or "").strip().lower().lstrip(".")
     if key == "lmn":
         key = "lumen"
     parts: list[str] = []
     if plate.get("kind") != "inspection":
-        axes = []
-        if plate.get("mirror_x"):
-            axes.append("X")
-        if plate.get("mirror_y"):
-            axes.append("Y")
-        if axes:
+        axes, uncertain = _mirror_axes(plate)
+        writer = writer_for(key) if key in ("lumen", "goo", "ctb", "nanodlp") else ""
+        if uncertain and (plate.get("mirror_x") or plate.get("mirror_y")):
+            parts.append(
+                f"{plate['name']} has a mirror flag that is not true or false. "
+                "TorchC0 will not guess a flip, so it will not write this file."
+            )
+        elif axes and writer != "dragonfruit":
             parts.append(
                 f"{plate['name']} is listed with a mirrored image ({' and '.join(axes)}). "
-                "mslicer marks the GOO mirror bits untested, and TorchC0 has not verified a pixel flip, "
-                "so it will not write this file."
+                "mslicer does not flip pixels, and TorchC0 will not write an unmirrored file "
+                "for that catalog."
             )
     native = (plate.get("native_format") or "").lstrip(".").lower()
     version = (plate.get("native_version") or "").lower()
@@ -361,12 +418,12 @@ def slice_mesh(mesh: trimesh.Trimesh, settings: dict, plate: dict, out_path: Pat
                aa: bool = False, aa_level: int = 4, thumb_dir: Path | None = None,
                cancel: threading.Event | None = None, progress=None) -> dict:
     """Write `out_path` as a .lumen file. Returns the inspection report."""
-    binary = lumen_bin()
-    if binary is None:
-        raise ResinSliceError("The LUMEN encoder is not built on this machine (tools/zeim-lumen).")
     blocked = block_reason(plate, "lumen")
     if blocked:
         raise ResinSliceError(blocked)
+    binary = lumen_bin()
+    if binary is None:
+        raise ResinSliceError("The LUMEN encoder is not built on this machine (tools/zeim-lumen).")
     if len(mesh.faces) > MAX_FACES:
         raise ResinSliceError(f"This mesh has {len(mesh.faces):,} triangles. The slice limit is {MAX_FACES:,}.")
     if not np.isfinite(mesh.vertices).all():

@@ -16,7 +16,7 @@ import trimesh
 
 from app import config
 from app.core import resin_slice
-from app.services import mslicer_engine
+from app.services import mslicer_engine, resin_engine
 
 _lock = threading.Lock()
 _cancel: dict[str, threading.Event] = {}
@@ -80,10 +80,12 @@ def public(job: dict) -> dict:
             "native_format": report.get("native_format"),
             "native_format_written": bool(report.get("native_format_written")),
             "engine": report.get("engine") or "lumen-format",
+            "engine_requested": report.get("engine_requested") or report.get("engine") or "",
+            "engine_fallback": report.get("engine_fallback") or "",
             "ctb_container": report.get("ctb_container") or "",
             "file_magic": report.get("file_magic") or "",
             "hardware_tested": False,
-            "mirror_applied": False,
+            "mirror_applied": bool(report.get("mirror_applied")),
             "mirror_x": bool(report.get("mirror_x")),
             "mirror_y": bool(report.get("mirror_y")),
             "bytes": report.get("bytes"),
@@ -222,10 +224,11 @@ def _run(job_id: str, plate: dict) -> None:
                     f"The model is {ext[0]:.1f} × {ext[1]:.1f} × {ext[2]:.1f} mm. "
                     f"{plate['name']} is {sx:.1f} × {sy:.1f} × {sz:.1f} mm."
                 )
-            job["phase"] = "mslicer"
+            job["phase"] = "slice"
             _write(job)
-            report = mslicer_engine.slice_file(
-                stl_path, out, plate, settings, kind, aa=bool(job["aa"]), cancel=ev,
+            report = resin_engine.slice_printer_file(
+                stl_path, out, plate, settings, kind, aa=bool(job["aa"]),
+                aa_level=int(job.get("aa_level") or 4), cancel=ev,
                 placed=bool(job.get("placed")),
             )
             report["plate_name"] = plate["name"]

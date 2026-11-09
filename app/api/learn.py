@@ -169,7 +169,8 @@ def credits_page():
     body = (f"<h1>{escape(d['title'])}</h1><p>{escape(d['intro'])}</p>"
             f"<h2>{escape(t['heading'])}</h2><p class=help>{escape(t['blurb'])}</p>{table(credits.python_packages())}"
             f"<h3>{escape(t['system_heading'])}</h3>{table(credits.system_tools())}"
-            '<p class="attrib">Slicing powered by <a href="https://github.com/prusa3d/PrusaSlicer" rel="noopener noreferrer" target="_blank">PrusaSlicer</a> (AGPL-3.0), unmodified</p>'
+            '<p class="attrib">Slicing powered by <a href="https://github.com/prusa3d/PrusaSlicer" rel="noopener noreferrer" target="_blank">PrusaSlicer</a> (AGPL-3.0), unmodified. '
+            'Resin .ctb uses <a href="https://github.com/Open-Resin-Alliance/DragonFruit/tree/97596a55882cb139bbcf96bb98b211f82ae4c5f0" rel="noopener noreferrer" target="_blank">DragonFruit</a> (AGPL-3.0-or-later), unmodified</p>'
             f"<h3>{escape(t['bundled_heading'])}</h3>{table(credits.bundled())}<p class=help>{escape(t['others'])}</p>"
             f"<h2>{escape(d['creators']['heading'])}</h2><p class=help>{escape(d['creators']['blurb'])}</p>{mk_html}<p class=help>{escape(d['creators']['originals_note'])}</p>"
             f"<h2>{escape(d['testers']['heading'])}</h2><p class=help>{escape(d['testers']['blurb'])}</p>{people(d['testers'])}"

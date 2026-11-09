@@ -44,10 +44,13 @@ jobs:
 
   resin-engine:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -61,5 +64,10 @@ jobs:
         run: cargo build --release --manifest-path third_party/mslicer/Cargo.toml -p slicer --bin slicer
       - name: Build the LUMEN encoder
         run: cargo build --release --manifest-path tools/zeim-lumen/Cargo.toml
+      - name: Build DragonFruit CLI
+        run: bash tools/dragonfruit/build.sh /tmp/zeim-dragonfruit
       - name: Slice tests
-        run: PYTHONPATH=. pytest tests/test_mslicer_engine.py tests/test_rea_boundary.py tests/test_resin_lumen.py tests/test_torchc0_resin.py -q -k "not chromium and not real_browser"
+        env:
+          ZEIM_DRAGONFRUIT_BIN: /tmp/zeim-dragonfruit/rust/dragonfruit-cli/target/release/dragonfruit-cli
+          ZEIM_RESIN_ENGINE: dragonfruit
+        run: PYTHONPATH=. pytest tests/test_mslicer_engine.py tests/test_dragonfruit_engine.py tests/test_rea_boundary.py tests/test_resin_lumen.py tests/test_torchc0_resin.py -q -k "not chromium and not real_browser"
