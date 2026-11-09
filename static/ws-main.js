@@ -102,6 +102,7 @@
     var sheet = document.getElementById("processSheet");
     var device = document.getElementById("deviceSheet");
     var title = document.getElementById("procTitle");
+    try {
     if (which === "device") {
       if (sheet) sheet.hidden = true;
       if (device) device.hidden = false;
@@ -127,6 +128,9 @@
     }
     if (sheet) sheet.hidden = true;
     if (device) device.hidden = true;
+    } finally {
+      document.dispatchEvent(new CustomEvent("zeim:proc-tab"));
+    }
   }
   function focusXform(kind) {
     var plate = document.getElementById("plateTool"); if (plate) plate.open = true;

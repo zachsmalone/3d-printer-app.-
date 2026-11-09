@@ -1,7 +1,9 @@
 /* Paint-on supports on the model that is already on screen.
    Left drag / one finger paints. Right drag orbits. Scroll or two fingers zoom.
    Green = need support (enforcer), red = never (blocker). Erase removes marks under the brush.
-   The mesh material is not replaced. Marks are discs on the hit point. */
+   The mesh material is not replaced. Marks are drawn on the surface itself, so they
+   cannot float in the air or spill past the silhouette. The slicer still builds a
+   vertical column at the hit, which is a different shape from this patch. */
 import * as THREE from "three";
 
 let strokes = [];
@@ -85,82 +87,174 @@ export function raycastModel(v, ev) {
   return { local, normal, object: hit.object };
 }
 
-function overlay() {
-  if (!viewer) return null;
-  let g = viewer.scene.getObjectByName("zeim-support-paint");
-  if (!g) {
-    g = new THREE.Group();
-    g.name = "zeim-support-paint";
-    g.userData.paint = true;
-    viewer.scene.add(g);
-  }
-  return g;
+const STROKE_CAP = 64;
+
+function clearLegacyDiscs() {
+  const g = viewer && viewer.scene.getObjectByName("zeim-support-paint");
+  if (!g) return;
+  viewer.scene.remove(g);
+  g.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+}
+
+function paintMaterial() {
+  const data = new Float32Array(STROKE_CAP * 3 * 4);
+  const tex = new THREE.DataTexture(data, STROKE_CAP, 3, THREE.RGBAFormat, THREE.FloatType);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  tex.flipY = false;
+  if (THREE.NoColorSpace) tex.colorSpace = THREE.NoColorSpace;
+  tex.needsUpdate = true;
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    toneMapped: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+    uniforms: {
+      strokeTex: { value: tex },
+      cursor: { value: new THREE.Vector4(0, 0, 0, -1) },
+      cursorN: { value: new THREE.Vector3(0, 0, 1) },
+      cursorColor: { value: new THREE.Color(0x00e676) },
+    },
+    vertexShader: `
+      varying vec3 vLocal;
+      varying vec3 vN;
+      void main() {
+        vLocal = position;
+        vN = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vLocal;
+      varying vec3 vN;
+      uniform sampler2D strokeTex;
+      uniform vec4 cursor;
+      uniform vec3 cursorN;
+      uniform vec3 cursorColor;
+      bool onFace(vec3 p, vec3 n, float r) {
+        if (dot(normalize(vN), n) < 0.72) return false;
+        vec3 d = vLocal - p;
+        float along = dot(d, n);
+        vec3 planar = d - n * along;
+        return abs(along) < 0.35 && dot(planar, planar) <= r * r;
+      }
+      void main() {
+        vec3 col = vec3(0.0);
+        float a = 0.0;
+        for (int i = 0; i < ${STROKE_CAP}; i++) {
+          float u = (float(i) + 0.5) / ${STROKE_CAP}.0;
+          vec4 s = texture2D(strokeTex, vec2(u, 0.1667));
+          if (s.w <= 0.0) continue;
+          vec3 n = texture2D(strokeTex, vec2(u, 0.5)).xyz;
+          if (onFace(s.xyz, n, s.w)) {
+            col = texture2D(strokeTex, vec2(u, 0.8333)).rgb;
+            a = 0.86;
+          }
+        }
+        if (cursor.w > 0.0 && onFace(cursor.xyz, cursorN, cursor.w)) {
+          vec3 d = vLocal - cursor.xyz;
+          float along = dot(d, cursorN);
+          float planar = length(d - cursorN * along);
+          float band = max(0.35, cursor.w * 0.12);
+          if (planar <= cursor.w && planar >= cursor.w - band) {
+            col = cursorColor;
+            a = 0.96;
+          }
+        }
+        if (a < 0.02) discard;
+        gl_FragColor = vec4(col, a);
+      }
+    `,
+  });
+  mat.userData.strokeData = data;
+  mat.userData.strokeTex = tex;
+  return mat;
+}
+
+function writeStrokes(mat, list) {
+  const data = mat.userData.strokeData;
+  data.fill(0);
+  const slice = list.slice(-STROKE_CAP);
+  slice.forEach((s, i) => {
+    const o = i * 4;
+    data[o] = s.x;
+    data[o + 1] = s.y;
+    data[o + 2] = s.z;
+    data[o + 3] = Math.max(0.2, +s.r || 0);
+    const nrm = (STROKE_CAP + i) * 4;
+    const nx = +s.nx || 0, ny = +s.ny || 0, nz = s.nz == null ? 1 : +s.nz;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    data[nrm] = nx / len;
+    data[nrm + 1] = ny / len;
+    data[nrm + 2] = nz / len;
+    data[nrm + 3] = 1;
+    const c = (STROKE_CAP * 2 + i) * 4;
+    const col = s.kind === "block" ? [1, 0.0902, 0.2667] : [0, 0.902, 0.4627];
+    data[c] = col[0];
+    data[c + 1] = col[1];
+    data[c + 2] = col[2];
+    data[c + 3] = 1;
+  });
+  mat.userData.strokeTex.needsUpdate = true;
+}
+
+function ensureOverlays() {
+  clearLegacyDiscs();
+  modelMeshes().forEach((host, meshIndex) => {
+    let ov = host.getObjectByName("zeim-paint-overlay");
+    if (!ov) {
+      ov = new THREE.Mesh(host.geometry, paintMaterial());
+      ov.name = "zeim-paint-overlay";
+      ov.userData.paint = true;
+      ov.raycast = () => {};
+      ov.renderOrder = 5;
+      host.add(ov);
+    }
+    const mine = strokes.filter(s => (s.mesh || 0) === meshIndex && (s.kind === "enforce" || s.kind === "block"));
+    writeStrokes(ov.material, mine);
+  });
 }
 
 function hideCursor() {
-  const g = viewer && viewer.scene.getObjectByName("zeim-support-paint");
-  const c = g && g.getObjectByName("cursor");
-  if (c) c.visible = false;
-}
-
-function disc(radius, color, opacity) {
-  const m = new THREE.Mesh(
-    new THREE.CircleGeometry(radius, 20),
-    new THREE.MeshBasicMaterial({
-      color, transparent: true, opacity, depthTest: true,
-      polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide,
-    })
-  );
-  m.userData.paint = true;
-  m.renderOrder = 5;
-  return m;
-}
-
-function place(mesh, local, normal, host) {
-  const world = host.localToWorld(local.clone());
-  mesh.position.copy(world);
-  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal.clone().normalize());
-  mesh.quaternion.copy(q);
-  mesh.position.addScaledVector(normal, 0.15);
+  if (!viewer) return;
+  modelMeshes().forEach(host => {
+    const ov = host.getObjectByName("zeim-paint-overlay");
+    if (ov) ov.material.uniforms.cursor.value.set(0, 0, 0, -1);
+  });
 }
 
 function drawMarks() {
-  const g = overlay();
-  if (!g) return;
-  const cursor = g.getObjectByName("cursor");
-  for (const c of [...g.children]) if (c !== cursor) { g.remove(c); c.geometry.dispose(); c.material.dispose(); }
-  const meshes = modelMeshes();
-  if (!meshes.length) return;
-  for (const s of strokes) {
-    const host = meshes[s.mesh] || meshes[0];
-    const color = s.kind === "block" ? 0xff1744 : 0x00e676;
-    const m = disc(s.r, color, 0.82);
-    const n = new THREE.Vector3(s.nx || 0, s.ny || 0, s.nz || 1);
-    place(m, new THREE.Vector3(s.x, s.y, s.z), n, host);
-    g.add(m);
-  }
-  if (!cursor) {
-    const ring = disc(brushR, 0xffffff, 0.95);
-    ring.name = "cursor";
-    ring.visible = false;
-    g.add(ring);
-  }
+  if (!viewer) return;
+  ensureOverlays();
   const n = $("#spPaintCount");
   if (n) n.textContent = countText();
 }
 
 function moveCursor(hit) {
-  const g = overlay();
-  if (!g) return;
-  let cursor = g.getObjectByName("cursor");
-  if (!cursor) return;
-  if (!hit || !armed) { cursor.visible = false; return; }
-  cursor.geometry.dispose();
-  cursor.geometry = new THREE.CircleGeometry(Math.max(brushR, 0.8), 24);
-  cursor.material.color.set(kind === "block" ? 0xff1744 : kind === "erase" ? 0xffffff : 0x00e676);
-  const host = hit.object;
-  place(cursor, hit.local, hit.normal, host);
-  cursor.visible = true;
+  if (!viewer) return;
+  ensureOverlays();
+  const hex = kind === "block" ? 0xff1744 : kind === "erase" ? 0xffffff : 0x00e676;
+  modelMeshes().forEach(host => {
+    const ov = host.getObjectByName("zeim-paint-overlay");
+    if (!ov) return;
+    const u = ov.material.uniforms.cursor.value;
+    if (!hit || !armed || hit.object !== host) {
+      u.set(0, 0, 0, -1);
+      return;
+    }
+    u.set(hit.local.x, hit.local.y, hit.local.z, Math.max(brushR, 0.8));
+    ov.material.uniforms.cursorN.value.copy(hit.normal).normalize();
+    ov.material.uniforms.cursorColor.value.setHex(hex);
+  });
 }
 
 let saveTimer = 0;
@@ -230,24 +324,34 @@ function listen() {
 }
 
 export function mountPaint(host) {
-  if (!host) return;
-  host.innerHTML = `
-    <details class="spPaint" id="spPaintBox" open>
-      <summary>Paint-on supports</summary>
-      <p class="help">The model stays on screen. Turn Paint on, then drag on the surface. Green must have support, red must not. Erase lifts marks. Right-drag orbits, scroll or two fingers zoom. Left-drag paints only while Paint is on.</p>
-      <div class="row">
-        <div class="segmented" role="group" aria-label="Brush kind">
-          <button type="button" id="spPaintNeed" aria-pressed="true">Need support</button>
-          <button type="button" id="spPaintNever" aria-pressed="false">Never support</button>
-          <button type="button" id="spPaintErase" aria-pressed="false">Erase</button>
-        </div>
-        <button type="button" class="btn small" id="spPaintArm" aria-pressed="false">Paint</button>
-        <button type="button" class="btn small" id="spPaintClear">Clear</button>
+  if (host) {
+    host.innerHTML = `<p class="help" id="spPaintNote">Paint tools stay on the model, including after this panel closes. The colour is a flat patch on the face. Slice builds a vertical column at that point (shaft and tip). The column is not cut to the face.</p>`;
+  }
+  const viewerEl = document.getElementById("editViewer");
+  let dock = document.getElementById("spPaintDock");
+  if (!dock) {
+    dock = document.createElement("div");
+    dock.id = "spPaintDock";
+    dock.className = "sp-dock";
+    (viewerEl || host || document.body).appendChild(dock);
+  }
+  dock.innerHTML = `
+    <p class="help" id="spPaintLead">Drag on the surface while Paint is on. The colour stays on the model. Slice builds a vertical column here (shaft and tip below), not this flat patch, and that column is not cut to the face.</p>
+    <div class="row">
+      <div class="segmented" role="group" aria-label="Brush kind">
+        <button type="button" id="spPaintNeed" aria-pressed="true">Need support</button>
+        <button type="button" id="spPaintNever" aria-pressed="false">Never support</button>
+        <button type="button" id="spPaintErase" aria-pressed="false">Erase</button>
       </div>
+      <button type="button" class="btn small" id="spPaintArm" aria-pressed="false">Paint</button>
+      <button type="button" class="btn small" id="spPaintClear">Clear</button>
+    </div>
+    <details class="spPaint" id="spPaintBox">
+      <summary>Brush column</summary>
       <div class="grid2" style="margin-top:6px">
-        <label class="inl">Brush Ø <input type="range" id="spPaintR" min="1" max="12" step="0.5" value="4"> <span id="spPaintRlbl">4 mm</span></label>
-        <label class="inl">Tip Ø <input type="range" id="spPaintTip" min="0.4" max="6" step="0.2" value="1.2"> <span id="spPaintTiplbl">1.2 mm</span></label>
-        <label class="inl">Shaft Ø <input type="range" id="spPaintTh" min="1" max="10" step="0.5" value="2.5"> <span id="spPaintThlbl">2.5 mm</span></label>
+        <label class="inl">Brush radius <input type="range" id="spPaintR" min="1" max="12" step="0.5" value="4"> <span id="spPaintRlbl">4 mm</span></label>
+        <label class="inl">Tip radius <input type="range" id="spPaintTip" min="0.4" max="6" step="0.2" value="1.2"> <span id="spPaintTiplbl">1.2 mm</span></label>
+        <label class="inl">Shaft radius <input type="range" id="spPaintTh" min="1" max="10" step="0.5" value="2.5"> <span id="spPaintThlbl">2.5 mm</span></label>
       </div>
       <div class="field" style="margin-top:6px">
         <label for="spPaintSlot">Support filament</label>
@@ -261,8 +365,9 @@ export function mountPaint(host) {
           <option value="hips">HIPS</option>
         </select>
       </div>
-      <p class="help" id="spPaintCount" aria-live="polite">0 marks</p>
-    </details>`;
+      <p class="help">Brush radius is the patch you see. Tip and shaft are the column PrusaSlicer receives. The column stands upright through the mark and can extend past the silhouette.</p>
+    </details>
+    <p class="help" id="spPaintCount" aria-live="polite">0 marks</p>`;
   const setKind = k => {
     kind = k;
     $("#spPaintNeed").setAttribute("aria-pressed", k === "enforce" ? "true" : "false");
