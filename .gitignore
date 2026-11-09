@@ -38,3 +38,7 @@ backups/
 zeimcad/target/
 tools/zeim-lumen/target/
 third_party/mslicer/target/
+
+# resin-engine bench outputs (regenerate with tools/bench/resin_engines/harness.py)
+tools/bench/resin_engines/cache/
+tools/bench/resin_engines/work/

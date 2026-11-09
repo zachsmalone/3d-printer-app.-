@@ -1,0 +1,5217 @@
+{
+  "measured_at": "2026-11-09T18:39:33Z",
+  "host": {
+    "cpu_model": "Intel(R) Xeon(R) Processor",
+    "cpus": 4
+  },
+  "settings": {
+    "layer_mm": 0.05,
+    "exposure_s": 2.5,
+    "bottom_exposure_s": 30.0,
+    "bottom_layers": 5,
+    "lift_mm": 6.0,
+    "lift_speed_mm_min": 65.0,
+    "anti_aliasing": "off",
+    "supports": "none",
+    "orientation": "as generated, no extra rotation",
+    "mirror_applied": false,
+    "container_note": "Timed runs write unencrypted CTB v4 for Jupiter and Saturn 2, and GOO for Mars 5, so UVtools can read both engines. Catalog native containers are probed separately. Catalog mirror flags are not applied; both engines are asked not to mirror."
+  },
+  "printers": [
+    {
+      "id": "jupiter",
+      "name": "ELEGOO Jupiter",
+      "family": "Jupiter",
+      "width_px": 5448,
+      "height_px": 3064,
+      "build_width_mm": 277.848,
+      "build_depth_mm": 156.264,
+      "build_height_mm": 300.0,
+      "extension": "ctb",
+      "df_format_version": "v4",
+      "ms_ctb": "legacy",
+      "catalog_native": "ctb v5",
+      "catalog_mirror_x": false,
+      "catalog_mirror_y": false
+    },
+    {
+      "id": "saturn2",
+      "name": "ELEGOO Saturn 2",
+      "family": "Saturn",
+      "width_px": 7680,
+      "height_px": 4320,
+      "build_width_mm": 218.88,
+      "build_depth_mm": 123.12,
+      "build_height_mm": 250.0,
+      "extension": "ctb",
+      "df_format_version": "v4",
+      "ms_ctb": "legacy",
+      "catalog_native": "ctb v5enc",
+      "catalog_mirror_x": false,
+      "catalog_mirror_y": true
+    },
+    {
+      "id": "mars5",
+      "name": "ELEGOO Mars 5",
+      "family": "Mars",
+      "width_px": 4098,
+      "height_px": 2560,
+      "build_width_mm": 143.43,
+      "build_depth_mm": 89.6,
+      "build_height_mm": 165.0,
+      "extension": "goo",
+      "df_format_version": null,
+      "ms_ctb": null,
+      "catalog_native": "goo",
+      "catalog_mirror_x": false,
+      "catalog_mirror_y": true
+    }
+  ],
+  "meshes": {
+    "box": {
+      "triangles": 12,
+      "min_mm": [
+        -10.0,
+        -8.0,
+        0.0
+      ],
+      "max_mm": [
+        10.0,
+        8.0,
+        12.0
+      ],
+      "note": "Axis-aligned 20 x 16 x 12 mm box, centred on the plate, sitting on the bed.",
+      "expected_layers": 240
+    },
+    "asymmetric": {
+      "triangles": 24,
+      "min_mm": [
+        -15.0,
+        -10.0,
+        0.0
+      ],
+      "max_mm": [
+        15.0,
+        10.0,
+        12.0
+      ],
+      "note": "30 x 20 x 4 mm slab with a 10 x 8 mm tower on the +X +Y corner, from z = 4 to z = 12. A mirror or a Y flip moves the tower to another corner.",
+      "expected_layers": 240
+    },
+    "sculpt": {
+      "triangles": 906300,
+      "min_mm": [
+        -24.0,
+        -20.0,
+        0.0
+      ],
+      "max_mm": [
+        24.0,
+        20.0,
+        20.0
+      ],
+      "note": "Height-field solid, 48 x 40 mm in XY and exactly 20 mm tall, with two smooth bumps. Generated here; the repository had no mesh over 900k triangles.",
+      "expected_layers": 400
+    }
+  },
+  "bins": {
+    "mslicer": "/agent/repos/3d-printer-app.-/third_party/mslicer/target/release/slicer",
+    "dragonfruit": "/home/ubuntu/dragonfruit/rust/dragonfruit-cli/target/release/dragonfruit-cli",
+    "uvtools": "/home/ubuntu/uvtools/UVtoolsCmd"
+  },
+  "cases": [
+    {
+      "printer": "jupiter",
+      "printer_name": "ELEGOO Jupiter",
+      "mesh": "box",
+      "input_triangles": 12,
+      "expected_layers": 240,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.021213966999994227,
+                "peak_rss_kb": 10468,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0114,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.017817151999906855,
+                "peak_rss_kb": 10412,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0112,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.012091590000068209,
+                "peak_rss_kb": 10448,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0086,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.011209987000029287,
+                "peak_rss_kb": 10408,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0083,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.01079212699994514,
+                "peak_rss_kb": 10816,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0087,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.010897450000015851,
+                "peak_rss_kb": 10552,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0088,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.017817151999906855,
+            "warm": 0.010897450000015851
+          },
+          "median_engine_s": {
+            "cold": 0.0112,
+            "warm": 0.0087
+          },
+          "median_peak_rss_kb": {
+            "cold": 10448.0,
+            "warm": 10552.0
+          },
+          "triangles_reported": 12,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/jupiter-box-mslicer.ctb",
+          "output_bytes": 483875
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.021264339000026666,
+                "peak_rss_kb": 15776,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.012359052,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.012359052,
+                  "total_s": 0.008909579,
+                  "layers_per_second": 26937.299730997387,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.017079680000051667,
+                "peak_rss_kb": 15844,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.009535066,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.009535066,
+                  "total_s": 0.008443022,
+                  "layers_per_second": 28425.84088967197,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.012779206000004706,
+                "peak_rss_kb": 16044,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.008352104,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.008352104,
+                  "total_s": 0.007509603,
+                  "layers_per_second": 31959.07959448722,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.006975319999924068,
+                "peak_rss_kb": 15788,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006159973,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.006159973,
+                  "total_s": 0.006107905,
+                  "layers_per_second": 39293.34198878339,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.008568221000018639,
+                "peak_rss_kb": 15588,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006484319,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.006484319,
+                  "total_s": 0.006417487,
+                  "layers_per_second": 37397.81631034079,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.008817878000058954,
+                "peak_rss_kb": 15644,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006333323,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.006333323,
+                  "total_s": 0.006271381,
+                  "layers_per_second": 38269.08299782775,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.017079680000051667,
+            "warm": 0.008568221000018639
+          },
+          "median_engine_s": {
+            "cold": 0.009535066,
+            "warm": 0.006333323
+          },
+          "median_peak_rss_kb": {
+            "cold": 15844.0,
+            "warm": 15644.0
+          },
+          "triangles_reported": 12,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/jupiter-box-dragonfruit.ctb",
+          "output_bytes": 687669
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 123088,
+              "area_mm2": 320.15188800000004,
+              "versus_analytic": {
+                "expected_pixels": 123088,
+                "actual_pixels": 123088,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 123009,
+              "area_mm2": 319.9464090000001,
+              "versus_analytic": {
+                "expected_pixels": 123009,
+                "actual_pixels": 123009,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 705,
+                "iou": 0.9942869182583609,
+                "a_pixels": 123088,
+                "b_pixels": 123009
+              },
+              "b_flipped_in_y": {
+                "xor": 705,
+                "iou": 0.9942869182583609,
+                "a_pixels": 123088,
+                "b_pixels": 123009
+              }
+            }
+          },
+          "120": {
+            "z_mm": 6.025,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 123088,
+              "area_mm2": 320.15188800000004,
+              "versus_analytic": {
+                "expected_pixels": 123088,
+                "actual_pixels": 123088,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 123009,
+              "area_mm2": 319.9464090000001,
+              "versus_analytic": {
+                "expected_pixels": 123009,
+                "actual_pixels": 123009,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 705,
+                "iou": 0.9942869182583609,
+                "a_pixels": 123088,
+                "b_pixels": 123009
+              },
+              "b_flipped_in_y": {
+                "xor": 705,
+                "iou": 0.9942869182583609,
+                "a_pixels": 123088,
+                "b_pixels": 123009
+              }
+            }
+          },
+          "239": {
+            "z_mm": 11.975000000000001,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 123088,
+              "area_mm2": 320.15188800000004,
+              "versus_analytic": {
+                "expected_pixels": 123088,
+                "actual_pixels": 123088,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 123009,
+              "area_mm2": 319.9464090000001,
+              "versus_analytic": {
+                "expected_pixels": 123009,
+                "actual_pixels": 123009,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 705,
+                "iou": 0.9942869182583609,
+                "a_pixels": 123088,
+                "b_pixels": 123009
+              },
+              "b_flipped_in_y": {
+                "xor": 705,
+                "iou": 0.9942869182583609,
+                "a_pixels": 123088,
+                "b_pixels": 123009
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 483875,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "5448",
+              "ResolutionY": "3064",
+              "DisplayWidth": "277.848",
+              "DisplayHeight": "156.264",
+              "MachineZ": "300",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              5448,
+              3064
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 687669,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "5448",
+              "ResolutionY": "3064",
+              "DisplayWidth": "277.848",
+              "DisplayHeight": "156.264",
+              "MachineZ": "12",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              5448,
+              3064
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "jupiter",
+      "printer_name": "ELEGOO Jupiter",
+      "mesh": "asymmetric",
+      "input_triangles": 24,
+      "expected_layers": 240,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.0147825849999208,
+                "peak_rss_kb": 9532,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0089,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.016479057999958968,
+                "peak_rss_kb": 9956,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.009699999999999999,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.012103836999926898,
+                "peak_rss_kb": 9620,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0083,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.010680450999984714,
+                "peak_rss_kb": 9900,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0078,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.008868183000004137,
+                "peak_rss_kb": 9692,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0076,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.011727624000059222,
+                "peak_rss_kb": 9992,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010199999999999999,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.0147825849999208,
+            "warm": 0.010680450999984714
+          },
+          "median_engine_s": {
+            "cold": 0.0089,
+            "warm": 0.0078
+          },
+          "median_peak_rss_kb": {
+            "cold": 9620.0,
+            "warm": 9900.0
+          },
+          "triangles_reported": 24,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/jupiter-asymmetric-mslicer.ctb",
+          "output_bytes": 370595
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.013368571999990309,
+                "peak_rss_kb": 15176,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.009979726,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.009979726,
+                  "total_s": 0.00893055,
+                  "layers_per_second": 26874.044711691888,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.0153929140000173,
+                "peak_rss_kb": 15556,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010254395,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.010254395,
+                  "total_s": 0.009089311,
+                  "layers_per_second": 26404.641671959514,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.012928771000019879,
+                "peak_rss_kb": 15236,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.008529909,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.008529909,
+                  "total_s": 0.007203278,
+                  "layers_per_second": 33318.16431352504,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.00881589600010102,
+                "peak_rss_kb": 15124,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006520276,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006520276,
+                  "total_s": 0.006469473,
+                  "layers_per_second": 37097.302979701744,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.013379768999925545,
+                "peak_rss_kb": 14980,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010903413,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.010903413,
+                  "total_s": 0.010851146,
+                  "layers_per_second": 22117.47957312527,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.008652571999959946,
+                "peak_rss_kb": 15208,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006683478,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006683478,
+                  "total_s": 0.00662839,
+                  "layers_per_second": 36207.88758657834,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.013368571999990309,
+            "warm": 0.00881589600010102
+          },
+          "median_engine_s": {
+            "cold": 0.009979726,
+            "warm": 0.006683478
+          },
+          "median_peak_rss_kb": {
+            "cold": 15236.0,
+            "warm": 15124.0
+          },
+          "triangles_reported": 24,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/jupiter-asymmetric-dragonfruit.ctb",
+          "output_bytes": 576309
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": [
+              [
+                -15.0,
+                -10.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 230496,
+              "area_mm2": 599.5200960000001,
+              "versus_analytic": {
+                "expected_pixels": 230496,
+                "actual_pixels": 230496,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 231477,
+              "area_mm2": 602.0716770000001,
+              "versus_analytic": {
+                "expected_pixels": 231477,
+                "actual_pixels": 231477,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 981,
+                "iou": 0.9957619979522804,
+                "a_pixels": 230496,
+                "b_pixels": 231477
+              },
+              "b_flipped_in_y": {
+                "xor": 981,
+                "iou": 0.9957619979522804,
+                "a_pixels": 230496,
+                "b_pixels": 231477
+              }
+            }
+          },
+          "40": {
+            "z_mm": 2.025,
+            "analytic_rects": [
+              [
+                -15.0,
+                -10.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 230496,
+              "area_mm2": 599.5200960000001,
+              "versus_analytic": {
+                "expected_pixels": 230496,
+                "actual_pixels": 230496,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 231477,
+              "area_mm2": 602.0716770000001,
+              "versus_analytic": {
+                "expected_pixels": 231477,
+                "actual_pixels": 231477,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 981,
+                "iou": 0.9957619979522804,
+                "a_pixels": 230496,
+                "b_pixels": 231477
+              },
+              "b_flipped_in_y": {
+                "xor": 981,
+                "iou": 0.9957619979522804,
+                "a_pixels": 230496,
+                "b_pixels": 231477
+              }
+            }
+          },
+          "160": {
+            "z_mm": 8.025,
+            "analytic_rects": [
+              [
+                5.0,
+                2.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 30772,
+              "area_mm2": 80.03797200000001,
+              "versus_analytic": {
+                "expected_pixels": 30772,
+                "actual_pixels": 30772,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 30772,
+              "area_mm2": 80.03797200000001,
+              "versus_analytic": {
+                "expected_pixels": 30772,
+                "actual_pixels": 30772,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 61544,
+                "iou": 0.0,
+                "a_pixels": 30772,
+                "b_pixels": 30772
+              },
+              "b_flipped_in_y": {
+                "xor": 392,
+                "iou": 0.9873417721518988,
+                "a_pixels": 30772,
+                "b_pixels": 30772
+              }
+            }
+          },
+          "239": {
+            "z_mm": 11.975000000000001,
+            "analytic_rects": [
+              [
+                5.0,
+                2.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 30772,
+              "area_mm2": 80.03797200000001,
+              "versus_analytic": {
+                "expected_pixels": 30772,
+                "actual_pixels": 30772,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 30772,
+              "area_mm2": 80.03797200000001,
+              "versus_analytic": {
+                "expected_pixels": 30772,
+                "actual_pixels": 30772,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 61544,
+                "iou": 0.0,
+                "a_pixels": 30772,
+                "b_pixels": 30772
+              },
+              "b_flipped_in_y": {
+                "xor": 392,
+                "iou": 0.9873417721518988,
+                "a_pixels": 30772,
+                "b_pixels": 30772
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 370595,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "5448",
+              "ResolutionY": "3064",
+              "DisplayWidth": "277.848",
+              "DisplayHeight": "156.264",
+              "MachineZ": "300",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              5448,
+              3064
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 576309,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "5448",
+              "ResolutionY": "3064",
+              "DisplayWidth": "277.848",
+              "DisplayHeight": "156.264",
+              "MachineZ": "12",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              5448,
+              3064
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "jupiter",
+      "printer_name": "ELEGOO Jupiter",
+      "mesh": "sculpt",
+      "input_triangles": 906300,
+      "expected_layers": 400,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.3470983329999626,
+                "peak_rss_kb": 65652,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0691,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.35607871199999863,
+                "peak_rss_kb": 65800,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0765,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.3546691669999973,
+                "peak_rss_kb": 65884,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0751,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.3351217820001011,
+                "peak_rss_kb": 65156,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0704,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.33110146700005316,
+                "peak_rss_kb": 65732,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0714,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.3305722989999822,
+                "peak_rss_kb": 65260,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0718,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 5448,
+                  "height": 3064,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.3546691669999973,
+            "warm": 0.33110146700005316
+          },
+          "median_engine_s": {
+            "cold": 0.0751,
+            "warm": 0.0714
+          },
+          "median_peak_rss_kb": {
+            "cold": 65800.0,
+            "warm": 65260.0
+          },
+          "triangles_reported": 906300,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/jupiter-sculpt-mslicer.ctb",
+          "output_bytes": 2079574
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.2120339990000275,
+                "peak_rss_kb": 165616,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.098842361,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.098842361,
+                  "total_s": 0.082019987,
+                  "layers_per_second": 4876.860075581333,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.2306599929999038,
+                "peak_rss_kb": 165344,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.112137458,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.112137458,
+                  "total_s": 0.094024067,
+                  "layers_per_second": 4254.229930300718,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.21664616500004286,
+                "peak_rss_kb": 165644,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.104607074,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.104607074,
+                  "total_s": 0.089041518,
+                  "layers_per_second": 4492.286396105691,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.19808790900003714,
+                "peak_rss_kb": 165156,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.10895258,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.10895258,
+                  "total_s": 0.095708139,
+                  "layers_per_second": 4179.372874442789,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.18302464400005647,
+                "peak_rss_kb": 164100,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.093002939,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.093002939,
+                  "total_s": 0.080432221,
+                  "layers_per_second": 4973.131352421563,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.17531299799998123,
+                "peak_rss_kb": 165980,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.088713682,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.088713682,
+                  "total_s": 0.076184293,
+                  "layers_per_second": 5250.426095048228,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    5448,
+                    3064
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.21664616500004286,
+            "warm": 0.18302464400005647
+          },
+          "median_engine_s": {
+            "cold": 0.104607074,
+            "warm": 0.093002939
+          },
+          "median_peak_rss_kb": {
+            "cold": 165616.0,
+            "warm": 165156.0
+          },
+          "triangles_reported": 906300,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/jupiter-sculpt-dragonfruit.ctb",
+          "output_bytes": 2286343
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 738417,
+              "area_mm2": 1920.6226170000002
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 738576,
+              "area_mm2": 1921.0361760000003
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1945,
+                "iou": 0.9973697342282097,
+                "a_pixels": 738417,
+                "b_pixels": 738576
+              },
+              "b_flipped_in_y": {
+                "xor": 1739,
+                "iou": 0.9976479848951669,
+                "a_pixels": 738417,
+                "b_pixels": 738576
+              }
+            }
+          },
+          "200": {
+            "z_mm": 10.025,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 254983,
+              "area_mm2": 663.2107830000001
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 254688,
+              "area_mm2": 662.4434880000001
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 89269,
+                "iou": 0.7019100410725615,
+                "a_pixels": 254983,
+                "b_pixels": 254688
+              },
+              "b_flipped_in_y": {
+                "xor": 1673,
+                "iou": 0.993456459839169,
+                "a_pixels": 254983,
+                "b_pixels": 254688
+              }
+            }
+          },
+          "399": {
+            "z_mm": 19.975,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 199,
+              "area_mm2": 0.517599
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 204,
+              "area_mm2": 0.5306040000000001
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 403,
+                "iou": 0.0,
+                "a_pixels": 199,
+                "b_pixels": 204
+              },
+              "b_flipped_in_y": {
+                "xor": 23,
+                "iou": 0.892018779342723,
+                "a_pixels": 199,
+                "b_pixels": 204
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 2079574,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "5448",
+              "ResolutionY": "3064",
+              "DisplayWidth": "277.848",
+              "DisplayHeight": "156.264",
+              "MachineZ": "300",
+              "LayerHeight": "0.05",
+              "LayerCount": "400",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 400,
+            "resolution": [
+              5448,
+              3064
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 2286343,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "5448",
+              "ResolutionY": "3064",
+              "DisplayWidth": "277.848",
+              "DisplayHeight": "156.264",
+              "MachineZ": "20",
+              "LayerHeight": "0.05",
+              "LayerCount": "400",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 400,
+            "resolution": [
+              5448,
+              3064
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "saturn2",
+      "printer_name": "ELEGOO Saturn 2",
+      "mesh": "box",
+      "input_triangles": 12,
+      "expected_layers": 240,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.021984710000197083,
+                "peak_rss_kb": 15260,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0159,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.01965106200009359,
+                "peak_rss_kb": 15180,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0162,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.01843796699995437,
+                "peak_rss_kb": 15160,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.015,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.01772399499986932,
+                "peak_rss_kb": 15320,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0149,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.017219779000015478,
+                "peak_rss_kb": 15256,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0147,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.017143202999932328,
+                "peak_rss_kb": 14896,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.014199999999999999,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.01965106200009359,
+            "warm": 0.017219779000015478
+          },
+          "median_engine_s": {
+            "cold": 0.0159,
+            "warm": 0.0147
+          },
+          "median_peak_rss_kb": {
+            "cold": 15180.0,
+            "warm": 15256.0
+          },
+          "triangles_reported": 12,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/saturn2-box-mslicer.ctb",
+          "output_bytes": 840995
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.013115830000060669,
+                "peak_rss_kb": 16576,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.009534125,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.009534125,
+                  "total_s": 0.008401031,
+                  "layers_per_second": 28567.92219907295,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.015432589000056396,
+                "peak_rss_kb": 16580,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.012186839,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.012186839,
+                  "total_s": 0.011182819,
+                  "layers_per_second": 21461.49374321448,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.015156049000097482,
+                "peak_rss_kb": 16360,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010069378,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.010069378,
+                  "total_s": 0.008632583,
+                  "layers_per_second": 27801.64407339032,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.012931708999985858,
+                "peak_rss_kb": 16668,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010190938,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.010190938,
+                  "total_s": 0.010132433,
+                  "layers_per_second": 23686.31502423949,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.013133524000068064,
+                "peak_rss_kb": 16276,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.009983728,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.009983728,
+                  "total_s": 0.009901527,
+                  "layers_per_second": 24238.68560879549,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.008812341000066226,
+                "peak_rss_kb": 16700,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.007333362,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.007333362,
+                  "total_s": 0.007240621,
+                  "layers_per_second": 33146.328194777765,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.015156049000097482,
+            "warm": 0.012931708999985858
+          },
+          "median_engine_s": {
+            "cold": 0.010069378,
+            "warm": 0.009983728
+          },
+          "median_peak_rss_kb": {
+            "cold": 16576.0,
+            "warm": 16668.0
+          },
+          "triangles_reported": 12,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/saturn2-box-dragonfruit.ctb",
+          "output_bytes": 1044789
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 394524,
+              "area_mm2": 320.45211900000004,
+              "versus_analytic": {
+                "expected_pixels": 394524,
+                "actual_pixels": 394524,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 393261,
+              "area_mm2": 319.42624725,
+              "versus_analytic": {
+                "expected_pixels": 393261,
+                "actual_pixels": 393261,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1263,
+                "iou": 0.9967986738449371,
+                "a_pixels": 394524,
+                "b_pixels": 393261
+              },
+              "b_flipped_in_y": {
+                "xor": 1263,
+                "iou": 0.9967986738449371,
+                "a_pixels": 394524,
+                "b_pixels": 393261
+              }
+            }
+          },
+          "120": {
+            "z_mm": 6.025,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 394524,
+              "area_mm2": 320.45211900000004,
+              "versus_analytic": {
+                "expected_pixels": 394524,
+                "actual_pixels": 394524,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 393261,
+              "area_mm2": 319.42624725,
+              "versus_analytic": {
+                "expected_pixels": 393261,
+                "actual_pixels": 393261,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1263,
+                "iou": 0.9967986738449371,
+                "a_pixels": 394524,
+                "b_pixels": 393261
+              },
+              "b_flipped_in_y": {
+                "xor": 1263,
+                "iou": 0.9967986738449371,
+                "a_pixels": 394524,
+                "b_pixels": 393261
+              }
+            }
+          },
+          "239": {
+            "z_mm": 11.975000000000001,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 394524,
+              "area_mm2": 320.45211900000004,
+              "versus_analytic": {
+                "expected_pixels": 394524,
+                "actual_pixels": 394524,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 393261,
+              "area_mm2": 319.42624725,
+              "versus_analytic": {
+                "expected_pixels": 393261,
+                "actual_pixels": 393261,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1263,
+                "iou": 0.9967986738449371,
+                "a_pixels": 394524,
+                "b_pixels": 393261
+              },
+              "b_flipped_in_y": {
+                "xor": 1263,
+                "iou": 0.9967986738449371,
+                "a_pixels": 394524,
+                "b_pixels": 393261
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 840995,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "7680",
+              "ResolutionY": "4320",
+              "DisplayWidth": "218.88",
+              "DisplayHeight": "123.12",
+              "MachineZ": "250",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              7680,
+              4320
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 1044789,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "7680",
+              "ResolutionY": "4320",
+              "DisplayWidth": "218.88",
+              "DisplayHeight": "123.12",
+              "MachineZ": "12",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              7680,
+              4320
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "saturn2",
+      "printer_name": "ELEGOO Saturn 2",
+      "mesh": "asymmetric",
+      "input_triangles": 24,
+      "expected_layers": 240,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.017742436999924394,
+                "peak_rss_kb": 12176,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0129,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.01988382200011074,
+                "peak_rss_kb": 13216,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0147,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.019572799999878043,
+                "peak_rss_kb": 12960,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.013800000000000002,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.014911676999872725,
+                "peak_rss_kb": 12904,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.013699999999999999,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.015210027999955855,
+                "peak_rss_kb": 13184,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.013699999999999999,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.012290942999925392,
+                "peak_rss_kb": 13096,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010199999999999999,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.019572799999878043,
+            "warm": 0.014911676999872725
+          },
+          "median_engine_s": {
+            "cold": 0.013800000000000002,
+            "warm": 0.013699999999999999
+          },
+          "median_peak_rss_kb": {
+            "cold": 12960.0,
+            "warm": 13096.0
+          },
+          "triangles_reported": 24,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/saturn2-asymmetric-mslicer.ctb",
+          "output_bytes": 638435
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.013424536999991687,
+                "peak_rss_kb": 16048,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.010269289,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.010269289,
+                  "total_s": 0.008312645,
+                  "layers_per_second": 28871.67682488546,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.01510164100000111,
+                "peak_rss_kb": 16208,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.011325202,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.011325202,
+                  "total_s": 0.010443587,
+                  "layers_per_second": 22980.61001454768,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.012781334000010247,
+                "peak_rss_kb": 16568,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.008943614,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.008943614,
+                  "total_s": 0.007933378,
+                  "layers_per_second": 30251.930514340802,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.008665414000006422,
+                "peak_rss_kb": 16444,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.007205323,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.007205323,
+                  "total_s": 0.007159244,
+                  "layers_per_second": 33523.092661739145,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.008772765000003346,
+                "peak_rss_kb": 16092,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006641761,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006641761,
+                  "total_s": 0.006593135,
+                  "layers_per_second": 36401.499438431034,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.00857179299987365,
+                "peak_rss_kb": 16120,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.007011382,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.007011382,
+                  "total_s": 0.006962271,
+                  "layers_per_second": 34471.51080444872,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.013424536999991687,
+            "warm": 0.008665414000006422
+          },
+          "median_engine_s": {
+            "cold": 0.010269289,
+            "warm": 0.007011382
+          },
+          "median_peak_rss_kb": {
+            "cold": 16208.0,
+            "warm": 16120.0
+          },
+          "triangles_reported": 24,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/saturn2-asymmetric-dragonfruit.ctb",
+          "output_bytes": 842229
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": [
+              [
+                -15.0,
+                -10.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 738504,
+              "area_mm2": 599.8498740000001,
+              "versus_analytic": {
+                "expected_pixels": 738504,
+                "actual_pixels": 738504,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 738153,
+              "area_mm2": 599.5647742500001,
+              "versus_analytic": {
+                "expected_pixels": 738153,
+                "actual_pixels": 738153,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1753,
+                "iou": 0.9976285333567819,
+                "a_pixels": 738504,
+                "b_pixels": 738153
+              },
+              "b_flipped_in_y": {
+                "xor": 1753,
+                "iou": 0.9976285333567819,
+                "a_pixels": 738504,
+                "b_pixels": 738153
+              }
+            }
+          },
+          "40": {
+            "z_mm": 2.025,
+            "analytic_rects": [
+              [
+                -15.0,
+                -10.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 738504,
+              "area_mm2": 599.8498740000001,
+              "versus_analytic": {
+                "expected_pixels": 738504,
+                "actual_pixels": 738504,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 738153,
+              "area_mm2": 599.5647742500001,
+              "versus_analytic": {
+                "expected_pixels": 738153,
+                "actual_pixels": 738153,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1753,
+                "iou": 0.9976285333567819,
+                "a_pixels": 738504,
+                "b_pixels": 738153
+              },
+              "b_flipped_in_y": {
+                "xor": 1753,
+                "iou": 0.9976285333567819,
+                "a_pixels": 738504,
+                "b_pixels": 738153
+              }
+            }
+          },
+          "160": {
+            "z_mm": 8.025,
+            "analytic_rects": [
+              [
+                5.0,
+                2.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 98631,
+              "area_mm2": 80.11302975000001,
+              "versus_analytic": {
+                "expected_pixels": 98631,
+                "actual_pixels": 98631,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 98280,
+              "area_mm2": 79.82793000000001,
+              "versus_analytic": {
+                "expected_pixels": 98280,
+                "actual_pixels": 98280,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 196911,
+                "iou": 0.0,
+                "a_pixels": 98631,
+                "b_pixels": 98280
+              },
+              "b_flipped_in_y": {
+                "xor": 351,
+                "iou": 0.99644128113879,
+                "a_pixels": 98631,
+                "b_pixels": 98280
+              }
+            }
+          },
+          "239": {
+            "z_mm": 11.975000000000001,
+            "analytic_rects": [
+              [
+                5.0,
+                2.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 98631,
+              "area_mm2": 80.11302975000001,
+              "versus_analytic": {
+                "expected_pixels": 98631,
+                "actual_pixels": 98631,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 98280,
+              "area_mm2": 79.82793000000001,
+              "versus_analytic": {
+                "expected_pixels": 98280,
+                "actual_pixels": 98280,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 196911,
+                "iou": 0.0,
+                "a_pixels": 98631,
+                "b_pixels": 98280
+              },
+              "b_flipped_in_y": {
+                "xor": 351,
+                "iou": 0.99644128113879,
+                "a_pixels": 98631,
+                "b_pixels": 98280
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 638435,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "7680",
+              "ResolutionY": "4320",
+              "DisplayWidth": "218.88",
+              "DisplayHeight": "123.12",
+              "MachineZ": "250",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              7680,
+              4320
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 842229,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "7680",
+              "ResolutionY": "4320",
+              "DisplayWidth": "218.88",
+              "DisplayHeight": "123.12",
+              "MachineZ": "12",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 240,
+            "resolution": [
+              7680,
+              4320
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "saturn2",
+      "printer_name": "ELEGOO Saturn 2",
+      "mesh": "sculpt",
+      "input_triangles": 906300,
+      "expected_layers": 400,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.37279778700008137,
+                "peak_rss_kb": 77340,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0808,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.3658984290000262,
+                "peak_rss_kb": 77692,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.09090000000000001,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.45017624199999773,
+                "peak_rss_kb": 78020,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0927,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.3672363770001539,
+                "peak_rss_kb": 77520,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0837,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.3422868609998204,
+                "peak_rss_kb": 77976,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0881,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.34964121900020473,
+                "peak_rss_kb": 77592,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0845,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 7680,
+                  "height": 4320,
+                  "extension": "ctb"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.37279778700008137,
+            "warm": 0.34964121900020473
+          },
+          "median_engine_s": {
+            "cold": 0.09090000000000001,
+            "warm": 0.0845
+          },
+          "median_peak_rss_kb": {
+            "cold": 77692.0,
+            "warm": 77592.0
+          },
+          "triangles_reported": 906300,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/saturn2-sculpt-mslicer.ctb",
+          "output_bytes": 3830738
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.21778303399992183,
+                "peak_rss_kb": 165736,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.105952536,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.105952536,
+                  "total_s": 0.088696072,
+                  "layers_per_second": 4509.782575264438,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.21020595300001332,
+                "peak_rss_kb": 165752,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.104971026,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.104971026,
+                  "total_s": 0.089364383,
+                  "layers_per_second": 4476.056193438945,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.20991500100012672,
+                "peak_rss_kb": 165340,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.106212697,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.106212697,
+                  "total_s": 0.089976961,
+                  "layers_per_second": 4445.582464159909,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.19227895500011982,
+                "peak_rss_kb": 165804,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.10042683,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.10042683,
+                  "total_s": 0.087112966,
+                  "layers_per_second": 4591.738961109418,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.1796798499999568,
+                "peak_rss_kb": 165344,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.09467382,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.09467382,
+                  "total_s": 0.08222764,
+                  "layers_per_second": 4864.5443308357135,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.19242542899996806,
+                "peak_rss_kb": 164904,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.104947508,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.104947508,
+                  "total_s": 0.091734494,
+                  "layers_per_second": 4360.409945685207,
+                  "format": ".ctb",
+                  "resolution_px": [
+                    7680,
+                    4320
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.21020595300001332,
+            "warm": 0.19227895500011982
+          },
+          "median_engine_s": {
+            "cold": 0.105952536,
+            "warm": 0.10042683
+          },
+          "median_peak_rss_kb": {
+            "cold": 165736.0,
+            "warm": 165344.0
+          },
+          "triangles_reported": 906300,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/saturn2-sculpt-dragonfruit.ctb",
+          "output_bytes": 4032309
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 2363983,
+              "area_mm2": 1920.1451917500003
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 2360896,
+              "area_mm2": 1917.6377760000003
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 3793,
+                "iou": 0.9983957440905185,
+                "a_pixels": 2363983,
+                "b_pixels": 2360896
+              },
+              "b_flipped_in_y": {
+                "xor": 3113,
+                "iou": 0.9986831619004432,
+                "a_pixels": 2363983,
+                "b_pixels": 2360896
+              }
+            }
+          },
+          "200": {
+            "z_mm": 10.025,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 815900,
+              "area_mm2": 662.714775
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 815331,
+              "area_mm2": 662.25260475
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 285659,
+                "iou": 0.7019557721100323,
+                "a_pixels": 815900,
+                "b_pixels": 815331
+              },
+              "b_flipped_in_y": {
+                "xor": 2985,
+                "iou": 0.9963468721393011,
+                "a_pixels": 815900,
+                "b_pixels": 815331
+              }
+            }
+          },
+          "399": {
+            "z_mm": 19.975,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 642,
+              "area_mm2": 0.5214645
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 642,
+              "area_mm2": 0.5214645
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1284,
+                "iou": 0.0,
+                "a_pixels": 642,
+                "b_pixels": 642
+              },
+              "b_flipped_in_y": {
+                "xor": 40,
+                "iou": 0.9395770392749244,
+                "a_pixels": 642,
+                "b_pixels": 642
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 3830738,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "7680",
+              "ResolutionY": "4320",
+              "DisplayWidth": "218.88",
+              "DisplayHeight": "123.12",
+              "MachineZ": "250",
+              "LayerHeight": "0.05",
+              "LayerCount": "400",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 400,
+            "resolution": [
+              7680,
+              4320
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 4032309,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "4",
+              "IsMagicValid": "True",
+              "ResolutionX": "7680",
+              "ResolutionY": "4320",
+              "DisplayWidth": "218.88",
+              "DisplayHeight": "123.12",
+              "MachineZ": "20",
+              "LayerHeight": "0.05",
+              "LayerCount": "400",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "1",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "0601fd1204000000",
+            "layers_reported": 400,
+            "resolution": [
+              7680,
+              4320
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "mars5",
+      "printer_name": "ELEGOO Mars 5",
+      "mesh": "box",
+      "input_triangles": 12,
+      "expected_layers": 240,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.017207416000019293,
+                "peak_rss_kb": 12848,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0108,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.017109067000092182,
+                "peak_rss_kb": 12948,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0114,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.016241699999909542,
+                "peak_rss_kb": 13120,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0121,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.009832152999933896,
+                "peak_rss_kb": 12360,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0087,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.013069014999928186,
+                "peak_rss_kb": 13052,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0107,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.01294120399984422,
+                "peak_rss_kb": 13032,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0106,
+                "triangles": 12,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.017109067000092182,
+            "warm": 0.01294120399984422
+          },
+          "median_engine_s": {
+            "cold": 0.0114,
+            "warm": 0.0106
+          },
+          "median_peak_rss_kb": {
+            "cold": 12948.0,
+            "warm": 13032.0
+          },
+          "triangles_reported": 12,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/mars5-box-mslicer.goo",
+          "output_bytes": 654368
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.010786032999931194,
+                "peak_rss_kb": 7560,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.005707626,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.005707626,
+                  "total_s": 0.00476444,
+                  "layers_per_second": 50373.18131826616,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.010633039999902394,
+                "peak_rss_kb": 8044,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006243615,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.006243615,
+                  "total_s": 0.005378901,
+                  "layers_per_second": 44618.77993292682,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.01506274400003349,
+                "peak_rss_kb": 7960,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.007630193,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.007630193,
+                  "total_s": 0.007043555,
+                  "layers_per_second": 34073.70283897833,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.00864403599985053,
+                "peak_rss_kb": 8136,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.00670536,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.00670536,
+                  "total_s": 0.006657623,
+                  "layers_per_second": 36048.90213819557,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.008488069999884829,
+                "peak_rss_kb": 7892,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006971955,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.006971955,
+                  "total_s": 0.006921659,
+                  "layers_per_second": 34673.76823966624,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.006483464999973876,
+                "peak_rss_kb": 7672,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.005152925,
+                "triangles": 12,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 12,
+                  "wall_s": 0.005152925,
+                  "total_s": 0.005105758,
+                  "layers_per_second": 47005.75311246636,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.010786032999931194,
+            "warm": 0.008488069999884829
+          },
+          "median_engine_s": {
+            "cold": 0.006243615,
+            "warm": 0.00670536
+          },
+          "median_peak_rss_kb": {
+            "cold": 7960.0,
+            "warm": 7892.0
+          },
+          "triangles_reported": 12,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/mars5-box-dragonfruit.goo",
+          "output_bytes": 653408
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 261976,
+              "area_mm2": 320.92060000000004,
+              "versus_analytic": {
+                "expected_pixels": 261976,
+                "actual_pixels": 261976,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 260947,
+              "area_mm2": 319.660075,
+              "versus_analytic": {
+                "expected_pixels": 260947,
+                "actual_pixels": 260947,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1029,
+                "iou": 0.9960721592817663,
+                "a_pixels": 261976,
+                "b_pixels": 260947
+              },
+              "b_flipped_in_y": {
+                "xor": 1029,
+                "iou": 0.9960721592817663,
+                "a_pixels": 261976,
+                "b_pixels": 260947
+              }
+            }
+          },
+          "120": {
+            "z_mm": 6.025,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 261976,
+              "area_mm2": 320.92060000000004,
+              "versus_analytic": {
+                "expected_pixels": 261976,
+                "actual_pixels": 261976,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 260947,
+              "area_mm2": 319.660075,
+              "versus_analytic": {
+                "expected_pixels": 260947,
+                "actual_pixels": 260947,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1029,
+                "iou": 0.9960721592817663,
+                "a_pixels": 261976,
+                "b_pixels": 260947
+              },
+              "b_flipped_in_y": {
+                "xor": 1029,
+                "iou": 0.9960721592817663,
+                "a_pixels": 261976,
+                "b_pixels": 260947
+              }
+            }
+          },
+          "239": {
+            "z_mm": 11.975000000000001,
+            "analytic_rects": [
+              [
+                -10.0,
+                -8.0,
+                10.0,
+                8.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 261976,
+              "area_mm2": 320.92060000000004,
+              "versus_analytic": {
+                "expected_pixels": 261976,
+                "actual_pixels": 261976,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 260947,
+              "area_mm2": 319.660075,
+              "versus_analytic": {
+                "expected_pixels": 260947,
+                "actual_pixels": 260947,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1029,
+                "iou": 0.9960721592817663,
+                "a_pixels": 261976,
+                "b_pixels": 260947
+              },
+              "b_flipped_in_y": {
+                "xor": 1029,
+                "iou": 0.9960721592817663,
+                "a_pixels": 261976,
+                "b_pixels": 260947
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 654368,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "30",
+              "ResolutionX": "4098",
+              "ResolutionY": "2560",
+              "DisplayWidth": "143.43",
+              "DisplayHeight": "89.6",
+              "MachineZ": "165",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "0",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "56332e3007000000",
+            "layers_reported": 240,
+            "resolution": [
+              4098,
+              2560
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 653408,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "12",
+              "ResolutionX": "4098",
+              "ResolutionY": "2560",
+              "DisplayWidth": "143.43",
+              "DisplayHeight": "89.6",
+              "MachineZ": "220",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "8",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "56312e3207000000",
+            "layers_reported": 240,
+            "resolution": [
+              4098,
+              2560
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "mars5",
+      "printer_name": "ELEGOO Mars 5",
+      "mesh": "asymmetric",
+      "input_triangles": 24,
+      "expected_layers": 240,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.016717692999918654,
+                "peak_rss_kb": 11408,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0088,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.017696523999802594,
+                "peak_rss_kb": 11560,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0123,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.015115136999838796,
+                "peak_rss_kb": 11568,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0108,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.008949397999913344,
+                "peak_rss_kb": 11564,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0083,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.010727066000072227,
+                "peak_rss_kb": 11628,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.008400000000000001,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.011132043999850794,
+                "peak_rss_kb": 10820,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.008400000000000001,
+                "triangles": 24,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 240,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.016717692999918654,
+            "warm": 0.010727066000072227
+          },
+          "median_engine_s": {
+            "cold": 0.0108,
+            "warm": 0.008400000000000001
+          },
+          "median_peak_rss_kb": {
+            "cold": 11560.0,
+            "warm": 11564.0
+          },
+          "triangles_reported": 24,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/mars5-asymmetric-mslicer.goo",
+          "output_bytes": 544288
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.012808041999960551,
+                "peak_rss_kb": 7016,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.005516312,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.005516312,
+                  "total_s": 0.004357926,
+                  "layers_per_second": 55072.06868588407,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.010658203999810212,
+                "peak_rss_kb": 7768,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006160428,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006160428,
+                  "total_s": 0.005028389,
+                  "layers_per_second": 47729.004259614754,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.011082923000003575,
+                "peak_rss_kb": 7580,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006187071,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006187071,
+                  "total_s": 0.005073937,
+                  "layers_per_second": 47300.547878304365,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.006477195999877949,
+                "peak_rss_kb": 7748,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.005563254,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.005563254,
+                  "total_s": 0.005518616,
+                  "layers_per_second": 43489.16467462132,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.006524692999846593,
+                "peak_rss_kb": 7644,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006296616,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006296616,
+                  "total_s": 0.0062527,
+                  "layers_per_second": 38383.41836326707,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.008543151999901966,
+                "peak_rss_kb": 7748,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.006205134,
+                "triangles": 24,
+                "layers": 240,
+                "summary": {
+                  "layers": 240,
+                  "model_triangle_count": 24,
+                  "wall_s": 0.006205134,
+                  "total_s": 0.006161832,
+                  "layers_per_second": 38949.455291867744,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.011082923000003575,
+            "warm": 0.006524692999846593
+          },
+          "median_engine_s": {
+            "cold": 0.006160428,
+            "warm": 0.006205134
+          },
+          "median_peak_rss_kb": {
+            "cold": 7580.0,
+            "warm": 7748.0
+          },
+          "triangles_reported": 24,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/mars5-asymmetric-dragonfruit.goo",
+          "output_bytes": 543328
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": [
+              [
+                -15.0,
+                -10.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 490776,
+              "area_mm2": 601.2005999999999,
+              "versus_analytic": {
+                "expected_pixels": 490776,
+                "actual_pixels": 490776,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 489347,
+              "area_mm2": 599.450075,
+              "versus_analytic": {
+                "expected_pixels": 489347,
+                "actual_pixels": 489347,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1429,
+                "iou": 0.9970882846756972,
+                "a_pixels": 490776,
+                "b_pixels": 489347
+              },
+              "b_flipped_in_y": {
+                "xor": 1429,
+                "iou": 0.9970882846756972,
+                "a_pixels": 490776,
+                "b_pixels": 489347
+              }
+            }
+          },
+          "40": {
+            "z_mm": 2.025,
+            "analytic_rects": [
+              [
+                -15.0,
+                -10.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 490776,
+              "area_mm2": 601.2005999999999,
+              "versus_analytic": {
+                "expected_pixels": 490776,
+                "actual_pixels": 490776,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 489347,
+              "area_mm2": 599.450075,
+              "versus_analytic": {
+                "expected_pixels": 489347,
+                "actual_pixels": 489347,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 1429,
+                "iou": 0.9970882846756972,
+                "a_pixels": 490776,
+                "b_pixels": 489347
+              },
+              "b_flipped_in_y": {
+                "xor": 1429,
+                "iou": 0.9970882846756972,
+                "a_pixels": 490776,
+                "b_pixels": 489347
+              }
+            }
+          },
+          "160": {
+            "z_mm": 8.025,
+            "analytic_rects": [
+              [
+                5.0,
+                2.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 65494,
+              "area_mm2": 80.23015000000001,
+              "versus_analytic": {
+                "expected_pixels": 65494,
+                "actual_pixels": 65494,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 65208,
+              "area_mm2": 79.8798,
+              "versus_analytic": {
+                "expected_pixels": 65208,
+                "actual_pixels": 65208,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 130702,
+                "iou": 0.0,
+                "a_pixels": 65494,
+                "b_pixels": 65208
+              },
+              "b_flipped_in_y": {
+                "xor": 742,
+                "iou": 0.988710020997535,
+                "a_pixels": 65494,
+                "b_pixels": 65208
+              }
+            }
+          },
+          "239": {
+            "z_mm": 11.975000000000001,
+            "analytic_rects": [
+              [
+                5.0,
+                2.0,
+                15.0,
+                10.0
+              ]
+            ],
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 65494,
+              "area_mm2": 80.23015000000001,
+              "versus_analytic": {
+                "expected_pixels": 65494,
+                "actual_pixels": 65494,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 65208,
+              "area_mm2": 79.8798,
+              "versus_analytic": {
+                "expected_pixels": 65208,
+                "actual_pixels": 65208,
+                "missing": 0,
+                "extra": 0,
+                "xor": 0,
+                "iou": 1.0
+              }
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 130702,
+                "iou": 0.0,
+                "a_pixels": 65494,
+                "b_pixels": 65208
+              },
+              "b_flipped_in_y": {
+                "xor": 742,
+                "iou": 0.988710020997535,
+                "a_pixels": 65494,
+                "b_pixels": 65208
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 544288,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "30",
+              "ResolutionX": "4098",
+              "ResolutionY": "2560",
+              "DisplayWidth": "143.43",
+              "DisplayHeight": "89.6",
+              "MachineZ": "165",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "0",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "56332e3007000000",
+            "layers_reported": 240,
+            "resolution": [
+              4098,
+              2560
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 543328,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "12",
+              "ResolutionX": "4098",
+              "ResolutionY": "2560",
+              "DisplayWidth": "143.43",
+              "DisplayHeight": "89.6",
+              "MachineZ": "220",
+              "LayerHeight": "0.05",
+              "LayerCount": "240",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "8",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "56312e3207000000",
+            "layers_reported": 240,
+            "resolution": [
+              4098,
+              2560
+            ]
+          }
+        }
+      }
+    },
+    {
+      "printer": "mars5",
+      "printer_name": "ELEGOO Mars 5",
+      "mesh": "sculpt",
+      "input_triangles": 906300,
+      "expected_layers": 400,
+      "engines": {
+        "mslicer": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.35093580500006283,
+                "peak_rss_kb": 74412,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0721,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.37395518800008176,
+                "peak_rss_kb": 75148,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.07629999999999999,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.3672257860000627,
+                "peak_rss_kb": 74872,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0767,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.34717474200010656,
+                "peak_rss_kb": 74748,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0736,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.32666890899986356,
+                "peak_rss_kb": 74984,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.0729,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.33501647699995374,
+                "peak_rss_kb": 74868,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.07379999999999999,
+                "triangles": 906300,
+                "summary": {
+                  "program": "mslicer",
+                  "license": "GPL-3.0",
+                  "layers": 400,
+                  "width": 4098,
+                  "height": 2560,
+                  "extension": "goo"
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.3672257860000627,
+            "warm": 0.33501647699995374
+          },
+          "median_engine_s": {
+            "cold": 0.07629999999999999,
+            "warm": 0.0736
+          },
+          "median_peak_rss_kb": {
+            "cold": 74872.0,
+            "warm": 74868.0
+          },
+          "triangles_reported": 906300,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/mars5-sculpt-mslicer.goo",
+          "output_bytes": 2330595
+        },
+        "dragonfruit": {
+          "runs": {
+            "cold": [
+              {
+                "wall_s": 0.21740469399992435,
+                "peak_rss_kb": 160820,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.098158746,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.098158746,
+                  "total_s": 0.080215477,
+                  "layers_per_second": 4986.56886376179,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.2086210980000942,
+                "peak_rss_kb": 160856,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.101128382,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.101128382,
+                  "total_s": 0.083506322,
+                  "layers_per_second": 4790.056494165796,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.22054984800001876,
+                "peak_rss_kb": 160776,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.107646525,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.107646525,
+                  "total_s": 0.088560826,
+                  "layers_per_second": 4516.669706761769,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 2
+              }
+            ],
+            "warm": [
+              {
+                "wall_s": 0.20263488400019014,
+                "peak_rss_kb": 160972,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.100540777,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.100540777,
+                  "total_s": 0.084561371,
+                  "layers_per_second": 4730.292274944312,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 0
+              },
+              {
+                "wall_s": 0.1765856250001434,
+                "peak_rss_kb": 161092,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.090265679,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.090265679,
+                  "total_s": 0.078081632,
+                  "layers_per_second": 5122.8437438397805,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 1
+              },
+              {
+                "wall_s": 0.1709573270002238,
+                "peak_rss_kb": 160936,
+                "returncode": 0,
+                "timed_out": false,
+                "engine_s": 0.084589443,
+                "triangles": 906300,
+                "layers": 400,
+                "summary": {
+                  "layers": 400,
+                  "model_triangle_count": 906300,
+                  "wall_s": 0.084589443,
+                  "total_s": 0.072615872,
+                  "layers_per_second": 5508.437604384892,
+                  "format": ".goo",
+                  "resolution_px": [
+                    4098,
+                    2560
+                  ]
+                },
+                "index": 2
+              }
+            ]
+          },
+          "median_wall_s": {
+            "cold": 0.21740469399992435,
+            "warm": 0.1765856250001434
+          },
+          "median_engine_s": {
+            "cold": 0.101128382,
+            "warm": 0.090265679
+          },
+          "median_peak_rss_kb": {
+            "cold": 160820.0,
+            "warm": 160972.0
+          },
+          "triangles_reported": 906300,
+          "output": "/agent/repos/3d-printer-app.-/tools/bench/resin_engines/work/mars5-sculpt-dragonfruit.goo",
+          "output_bytes": 2331652
+        }
+      },
+      "compare": {
+        "layers": {
+          "0": {
+            "z_mm": 0.025,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 1566590,
+              "area_mm2": 1919.07275
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 1566819,
+              "area_mm2": 1919.3532750000002
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 2981,
+                "iou": 0.998099088442445,
+                "a_pixels": 1566590,
+                "b_pixels": 1566819
+              },
+              "b_flipped_in_y": {
+                "xor": 2539,
+                "iou": 0.9983807129454952,
+                "a_pixels": 1566590,
+                "b_pixels": 1566819
+              }
+            }
+          },
+          "200": {
+            "z_mm": 10.025,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 541191,
+              "area_mm2": 662.958975
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 540673,
+              "area_mm2": 662.3244249999999
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 189394,
+                "iou": 0.7020368800039016,
+                "a_pixels": 541191,
+                "b_pixels": 540673
+              },
+              "b_flipped_in_y": {
+                "xor": 2538,
+                "iou": 0.9953190790869069,
+                "a_pixels": 541191,
+                "b_pixels": 540673
+              }
+            }
+          },
+          "399": {
+            "z_mm": 19.975,
+            "analytic_rects": null,
+            "mslicer": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 429,
+              "area_mm2": 0.525525
+            },
+            "dragonfruit": {
+              "unique_levels": 2,
+              "min": 0,
+              "max": 255,
+              "not_binary": false,
+              "solid_pixels": 430,
+              "area_mm2": 0.5267499999999999
+            },
+            "between_engines": {
+              "stored_order": {
+                "xor": 859,
+                "iou": 0.0,
+                "a_pixels": 429,
+                "b_pixels": 430
+              },
+              "b_flipped_in_y": {
+                "xor": 27,
+                "iou": 0.9390519187358917,
+                "a_pixels": 429,
+                "b_pixels": 430
+              }
+            }
+          }
+        },
+        "file": {
+          "mslicer": {
+            "bytes": 2330595,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "30",
+              "ResolutionX": "4098",
+              "ResolutionY": "2560",
+              "DisplayWidth": "143.43",
+              "DisplayHeight": "89.6",
+              "MachineZ": "165",
+              "LayerHeight": "0.05",
+              "LayerCount": "400",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "0",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "56332e3007000000",
+            "layers_reported": 400,
+            "resolution": [
+              4098,
+              2560
+            ]
+          },
+          "dragonfruit": {
+            "bytes": 2331652,
+            "uvtools_ok": true,
+            "uvtools_returncode": 0,
+            "properties": {
+              "Version": "12",
+              "ResolutionX": "4098",
+              "ResolutionY": "2560",
+              "DisplayWidth": "143.43",
+              "DisplayHeight": "89.6",
+              "MachineZ": "220",
+              "LayerHeight": "0.05",
+              "LayerCount": "400",
+              "BottomLayerCount": "5",
+              "ExposureTime": "2.5",
+              "BottomExposureTime": "30",
+              "LiftHeight": "6",
+              "BottomLiftHeight": "6",
+              "LiftSpeed": "65",
+              "BottomLiftSpeed": "65",
+              "RetractSpeed": "65",
+              "AntiAliasing": "8",
+              "LayerImageFormat": "Rle"
+            },
+            "uvtools_error": "",
+            "magic_hex": "56312e3207000000",
+            "layers_reported": 400,
+            "resolution": [
+              4098,
+              2560
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "probes": {
+    "containers": [
+      {
+        "engine": "mslicer",
+        "label": "v5",
+        "returncode": 0,
+        "wall_s": 0.011067143999980544,
+        "bytes": 479765,
+        "magic_hex": "0701fd1220010000",
+        "uvtools_ok": true,
+        "properties": {
+          "Version": "5",
+          "ResolutionX": "5448",
+          "ResolutionY": "3064",
+          "DisplayWidth": "277.848",
+          "DisplayHeight": "156.264",
+          "MachineZ": "300",
+          "LayerHeight": "0.05",
+          "LayerCount": "240",
+          "BottomLayerCount": "5",
+          "ExposureTime": "2.5",
+          "BottomExposureTime": "30",
+          "LiftHeight": "6",
+          "BottomLiftHeight": "2",
+          "LiftSpeed": "65",
+          "BottomLiftSpeed": "65",
+          "RetractSpeed": "65",
+          "AntiAliasing": "0",
+          "LayerImageFormat": "Rle"
+        },
+        "uvtools_error": ""
+      },
+      {
+        "engine": "dragonfruit",
+        "label": "v5",
+        "returncode": 0,
+        "wall_s": 0.009407070999941425,
+        "bytes": 687753,
+        "magic_hex": "0601fd1205000000",
+        "uvtools_ok": true,
+        "properties": {
+          "Version": "5",
+          "IsMagicValid": "True",
+          "ResolutionX": "5448",
+          "ResolutionY": "3064",
+          "DisplayWidth": "277.848",
+          "DisplayHeight": "156.264",
+          "MachineZ": "12",
+          "LayerHeight": "0.05",
+          "LayerCount": "240",
+          "BottomLayerCount": "5",
+          "ExposureTime": "2.5",
+          "BottomExposureTime": "30",
+          "LiftHeight": "6",
+          "BottomLiftHeight": "6",
+          "LiftSpeed": "65",
+          "BottomLiftSpeed": "65",
+          "RetractSpeed": "65",
+          "AntiAliasing": "1",
+          "LayerImageFormat": "Rle"
+        },
+        "uvtools_error": ""
+      },
+      {
+        "engine": "dragonfruit",
+        "label": "v5enc",
+        "returncode": 0,
+        "wall_s": 0.008741955000004964,
+        "bytes": 683577,
+        "magic_hex": "0701fd1220010000",
+        "uvtools_ok": true,
+        "properties": {
+          "Version": "5",
+          "ResolutionX": "5448",
+          "ResolutionY": "3064",
+          "DisplayWidth": "277.848",
+          "DisplayHeight": "156.264",
+          "MachineZ": "12",
+          "LayerHeight": "0.05",
+          "LayerCount": "240",
+          "BottomLayerCount": "5",
+          "ExposureTime": "2.5",
+          "BottomExposureTime": "30",
+          "LiftHeight": "6",
+          "BottomLiftHeight": "6",
+          "LiftSpeed": "65",
+          "BottomLiftSpeed": "65",
+          "RetractSpeed": "65",
+          "AntiAliasing": "1",
+          "LayerImageFormat": "Rle"
+        },
+        "uvtools_error": ""
+      }
+    ],
+    "mirrors": [
+      {
+        "flag": "--mirror-x",
+        "returncode": 0,
+        "wall_s": 0.008816091999960918,
+        "tower_bbox": {
+          "x0": 2429,
+          "x1": 2624,
+          "y0": 1335,
+          "y1": 1491,
+          "pixels": 30772
+        }
+      },
+      {
+        "flag": "--mirror-y",
+        "returncode": 0,
+        "wall_s": 0.00896807499998431,
+        "tower_bbox": {
+          "x0": 2822,
+          "x1": 3017,
+          "y0": 1571,
+          "y1": 1727,
+          "pixels": 30772
+        }
+      }
+    ],
+    "lumen": {
+      "engine": "dragonfruit",
+      "label": "lumen",
+      "returncode": 0,
+      "wall_s": 0.020028757999853042,
+      "bytes": 15744,
+      "magic_hex": "4c554d4e01000000",
+      "lumen_magic": "LUMN"
+    },
+    "header_with_machine_height": {
+      "note": "One file each, not part of the timed medians. Metadata added printer.buildVolumeMm.height, ctb.bedSizeZ for the CTB file, and goo.antiAliasingLevel 1 for the GOO file.",
+      "ctb": {
+        "MachineZ": "300",
+        "ExposureTime": "2.5",
+        "BottomExposureTime": "30",
+        "AntiAliasing": "1",
+        "LayerCount": "240",
+        "ResolutionX": "5448"
+      },
+      "goo": {
+        "MachineZ": "165",
+        "ExposureTime": "2.5",
+        "AntiAliasing": "1",
+        "LayerCount": "240",
+        "Version": "12"
+      }
+    },
+    "bed_rectangle": {
+      "note": "260 x 140 x 0.2 mm slab on Jupiter, 4 layers, 3 cold and 3 warm. A large simple rectangle, not a dense mesh.",
+      "size_mm": [
+        260,
+        140,
+        0.2
+      ],
+      "runs": {
+        "mslicer": [
+          {
+            "phase": "cold",
+            "wall_s": 0.006623062000016944,
+            "engine_s": 0.0038,
+            "peak_rss_kb": 5672,
+            "returncode": 0
+          },
+          {
+            "phase": "cold",
+            "wall_s": 0.006558845999961704,
+            "engine_s": 0.0038,
+            "peak_rss_kb": 6612,
+            "returncode": 0
+          },
+          {
+            "phase": "cold",
+            "wall_s": 0.006478225999899223,
+            "engine_s": 0.0039,
+            "peak_rss_kb": 6728,
+            "returncode": 0
+          },
+          {
+            "phase": "warm",
+            "wall_s": 0.006466652999961298,
+            "engine_s": 0.0037,
+            "peak_rss_kb": 6552,
+            "returncode": 0
+          },
+          {
+            "phase": "warm",
+            "wall_s": 0.006393235000132336,
+            "engine_s": 0.004900000000000001,
+            "peak_rss_kb": 6592,
+            "returncode": 0
+          },
+          {
+            "phase": "warm",
+            "wall_s": 0.0063657729999704316,
+            "engine_s": 0.0034,
+            "peak_rss_kb": 5760,
+            "returncode": 0
+          }
+        ],
+        "dragonfruit": [
+          {
+            "phase": "cold",
+            "wall_s": 0.004274414000065008,
+            "engine_s": 0.002677018,
+            "peak_rss_kb": 7108,
+            "returncode": 0
+          },
+          {
+            "phase": "cold",
+            "wall_s": 0.006482318000053056,
+            "engine_s": 0.004217432,
+            "peak_rss_kb": 7392,
+            "returncode": 0
+          },
+          {
+            "phase": "cold",
+            "wall_s": 0.0043451189999359485,
+            "engine_s": 0.003028431,
+            "peak_rss_kb": 7108,
+            "returncode": 0
+          },
+          {
+            "phase": "warm",
+            "wall_s": 0.004445107000037751,
+            "engine_s": 0.002928003,
+            "peak_rss_kb": 7344,
+            "returncode": 0
+          },
+          {
+            "phase": "warm",
+            "wall_s": 0.006462498000018968,
+            "engine_s": 0.004048144,
+            "peak_rss_kb": 7212,
+            "returncode": 0
+          },
+          {
+            "phase": "warm",
+            "wall_s": 0.004391141000041898,
+            "engine_s": 0.003482792,
+            "peak_rss_kb": 7464,
+            "returncode": 0
+          }
+        ]
+      },
+      "files": {
+        "mslicer": {
+          "bytes": 67639,
+          "properties": {
+            "Version": "4",
+            "IsMagicValid": "True",
+            "ResolutionX": "5448",
+            "ResolutionY": "3064",
+            "DisplayWidth": "277.848",
+            "DisplayHeight": "156.264",
+            "MachineZ": "300",
+            "LayerHeight": "0.05",
+            "LayerCount": "4",
+            "BottomLayerCount": "5",
+            "ExposureTime": "2.5",
+            "BottomExposureTime": "30",
+            "LiftHeight": "6",
+            "BottomLiftHeight": "6",
+            "LiftSpeed": "65",
+            "BottomLiftSpeed": "65",
+            "RetractSpeed": "65",
+            "AntiAliasing": "1",
+            "LayerImageFormat": "Rle"
+          }
+        },
+        "dragonfruit": {
+          "bytes": 272849,
+          "properties": {
+            "Version": "4",
+            "IsMagicValid": "True",
+            "ResolutionX": "5448",
+            "ResolutionY": "3064",
+            "DisplayWidth": "277.848",
+            "DisplayHeight": "156.264",
+            "MachineZ": "0.2",
+            "LayerHeight": "0.05",
+            "LayerCount": "4",
+            "BottomLayerCount": "5",
+            "ExposureTime": "2.5",
+            "BottomExposureTime": "30",
+            "LiftHeight": "6",
+            "BottomLiftHeight": "6",
+            "LiftSpeed": "65",
+            "BottomLiftSpeed": "65",
+            "RetractSpeed": "65",
+            "AntiAliasing": "1",
+            "LayerImageFormat": "Rle"
+          }
+        }
+      }
+    },
+    "sculpt_scaled_to_bed": {
+      "note": "The 906300-triangle sculpt scaled in XY to 240 x 140 mm, height still 20 mm, Jupiter, 3 runs with the process already warm. Not a cold/warm pair.",
+      "runs": {
+        "mslicer": [
+          {
+            "wall_s": 0.38162535500009653,
+            "engine_s": 0.1172,
+            "peak_rss_kb": 98524,
+            "returncode": 0,
+            "layers": 400
+          },
+          {
+            "wall_s": 0.4116271749999214,
+            "engine_s": 0.1222,
+            "peak_rss_kb": 99728,
+            "returncode": 0,
+            "layers": 400
+          },
+          {
+            "wall_s": 0.3806131560002086,
+            "engine_s": 0.1182,
+            "peak_rss_kb": 99628,
+            "returncode": 0,
+            "layers": 400
+          }
+        ],
+        "dragonfruit": [
+          {
+            "wall_s": 0.18342765200009126,
+            "engine_s": 0.103738298,
+            "peak_rss_kb": 165984,
+            "returncode": 0,
+            "layers": 400
+          },
+          {
+            "wall_s": 0.1939687579999827,
+            "engine_s": 0.113932756,
+            "peak_rss_kb": 167296,
+            "returncode": 0,
+            "layers": 400
+          },
+          {
+            "wall_s": 0.20318503800012877,
+            "engine_s": 0.11041875,
+            "peak_rss_kb": 166268,
+            "returncode": 0,
+            "layers": 400
+          }
+        ]
+      }
+    }
+  }
+}
