@@ -1,14 +1,23 @@
-# The engine stage builds two slicer binaries:
+# The engine stage builds three slicer binaries:
 #   mslicer `slicer` (GPL-3.0, source copied to /usr/local/share/zeim/mslicer-source)
 #   zeim-lumen (calls the MIT/Apache lumen-format crate)
+#   dragonfruit-cli (AGPL-3.0-or-later, unmodified, cloned at the pinned commit; source is not copied in)
 # nalgebra 0.34, which mslicer v0.10.1 depends on, needs Rust 1.87 or newer.
+# DragonFruit's rust-toolchain.toml pins Rust 1.97.0.
 FROM rust:1-bookworm AS engine-build
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates curl xz-utils \
+ && curl -fsSL https://nodejs.org/dist/v22.21.0/node-v22.21.0-linux-x64.tar.xz | tar -xJ -C /usr/local --strip-components=1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && node --version
 WORKDIR /src/zeim
 COPY third_party/mslicer /src/zeim/third_party/mslicer
 COPY third_party/open-resin-alliance/lumen-format /src/zeim/third_party/open-resin-alliance/lumen-format
 COPY tools/zeim-lumen /src/zeim/tools/zeim-lumen
+COPY tools/dragonfruit/build.sh /src/zeim/tools/dragonfruit/build.sh
 RUN cargo build --release --manifest-path /src/zeim/third_party/mslicer/Cargo.toml -p slicer --bin slicer \
- && cargo build --release --manifest-path /src/zeim/tools/zeim-lumen/Cargo.toml
+ && cargo build --release --manifest-path /src/zeim/tools/zeim-lumen/Cargo.toml \
+ && bash /src/zeim/tools/dragonfruit/build.sh /src/dragonfruit
 
 # ZEIM (photo3d) container image. Build from the repo root:
 #   docker build -t zeim:dev .
@@ -62,10 +71,13 @@ COPY data ./data
 COPY workers/ai3d/prep.py ./workers/ai3d/prep.py
 COPY --from=engine-build /src/zeim/third_party/mslicer/target/release/slicer /usr/local/bin/mslicer-slicer
 COPY --from=engine-build /src/zeim/tools/zeim-lumen/target/release/zeim-lumen /usr/local/bin/zeim-lumen
+COPY --from=engine-build /src/dragonfruit/rust/dragonfruit-cli/target/release/dragonfruit-cli /usr/local/bin/dragonfruit-cli
 COPY third_party/mslicer /usr/local/share/zeim/mslicer-source
 RUN rm -rf /usr/local/share/zeim/mslicer-source/target
 ENV ZEIM_MSLICER_BIN=/usr/local/bin/mslicer-slicer \
-    ZEIM_LUMEN_BIN=/usr/local/bin/zeim-lumen
+    ZEIM_LUMEN_BIN=/usr/local/bin/zeim-lumen \
+    ZEIM_DRAGONFRUIT_BIN=/usr/local/bin/dragonfruit-cli \
+    ZEIM_RESIN_ENGINE=dragonfruit
 
 # The photo check must load on CPU during the build. A plain image is approved.
 # RSS here is the checker plus Python; the container cap is 14 GB.

@@ -2,9 +2,11 @@
 
 GOO's 8-byte tag is the tag in Elegoo's published container and in mslicer's
 `MAGIC_TAG` (`07 00 00 00 44 4C 50 00`), sitting immediately after the 4-byte
-version. CTB v4 starts with little-endian `0x12FD0106` and mslicer's v5 with
-`0x12FD0107`. Layer count for GOO is the big-endian u32 at offset 195310, the
-same offset the MIT Elegoo plugin records as `GOO_LAYER_COUNT_OFFSET`.
+version. CTB v4 starts with little-endian `0x12FD0106` and a version field of 4 at
+offset 4. DragonFruit's unencrypted v5 uses that same magic with version 5.
+mslicer's encrypted v5 starts with `0x12FD0107`. Layer count for GOO is the
+big-endian u32 at offset 195310, the same offset the MIT Elegoo plugin records
+as `GOO_LAYER_COUNT_OFFSET`.
 """
 from __future__ import annotations
 
@@ -31,7 +33,8 @@ def identify(data: bytes, fmt: str) -> dict:
             raise FileIdError("The CTB file is too small.")
         magic = struct.unpack_from("<I", data, 0)[0]
         if magic == CTB_V4:
-            name = "CTB-v4"
+            version = struct.unpack_from("<I", data, 4)[0]
+            name = "CTB-v5" if version >= 5 else "CTB-v4"
         elif magic == CTB_V5:
             name = "CTB-v5"
         else:

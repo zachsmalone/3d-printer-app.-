@@ -487,7 +487,11 @@ def _printer_download(job_id: str, actor: Actor, ext: str):
         resin_fileid.identify(data, ext)
     except resin_fileid.FileIdError as exc:
         raise HTTPException(404, str(exc))
-    fname = fnames.file_name(job.get("name") or "torchc0", ext)
+    engine = ((job.get("report") or {}).get("engine") or "").strip().lower()
+    stem = job.get("name") or "torchc0"
+    if engine in ("dragonfruit", "mslicer"):
+        stem = f"{stem} - {engine}"
+    fname = fnames.file_name(stem, ext)
     return Response(content=data, media_type="application/octet-stream",
                     headers={"Content-Disposition": fnames.disposition(fname), "Cache-Control": "no-store"})
 

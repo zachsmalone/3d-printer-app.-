@@ -39,6 +39,13 @@
         "dpkg": "prusa-slicer",
         "what": "Turns a model into printer instructions (G-code) when you choose \"Slice here\".",
         "url": "https://github.com/prusa3d/PrusaSlicer"
+      },
+      {
+        "name": "DragonFruit",
+        "command": "dragonfruit-cli",
+        "dpkg": "",
+        "what": "Slices resin .ctb and .nanodlp files. Unmodified AGPL-3.0-or-later program, commit 97596a55882cb139bbcf96bb98b211f82ae4c5f0, run as its own process. Source offer: third_party/dragonfruit/SOURCE.md.",
+        "url": "https://github.com/Open-Resin-Alliance/DragonFruit/tree/97596a55882cb139bbcf96bb98b211f82ae4c5f0"
       }
     ],
     "bundled_heading": "Code that ships inside ZEIM's pages",

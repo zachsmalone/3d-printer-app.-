@@ -7,7 +7,7 @@ backup, restore-drill, retention and checksum-failure test on a fake tree (incl.
 
 | File | Purpose |
 |---|---|
-| `../../Dockerfile` (repo root; Engineering moved and edited it, history in git) | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker |
+| `../../Dockerfile` (repo root; Engineering moved and edited it, history in git) | Python 3.13 on Debian trixie, `prusa-slicer` 2.9.2, DejaVu fonts, non-root uid 10001, tini, healthcheck, single uvicorn worker. The engine stage also builds mslicer, zeim-lumen, and unmodified `dragonfruit-cli` at the commit in `tools/dragonfruit/build.sh`. |
 | `docker-compose.yml` | `app` (internal port 8765 only) + `caddy` (80/443); runtime `data/` and `outputs/` volumes, plus a read-only repo-catalog mount at `/app/data`; read-only rootfs, caps dropped, mem/CPU limits |
 | `Caddyfile` | Full app: automatic HTTPS, 550 MiB body cap, gzip/zstd, security headers, CSP in **report-only** mode, 660 s proxy timeout for slicing. This is the file zeim-prod should run. |
 | `Caddyfile.coming-soon` | Optional holding page for every path except `/healthz`. Used only when `ZEIM_COMING_SOON=1`. |

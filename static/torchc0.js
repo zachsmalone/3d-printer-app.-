@@ -578,9 +578,10 @@ function wire() {
           const ext = j.format || "lumen";
           const native = (j.report && j.report.native_format) || "";
           const hw = "It has not been printed on a machine.";
+          const engine = (j.report && j.report.engine) || (ext === "lumen" ? "lumen-format" : "mslicer");
           const kind = ext === "lumen"
             ? `${layers} layers in a .lumen file. ${native ? `Stock files for this plate are ${native}. ` : ""}${hw}`
-            : `${layers} layers in a .${ext} file from mslicer. ${native ? `Catalog stock file is ${native}. ` : ""}That name is not a firmware test. ${hw}`;
+            : `${layers} layers in a .${ext} file from ${engine}. ${native ? `Catalog stock file is ${native}. ` : ""}That name is not a firmware test. ${hw}`;
           const preview = ext === "lumen" ? `<img id="rzLayerImg" alt="Sliced layer preview" style="width:100%;max-width:320px;height:auto;background:#111;border-radius:8px">
             <div class="field"><label for="rzLayerN">Layer preview</label><input id="rzLayerN" type="range" min="0" max="${layers - 1}" value="0" style="width:100%;min-height:44px"></div>` : "";
           box.innerHTML = `<p class="help">${kind}</p>
