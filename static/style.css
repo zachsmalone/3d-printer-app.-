@@ -1250,20 +1250,24 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #spPaintDock .help{margin:0 0 6px}
 @media (max-width:900px){
   #viewEdit.support-live>#editViewer,
-  #viewEdit.support-live>.stage>#editViewer{right:0!important;bottom:212px!important}
-  #viewEdit.support-live>.proc-sheet{left:0;right:0;top:auto;width:auto;height:auto;max-height:200px;bottom:52px;border-radius:16px 16px 0 0}
-  #viewEdit.paint-ready #spPaintDock{top:auto;bottom:8px;left:8px;right:8px;width:auto;max-height:56px;overflow:hidden;padding:4px 6px}
+  #viewEdit.support-live>.stage>#editViewer{right:0!important;bottom:280px!important}
+  #viewEdit.support-live>.proc-sheet{left:0;right:0;top:auto;width:auto;height:auto;max-height:168px;bottom:52px;border-radius:16px 16px 0 0}
+  #viewEdit.paint-ready #spPaintDock{position:fixed;z-index:61;top:auto;left:8px;right:8px;width:auto;max-height:56px;overflow:hidden;padding:4px 6px}
+  #viewEdit.support-live #spPaintDock{bottom:228px}
   #spPaintLead,#spPaintDock #spPaintCount,#spPaintDock details{display:none}
   #spPaintDock .row{flex-wrap:nowrap;overflow-x:auto}
+  #viewEdit.paint-ready:not(.support-live)>#editViewer,
+  #viewEdit.paint-ready:not(.support-live)>.stage>#editViewer{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:128px!important;width:auto!important;height:auto!important}
   #viewEdit.paint-ready:not(.support-live) #spPaintDock{bottom:calc(60px + env(safe-area-inset-bottom))}
 }
 @media (max-width:768px){
-  body[data-view=slicer] #viewEdit.paint-ready:not(.support-live) #spPaintDock{bottom:calc(var(--tabbar-h) + 64px + env(safe-area-inset-bottom))}
-}
-@media (max-width:768px){
-  body[data-view=slicer] #viewEdit.support-live>.proc-sheet{bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}
+  body[data-view=slicer] #viewEdit.support-live>.proc-sheet{max-height:168px;bottom:calc(var(--tabbar-h) + 2 * var(--s1) + 1px + env(safe-area-inset-bottom))}
   body[data-view=slicer] #viewEdit.support-live>#editViewer,
-  body[data-view=slicer] #viewEdit.support-live>.stage>#editViewer{right:0!important;bottom:calc(200px + var(--tabbar-h) + env(safe-area-inset-bottom))!important}
+  body[data-view=slicer] #viewEdit.support-live>.stage>#editViewer{right:0!important;bottom:calc(240px + var(--tabbar-h) + env(safe-area-inset-bottom))!important}
+  body[data-view=slicer] #viewEdit.support-live #spPaintDock{bottom:calc(196px + var(--tabbar-h) + env(safe-area-inset-bottom))}
+  body[data-view=slicer] #viewEdit.paint-ready:not(.support-live) #spPaintDock{bottom:calc(var(--tabbar-h) + 64px + env(safe-area-inset-bottom))}
+  body[data-view=slicer] #viewEdit.paint-ready:not(.support-live)>#editViewer,
+  body[data-view=slicer] #viewEdit.paint-ready:not(.support-live)>.stage>#editViewer{bottom:calc(128px + var(--tabbar-h) + env(safe-area-inset-bottom))!important}
 }
 #viewEdit>.proc-sheet[hidden],#viewEdit>.bed-sheet[hidden]{display:none!important}
 #viewEdit .bed-sheet-body{padding:12px 16px;overflow:auto}

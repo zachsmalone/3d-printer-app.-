@@ -126,22 +126,26 @@ function paintMaterial() {
     },
     vertexShader: `
       varying vec3 vLocal;
+      varying vec3 vN;
       void main() {
         vLocal = position;
+        vN = normalize(mat3(modelMatrix) * normal);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
       varying vec3 vLocal;
+      varying vec3 vN;
       uniform sampler2D strokeTex;
       uniform vec4 cursor;
       uniform vec3 cursorN;
       uniform vec3 cursorColor;
       bool onFace(vec3 p, vec3 n, float r) {
+        if (dot(normalize(vN), n) < 0.72) return false;
         vec3 d = vLocal - p;
         float along = dot(d, n);
         vec3 planar = d - n * along;
-        return abs(along) < 0.6 && dot(planar, planar) <= r * r;
+        return abs(along) < 0.35 && dot(planar, planar) <= r * r;
       }
       void main() {
         vec3 col = vec3(0.0);
