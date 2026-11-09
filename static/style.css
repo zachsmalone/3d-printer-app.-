@@ -1228,9 +1228,9 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #viewEdit>.bed-bar .bed-scroll[hidden]{display:none!important}
 #viewEdit>.bed-bar .bed-scroll > div{display:flex;align-items:stretch;gap:2px;min-width:100%}
 #viewEdit>.bed-bar .bed-scroll > div[hidden]{display:none!important}
-#viewEdit>.bed-bar button.bed-cat,#viewEdit>.bed-bar .bed-scroll button{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:var(--txt);font:inherit;font-size:14px;font-weight:650;cursor:pointer;white-space:nowrap}
-#viewEdit>.bed-bar button:hover{background:color-mix(in srgb,#0066FF 10%,var(--panel))}
-#viewEdit>.bed-bar button:focus-visible{outline:3px solid var(--focus,#6AA6FF);outline-offset:2px}
+#viewEdit>.bed-bar button.bed-cat,#viewEdit>.bed-bar .bed-scroll button,#viewEdit>.bed-bar .bed-scroll a.bed-cat{flex:0 0 auto;min-height:44px;min-width:44px;padding:0 14px;border:0;border-radius:10px;background:transparent;color:var(--txt);font:inherit;font-size:14px;font-weight:650;cursor:pointer;white-space:nowrap;text-decoration:none}
+#viewEdit>.bed-bar button:hover,#viewEdit>.bed-bar a.bed-cat:hover{background:color-mix(in srgb,#0066FF 10%,var(--panel))}
+#viewEdit>.bed-bar button:focus-visible,#viewEdit>.bed-bar a.bed-cat:focus-visible{outline:3px solid var(--focus,#6AA6FF);outline-offset:2px}
 #viewEdit>.bed-bar .bed-device{flex:0 0 auto;max-width:148px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;text-align:left;line-height:1.15;padding-top:2px;padding-bottom:2px}
 #viewEdit .bed-dev-name{font-size:14px;font-weight:650;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #viewEdit .bed-dev-state{font-size:12px;font-weight:500;color:var(--mut)}
