@@ -53,31 +53,64 @@ def _fdm_lean(data: bytes):
                  "(the shape change is far smaller than a print layer).")
 
 
+def _scale_preview(preview: dict, factor: float) -> dict:
+    """Scale encoded view positions into millimetres. No positions (the browser drew its own) is a no-op."""
+    bodies = preview.get("bodies") or []
+    if factor == 1.0 or not bodies or not bodies[0].get("positions"):
+        return preview
+    raw = base64.b64decode(bodies[0]["positions"])
+    arr = np.frombuffer(raw, dtype="<f4").copy() * np.float32(factor)
+    bodies[0]["positions"] = base64.b64encode(np.ascontiguousarray(arr.astype("<f4")).tobytes()).decode()
+    return preview
+
+
 def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_delete_oldest: bool,
-                    base: dict, warnings: list, scale: float, units: str, stream: bool, background: BackgroundTasks):
+                    base: dict, warnings: list, scale: float, units: str, stream: bool, background: BackgroundTasks,
+                    client_view: bool = False):
     """Show a lighter view quickly. The original STL is stored unchanged. Slice waits for the full check.
 
     The full file and the mesh check are a background task that runs after this response is finished.
     Starting them earlier holds the preview behind the disk write and the mesh load.
+
+    `client_view` means the browser already drew a sample from the file. The response then omits the
+    sampled triangles (several megabytes of base64). The preview file is still written after that
+    line, for a later reload. Slice still uses the original bytes.
     """
     from .builds import disk_guard
 
-    def commit(preview: dict, size_mm: list, triangles: int, *, persist_preview: bool):
+    def commit(preview: dict, size_mm: list, triangles: int, *, persist_preview: bool, bounds: dict | None = None):
+        preview = _scale_preview(preview, scale)
         if scale != 1.0:
-            raw = base64.b64decode(preview["bodies"][0]["positions"])
-            arr = np.frombuffer(raw, dtype="<f4").copy() * np.float32(scale)
-            preview["bodies"][0]["positions"] = base64.b64encode(np.ascontiguousarray(arr.astype("<f4")).tobytes()).decode()
             size_mm = [round(float(v) * scale, 3) for v in size_mm]
+            if bounds:
+                bounds = {k: [round(float(v) * scale, 3) for v in vals] for k, vals in bounds.items()}
         # The small record is written here so a slice that arrives with the view already sees slice_ready false.
         # The preview file, the history scan, and the disk sweep are not on this side of the yield.
         meta = editproj.create_pending_stl(
             actor.sid, privacy.default_level(actor), title=title, base=base, original=None,
             beginner=beginner, warnings=warnings, preview=preview if persist_preview else None,
             size_mm=size_mm, triangles=triangles,
-            import_scale=scale, import_units=units, write_preview=persist_preview)
+            import_scale=scale, import_units=units, write_preview=persist_preview, bounds=bounds)
         background.add_task(editproj.store_original_and_check, meta["id"], data)
         body = {**editproj.quick_payload(meta, preview), "history": None}
         return meta["id"], body
+
+    def bookkeeping():
+        try:
+            disk_guard()
+            with store.lock:
+                store.reserve(actor.sid, auto_delete_oldest)
+        except HistoryFull:
+            pass
+
+    def store_view_file(bid: str):
+        """Sampled preview for a reload. Failure leaves the project; the open view is already on screen."""
+        ready = {}
+        for ev in editproj.iter_binary_stl_preview(data):
+            if ev.get("phase") == "preview_ready":
+                ready = ev
+        if ready:
+            editproj.write_preview(bid, _scale_preview(ready["preview"], scale))
 
     if not stream:
         disk_guard()
@@ -86,31 +119,47 @@ def _open_large_stl(data: bytes, actor: Actor, title: str, beginner: bool, auto_
                 store.reserve(actor.sid, auto_delete_oldest)
             except HistoryFull:
                 return _full(actor)
-        ready = {}
-        for ev in editproj.iter_binary_stl_preview(data):
-            if ev.get("phase") == "preview_ready":
-                ready = ev
-        _bid, project = commit(ready["preview"], ready["size_mm"], ready["triangles"], persist_preview=True)
+        if client_view:
+            triangles, bounds = editproj.binary_stl_bounds(data)
+            _bid, project = commit(editproj.slim_preview(triangles > editproj.MAX_PREVIEW_FACES),
+                                   bounds["size_mm"], triangles, persist_preview=False, bounds=bounds)
+            store_view_file(_bid)
+        else:
+            ready = {}
+            for ev in editproj.iter_binary_stl_preview(data):
+                if ev.get("phase") == "preview_ready":
+                    ready = ev
+            _bid, project = commit(ready["preview"], ready["size_mm"], ready["triangles"],
+                                   persist_preview=True, bounds=ready.get("bounds"))
         project["history"] = [summary(m) for m in store.list(actor.sid)]
         return project
 
     def body():
         try:
+            if client_view:
+                triangles, bounds = editproj.binary_stl_bounds(data)
+                yield json.dumps({"phase": "view", "done": triangles, "total": triangles, "unit": "triangles"}) + "\n"
+                bid, project = commit(editproj.slim_preview(triangles > editproj.MAX_PREVIEW_FACES),
+                                      bounds["size_mm"], triangles, persist_preview=False, bounds=bounds)
+                yield json.dumps({"phase": "interactive", "slice_ready": False, "project": project}) + "\n"
+                try:
+                    store_view_file(bid)
+                except Exception:
+                    import logging
+                    logging.getLogger("zeim.import").exception("preview file was not stored")
+                bookkeeping()
+                return
             ready = {}
             for ev in editproj.iter_binary_stl_preview(data):
                 if ev.get("phase") == "preview_ready":
                     ready = ev
                 else:
                     yield json.dumps(ev) + "\n"
-            bid, project = commit(ready["preview"], ready["size_mm"], ready["triangles"], persist_preview=False)
+            bid, project = commit(ready["preview"], ready["size_mm"], ready["triangles"],
+                                  persist_preview=False, bounds=ready.get("bounds"))
             yield json.dumps({"phase": "interactive", "slice_ready": False, "project": project}) + "\n"
             # After the view line: capacity sweep and the preview file. A slow disk stays behind the line.
-            try:
-                disk_guard()
-                with store.lock:
-                    store.reserve(actor.sid, auto_delete_oldest)
-            except HistoryFull:
-                pass
+            bookkeeping()
             editproj.write_preview(bid, ready["preview"])
         except Exception:
             import logging
@@ -165,6 +214,7 @@ def new_project(
     keep_history: bool = Form(True),
     fdm_big: bool = Form(False),                # FDM tab still sends this. Large STLs are no longer replaced with a simpler mesh.
     progress: str = Form(""),                   # "1": newline JSON phases while the view is built
+    client_view: str = Form(""),                # "1": the browser already drew a sample; do not send those triangles back
     select: str = Form(""),                     # Select mode: traced selection for a photo base (app/core/selectmask.py)
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
@@ -235,7 +285,7 @@ def new_project(
                 base = {"type": "upload", "format": "stl", "units": units}
                 fast_title = title or sample_title or "My model"
                 return _open_large_stl(data, actor, fast_title, beginner, auto_delete_oldest, base, warnings,
-                                       scale, units, progress == "1", background)
+                                       scale, units, progress == "1", background, client_view == "1")
             _gate(data, actor)
             try:
                 mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])     # warn on the converted size (B9)
@@ -304,9 +354,10 @@ def new_project(
 
 
 @router.get("/{bid}")
-def get_project(bid: str, actor: Actor = Depends(get_actor)):
+def get_project(bid: str, brief: int = 0, actor: Actor = Depends(get_actor)):
     _edit_meta(bid, actor)
-    return editproj.payload(bid)
+    # brief=1 is the "is the full check done yet" poll. It must not ship the sampled view again.
+    return editproj.payload(bid, include_preview=not brief)
 
 
 @router.put("/{bid}/support-paint")

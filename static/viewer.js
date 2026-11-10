@@ -38,16 +38,25 @@ export class Viewer {
   }
   load(preview, mode, opts = {}) {
     this.group.clear();
-    for (const b of preview.bodies) {
+    let drawn = 0;
+    for (const b of (preview && preview.bodies) || []) {
+      if (b.positions == null) continue;
       const g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.BufferAttribute(b64(b.positions, Float32Array), 3));
-      g.setIndex(new THREE.BufferAttribute(b64(b.indices, Uint32Array), 1));
-      const gg = opts.flat ? g.toNonIndexed() : g;
+      const pos = b.positions instanceof Float32Array ? b.positions : b64(b.positions, Float32Array);
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      let gg = g;
+      if (b.indices) {
+        const idx = b.indices instanceof Uint32Array ? b.indices : b64(b.indices, Uint32Array);
+        g.setIndex(new THREE.BufferAttribute(idx, 1));
+        gg = opts.flat ? g.toNonIndexed() : g;
+        drawn += idx.length / 3;
+      } else drawn += pos.length / 9;
       gg.computeVertexNormals();
       const color = b.color || (mode === "lithophane" ? "#f2ead8" : "#8fb0e0");
       const m = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05, flatShading: false, wireframe: this.wire });
       const mesh = new THREE.Mesh(gg, m); mesh.userData.object = b.object ?? null; mesh.userData.name = b.name || ""; this.group.add(mesh);
     }
+    if (this.el) this.el.dataset.viewTriangles = String(drawn);
     this.backlit = false; this.scene.background = null;
     if (!opts.keepCamera) this.reset();
   }
