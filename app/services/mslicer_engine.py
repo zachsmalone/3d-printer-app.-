@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 
 from app.core import resin_fileid, resin_slice
+from app.core.affinity import leave_one_cpu
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -201,6 +202,7 @@ def slice_file(stl: Path, out: Path, plate: dict, settings: dict, fmt: str, *, a
 
 
 def _limits() -> None:
+    leave_one_cpu()
     mem_mb = int(os.environ.get("ZEIM_MSLICER_MEM_MB", "4096"))
     cpu_s = int(os.environ.get("ZEIM_MSLICER_CPU_S", "120"))
     try:

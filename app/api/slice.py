@@ -8,6 +8,7 @@ import shutil
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -22,6 +23,7 @@ from app.community.identity import Actor, get_actor
 from app.services import editproj
 from app.core.exporters import mesh_3mf
 from app.services import filament_slots as fslots
+from app.services import slice_inflight
 from app.services import slice_engine as eng
 from app.services import support_extruder
 from app.services.print_setup import printer_public
@@ -37,6 +39,19 @@ _slots = threading.BoundedSemaphore(int(os.environ.get("PHOTO3D_SLICE_CONCURRENC
 
 def _fail(status: int, code: str, message: str):
     raise HTTPException(status_code=status, detail={"code": code, "message": message})
+
+
+@contextmanager
+def _own_slice(sid: str, job: str):
+    """Hold this user/job for the whole slice. A second request gets 409, not another 200."""
+    try:
+        slice_inflight.claim(sid, job)
+    except slice_inflight.SliceBusy:
+        _fail(409, "busy", slice_inflight.BUSY_MESSAGE)
+    try:
+        yield
+    finally:
+        slice_inflight.release(sid, job)
 
 
 def _with_support_extruder(prof, strokes: list):
@@ -208,145 +223,146 @@ def slice_model(
         raise HTTPException(status_code=409, detail={"code": "ventilation_check", "message": warn["title"] + ". " + warn["message"],
                                                      "warning": warn})
 
-    root = slices_root()
-    _prune(root)
-    slice_id = uuid.uuid4().hex
-    work = root / slice_id
-    work.mkdir(parents=True, exist_ok=True)
+    with _own_slice(actor.sid, model_id or ""):
+        root = slices_root()
+        _prune(root)
+        slice_id = uuid.uuid4().hex
+        work = root / slice_id
+        work.mkdir(parents=True, exist_ok=True)
 
-    if not _slots.acquire(blocking=False):
-        shutil.rmtree(work, ignore_errors=True)
-        _fail(503, "busy", "The slicer is busy right now. Please try again in a minute.")
-    try:
-        if file is not None:
-            stl = work / "input.stl"
-            data = file.file.read(MAX_UPLOAD_BYTES + 1)
-            if len(data) > MAX_UPLOAD_BYTES:
-                _fail(413, "too_large", "That file is over the 50 MB limit.")
-            from app.core import meshedit
-            ext = meshedit.guess_model_ext(file.filename or "", data, file.content_type or "")
-            if not ext:
-                _fail(400, "bad_model", "Please upload an .stl, .obj or .3mf file.")
-            if ext == "stl":
-                stl.write_bytes(data)
-            else:                                   # 3MF / OBJ: parse (units → mm) and hand the slicer a binary STL
-                if meshedit.sniff(data, ext):
-                    _fail(400, "bad_model", meshedit.sniff(data, ext))
-                try:
-                    mesh, _w = meshedit.load_mesh(data, ext)
-                except meshedit.OpError as e:
-                    _fail(400, "bad_model", str(e))
-                stl.write_bytes(mesh.export(file_type="stl"))
-        else:
-            shutil.copyfile(resolve_model(model_id, actor), work / "input.stl")  # type: ignore[arg-type]
-            stl = work / "input.stl"
-            plate_objs, skipped = plate_on_bed(model_id, prof)
-            if skipped and plate_objs:              # warnings never block: slice what's on the bed, name the rest
-                import trimesh as _tm
-                stl.write_bytes(_tm.util.concatenate(plate_objs).export(file_type="stl"))
-        fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit or fit, info=(scaling := {}))
-        paint_info = None
-        paint_strokes: list = []
-        model_for_engine = work / "model.stl"
-        if support_paint:
-            from app.services import support_paint as spaint
-            import trimesh
-            try:
-                strokes = spaint.parse_strokes(support_paint)
-            except spaint.PaintError as e:
-                _fail(400, "bad_paint", str(e))
-            if strokes:
-                paint_strokes = strokes
-                mesh = trimesh.load(str(work / "model.stl"), force="mesh")
-                paint_info = spaint.write_paint_3mf(mesh, strokes, work / "model_paint.3mf")
-                model_for_engine = work / "model_paint.3mf"
-                # Painted "need support" areas require supports on; leave the maker's Auto/Everywhere choice.
-                if paint_info["enforcers"] and chosen.get("supports") == "off":
-                    opts = {**opts, "supports": "auto"}
+        if not _slots.acquire(blocking=False):
+            shutil.rmtree(work, ignore_errors=True)
+            _fail(503, "busy", "The slicer is busy right now. Please try again in a minute.")
+        try:
+            if file is not None:
+                stl = work / "input.stl"
+                data = file.file.read(MAX_UPLOAD_BYTES + 1)
+                if len(data) > MAX_UPLOAD_BYTES:
+                    _fail(413, "too_large", "That file is over the 50 MB limit.")
+                from app.core import meshedit
+                ext = meshedit.guess_model_ext(file.filename or "", data, file.content_type or "")
+                if not ext:
+                    _fail(400, "bad_model", "Please upload an .stl, .obj or .3mf file.")
+                if ext == "stl":
+                    stl.write_bytes(data)
+                else:                                   # 3MF / OBJ: parse (units → mm) and hand the slicer a binary STL
+                    if meshedit.sniff(data, ext):
+                        _fail(400, "bad_model", meshedit.sniff(data, ext))
                     try:
-                        prof, chosen = eng.profile_for(printer_id or profile, nozzle, opts)
-                    except eng.SliceError as e:
-                        _fail(e.status, e.code, e.message)
-                    paint_info = {**paint_info, "supports_forced": "auto",
-                                  "supports_note": "You painted areas that need supports, so ZEIM turned Supports on (Auto). You can still pick Everywhere."}
-        if paint_strokes:
-            prof, filament_info = _with_support_extruder(prof, paint_strokes)
-            slot_plan = _keep_support_toolchange(slot_plan, filament_info)
-            if paint_info is not None:
-                paint_info = {**paint_info, "support_filament": filament_info}
-        parts = None
-        if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
-            parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
-        try:
-            res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
-                                       bounds_stl=work / "model.stl", parts=parts)
+                        mesh, _w = meshedit.load_mesh(data, ext)
+                    except meshedit.OpError as e:
+                        _fail(400, "bad_model", str(e))
+                    stl.write_bytes(mesh.export(file_type="stl"))
+            else:
+                shutil.copyfile(resolve_model(model_id, actor), work / "input.stl")  # type: ignore[arg-type]
+                stl = work / "input.stl"
+                plate_objs, skipped = plate_on_bed(model_id, prof)
+                if skipped and plate_objs:              # warnings never block: slice what's on the bed, name the rest
+                    import trimesh as _tm
+                    stl.write_bytes(_tm.util.concatenate(plate_objs).export(file_type="stl"))
+            fitted = fit_to_printer(stl, work / "model.stl", prof, scale_to_fit or fit, info=(scaling := {}))
+            paint_info = None
+            paint_strokes: list = []
+            model_for_engine = work / "model.stl"
+            if support_paint:
+                from app.services import support_paint as spaint
+                import trimesh
+                try:
+                    strokes = spaint.parse_strokes(support_paint)
+                except spaint.PaintError as e:
+                    _fail(400, "bad_paint", str(e))
+                if strokes:
+                    paint_strokes = strokes
+                    mesh = trimesh.load(str(work / "model.stl"), force="mesh")
+                    paint_info = spaint.write_paint_3mf(mesh, strokes, work / "model_paint.3mf")
+                    model_for_engine = work / "model_paint.3mf"
+                    # Painted "need support" areas require supports on; leave the maker's Auto/Everywhere choice.
+                    if paint_info["enforcers"] and chosen.get("supports") == "off":
+                        opts = {**opts, "supports": "auto"}
+                        try:
+                            prof, chosen = eng.profile_for(printer_id or profile, nozzle, opts)
+                        except eng.SliceError as e:
+                            _fail(e.status, e.code, e.message)
+                        paint_info = {**paint_info, "supports_forced": "auto",
+                                      "supports_note": "You painted areas that need supports, so ZEIM turned Supports on (Auto). You can still pick Everywhere."}
+            if paint_strokes:
+                prof, filament_info = _with_support_extruder(prof, paint_strokes)
+                slot_plan = _keep_support_toolchange(slot_plan, filament_info)
+                if paint_info is not None:
+                    paint_info = {**paint_info, "support_filament": filament_info}
+            parts = None
+            if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
+                parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
+            try:
+                res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
+                                           bounds_stl=work / "model.stl", parts=parts)
+            except eng.SliceError as e:
+                # Sculptures that stand on a point (busts, figures) have an empty first layer with supports off and
+                # PrusaSlicer refuses them. Retry once with Supports: Auto and say so, instead of a dead end.
+                if e.code != "first_layer_empty" or (chosen.get("supports") or "off") != "off":
+                    raise
+                prof, chosen = eng.profile_for(printer_id or profile, nozzle, {**opts, "supports": "auto"})
+                chosen = {**chosen, "temp_notes": [AUTO_SUPPORT_NOTE, *(chosen.get("temp_notes") or [])]}
+                prof, filament_info = _with_support_extruder(prof, paint_strokes)
+                if paint_info is not None and filament_info is not None:
+                    paint_info = {**paint_info, "support_filament": filament_info}
+                res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
+                                           bounds_stl=work / "model.stl", parts=parts)
         except eng.SliceError as e:
-            # Sculptures that stand on a point (busts, figures) have an empty first layer with supports off and
-            # PrusaSlicer refuses them. Retry once with Supports: Auto and say so, instead of a dead end.
-            if e.code != "first_layer_empty" or (chosen.get("supports") or "off") != "off":
-                raise
-            prof, chosen = eng.profile_for(printer_id or profile, nozzle, {**opts, "supports": "auto"})
-            chosen = {**chosen, "temp_notes": [AUTO_SUPPORT_NOTE, *(chosen.get("temp_notes") or [])]}
-            prof, filament_info = _with_support_extruder(prof, paint_strokes)
-            if paint_info is not None and filament_info is not None:
-                paint_info = {**paint_info, "support_filament": filament_info}
-            res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
-                                       bounds_stl=work / "model.stl", parts=parts)
-    except eng.SliceError as e:
-        shutil.rmtree(work, ignore_errors=True)
-        _fail(e.status, e.code, e.message)
-    except HTTPException:
-        shutil.rmtree(work, ignore_errors=True)
-        raise
-    finally:
-        _slots.release()
-        (work / "input.stl").unlink(missing_ok=True)
-        memtrim.trim()
-    _g = work / "model.gcode"
-    _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
-    _g.write_text(fslots.gcode_header(slot_plan) + _body)
-    (work / "slots.json").write_text(json.dumps(slot_plan))
-    from app.services import slicer as _sl, willprint
-    stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
-    try:
-        badge = willprint.check_file(work / "model.stl", prof.id, prof.nozzle, slices_ok=True, filament_g=res.filament_grams)
-    except Exception:
-        badge = None
-    from app.services import gcode_hints, gcode_pause
-    hints = gcode_hints.markers(work / "model.stl", chosen.get("supports") or "off", badge)
-    if getattr(actor, "user", None):
+            shutil.rmtree(work, ignore_errors=True)
+            _fail(e.status, e.code, e.message)
+        except HTTPException:
+            shutil.rmtree(work, ignore_errors=True)
+            raise
+        finally:
+            _slots.release()
+            (work / "input.stl").unlink(missing_ok=True)
+            memtrim.trim()
+        _g = work / "model.gcode"
+        _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
+        _g.write_text(fslots.gcode_header(slot_plan) + _body)
+        (work / "slots.json").write_text(json.dumps(slot_plan))
+        from app.services import slicer as _sl, willprint
+        stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
         try:
-            (work / "owner_sid").write_text(actor.sid)
-        except OSError:
-            pass
+            badge = willprint.check_file(work / "model.stl", prof.id, prof.nozzle, slices_ok=True, filament_g=res.filament_grams)
+        except Exception:
+            badge = None
+        from app.services import gcode_hints, gcode_pause
+        hints = gcode_hints.markers(work / "model.stl", chosen.get("supports") or "off", badge)
+        if getattr(actor, "user", None):
+            try:
+                (work / "owner_sid").write_text(actor.sid)
+            except OSError:
+                pass
 
-    slice_events = ["fdm_slice"]
-    if str(supports or "").lower() not in ("", "off", "false", "none", "0"):
-        slice_events.append("supports_slice")
-    if (infill_pattern or "") == "adaptivecubic":
-        slice_events.append("adaptive_infill")
-    return badges.merge({
-        "slice_id": slice_id,
-        "profile": prof.id,
-        "plate_objects": len(parts) if parts else 1,
-        "skipped_objects": skipped,
-        "skipped_note": (f"Skipped {len(skipped)} object{'s' * (len(skipped) > 1)} off the bed: {', '.join(skipped)}. "
-                         "Only the objects on the bed were sliced. Split them onto another plate to print them too.") if skipped else "",
-        "gcode_url": f"/api/slice/{slice_id}/gcode",
-        "print_time_seconds": res.print_time_seconds,
-        "print_time_human": eng.humanize(res.print_time_seconds),
-        "filament_grams": res.filament_grams,
-        "filament_density_g_cm3": chosen.get("filament_density"), "grams_note": chosen.get("grams_note") or "",
-        "model_size_mm": [round(v, 2) for v in res.size_mm],
-        "printer_id": prof.id, "printer": prof.name, "nozzle": prof.nozzle, "settings": chosen,
-        "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
-        "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
-        "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
-        "support_paint": paint_info, "slots": slot_plan["slots"], "slot_notes": slot_plan["notes"],
-        "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
-        "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
-                      "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
-    }, actor, *slice_events)
+        slice_events = ["fdm_slice"]
+        if str(supports or "").lower() not in ("", "off", "false", "none", "0"):
+            slice_events.append("supports_slice")
+        if (infill_pattern or "") == "adaptivecubic":
+            slice_events.append("adaptive_infill")
+        return badges.merge({
+            "slice_id": slice_id,
+            "profile": prof.id,
+            "plate_objects": len(parts) if parts else 1,
+            "skipped_objects": skipped,
+            "skipped_note": (f"Skipped {len(skipped)} object{'s' * (len(skipped) > 1)} off the bed: {', '.join(skipped)}. "
+                             "Only the objects on the bed were sliced. Split them onto another plate to print them too.") if skipped else "",
+            "gcode_url": f"/api/slice/{slice_id}/gcode",
+            "print_time_seconds": res.print_time_seconds,
+            "print_time_human": eng.humanize(res.print_time_seconds),
+            "filament_grams": res.filament_grams,
+            "filament_density_g_cm3": chosen.get("filament_density"), "grams_note": chosen.get("grams_note") or "",
+            "model_size_mm": [round(v, 2) for v in res.size_mm],
+            "printer_id": prof.id, "printer": prof.name, "nozzle": prof.nozzle, "settings": chosen,
+            "filament_mm": float(stats["filament_mm"]) if stats.get("filament_mm") else None,
+            "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
+            "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
+            "support_paint": paint_info, "slots": slot_plan["slots"], "slot_notes": slot_plan["notes"],
+            "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
+            "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
+                          "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
+        }, actor, *slice_events)
 
 
 AUTO_SUPPORT_NOTE = ("Only a small point of this model touches the bed, so ZEIM turned Supports on (Auto) to give it a "
