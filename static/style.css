@@ -804,7 +804,21 @@ html[data-theme=dark][data-cb=blueyellow]{--ok:#5ED6A9;--okbg:#0B2A20;--bad:#FF8
 @media (forced-colors:active){.logoimg{forced-color-adjust:none;background:#fff;padding:2px 6px;border-radius:6px}html[data-theme=dark] .logo-light{display:block!important}html[data-theme=dark] .logo-dark{display:none!important}}
 .rzDrop{min-height:96px;gap:6px}.rzDrop .i{width:24px;height:24px;color:var(--accink)}#rzFileStatus:empty{display:none}
 #rzFileStatus{overflow-wrap:anywhere;word-break:break-word;min-width:0}.rzRow>.field{min-width:0}.rzDrop{max-width:100%;box-sizing:border-box}.rzDrop input[type=file]{max-width:100%}
+.rzView{position:relative;width:100%;height:min(56vw,320px);min-height:200px;border-radius:8px;overflow:hidden}
 @media (max-width:480px){.rzRow{grid-template-columns:1fr}.rzRow #rzPrinter{width:100%}}
+/* The viewer used to sit in the right cell of a 50/50 row, so the left half was only the printer menu. With a model open, the viewer takes the width and the support controls sit beside it. */
+@media (min-width:960px){
+  #viewTorch.has-model{max-width:min(1680px,100%)}
+  #viewTorch.has-model .rzRow{grid-template-columns:minmax(0,1fr)}
+  #viewTorch.has-model .rzRow>.field:first-child{max-width:480px}
+  #viewTorch.has-model .rzFileCol{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,min(400px,32%));grid-template-areas:"label label" "drop drop" "status status" "view supports" "hint supports";gap:8px 16px;align-items:start}
+  #viewTorch.has-model .rzFileCol>label{grid-area:label}
+  #viewTorch.has-model #rzDrop{grid-area:drop}
+  #viewTorch.has-model #rzFileStatus{grid-area:status;margin:0}
+  #viewTorch.has-model #rzPickView{grid-area:view;height:min(68vh,720px);min-height:380px}
+  #viewTorch.has-model #rzCamHint{grid-area:hint;margin:0}
+  #viewTorch.has-model #rzSupEdit{grid-area:supports;margin:0;align-self:start;min-width:0}
+}
 
 /* phone tap targets (QA 2026-10-22) */
 @media (max-width:768px){.topbar .nav{overflow-x:auto;scrollbar-width:none}.topbar .nav button{flex:1 0 44px;min-width:44px}}

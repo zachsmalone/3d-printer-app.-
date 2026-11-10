@@ -354,9 +354,9 @@ function panelHTML() {
   const brands = [...new Set(cat.printers.map(p => p.brand))];
   return `<h2>Resin print settings</h2>
     <div class="grid2 rzRow"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
-    <div class="field"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
+    <div class="field rzFileCol"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p>
-      <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div>
+      <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden></div>
       <p class="help" id="rzCamHint">${CAM_HINT}</p>
       <fieldset class="rzOrient" id="rzSupEdit" hidden><legend>Supports on the model</legend>
         <p class="help" id="rzSupRule">A green mark is the point you tapped for a support. A red mark is the keep-clear point you tapped. Both stay on that point when the view turns.</p>
