@@ -21,6 +21,7 @@ from pathlib import Path
 import trimesh
 
 from app.core import resin_fileid, resin_slice
+from app.core.affinity import leave_one_cpu
 
 COMMIT = "97596a55882cb139bbcf96bb98b211f82ae4c5f0"
 VERSION = "2.1.1"
@@ -234,6 +235,7 @@ def slice_file(
 
 
 def _limits() -> None:
+    leave_one_cpu()
     mem_mb = int(os.environ.get("ZEIM_DRAGONFRUIT_MEM_MB", "4096"))
     cpu_s = int(os.environ.get("ZEIM_DRAGONFRUIT_CPU_S", "180"))
     try:

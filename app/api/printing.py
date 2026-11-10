@@ -12,6 +12,7 @@ from ..services.history import store
 from ..community import badges, privacy
 from ..community.identity import Actor, get_actor
 from . import guards
+from . import slice as slice_api
 from .builds import load_model, meta_for
 
 router = APIRouter(prefix="/api")
@@ -141,7 +142,13 @@ def slice_build(bid: str, actor: Actor = Depends(get_actor), layer_height: float
         if not nozzle and user_pr.get("nozzle") is not None:
             nozzle = str(user_pr["nozzle"])
     chosen = {"printer_id": catalog_printer, "nozzle": nozzle} if catalog_printer else {}
-    res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr), **chosen)
+    with slice_api._own_slice(actor.sid, bid):
+        if not slice_api._slots.acquire(blocking=False):
+            slice_api._fail(503, "busy", "The slicer is busy right now. Please try again in a minute.")
+        try:
+            res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr), **chosen)
+        finally:
+            slice_api._slots.release()
     if pr:
         res["bed"] = list(printers.bed_of(pr))
     elif catalog_printer:
@@ -177,7 +184,13 @@ def send_to_printer(bid: str, request: Request, actor: Actor = Depends(get_actor
         raise HTTPException(404, "unknown printer")
     if pr["type"] not in printers.IMPLEMENTED:
         return JSONResponse(printers.send(pr, None, "", start))  # clear stub message
-    res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr))
+    with slice_api._own_slice(actor.sid, bid):
+        if not slice_api._slots.acquire(blocking=False):
+            slice_api._fail(503, "busy", "The slicer is busy right now. Please try again in a minute.")
+        try:
+            res = _slice(bid, layer_height, fill_density, upright, supports, brim, printers.bed_of(pr), printers.ini_of(pr))
+        finally:
+            slice_api._slots.release()
     if not res.get("ok"):
         return JSONResponse({"ok": False, "stage": "slice", **res})
     filament_g = None

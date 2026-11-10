@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from app.core.affinity import leave_one_cpu
+
 log = logging.getLogger("zeim.slice")
 
 SLICE_TIMEOUT_S = int(os.environ.get("PHOTO3D_SLICE_TIMEOUT", "300"))
@@ -191,8 +193,10 @@ def find_engine() -> Optional[str]:
 
 def _slice_rlimits():
     """Cap the slicer process's memory (RLIMIT_AS) so one huge mesh can't OOM the host.
-    Default 2560 MB, env-tunable (PHOTO3D_SLICE_MEM_MB, 0 = off)."""
+    Default 2560 MB, env-tunable (PHOTO3D_SLICE_MEM_MB, 0 = off).
+    One CPU stays with the web process so /healthz can answer while PrusaSlicer runs."""
     import resource
+    leave_one_cpu()
     mb = SLICE_MEM_MB
     if mb <= 0:
         return

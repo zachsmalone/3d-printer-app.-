@@ -300,8 +300,12 @@ def service_worker():
 
 
 @app.get("/healthz", include_in_schema=False)
-def healthz():
-    """Liveness probe for containers / uptime monitors: no auth, no cookies, no user data."""
+async def healthz():
+    """Liveness probe for containers / uptime monitors: no auth, no cookies, no user data.
+
+    Async so a full worker-thread pool (every thread waiting on a slice or prepare)
+    cannot stop the probe. The probe does no disk or session work.
+    """
     return {"status": "ok"}
 
 

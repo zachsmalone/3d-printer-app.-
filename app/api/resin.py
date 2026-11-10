@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -20,6 +22,7 @@ from .. import config
 from ..community import badges
 from ..community.identity import Actor, get_actor
 from ..core import guard, meshedit, resin, resin_fileid, resin_slice, resin_sources
+from ..services import procjob
 from ..services import resin_jobs
 from ..services import editproj
 from ..services import filenames as fnames
@@ -157,7 +160,36 @@ def _to_stl(data):
     return m.export(file_type="stl")
 
 
+def _note_worker():
+    """When ZEIM_HEAVY_REPORT is set, record whether this worker inherited the web process.
+
+    A fork of the server sees a mark set only in the parent. A fresh interpreter does not.
+    ZEIM_HEAVY_HOLD_S burns CPU here so a concurrency test can watch /healthz during prepare.
+    Both are unset in production.
+    """
+    report = os.environ.get("ZEIM_HEAVY_REPORT", "")
+    if report:
+        Path(report).write_text(json.dumps({
+            "pid": os.getpid(),
+            "saw_parent_mark": bool(getattr(sys.modules[__name__], "_HEAVY_PARENT_MARK", False)),
+        }))
+    raw = os.environ.get("ZEIM_HEAVY_HOLD_S", "")
+    if not raw:
+        return
+    try:
+        seconds = float(raw)
+    except ValueError:
+        return
+    if seconds <= 0 or seconds > 30:
+        return
+    end = time.perf_counter() + seconds
+    token = 0
+    while time.perf_counter() < end:
+        token = (token + 1) & 0xFFFFFFFF
+
+
 def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False, manual=None, avoid=None):
+    _note_worker()
     m, n_in, fit_note = _load_fit(data, ext, simplify)
     note = note or fit_note
     out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains, manual_supports=manual, avoid=avoid)
@@ -233,7 +265,7 @@ def preview(file: UploadFile = File(...), printer_id: str = Form(""), simplify: 
         try:
             bed = _bed_for(printer_id)
             do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
-            stl, n, note = guard.run(_preview, data, ext, bed, do_simplify, timeout=180, mem_mb=RESIN_MEM_MB)
+            stl, n, note = procjob.call(_preview, (data, ext, bed, do_simplify), timeout=180, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -271,7 +303,7 @@ def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y
                     printer_id: str = Form(""), supports: str = Form("true"),
                     base_lift_mm: str = Form(""), raft_mm: str = Form(""),
                     points: str = Form("[]"), kinds: str = Form("[]"), actor: Actor = Depends(get_actor)):
-    """The point a mark will store. A support point is where the pillar will touch. A keep-clear point is the exclusion coordinate."""
+    """The point a mark will store. A support point stays on the tapped face. A keep-clear point is that same coordinate."""
     raw = _points(points, "Support contact")
     try:
         kind_list = json.loads(kinds) if kinds else []
@@ -369,12 +401,12 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
             # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
             # A package whose mesh is a separate large part needs the same budget as prepare. This does not raise the process-wide cap.
-            data, ext = guard.run(_to_stl, data, timeout=120, mem_mb=RESIN_MEM_MB), "stl"
+            data, ext = procjob.call(_to_stl, (data,), timeout=120, mem_mb=RESIN_MEM_MB), "stl"
         if not _one.acquire(timeout=ONE_WAIT_S):
             raise guard.Busy()
         try:
             do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
-            stl, tmf, rep = guard.run(_work, data, ext, s, bed, isl, drn, note, do_simplify, manual, avoid, timeout=240, mem_mb=RESIN_MEM_MB)
+            stl, tmf, rep = procjob.call(_work, (data, ext, s, bed, isl, drn, note, do_simplify, manual, avoid), timeout=240, mem_mb=RESIN_MEM_MB)
         finally:
             _one.release()
     except meshedit.OpError as e:
@@ -396,12 +428,12 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         meta["printer"] = printer_meta
     (d / f"{rid}.json").write_text(json.dumps(meta))
     (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
-    reported = (rep.get("support") or {}).get("manual_contact")
-    contact = manual if reported is None else reported
+    # The marks stay on the points the maker tapped. manual_contact is where a pillar
+    # was actually built, which can be a shorter list when a pillar would run through the model.
     (d / f"{rid}.supports.json").write_text(json.dumps({
-        "manual": contact, "avoid": avoid, "sid": actor.sid,
+        "manual": manual, "avoid": avoid, "sid": actor.sid,
     }))
-    rep["support_edit"] = {"manual": contact, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
+    rep["support_edit"] = {"manual": manual, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
     return badges.merge(rep, actor, "resin_slice")

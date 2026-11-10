@@ -51,6 +51,7 @@ function ensureViewer() {
   wireDrag(viewer);
   return viewer;
 }
+addEventListener("zeim:viewer-resize", () => { if (viewer) viewer.resize(); });
 
 /* ---------- opening / creating projects ---------- */
 async function postUpload(url, fd, signal, onUpload, onEvent) {
