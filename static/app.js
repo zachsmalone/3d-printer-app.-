@@ -843,7 +843,16 @@ $("#btnQueueAdd")?.addEventListener("click", async () => {
 });
 $("#btnOpenBoard")?.addEventListener("click", () => window.ZEIM_openPrinterBoard?.());
 
+let sliceRuns = 0;
 $("#btnSlice").onclick = async () => {
+  sliceRuns += 1;
+  const lead = sliceRuns === 1;
+  if (!lead) {
+    try { await api(`/api/slice/${printId}`, { method: "POST", body: sliceOpts() }); }
+    catch { /* the slice already on screen is still working */ }
+    finally { sliceRuns -= 1; }
+    return;
+  }
   $("#sliceOut").textContent = "Slicing…";
   try {
     const r = await api(`/api/slice/${printId}`, { method: "POST", body: sliceOpts() });
@@ -855,7 +864,10 @@ $("#btnSlice").onclick = async () => {
       $("#sliceOut").innerHTML = `Done: ${r.layers} layers${est ? ", " + est : " (the slicer gave no time/filament estimate)"} · <a href="${r.download}" download>download G-code</a>` +
         `<br><small>${esc(r.stats_note || "")}</small>`;
     }
-  } catch (e) { $("#sliceOut").textContent = e.message; }
+  } catch (e) {
+    if (e.status === 409 && e.body?.detail?.code === "busy") $("#sliceOut").textContent = e.message || "This slice is still working.";
+    else $("#sliceOut").textContent = e.message;
+  } finally { sliceRuns -= 1; }
 };
 function transferLead(r) {
   if (!r || !r.ok) return "";

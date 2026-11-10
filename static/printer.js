@@ -446,9 +446,18 @@ export function wirePanel(getModelId) {
     el.hidden = !on;
     if (label && text) label.textContent = text;
   };
+  let sliceRuns = 0;
   const doSlice = async (ventOk = false) => {
     const out = $("#spOut"), fd = readPanel(); fd.append("model_id", getModelId());
     if (ventOk) fd.append("ventilation_ok", "true");
+    sliceRuns += 1;
+    const lead = sliceRuns === 1;
+    if (!lead) {
+      try { await api("/api/slice", { method: "POST", body: fd }); }
+      catch { /* the slice already on screen is still working */ }
+      finally { sliceRuns -= 1; }
+      return;
+    }
     $("#spMatWarn").hidden = false;
     if (gcDispose) { gcDispose(); gcDispose = null; }
     out.innerHTML = `<p class="help">Slicing for the ${esc(prefLabel())}. The triangles are not reduced. Checks finish before a result is shown. The preview starts after that.</p>`; $("#spGo").disabled = true;
@@ -513,7 +522,9 @@ export function wirePanel(getModelId) {
         out.querySelector("a[download]")?.focus();
       }
     } catch (e) {
-      if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
+      if (e.status === 409 && e.body?.detail?.code === "busy") {
+        out.innerHTML = `<p class="help" role="status">${esc(e.message || "This slice is still working.")}</p>`;
+      } else if (e.status === 409 && e.body?.detail?.code === "ventilation_check") {     // warn, then allow: the maker must read this once
         const sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = false;
         out.innerHTML = matWarnHTML(e.body.detail.warning?.material || $("#spMat").value, { ask: true });
         $("#spMatWarn").hidden = true;                                           // one copy on screen (the one that asks)
@@ -523,7 +534,7 @@ export function wirePanel(getModelId) {
       } else if (e.name === "AbortError") out.innerHTML = `<p class="help" role="status">Stopped waiting for this slice. Nothing was sent to a printer. Press Slice to try again.</p>`;
       else out.innerHTML = `<p class="help warn" role="alert">${esc(e.message)}</p>`;
     }
-    finally { clearInterval(tick); if (stop) { stop.hidden = true; stop.onclick = null; } $("#spGo").disabled = false; bedBusy(false); }
+    finally { sliceRuns -= 1; clearInterval(tick); if (stop) { stop.hidden = true; stop.onclick = null; } $("#spGo").disabled = false; bedBusy(false); }
   };
   $("#spGo").onclick = () => doSlice(false);
   applySmartFix();
