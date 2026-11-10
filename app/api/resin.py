@@ -303,7 +303,7 @@ def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y
                     printer_id: str = Form(""), supports: str = Form("true"),
                     base_lift_mm: str = Form(""), raft_mm: str = Form(""),
                     points: str = Form("[]"), kinds: str = Form("[]"), actor: Actor = Depends(get_actor)):
-    """The point a mark will store. A support point is where the pillar will touch. A keep-clear point is the exclusion coordinate."""
+    """The point a mark will store. A support point stays on the tapped face. A keep-clear point is that same coordinate."""
     raw = _points(points, "Support contact")
     try:
         kind_list = json.loads(kinds) if kinds else []
@@ -428,12 +428,12 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         meta["printer"] = printer_meta
     (d / f"{rid}.json").write_text(json.dumps(meta))
     (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
-    reported = (rep.get("support") or {}).get("manual_contact")
-    contact = manual if reported is None else reported
+    # The marks stay on the points the maker tapped. manual_contact is where a pillar
+    # was actually built, which can be a shorter list when a pillar would run through the model.
     (d / f"{rid}.supports.json").write_text(json.dumps({
-        "manual": contact, "avoid": avoid, "sid": actor.sid,
+        "manual": manual, "avoid": avoid, "sid": actor.sid,
     }))
-    rep["support_edit"] = {"manual": contact, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
+    rep["support_edit"] = {"manual": manual, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
     rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
     rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
     return badges.merge(rep, actor, "resin_slice")

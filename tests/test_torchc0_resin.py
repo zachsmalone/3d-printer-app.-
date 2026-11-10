@@ -562,9 +562,9 @@ def test_manual_support_and_keep_clear_change_the_mesh_and_the_slice(tmp_path):
     assert sum(with_support["lit"]) > sum(without["lit"])
 
 
-def test_top_tap_mark_is_the_pillar_contact_and_keep_clear_is_not_moved():
-    """A click on an upward face is not the green mark. The mark and the pillar meet the underside below it.
-    A keep-clear point is stored as given once it is already that underside."""
+def test_tapped_face_stays_put_and_an_open_underside_still_builds_a_pillar():
+    """A tap on the top or a side stays on that face. It is not moved to another face.
+    A point already on an open underside still grows a pillar there."""
     base = _box([10, 10, 2], [0, 0, 1])
     wing = _box([6, 6, 4], [8, 0, 10])
     raw = trimesh.util.concatenate([base, wing])
@@ -573,37 +573,40 @@ def test_top_tap_mark_is_the_pillar_contact_and_keep_clear_is_not_moved():
     crown = placed.vertices[placed.vertices[:, 2] > top_z - 0.2]
     top = [float(crown[:, 0].mean()), float(crown[:, 1].mean()), top_z]
     hit, moved = resin.contact_point(placed, top)
-    assert moved is True
-    assert hit[2] == pytest.approx(8, abs=0.15)
+    assert moved is False
+    assert hit[2] == pytest.approx(top[2], abs=0.2)
     assert abs(hit[0] - top[0]) < 0.2 and abs(hit[1] - top[1]) < 0.2
+    side_vs = placed.vertices[np.abs(placed.vertices[:, 0] - placed.bounds[1][0]) < 0.05]
+    side = [float(side_vs[:, 0].mean()), float(side_vs[:, 1].mean()), float(side_vs[:, 2].mean())]
+    side_hit, side_moved = resin.contact_point(placed, side)
+    assert side_moved is False and np.linalg.norm(side_hit - side) < 0.35
+    under = [top[0], top[1], 8.0]
+    uhit, umoved = resin.contact_point(placed, under)
+    assert umoved is False and uhit[2] == pytest.approx(8, abs=0.2)
     quiet = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": "0", "layer_mm": "0.2"})
-    out, rep = resin.prepare(raw, quiet, manual_supports=[top])
+    out, rep = resin.prepare(raw, quiet, manual_supports=[uhit.tolist()])
     contact = rep["support"]["manual_contact"][0]
-    assert contact[2] == pytest.approx(float(hit[2]), abs=0.05)
-    assert abs(contact[0] - top[0]) < 0.3 and abs(contact[1] - top[1]) < 0.3
+    assert contact[2] == pytest.approx(float(uhit[2]), abs=0.15)
+    assert abs(contact[0] - under[0]) < 0.3 and abs(contact[1] - under[1]) < 0.3
     xy = np.linalg.norm(out.vertices[:, :2] - contact[:2], axis=1)
     band = out.vertices[(xy < 0.6) & (out.vertices[:, 2] < contact[2] - 0.3) & (out.vertices[:, 2] > contact[2] - 2.0)]
     bare_xy = np.linalg.norm(placed.vertices[:, :2] - contact[:2], axis=1)
     bare = placed.vertices[(bare_xy < 0.6) & (placed.vertices[:, 2] < contact[2] - 0.3) & (placed.vertices[:, 2] > contact[2] - 2.0)]
     assert len(band) > 0 and len(bare) == 0
+    top_out, top_rep = resin.prepare(raw, quiet, manual_supports=[top])
+    assert all(abs(c[2] - top[2]) < 0.4 for c in top_rep["support"]["manual_contact"])
+    assert top_out is not None
     avoid = [round(contact[0] + 1.5, 3), round(contact[1], 3), round(contact[2], 3)]
     _, kept = resin.prepare(raw, quiet, manual_supports=[contact], avoid=[avoid])
     assert kept["support"]["avoid"] == [avoid]
     assert kept["support"]["manual_contact"][0] == pytest.approx(contact, abs=0.05)
     turned = resin.place_on_bed(placed, 90, 0)
     sent = _mul(resin.placement_matrix(placed, 90, 0), hit)
-    again, _moved_again = resin.contact_point(turned, sent)
-    posed = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": "90", "layer_mm": "0.2"})
-    _, posed_rep = resin.prepare(placed, posed, manual_supports=[sent.tolist()])
-    posed_contact = posed_rep["support"]["manual_contact"][0]
-    assert posed_contact == pytest.approx(list(again), abs=0.08)
-    closest, dist, face_id = trimesh.proximity.closest_point(turned, [sent])
-    faces_down = float(dist[0]) <= 0.35 and float(turned.face_normals[int(face_id[0])][2]) < -0.2
-    if not faces_down:
-        assert np.linalg.norm(np.asarray(posed_contact) - sent) > 0.5
+    again, moved_again = resin.contact_point(turned, sent)
+    assert moved_again is False and np.linalg.norm(np.asarray(again) - sent) < 0.35
 
 
-def test_support_contact_endpoint_returns_the_underside(c):
+def test_support_contact_endpoint_stays_on_the_tapped_face(c):
     import json
     base = _box([10, 10, 2], [0, 0, 1])
     wing = _box([6, 6, 4], [8, 0, 10])
@@ -621,7 +624,8 @@ def test_support_contact_endpoint_returns_the_underside(c):
     })
     assert body.status_code == 200, body.text
     hit = body.json()["contacts"][0]
-    assert hit["ok"] is True and hit["moved"] is True and hit["point"][2] < top[2] - 1
+    assert hit["moved"] is False and abs(hit["point"][2] - top[2]) < 0.4
+    assert abs(hit["point"][0] - top[0]) < 0.4 and abs(hit["point"][1] - top[1]) < 0.4
     avoid = c.post("/api/resin/support-contact", data={
         "upload_id": uid, "tilt_deg": "0", "supports": "true",
         "points": json.dumps([hit["point"]]), "kinds": json.dumps(["avoid"]),
@@ -641,7 +645,8 @@ def test_support_contact_endpoint_returns_the_underside(c):
     })
     projected = side_support.json()["contacts"][0]
     kept = side_avoid.json()["contacts"][0]
-    assert projected["moved"] is True and projected["point"][2] < side[2] - 1
+    assert projected["moved"] is False
+    assert max(abs(a - b) for a, b in zip(projected["point"], side)) < 0.4
     assert kept["moved"] is False and kept["point"] == side
     floor = loaded.vertices[loaded.vertices[:, 2] < 0.2]
     plate_pt = [round(float(floor[:, 0].mean()), 3), round(float(floor[:, 1].mean()), 3), 0.0]
@@ -765,8 +770,7 @@ def test_advanced_support_controls_are_inside_rz_adv_and_wired():
     assert 'tip_mm: $("#rzTip").value' in js
     assert 'shaft_mm: $("#rzShaft").value' in js
     assert 'raft_mm: $("#rzRaft").value' in js
-    assert 'fd.append("base_lift_mm", $("#rzBaseLift").value)' in js
-    assert 'fd.append("raft_mm", $("#rzRaft").value)' in js
+    assert 'Object.entries(v).forEach(([k, x]) => fd.append(k, x))' in js
 
 
 def test_api_support_fields_and_formats_note(c):
