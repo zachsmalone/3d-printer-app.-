@@ -11,6 +11,8 @@ from functools import lru_cache
 from pathlib import Path
 
 from app import printers as catalog
+from app.services import slice_engine as slice_eng
+from app.services.support_extruder import idle as support_filament_idle, status as support_filament_status
 
 SPECS_PATH = Path(__file__).resolve().parents[2] / "data" / "nozzles" / "nozzle-specs.json"
 # Catalog printer -> family key in nozzle-specs.json printer_nozzle_availability (and its manufacturer_profile brand).
@@ -154,10 +156,40 @@ def printer_public(pid: str) -> dict:
             "multi_color_system": list(systems), "filament_slots": 1 if resin else slot_count_for_systems(systems)}
 
 
+def support_filament_catalog(row: dict) -> dict:
+    """Support-filament picker for one catalog row. Follows the ini ZEIM loads for that printer."""
+    slots = int(row.get("filament_slots") or 1)
+    if row.get("technology") == "Resin" or not row.get("nozzles"):
+        return support_filament_idle(slots)
+    nozzle = row.get("stock_nozzle_mm") or row["nozzles"][0]
+    try:
+        prof, _settings = slice_eng.profile_for(row["id"], nozzle, {})
+    except slice_eng.SliceError:
+        return support_filament_idle(slots)
+    return support_filament_status(prof.ini, slots)
+
+
+@lru_cache(maxsize=None)
+def _support_filament_cached(pid: str) -> tuple:
+    info = support_filament_catalog(printer_public(pid))
+    return (info["can_drive"], info["extruder_count"], info["message"], tuple(info["choices"]))
+
+
+def support_filament_for(pid: str) -> dict:
+    can_drive, count, message, choices = _support_filament_cached(pid)
+    return {"can_drive": can_drive, "extruder_count": count, "message": message, "choices": list(choices)}
+
+
 def public() -> dict:
     mats = catalog.load_materials()
+    ids = sorted(_catalog(), key=lambda k: printer_public(k)["name"])
+    printers = []
+    for pid in ids:
+        row = printer_public(pid)
+        row["support_filament"] = support_filament_for(pid)
+        printers.append(row)
     return {"default": {"printer_id": DEFAULT_PRINTER, "nozzle": DEFAULT_NOZZLE}, "nozzles": list(NOZZLES),
-            "printers": [printer_public(pid) for pid in sorted(_catalog(), key=lambda k: printer_public(k)["name"])],
+            "printers": printers,
             "patterns": list(BEGINNER_PATTERNS), "patterns_advanced": list(PATTERNS),
             "patterns_solid": list(SOLID_PATTERNS), "supports": list(SUPPORTS),
             # the preset's own numbers too, so the Advanced fields start from the preset the maker picked (not from Standard's numbers)
