@@ -75,9 +75,9 @@ def test_three_colours_two_slots_folds_and_warns():
     assert any("continue" in n for n in info["notes"])
 
 
-def _slice(client, stl, slots):
+def _slice(client, stl, slots, single_slot="1"):
     r = client.post("/api/slice", data={"printer_id": "creality_k1", "nozzle": "0.4", "supports": "off",
-                                        "material": "PLA", "slots": slots},
+                                        "material": "PLA", "slots": slots, "single_slot": single_slot},
                     files={"file": ("t.stl", stl, "application/sla")})
     assert r.status_code == 200, r.text
     return r.json()

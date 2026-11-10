@@ -154,16 +154,33 @@ function slotsHTML(p, mats) {
     }).join("")}
     <p class="help" id="spSlotNotes" aria-live="polite"></p></fieldset>`;
 }
-/* One physical slot on a CFS / AMS / MMU / ACE. Default on. Copy comes from the catalog, including what the printer may still do itself. */
+/* One physical slot on a CFS / AMS / MMU / ACE. Off until the maker confirms. The switch is the same segmented control as Beginner / Advanced. */
+const SINGLE_SHORT = "Skips bed leveling. Untested on hardware.";
+const SINGLE_WARN = "This skips the printer's calibration and bed leveling. The first layer may not stick or may be uneven. The printer's firmware may still check the other slots. This has not been tested on hardware yet.";
 function singleSlotHTML(p) {
   const o = p?.single_slot_option;
   if (!o) return "";
   const n = +o.slots || 4;
   const opts = Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i === 0 ? " selected" : ""}>${i + 1}</option>`).join("");
+  const x = `<svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   return `<fieldset class="spslots" id="spSingleSlotBox"><legend>One filament slot</legend>
-    <label class="chk" for="spSingleSlot"><input type="checkbox" id="spSingleSlot" checked> ${esc(o.label || "Single slot: skip calibration and unused-slot checks")}</label>
-    <div class="spslot"><label for="spSingleSlotN">Slot</label><select id="spSingleSlotN">${opts}</select></div>
-    <p class="help" id="spSingleSlotNote">${esc(o.note || "")}</p></fieldset>`;
+    <p id="spSingleSlotLabel">${esc(o.label || "Single slot: skip calibration and unused-slot checks")}</p>
+    <div class="spslot">
+      <div class="segmented" role="group" aria-labelledby="spSingleSlotLabel">
+        <button type="button" id="spSingleOff" aria-pressed="true">Off</button>
+        <button type="button" id="spSingleOn" aria-pressed="false">On</button>
+      </div>
+      <p class="help" id="spSingleSlotBeside">${esc(o.short_note || SINGLE_SHORT)}</p>
+    </div>
+    <div class="spslot"><label for="spSingleSlotN">Slot</label><select id="spSingleSlotN" disabled>${opts}</select></div>
+    <p class="help" id="spSingleSlotNote">${esc(o.note || "")}</p></fieldset>
+    <dialog id="spSingleAsk" aria-labelledby="spSingleAskTitle">
+      <div class="dlg">
+        <div class="dh"><h3 id="spSingleAskTitle">Skip calibration and bed leveling?</h3><button type="button" class="x" id="spSingleAskX" aria-label="Close">${x}</button></div>
+        <div class="body"><p id="spSingleAskText">${esc(o.warn || SINGLE_WARN)}</p></div>
+        <div class="df"><button type="button" class="btn" id="spSingleCancel">Cancel</button><button type="button" class="btn primary" id="spSingleTurnOn">Turn on</button></div>
+      </div>
+    </dialog>`;
 }
 const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 /* Beginner keeps the short row. Advanced adds every PrusaSlicer 2.9 sparse pattern.
@@ -338,9 +355,9 @@ function readPanel() {
   if ($("#spFit").checked) fd.append("scale_to_fit", "true");
   const paint = getStrokes();
   if (paint.length) fd.append("support_paint", JSON.stringify(paint));
-  const single = $("#spSingleSlot");
-  if (single) fd.append("single_slot", single.checked ? "1" : "0");
-  if (single?.checked) {
+  const singleOn = $("#spSingleOn")?.getAttribute("aria-pressed") === "true";
+  if ($("#spSingleOff")) fd.append("single_slot", singleOn ? "1" : "0");
+  if (singleOn) {
     fd.append("slots", $("#spSingleSlotN")?.value || "1");
   } else {
     const on = [...document.querySelectorAll("[name=spSlotOn]:checked")].map(c => +c.value);
@@ -378,16 +395,47 @@ export function wirePanel(getModelId) {
   document.addEventListener("zeim:proc-tab", syncSupportSheet);
   syncSupportSheet();
   const slotBox = $("#spSlots");
-  const single = $("#spSingleSlot");
   const matField = mat.closest(".field");
+  const singleOn = () => $("#spSingleOn")?.getAttribute("aria-pressed") === "true";
   const syncSingle = () => {
-    const direct = !!(single && single.checked);
+    const direct = singleOn();
     const picker = $("#spSingleSlotN");
     if (picker) picker.disabled = !direct;
     if (slotBox) slotBox.hidden = direct;
     if (matField) matField.hidden = !!(slotBox && !slotBox.hidden);
   };
-  if (single) single.addEventListener("change", syncSingle);
+  const setSingle = (on) => {
+    $("#spSingleOff")?.setAttribute("aria-pressed", on ? "false" : "true");
+    $("#spSingleOn")?.setAttribute("aria-pressed", on ? "true" : "false");
+    syncSingle();
+  };
+  const singleAsk = () => {
+    const inPanel = document.querySelector("#slicePanel #spSingleAsk");
+    document.querySelectorAll("#spSingleAsk").forEach(d => { if (inPanel && d !== inPanel) d.remove(); });
+    const d = document.getElementById("spSingleAsk");
+    if (!d) return;
+    if (d.parentElement !== document.body) document.body.appendChild(d);
+    if (!d.open) d.showModal();
+    document.getElementById("spSingleCancel")?.focus();
+  };
+  const closeSingleAsk = (turnOn) => {
+    setSingle(!!turnOn);
+    const d = document.getElementById("spSingleAsk");
+    if (d?.open) d.close();
+  };
+  const offBtn = $("#spSingleOff"), onBtn = $("#spSingleOn");
+  if (offBtn) offBtn.onclick = () => closeSingleAsk(false);
+  if (onBtn) onBtn.onclick = () => { if (!singleOn()) singleAsk(); };
+  const inPanelAsk = document.querySelector("#slicePanel #spSingleAsk");
+  document.querySelectorAll("#spSingleAsk").forEach(d => { if (inPanelAsk && d !== inPanelAsk) d.remove(); });
+  const ask = document.getElementById("spSingleAsk");
+  if (ask && !ask.dataset.wired) {
+    ask.dataset.wired = "1";
+    document.getElementById("spSingleCancel").onclick = () => closeSingleAsk(false);
+    document.getElementById("spSingleAskX").onclick = () => closeSingleAsk(false);
+    document.getElementById("spSingleTurnOn").onclick = () => closeSingleAsk(true);
+    ask.addEventListener("cancel", (e) => { e.preventDefault(); closeSingleAsk(false); });
+  }
   syncSingle();
   if (slotBox) {
     // Multi-head: per-slot material replaces the single Material field while that list is open.

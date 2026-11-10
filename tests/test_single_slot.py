@@ -50,8 +50,10 @@ def test_catalog_option_matches_known_families_and_stays_unverified():
         opt = ss.option_for(pid)
         known = pid in ss.CREALITY_CFS_IDS or any(s in _SYSTEMS for s in systems)
         if known:
-            assert opt["default_on"] is True and opt["hardware_verified"] is False
+            assert opt["default_on"] is False and opt["hardware_verified"] is False
             assert opt["label"] == ss.LABEL
+            assert opt["short_note"] == ss.SHORT_NOTE
+            assert "bed leveling" in opt["warn"] and "not been tested on hardware" in opt["warn"]
             assert "not printed" in opt["note"].lower() or "has not printed" in opt["note"]
         else:
             assert opt is None
@@ -61,11 +63,12 @@ def test_catalog_option_matches_known_families_and_stays_unverified():
     assert ps.printer_public("creality_ender3_v3")["single_slot_option"] is None
 
 
-def test_resolve_is_on_by_default_for_one_slot_and_off_otherwise():
+def test_resolve_stays_off_until_the_switch_is_turned_on():
     plan = fs.plan_heads("2", "PLA", "#00FF00")
-    spec = ss.resolve("creality_k1", plan, None)
-    assert spec["tool"] == "T1" and spec["slot"] == 2 and spec["hardware_verified"] is False
+    assert ss.resolve("creality_k1", plan, None) is None
     assert ss.resolve("creality_k1", plan, False) is None
+    spec = ss.resolve("creality_k1", plan, True)
+    assert spec["tool"] == "T1" and spec["slot"] == 2 and spec["hardware_verified"] is False
     assert ss.resolve("creality_k1", fs.plan_heads("1,3"), None) is None
     assert ss.resolve("creality_ender3_v3", plan, None) is None
     assert ss.resolve("prusa_mk4", fs.plan_heads("5"), True)["tool"] == "T4"
@@ -112,7 +115,7 @@ def test_finish_gcode_keeps_one_tool_and_drops_leveling():
 
 
 def test_finish_inserts_the_family_load_when_the_slicer_emitted_none():
-    creality = ss.resolve("creality_k1", fs.plan_heads("1"), None)
+    creality = ss.resolve("creality_k1", fs.plan_heads("1"), True)
     out = ss.finish_gcode("M109 S210\nG28\nG1 X2\n", creality)
     assert out.index("G28") < out.index("T0") < out.index("G1 X2")
     assert "M620" not in out
@@ -137,8 +140,17 @@ def test_slice_api_writes_one_slot_for_k1_and_leaves_leveling_out(monkeypatch):
         "G29\nT0\nT2\nG1 X1 Y1 E0.1\n"
     ))
     client = TestClient(app)
-    res = client.post("/api/slice", data={
+    plain = client.post("/api/slice", data={
         "printer_id": "creality_k1", "nozzle": "0.4", "supports": "off", "material": "PLA", "slots": "3",
+    }, files={"file": ("t.stl", _box(), "model/stl")})
+    assert plain.status_code == 200, plain.text
+    assert plain.json()["single_slot"] is False
+    assert "gcode_flavor = marlin2" in seen["ini"]
+    assert "END_PRINT" not in seen["ini"]
+    assert not re.search(r"^T\d+", client.get(plain.json()["gcode_url"]).text, re.M)
+    res = client.post("/api/slice", data={
+        "printer_id": "creality_k1", "nozzle": "0.4", "supports": "off", "material": "PLA",
+        "slots": "3", "single_slot": "1",
     }, files={"file": ("t.stl", _box(), "model/stl")})
     assert res.status_code == 200, res.text
     body = res.json()
@@ -205,10 +217,16 @@ def test_bad_flag_and_slot_past_the_box_are_refused():
     assert far.status_code == 400 and "1" in far.text
 
 
-def test_filament_tab_markup_is_the_single_slot_control():
+def test_filament_tab_is_an_off_switch_with_a_confirm_dialog():
     js = (Path(__file__).resolve().parents[1] / "static" / "printer.js").read_text(encoding="utf-8")
     assert "function singleSlotHTML" in js
-    assert 'id="spSingleSlot"' in js and 'id="spSingleSlotN"' in js
+    assert 'id="spSingleOff" aria-pressed="true">Off' in js
+    assert 'id="spSingleOn" aria-pressed="false">On' in js
+    assert 'class="segmented"' in js
+    assert 'id="spSingleAsk"' in js and 'class="dlg"' in js and 'class="df"' in js
+    assert 'id="spSingleCancel">Cancel' in js
+    assert 'id="spSingleTurnOn">Turn on' in js
+    assert ss.SHORT_NOTE in js and ss.WARN in js
     assert "single_slot_option" in js
     assert 'fd.append("single_slot"' in js
     assert ss.LABEL in js

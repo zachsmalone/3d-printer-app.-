@@ -38,6 +38,14 @@ from app import printers as catalog
 from app.services.slice_engine import merge_ini
 
 LABEL = "Single slot: skip calibration and unused-slot checks"
+# Shown beside the Off/On switch. The confirm dialog carries the fuller warning.
+SHORT_NOTE = "Skips bed leveling. Untested on hardware."
+WARN = (
+    "This skips the printer's calibration and bed leveling. "
+    "The first layer may not stick or may be uneven. "
+    "The printer's firmware may still check the other slots. "
+    "This has not been tested on hardware yet."
+)
 
 # Catalog rows omit multi_color_system for these models ("missing means unknown").
 # CFS is an optional box, not a claim that every unit has one.
@@ -143,15 +151,17 @@ def option_for(printer_id: str) -> dict | None:
     return {
         "family": fam,
         "slots": _SLOT_COUNT[fam],
-        "default_on": True,
+        "default_on": False,
         "label": LABEL,
+        "short_note": SHORT_NOTE,
+        "warn": WARN,
         "note": _UI_NOTE[fam],
         "hardware_verified": False,
     }
 
 
 def parse_flag(raw) -> bool | None:
-    """None = omitted (the server default). True / False = the Filament checkbox."""
+    """None = omitted (stays off). True / False = the Filament switch."""
     if raw is None:
         return None
     text = str(raw).strip().lower()
@@ -167,14 +177,14 @@ def parse_flag(raw) -> bool | None:
 def resolve(printer_id: str, slot_plan: dict, flag: bool | None) -> dict | None:
     """The file change for this slice, or None when the option does not apply.
 
-    Omitted flag: on for a one-slot job on a known family. Explicit off stays off.
+    Omitted and explicit off stay off, including a one-colour job. Only an explicit on applies.
     More than one slot stays off (those slots are in use).
     """
     fam = family_id(printer_id)
     slots = list(slot_plan.get("slots") or [])
     if fam is None or len(slots) != 1:
         return None
-    if flag is False:
+    if flag is not True:
         return None
     slot = int(slots[0])
     limit = _SLOT_COUNT[fam]
