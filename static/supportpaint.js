@@ -110,8 +110,10 @@ export function raycastModel(v, ev) {
   const hit = rc.intersectObjects(meshes, false)[0];
   if (!hit || !hit.object) return null;
   const local = hit.object.worldToLocal(hit.point.clone());
-  const normal = hit.face ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 0, 1);
-  return { local, normal, object: hit.object };
+  // Face normal in the mesh's own space. The paint overlay is a child of that mesh,
+  // so a world normal would slide the disc off the face whenever the part is turned.
+  const normal = hit.face ? hit.face.normal.clone().normalize() : new THREE.Vector3(0, 0, 1);
+  return { local, world: hit.point.clone(), normal, object: hit.object };
 }
 
 const STROKE_CAP = 64;
@@ -156,7 +158,7 @@ function paintMaterial() {
       varying vec3 vN;
       void main() {
         vLocal = position;
-        vN = normalize(mat3(modelMatrix) * normal);
+        vN = normalize(normal);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -324,6 +326,17 @@ function paintAt(hit) {
   drawMarks();
 }
 
+function noteRay(v, ev, hit) {
+  if (!v.el || !hit || !hit.world) return;
+  const rect = v.renderer.domElement.getBoundingClientRect();
+  const p = hit.world.clone().project(v.camera);
+  const sx = (p.x * 0.5 + 0.5) * rect.width + rect.left;
+  const sy = (-p.y * 0.5 + 0.5) * rect.height + rect.top;
+  v.el.dataset.paintCursor = `${ev.clientX.toFixed(2)},${ev.clientY.toFixed(2)}`;
+  v.el.dataset.paintRay = `${sx.toFixed(2)},${sy.toFixed(2)}`;
+  v.el.dataset.paint = `${hit.local.x.toFixed(3)},${hit.local.y.toFixed(3)},${hit.local.z.toFixed(3)}`;
+}
+
 let listening = false;
 function listen() {
   if (listening || !viewer) return;
@@ -333,6 +346,7 @@ function listen() {
     if (e.pointerType === "touch" && e.isPrimary === false) return;
     const hit = raycastModel(viewer, e);
     if (!hit) return;
+    noteRay(viewer, e, hit);
     painting = true;
     el.setPointerCapture(e.pointerId);
     paintAt(hit);
@@ -341,6 +355,7 @@ function listen() {
   el.addEventListener("pointermove", e => {
     if (!armed) return;
     const hit = raycastModel(viewer, e);
+    if (hit) noteRay(viewer, e, hit);
     moveCursor(hit);
     if (painting) paintAt(hit);
   });

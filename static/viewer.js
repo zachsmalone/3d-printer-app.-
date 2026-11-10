@@ -33,7 +33,9 @@ export class Viewer {
   resize() {
     const w = this.el.clientWidth, h = this.el.clientHeight;
     if (!w || !h) return;
-    this.renderer.setSize(w, h, false);
+    // Update the canvas CSS size too. A drawing buffer at devicePixelRatio with no CSS size
+    // displays at the buffer's pixel count and the visible view is a crop of that image.
+    this.renderer.setSize(w, h);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
   }
   load(preview, mode, opts = {}) {

@@ -65,15 +65,11 @@ def run(page, label, width):
         return
     status = page.inner_text("#rzSupStatus")
     rule = page.inner_text("#rzSupRule")
-    ok(f"{label}: green mark is the contact", "where the pillar will touch" in rule and "where the pillar will touch" in status, status)
+    ok(f"{label}: green mark is the tapped point", "point you tapped" in rule and "point you tapped" in status, status)
     contact = [float(x) for x in (page.get_attribute("#rzPickView", "data-contact") or "").split(",") if x]
     tap = [float(x) for x in (page.get_attribute("#rzPickView", "data-tap") or "").split(",") if x]
-    moved = page.get_attribute("#rzPickView", "data-moved")
-    if moved == "1":
-        ok(f"{label}: projected mark is below the tap", len(contact) == 3 and len(tap) == 3 and contact[2] < tap[2] - 0.3, f"{contact} vs {tap}")
-        ok(f"{label}: projection is stated", "underside" in status.lower(), status)
-    else:
-        ok(f"{label}: mark stays on the tapped face", len(contact) == 3 and len(tap) == 3 and abs(contact[2] - tap[2]) < 0.45, f"{contact} vs {tap} {status}")
+    gap = max(abs(a - b) for a, b in zip(contact, tap)) if len(contact) == 3 and len(tap) == 3 else 99
+    ok(f"{label}: mark stays on the tapped face", gap < 0.05 and page.get_attribute("#rzPickView", "data-moved") == "0", f"{contact} vs {tap} {status}")
     ok(f"{label}: one support marker", page.get_attribute("#rzPickView", "data-supports") == "1", status)
     page.screenshot(path=os.path.join(SHOTS, f"torchc0-supports-{width}.png"))
     before = page.get_attribute("#rzPickView", "data-supports")
@@ -188,10 +184,11 @@ def run_jupiter(page, label, width):
     status = page.inner_text("#rzSupStatus")
     ok(f"{label}: top tap placed a support", green, status + " normal=" + str(page.get_attribute("#rzPickView", "data-normal")))
     if green:
-        ok(f"{label}: green projection is stated", "underside" in status.lower() and "where the pillar will touch" in status.lower(), status)
+        ok(f"{label}: green mark is the tapped point", "point you tapped" in status.lower(), status)
         contact = [float(x) for x in page.get_attribute("#rzPickView", "data-contact").split(",")]
         tap = [float(x) for x in page.get_attribute("#rzPickView", "data-tap").split(",")]
-        ok(f"{label}: green contact is below the tap", contact[2] < tap[2] - 1, f"{contact} vs {tap}")
+        gap = max(abs(a - b) for a, b in zip(contact, tap))
+        ok(f"{label}: green contact is the tap", gap < 0.05 and page.get_attribute("#rzPickView", "data-moved") == "0", f"{contact} vs {tap}")
         green_shot = os.path.join(SHOTS, f"torchc0-support-jupiter-{width}.png")
         page.screenshot(path=green_shot)
         vivid_green = colored_centroid(green_shot, box, lambda p: p[1] > 190 and p[1] > p[0] + 60 and p[1] > p[2] + 40)
