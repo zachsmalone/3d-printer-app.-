@@ -336,20 +336,55 @@ def _stats_from(a: dict, title: str) -> dict:
             "watertight": a["watertight"], "size_mm": a["size_mm"], "triangles": a["triangles"]}
 
 
+_STL_REC = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")])
+_PREVIEW_NOTE = "Preview only. The saved file keeps every triangle."
+
+
+def _binary_stl_count(data: bytes) -> int:
+    if len(data) < 84:
+        raise meshedit.OpError("That file doesn't look like a binary STL.")
+    n = int.from_bytes(data[80:84], "little")
+    if len(data) != 84 + 50 * n or n <= 0:
+        raise meshedit.OpError("That file doesn't look like a binary STL.")
+    return n
+
+
+def _bounds_from(lo, hi) -> dict:
+    return {
+        "size_mm": [round(float(x), 3) for x in (hi - lo)],
+        "min_mm": [round(float(x), 3) for x in lo],
+        "max_mm": [round(float(x), 3) for x in hi],
+        "center_mm": [round(float(x), 3) for x in (lo + hi) / 2],
+    }
+
+
+def binary_stl_bounds(data: bytes) -> tuple[int, dict]:
+    """Triangle count and axis-aligned bounds in mm. Does not copy or change `data`."""
+    n = _binary_stl_count(data)
+    tris = np.frombuffer(data, dtype=_STL_REC, count=n, offset=84)["v"]
+    flat = tris.reshape(-1, 3)
+    lo = np.min(flat, axis=0)
+    hi = np.max(flat, axis=0)
+    return n, _bounds_from(lo, hi)
+
+
+def slim_preview(decimated: bool) -> dict:
+    """View metadata with no triangle bytes. The browser already drew its own sample."""
+    return {"decimated": bool(decimated), "authoritative": False, "note": _PREVIEW_NOTE, "bodies": []}
+
+
 def iter_binary_stl_preview(data: bytes, max_faces: int = MAX_PREVIEW_FACES):
     """Walk a binary STL and yield view progress, then one preview_ready event.
 
     Progress counts source triangles visited. The preview keeps at most max_faces triangles.
     The bytes of `data` are not modified. This is not the mesh Slice or export will use.
     """
-    n = int.from_bytes(data[80:84], "little")
-    if len(data) != 84 + 50 * n or n <= 0:
-        raise meshedit.OpError("That file doesn't look like a binary STL.")
-    rec = np.dtype([("n", "<f4", 3), ("v", "<f4", (3, 3)), ("a", "<u2")])
-    tris = np.frombuffer(data, dtype=rec, count=n, offset=84)["v"]
+    n = _binary_stl_count(data)
+    tris = np.frombuffer(data, dtype=_STL_REC, count=n, offset=84)["v"]
     flat = tris.reshape(-1, 3)
     lo = np.min(flat, axis=0)
     hi = np.max(flat, axis=0)
+    bounds = _bounds_from(lo, hi)
     step = 1 if n <= max_faces else int(np.ceil(n / max_faces))
     picks = []
     chunk = max(step, n // 8)
@@ -367,9 +402,8 @@ def iter_binary_stl_preview(data: bytes, max_faces: int = MAX_PREVIEW_FACES):
     pos = np.ascontiguousarray(chosen.reshape(-1, 3).astype("<f4"))
     idx = np.arange(len(pos), dtype="<u4")
     yield {"phase": "preview_ready", "triangles": int(n),
-           "size_mm": [round(float(x), 3) for x in (hi - lo)],
-           "preview": {"decimated": bool(step != 1), "authoritative": False,
-                       "note": "Preview only. The saved file keeps every triangle.",
+           "size_mm": bounds["size_mm"], "bounds": bounds,
+           "preview": {"decimated": bool(step != 1), "authoritative": False, "note": _PREVIEW_NOTE,
                        "bodies": [{"name": "model", "color": None,
                                    "positions": base64.b64encode(pos.tobytes()).decode(),
                                    "indices": base64.b64encode(idx.tobytes()).decode()}]}}
@@ -399,7 +433,8 @@ def not_ready(meta: dict | None) -> str | None:
 
 def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes | None,
                        beginner: bool, warnings: list[str], preview: dict | None, size_mm: list, triangles: int,
-                       import_scale: float = 1.0, import_units: str = "mm", write_preview: bool = True) -> dict:
+                       import_scale: float = 1.0, import_units: str = "mm", write_preview: bool = True,
+                       bounds: dict | None = None) -> dict:
     """Save the pending record and mark Slice off. The original bytes are written when given.
 
     `write_preview` false keeps the large preview JSON off this call. The open path yields the
@@ -423,6 +458,8 @@ def create_pending_stl(owner_sid: str, visibility: str, *, title: str, base: dic
             "source": "", "params": {}, "auto_notes": [], "info": {}, "owner_sid": owner_sid, "visibility": visibility,
             "slice_ready": False, "header_triangles": triangles,
             "stats": {"triangles": triangles, "watertight": None, "size_mm": size_mm, "pending": True,
+                      "min_mm": (bounds or {}).get("min_mm"), "max_mm": (bounds or {}).get("max_mm"),
+                      "center_mm": (bounds or {}).get("center_mm"),
                       "bodies": [{"name": title[:60] or "Untitled", "triangles": triangles, "watertight": None, "volume_mm3": None}]}}
     store.save(meta)
     return store.get(bid)
@@ -436,23 +473,30 @@ def write_preview(bid: str, preview: dict) -> None:
     (d / "preview.json").write_text(json.dumps(preview))
 
 
-def quick_payload(meta: dict, preview: dict | None = None) -> dict:
-    """Project JSON for a large STL whose full check has not finished. Does not load the mesh."""
+def quick_payload(meta: dict, preview: dict | None = None, *, load_preview: bool = True) -> dict:
+    """Project JSON for a large STL whose full check has not finished. Does not load the mesh.
+
+    `load_preview` false skips the preview file. That file is the sampled view as base64 and
+    is several megabytes; the status poll does not need it.
+    """
     from ..api.builds import summary
-    d = store.dir(meta["id"])
-    if preview is None:
-        path = d / "preview.json"
-        preview = json.loads(path.read_text()) if path.is_file() else {
-            "decimated": True, "authoritative": False, "note": "Preview only. The saved file keeps every triangle.",
-            "bodies": []}
     n = int(meta.get("header_triangles") or meta.get("stats", {}).get("triangles") or 0)
+    if preview is None:
+        if not load_preview:
+            preview = slim_preview(n > MAX_PREVIEW_FACES)
+        else:
+            path = store.dir(meta["id"]) / "preview.json"
+            preview = json.loads(path.read_text()) if path.is_file() else slim_preview(True)
     size = (meta.get("stats") or {}).get("size_mm") or [0, 0, 0]
     if meta.get("slice_ready") and meta.get("analysis"):
         analysis = meta["analysis"]
         quality = meta.get("quality_gate") or {"ok": None, "pending": True, "message": "Checking the full model."}
     else:
+        st = meta.get("stats") or {}
         analysis = {"triangles": n, "vertices": None, "watertight": None, "size_mm": size, "volume_mm3": None,
-                    "pending": True, "boundary_edges": None, "components": None, "min_mm": None, "max_mm": None}
+                    "area_mm2": None, "pending": True, "boundary_edges": None, "components": None,
+                    "min_mm": st.get("min_mm"), "max_mm": st.get("max_mm"), "center_mm": st.get("center_mm"),
+                    "center_of_mass_mm": None}
         err = meta.get("check_error") or ""
         quality = {"ok": None, "pending": True,
                    "message": err or "Checking the full model. Slice stays off until this finishes. The view is a lighter preview."}
@@ -1091,11 +1135,11 @@ def save_support_paint(bid: str, strokes: list[dict]) -> dict:
     return support_paint_view(meta)
 
 
-def payload(bid: str, report=None) -> dict:
+def payload(bid: str, report=None, *, include_preview: bool = True) -> dict:
     from ..api.builds import summary
     meta = store.get(bid)
     if meta.get("header_triangles"):
-        body = quick_payload(meta)
+        body = quick_payload(meta, load_preview=include_preview)
         if report is not None:
             body["report"] = report
         return body

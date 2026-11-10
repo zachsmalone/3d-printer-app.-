@@ -11,9 +11,12 @@ import { previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo } from "/static/gizmo-view.js";
 import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
 import { bindViewer, bindProject, setStrokes } from "/static/supportpaint.js";
+import { sampleBinaryStl } from "/static/stl-sample.js";
+import { createLineParser } from "/static/ndjson-lines.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
+const FILE_MM = { mm: 1, cm: 10, in: 25.4, m: 1000 };   // file units → millimetres, same factors as the server
 const E = { p: null, unit: localStorage.eunit || "mm", tool: null, measure: false, pts: [], last: null };
 let viewer = null, ghost = null, measureObjs = [];
 let copyFromPhoto = "";
@@ -53,31 +56,26 @@ addEventListener("zeim:viewer-resize", () => { if (viewer) viewer.resize(); });
 /* ---------- opening / creating projects ---------- */
 async function postUpload(url, fd, signal, onUpload, onEvent) {
   const xhr = new XMLHttpRequest();
-  let buf = "", shown = false, project = null, settled = false;
+  let shown = false, project = null, settled = false;
   let finish = () => {}, fail = () => {};
-  const take = (text) => {
-    buf += text;
-    const lines = buf.split("\n");
-    buf = lines.pop() || "";
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      let ev; try { ev = JSON.parse(line); } catch { continue; }
-      if (ev.phase === "error") {
-        const e = new Error(ev.message || ev.body?.message || "The model could not be opened.");
-        e.status = ev.status || 400; e.body = ev.body || {}; throw e;
-      }
-      if (ev.phase === "view" && ev.total) {
-        if (ev.done >= ev.total) onEvent({ phase: "draw" });
-        else onEvent({ phase: "view", pct: Math.min(99, Math.floor(100 * ev.done / ev.total)) });
-      }
-      if (ev.phase === "interactive" && ev.project && !settled) {
-        project = ev.project;
-        settled = true;
-        onEvent({ phase: "draw" });
-        finish(project);
-      }
+  const takeLine = (line) => {
+    let ev; try { ev = JSON.parse(line); } catch { return; }
+    if (ev.phase === "error") {
+      const e = new Error(ev.message || ev.body?.message || "The model could not be opened.");
+      e.status = ev.status || 400; e.body = ev.body || {}; throw e;
+    }
+    if (ev.phase === "view" && ev.total) {
+      if (ev.done >= ev.total) onEvent({ phase: "draw" });
+      else onEvent({ phase: "view", pct: Math.min(99, Math.floor(100 * ev.done / ev.total)) });
+    }
+    if (ev.phase === "interactive" && ev.project && !settled) {
+      project = ev.project;
+      settled = true;
+      onEvent({ phase: "draw" });
+      finish(project);
     }
   };
+  const parser = createLineParser(takeLine);
   const done = new Promise((resolve, reject) => {
     finish = resolve;
     fail = reject;
@@ -88,7 +86,7 @@ async function postUpload(url, fd, signal, onUpload, onEvent) {
     let read = 0;
     xhr.onprogress = () => {
       const text = xhr.responseText || "";
-      try { take(text.slice(read)); } catch (e) { if (!settled) { settled = true; fail(e); xhr.abort(); } }
+      try { parser.push(text.slice(read)); } catch (e) { if (!settled) { settled = true; fail(e); xhr.abort(); } }
       read = text.length;
     };
     xhr.onerror = () => reject(Object.assign(new Error("The upload didn't finish. Check the connection and try again."), { name: "UploadError" }));
@@ -106,7 +104,7 @@ async function postUpload(url, fd, signal, onUpload, onEvent) {
         try { resolve(JSON.parse(xhr.responseText || "")); } catch { reject(new Error("The model could not be opened.")); }
         return;
       }
-      try { take((xhr.responseText || "").slice(read)); if (buf.trim()) take(buf + "\n"); } catch (e) { reject(e); return; }
+      try { parser.push((xhr.responseText || "").slice(read)); parser.flush(); } catch (e) { reject(e); return; }
       if (!project) { reject(new Error("The model could not be opened.")); return; }
       resolve(project);
     };
@@ -116,17 +114,27 @@ async function postUpload(url, fd, signal, onUpload, onEvent) {
   return done.then(p => ({ project: project || p, shown }));
 }
 const mbOf = n => (n / (1024 * 1024)).toFixed(1);
-async function create(fd, retry) {
+function uploadLine(loaded, total) {
+  const m = $("#editMsg");
+  if (m) m.textContent = `Uploading… ${mbOf(loaded)} MB of ${mbOf(total)} MB`;
+}
+async function create(fd, retry, opt = {}) {
+  const localView = !!opt.localView;
   if (importCtl) importCtl.abort();
   const ctl = importCtl = new AbortController();
   const streaming = typeof fd?.has === "function" && fd.has("progress");
-  busy(true, streaming ? "Uploading…" : "Importing…", () => ctl.abort());
+  // A local sample is already on screen. Covering it again would hide a view the user can orbit.
+  if (!localView) busy(true, streaming ? "Uploading…" : "Importing…", () => ctl.abort());
   try {
     let r;
     if (streaming) {
       const out = await postUpload("/api/edit/new", fd, ctl.signal,
-        (loaded, total) => busy(true, `Uploading… ${mbOf(loaded)} MB of ${mbOf(total)} MB`, () => ctl.abort()),
+        (loaded, total) => {
+          if (localView) uploadLine(loaded, total);
+          else busy(true, `Uploading… ${mbOf(loaded)} MB of ${mbOf(total)} MB`, () => ctl.abort());
+        },
         (ev) => {
+          if (localView) return;
           if (ev.phase === "uploaded") busy(true, "Upload finished. Preparing the view…", () => ctl.abort());
           else if (ev.phase === "view") busy(true, `Preparing the view… ${ev.pct}%`, () => ctl.abort());
           else if (ev.phase === "draw") busy(true, "Drawing the model…", () => ctl.abort());
@@ -135,14 +143,19 @@ async function create(fd, retry) {
     } else r = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
     if (ctl.signal.aborted || ctl !== importCtl) return;
     if (Array.isArray(r.history)) { S.history = r.history; renderHistory(); }
-    loadProject(r);
+    const keep = localView && !(r.preview?.bodies || []).some(b => b && b.positions);
+    loadProject(r, keep, keep);
     if (copyFromPhoto && r.id) { rememberCopy(sessionStorage, copyFromPhoto, r.id); copyFromPhoto = ""; document.dispatchEvent(new CustomEvent("zeim:flow")); }
     if (r.warnings?.length) toast(r.warnings[0]);
   } catch (e) {
-    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry); }; openFull(); const n = e.body?.max; editPick.msg((n ? `Your recent builds are full (${n} of ${n}).` : "Your recent builds are full.") + " Delete one in the window, then continue."); }
+    if (localView && e?.message && e.name !== "AbortError") { const m = $("#editMsg"); if (m) m.textContent = e.message; }
+    if (e.status === 409 && e.body?.code === "history_full") { S.history = e.body.builds; renderHistory(); S.pending = auto => { S.pending = null; const f2 = retry(); if (auto) f2.append("auto_delete_oldest", "true"); return create(f2, retry, opt); }; openFull(); const n = e.body?.max; editPick.msg((n ? `Your recent builds are full (${n} of ${n}).` : "Your recent builds are full.") + " Delete one in the window, then continue."); }
     else if ((e.status === 415 && /photo/i.test(e.message)) || (E.photoTry && [400, 413, 415].includes(e.status))) { copyFromPhoto = ""; editPick.msg(e.message); }       // photo problems stay under the photo buttons (QA-3)
     else if (e.name === "AbortError") {
-      if (ctl === importCtl) modelMsg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear on Account.");
+      if (ctl === importCtl) {
+        modelMsg("Cancelled. This page stopped waiting. If the file already reached the server, it can still appear on Account.");
+        if (localView) { const m = $("#editMsg"); if (m) m.textContent = "Cancelled."; }
+      }
     }
     else { copyFromPhoto = ""; toast(e.message, "err"); }
   } finally { if (ctl === importCtl) busy(false); }
@@ -166,8 +179,86 @@ function fromFile(file) {
   if (E.photoTry && !file.size) return editPick.msg("We couldn't open that photo. Try a JPG or PNG.");            // same pre-checks as Studio, shown inline (QA-3)
   if (E.photoTry && file.size > 25 * 1024 * 1024) return editPick.msg("That photo is over 25 MB. Try a smaller one (JPG or PNG).");
   editPick.msg("");
-  const mk = () => { const fd = new FormData(); fd.append("file", file); fd.append("units", $("#editUnits").value); fd.append("photo_mode", $("#editPhotoMode").value); fd.append("photo_ack", editPick.acked());   fd.append("beginner", !isExpert()); fd.append("fdm_big", "true"); fd.append("progress", "1"); return fd; };   // view first; the full check does not replace triangles
-  create(mk(), mk);
+  const units = $("#editUnits").value;
+  const mk = (clientView) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("units", clientView ? units : $("#editUnits").value);
+    fd.append("photo_mode", $("#editPhotoMode").value);
+    fd.append("photo_ack", editPick.acked());
+    fd.append("beginner", !isExpert());
+    fd.append("fdm_big", "true");
+    fd.append("progress", "1");
+    if (clientView) fd.append("client_view", "1");   // this browser already drew a sample; the saved file is still the original
+    return fd;
+  };
+  if (!E.photoTry) {
+    openLargeStl(file, mk, units).catch(e => {
+      console.error(e); busy(false);
+      modelMsg("We couldn't open that file. Please try again, or choose an .stl, .obj or .3mf file.");
+    });
+    return;
+  }
+  create(mk(false), () => mk(false));
+}
+function showLocalMesh(sample) {
+  $("#editEmpty").hidden = true;
+  $("#editResult").hidden = false;
+  $("#editVtools").hidden = false;
+  $("#eUndo").disabled = true;
+  $("#eRedo").disabled = true;
+  ensureViewer()?.load({
+    decimated: sample.decimated, authoritative: false,
+    bodies: [{ name: "model", positions: sample.positions }],
+  }, "edit", { flat: true });
+  const size = (sample.size_mm || []).map(x => fmt(x)).join(" × ");
+  $("#editStats").innerHTML = `<span class="pill">${size} ${E.unit}</span><span class="pill">${sample.triangles.toLocaleString()} triangles</span><span class="pill" title="This view uses fewer triangles. The saved file and Slice use every triangle.">preview only</span>`;
+  $("#editMsg").textContent = "Uploading…";
+}
+async function openLargeStl(file, mk, units) {
+  // Big binary STLs used to stay behind the upload and a multi-megabyte preview. Draw a sample
+  // from the file first. The upload still sends every triangle, and Slice waits for that file.
+  if (importCtl) importCtl.abort();
+  const ctl = importCtl = new AbortController();
+  const cancel = () => ctl.abort();
+  busy(true, "Preparing the view…", cancel);
+  let sample = null;
+  try {
+    sample = await sampleBinaryStl(file, {
+      scale: FILE_MM[units] || 1,
+      signal: ctl.signal,
+      onProgress(done, total) {
+        if (ctl !== importCtl) return;
+        if (!(total > 0)) return;
+        if (done >= total) busy(true, "Drawing the model…", cancel);
+        else busy(true, `Preparing the view… ${Math.min(99, Math.floor(100 * done / total))}%`, cancel);
+      },
+    });
+  } catch (e) {
+    if (e.name === "AbortError" || ctl.signal.aborted) {
+      if (ctl === importCtl) { busy(false); modelMsg("Cancelled."); }
+      return;
+    }
+    console.error(e);
+    sample = null;
+  }
+  if (ctl !== importCtl) return;
+  if (!sample || !sample.positions || !sample.positions.length) {
+    busy(false);
+    create(mk(false), () => mk(false));
+    return;
+  }
+  busy(true, "Drawing the model…", cancel);
+  try { showLocalMesh(sample); }
+  catch (e) {
+    console.error(e);
+    busy(false);
+    create(mk(false), () => mk(false));
+    return;
+  }
+  if (ctl !== importCtl || ctl.signal.aborted) { busy(false); return; }
+  busy(false);
+  create(mk(true), () => mk(true), { localView: true });
 }
 const drop = $("#editDrop");
 $("#btnHave3d")?.addEventListener("click", () => { location.hash = "slicer"; $("#editFile").click(); });     // photo page → FDM Slicer (same tap, so iOS opens the picker)
@@ -294,7 +385,7 @@ document.addEventListener("zeim:open-edit", async e => {
 document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 
 /* ---------- applying a project payload ---------- */
-function loadProject(p, keepCamera = false) {
+function loadProject(p, keepCamera = false, keepMesh = false) {
   { const oc = $("#editOpenCad"); if (oc) oc.href = "/static/cad.html?bid=" + encodeURIComponent(p.id); }
   try { sessionStorage.setItem("zeim.edit.last", p.id); } catch { }   // so Back from CAD (full page load) can restore it
   E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearFaceMark(); clearMeasure(); clearGhost();
@@ -302,7 +393,7 @@ function loadProject(p, keepCamera = false) {
   if (!p.plate) document.body.dataset.bedSel = "1";
   else delete document.body.dataset.bedSel;
   document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
-  ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
+  if (!keepMesh) ensureViewer()?.load(p.preview, "edit", { flat: true, keepCamera });
   const a = p.analysis || {};
   const pending = p.slice_ready === false || a.pending;
   const q = p.quality_gate || { ok: true, issues: [], message: "Closed mesh. You can export the geometry. Slice it before printing." };
@@ -334,11 +425,11 @@ function watchSliceReady(id) {
   const tick = async () => {
     if (gen !== sliceWatch || !E.p || E.p.id !== id || E.p.slice_ready !== false) return;
     try {
-      const p = await api("/api/edit/" + encodeURIComponent(id));
+      const p = await api("/api/edit/" + encodeURIComponent(id) + "?brief=1");
       if (gen !== sliceWatch || !E.p || E.p.id !== id) return;
       if (p.slice_ready !== false) {
         E.p = p;
-        loadProject(p, true);
+        loadProject(p, true, true);
         return;
       }
       if (p.quality_gate?.message && /could not be checked/.test(p.quality_gate.message)) {
@@ -357,7 +448,8 @@ async function renderSlicePanel() {
   try { await loadCatalog(); } catch { return; }
   const lithoHint = (E.p.mode === "lithophane" || E.p.base?.photo_mode === "lithophane" || E.p.base?.from_mode === "lithophane") ? "lithophane" : "";
   if (window.zeimSave && window.zeimSave.hold) window.zeimSave.hold("slicer");
-  $("#slicePanel").innerHTML = panelHTML(lithoHint); wirePanel(() => E.p.id);
+  $("#slicePanel").innerHTML = panelHTML(lithoHint);
+  try { wirePanel(() => E.p.id); } catch (e) { console.error(e); }
   if (E.p.slice_ready === false) {
     const go = document.getElementById("spGo");
     if (go) { go.disabled = true; go.title = "Slice stays off until the full model check finishes."; }
@@ -655,7 +747,12 @@ addEventListener("keydown", e => {
 
 /* ---------- tool panel ---------- */
 function renderTools() {
-  const a = A(), cap = E.p.capabilities, sz = a.size_mm, ctr = a.center_mm;
+  const a = A() || {}, cap = E.p.capabilities || {};
+  const vec = v => Array.isArray(v) && v.length >= 3 ? v : [0, 0, 0];
+  const sz = vec(a.size_mm), ctr = vec(a.center_mm), mx = vec(a.max_mm), mn = vec(a.min_mm);
+  const volTxt = a.volume_mm3 == null ? "—" : `${(a.volume_mm3 / 1000).toFixed(2)} cm³`;
+  const areaTxt = a.area_mm2 == null ? "—" : `${(a.area_mm2 / 100).toFixed(1)} cm²`;
+  const comTxt = Array.isArray(a.center_of_mass_mm) ? a.center_of_mass_mm.map(fmt).join(", ") : "—";
   const unitSel = `<div class="row" style="justify-content:space-between"><b>${esc(E.p.title)}</b><span class="seg" id="unitSeg">${Object.keys(UNITS).map(u => `<button data-unit="${u}" class="${u === E.unit ? "on" : ""}">${u}</button>`).join("")}</span></div>`;
   const beginner = `<div data-lvl="beginner">
     <p class="help">Pick a job. ZEIM chooses sensible settings — switch to Experienced mode for every tool.</p>
@@ -780,7 +877,7 @@ function renderTools() {
         <div class="field"><label>Axis</label><select name="axis"><option value="z">Z</option><option value="x">X</option><option value="y">Y</option></select></div>
         ${numInput("diameter", 6, "Major Ø (M)", "mm")}${numInput("length", 12, "Length", "mm")}
         ${numInput("pitch", 0, "Pitch (0=auto)", "mm")}${numInput("clearance", 0.2, "Clearance", "mm")}
-        ${lenInput("px", ctr[0], "Base X")}${lenInput("py", ctr[1], "Base Y")}${lenInput("pz", a.max_mm[2], "Base Z")}
+        ${lenInput("px", ctr[0], "Base X")}${lenInput("py", ctr[1], "Base Y")}${lenInput("pz", mx[2], "Base Z")}
       </div>
       <button class="btn small">Apply thread</button>
       <p class="help">Approximate metric thread (stacked profile). Fit is <b>Simulated</b> until you test-print.</p></form>` : `<p class="help">Needs manifold3d.</p>`}</details>
@@ -807,9 +904,9 @@ function renderTools() {
     </details>
     <details class="tool"><summary><svg class=i aria-hidden=true focusable=false><use href=#i-ruler></use></svg> Measure &amp; info</summary>
       <button class="btn small" id="toggleMeasure">${E.measure ? "Stop measuring" : "Measure two points"}</button>
-      <table class="info-table"><tr><td>Size (${E.unit})</td><td>${sz.map(fmt).join(" × ")}</td></tr><tr><td>Volume</td><td>${(a.volume_mm3 / 1000).toFixed(2)} cm³</td></tr><tr><td>Surface area</td><td>${(a.area_mm2 / 100).toFixed(1)} cm²</td></tr>
-      <tr><td>Triangles</td><td>${a.triangles.toLocaleString()}</td></tr><tr><td>Watertight</td><td>${a.watertight ? "yes" : "no"} (open edges: ${a.boundary_edges}, non-manifold: ${a.nonmanifold_edges})</td></tr>
-      <tr><td>Pieces</td><td>${a.components ?? "n/a"}</td></tr><tr><td>Bounds min</td><td>${a.min_mm.map(fmt).join(", ")}</td></tr><tr><td>Bounds max</td><td>${a.max_mm.map(fmt).join(", ")}</td></tr><tr><td>Centre of mass</td><td>${a.center_of_mass_mm.map(fmt).join(", ")}</td></tr></table></details>
+      <table class="info-table"><tr><td>Size (${E.unit})</td><td>${sz.map(fmt).join(" × ")}</td></tr><tr><td>Volume</td><td>${volTxt}</td></tr><tr><td>Surface area</td><td>${areaTxt}</td></tr>
+      <tr><td>Triangles</td><td>${(a.triangles || 0).toLocaleString()}</td></tr><tr><td>Watertight</td><td>${a.watertight == null ? "—" : a.watertight ? "yes" : "no"} (open edges: ${a.boundary_edges ?? "—"}, non-manifold: ${a.nonmanifold_edges ?? "—"})</td></tr>
+      <tr><td>Pieces</td><td>${a.components ?? "n/a"}</td></tr><tr><td>Bounds min</td><td>${a.min_mm ? mn.map(fmt).join(", ") : "—"}</td></tr><tr><td>Bounds max</td><td>${a.max_mm ? mx.map(fmt).join(", ") : "—"}</td></tr><tr><td>Centre of mass</td><td>${comTxt}</td></tr></table></details>
   </div>`;
   const plateHTML = renderPlate({ p: E.p, viewer, doOp, measuring: () => E.measure });
   $("#editPanel").innerHTML = unitSel + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px" title="New build: save or ask before the screen clears. This does not send the model to Showcase.">New build</button>`;

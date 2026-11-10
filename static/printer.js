@@ -3,10 +3,10 @@
 import { api, esc, $, toast } from "/static/app.js";
 import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
 import { gcodePreviewHTML, wireGcodePreview } from "/static/gcodeview.js";
-const HAS_GL = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } })();
-let gcDispose = null;  // previous G-code preview (freed on the next slice)
 import { mountPaint, getStrokes } from "/static/supportpaint.js";
 import { costHTML, wireCost } from "/static/cost.js";
+const HAS_GL = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } })();
+let gcDispose = null;  // previous G-code preview (freed on the next slice)
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const KEY = "zeim.printer";
