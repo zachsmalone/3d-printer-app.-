@@ -5,6 +5,7 @@ import { api, esc, $ } from "/static/app.js";
 import { money } from "/static/cost.js";
 import * as THREE from "three";
 import { postForm, progress as handoffProgress } from "/static/handoff-veil.js";
+import { createMeshCache, buildGrid, raycastGrid } from "/static/resin-view.js";
 
 /* OrbitControls in static/vendor/OrbitControls.js: LEFT rotate, MIDDLE dolly, RIGHT pan.
    Ctrl, Shift, or Meta swaps the left and right actions. The wheel dollies. */
@@ -43,22 +44,71 @@ function threeMatrix(M) {
   e.set(M[0], M[1], M[2], M[3], M[4], M[5], M[6], M[7], M[8], M[9], M[10], M[11], M[12], M[13], M[14], M[15]);
   return e;
 }
-function saveSupportLocal() {
-  try {
-    localStorage.setItem(SUPPORT_KEY, JSON.stringify({
-      name: supportEdit.name, size: supportEdit.size, manual: supportEdit.manual, avoid: supportEdit.avoid,
-    }));
-  } catch { /* the prepare response still keeps the marks */ }
+function supportRecord() {
+  return {
+    key: `${supportEdit.name}\0${supportEdit.size}`,
+    name: supportEdit.name, size: supportEdit.size, at: Date.now(),
+    manual: supportEdit.manual, avoid: supportEdit.avoid, undo: supportEdit.undo,
+  };
 }
-function loadSupportLocal(name, size) {
+function applySupportRecord(raw) {
+  if (!raw) return;
+  supportEdit.manual = Array.isArray(raw.manual) ? raw.manual : [];
+  supportEdit.avoid = Array.isArray(raw.avoid) ? raw.avoid : [];
+  supportEdit.undo = Array.isArray(raw.undo) ? raw.undo : [];
+}
+function newerRecord(a, b) {
+  if (!a) return b || null;
+  if (!b) return a;
+  return (b.at || 0) >= (a.at || 0) ? b : a;
+}
+function readSupportLocal(name, size) {
   try {
     const raw = JSON.parse(localStorage.getItem(SUPPORT_KEY) || "null");
-    if (!raw || raw.name !== name || raw.size !== size) return false;
-    supportEdit.manual = Array.isArray(raw.manual) ? raw.manual : [];
-    supportEdit.avoid = Array.isArray(raw.avoid) ? raw.avoid : [];
-    supportEdit.undo = [];
-    return true;
-  } catch { return false; }
+    if (!raw || raw.name !== name || raw.size !== size) return null;
+    return raw;
+  } catch { return null; }
+}
+function supportDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("zeim.resinSupports", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("edits")) db.createObjectStore("edits", { keyPath: "key" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+function readSupportIdb(name, size) {
+  return supportDb().then(db => new Promise(resolve => {
+    const tx = db.transaction("edits", "readonly");
+    const req = tx.objectStore("edits").get(`${name}\0${size}`);
+    req.onsuccess = () => { db.close(); resolve(req.result && req.result.name === name && req.result.size === size ? req.result : null); };
+    req.onerror = () => { db.close(); resolve(null); };
+  })).catch(() => null);
+}
+function writeSupportIdb(rec) {
+  return supportDb().then(db => new Promise(resolve => {
+    const tx = db.transaction("edits", "readwrite");
+    tx.objectStore("edits").put(rec);
+    tx.oncomplete = () => { db.close(); resolve(true); };
+    tx.onerror = () => { db.close(); resolve(false); };
+  })).catch(() => false);
+}
+function saveSupportLocal() {
+  const rec = supportRecord();
+  try { localStorage.setItem(SUPPORT_KEY, JSON.stringify(rec)); } catch { /* IndexedDB still keeps the marks */ }
+  const pv = $("#rzPickView");
+  if (pv) pv.dataset.supportSaved = String(rec.at);
+  writeSupportIdb(rec);
+}
+async function restoreSupports(name, size) {
+  const local = readSupportLocal(name, size);
+  const stored = await readSupportIdb(name, size);
+  const best = newerRecord(local, stored);
+  applySupportRecord(best);
+  return !!best;
 }
 function supportStatus() {
   const el = $("#rzSupStatus");
@@ -70,36 +120,117 @@ function supportStatus() {
     ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. A green mark is the point you tapped. A red mark is the keep-clear point. Both stay on that point when the view turns. Automatic supports skip keep-clear marks. An unsupported island is still reported.`
     : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. The mark stays on the point you tapped, on any face. Drag orbits, right-drag pans.`);
 }
+function markMaterial(viewer, color) {
+  const key = String(color);
+  if (!viewer._markMats) viewer._markMats = {};
+  if (!viewer._markMats[key]) {
+    const mat = new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false, transparent: true });
+    mat.userData.shared = true;
+    viewer._markMats[key] = mat;
+  }
+  return viewer._markMats[key];
+}
+function removeMarks(viewer) {
+  for (const child of [...viewer.group.children]) {
+    if (child.userData && child.userData.mark) viewer.group.remove(child);
+  }
+}
+function hookContext(viewer, el) {
+  if (viewer._ctxHook) return;
+  viewer._ctxHook = true;
+  const canvas = viewer.renderer.domElement;
+  const touch = () => {
+    viewer.scene.traverse(obj => {
+      if (obj.geometry) {
+        for (const attr of Object.values(obj.geometry.attributes)) attr.needsUpdate = true;
+        if (obj.geometry.index) obj.geometry.index.needsUpdate = true;
+      }
+      const mats = obj.material ? [].concat(obj.material) : [];
+      mats.forEach(m => { m.needsUpdate = true; });
+    });
+  };
+  canvas.addEventListener("webglcontextlost", ev => {
+    ev.preventDefault();
+    viewer._contextLost = true;
+    el.dataset.contextLost = "1";
+    supportEdit.notice = "The 3D view paused to free memory. Your support marks are kept.";
+    supportStatus();
+  });
+  canvas.addEventListener("webglcontextrestored", () => {
+    viewer._contextLost = false;
+    el.dataset.contextLost = "0";
+    touch();
+    viewer.resize();
+    supportEdit.notice = "The 3D view is back. Your support marks are still here.";
+    supportStatus();
+  });
+  el.dataset.contextLost = "0";
+}
+function bindModelRay(model, grid) {
+  model.raycast = (raycaster, intersects) => {
+    const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+    const ray = raycaster.ray.clone().applyMatrix4(inv);
+    const hit = raycastGrid(grid, [ray.origin.x, ray.origin.y, ray.origin.z], [ray.direction.x, ray.direction.y, ray.direction.z]);
+    if (!hit) return;
+    const point = new THREE.Vector3(hit.point[0], hit.point[1], hit.point[2]).applyMatrix4(model.matrixWorld);
+    const distance = raycaster.ray.origin.distanceTo(point);
+    if (distance < raycaster.near || distance > raycaster.far) return;
+    intersects.push({
+      distance, point, object: model,
+      face: { normal: new THREE.Vector3(hit.normal[0], hit.normal[1], hit.normal[2]) },
+    });
+  };
+}
 async function show3D(el, url, lc, buf, bed, opts) {
   opts = opts || {};
   try {
     const { Viewer } = await import("/static/viewer.js");
     let viewer = views.get(el);
     if (!viewer || !el.contains(viewer.el)) { viewer = new Viewer(el); views.set(el, viewer); }
+    hookContext(viewer, el);
     if (!buf) buf = await (await fetch(url)).arrayBuffer();
-    const dv = new DataView(buf), n = dv.getUint32(80, true);
-    if (84 + n * 50 > buf.byteLength) throw new Error("not a binary STL");
-    const pos = new Float32Array(n * 9);
-    for (let i = 0; i < n; i++) for (let k = 0; k < 9; k++) pos[i * 9 + k] = dv.getFloat32(84 + i * 50 + 12 + k * 4, true);
-    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.computeVertexNormals();
-    viewer.group.clear();
-    viewer.setBed(bed);
-    const model = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: "#8fb0e0", roughness: 0.6, transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
-    model.userData.model = true;
+    if (!viewer._meshCache) viewer._meshCache = createMeshCache();
+    const used = viewer._meshCache.use(buf);
+    let model = viewer._modelMesh;
+    if (used.built || !model) {
+      if (model) {
+        viewer.group.remove(model);
+        model.geometry.dispose();
+        model.material.dispose();
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(used.positions, 3));
+      g.computeVertexNormals();
+      g.computeBoundingBox();
+      model = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: "#8fb0e0", roughness: 0.6, transparent: true, opacity: 0.92, side: THREE.DoubleSide }));
+      model.userData.model = true;
+      model.matrixAutoUpdate = false;
+      viewer.group.add(model);
+      viewer._modelMesh = model;
+      viewer._pick = buildGrid(used.positions);
+      const sz = g.boundingBox.getSize(new THREE.Vector3());
+      viewer._markR = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
+      el.dataset.meshBuilds = String(viewer._meshCache.builds);
+    }
+    bindModelRay(model, viewer._pick);
+    const bedKey = bed ? bed.join(",") : "";
+    if (viewer._bedKey !== bedKey) { viewer.setBed(bed); viewer._bedKey = bedKey; }
     const M = opts.matrix || eye4();
-    model.matrixAutoUpdate = false;
     model.matrix.copy(threeMatrix(M));
     model.updateMatrixWorld(true);
-    viewer.group.add(model);
-    g.computeBoundingBox(); const sz = g.boundingBox.getSize(new THREE.Vector3()), r = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
+    if (!viewer._markGeo) viewer._markGeo = new THREE.SphereGeometry(1, 12, 8);
+    removeMarks(viewer);
+    const r = viewer._markR || 0.8;
     const mark = (p, color, kind, index) => {
       const solid = kind === "avoid" ? "#ff2d3a" : color;
       const add = (radius, tint, order) => {
-        const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 14, 10), new THREE.MeshBasicMaterial({
-          color: tint, depthTest: false, depthWrite: false, transparent: true,
-        }));
-        mesh.position.set(p[0], p[1], p[2]); mesh.renderOrder = order;
-        mesh.userData.mark = kind; mesh.userData.index = index; viewer.group.add(mesh);
+        const mesh = new THREE.Mesh(viewer._markGeo, markMaterial(viewer, tint));
+        mesh.scale.setScalar(radius);
+        mesh.position.set(p[0], p[1], p[2]);
+        mesh.renderOrder = order;
+        mesh.userData.mark = kind;
+        mesh.userData.index = index;
+        viewer.group.add(mesh);
       };
       // The model is translucent and draws after opaque meshes, which hid a mark that sat on a face.
       if (kind === "manual" || kind === "avoid") add(r * 1.55, "#ffffff", 10);
@@ -109,6 +240,7 @@ async function show3D(el, url, lc, buf, bed, opts) {
     ((lc && lc.suction) || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
     (opts.manual || []).forEach((p, i) => mark(applyPoint(M, p), "#3dd68c", "manual", i));
     (opts.avoid || []).forEach((p, i) => mark(applyPoint(M, p), "#e5484d", "avoid", i));
+    el.dataset.markSyncs = String((+el.dataset.markSyncs || 0) + 1);
     if (!opts.keepCamera) {
       const box = new THREE.Box3().setFromObject(model);
       const c = box.getCenter(new THREE.Vector3());
@@ -120,10 +252,10 @@ async function show3D(el, url, lc, buf, bed, opts) {
       viewer.controls.target.copy(c);
       viewer.controls.update();
     }
-    const marks = viewer.group.children.filter(c => c.userData && (c.userData.mark || (lc && (c.userData.mark === undefined)))).length;
     el.dataset.markers = String(((lc && lc.islands) || []).filter(i => i.xyz).length + ((lc && lc.suction) || []).filter(i => i.xyz).length);
     el.dataset.supports = String((opts.manual || []).length);
     el.dataset.avoid = String((opts.avoid || []).length);
+    el.dataset.triangles = String(viewer._meshCache.triangles || 0);
     const canvas = viewer.renderer.domElement;
     if (viewer._resinPick) canvas.removeEventListener("pointerup", viewer._resinPick);
     if (viewer._resinDownFn) canvas.removeEventListener("pointerdown", viewer._resinDownFn);
@@ -138,7 +270,9 @@ async function show3D(el, url, lc, buf, bed, opts) {
       const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
       const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, viewer.camera);
       const marksHit = ray.intersectObjects(viewer.group.children.filter(c => c.userData && c.userData.mark), false);
+      const t0 = performance.now();
       const modelHit = ray.intersectObject(model, false);
+      el.dataset.pickMs = (performance.now() - t0).toFixed(2);
       if (modelHit[0]) {
         const p = modelHit[0].point.clone().project(viewer.camera);
         const sx = (p.x * 0.5 + 0.5) * rect.width + rect.left;
@@ -152,8 +286,12 @@ async function show3D(el, url, lc, buf, bed, opts) {
     viewer._resinPick = up;
     canvas.addEventListener("pointerdown", down);
     canvas.addEventListener("pointerup", up);
-    void marks;
-  } catch (e) { el.innerHTML = `<p class="help">3D preview unavailable here (${esc(e.message)}). The files below are still ready.</p>`; }
+  } catch (e) {
+    const msg = `3D preview hit a limit (${e.message}). The support marks are still kept.`;
+    const note = $("#rzSupStatus");
+    if (note) note.textContent = msg;
+    if (!el.querySelector("canvas")) el.innerHTML = `<p class="help">${esc(msg)}</p>`;
+  }
 }
 
 const PKEY = "zeim.resinPrice";   // remembered in this browser only: {price, unit, currency}
@@ -416,7 +554,7 @@ function wire() {
         }
       } else if (!sameFile) {
         supportEdit.manual = []; supportEdit.avoid = []; supportEdit.undo = [];
-        loadSupportLocal(nm, f.size);
+        await restoreSupports(nm, f.size);
       }
       supportEdit.name = nm; supportEdit.size = f.size; supportEdit.bed = bed; supportEdit.buf = buf;
       supportEdit.matrix = parseMatrix(r.headers.get("X-Zeim-Matrix"));
