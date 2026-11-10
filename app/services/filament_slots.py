@@ -169,6 +169,9 @@ def annotate_3mf(data: bytes, p: dict, extruder_of=None) -> bytes:
     info = {"slots": p["slots"], "filament_to_slot": {str(i + 1): s for i, s in enumerate(p["slots"])},
             "colours": p.get("colour_of_filament") or p.get("colours"),
             "materials": p.get("materials"), "notes": p["notes"]}
+    for key in ("single_slot", "family", "tool", "hardware_verified", "firmware_note"):
+        if key in p:
+            info[key] = p[key]
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for it in zin.infolist():
@@ -198,9 +201,17 @@ def gcode_header(p: dict) -> str:
         col = cols[i] if i < len(cols) and cols[i] else ""
         bit = f"; ZEIM slot {s}: {mat}" + (f" {col}" if col else "")
         lines.append(bit)
-    if len(p["slots"]) == 1:
+    if p.get("single_slot"):
+        lines.append(f"; ZEIM single-slot: {p.get('family')} slot {p['slots'][0]} tool {p.get('tool')}")
+        lines.append("; ZEIM: one filament in this file. Other slots are not named.")
+        if p.get("firmware_note"):
+            lines.append("; ZEIM: " + str(p["firmware_note"]))
+        lines.append("; ZEIM: not confirmed on a printer.")
+    elif len(p["slots"]) == 1:
         lines.append("; ZEIM: single-material G-code, no tool changes. Unused slots are not referenced.")
-    lines.append("; ZEIM: only listed slots are heated, primed or purged. Unused ports are not referenced.")
+        lines.append("; ZEIM: only listed slots are heated, primed or purged. Unused ports are not referenced.")
+    else:
+        lines.append("; ZEIM: only listed slots are heated, primed or purged. Unused ports are not referenced.")
     return "\n".join(lines) + "\n"
 
 
@@ -227,15 +238,21 @@ def keep_gcode_line(line: str, p: dict) -> bool:
     used = set(p["slots"])
     used_0 = {s - 1 for s in used}
     single = len(used) == 1
+    # Single-slot mode keeps one 0-based tool (slot 1 is T0). T1 would be slot 2, so it is not a second spelling of slot 1.
+    chosen = (int(p["slots"][0]) - 1) if single and p.get("single_slot") else None
 
     def tool_ok(t: int) -> bool:
+        if chosen is not None:
+            return t == chosen
         return t in used or t in used_0
 
     bare = line.split(";", 1)[0].strip()
     if re.match(r"^T\d+\b", bare, re.I):
+        t = int(re.match(r"^T(\d+)", bare, re.I).group(1))
+        if chosen is not None:
+            return t == chosen
         if single:
             return False
-        t = int(re.match(r"^T(\d+)", bare, re.I).group(1))
         return tool_ok(t)
     if re.match(r"^M10[49]\b", bare, re.I):
         tm = re.search(r"\bT(\d+)\b", bare, re.I)

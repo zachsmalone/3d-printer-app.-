@@ -23,6 +23,7 @@ from app.community.identity import Actor, get_actor
 from app.services import editproj
 from app.core.exporters import mesh_3mf
 from app.services import filament_slots as fslots
+from app.services import single_slot as single_slot_file
 from app.services import slice_inflight
 from app.services import slice_engine as eng
 from app.services import support_extruder
@@ -52,6 +53,17 @@ def _own_slice(sid: str, job: str):
         yield
     finally:
         slice_inflight.release(sid, job)
+
+
+def _arm_single_slot(prof, slot_plan: dict, flag: bool | None):
+    """Merge the one-slot start G-code when this print is a single slot on a known family."""
+    try:
+        spec = single_slot_file.resolve(prof.id, slot_plan, flag)
+    except ValueError as e:
+        _fail(400, "bad_slots", str(e))
+    if spec is None:
+        return prof, slot_plan, None
+    return single_slot_file.apply_profile(prof, spec), {**slot_plan, **single_slot_file.plan_fields(spec)}, spec
 
 
 def _with_support_extruder(prof, strokes: list):
@@ -182,6 +194,7 @@ def slice_model(
     slots: Optional[str] = Form(None),
     slot_materials: Optional[str] = Form(None),
     slot_colours: Optional[str] = Form(None),
+    single_slot: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
     from app.core import memtrim
@@ -197,6 +210,7 @@ def slice_model(
             slot_plan = fslots.plan([], fslots.parse_slots(slots))
             if slots:
                 slot_plan = fslots.plan_heads(slot_plan["slots"], material, None)
+        slot_flag = single_slot_file.parse_flag(single_slot)
     except ValueError as e:
         _fail(400, "bad_slots", str(e))
     plate_objs, skipped = None, []
@@ -290,6 +304,7 @@ def slice_model(
                 slot_plan = _keep_support_toolchange(slot_plan, filament_info)
                 if paint_info is not None:
                     paint_info = {**paint_info, "support_filament": filament_info}
+            prof, slot_plan, slot_spec = _arm_single_slot(prof, slot_plan, slot_flag)
             parts = None
             if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
                 parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
@@ -306,6 +321,7 @@ def slice_model(
                 prof, filament_info = _with_support_extruder(prof, paint_strokes)
                 if paint_info is not None and filament_info is not None:
                     paint_info = {**paint_info, "support_filament": filament_info}
+                prof, slot_plan, slot_spec = _arm_single_slot(prof, slot_plan, slot_flag)
                 res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
                                            bounds_stl=work / "model.stl", parts=parts)
         except eng.SliceError as e:
@@ -320,6 +336,8 @@ def slice_model(
             memtrim.trim()
         _g = work / "model.gcode"
         _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
+        if slot_spec is not None:
+            _body = single_slot_file.finish_gcode(_body, slot_spec)
         _g.write_text(fslots.gcode_header(slot_plan) + _body)
         (work / "slots.json").write_text(json.dumps(slot_plan))
         from app.services import slicer as _sl, willprint
@@ -359,6 +377,10 @@ def slice_model(
             "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
             "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
             "support_paint": paint_info, "slots": slot_plan["slots"], "slot_notes": slot_plan["notes"],
+            "single_slot": bool(slot_plan.get("single_slot")),
+            "single_slot_family": slot_plan.get("family") or "",
+            "single_slot_tool": slot_plan.get("tool") or "",
+            "hardware_verified": False if slot_plan.get("single_slot") else None,
             "firmware": gcode_pause.firmware_for(prof.id), "problem_markers": hints,
             "downloads": {"gcode": f"/api/slice/{slice_id}/gcode", "stl": f"/api/slice/{slice_id}/model.stl",
                           "3mf": f"/api/slice/{slice_id}/model.3mf", "layers": f"/api/slice/{slice_id}/layers"},
@@ -466,7 +488,6 @@ def fit_to_printer(src: Path, dst: Path, prof, scale: bool, info: Optional[dict]
     return pct
 
 
-@router.get("/{slice_id}/model.{ext}")
 def _slice_owner(slice_id: str) -> str:
     try:
         return (slices_root() / slice_id / "owner_sid").read_text().strip()
@@ -474,6 +495,7 @@ def _slice_owner(slice_id: str) -> str:
         return ""
 
 
+@router.get("/{slice_id}/model.{ext}")
 def download_model(slice_id: str, ext: str):
     """The model exactly as sliced: sized for the chosen printer, placed on its bed. 3MF is built from it on demand."""
     if not _SLICE_ID.match(slice_id) or ext not in ("stl", "3mf"):
