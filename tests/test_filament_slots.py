@@ -75,31 +75,55 @@ def test_three_colours_two_slots_folds_and_warns():
     assert any("continue" in n for n in info["notes"])
 
 
-def _slice(client, stl, slots):
+def _slice(client, stl, slots, single_slot="1"):
     r = client.post("/api/slice", data={"printer_id": "creality_k1", "nozzle": "0.4", "supports": "off",
-                                        "material": "PLA", "slots": slots},
+                                        "material": "PLA", "slots": slots, "single_slot": single_slot},
                     files={"file": ("t.stl", stl, "application/sla")})
     assert r.status_code == 200, r.text
     return r.json()
 
 
 @pytest.mark.parametrize("slots,expect", [("1", [1]), ("2", [2]), ("1,3", [1])])
-def test_gcode_single_material_no_tool_changes(slots, expect):
+def test_gcode_single_colour_names_one_slot_and_skips_leveling_macros(slots, expect):
     from app.services import slicer
     if not slicer.status()["available"]:
         pytest.skip("PrusaSlicer not available")
     client = TestClient(app_())
     body = _slice(client, trimesh.creation.box((15, 15, 6)).export(file_type="stl"), slots)
-    assert body["slots"] == expect
+    assert body["slots"] == expect and body["single_slot"] is True and body["hardware_verified"] is False
     g = client.get(body["gcode_url"]).text
+    tool = f"T{expect[0] - 1}"
     assert f"; ZEIM filament slots used: {','.join(map(str, expect))}" in g
-    assert not re.search(r"^T\d+", g, re.M)                                  # no tool changes / slot selects
-    assert not re.search(r"^M10[49]\b.*\bT\d", g, re.M)                      # no per-extruder temperatures
-    assert not re.search(r"^(M600|M701|M702)\b", g, re.M)                    # no filament change / load macros
+    assert re.findall(r"^T\d+", g, re.M) == [tool]
+    assert not re.search(r"^M10[49]\b.*\bT\d", g, re.M)
+    assert not re.search(r"^(M600|M701|M702)\b", g, re.M)
+    assert not re.search(r"^START_PRINT\b", g, re.M)
+    assert not re.search(r"^G29\b", g, re.M)
+    assert not re.search(r"^CX_PRINT_LEVELING_CALIBRATION\b", g, re.M)
+    assert not re.search(r"^BED_MESH_CALIBRATE\b", g, re.M)
+    assert "not confirmed on a printer" in g
     fc = re.search(r"^; filament_colour = (.*)$", g, re.M).group(1)
-    assert ";" not in fc                                                     # one filament in the config block
-    files = _read(client.get(f"/api/slice/{body['slice_id']}/model.3mf").content)
-    assert json.loads(files["Metadata/zeim_slots.json"])["slots"] == expect
+    assert ";" not in fc
+    info = json.loads(_read(client.get(f"/api/slice/{body['slice_id']}/model.3mf").content)["Metadata/zeim_slots.json"])
+    assert info["slots"] == expect and info["single_slot"] is True and info["hardware_verified"] is False
+    assert info["tool"] == tool
+
+
+def test_gcode_single_slot_off_keeps_a_file_with_no_tool_command():
+    from app.services import slicer
+    if not slicer.status()["available"]:
+        pytest.skip("PrusaSlicer not available")
+    client = TestClient(app_())
+    stl = trimesh.creation.box((15, 15, 6)).export(file_type="stl")
+    r = client.post("/api/slice", data={"printer_id": "creality_k1", "nozzle": "0.4", "supports": "off",
+                                        "material": "PLA", "slots": "1", "single_slot": "0"},
+                    files={"file": ("t.stl", stl, "application/sla")})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["single_slot"] is False and body["slots"] == [1]
+    g = client.get(body["gcode_url"]).text
+    assert not re.search(r"^T\d+", g, re.M)
+    assert "no tool changes" in g
 
 
 def test_slice_rejects_bad_slot():

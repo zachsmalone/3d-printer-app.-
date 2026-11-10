@@ -154,6 +154,34 @@ function slotsHTML(p, mats) {
     }).join("")}
     <p class="help" id="spSlotNotes" aria-live="polite"></p></fieldset>`;
 }
+/* One physical slot on a CFS / AMS / MMU / ACE. Off until the maker confirms. The switch is the same segmented control as Beginner / Advanced. */
+const SINGLE_SHORT = "Skips bed leveling. Untested on hardware.";
+const SINGLE_WARN = "This skips the printer's calibration and bed leveling. The first layer may not stick or may be uneven. The printer's firmware may still check the other slots. This has not been tested on hardware yet.";
+function singleSlotHTML(p) {
+  const o = p?.single_slot_option;
+  if (!o) return "";
+  const n = +o.slots || 4;
+  const opts = Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i === 0 ? " selected" : ""}>${i + 1}</option>`).join("");
+  const x = `<svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  return `<fieldset class="spslots" id="spSingleSlotBox"><legend>One filament slot</legend>
+    <p id="spSingleSlotLabel">${esc(o.label || "Single slot: skip calibration and unused-slot checks")}</p>
+    <div class="spslot">
+      <div class="segmented" role="group" aria-labelledby="spSingleSlotLabel">
+        <button type="button" id="spSingleOff" aria-pressed="true">Off</button>
+        <button type="button" id="spSingleOn" aria-pressed="false">On</button>
+      </div>
+      <p class="help" id="spSingleSlotBeside">${esc(o.short_note || SINGLE_SHORT)}</p>
+    </div>
+    <div class="spslot"><label for="spSingleSlotN">Slot</label><select id="spSingleSlotN" disabled>${opts}</select></div>
+    <p class="help" id="spSingleSlotNote">${esc(o.note || "")}</p></fieldset>
+    <dialog id="spSingleAsk" aria-labelledby="spSingleAskTitle">
+      <div class="dlg">
+        <div class="dh"><h3 id="spSingleAskTitle">Skip calibration and bed leveling?</h3><button type="button" class="x" id="spSingleAskX" aria-label="Close">${x}</button></div>
+        <div class="body"><p id="spSingleAskText">${esc(o.warn || SINGLE_WARN)}</p></div>
+        <div class="df"><button type="button" class="btn" id="spSingleCancel">Cancel</button><button type="button" class="btn primary" id="spSingleTurnOn">Turn on</button></div>
+      </div>
+    </dialog>`;
+}
 const svg = (d) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 /* Beginner keeps the short row. Advanced adds every PrusaSlicer 2.9 sparse pattern.
    Tri-hexagon is Creality Print's name for the stars key. Zigzag is PrusaSlicer's zigzag,
@@ -241,6 +269,7 @@ export function panelHTML(hintMode) {
     <div id="procPane-filament" role="tabpanel" aria-labelledby="procTab-filament" hidden>
       <div class="patgrid" role="group" aria-label="Filament">${mats.map(id => `<button type="button" class="pat" data-mat="${esc(id)}" aria-pressed="${id === "PLA" ? "true" : "false"}"><span>${esc(id)}</span></button>`).join("")}</div>
       <div class="sr-only" id="spMatRow">${sel("spMat", "Material", mats, "PLA")}</div>
+      ${singleSlotHTML(p)}
       ${slotsHTML(p, mats)}
       <div id="spMatWarn" aria-live="polite">${matWarnHTML("PLA")}</div>
       <div class="sp-adv grid3" ${beginner ? "hidden" : ""}>
@@ -326,12 +355,18 @@ function readPanel() {
   if ($("#spFit").checked) fd.append("scale_to_fit", "true");
   const paint = getStrokes();
   if (paint.length) fd.append("support_paint", JSON.stringify(paint));
-  const on = [...document.querySelectorAll("[name=spSlotOn]:checked")].map(c => +c.value);
-  if ($("#spSlots") && on.length) {
-    fd.append("slots", on.join(","));
-    fd.append("slot_materials", JSON.stringify(on.map(s => ($("#spSlotMat" + s)?.value) || "PLA")));
-    fd.append("slot_colours", JSON.stringify(on.map(s => ($("#spSlotCol" + s)?.value) || "#FFFFFF")));
-    const m0 = $("#spSlotMat" + on[0]); if (m0) fd.set("material", m0.value);
+  const singleOn = $("#spSingleOn")?.getAttribute("aria-pressed") === "true";
+  if ($("#spSingleOff")) fd.append("single_slot", singleOn ? "1" : "0");
+  if (singleOn) {
+    fd.append("slots", $("#spSingleSlotN")?.value || "1");
+  } else {
+    const on = [...document.querySelectorAll("[name=spSlotOn]:checked")].map(c => +c.value);
+    if ($("#spSlots") && on.length) {
+      fd.append("slots", on.join(","));
+      fd.append("slot_materials", JSON.stringify(on.map(s => ($("#spSlotMat" + s)?.value) || "PLA")));
+      fd.append("slot_colours", JSON.stringify(on.map(s => ($("#spSlotCol" + s)?.value) || "#FFFFFF")));
+      const m0 = $("#spSlotMat" + on[0]); if (m0) fd.set("material", m0.value);
+    }
   }
   return fd;
 }
@@ -360,10 +395,50 @@ export function wirePanel(getModelId) {
   document.addEventListener("zeim:proc-tab", syncSupportSheet);
   syncSupportSheet();
   const slotBox = $("#spSlots");
+  const matField = mat.closest(".field");
+  const singleOn = () => $("#spSingleOn")?.getAttribute("aria-pressed") === "true";
+  const syncSingle = () => {
+    const direct = singleOn();
+    const picker = $("#spSingleSlotN");
+    if (picker) picker.disabled = !direct;
+    if (slotBox) slotBox.hidden = direct;
+    if (matField) matField.hidden = !!(slotBox && !slotBox.hidden);
+  };
+  const setSingle = (on) => {
+    $("#spSingleOff")?.setAttribute("aria-pressed", on ? "false" : "true");
+    $("#spSingleOn")?.setAttribute("aria-pressed", on ? "true" : "false");
+    syncSingle();
+  };
+  const singleAsk = () => {
+    const inPanel = document.querySelector("#slicePanel #spSingleAsk");
+    document.querySelectorAll("#spSingleAsk").forEach(d => { if (inPanel && d !== inPanel) d.remove(); });
+    const d = document.getElementById("spSingleAsk");
+    if (!d) return;
+    if (d.parentElement !== document.body) document.body.appendChild(d);
+    if (!d.open) d.showModal();
+    document.getElementById("spSingleCancel")?.focus();
+  };
+  const closeSingleAsk = (turnOn) => {
+    setSingle(!!turnOn);
+    const d = document.getElementById("spSingleAsk");
+    if (d?.open) d.close();
+  };
+  const offBtn = $("#spSingleOff"), onBtn = $("#spSingleOn");
+  if (offBtn) offBtn.onclick = () => closeSingleAsk(false);
+  if (onBtn) onBtn.onclick = () => { if (!singleOn()) singleAsk(); };
+  const inPanelAsk = document.querySelector("#slicePanel #spSingleAsk");
+  document.querySelectorAll("#spSingleAsk").forEach(d => { if (inPanelAsk && d !== inPanelAsk) d.remove(); });
+  const ask = document.getElementById("spSingleAsk");
+  if (ask && !ask.dataset.wired) {
+    ask.dataset.wired = "1";
+    document.getElementById("spSingleCancel").onclick = () => closeSingleAsk(false);
+    document.getElementById("spSingleAskX").onclick = () => closeSingleAsk(false);
+    document.getElementById("spSingleTurnOn").onclick = () => closeSingleAsk(true);
+    ask.addEventListener("cancel", (e) => { e.preventDefault(); closeSingleAsk(false); });
+  }
+  syncSingle();
   if (slotBox) {
-    // Multi-head: per-slot material replaces the single Material field (slot 1 is primary).
-    const matField = mat.closest(".field");
-    if (matField) matField.hidden = true;
+    // Multi-head: per-slot material replaces the single Material field while that list is open.
     const syncSlots = () => {
       const on = [...slotBox.querySelectorAll("[name=spSlotOn]:checked")].map(c => +c.value);
       const note = $("#spSlotNotes");
@@ -481,7 +556,7 @@ export function wirePanel(getModelId) {
         ${r.skipped_objects?.length ? `<div class="help warn" role="alert" id="spSkipped"><p>${esc(r.skipped_note)}</p><div class="row"><button type="button" class="btn small" id="spSplit">Split onto another plate</button><button type="button" class="btn small ghost" id="spSkipX" aria-label="Dismiss this warning">Dismiss</button></div></div>` : ""}
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${(r.slot_notes || []).map(n => `<p class="help">${esc(n)}</p>`).join("")}
-        ${r.slots ? `<p class="help">Filament slots used: ${esc((r.slots || []).join(", "))}. Unused ports are not heated, primed or purged.</p>` : ""}
+        ${r.single_slot ? `<p class="help">Single slot ${esc(r.single_slot_tool || "")}. Not confirmed on a printer.</p>` : (r.slots ? `<p class="help">Filament slots used: ${esc((r.slots || []).join(", "))}. Unused ports are not heated, primed or purged.</p>` : "")}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
         ${firstPrintChecklistHTML(r.settings.material)}
