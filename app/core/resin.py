@@ -30,9 +30,17 @@ PRESETS = {
                  "lift_mm": 6.0, "lift_speed_mm_min": 80.0},
 }
 DEFAULT_PRESET = "standard"
+# Support fine-tuning. Defaults match the old hardcodes so an omitted field builds the same mesh:
+# spacing 4 mm, lift 5 mm, tip 0.4 mm, shaft 1 mm, raft 1 mm.
+DEFAULT_SUPPORT_SPACING_MM = 4.0
+DEFAULT_BASE_LIFT_MM = 5.0
+DEFAULT_TIP_MM = 0.4
+DEFAULT_SHAFT_MM = 1.0
+DEFAULT_RAFT_MM = 1.0
 LIMITS = {"layer_mm": (0.01, 0.2), "exposure_s": (0.5, 30.0), "bottom_exposure_s": (5.0, 120.0), "bottom_layers": (1, 15),
           "lift_mm": (1.0, 15.0), "lift_speed_mm_min": (10.0, 300.0), "tilt_deg": (-180.0, 180.0), "tilt_y_deg": (-180.0, 180.0), "wall_mm": (0.0, 6.0),
-          "drain_mm": (0.0, 10.0), "price": (0.0, 10000.0), "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0)}
+          "drain_mm": (0.0, 10.0), "price": (0.0, 10000.0), "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0),
+          "tip_mm": (0.2, 0.8), "shaft_mm": (0.6, 2.5), "raft_mm": (0.5, 3.0)}
 SAFETY = ["Wear nitrile gloves and eye protection; uncured resin irritates skin and eyes.",
           "Print and wash in a ventilated room; keep resin away from pets, food areas and anyone not wearing gloves.",
           "Wash prints in IPA (or the resin maker's wash), then cure under UV. Cure used IPA and resin waste in sunlight before disposal; never pour it down a drain.",
@@ -188,8 +196,11 @@ def settings(opts: dict | None = None) -> dict:
     s["tilt_y_deg"] = _num(o, "tilt_y_deg", 0.0)
     s["wall_mm"] = _num(o, "wall_mm", 2.0)
     s["drain_mm"] = _num(o, "drain_mm", 3.0)
-    s["support_spacing_mm"] = _num(o, "support_spacing_mm", 4.0)
-    s["base_lift_mm"] = _num(o, "base_lift_mm", 5.0)
+    s["support_spacing_mm"] = _num(o, "support_spacing_mm", DEFAULT_SUPPORT_SPACING_MM)
+    s["base_lift_mm"] = _num(o, "base_lift_mm", DEFAULT_BASE_LIFT_MM)
+    s["tip_mm"] = _num(o, "tip_mm", DEFAULT_TIP_MM)
+    s["shaft_mm"] = _num(o, "shaft_mm", DEFAULT_SHAFT_MM)
+    s["raft_mm"] = _num(o, "raft_mm", DEFAULT_RAFT_MM)
     s["density_g_ml"] = mat["density_g_ml"]
     s["price"] = _material_price(o, material)
     s["price_unit"] = o.get("price_unit") or DEFAULT_PRICE_UNIT
@@ -314,7 +325,7 @@ def pillar_path_clear(mesh: trimesh.Trimesh, contact) -> bool:
     return not bool(hit[0]) if len(hit) else True
 
 
-def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=0.4, shaft_d=1.0, raft_mm=1.0, envelope=None,
+def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=DEFAULT_TIP_MM, shaft_d=DEFAULT_SHAFT_MM, raft_mm=DEFAULT_RAFT_MM, envelope=None,
                    extra=None, auto=True, avoid=None, manual=None):
     """Model raised by base_lift; a cone tip + cylinder pillar to a raft under each support point.
     Points whose straight path down hits the model itself are skipped (counted) instead of piercing it.
@@ -741,9 +752,9 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
     avoid_list = [list(map(float, p)) for p in (avoid or [])][:200]
     if s["supports"] or island_supports or manual_list:
         # supports off + named pillars only: the model stays on the plate (no lift, no raft); pillars stand on the plate
-        bl, raft = (s["base_lift_mm"], 1.0) if s["supports"] else (0.0, 0.0)
+        bl, raft = (s["base_lift_mm"], s["raft_mm"]) if s["supports"] else (0.0, 0.0)
         lift = bl + raft
-        work, sr = build_supports(work, s["support_spacing_mm"], bl, raft_mm=raft, envelope=envelope,
+        work, sr = build_supports(work, s["support_spacing_mm"], bl, tip_d=s["tip_mm"], shaft_d=s["shaft_mm"], raft_mm=raft, envelope=envelope,
                                   extra=island_supports[:200] if island_supports else None, auto=s["supports"],
                                   avoid=avoid_list if s["supports"] else None, manual=manual_list or None)
         if island_supports:

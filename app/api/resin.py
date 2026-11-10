@@ -55,7 +55,9 @@ def catalog():
                       "hardware_tested": False, "native_formats_written": []},
             "sources": resin_sources.public_sources(),
             "formats_note": "TorchC0 still exports STL and 3MF. "
-                            "Slice writes .lumen here, or .goo, .ctb and .nanodlp through the separate mslicer program when the plate's stock file matches. "
+                            "Slice writes .lumen here. "
+                            ".ctb and .nanodlp are written by the separate DragonFruit program when the plate's stock file matches. "
+                            ".goo is written by the separate mslicer program when the plate's stock file matches. "
                             "It does not write Lychee, Photon, .ctbx, or a zip renamed as a printer file. "
                             "A written .ctb or .goo is the catalog container, not a firmware test. " + resin_sources.SOURCES_NOTE}
 
@@ -267,6 +269,7 @@ def placement(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y_deg: 
 @router.post("/support-contact")
 def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y_deg: str = Form("0"),
                     printer_id: str = Form(""), supports: str = Form("true"),
+                    base_lift_mm: str = Form(""), raft_mm: str = Form(""),
                     points: str = Form("[]"), kinds: str = Form("[]"), actor: Actor = Depends(get_actor)):
     """The point a mark will store. A support point is where the pillar will touch. A keep-clear point is the exclusion coordinate."""
     raw = _points(points, "Support contact")
@@ -281,12 +284,13 @@ def support_contact(upload_id: str = Form(""), tilt_deg: str = Form("0"), tilt_y
         s = resin.settings({
             "tilt_deg": tilt_deg or "0", "tilt_y_deg": tilt_y_deg or "0",
             "hollow": "false", "supports": supports,
+            "base_lift_mm": base_lift_mm, "raft_mm": raft_mm,
         })
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
     mesh = trimesh.load(trimesh.util.wrap_as_stream(data), file_type="stl", force="mesh")
     mesh = resin.place_on_bed(mesh, s["tilt_deg"], s["tilt_y_deg"], _bed_for(printer_id))
-    lift, raft = (s["base_lift_mm"], 1.0) if s["supports"] else (0.0, 0.0)
+    lift, raft = (s["base_lift_mm"], s["raft_mm"]) if s["supports"] else (0.0, 0.0)
     contacts = []
     for i, p in enumerate(raw):
         kind = kind_list[i] if i < len(kind_list) and kind_list[i] in ("support", "avoid") else "support"
@@ -329,11 +333,11 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
             lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), tilt_y_deg: str = Form(""), simplify: str = Form("false"), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
-            base_lift_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), support_points: str = Form(""), avoid_points: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+            base_lift_mm: str = Form(""), tip_mm: str = Form(""), shaft_mm: str = Form(""), raft_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), support_points: str = Form(""), avoid_points: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
             "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg", "tilt_y_deg",
-            "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "price", "price_unit")})
+            "hollow", "wall_mm", "drain_mm", "supports", "support_spacing_mm", "base_lift_mm", "tip_mm", "shaft_mm", "raft_mm", "price", "price_unit")})
     except resin.ResinError as e:
         raise HTTPException(400, str(e))
     isl, drn = _points(island_supports, "Island supports"), _points(drains, "Drain holes")

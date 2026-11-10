@@ -78,7 +78,8 @@ SOURCES = (
 
 SOURCES_NOTE = (
     "Open Resin .lumen uses the MIT/Apache reference encoder. "
-    ".goo, .ctb, and .nanodlp are written by the separate mslicer program (GPL-3.0), whose source is shipped beside it. "
+    ".ctb and .nanodlp are written by the separate unmodified DragonFruit program (AGPL-3.0-or-later). "
+    ".goo is written by the separate mslicer program (GPL-3.0), whose source is shipped beside it. "
     "A plate's stock extension has to match the file. CTB v2 is not written. "
     "REA is a reverse-engineering tool, not a resin slicer, and it is not pointed at a proprietary program."
 )
