@@ -1,6 +1,7 @@
 """A second FDM slice of the same job is 409, and a heavy resin prepare does not stall /healthz."""
 import json
 import os
+import shutil
 import socket
 import struct
 import threading
@@ -15,6 +16,7 @@ import uvicorn
 from app.main import app
 from app.services import slice_engine as eng
 from app.services import slice_inflight
+from app.services.history import store
 
 ROOT = Path(__file__).resolve().parents[1]
 pytestmark = pytest.mark.filterwarnings("ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning")
@@ -75,12 +77,12 @@ def test_same_job_is_409_on_both_fdm_routes(monkeypatch):
             signed = setup.post("/api/me/signup", json={"display_name": "Ada Adult", "dob": "1985-05-05"})
             assert signed.status_code == 200, signed.text
             sid = setup.cookies["p3d_sid"]
-        from app.services.history import store
         for bid in ("jobbusy01", "jobbusy02"):
             folder = store.dir(bid)
             folder.mkdir(parents=True, exist_ok=True)
             (folder / "meta.json").write_text(json.dumps({
-                "id": bid, "owner_sid": sid, "visibility": "private", "created": 0,
+                "id": bid, "owner_sid": sid, "visibility": "private",
+                "created": "2020-01-01T00:00:00+00:00",
             }))
             _stl_box(folder / "model.stl")
         cookies = {"p3d_sid": sid}
@@ -126,6 +128,8 @@ def test_same_job_is_409_on_both_fdm_routes(monkeypatch):
         release.set()
         _stop(server, thread)
         slice_inflight.reset()
+        for bid in ("jobbusy01", "jobbusy02"):
+            shutil.rmtree(store.dir(bid), ignore_errors=True)
 
 
 def test_healthz_stays_200_during_heavy_prepare(tmp_path, monkeypatch):
