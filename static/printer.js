@@ -343,7 +343,7 @@ export function openInHTML(dl) {
 export function wirePanel(getModelId) {
   const mat = $("#spMat");
   if (!mat) return;
-  mountPaint($("#spPaintHost"), printerOf(pref.printer_id)?.support_filament);
+  mountPaint($("#spPaintHost"), printerOf(P.pref.printer_id)?.support_filament);
   const syncSupportSheet = () => {
     const edit = document.getElementById("viewEdit");
     const sheet = document.getElementById("processSheet");
@@ -352,9 +352,13 @@ export function wirePanel(getModelId) {
     const open = !!(sheet && !sheet.hidden && tab && tab.getAttribute("aria-selected") === "true");
     edit.classList.toggle("support-live", open);
     if (open) edit.classList.add("paint-ready");
-    requestAnimationFrame(() => window.dispatchEvent(new Event("resize")));
+    requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("zeim:viewer-resize"));
+    });
   };
   document.addEventListener("zeim:proc-tab", syncSupportSheet);
+  syncSupportSheet();
   const slotBox = $("#spSlots");
   if (slotBox) {
     // Multi-head: per-slot material replaces the single Material field (slot 1 is primary).

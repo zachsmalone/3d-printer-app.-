@@ -204,4 +204,4 @@ def test_picker_source_has_no_pretend_pva_slot():
     assert "This printer has one extruder." in js
     assert "can_drive" in js and "supportFilament" in js
     assert "support_filament" in printer
-    assert "mountPaint($(\"#spPaintHost\"), printerOf(pref.printer_id)?.support_filament)" in printer
+    assert "mountPaint($(\"#spPaintHost\"), printerOf(P.pref.printer_id)?.support_filament)" in printer

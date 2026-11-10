@@ -67,8 +67,8 @@ function supportStatus() {
   const mode = { orbit: "Orbit", add: "Add support", erase: "Erase", avoid: "Keep clear" }[supportEdit.mode] || "Orbit";
   const notice = supportEdit.notice ? `${supportEdit.notice} ` : "";
   el.textContent = notice + (n || a
-    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. A green mark is where the pillar will touch. A red mark is the keep-clear point. Automatic supports skip keep-clear marks. An unsupported island is still reported.`
-    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. A support tap on a face that does not point at the plate moves the green mark to the underside below it. A keep-clear tap stays on the point you tapped. Drag orbits, right-drag pans.`);
+    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. A green mark is the point you tapped. A red mark is the keep-clear point. Both stay on that point when the view turns. Automatic supports skip keep-clear marks. An unsupported island is still reported.`
+    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. The mark stays on the point you tapped, on any face. Drag orbits, right-drag pans.`);
 }
 async function show3D(el, url, lc, buf, bed, opts) {
   opts = opts || {};
@@ -139,6 +139,13 @@ async function show3D(el, url, lc, buf, bed, opts) {
       const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, viewer.camera);
       const marksHit = ray.intersectObjects(viewer.group.children.filter(c => c.userData && c.userData.mark), false);
       const modelHit = ray.intersectObject(model, false);
+      if (modelHit[0]) {
+        const p = modelHit[0].point.clone().project(viewer.camera);
+        const sx = (p.x * 0.5 + 0.5) * rect.width + rect.left;
+        const sy = (-p.y * 0.5 + 0.5) * rect.height + rect.top;
+        el.dataset.cursor = `${ev.clientX.toFixed(2)},${ev.clientY.toFixed(2)}`;
+        el.dataset.ray = `${sx.toFixed(2)},${sy.toFixed(2)}`;
+      }
       opts.onPick({ mark: marksHit[0] || null, hit: modelHit[0] || null, matrix: model.matrix });
     };
     viewer._resinDownFn = down;
@@ -214,7 +221,7 @@ function panelHTML() {
       <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden style="position:relative;width:100%;height:min(60vw,300px);min-height:200px;border-radius:8px;overflow:hidden"></div>
       <p class="help" id="rzCamHint">${CAM_HINT}</p>
       <fieldset class="rzOrient" id="rzSupEdit" hidden><legend>Supports on the model</legend>
-        <p class="help" id="rzSupRule">A green mark is where the pillar will touch. A red mark is the keep-clear point you tapped. A support tap on a face that does not point at the plate moves only the green mark to the underside below the tap, and the line under this says so.</p>
+        <p class="help" id="rzSupRule">A green mark is the point you tapped for a support. A red mark is the keep-clear point you tapped. Both stay on that point when the view turns.</p>
         <p class="help" id="rzSupStatus"></p>
         <div class="row"><button type="button" class="btn small" id="rzModeOrbit" aria-pressed="true">Orbit</button><button type="button" class="btn small" id="rzModeAdd">Add support</button><button type="button" class="btn small" id="rzModeErase">Erase</button><button type="button" class="btn small" id="rzModeAvoid">Keep clear</button><button type="button" class="btn small" id="rzSupUndo">Undo</button><button type="button" class="btn small" id="rzSupReset">Reset</button></div>
       </fieldset></div></div>
@@ -296,20 +303,6 @@ function wire() {
     }).then(supportStatus);
   };
   let contactBusy = false;
-  async function askContacts(placedPoints, kinds) {
-    const fd = new FormData();
-    fd.append("upload_id", picked.id);
-    fd.append("tilt_deg", $("#rzTilt").value || "0");
-    fd.append("tilt_y_deg", $("#rzTiltY").value || "0");
-    fd.append("printer_id", $("#rzPrinter").value || "");
-    fd.append("supports", $("#rzSup") && $("#rzSup").checked ? "true" : "false");
-    fd.append("base_lift_mm", $("#rzBaseLift").value);
-    fd.append("raft_mm", $("#rzRaft").value);
-    fd.append("points", JSON.stringify(placedPoints));
-    fd.append("kinds", JSON.stringify(kinds || placedPoints.map(() => "support")));
-    const body = await api("/api/resin/support-contact", { method: "POST", body: fd });
-    return body.contacts || [];
-  }
   function storePlaced(point, matrix) {
     const inv = (matrix || threeMatrix(supportEdit.matrix || eye4())).clone().invert();
     const v = new THREE.Vector3(point[0], point[1], point[2]).applyMatrix4(inv);
@@ -324,39 +317,8 @@ function wire() {
     pv.dataset.kind = kind;
   }
   async function recontactMarks() {
-    if (!picked) { supportStatus(); return; }
-    const manuals = supportEdit.manual.map(p => p.slice());
-    if (manuals.length) {
-      const M = supportEdit.matrix || eye4();
-      const placed = manuals.map(p => applyPoint(M, p).map(round3));
-      let contacts;
-      try { contacts = await askContacts(placed, placed.map(() => "support")); }
-      catch (e) {
-        supportEdit.notice = `The pose changed and the contact check failed (${e.message}). The green marks were cleared so they cannot sit away from the pillars. Red keep-clear marks stay where they were tapped.`;
-        supportEdit.manual = [];
-        saveSupportLocal();
-        await redrawPick(true);
-        return;
-      }
-      const nextM = [];
-      let moved = 0, dropped = 0;
-      const mat = threeMatrix(M);
-      for (let i = 0; i < manuals.length; i++) {
-        const c = contacts[i];
-        if (!c || !c.ok || !c.point) { dropped++; continue; }
-        const prev = placed[i];
-        if (Math.abs(prev[0] - c.point[0]) > 0.4 || Math.abs(prev[1] - c.point[1]) > 0.4 || Math.abs(prev[2] - c.point[2]) > 0.4) moved++;
-        nextM.push(storePlaced(c.point, mat));
-      }
-      if (moved || dropped) {
-        pushUndo();
-        supportEdit.manual = nextM;
-        supportEdit.notice = dropped
-          ? `The pose or printer changed. ${dropped} green mark${dropped === 1 ? "" : "s"} had no pillar contact and ${dropped === 1 ? "was" : "were"} removed. Each remaining green mark is where a pillar will touch. Red keep-clear marks stay on the tapped points.`
-          : "The pose or printer changed. The green marks moved to the undersides that face the plate, where the pillars will touch. Red keep-clear marks stay on the tapped points.";
-        saveSupportLocal();
-      }
-    }
+    // Marks are stored on the mesh and drawn with the placement matrix, so a pose change
+    // keeps each one on the face that was tapped. They are not snapped to another face.
     await redrawPick(true);
   }
   async function onSupportPick(ev) {
@@ -379,41 +341,17 @@ function wire() {
     const pv = $("#rzPickView");
     if (pv) pv.dataset.normal = [round3(nrm.x), round3(nrm.y), round3(nrm.z)].join(",");
     try {
-      if (kind === "avoid") {
-        pushUndo();
-        supportEdit.avoid.push(storePlaced(tap, ev.matrix));
-        if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
-        rememberContact(tap, Object.assign(tap.slice(), { moved: false }), "avoid");
-        supportEdit.notice = "The red mark is the keep-clear point you tapped. Automatic supports near it are skipped.";
-        saveSupportLocal();
-        await redrawPick(true);
-        return;
-      }
-      const contacts = await askContacts([tap], [kind]);
-      const c = contacts[0];
-      if (!c || !c.ok || !c.point) {
-        supportEdit.notice = c && c.blocked
-          ? "A pillar there would run into the model. No green mark was placed."
-          : c && c.on_plate
-            ? "That spot is too close to the plate for a pillar. No green mark was placed."
-            : "No underside below that tap faces the plate. No mark was placed.";
-        supportStatus();
-        return;
-      }
       pushUndo();
-      const stored = storePlaced(c.point, ev.matrix);
-      (kind === "avoid" ? supportEdit.avoid : supportEdit.manual).push(stored);
-      if (supportEdit.manual.length > 200) supportEdit.manual.length = 200;
-      if (supportEdit.avoid.length > 200) supportEdit.avoid.length = 200;
-      rememberContact(tap, Object.assign(c.point.slice(), { moved: !!c.moved }), kind);
-      supportEdit.notice = c.moved
-        ? "The tap was not on a downward face. The green mark is the underside below it, where the pillar will touch."
-        : "The green mark is where the pillar will touch.";
+      const stored = storePlaced(tap, ev.matrix);
+      const list = kind === "avoid" ? supportEdit.avoid : supportEdit.manual;
+      list.push(stored);
+      if (list.length > 200) list.length = 200;
+      rememberContact(tap, Object.assign(tap.slice(), { moved: false }), kind);
+      supportEdit.notice = kind === "avoid"
+        ? "The red mark is the keep-clear point you tapped. Automatic supports near it are skipped."
+        : "The green mark is the point you tapped.";
       saveSupportLocal();
       await redrawPick(true);
-    } catch (e) {
-      supportEdit.notice = `Could not find where a support would touch (${e.message}). No mark was placed.`;
-      supportStatus();
     } finally { contactBusy = false; }
   }
   $("#rzModeOrbit").onclick = () => setMode("orbit");
@@ -664,8 +602,8 @@ function wire() {
         const avoidMoved = sentAvoid.length !== keptBack.length || sentAvoid.some((p, i) => far(p, keptBack[i]));
         supportEdit.manual = built.map(toBase);
         supportEdit.avoid = keptBack.map(toBase);
-        if (supportMoved) supportEdit.notice = "The green marks are where the pillars will touch. A tap that was not on a downward face was moved to that underside.";
-        if (avoidMoved) supportEdit.notice = "The red marks were moved onto the keep-clear points that automatic supports skip.";
+        if (supportMoved) supportEdit.notice = "Prepared. The green marks stay on the points you tapped.";
+        if (avoidMoved) supportEdit.notice = "Prepared. The red marks stay on the keep-clear points you tapped.";
         saveSupportLocal();
         if (supportEdit.buf) await redrawPick(true);
       }

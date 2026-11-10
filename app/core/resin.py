@@ -406,26 +406,19 @@ def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=D
 
 
 def contact_point(mesh: trimesh.Trimesh, point, downward: float = 0.2):
-    """Where a pillar will touch for this tap, in the same frame as `point`.
+    """The surface point under this tap, in the same frame as `point`.
 
-    A tap already on a downward face stays there. Any other tap uses the nearest
-    downward face straight below it. Returns (point, moved) or (None, False) when
-    nothing below the tap faces the plate.
+    A tap already on the mesh stays on that face, whichever way the face points.
+    Nothing is moved to a different face. Returns (point, moved). moved is False
+    when the tap is on the surface. A tap in empty space returns (None, False).
+    `downward` is kept so older callers still pass it; facing is not used.
     """
+    _ = downward
     p = np.asarray(point, dtype=float).reshape(3)
-    closest, dist, face_id = trimesh.proximity.closest_point(mesh, [p])
-    normal = mesh.face_normals[int(face_id[0])]
-    if float(dist[0]) <= 0.35 and float(normal[2]) < -downward:
+    closest, dist, _face_id = trimesh.proximity.closest_point(mesh, [p])
+    if float(dist[0]) <= 0.35:
         return np.asarray(closest[0], dtype=float), False
-    origin = np.array([p[0], p[1], float(mesh.bounds[1][2]) + 1.0], dtype=float)
-    loc, _, idx = mesh.ray.intersects_location([origin], [[0.0, 0.0, -1.0]])
-    below = [np.asarray(q, dtype=float) for q, fi in zip(loc, idx)
-             if mesh.face_normals[int(fi)][2] < -downward and float(q[2]) <= float(p[2]) + 0.05]
-    if not below:
-        return None, False
-    contact = max(below, key=lambda q: float(q[2]))
-    moved = float(np.linalg.norm(contact - p)) > 0.35
-    return contact, moved
+    return None, False
 
 
 def _surface_below(m, pts, reach=2.0):
