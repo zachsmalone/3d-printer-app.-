@@ -224,7 +224,9 @@ function panelHTML() {
     <p class="help" id="rzMatNote"></p><div id="rzMatExtra"></div>
     <details class="rzAdv" id="rzAdv"${document.body.dataset.level === "expert" ? " open" : ""}><summary>Advanced resin settings</summary><div class="grid3">${num("rzLayer", "Layer height", 0.05, 0.01, 0.2, 0.01, "mm")}${num("rzExp", "Exposure", 2.5, 0.5, 30, 0.1, "s")}${num("rzBExp", "Bottom exposure", 30, 5, 120, 1, "s")}
       ${num("rzBL", "Bottom layers", 5, 1, 15, 1, "")}${num("rzLift", "Lift distance", 6, 1, 15, 0.5, "mm")}${num("rzLiftS", "Lift speed", 65, 10, 300, 5, "mm/min")}
-      ${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div></details>
+      ${num("rzWall", "Hollow wall", 2, 0.5, 6, 0.5, "mm")}${num("rzDrain", "Drain hole Ø", 3, 0, 10, 0.5, "mm")}</div>
+      <div class="grid3">${num("rzSupSpace", "Support spacing", "4.0", 1.5, 10, 0.1, "mm")}${num("rzBaseLift", "Base lift", "5.0", 0, 15, 0.5, "mm")}${num("rzTip", "Tip diameter", "0.4", 0.2, 0.8, 0.05, "mm")}
+      ${num("rzShaft", "Shaft diameter", "1.0", 0.6, 2.5, 0.1, "mm")}${num("rzRaft", "Raft thickness", "1.0", 0.5, 3, 0.1, "mm")}</div></details>
     <p class="help warn rzWarn" id="rzWallWarn" hidden>Walls under 1 mm crack easily in resin. Use 1 mm or more, or prepare anyway.
       <button type="button" class="btn small" id="rzWallAnyway">Prepare anyway</button> <button type="button" class="btn small" id="rzWallDismiss" aria-label="Dismiss this warning">Dismiss</button></p>
     <div class="grid3"><div class="field"><label for="rzCur">Currency</label><select id="rzCur">${CURS.map(c => `<option ${c === (loadP().currency || "$") ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></div>
@@ -301,6 +303,8 @@ function wire() {
     fd.append("tilt_y_deg", $("#rzTiltY").value || "0");
     fd.append("printer_id", $("#rzPrinter").value || "");
     fd.append("supports", $("#rzSup") && $("#rzSup").checked ? "true" : "false");
+    fd.append("base_lift_mm", $("#rzBaseLift").value);
+    fd.append("raft_mm", $("#rzRaft").value);
     fd.append("points", JSON.stringify(placedPoints));
     fd.append("kinds", JSON.stringify(kinds || placedPoints.map(() => "support")));
     const body = await api("/api/resin/support-contact", { method: "POST", body: fd });
@@ -430,6 +434,8 @@ function wire() {
   const drainWarn = () => { $("#rzDrainWarn").hidden = !($("#rzHollow").checked && !(+$("#rzDrain").value > 0)); };   // UX10
   $("#rzDrain").addEventListener("input", drainWarn); $("#rzHollow").addEventListener("change", drainWarn);
   $("#rzSup").addEventListener("change", () => { recontactMarks(); });
+  $("#rzBaseLift").addEventListener("change", () => { recontactMarks(); });
+  $("#rzRaft").addEventListener("change", () => { recontactMarks(); });
   $("#rzWallDismiss").onclick = () => { wallOk = true; wallWarn(); };
   $("#rzWallAnyway").onclick = () => { wallOk = true; wallWarn(); $("#rzGo").click(); };
   // file pick / drop: show name + size right away; wrong types get a friendly note (never blocks anything else)
@@ -502,6 +508,7 @@ function wire() {
     const v = { printer_id: $("#rzPrinter").value, material: $("#rzMaterial").value, preset: pr.value, layer_mm: $("#rzLayer").value, exposure_s: $("#rzExp").value,
       bottom_exposure_s: $("#rzBExp").value, bottom_layers: $("#rzBL").value, lift_mm: $("#rzLift").value, lift_speed_mm_min: $("#rzLiftS").value,
       tilt_deg: $("#rzTilt").value, tilt_y_deg: $("#rzTiltY").value, wall_mm: $("#rzWall").value, drain_mm: $("#rzDrain").value, hollow: $("#rzHollow").checked, supports: $("#rzSup").checked,
+      support_spacing_mm: $("#rzSupSpace").value, base_lift_mm: $("#rzBaseLift").value, tip_mm: $("#rzTip").value, shaft_mm: $("#rzShaft").value, raft_mm: $("#rzRaft").value,
       price: $("#rzCost").value, price_unit: $("#rzCostU").value };
     last = { v, f, isl: [], drains: [] };
     await run();

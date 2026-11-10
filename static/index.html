@@ -481,7 +481,8 @@
   <header class="bed-head wsbar" data-ws="slicer" role="group" aria-label="Slicer workspace">
     <button type="button" class="btn small bed-back" data-ws-act="exit" aria-label="Back" title="If the bed is empty, go back. If there is work, choose stay, save and leave, reset the bed, or abandon unsaved changes. This does not send it to Showcase.">Back</button>
     <nav id="fdmFlow" class="pflow pflow-inline" data-flow hidden aria-label="Project stages"><ol class="path"></ol></nav>
-    <span class="bed-name">FDM</span>
+    <span class="bed-name" data-kind-only="fdm">FDM</span>
+    <span class="bed-name" data-kind-only="resin">Resin</span>
     <a class="btn small learnq" href="#learn/first-print" data-learnq="first-print" aria-label="Help: Learn lesson, Your first print" title="Learn: Your first print">?</a>
     <button type="button" class="btn small bed-done" data-ws-act="done" aria-label="Done" title="Choose where this model goes. Nothing is published from this button.">Done</button>
   </header>
@@ -540,7 +541,7 @@
       </div>
       <p class="help" id="editMsg"></p>
       <div id="editWill" aria-live="polite"></div>
-      <p class="help" id="procHint">Quality, support, infill, and brim open under the model.</p>
+      <p class="help" id="procHint" data-kind-only="fdm">Quality, support, infill, and brim open under the model.</p>
       <details class="auto" open><summary><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-list"/></svg> Steps <small id="editHeadNote"></small></summary><ol class="oplist" id="editOps"></ol></details>
     </div>
   </section>
@@ -553,7 +554,7 @@
       <button type="button" data-xform="delete" title="Remove a selected part on a plate">Delete</button>
     </div>
   </div>
-  <section id="processSheet" class="proc-sheet" hidden aria-labelledby="procTitle">
+  <section id="processSheet" class="proc-sheet" hidden aria-labelledby="procTitle" data-kind-only="fdm">
     <div class="proc-bar">
       <h2 id="procTitle">Process</h2>
       <button type="button" class="btn small" id="procExpand">Expand</button>
@@ -581,18 +582,19 @@
         <span class="bed-dev-name" id="bedPrinterName">No printer saved</span>
         <span class="bed-dev-state" id="bedPrinterState">Not connected</span>
       </button>
-      <button type="button" class="bed-cat" data-bed-cat="filament" data-bed-label="Filament" data-bed-sheet="filament" id="bedFilament">Filament</button>
-      <button type="button" class="bed-cat" data-bed-cat="process" data-bed-label="Process" data-bed-sheet="process">Process</button>
+      <a class="bed-cat" id="slicerTorch" href="#torchc0" data-kind-only="resin">Open in Resin (TorchC0)</a>
+      <button type="button" class="bed-cat" data-bed-cat="filament" data-bed-label="Filament" data-bed-sheet="filament" id="bedFilament" data-kind-only="fdm">Filament</button>
+      <button type="button" class="bed-cat" data-bed-cat="process" data-bed-label="Process" data-bed-sheet="process" data-kind-only="fdm">Process</button>
       <button type="button" class="bed-cat" data-bed-cat="transform" data-bed-label="Transform">Transform</button>
       <button type="button" class="bed-cat" data-bed-cat="import" data-bed-label="Import">Import</button>
       <button type="button" class="bed-cat bed-act" id="slicerRepair" data-bed-act="repair" title="Repair holes and flipped faces on the open model. This uses the same repair as Fix. It does not leave the workspace.">Repair</button>
-      <button type="button" class="bed-cat bed-act" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace.">Slice</button>
-      <button type="button" class="bed-cat bed-act" id="slicerPreview" data-bed-act="preview" title="Show the sliced layers. Slice first.">Preview</button>
+      <button type="button" class="bed-cat bed-act" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace." data-kind-only="fdm">Slice</button>
+      <button type="button" class="bed-cat bed-act" id="slicerPreview" data-bed-act="preview" title="Show the sliced layers. Slice first." data-kind-only="fdm">Preview</button>
       <button type="button" class="bed-cat bed-act" id="slicerSend" data-bed-act="send-print" title="Open print and send for a printer already set up.">Send</button>
     </div>
     <div class="bed-scroll" id="bedTools" hidden>
       <div data-for="device"><button type="button" data-bed-sheet="device">Change printer</button></div>
-      <div data-for="filament" hidden>
+      <div data-for="filament" hidden data-kind-only="fdm">
         <button type="button" data-mat="PLA">PLA</button>
         <button type="button" data-mat="PETG">PETG</button>
         <button type="button" data-mat="TPU">TPU</button>
@@ -601,14 +603,14 @@
         <button type="button" data-mat="PC">PC</button>
         <button type="button" data-bed-tab="filament">Temperatures</button>
       </div>
-      <div data-for="process" hidden>
-        <button type="button" data-bed-tab="quality">Quality</button>
-        <button type="button" data-bed-tab="strength">Strength</button>
-        <button type="button" data-bed-tab="speed">Speed</button>
-        <button type="button" data-bed-tab="cooling">Cooling</button>
-        <button type="button" data-bed-tab="support">Support</button>
-        <button type="button" data-bed-tab="infill">Infill</button>
-        <button type="button" data-bed-tab="adhesion">Adhesion</button>
+      <div data-for="process" hidden data-kind-only="fdm">
+        <button type="button" data-bed-tab="quality" data-kind-only="fdm">Quality</button>
+        <button type="button" data-bed-tab="strength" data-kind-only="fdm">Strength</button>
+        <button type="button" data-bed-tab="speed" data-kind-only="fdm">Speed</button>
+        <button type="button" data-bed-tab="cooling" data-kind-only="fdm">Cooling</button>
+        <button type="button" data-bed-tab="support" data-kind-only="fdm">Support</button>
+        <button type="button" data-bed-tab="infill" data-kind-only="fdm">Infill</button>
+        <button type="button" data-bed-tab="adhesion" data-kind-only="fdm">Adhesion</button>
       </div>
       <div data-for="transform" hidden>
         <button type="button" data-xform="move">Move</button>

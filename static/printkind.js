@@ -12,6 +12,58 @@ let kind = null;
 
 export const printKind = () => kind;
 
+/* Open Process/Filament drill-in is FDM chrome. Remember it so toggling back restores the same row. */
+let resinHold = null;
+
+function paintSlicerChrome() {
+  const resin = kind === "resin";
+  const title = document.querySelector('#viewEdit > h1[data-sec="edit"]');
+  if (title) title.textContent = resin ? "Slicer" : "FDM Slicer";
+  const edit = document.getElementById("viewEdit");
+  const pin = document.getElementById("bedPin");
+  const tools = document.getElementById("bedTools");
+  const cats = document.getElementById("bedCats");
+  if (resin) {
+    if (!resinHold) {
+      const cat = pin && !pin.hidden ? (pin.dataset.cat || "") : "";
+      resinHold = {
+        drill: cat === "filament" || cat === "process" ? { cat, label: pin.textContent || "" } : null,
+        support: !!(edit && edit.classList.contains("support-live")),
+        paint: !!(edit && edit.classList.contains("paint-ready")),
+      };
+    }
+    if (edit) {
+      edit.classList.remove("support-live");
+      edit.classList.remove("paint-ready");
+    }
+    const catNow = pin && !pin.hidden ? (pin.dataset.cat || "") : "";
+    if ((catNow === "filament" || catNow === "process") && pin && tools && cats) {
+      if (!resinHold.drill) resinHold.drill = { cat: catNow, label: pin.textContent || "" };
+      pin.hidden = true;
+      pin.textContent = "";
+      delete pin.dataset.cat;
+      tools.hidden = true;
+      cats.hidden = false;
+    }
+    return;
+  }
+  if (!resinHold) return;
+  const hold = resinHold;
+  resinHold = null;
+  if (hold.drill && pin && tools && cats && !pin.dataset.cat) {
+    tools.querySelectorAll("[data-for]").forEach(row => { row.hidden = row.getAttribute("data-for") !== hold.drill.cat; });
+    pin.hidden = false;
+    pin.textContent = hold.drill.label;
+    pin.dataset.cat = hold.drill.cat;
+    cats.hidden = true;
+    tools.hidden = false;
+  }
+  if (edit) {
+    edit.classList.toggle("support-live", hold.support);
+    edit.classList.toggle("paint-ready", hold.paint);
+  }
+}
+
 function apply() {
   document.body.dataset.printKind = kind;
   document.querySelectorAll("#kindPick [data-kind]").forEach(b => {
@@ -29,6 +81,7 @@ function apply() {
   document.querySelectorAll('a[href="#slicer/hollow"],a[href="#torchc0"][data-kind-link]').forEach(a => {
     a.dataset.kindLink = "1"; a.setAttribute("href", kind === "resin" ? "#torchc0" : "#slicer/hollow");
   });
+  paintSlicerChrome();
   note();
 }
 

@@ -1,4 +1,5 @@
 """TorchC0 (ZEIM's resin program): settings, orient, supports, hollow + drain, estimates, API and UI wiring."""
+import hashlib
 import io
 import zipfile
 from pathlib import Path
@@ -700,6 +701,104 @@ def test_api_saves_support_marks_for_reopen(c):
     assert again.status_code == 200
     assert again.json()["manual"] == [tip] and again.json()["avoid"] == [avoid]
     assert body["support"]["manual_requested"] >= 1
+
+
+def test_support_defaults_match_the_old_hardcodes_and_clamp():
+    s = resin.settings()
+    assert s["support_spacing_mm"] == 4.0 and s["base_lift_mm"] == 5.0
+    assert s["tip_mm"] == 0.4 and s["shaft_mm"] == 1.0 and s["raft_mm"] == 1.0
+    blank = resin.settings({
+        "support_spacing_mm": "", "base_lift_mm": "", "tip_mm": "", "shaft_mm": "", "raft_mm": "",
+    })
+    assert (blank["support_spacing_mm"], blank["base_lift_mm"], blank["tip_mm"], blank["shaft_mm"], blank["raft_mm"]) == (4.0, 5.0, 0.4, 1.0, 1.0)
+    edges = {
+        "support_spacing_mm": (1.5, 10.0), "base_lift_mm": (0.0, 15.0),
+        "tip_mm": (0.2, 0.8), "shaft_mm": (0.6, 2.5), "raft_mm": (0.5, 3.0),
+    }
+    for key, (lo, hi) in edges.items():
+        assert resin.LIMITS[key] == (lo, hi)
+        assert resin.settings({key: lo})[key] == lo and resin.settings({key: hi})[key] == hi
+        for bad in (lo - 0.01, hi + 0.01):
+            with pytest.raises(resin.ResinError):
+                resin.settings({key: bad})
+
+
+def test_omitted_support_fields_keep_the_historical_mesh_bytes():
+    """The supported STL for a flat box is the file TorchC0 wrote before tip, shaft and raft were fields."""
+    box = trimesh.creation.box(extents=[20, 15, 10])
+    historical = resin.build_supports(resin.orient(box, 30), 4.0, 5.0)[0].export(file_type="stl")
+    assert hashlib.sha256(historical).hexdigest() == "4149decd3a444c945bc0810d4d4bcdfb7ba8be6c4f8f60921fd0c3ebeeffafbb"
+    named = resin.build_supports(
+        resin.orient(box, 30), 4.0, 5.0,
+        tip_d=resin.DEFAULT_TIP_MM, shaft_d=resin.DEFAULT_SHAFT_MM, raft_mm=resin.DEFAULT_RAFT_MM,
+    )[0].export(file_type="stl")
+    assert named == historical
+    omitted = resin.prepare(box, resin.settings({"hollow": "false", "tilt_deg": 0}))[0].export(file_type="stl")
+    explicit = resin.prepare(box, resin.settings({
+        "hollow": "false", "tilt_deg": 0,
+        "support_spacing_mm": 4, "base_lift_mm": 5, "tip_mm": 0.4, "shaft_mm": 1, "raft_mm": 1,
+    }))[0].export(file_type="stl")
+    assert explicit == omitted
+    assert hashlib.sha256(omitted).hexdigest() == "b1a441fc10f479c3132f7b59f890b75c42ac76d7b53ea6704654bfb3a08e4f96"
+    off = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": 0})
+    tuned_off = resin.settings({"hollow": "false", "supports": "false", "tilt_deg": 0, "raft_mm": 2.5, "tip_mm": 0.2, "shaft_mm": 2})
+    assert resin.prepare(box, off)[0].export(file_type="stl") == resin.prepare(box, tuned_off)[0].export(file_type="stl")
+    thin = resin.prepare(box, resin.settings({"hollow": "false", "tilt_deg": 0, "tip_mm": 0.2, "shaft_mm": 1.5, "raft_mm": 2}))
+    assert thin[0].export(file_type="stl") != omitted
+    assert thin[1]["support"]["tip_mm"] == 0.2 and thin[1]["support"]["shaft_mm"] == 1.5 and thin[1]["support"]["raft_mm"] == 2
+
+
+def test_advanced_support_controls_are_inside_rz_adv_and_wired():
+    js = (ROOT / "static" / "torchc0.js").read_text()
+    adv = js.split('id="rzAdv"', 1)[1].split("</details>", 1)[0]
+    for snippet in (
+        'num("rzSupSpace", "Support spacing", "4.0", 1.5, 10, 0.1, "mm")',
+        'num("rzBaseLift", "Base lift", "5.0", 0, 15, 0.5, "mm")',
+        'num("rzTip", "Tip diameter", "0.4", 0.2, 0.8, 0.05, "mm")',
+        'num("rzShaft", "Shaft diameter", "1.0", 0.6, 2.5, 0.1, "mm")',
+        'num("rzRaft", "Raft thickness", "1.0", 0.5, 3, 0.1, "mm")',
+    ):
+        assert snippet in adv
+    assert 'id="rzHollow"' not in adv and 'id="rzSup"' not in adv
+    assert 'support_spacing_mm: $("#rzSupSpace").value' in js
+    assert 'base_lift_mm: $("#rzBaseLift").value' in js
+    assert 'tip_mm: $("#rzTip").value' in js
+    assert 'shaft_mm: $("#rzShaft").value' in js
+    assert 'raft_mm: $("#rzRaft").value' in js
+    assert 'fd.append("base_lift_mm", $("#rzBaseLift").value)' in js
+    assert 'fd.append("raft_mm", $("#rzRaft").value)' in js
+
+
+def test_api_support_fields_and_formats_note(c):
+    mesh = _stl(trimesh.creation.box(extents=[20, 15, 10]))
+    common = {"hollow": "false", "tilt_deg": "0", "supports": "true"}
+    omitted = c.post("/api/resin/prepare", data=common, files={"file": ("cube.stl", mesh, "model/stl")})
+    assert omitted.status_code == 200, omitted.text
+    body = omitted.json()
+    assert body["settings"]["tip_mm"] == 0.4 and body["settings"]["shaft_mm"] == 1.0 and body["settings"]["raft_mm"] == 1.0
+    assert body["settings"]["support_spacing_mm"] == 4.0 and body["settings"]["base_lift_mm"] == 5.0
+    assert body["support"]["tip_mm"] == 0.4 and body["support"]["shaft_mm"] == 1.0 and body["support"]["raft_mm"] == 1.0
+    explicit = c.post("/api/resin/prepare", data={
+        **common, "support_spacing_mm": "4.0", "base_lift_mm": "5.0", "tip_mm": "0.4", "shaft_mm": "1.0", "raft_mm": "1.0",
+    }, files={"file": ("cube.stl", mesh, "model/stl")})
+    assert explicit.status_code == 200, explicit.text
+    same = c.get(omitted.json()["downloads"]["stl"]).content
+    assert same == c.get(explicit.json()["downloads"]["stl"]).content and len(same) > 84
+    changed = c.post("/api/resin/prepare", data={
+        **common, "support_spacing_mm": "6", "base_lift_mm": "8", "tip_mm": "0.2", "shaft_mm": "1.5", "raft_mm": "2",
+    }, files={"file": ("cube.stl", mesh, "model/stl")})
+    assert changed.status_code == 200, changed.text
+    tuned = changed.json()
+    assert tuned["settings"]["tip_mm"] == 0.2 and tuned["support"]["shaft_mm"] == 1.5 and tuned["support"]["raft_mm"] == 2
+    assert c.get(tuned["downloads"]["stl"]).content != same
+    refused = c.post("/api/resin/prepare", data={**common, "tip_mm": "2"}, files={"file": ("cube.stl", mesh, "model/stl")})
+    assert refused.status_code == 400 and "tip mm" in refused.json()["detail"].lower()
+    note = c.get("/api/resin/catalog").json()["formats_note"]
+    assert "DragonFruit" in note and ".ctb" in note and ".nanodlp" in note
+    assert "mslicer" in note and ".goo" in note
+    assert "goo, .ctb and .nanodlp through the separate mslicer" not in note
+    assert ".goo, .ctb, and .nanodlp are written by the separate mslicer" not in note
+    assert "not a resin slicer" in note.lower() or "reverse-engineering" in note.lower()
 
 
 def test_torchc0_islands_cups_cost_in_chromium():
