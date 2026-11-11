@@ -932,6 +932,7 @@
   </section>
   <ul class="grid toolgrid" aria-label="Printer and preferences">
     <li class="toolcard"><h2>ZeimFeedback</h2><p class="help">Tell ZEIM what should be better. You don't need an email address. ZEIM sends this for you.</p><button type="button" class="btn" id="btnFeedback">Send feedback</button></li>
+    <li class="toolcard" id="accFeedbackInboxCard" hidden><h2>Feedback inbox</h2><p class="help">Recommend scores and written notes sent through ZEIM. Only you can see this.</p><a class="btn" href="#feedback">Open</a></li>
     <li class="toolcard"><h2>Your printer</h2><p class="help">Pick your printer and nozzle. The Slicer, exports and "Will it print?" use it.</p><div id="accPrinter"></div></li>
     <li class="toolcard"><h2>Settings</h2><p class="help">Printers, defaults, accounts and privacy.</p><button class="btn big" id="btnSettings" aria-label="Settings"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg> <span class="lbl">Settings</span></button></li>
     <li class="toolcard"><h2 id="savePrefsH">Saving your work</h2><p class="help">For CAD, the FDM Slicer, TorchC0 and Lithophane. Each project is also saved after every step.</p>
@@ -950,6 +951,22 @@
   </ul>
   <section class="cols" aria-labelledby="colH"><h2 id="colH"><svg class="i" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg> Collections</h2><p class="help" id="colNote">Group your own Showcase projects into named lists. Public ones show on your profile. Nothing is ranked or boosted.</p><div id="colHost"></div><div class="field row" id="colNewRow" hidden><label class="sr-only" for="colNewName">New collection name</label><input id="colNewName" maxlength="60" placeholder="Desk organizers"><label class="inl"><input type="checkbox" id="colNewPub" checked> Public</label><button type="button" class="btn" id="colNewGo">Create</button></div></section>
   <section class="favs" aria-labelledby="favH"><h2 id="favH">Favorites</h2><p class="help" id="favNote">Projects you save with the heart. Only you can see this list.</p><ul class="grid" id="favGrid"></ul></section>
+</main>
+
+<main class="page" id="viewFeedback" hidden>
+<div class="zt-band" data-zt="account" aria-hidden="true"><img class="zt-art" src="/static/zt/account.webp" srcset="/static/zt/account.webp 1x, /static/zt/account@2x.webp 2x" width="1000" height="320" alt="" loading="lazy" decoding="async"><i class="zt-ink"></i><i class="zt-ink"></i><i class="zt-ink"></i></div>
+  <div class="pagehead"><div><h1>Feedback</h1><p class="help">Recommend scores and written notes sent through ZEIM. Only you can see this.</p><p><a class="btn small" href="#account">Back to Account</a></p></div></div>
+  <section class="mestudio" id="fbNpsSec" aria-labelledby="fbNpsH">
+    <h2 id="fbNpsH">How likely are you to recommend ZEIM</h2>
+    <div id="fbNpsSummary"><p class="help">Loading…</p></div>
+    <ul class="plist" id="fbNpsList"></ul>
+    <p id="fbNpsMore" hidden><button type="button" class="btn small" id="fbNpsMoreBtn">Show more scores</button></p>
+  </section>
+  <section class="mestudio" id="fbNotesSec" aria-labelledby="fbNotesH">
+    <h2 id="fbNotesH">Written notes</h2>
+    <ul class="plist" id="fbNotesList"></ul>
+    <p id="fbNotesMore" hidden><button type="button" class="btn small" id="fbNotesMoreBtn">Show more notes</button></p>
+  </section>
 </main>
 
 <main class="page" id="viewLearn" hidden>

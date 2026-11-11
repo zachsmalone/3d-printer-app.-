@@ -49,6 +49,12 @@ def get_config():
 
 
 # ---------------- identity ----------------
+def _feedback_view(request: Request, actor: Actor) -> bool:
+    """Whether this visitor may open the private Feedback inbox. False for everyone else."""
+    from ..community.feedback_inbox import can_view
+    return can_view(request, actor)
+
+
 def _auth_caps(request: Request, actor: Actor) -> dict:
     """What the SIGN-IN UI may honestly offer, derived from what is actually mounted —
     never from whether a request succeeded. No tokens or internals are exposed."""
@@ -63,13 +69,15 @@ def _auth_caps(request: Request, actor: Actor) -> dict:
 
 def me(request: Request, actor: Actor = Depends(get_actor)):
     return {**idn.public_profile(actor), "send": guards.send_caps(request, actor),
-            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
+            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor),
+            "feedback_view": _feedback_view(request, actor)}
 
 
 @router.get("/me")
 def me(request: Request, actor: Actor = Depends(get_actor)):
     return {**idn.public_profile(actor), "send": guards.send_caps(request, actor),
-            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor)}
+            "hide_mature": catalog.hides_mature(actor), "auth": _auth_caps(request, actor),
+            "feedback_view": _feedback_view(request, actor)}
 
 
 @router.get("/me/badges")
