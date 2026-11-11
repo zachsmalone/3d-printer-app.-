@@ -3,7 +3,7 @@
 Collection is unchanged: scores stay anonymous date+number lines, and notes stay
 the records already written under DATA/feedback/. This module only reads them.
 Access is the existing owner/admin check (local owner, or X-Admin-Token) or a
-signed-in account with site_admin set on the user record.
+signed-in account with site_admin set on the user record. Denied requests get 404.
 """
 from __future__ import annotations
 
