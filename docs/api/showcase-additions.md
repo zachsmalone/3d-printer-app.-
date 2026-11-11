@@ -84,16 +84,28 @@ every path that creates a project (API today, any future importer) gets the
 same rule. The source must also be visible to the remixer (pre-existing rule).
 
 **Scope note:** enforcement is only this gate. It does not verify that the
-remixer is the rights holder, that attribution is actually included, that a
-share-alike remix carries the same licence, or that a non-commercial licence is
-respected — those are community/reporting matters, not code checks.
+remixer is the rights holder, that attribution is actually included, or that a
+non-commercial licence is respected — those are community/reporting matters.
+The publish form selects the same licence when the source is share-alike
+(`cc-by-sa-4.0`, `cc-by-nc-sa-4.0`). The server does not add a second rejection
+for a different licence on that remix; `may_remix` on the source is still the
+permission check.
 
 ### Limits
 
 - 8 licences total (the CC 4.0 suite plus private-use). No custom or free-text
   licence uploads in this version.
-- A project's licence cannot be changed after publish in this version —
-  re-publishing with a new licence is the current path.
+
+### `PUT /api/showcase/{id}/license`
+
+Owner only. Body: `{"license_id": "cc-by-4.0"}`.
+
+- The id must be one of the menu ids. Blank, missing, and unknown values are
+  `400` with `unknown licence: pick one from the licence list`. This route does
+  not turn a blank into `private-use` (that default is only for a new publish).
+- Someone else, including a signed-out session, gets `404`.
+- The change writes `license_id` on that project only. It does not clear
+  `remix_of` on this project or on remixes that already point at it.
 
 ## Sort options
 
@@ -170,5 +182,5 @@ Selection rules:
   management) and a collection-visibility model first.
 - **Comments** — deferred for the same reason: user-generated text needs the
   word-list filter wired to a moderation queue before launch.
-- **Licence changes after publish**, **custom licence text**, **licence-based
-  search filters** — not in this version.
+- **Custom licence text** — not in this version. Licence filters on the
+  showcase list already exist separately.

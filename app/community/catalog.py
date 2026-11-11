@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from .. import config
 from ..config import DATA, OUT, MAX_BUILDS
 from .identity import Actor, restricted
-from . import originals_qa, privacy
+from . import licensing, originals_qa, privacy
 from ..services.credits import credit_line
 from ..services.history import store as _bstore
 from .store import ENGAGEMENT, LISTINGS, MODERATION, USERS
@@ -425,6 +425,25 @@ def set_allow_remixes(actor: Actor, item_id: str, allow) -> dict:
                 found.update(i)
     LISTINGS.update(f)
     if not found:
+        raise Denied(404, "not found")
+    return get(item_id, actor)
+
+
+def set_license(actor: Actor, item_id: str, license_id) -> dict:
+    """Owner only. The id must be on the licence menu. Remix credit on this item and on other items is left alone."""
+    try:
+        lid = licensing.require(license_id)
+    except ValueError as e:
+        raise Denied(400, str(e))
+    found = {}
+
+    def f(l):
+        for i in l:
+            if i.get("id") == item_id and i.get("owner_sid") == actor.sid and not i.get("example") and not i.get("original"):
+                i["license_id"] = lid
+                found["id"] = i["id"]
+    LISTINGS.update(f)
+    if "id" not in found:
         raise Denied(404, "not found")
     return get(item_id, actor)
 
