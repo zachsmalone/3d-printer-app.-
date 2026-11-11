@@ -505,7 +505,7 @@
       <div hidden><label for="editFromBuild" class="sr-only">Saved project</label><select id="editFromBuild"></select><button type="button" class="btn" id="editFromBuildGo">Open in the slicer</button></div>
       <h2 style="margin-top:16px"><i>or</i> Build from primitives</h2>
       <div class="row"><a class="btn" href="/builder.html">Open the parts builder ▸</a><span class="help" style="align-self:center">Combine boxes, cylinders and more — solids add, holes cut, every size stays editable.</span></div>
-      <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your recent builds. The count is on Lithophane. Starred builds stay. Colours from multi-colour builds and 3MF files are merged into one mesh for slicing.</p>
+      <p class="help">Your uploaded file is always kept as-is; edits are stored as a list of steps you can undo, redo or jump back through. Each project counts toward your recent builds. The count is on Lithophane. Starred builds stay. Colours from multi-colour photo builds are still merged into one mesh in the editor.</p>
     </section>
     <section id="editPanel" hidden></section>
   </aside>
@@ -563,6 +563,16 @@
     <p class="help" id="procEmpty">Open a model to change quality, filament, strength, speed, cooling, supports, infill, and adhesion.</p>
     <section class="slicepanel" id="slicePanel" aria-label="Slicer settings"></section>
   </section>
+  <section id="partsSheet" class="bed-sheet proc-sheet" hidden aria-labelledby="partsTitle">
+    <div class="proc-bar">
+      <h2 id="partsTitle">Parts</h2>
+      <button type="button" class="btn small bed-check" id="partsClose" aria-label="Done">✓</button>
+    </div>
+    <div class="bed-sheet-body">
+      <ul id="bedPartsList"></ul>
+      <button type="button" class="btn" id="editDetectParts">Detect parts</button>
+    </div>
+  </section>
   <section id="deviceSheet" class="bed-sheet proc-sheet" hidden aria-labelledby="deviceTitle">
     <div class="proc-bar">
       <h2 id="deviceTitle">Printer</h2>
@@ -587,6 +597,7 @@
       <button type="button" class="bed-cat" data-bed-cat="process" data-bed-label="Process" data-bed-sheet="process" data-kind-only="fdm">Process</button>
       <button type="button" class="bed-cat" data-bed-cat="transform" data-bed-label="Transform">Transform</button>
       <button type="button" class="bed-cat" data-bed-cat="import" data-bed-label="Import">Import</button>
+      <button type="button" class="bed-cat" data-bed-cat="parts" data-bed-label="Parts" id="bedParts">Parts</button>
       <button type="button" class="bed-cat bed-act" id="slicerRepair" data-bed-act="repair" title="Repair holes and flipped faces on the open model. This uses the same repair as Fix. It does not leave the workspace.">Repair</button>
       <button type="button" class="bed-cat bed-act" id="slicerSlice" data-go="spGo" title="Slice with the process settings. This does not leave the workspace." data-kind-only="fdm">Slice</button>
       <button type="button" class="bed-cat bed-act" id="slicerPreview" data-bed-act="preview" title="Show the sliced layers. Slice first." data-kind-only="fdm">Preview</button>
@@ -628,6 +639,9 @@
       <div data-for="import" hidden>
         <button type="button" data-bed-act="import">From Account</button>
         <button type="button" data-bed-click="editChooseModel">Choose a file</button>
+      </div>
+      <div data-for="parts" hidden>
+        <button type="button" data-bed-sheet="parts">Show parts</button>
       </div>
     </div>
   </nav>

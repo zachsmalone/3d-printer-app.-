@@ -910,6 +910,7 @@ function renderTools() {
   </div>`;
   const plateHTML = renderPlate({ p: E.p, viewer, doOp, measuring: () => E.measure });
   $("#editPanel").innerHTML = unitSel + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px" title="New build: save or ask before the screen clears. This does not send the model to Showcase.">New build</button>`;
+  paintBedParts();
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
   syncSmartSplit();
@@ -924,6 +925,18 @@ function renderTools() {
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 wirePlatePanel($("#editPanel"));
+function paintBedParts() {
+  const list = document.getElementById("bedPartsList");
+  if (!list) return;
+  const parts = E.p?.parts || [];
+  const swatch = (color) => `<span class="bed-swatch" style="background:${color ? esc(color) : "transparent"}"></span>`;
+  list.innerHTML = parts.length
+    ? parts.map(part => `<li>${swatch(part.color)}<span>${esc(part.name || "Part")}</span></li>`).join("")
+    : `<li><span>One part.</span></li>`;
+}
+$("#partsSheet")?.addEventListener("click", e => {
+  if (e.target.closest("#editDetectParts")) { e.preventDefault(); return act(`/api/edit/${E.p.id}/parts/detect`, {}, "Finding parts…"); }
+});
 $("#editPanel").addEventListener("click", e => {
   const u = e.target.closest("[data-unit]"); if (u) { E.unit = u.dataset.unit; localStorage.eunit = E.unit; loadProject(E.p, true); return; }
   const big = e.target.closest("[data-big]");

@@ -21,7 +21,7 @@ from fastapi.responses import JSONResponse
 
 from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
-from ..core import cadops, meshedit
+from ..core import cadops, meshedit, meshparts
 from ..core import sketch as sk
 from ..services import editproj
 from ..services.history import HistoryFull, store
@@ -271,15 +271,20 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
         parts = []
     if not parts and (simplified or real_n > MAX_SCENE_FACES):
         raise _too_big(real_n)
+    model_parts = meshparts.resolve(meta.get("parts"), real_n, meta.get("title") or "Model")
+    body_colors = meshparts.colors_for_bodies(m, model_parts, parts) if not simplified else [None] * len(parts)
     out, shown = [], 0
     for i, b in enumerate(parts):
         packed, nfaces = _scene_body(i, b)
+        if i < len(body_colors) and body_colors[i]:
+            packed["color"] = body_colors[i]
         shown += nfaces
         out.append(packed)
     if simplified and shown > MAX_SCENE_FACES:
         raise _too_big(real_n)
     p = editproj.payload(bid)
     return {"id": bid, "title": meta.get("title"), "bodies": out,
+            "parts": meshparts.public(model_parts),
             "appearance": cadops.appearance_for_viewer(meta.get("appearance") or {}, m),
             "ops": p["ops"], "head": p["head"], "can_undo": p["can_undo"], "can_redo": p["can_redo"],
             "analysis": p["analysis"], "base": {k: v for k, v in (meta.get("base") or {}).items() if k in ("type", "format", "units", "photo_mode", "origin", "from_mode", "from_build")},
