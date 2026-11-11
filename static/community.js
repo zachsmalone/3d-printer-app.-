@@ -67,13 +67,14 @@ async function refreshMe() {
   document.dispatchEvent(new CustomEvent("zeim:me", { detail: ME }));
   loadNotes();
   paintAccountHandle();
+  paintFeedbackInboxLink();
 }
 
 /* ---------- views ---------- */
-const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn" };
+const VIEWS = { showcase: "#viewShowcase", slicer: "#viewEdit", torchc0: "#viewTorch", cad: "#viewCad", lithophane: "#viewCreate", smartfix: "#viewFix", ai3d: "#viewAi3d", account: "#viewAccount", learn: "#viewLearn", feedback: "#viewFeedback" };
 const ALIAS = { "": "showcase", resin: "torchc0", fdm: "slicer", edit: "slicer", create: "lithophane", "2d3d": "ai3d", projects: "account", studio: "account" };
 function show(view, tab) {
-  const navTab = tab || view;
+  const navTab = tab || (view === "feedback" ? "account" : view);
   $$("#mainNav button").forEach(b => { b.classList.toggle("on", b.dataset.view === navTab); if (b.dataset.view === navTab) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   Object.entries(VIEWS).forEach(([k, sel]) => { const m = $(sel); if (m) m.hidden = k !== view; });
   document.body.dataset.view = view;
@@ -83,6 +84,7 @@ function show(view, tab) {
   if (view === "showcase") loadShowcase();
   if (view === "learn") loadLearn();
   if (view === "ai3d") document.dispatchEvent(new CustomEvent("zeim:ai3d-shown"));
+  if (view === "feedback") loadFeedbackInbox();
 }
 $$("#mainNav button").forEach(b => b.onclick = () => { location.hash = b.dataset.view; });
 const TOOLWORDS = { smartorient: "Smart orient", cut: "Cut", orient: "Rotate", text: "Text", repair: "Repair", hollow: "Hollow", simplify: "Repair" };
@@ -1945,3 +1947,100 @@ document.addEventListener("DOMContentLoaded", () => { try { loadChallenges(); } 
 const _chObs = new MutationObserver(() => { if (document.body.dataset.view === "showcase") loadChallenges(); });
 try { _chObs.observe(document.body, { attributes: true, attributeFilter: ["data-view"] }); } catch { }
 
+
+
+/* ---------- private Feedback inbox (owner/admin only; server still enforces access) ---------- */
+function _fbEl(tag, props, ...kids) {
+  const e = Object.assign(document.createElement(tag), props || {});
+  kids.forEach(k => e.append(k));
+  return e;
+}
+function paintFeedbackInboxLink() {
+  const card = $("#accFeedbackInboxCard");
+  if (!card) return;
+  card.hidden = !(ME && ME.feedback_view);
+}
+async function loadFeedbackInbox() {
+  paintFeedbackInboxLink();
+  if (!(ME && ME.feedback_view)) {
+    const sum = $("#fbNpsSummary");
+    if (sum) sum.replaceChildren(_fbEl("p", { className: "help" }, "This page is only for the site owner."));
+    ["fbNpsList", "fbNotesList"].forEach(id => { const n = $(id); if (n) n.replaceChildren(); });
+    location.hash = "account";
+    return;
+  }
+  try {
+    const data = await api("/api/feedback/inbox?notes_limit=50&scores_limit=50");
+    paintFeedbackInbox(data);
+  } catch (e) {
+    const sum = $("#fbNpsSummary");
+    if (sum) sum.replaceChildren(_fbEl("p", { className: "help" }, e.message || "Could not load feedback."));
+  }
+}
+function paintFeedbackInbox(data) {
+  const nps = data.nps || {};
+  const sum = $("#fbNpsSummary");
+  if (sum) {
+    sum.replaceChildren();
+    if (!nps.answers) {
+      sum.append(_fbEl("p", { className: "help" }, "No recommend scores yet."));
+    } else {
+      const line = _fbEl("p", {});
+      line.append(_fbEl("strong", {}, String(nps.answers) + (nps.answers === 1 ? " response" : " responses")));
+      line.append(document.createTextNode(
+        ". Promoters (9–10): " + nps.promoters +
+        ". Passives (7–8): " + nps.passives +
+        ". Detractors (0–6): " + nps.detractors +
+        ". NPS: " + nps.score + "."));
+      sum.append(line);
+    }
+  }
+  const sl = $("#fbNpsList");
+  if (sl) {
+    sl.replaceChildren();
+    (data.scores && data.scores.items || []).forEach(row => {
+      const li = _fbEl("li", {});
+      li.append(_fbEl("strong", {}, "Score " + String(row.score)));
+      li.append(document.createTextNode(row.date ? " on " + row.date : ""));
+      sl.append(li);
+    });
+  }
+  const moreS = $("#fbNpsMore");
+  if (moreS) moreS.hidden = !data.scores || (data.scores.offset + data.scores.items.length >= data.scores.total);
+
+  const nl = $("#fbNotesList");
+  if (nl) {
+    nl.replaceChildren();
+    const items = (data.notes && data.notes.items) || [];
+    if (!items.length) {
+      nl.append(_fbEl("li", { className: "help" }, "No written notes yet."));
+    }
+    items.forEach(row => {
+      const li = _fbEl("li", { className: "toolcard" });
+      const meta = _fbEl("p", { className: "help" });
+      const bits = [];
+      if (row.date) bits.push(row.date);
+      if (row.who) bits.push(row.who);
+      bits.push(row.emailed ? "Emailed" : "Saved on this server");
+      meta.textContent = bits.join(" · ");
+      const body = _fbEl("p", {});
+      body.textContent = row.text || "";
+      li.append(meta, body);
+      nl.append(li);
+    });
+  }
+  const moreN = $("#fbNotesMore");
+  if (moreN) moreN.hidden = !data.notes || (data.notes.offset + data.notes.items.length >= data.notes.total);
+}
+
+let _fbScoresLimit = 50, _fbNotesLimit = 50;
+$("#fbNpsMoreBtn") && ($("#fbNpsMoreBtn").onclick = async () => {
+  _fbScoresLimit += 50;
+  try { paintFeedbackInbox(await api("/api/feedback/inbox?notes_limit=" + _fbNotesLimit + "&scores_limit=" + _fbScoresLimit)); }
+  catch (e) { const sum = $("#fbNpsSummary"); if (sum) sum.replaceChildren(_fbEl("p", { className: "help" }, e.message || "Could not load feedback.")); }
+});
+$("#fbNotesMoreBtn") && ($("#fbNotesMoreBtn").onclick = async () => {
+  _fbNotesLimit += 50;
+  try { paintFeedbackInbox(await api("/api/feedback/inbox?notes_limit=" + _fbNotesLimit + "&scores_limit=" + _fbScoresLimit)); }
+  catch (e) { const sum = $("#fbNpsSummary"); if (sum) sum.replaceChildren(_fbEl("p", { className: "help" }, e.message || "Could not load feedback.")); }
+});

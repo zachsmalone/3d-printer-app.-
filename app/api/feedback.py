@@ -18,6 +18,7 @@ from app.api.textcap import ip as client_ip
 from app.api.textcap import text_in
 from app.auth.mailer import mailer_from_env
 from app.community.identity import Actor, get_actor
+from app.community.feedback_inbox import inbox as read_inbox, require as require_inbox
 from app.core import ratelimit
 
 router = APIRouter(prefix="/api", tags=["feedback"])
@@ -62,3 +63,24 @@ def post_feedback(body: dict, request: Request, actor: Actor = Depends(get_actor
         "emailed": emailed,
         "message": SENT_MESSAGE if emailed else SAVED_MESSAGE,
     }
+
+
+page_router = APIRouter(include_in_schema=False)
+
+
+@router.get("/feedback/inbox")
+def get_inbox(request: Request, actor: Actor = Depends(get_actor),
+              notes_offset: int = 0, notes_limit: int = 50,
+              scores_offset: int = 0, scores_limit: int = 50):
+    """Owner/admin only. Recommend scores and stored written notes. 404 for everyone else."""
+    require_inbox(request, actor)
+    return read_inbox(notes_offset=notes_offset, notes_limit=notes_limit,
+                      scores_offset=scores_offset, scores_limit=scores_limit)
+
+
+@page_router.get("/feedback")
+def feedback_page(request: Request, actor: Actor = Depends(get_actor)):
+    """Bookmark for the private inbox. Everyone else gets 404, same as the API."""
+    require_inbox(request, actor)
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse("/#feedback", status_code=303)
