@@ -11,7 +11,7 @@ self.addEventListener("fetch", e => {
   if (r.method !== "GET" || u.origin !== location.origin) return;
   if (u.pathname.startsWith("/static/") && !u.pathname.endsWith(".html") && r.mode !== "navigate" && !r.headers.has("range")) {
     // Network first: a fresh copy whenever online; the cached copy only when the network fails.
-    e.respondWith(fetch(r).then(res => {
+    e.respondWith(fetch(r, {cache:"reload"}).then(res => {
       if (res.ok && res.type === "basic") { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)); }
       return res;
     }).catch(() => caches.match(r).then(m => m || Response.error())));
@@ -19,7 +19,7 @@ self.addEventListener("fetch", e => {
   }
   if (r.mode === "navigate") {
     // Pages are never cached; offline gets a plain notice instead of an old page.
-    e.respondWith(fetch(r).catch(() => new Response(
+    e.respondWith(fetch(r, {cache:"reload"}).catch(() => new Response(
       '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><p style="font:16px system-ui;padding:24px">You are offline. Reconnect and reload to keep going.</p>',
       { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } })));
   }

@@ -4,6 +4,7 @@ from pathlib import Path
 from tests.b1 import client
 from app.config import STATIC
 from app.main import CSP
+from app.assets import ASSET_VERSION, stamp_html
 
 
 def test_workbench_redirect_and_original_homepage():
@@ -11,7 +12,7 @@ def test_workbench_redirect_and_original_homepage():
     r = c.get("/workbench", follow_redirects=False)
     assert r.status_code == 307
     assert r.headers["location"] == "/workbench/"
-    assert c.get("/").content == (STATIC / "index.html").read_bytes()
+    assert c.get("/").text == stamp_html((STATIC / "index.html").read_text(encoding="utf-8"))
 
 
 def test_workbench_html_uses_only_same_origin_runtime_assets():
@@ -24,8 +25,8 @@ def test_workbench_html_uses_only_same_origin_runtime_assets():
     assert r.headers["x-frame-options"] == "DENY"
     assert "api.fontshare.com" not in r.text
     assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", r.text)
-    assert 'src="/static/perplexity-workbench/app.js"' in r.text
-    assert 'href="/static/perplexity-workbench/style.css"' in r.text
+    assert f'src="/static/perplexity-workbench/app.js?v={ASSET_VERSION}"' in r.text
+    assert f'href="/static/perplexity-workbench/style.css?v={ASSET_VERSION}"' in r.text
     assert 'src="/static/logo-header.png"' in r.text
     assert 'aria-label="Return to the original ZEIM app"' in r.text
 
