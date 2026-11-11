@@ -909,7 +909,10 @@ function renderTools() {
       <tr><td>Pieces</td><td>${a.components ?? "n/a"}</td></tr><tr><td>Bounds min</td><td>${a.min_mm ? mn.map(fmt).join(", ") : "—"}</td></tr><tr><td>Bounds max</td><td>${a.max_mm ? mx.map(fmt).join(", ") : "—"}</td></tr><tr><td>Centre of mass</td><td>${comTxt}</td></tr></table></details>
   </div>`;
   const plateHTML = renderPlate({ p: E.p, viewer, doOp, measuring: () => E.measure });
-  $("#editPanel").innerHTML = unitSel + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px" title="New build: save or ask before the screen clears. This does not send the model to Showcase.">New build</button>`;
+  const swatch = (color) => `<span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid var(--ctl);background:${color ? esc(color) : "transparent"};flex:none"></span>`;
+  const partRows = (E.p.parts || []).map(part => `<li style="display:flex;align-items:center;gap:8px;min-height:32px">${swatch(part.color)}<span>${esc(part.name || "Part")}</span></li>`).join("");
+  const partsHTML = `<details class="tool" open><summary>Parts</summary>${partRows ? `<ul style="list-style:none;margin:6px 0;padding:0">${partRows}</ul>` : `<p class="help">One part.</p>`}<button type="button" class="btn small" id="editDetectParts">Detect parts</button></details>`;
+  $("#editPanel").innerHTML = unitSel + partsHTML + plateHTML + `<p class="sr-only" id="plateLive" aria-live="polite"></p>` + beginner + expert + `<button class="btn ghost small" id="editClose" style="margin-top:8px" title="New build: save or ask before the screen clears. This does not send the model to Showcase.">New build</button>`;
   if (E.tool && !isExpert()) renderDrawer();
   syncShapeFields();
   syncSmartSplit();
@@ -925,6 +928,7 @@ function renderTools() {
 }
 wirePlatePanel($("#editPanel"));
 $("#editPanel").addEventListener("click", e => {
+  if (e.target.closest("#editDetectParts")) { e.preventDefault(); return act(`/api/edit/${E.p.id}/parts/detect`, {}, "Finding parts…"); }
   const u = e.target.closest("[data-unit]"); if (u) { E.unit = u.dataset.unit; localStorage.eunit = E.unit; loadProject(E.p, true); return; }
   const big = e.target.closest("[data-big]");
   if (big) {

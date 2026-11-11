@@ -1360,41 +1360,28 @@ def size_warnings(size_mm: float) -> list[str]:
     return []
 
 
+def load_document(data: bytes, ext: str, units_scale: float = 1.0, mtl: bytes | None = None, *,
+                  split_shells: bool = False) -> tuple[trimesh.Trimesh, list[dict], list[str]]:
+    """One mesh plus the part list (name, colour, source material, face runs).
+
+    `meshparts` imports this module, so the import stays inside the function.
+    `split_shells` is only for the editor: STL is never auto-split, and a large
+    3MF/OBJ is not walked for shells.
+    """
+    from .meshparts import load_document as _load
+    return _load(data, ext, units_scale, mtl, split_shells=split_shells)
+
+
 def load_mesh(data: bytes, ext: str, units_scale: float = 1.0) -> tuple[trimesh.Trimesh, list[str]]:
-    """Parse STL/OBJ/3MF into ONE mesh (mm). Multiple objects are merged (colours/materials are dropped).
-    `units_scale` is the factor the caller will apply for the user's chosen units (e.g. 25.4 for inches; ignored
-    for 3MF, which declares its own). The mesh is returned unscaled, but the size warning is judged on the
-    converted size, so a 1 in cube imported as inches is not called "only 1 mm across" (QA B9)."""
-    warnings = []
-    ft = ext.lower()
-    try:
-        obj = trimesh.load(io.BytesIO(data), file_type=ft, process=False, force="scene" if ft == "3mf" else "mesh",
-                           skip_materials=True) if ft != "3mf" else trimesh.load(io.BytesIO(data), file_type=ft, process=False)
-    except Exception as e:
-        raise OpError(f"Could not read the {ft.upper()} file: {e}")
-    if isinstance(obj, trimesh.Scene):
-        geoms = [g for g in obj.dump() if isinstance(g, trimesh.Trimesh)]       # applies build transforms
-        if not geoms:
-            raise OpError("The file contains no triangle meshes.")
-        if len(geoms) > 1:
-            warnings.append(f"{len(geoms)} objects were merged into one mesh (colours/materials are not kept).")
-        mesh = trimesh.util.concatenate(geoms)
-    else:
-        mesh = obj
-    if not isinstance(mesh, trimesh.Trimesh) or len(mesh.faces) == 0:
-        raise OpError("The file contains no triangles (maybe it is a curve/point file).")
-    if len(mesh.faces) > MAX_FACES:
-        raise OpError(f"{len(mesh.faces):,} triangles is above the {MAX_FACES:,} limit.")
-    mesh = _new(mesh.vertices, mesh.faces)
-    mesh.merge_vertices()
-    if not np.isfinite(mesh.vertices).all():
-        raise OpError("File contains invalid coordinates.")
-    k = 1.0
-    if ft == "3mf":
-        k = _3mf_unit_scale(data)
-        if k != 1.0:
-            mesh = _new(mesh.vertices * k, mesh.faces)
-            warnings.append(f"3MF declared units; converted to mm (×{k:g}).")
-    size = float(mesh.extents.max()) * (1.0 if ft == "3mf" else float(units_scale or 1.0))
-    warnings += size_warnings(size)
+    """Parse STL/OBJ/3MF into ONE mesh (mm). Part colours are not returned here.
+
+    Slicing, repair, and resin use this and still receive a single mesh. The editor uses
+    `load_document`, which keeps the part list. `units_scale` is the factor the caller will
+    apply for the user's chosen units (e.g. 25.4 for inches; ignored for 3MF, which declares
+    its own). The mesh is returned unscaled, but the size warning is judged on the converted
+    size, so a 1 in cube imported as inches is not called "only 1 mm across" (QA B9).
+    """
+    mesh, parts, warnings = load_document(data, ext, units_scale, split_shells=False)
+    if len(parts) > 1:
+        warnings = [*warnings, f"{len(parts)} objects were merged into one mesh (colours/materials are not kept)."]
     return mesh, warnings

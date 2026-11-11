@@ -189,9 +189,9 @@ function perFrame(fn) {
 
 const FIN = { matte: [0.9, 0], satin: [0.55, 0.05], gloss: [0.2, 0.05], metal: [0.3, 0.9], glass: [0.05, 0] };
 const PALETTE = ["#8fb0e0", "#e0a47a", "#9ad1a5", "#d6a3e0", "#e6d27a", "#7ad6d6", "#e08f9a"];
-function bodyMaterial(i) {
+function bodyMaterial(i, fallback) {
   const a = S.appearance[i] || {}, [rough, metal] = FIN[a.finish || "satin"];
-  const m = new THREE.MeshStandardMaterial({ color: a.color || PALETTE[i % PALETTE.length], roughness: rough, metalness: metal,
+  const m = new THREE.MeshStandardMaterial({ color: a.color || fallback || PALETTE[i % PALETTE.length], roughness: rough, metalness: metal,
     clippingPlanes: S.section ? [clipPlane] : [], side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
   if (a.finish === "glass") { m.transparent = true; m.opacity = 0.45; }
   const glow = bodyGlow(i, { selected: S.selBody, hover: pickPaint.hover?.body ?? -1, press: pickPaint.press?.body ?? -1 });
@@ -209,7 +209,7 @@ function buildWorld(keepCam) {
       indices: new Uint32Array(g.index.array),
     };
     const ng = g.toNonIndexed(); g.dispose(); ng.computeVertexNormals();
-    const mesh = new THREE.Mesh(ng, bodyMaterial(b.index)); mesh.userData.body = b.index;
+    const mesh = new THREE.Mesh(ng, bodyMaterial(b.index, b.color)); mesh.userData.body = b.index;
     mesh.userData.sculptSrc = sculptSrc;
     const eg = new THREE.BufferGeometry(); eg.setAttribute("position", new THREE.BufferAttribute(b64(b.edges, Float32Array), 3));
     const lines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x10131a, clippingPlanes: S.section ? [clipPlane] : [] }));
@@ -850,7 +850,7 @@ const TOOL_PANELS = {
   },
   visualize() {
     const bs = S.scene?.bodies || [];
-    panel("Visualize", bs.map(b => { const a = S.appearance[b.index] || {}; return `<div class="f"><label for="vc${b.index}">${esc(b.name)}</label><span style="display:flex;gap:4px"><input type="color" id="vc${b.index}" value="${a.color || PALETTE[b.index % PALETTE.length]}" style="width:48px">
+    panel("Visualize", bs.map(b => { const a = S.appearance[b.index] || {}; return `<div class="f"><label for="vc${b.index}">${esc(b.name)}</label><span style="display:flex;gap:4px"><input type="color" id="vc${b.index}" value="${a.color || b.color || PALETTE[b.index % PALETTE.length]}" style="width:48px">
       <select id="vf${b.index}" aria-label="${esc(b.name)} finish">${Object.keys(FIN).map(f => `<option ${f === (a.finish || "satin") ? "selected" : ""}>${f}</option>`).join("")}</select></span></div>`; }).join("") +
       `<p class="help">Display only: exported files and prints stay a single colour.</p>`, async () => {
         const out = {}; bs.forEach(b => out[b.index] = { color: $("#vc" + b.index).value, finish: $("#vf" + b.index).value });
@@ -1020,7 +1020,10 @@ function renderItems() {
   const box = $("#cwItems"), bs = S.scene?.bodies || [];
   const eye = (on, lbl, attr) => `<button class="cw-eye" ${attr} aria-pressed="${on}" aria-label="${on ? "Hide" : "Show"} ${esc(lbl)}">${on ? IC.eye : IC.eyeoff}</button>`;
   const sketches = (S.scene?.ops || []).filter(o => o.params?.sketch).map(o => `<div class="cw-item"><span class="nm">Sketch of step ${o.i}<br><small>${T(typeof o.params.plane === "string" ? o.params.plane + " plane" : o.params.plane?.construct === "midplane" ? "on a midplane" : o.params.plane?.construct === "offset" ? "on an offset plane" : "on a face")} · ${(o.params.sketch.entities || []).length} curves</small></span><button class="cw-eye" data-skedit="${o.i}" aria-label="Edit the sketch of step ${o.i}">✎</button></div>`).join("");
-  box.innerHTML = `<h3>Bodies</h3>${bs.length ? bs.map(b => `<div class="cw-item ${b.index === S.selBody ? "sel" : ""}" data-body="${b.index}"><span class="sw" style="background:${(S.appearance[b.index] || {}).color || PALETTE[b.index % PALETTE.length]}"></span>
+  const imported = S.scene?.parts || [];
+  const partRows = imported.map(p => `<div class="cw-item"><span class="sw" style="background:${esc(p.color || "transparent")}"></span><span class="nm">${esc(p.name || "Part")}</span></div>`).join("");
+  const partsHead = imported.length ? `<h3>Parts</h3>${partRows}` : "";
+  box.innerHTML = `${partsHead}<button type="button" class="btn small" id="cwDetectParts">Detect parts</button><h3>Bodies</h3>${bs.length ? bs.map(b => `<div class="cw-item ${b.index === S.selBody ? "sel" : ""}" data-body="${b.index}"><span class="sw" style="background:${(S.appearance[b.index] || {}).color || b.color || PALETTE[b.index % PALETTE.length]}"></span>
       <span class="nm">${T(b.name)}<br><small>${b.size.map(fmt).join(" × ")} mm</small></span>${eye(!S.hidden.has(b.index), b.name, `data-eye="${b.index}"`)}</div>`).join("") : `<p class="help">None yet.</p>`}
     <h3>Sketches</h3>${sketches || `<p class="help">None yet.</p>`}
     <h3>Planes &amp; axes</h3>
@@ -1029,6 +1032,10 @@ function renderItems() {
   fillTx(box);
 }
 $("#cwItems").addEventListener("click", e => {
+  if (e.target.closest("#cwDetectParts")) {
+    if (!S.bid) return;
+    return run(async () => { await api(`/api/edit/${S.bid}/parts/detect`, { method: "POST" }); await load(true); }, "Parts updated.");
+  }
   const ey = e.target.closest("[data-eye]"); if (ey) {
     const i = +ey.dataset.eye; S.hidden.has(i) ? S.hidden.delete(i) : S.hidden.add(i);
     world.children.forEach(g => g.visible = !S.hidden.has(g.userData.body));

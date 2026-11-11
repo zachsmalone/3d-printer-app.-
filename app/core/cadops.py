@@ -265,6 +265,28 @@ def ensure_body_ids(m: trimesh.Trimesh, start: int = 0):
     return m
 
 
+def shell_face_groups(m: trimesh.Trimesh) -> list[np.ndarray] | None:
+    """Face indices of each body, in the same order as `bodies`.
+
+    None when welding drops or reorders faces, so the indices would not refer to `m`.
+    Callers that only need the shells can use `bodies` instead.
+    """
+    recs = _component_faces(m)
+    if recs is None:
+        return None
+    if not recs:
+        return []
+
+    def _centre(group):
+        piece = group[0][1] if len(group) == 1 else _join_all([r[1] for r in group])
+        return tuple(np.round(np.asarray(piece.bounds.mean(axis=0), float), 3))
+
+    out = []
+    for group in sorted(_group_components(recs), key=_centre):
+        out.append(np.unique(np.concatenate([np.asarray(r[0], np.int64) for r in group])))
+    return out
+
+
 def bodies(m: trimesh.Trimesh) -> list[trimesh.Trimesh]:
     if m is None or len(getattr(m, "faces", [])) == 0:
         return []

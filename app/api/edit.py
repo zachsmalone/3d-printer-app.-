@@ -14,7 +14,7 @@ import json
 from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
-from ..core import autotune, exporters, geometry, imagesafe, meshedit
+from ..core import autotune, exporters, geometry, imagesafe, meshedit, meshparts
 from ..core import features as features_mod
 from ..core import printcheck as printcheck_mod
 from ..core import volcost as volcost_mod
@@ -216,6 +216,7 @@ def new_project(
     progress: str = Form(""),                   # "1": newline JSON phases while the view is built
     client_view: str = Form(""),                # "1": the browser already drew a sample; do not send those triangles back
     select: str = Form(""),                     # Select mode: traced selection for a photo base (app/core/selectmask.py)
+    mtl: UploadFile | None = File(None),        # optional OBJ material library (Kd colours)
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -230,6 +231,7 @@ def new_project(
     warnings: list[str] = []
     source_image = None
     ack = None
+    build_parts = None
     scale, base = 1.0, {}
     if from_build:                                              # ---- bring a ZEIM build into the editor
         meta = meta_for(from_build, actor, owner_only=True)
@@ -257,7 +259,10 @@ def new_project(
         src_origin = meta.get("origin") or (meta.get("base") or {}).get("origin")
         if src_origin == "lithophane" or meta.get("kind", "photo") == "photo":
             base["origin"] = "lithophane"
-        if len({(b.color or "").lower() for b in mdl.bodies}) > 1:          # only when colours are really lost (B12)
+        # A build whose printable mesh is the bodies themselves keeps those bodies as parts.
+        # Pop-art (and anything else with a separate solid) is still one heightfield, so the colours really are gone.
+        build_parts = None if mdl.single is not None else meshparts.from_bodies(mdl.bodies, len(mesh.faces))
+        if build_parts is None and len({(b.color or "").lower() for b in mdl.bodies}) > 1:
             warnings.append("Colours / separate colour bodies of the original build are merged into one mesh in the editor.")
     elif file is not None and file.filename:                    # ---- upload
         name = file.filename
@@ -287,8 +292,12 @@ def new_project(
                 return _open_large_stl(data, actor, fast_title, beginner, auto_delete_oldest, base, warnings,
                                        scale, units, progress == "1", background, client_view == "1")
             _gate(data, actor)
+            mtl_bytes = None
+            if mtl is not None and mtl.filename and ext == "obj":
+                mtl_bytes = mtl.file.read(2 * 1024 * 1024)
             try:
-                mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])     # warn on the converted size (B9)
+                mesh, build_parts, w = meshedit.load_document(
+                    data, ext, units_scale=meshedit.UNIT_MM[units], mtl=mtl_bytes, split_shells=True)
             except meshedit.OpError as e:
                 raise HTTPException(422, str(e))
             warnings += w
@@ -324,6 +333,7 @@ def new_project(
             v, f = mdl.solid()
             mesh = trimesh.Trimesh(v, f, process=False)
             original, ext_o = exporters.to_stl(mdl), "stl"
+            build_parts = None if mdl.single is not None else meshparts.from_bodies(mdl.bodies, len(mesh.faces))
             source_image = (data, src_ext)
             base = {"type": "photo", "origin": "lithophane", "photo_mode": photo_mode, "width_mm": width_mm, "params": params}
             ext = ext_o
@@ -345,7 +355,7 @@ def new_project(
             meta = editproj.create(actor.sid, privacy.default_level(actor), title=title.strip(), base=base,
                                    original=original, original_ext=ext, mesh=mesh, beginner=beginner,
                                    warnings=warnings, import_scale=scale, import_units=units, source_image=source_image,
-                                   parent_build=from_build or "")
+                                   parent_build=from_build or "", parts=build_parts)
         except meshedit.OpError as e:
             raise HTTPException(422, str(e))
         if ack is not None:
@@ -358,6 +368,22 @@ def get_project(bid: str, brief: int = 0, actor: Actor = Depends(get_actor)):
     _edit_meta(bid, actor)
     # brief=1 is the "is the full check done yet" poll. It must not ship the sampled view again.
     return editproj.payload(bid, include_preview=not brief)
+
+
+@router.post("/{bid}/parts/detect")
+def detect_parts(bid: str, actor: Actor = Depends(get_actor)):
+    """Split disconnected shells into parts. The printable mesh stays one mesh."""
+    meta = _edit_meta(bid, actor, owner_only=True)
+    blocked = editproj.not_ready(meta)
+    if blocked:
+        raise HTTPException(409, blocked)
+    mesh = editproj.mesh_at(bid, meta)
+    try:
+        parts = meshparts.detect(mesh, meta.get("parts"))
+    except meshparts.PartsError as e:
+        raise HTTPException(422, str(e))
+    editproj.save_parts(bid, parts)
+    return editproj.payload(bid)
 
 
 @router.put("/{bid}/support-paint")
@@ -615,11 +641,12 @@ def new_multi(
             raise HTTPException(415, f"File {n}: {bad}")
         _gate(data, actor)
         try:
-            mesh, w = meshedit.load_mesh(data, ext, units_scale=meshedit.UNIT_MM[units])       # warn on the converted size (B9)
+            mesh, file_parts, w = meshedit.load_document(
+                data, ext, units_scale=meshedit.UNIT_MM[units], split_shells=True)
         except meshedit.OpError as e:
             raise HTTPException(422, f"File {n}: {e}")
         scale = meshedit.UNIT_MM[units] if ext != "3mf" else 1.0
-        loaded.append({"n": n, "data": data, "ext": ext, "mesh": mesh, "warnings": w, "scale": scale})
+        loaded.append({"n": n, "data": data, "ext": ext, "mesh": mesh, "warnings": w, "scale": scale, "parts": file_parts})
 
     from .builds import disk_guard
     disk_guard()
@@ -634,6 +661,9 @@ def new_multi(
                 meshes.append(m)
             combined, plate = orient.arrange(meshes, (bed_x, bed_y), gap_mm, bed_z)
             warnings = [w for x in loaded for w in x["warnings"]]
+            for x in loaded:
+                if len(x.get("parts") or []) > 1:
+                    warnings.append(f"{len(x['parts'])} objects in file {x['n']} were merged into one mesh (colours/materials are not kept).")
             warnings.append(f"{len(loaded)} parts arranged on one plate, {gap_mm:g} mm apart.")
             if not plate["fits"]:
                 warnings.append(f"The parts don't fit on a {bed_x:g} × {bed_y:g} mm bed together "
@@ -665,7 +695,7 @@ def new_multi(
                                            base={"type": "upload", "format": x["ext"], "units": units if x["ext"] != "3mf" else "from file"},
                                            original=x["data"], original_ext=x["ext"], mesh=x["mesh"], beginner=beginner,
                                            warnings=x["warnings"], import_scale=x["scale"], import_units=units,
-                                           ai=x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]))
+                                           ai=x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]), parts=x.get("parts"))
                 except meshedit.OpError as e:
                     raise HTTPException(422, f"File {x['n']}: {e}")
                 made.append(meta["id"])

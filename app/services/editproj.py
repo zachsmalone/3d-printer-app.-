@@ -26,7 +26,7 @@ from PIL import Image
 
 from ..core import cadops
 from ..core import dims as dimmod
-from ..core import exporters, geometry, meshedit, meshthumb
+from ..core import exporters, geometry, meshedit, meshparts, meshthumb
 from ..core.geometry import Body, Model
 from .history import store
 
@@ -178,7 +178,9 @@ def _stats(m: trimesh.Trimesh, title: str) -> dict:
 
 
 def as_model(m: trimesh.Trimesh, title: str) -> Model:
-    # the object name inside exported OBJ/3MF is deliberately generic: the project title (user text) is never written into files
+    # Export, slice, and handoff take one mesh. Parts stay on the project; this is their merge.
+    # The object name inside exported OBJ/3MF is deliberately generic: the project title is never written into files.
+    m = meshparts.merged_mesh(m)
     return Model(bodies=[Body("model", m.vertices.copy(), m.faces.copy())], mode="edit")
 
 
@@ -301,7 +303,7 @@ def ai_in_3mf(data: bytes) -> bool:
 def create(owner_sid: str, visibility: str, *, title: str, base: dict, original: bytes, original_ext: str,
            mesh: trimesh.Trimesh, beginner: bool, warnings: list[str], import_scale: float = 1.0,
            import_units: str = "mm", source_image: tuple[bytes, str] | None = None,
-           ai: bool = False, parent_build: str = "") -> dict:
+           ai: bool = False, parent_build: str = "", parts: list | None = None) -> dict:
     """Caller must already hold `store.lock` and have reserved a history slot."""
     bid = uuid.uuid4().hex[:12]
     d = store.dir(bid)
@@ -319,6 +321,12 @@ def create(owner_sid: str, visibility: str, *, title: str, base: dict, original:
         meta["parent_build"] = parent_build
     if ai or (original_ext == "3mf" and ai_in_3mf(original)) or (parent_build and ai_lineage({"parent_build": parent_build})):
         meta["ai"] = True                                         # AI-made provenance survives the editor
+    stored = meshparts.validate(parts, len(mesh.faces)) if parts else None
+    if stored and meshparts.worth_storing(stored):
+        meta["parts"] = stored
+        layout = meshparts.plate_layout(stored, len(mesh.faces))
+        if layout:
+            meta["plate_layouts"] = {str(len(ops)): layout}
     _BASES[bid] = mesh
     try:
         m = mesh_at(bid, {**meta, "head": len(ops)})
@@ -509,7 +517,8 @@ def quick_payload(meta: dict, preview: dict | None = None, *, load_preview: bool
             "analysis": analysis, "quality_gate": quality, "base": meta.get("base"), "warnings": meta.get("warnings", []),
             "slice_ready": bool(meta.get("slice_ready")), "report": meta.get("last_report"),
             "support_paint": support_paint_view(meta),
-            "original": f"/api/edit/{meta['id']}/original", "capabilities": capabilities()}
+            "original": f"/api/edit/{meta['id']}/original", "capabilities": capabilities(),
+            "parts": _parts_public(meta, int(meta.get("header_triangles") or n))}
 
 
 def _mark_check_failed(bid: str) -> None:
@@ -691,7 +700,7 @@ def clone(owner_sid: str, visibility: str, src_bid: str, *, title: str, beginner
                 "owner_sid": owner_sid, "visibility": visibility, "version_of": src_bid, "parent_build": src_bid}
         if ai_lineage(src):
             meta["ai"] = True
-        for k in ("dims", "appearance", "photo_ack"):
+        for k in ("dims", "appearance", "photo_ack", "parts"):
             if src.get(k):
                 meta[k] = copy.deepcopy(src[k])
         if layouts:
@@ -1044,6 +1053,31 @@ def capabilities() -> dict:
             "formats": sorted(meshedit.ALLOWED), "image_formats": sorted(meshedit.IMAGE_EXT), "units": list(meshedit.UNIT_MM)}
 
 
+def _parts_public(meta: dict, n_faces: int) -> list[dict]:
+    title = meta.get("title") or "Model"
+    return meshparts.public(meshparts.resolve(meta.get("parts"), n_faces, title))
+
+
+def save_parts(bid: str, parts: list[dict]) -> list[dict]:
+    """Replace the part list for the current mesh. The mesh itself is unchanged."""
+    with _lock:
+        meta = store.get(bid)
+        m = mesh_at(bid, meta)
+        stored = meshparts.validate(parts, len(m.faces))
+        if not stored:
+            raise meshedit.OpError("Those parts don't match this model.")
+        meta = store.get(bid)
+        meta["parts"] = stored
+        layout = meshparts.plate_layout(stored, len(m.faces))
+        if layout:
+            layouts = dict(meta.get("plate_layouts") or {})
+            layouts[str(meta.get("head") or 0)] = layout
+            meta["plate_layouts"] = layouts
+        store.save(meta)
+        store.cache.pop(bid, None)
+    return stored
+
+
 def preview(m: trimesh.Trimesh) -> dict:
     v, f, dec = m.vertices, m.faces, False
     if len(f) > MAX_PREVIEW_FACES:
@@ -1059,7 +1093,7 @@ def preview(m: trimesh.Trimesh) -> dict:
             "indices": base64.b64encode(np.asarray(f).astype("<u4").tobytes()).decode()}]}
 
 
-def preview_objects(m: trimesh.Trimesh, layout: dict) -> dict:
+def preview_objects(m: trimesh.Trimesh, layout: dict, colors=None, names=None) -> dict:
     """One preview body per plate object (so the viewer can select / highlight each)."""
     from ..core import plate as _plate
     objs = _plate.objects(m, layout)
@@ -1071,10 +1105,25 @@ def preview_objects(m: trimesh.Trimesh, layout: dict) -> dict:
         if len(f) > cap:
             dec = True
             f = f[np.linspace(0, len(f) - 1, cap).astype(int)]
-        bodies.append({"name": f"Object {i + 1}", "color": None, "object": i,
+        color = colors[i] if colors and i < len(colors) else None
+        name = names[i] if names and i < len(names) and names[i] else f"Object {i + 1}"
+        bodies.append({"name": name, "color": color, "object": i,
                        "positions": base64.b64encode(np.asarray(o.vertices).astype("<f4").tobytes()).decode(),
                        "indices": base64.b64encode(np.asarray(f).astype("<u4").tobytes()).decode()})
     return {"decimated": dec, "bodies": bodies}
+
+
+def preview_parts(m: trimesh.Trimesh, parts: list[dict]) -> dict:
+    """One coloured body per part when the plate is still a single object."""
+    bodies = []
+    for part in parts:
+        sub = meshparts.submesh(m, part)
+        bodies.append({
+            "name": part["name"], "color": part.get("color"), "object": 0,
+            "positions": base64.b64encode(np.asarray(sub.vertices).astype("<f4").tobytes()).decode(),
+            "indices": base64.b64encode(np.asarray(sub.faces).astype("<u4").tobytes()).decode(),
+        })
+    return {"decimated": False, "bodies": bodies}
 
 
 _GATE_PREFIX = "Fix the model before export: "
@@ -1152,7 +1201,17 @@ def payload(bid: str, report=None, *, include_preview: bool = True) -> dict:
     from ..core import plate as _plate
     L = layout_at(meta, m)
     pinfo = _plate.describe(m, L, tuple(bed_of(meta)))
-    prev = preview_objects(m, pinfo["layout"]) if len(pinfo["objects"]) > 1 else preview(m)
+    parts = meshparts.resolve(meta.get("parts"), len(m.faces), meta.get("title") or "Model")
+    if len(pinfo["objects"]) > 1:
+        matched = meshparts.labels_for_counts(parts, pinfo["layout"]["counts"], len(m.faces))
+        if matched:
+            prev = preview_objects(m, pinfo["layout"], colors=[p.get("color") for p in matched], names=[p["name"] for p in matched])
+        else:
+            prev = preview_objects(m, pinfo["layout"])
+    elif len(parts) > 1 and len(m.faces) <= MAX_PREVIEW_FACES:
+        prev = preview_parts(m, parts)
+    else:
+        prev = preview(m)
     analysis = meshedit.analyze(m)
     quality = export_quality(m)
     return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": prev, "plate": pinfo,
@@ -1160,4 +1219,5 @@ def payload(bid: str, report=None, *, include_preview: bool = True) -> dict:
             "analysis": analysis, "quality_gate": quality, "base": meta["base"], "warnings": meta.get("warnings", []),
             "report": report if report is not None else meta.get("last_report"),
             "support_paint": support_paint_view(meta),
-            "original": f"/api/edit/{bid}/original", "capabilities": capabilities()}
+            "original": f"/api/edit/{bid}/original", "capabilities": capabilities(),
+            "parts": meshparts.public(parts)}
