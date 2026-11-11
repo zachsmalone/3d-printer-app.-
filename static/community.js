@@ -3,7 +3,9 @@ import { P, loadCatalog, pickerHTML, wirePicker, readPicker, savePref, badgeHTML
 import { routeIntent, arriveLibrary, libraryHTML, openFromLibrary, exitTarget, LIBRARY_URL } from "/static/studio-library.js";
 import { bindFlow, originOf, readFlow, reuseCopy, slicerHash } from "/static/project-flow.js";
 import { sendTo } from "/static/handoff.js";
+import * as veil from "/static/handoff-veil.js";
 import { metricsOff, setMetricsOff } from "/static/metrics.js";
+import { showcaseFile, showSlice, showOpenCad, sliceDestination, rememberRemixFor, licenceChoice, shareAlikeLicence, cadPageHref } from "/static/showcase-open.js";
 
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const SOC_LABEL = { tiktok: "TikTok", instagram: "Instagram", reddit: "Reddit", patreon: "Patreon", youtube: "YouTube", x: "X", website: "Website" };
@@ -748,9 +750,12 @@ async function openItem(id) {
     ${i.owned && !i.original ? `<div class="field"><label for="itViewOnly">Downloads</label><select id="itViewOnly"><option value="no" ${i.view_only ? "" : "selected"}>Anyone who can see it may download it</option><option value="yes" ${i.view_only ? "selected" : ""}>View only, no download</option></select></div>` : ""}
     ${i.owned && !i.original && !i.example ? `<div class="itcols" id="itCols" data-iid="${i.id}"></div>` : ""}
     ${i.owned && !i.original && !i.example ? `<div class="field"><label for="itTip">Tip link <em>optional</em></label><div class="row"><input id="itTip" type="url" maxlength="300" placeholder="https://…" value="${esc(i.tip_url || "")}"><button type="button" class="btn small ghost" id="itTipSave">Save</button></div><small class="help">One https link. Leave it empty to remove it. ZEIM never takes a cut of tips or of sales you make from that link. Showcase downloads stay free.</small></div>` : ""}
+    ${i.owned && !i.original && !i.example ? `<div class="field"><label for="itLicense">Licence</label><select id="itLicense">${i.license_id ? `<option value="${esc(i.license_id)}">${esc(i.credit?.licence || i.license_id)}</option>` : `<option value="">Not set yet</option>`}</select><small class="help">Remixes already posted keep their credit. This only changes the licence on this project.</small></div>` : ""}
     ${i.owned && !i.original ? `<div class="field"><label for="itRemixSw">Allow remixes</label><select id="itRemixSw"><option value="yes" ${i.allow_remixes ? "selected" : ""}>Yes</option><option value="no" ${i.allow_remixes ? "" : "selected"}>No</option></select><small class="help">Remixes already posted keep their credit either way.</small></div>` : ""}
     ${i.owned ? `<div class="field"><label>Who can see this project <em>changes apply immediately</em></label><select id="itVis">${["private", "followers", "public"].map(v => `<option value="${v}" ${i.visibility === v ? "selected" : ""}>${{ private: "Private — only me", followers: "Followers only", public: "Public" }[v]}</option>`).join("")}</select></div>` : ""}
     <div class="row">${i.no_model ? '<span class="pill">No model yet</span>' : i.download_blocked ? '<span class="pill">View only: the maker turned off downloads</span>' : i.files.map(f => `<a class="btn" href="${f.url}" download><svg class=i aria-hidden=true focusable=false><use href=#i-download></use></svg> ${esc(f.name)}</a>`).join("")}
+      ${showSlice(i) ? `<button type="button" class="btn" id="itSlice" title="Print this model as it is"><svg class=i aria-hidden=true focusable=false><use href=#i-printer></use></svg> Slice</button>` : ""}
+      ${showOpenCad(i) ? `<button type="button" class="btn" id="itCad" title="Open a copy you can edit"><svg class=i aria-hidden=true focusable=false><use href=#i-pencil></use></svg> Open in CAD</button>` : ""}
       ${nzHTML(i, { large: true, uid: "d" })}${favHTML(i, true)}
       ${i.can_follow && !i.example ? `<button class="btn" id="itFollow">${i.following_creator ? "✔ Following" : "＋ Follow creator"}</button>` : ""}
       ${i.owned && !i.example && !i.original ? `<button type="button" class="btn" id="itEnterCh">Enter challenge</button>` : ""}
@@ -887,9 +892,27 @@ async function openItem(id) {
     } catch (e) { b.disabled = false; toast(e.message, "err"); }
   };
   if ($("#itTipSave")) $("#itTipSave").onclick = async () => { try { await api(`/api/showcase/${id}/tip`, J("PUT", { tip_url: $("#itTip").value.trim() })); toast($("#itTip").value.trim() ? "Tip link saved" : "Tip link removed", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); } };
+  if ($("#itLicense")) {
+    const paintLicence = menu => {
+      const sel = $("#itLicense"); if (!sel || !menu) return;
+      const chosen = i.license_id && menu.licenses.some(l => l.id === i.license_id) ? i.license_id : "";
+      sel.innerHTML = (chosen ? "" : `<option value="">Not set yet</option>`) + menu.licenses.map(l => `<option value="${esc(l.id)}"${l.id === chosen ? " selected" : ""}>${esc(l.name)}</option>`).join("");
+    };
+    ensureLicenceMenu().then(paintLicence).catch(() => {});
+    $("#itLicense").onchange = async e => {
+      if (!e.target.value) return;
+      try {
+        await api(`/api/showcase/${id}/license`, J("PUT", { license_id: e.target.value }));
+        toast("Licence updated. Remixes already posted keep their credit.", "ok");
+        openItem(id);
+      } catch (er) { toast(er.message, "err"); openItem(id); }
+    };
+  }
   if ($("#itRemixSw")) $("#itRemixSw").onchange = async e => { try { await api(`/api/showcase/${id}/remixes`, J("PUT", { allow_remixes: e.target.value === "yes" })); toast(e.target.value === "yes" ? "Remixes allowed" : "Remixes turned off", "ok"); openItem(id); } catch (er) { toast(er.message, "err"); openItem(id); } };
   if ($("#itEnterCh")) $("#itEnterCh").onclick = () => pickChallengeForItem(i);
   if ($("#itRemove")) $("#itRemove").onclick = () => removeShowcaseItem(i);
+  if ($("#itSlice")) $("#itSlice").onclick = () => startSlice(i);
+  if ($("#itCad")) $("#itCad").onclick = () => openInCad(i);
   if ($("#itRemix") && i.can_remix) $("#itRemix").onclick = () => startRemix(i);
   $("#itShare").onclick = () => { navigator.clipboard?.writeText(location.origin + i.share_url); toast("Link copied", "ok"); };
   if ($("#itReport")) $("#itReport").onclick = () => openReport("Report this project", async (reason, details) => {
@@ -973,43 +996,129 @@ function rememberRemixIntent(item) {
     sessionStorage.setItem(REMIX_RECENT, JSON.stringify(next));
   } catch { /* the Remix button still tells them what to do next */ }
 }
-async function startRemix(item) {
-  rememberRemixIntent(item);
-  const file = (item.files || []).find(f => f.url && /\.stl$/i.test(f.name || "")) || (item.files || []).find(f => f.url);
-  const credit = item.title || "this project";
-  if (item.download_blocked || item.view_only || !file) {
-    toast(`Downloads are off for this project, so it can't be opened as a remix. The credit for ${credit} is saved for a model you make yourself.`, "ok");
+const BUILDS_FULL = "Your recent builds are full. Delete one on Account, then try again.";
+
+/* Pick a downloadable file (an .stl when there is one), fetch it same-origin, and hand back a File. */
+async function showcaseMesh(item, onFrac) {
+  const file = showcaseFile(item);
+  if (!file) return null;
+  const { r, buf } = await veil.fetchBytes(file.url, null, onFrac);
+  if (!r.ok) throw new Error("Couldn't download that model.");
+  const blob = new Blob([buf], { type: "model/stl" });
+  const safe = String(file.name || "model.stl").replace(/[^\w.\-]+/g, "_").slice(0, 80) || "model.stl";
+  return new File([blob], safe, { type: blob.type || "model/stl" });
+}
+
+async function postShowcaseEdit(mesh, title) {
+  const fd = new FormData();
+  fd.append("file", mesh);
+  fd.append("title", String(title || "Model").slice(0, 80));
+  fd.append("units", "mm");
+  const project = await api("/api/edit/new", { method: "POST", body: fd });
+  if (!project?.id) {
+    const err = new Error(BUILDS_FULL);
+    err.code = "builds_full";
+    throw err;
+  }
+  if (project.preview) window.__zeimFreshEdit = { id: project.id, p: project, t: Date.now() };
+  return project;
+}
+
+function buildsFull(e) {
+  return e?.code === "builds_full" || (e?.status === 409 && e.body?.code === "history_full");
+}
+
+function sayBuildsFull(e) {
+  toast(e?.code === "builds_full" ? BUILDS_FULL : (e?.message || BUILDS_FULL), "err");
+}
+
+function markBusy(sel, on) {
+  const btn = $(sel);
+  if (!btn) return;
+  btn.disabled = !!on;
+  if (on) btn.setAttribute("aria-busy", "true");
+  else btn.removeAttribute("aria-busy");
+}
+
+/* Print the file as it is. Resin goes to TorchC0; FDM goes to the Slicer. Does not save remix credit. */
+async function openPrinter(item, { credit = "", button = "#itSlice" } = {}) {
+  const file = showcaseFile(item);
+  const blocked = item.download_blocked || (item.view_only && !item.owned) || !file;
+  if (blocked) {
+    if (credit) toast(`Downloads are off for this project, so it can't be opened as a remix. The credit for ${credit} is saved for a model you make yourself.`, "ok");
+    else toast("This project has no file to open.", "err");
     return;
   }
-  const btn = $("#itRemix");
-  if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+  const resin = sliceDestination(document.body.dataset.printKind) === "torchc0";
+  markBusy(button, true);
+  veil.open(resin ? "Opening in TorchC0…" : "Opening in the FDM Slicer…", resin ? ["zeim:torchc0-loaded"] : ["zeim:edit-loaded", "zeim:edit-load-failed"]);
   try {
-    const res = await fetch(file.url, { credentials: "same-origin" });
-    if (!res.ok) throw new Error("Couldn't download that model.");
-    const blob = await res.blob();
-    const safe = String(file.name || "remix.stl").replace(/[^\w.\-]+/g, "_").slice(0, 80) || "remix.stl";
-    const mesh = new File([blob], safe, { type: blob.type || "model/stl" });
-    const resin = document.body.dataset.printKind === "resin";
+    veil.band(0, resin ? 40 : 35, "Downloading the model…");
+    const mesh = await showcaseMesh(item, veil.isOpen() ? veil.frac : null);
+    if (!mesh) throw new Error("Couldn't download that model.");
     $("#dlgItem")?.close();
     if (resin) {
+      veil.band(40, 98, "Loading it into TorchC0…");
       location.hash = "torchc0";
       document.dispatchEvent(new CustomEvent("zeim:torchc0-file", { detail: mesh }));
-      toast(`Opened in TorchC0. Send to Showcase will credit ${credit}.`, "ok");
+      toast(credit ? `Opened in TorchC0. Send to Showcase will credit ${credit}.` : "Opened in TorchC0.", "ok");
       return;
     }
-    const fd = new FormData();
-    fd.append("file", mesh);
-    fd.append("title", String(item.title || "Remix").slice(0, 80));
-    fd.append("units", "mm");
-    const project = await api("/api/edit/new", { method: "POST", body: fd });
-    if (!project?.id) { toast("Your recent builds are full. Delete one on Account, then remix again.", "err"); return; }
+    veil.band(35, 70, "Preparing it for the Slicer…");
+    const project = await postShowcaseEdit(mesh, item.title || (credit ? "Remix" : "Model"));
+    veil.band(70, 95, "Loading it into the Slicer…");
     location.hash = "slicer";
     document.dispatchEvent(new CustomEvent("zeim:open-edit", { detail: project.id }));
-    toast(`Opened in the FDM Slicer. Send to Showcase will credit ${credit}.`, "ok");
+    toast(credit ? `Opened in the FDM Slicer. Send to Showcase will credit ${credit}.` : "Opened in the FDM Slicer.", "ok");
   } catch (e) {
-    toast(e.message || "Couldn't open that remix.", "err");
+    veil.close();
+    if (buildsFull(e)) { sayBuildsFull(e); return; }
+    toast(e.message || (credit ? "Couldn't open that remix." : "Couldn't open that model."), "err");
   } finally {
-    if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); }
+    markBusy(button, false);
+  }
+}
+
+async function startSlice(item) {
+  return openPrinter(item, { credit: "", button: "#itSlice" });
+}
+
+async function startRemix(item) {
+  rememberRemixIntent(item);
+  const credit = item.title || "this project";
+  return openPrinter(item, { credit, button: "#itRemix" });
+}
+
+/* A copy to edit. Non-owners keep the credit chain for Send to Showcase. A 200k-triangle model
+   still opens in CAD, which already offers a lighter view or a simplified copy. A 413 from the
+   upload itself stays here, with Slice or download as the other way. */
+async function openInCad(item) {
+  if (rememberRemixFor("cad", item)) rememberRemixIntent(item);
+  const file = showcaseFile(item);
+  if (item.download_blocked || (item.view_only && !item.owned) || !file) {
+    toast("This project has no file to open in CAD.", "err");
+    return;
+  }
+  markBusy("#itCad", true);
+  veil.open("Opening in CAD…", []);
+  try {
+    veil.band(0, 40, "Downloading the model…");
+    const mesh = await showcaseMesh(item, veil.isOpen() ? veil.frac : null);
+    if (!mesh) throw new Error("Couldn't download that model.");
+    veil.band(40, 85, "Preparing a copy for CAD…");
+    const project = await postShowcaseEdit(mesh, item.title || "Model");
+    location.href = cadPageHref(project.id);
+  } catch (e) {
+    veil.close();
+    if (e.status === 413) {
+      const why = e.message ? e.message + " " : "";
+      toast(why + "This model is too big to open in CAD. Slice it or download the file instead.", "err");
+      return;
+    }
+    if (buildsFull(e)) { sayBuildsFull(e); return; }
+    toast(e.message || "Couldn't open that model in CAD.", "err");
+  } finally {
+    markBusy("#itCad", false);
   }
 }
 function recentRemixTitle(raw) {
@@ -1024,6 +1133,7 @@ function setRemixCredit(raw, title) {
   else delete field.dataset.title;
   paintRemixCredit();
   paintRemixRecent();
+  fillLicencePicker();
 }
 function paintRemixCredit() {
   const field = $("#pub_remix"), chosen = $("#pubRemixChosen"), now = $("#pubRemixNow");
@@ -1094,7 +1204,7 @@ function wireRemixPicker() {
   });
   $("#pubRemixGo")?.addEventListener("click", searchRemixSources);
   $("#pubRemixSearch")?.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); searchRemixSources(); } });
-  $("#pub_remix")?.addEventListener("input", () => { delete $("#pub_remix").dataset.title; paintRemixCredit(); paintRemixRecent(); });
+  $("#pub_remix")?.addEventListener("input", () => { delete $("#pub_remix").dataset.title; paintRemixCredit(); paintRemixRecent(); fillLicencePicker(); });
   box.addEventListener("click", e => {
     if (e.target.closest("#pubRemixClear")) { setRemixCredit("", ""); return; }
     const b = e.target.closest("[data-remix-pick]");
@@ -1103,11 +1213,53 @@ function wireRemixPicker() {
   });
 }
 let publishBuild = null;
+let licenceMenu = null;
+let licenceFillGen = 0;
+let licenceFillP = null;
+async function ensureLicenceMenu() {
+  if (licenceMenu) return licenceMenu;
+  licenceMenu = await api("/api/showcase/licenses");
+  return licenceMenu;
+}
+function fillLicencePicker() {
+  const gen = ++licenceFillGen;
+  licenceFillP = (async () => {
+    let menu;
+    try { menu = await ensureLicenceMenu(); } catch { return; }
+    if (gen !== licenceFillGen) return;
+    const sel = $("#pub_license");
+    if (!sel) return;
+    const sourceId = remixIdOf($("#pub_remix")?.value);
+    let sourceLid = "";
+    if (sourceId) {
+      try { sourceLid = (await api("/api/showcase/" + encodeURIComponent(sourceId))).license_id || ""; }
+      catch { sourceLid = ""; }
+    }
+    if (gen !== licenceFillGen) return;
+    const choice = licenceChoice(menu.default, sourceLid);
+    const locked = shareAlikeLicence(sourceLid);
+    const prev = sel.value;
+    const wasLocked = !!sel.dataset.locked;
+    sel.innerHTML = (menu.licenses || []).map(l => `<option value="${esc(l.id)}">${esc(l.name)}</option>`).join("");
+    const keep = !locked && !wasLocked && [...sel.options].some(o => o.value === prev);
+    const next = locked ? locked : (keep ? prev : choice);
+    if ([...sel.options].some(o => o.value === next)) sel.value = next;
+    sel.disabled = !!locked;
+    sel.dataset.locked = locked || "";
+    const help = $("#pubLicenseHelp");
+    const row = (menu.licenses || []).find(l => l.id === sel.value);
+    if (help) help.textContent = locked
+      ? "This remix is of a share-alike project, so the same licence stays selected."
+      : (row?.blurb || "Private use is the starting choice.");
+  })();
+  return licenceFillP;
+}
 function publishPayload(build) {
   return {
     build_id: build.id, title: $("#pub_title").value, description: $("#pub_desc").value,
     tags: $("#pub_tags").value.split(","), accept_guidelines: $("#pub_ok").checked, visibility: $("#pub_vis").value,
     remix_of: ($("#pub_remix")?.value || "").trim(), nsfw: $("[name=pub_nsfw]:checked")?.value === "yes",
+    license_id: $("#pub_license")?.value || "private-use",
     allow_remixes: $("#pub_allow_remix").value === "yes", view_only: $("#pub_view_only").value === "yes",
     ai_made: !!$("#pub_ai")?.checked, tip_url: ($("#pub_tip")?.value || "").trim(),
     print_settings: psFields(),
@@ -1126,11 +1278,13 @@ function openShowcase(build) {
   if (aiBox) { aiBox.checked = aiForced || aiBox.checked && !aiBox.disabled; aiBox.disabled = aiForced; }
   if ($("#pub_ai_note")) $("#pub_ai_note").hidden = !aiForced;
   $("#pub_allow_remix").value = "yes"; $("#pub_view_only").value = "no";
+  if ($("#pub_license")) { $("#pub_license").disabled = false; $("#pub_license").dataset.locked = ""; $("#pub_license").value = "private-use"; }
   wireRemixPicker();
   let pending = ""; try { pending = sessionStorage.getItem(REMIX_NOW) || ""; } catch { pending = ""; }
   if ($("#pub_remix") && !$("#pub_remix").value && pending) setRemixCredit(pending, recentRemixTitle(pending));
   else { paintRemixCredit(); paintRemixRecent(); }
   if ($("#pubRemixHits")) $("#pubRemixHits").innerHTML = "";
+  fillLicencePicker();
   $("#dlgPublish").showModal();
   if (pending && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending) && !recentRemixTitle(pending)) {
     resolveRemixTitle(pending).then(t => { if (t && remixIdOf($("#pub_remix")?.value) === remixIdOf(pending)) { $("#pub_remix").dataset.title = t; paintRemixCredit(); } });
@@ -1175,6 +1329,7 @@ function showConflict(c) {
   $("#pubKeepPrivate").onclick = () => { $("#pub_vis").value = "private"; box.hidden = true; $("#btnDoPublish").click(); };
 }
 $("#btnDoPublish").onclick = async () => {
+  if (licenceFillP) { try { await licenceFillP; } catch { /* Private use stays selected if the menu did not load. */ } }
   if ($("#pubConflict")) $("#pubConflict").hidden = true;
   const nsfw = $("[name=pub_nsfw]:checked")?.value;
   if (!nsfw) return inlineMsg($("#btnDoPublish"), "Please answer: Is this NSFW (mild nudity / mature art)? Yes or No.");

@@ -592,6 +592,15 @@ def item_remixes(iid: str, body: dict, actor: Actor = Depends(get_actor)):
         raise D(e)
 
 
+@router.put("/showcase/{iid}/license")
+def item_license(iid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Owner only. license_id must be one of GET /api/showcase/licenses. Existing remix credit is not rewritten."""
+    try:
+        return catalog.public(catalog.set_license(actor, iid, (body or {}).get("license_id")), actor)
+    except catalog.Denied as e:
+        raise D(e)
+
+
 @router.post("/showcase/{iid}/like")
 def like(iid: str, body: dict | None = None, actor: Actor = Depends(get_actor)):
     guards.showcase_gate(actor, likes=True)

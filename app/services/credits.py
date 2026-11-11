@@ -11,6 +11,7 @@ from functools import lru_cache
 from importlib import metadata as md
 from pathlib import Path
 
+from ..community import licensing as _showcase_licensing
 from ..config import ROOT, STATIC
 
 FILE = Path(__file__).resolve().parent.parent / "credits.json"
@@ -226,6 +227,18 @@ def _https(u) -> str:
     return u if re.match(r"^https://[^\s<>\"']+$", u) else ""
 
 
+def _showcase_licence_row(lid: str) -> dict:
+    """Name and URL for a Showcase menu id that is not in the library table (private-use, ND, NC).
+
+    The library table in credits.json stays narrower on purpose. A stored license_id is looked up;
+    a missing id still produces no licence name.
+    """
+    row = _showcase_licensing.LICENSES.get(lid) if isinstance(lid, str) else None
+    if not row or not row.get("name"):
+        return {}
+    return {"name": row["name"], "url": row.get("url") or "", "share_alike": bool(row.get("share_alike"))}
+
+
 def credit_line(item: dict) -> dict | None:
     """The credit shown on a shared model / Original card and its download page. Keeps the short keys
     {'creator', 'licence', 'licence_url'} and adds the data-file fields of the attribution standard (section 7.1)
@@ -234,6 +247,10 @@ def credit_line(item: dict) -> dict | None:
     c = item.get("credit") or {}
     lid = c.get("license_id") or item.get("license_id") or ""
     row = licences().get(lid, {}) if lid else {}
+    if lid and not row.get("name"):
+        alt = _showcase_licence_row(lid)
+        if alt.get("name"):
+            row = alt
     lic = c.get("licence") or c.get("license") or item.get("license") or {}
     if isinstance(lic, str):
         lic = {"name": lic}

@@ -24,7 +24,7 @@ LICENSES: dict[str, dict] = {
                       derivatives=True, commercial=True,
                       blurb="Anyone may share, remix and sell it, with credit to you."),
     "cc-by-sa-4.0": dict(name="CC BY-SA 4.0", url="https://creativecommons.org/licenses/by-sa/4.0/",
-                         derivatives=True, commercial=True,
+                         derivatives=True, commercial=True, share_alike=True,
                          blurb="Like CC BY, but remixes must carry the same licence."),
     "cc-by-nd-4.0": dict(name="CC BY-ND 4.0", url="https://creativecommons.org/licenses/by-nd/4.0/",
                          derivatives=False, commercial=True,
@@ -33,7 +33,7 @@ LICENSES: dict[str, dict] = {
                          derivatives=True, commercial=False,
                          blurb="Anyone may remix with credit, for non-commercial use only."),
     "cc-by-nc-sa-4.0": dict(name="CC BY-NC-SA 4.0", url="https://creativecommons.org/licenses/by-nc-sa/4.0/",
-                            derivatives=True, commercial=False,
+                            derivatives=True, commercial=False, share_alike=True,
                             blurb="Non-commercial remixes with credit, same licence for them."),
     "cc-by-nc-nd-4.0": dict(name="CC BY-NC-ND 4.0", url="https://creativecommons.org/licenses/by-nc-nd/4.0/",
                             derivatives=False, commercial=False,
@@ -57,6 +57,18 @@ def check(license_id) -> str:
     if not isinstance(license_id, str) or license_id not in LICENSES:
         raise ValueError("unknown licence: pick one from the licence list")
     return license_id
+
+
+def require(license_id) -> str:
+    """A licence id that is already on the menu. Blank is not turned into the default."""
+    if not isinstance(license_id, str) or license_id not in LICENSES:
+        raise ValueError("unknown licence: pick one from the licence list")
+    return license_id
+
+
+def is_share_alike(license_id) -> bool:
+    """True only when this menu entry says remixes keep the same licence. Not a permission grant."""
+    return isinstance(license_id, str) and LICENSES.get(license_id, {}).get("share_alike") is True
 
 
 def describe(license_id) -> dict | None:
