@@ -22,7 +22,7 @@ def test_old_caches_are_deleted_and_only_static_is_cached():
     assert js.count(".put(") == 1                     # one place writes to the cache...
     put_block = js[js.index('startsWith("/static/")'):js.index("r.mode === \"navigate\"")]
     assert ".put(" in put_block                       # ...and it is the /static/ branch
-    assert "fetch(r).then" in put_block               # network first, cache only as fallback
+    assert "fetch(r, {cache:\"reload\"}).then" in put_block  # network first, skip HTTP cache, cache only as fallback
 
 
 def test_version_changes_each_start(monkeypatch):

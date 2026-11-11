@@ -17,6 +17,7 @@ from .api import calibration as calibration_api
 from .api import doctor as doctor_api
 from . import config
 from .config import STATIC
+from .assets import cache_control_for, stamp_html_responses
 
 import logging as _logging
 
@@ -178,17 +179,15 @@ CSP = ("default-src 'self'; script-src 'self' " + _inline_script_hashes() + "; s
        "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
 
 
-STATIC_LONG = (".webp", ".png", ".jpg", ".jpeg", ".svg", ".ico")
-
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     resp = await call_next(request)
     h = resp.headers
     if request.url.path.startswith("/static/"):
-        # JS/CSS/HTML: always revalidate (ETag keeps it cheap): a phone must never mix old and new JS modules.
-        # Images never import anything, so a browser may keep them a day without asking again (fonts stay no-cache, see the workbench test).
-        h.setdefault("Cache-Control", "public, max-age=86400" if request.url.path.lower().endswith(STATIC_LONG) else "no-cache")
+        # Unversioned JS/CSS stay no-cache (revalidate via ETag). Versioned ?v=<deploy> may be cached
+        # for a year because a new deploy uses a new query. Images may be kept a day (fonts stay no-cache).
+        h.setdefault("Cache-Control", cache_control_for(request.url.path, request.query_params.get("v")))
     h.setdefault("X-Content-Type-Options", "nosniff")
     h.setdefault("X-Frame-Options", "DENY")
     h.setdefault("Referrer-Policy", "no-referrer")
@@ -254,6 +253,11 @@ async def public_coming_soon_gate(request: Request, call_next):
     if config.coming_soon_enabled() and request.url.path != "/healthz":
         return _coming_soon_page()
     return await call_next(request)
+
+
+# Registered last so it rewrites HTML after other middleware has set headers, and so a
+# coming-soon short-circuit still goes through it (pages with no /static JS are left alone).
+app.middleware("http")(stamp_html_responses)
 
 
 from .community.safety import ChatBlocked as _ChatBlocked

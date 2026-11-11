@@ -98,12 +98,13 @@ def test_security_headers_on_pages_api_and_files():
 
 def test_inline_scripts_are_covered_by_csp_hashes():
     import base64, hashlib, re
-    csp = TestClient(app).get("/").headers["content-security-policy"]
-    for f in ("index.html", "sharetest.html"):
-        html = (config.STATIC / f).read_text()
-        for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", html, re.S):
-            assert "sha256-" + base64.b64encode(hashlib.sha256(m.group(1).encode()).digest()).decode() in csp, f
-        assert not re.search(r"\son(click|load|error|change|submit)=", html), "inline event handlers would need unsafe-inline"
+    c = TestClient(app)
+    for url in ("/", "/sharetest"):
+        page = c.get(url)
+        csp = page.headers["content-security-policy"]
+        for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", page.text, re.S):
+            assert "sha256-" + base64.b64encode(hashlib.sha256(m.group(1).encode()).digest()).decode() in csp, url
+        assert not re.search(r"\son(click|load|error|change|submit)=", page.text), "inline event handlers would need unsafe-inline"
 
 
 def test_api_docs_are_not_public():
