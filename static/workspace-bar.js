@@ -409,13 +409,16 @@ function onBedCat(ev) {
     ev.preventDefault();
     ev.stopPropagation();
     unpinCategory();
+    document.dispatchEvent(new CustomEvent("zeim:close-parts"));
     return;
   }
   const cat = ev.target.closest && ev.target.closest("#bedCats [data-bed-cat]");
   if (!cat) return;
   ev.preventDefault();
   ev.stopPropagation();
-  pinCategory(cat.getAttribute("data-bed-cat"), cat.getAttribute("data-bed-label") || cat.textContent.trim());
+  const id = cat.getAttribute("data-bed-cat");
+  pinCategory(id, cat.getAttribute("data-bed-label") || cat.textContent.trim());
+  document.dispatchEvent(new CustomEvent(id === "parts" ? "zeim:open-parts" : "zeim:close-parts"));
 }
 
 function onFdmAct(ev) {

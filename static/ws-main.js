@@ -94,6 +94,7 @@
     if (res.hidden) {
       var sheet = document.getElementById("processSheet"); if (sheet) sheet.hidden = true;
       var device = document.getElementById("deviceSheet"); if (device) device.hidden = true;
+      var partsSheet = document.getElementById("partsSheet"); if (partsSheet) partsSheet.hidden = true;
     }
     var empty = document.getElementById("procEmpty"), panel = document.getElementById("slicePanel");
     if (empty) empty.hidden = !!(panel && panel.childElementCount);
@@ -101,8 +102,16 @@
   function setDockTab(which) {
     var sheet = document.getElementById("processSheet");
     var device = document.getElementById("deviceSheet");
+    var partsSheet = document.getElementById("partsSheet");
     var title = document.getElementById("procTitle");
     try {
+    if (which === "parts") {
+      if (sheet) sheet.hidden = true;
+      if (device) device.hidden = true;
+      if (partsSheet) partsSheet.hidden = false;
+      return;
+    }
+    if (partsSheet) partsSheet.hidden = true;
     if (which === "device") {
       if (sheet) sheet.hidden = true;
       if (device) device.hidden = false;
@@ -144,6 +153,11 @@
     var big = kind === "scale" ? document.querySelector("[data-big=scale]") : null;
     if (big) big.click();
   }
+  document.addEventListener("zeim:open-parts", function () { setDockTab("parts"); });
+  document.addEventListener("zeim:close-parts", function () {
+    var partsSheet = document.getElementById("partsSheet");
+    if (partsSheet) partsSheet.hidden = true;
+  });
   document.addEventListener("zeim:bed-sel", syncSlicerDock);
   document.addEventListener("zeim:edit-loaded", syncSlicerDock);
   document.addEventListener("zeim:new-build", syncSlicerDock);
@@ -192,7 +206,7 @@
     }
     var tab = e.target.closest && e.target.closest("#slicerDock [data-docktab]");
     if (tab) { e.preventDefault(); setDockTab(tab.getAttribute("data-docktab")); return; }
-    if (e.target.closest && (e.target.closest("#processClose") || e.target.closest("#deviceClose"))) {
+    if (e.target.closest && (e.target.closest("#processClose") || e.target.closest("#deviceClose") || e.target.closest("#partsClose"))) {
       e.preventDefault();
       setDockTab("plate");
     }
