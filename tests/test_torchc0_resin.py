@@ -805,6 +805,21 @@ def test_api_support_fields_and_formats_note(c):
     assert "not a resin slicer" in note.lower() or "reverse-engineering" in note.lower()
 
 
+def test_large_shell_layer_check_vents_a_drain_and_flags_a_sealed_cavity():
+    """The raster check used for big shells must still tell a sealed cup from a drained one."""
+    from app.core import meshedit
+    mesh = trimesh.creation.icosphere(subdivisions=6, radius=30.0)
+    assert len(mesh.faces) > resin._LAYER_RASTER_FACES
+    sealed, _ = meshedit.op_hollow(mesh, {"wall": 2, "drain_diameter": 0})
+    drained, report = meshedit.op_hollow(mesh, {"wall": 2, "drain_diameter": 3, "per_cavity": 2})
+    assert len(sealed.faces) > resin._LAYER_RASTER_FACES
+    sealed_check = resin.layer_check(sealed, step=0.05)
+    drained_check = resin.layer_check(drained, step=0.05)
+    assert sealed_check["suction"] and max(row["area_mm2"] for row in sealed_check["suction"]) > 500
+    assert drained_check["suction"] == []
+    assert report["holes_made"] == [2]
+
+
 def test_proxy_mesh_falls_back_to_a_small_stand_in(monkeypatch):
     """A failed simplifier must not hand the full mesh to support queries."""
     mesh = trimesh.creation.icosphere(subdivisions=6)

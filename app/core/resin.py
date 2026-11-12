@@ -11,6 +11,7 @@ import math
 import fast_simplification
 import numpy as np
 import trimesh
+from scipy import ndimage
 from scipy.spatial import cKDTree
 
 from app.core import memtrim, meshedit
@@ -708,11 +709,210 @@ def add_holes(m: trimesh.Trimesh, diameter: float, per_cavity: int = 2):
     return m, made
 
 
+# Above this, polygonising every wrinkle of the full shell is the prepare timeout
+# (about 3 minutes for the 694k wrinkled mask). A 0.6 mm raster of the same slices
+# keeps the drained cavity unflagged and still reports the small cups and the
+# islands between supports. Smaller meshes stay on the exact polygon check.
+_LAYER_RASTER_FACES = 40_000
+_LAYER_PITCH_MM = 0.6
+
+
+def _section_segments(tri, zz, xy, height):
+    """One segment per triangle the plane cuts. Even-odd fill does not need a direction."""
+    above = zz >= height
+    nabove = above.sum(axis=1)
+    idx = np.flatnonzero((nabove == 1) | (nabove == 2))
+    if len(idx) == 0:
+        return np.zeros((0, 2, 2))
+    za = zz[idx]
+    abv = above[idx]
+    xyi = xy[idx]
+    hit = np.empty((len(idx), 2, 2), dtype=np.float64)
+    count = np.zeros(len(idx), dtype=np.int8)
+    for i, j in ((0, 1), (1, 2), (2, 0)):
+        diff = abv[:, i] != abv[:, j]
+        den = za[:, j] - za[:, i]
+        den = np.where(np.abs(den) < 1e-9, 1.0, den)
+        t = (height - za[:, i]) / den
+        point = xyi[:, i] + t[:, None] * (xyi[:, j] - xyi[:, i])
+        which = np.flatnonzero(diff)
+        have = count[which]
+        ok = have < 2
+        which = which[ok]
+        have = have[ok]
+        hit[which, have] = point[which]
+        count[which] = have + 1
+    return hit[count == 2]
+
+
+def _raster_even_odd(segs, origin, pitch, shape):
+    """Filled pixels of an even-odd scan of `segs`. Overlapping shells match the polygon check."""
+    height, width = shape
+    mask = np.zeros((height, width), dtype=np.uint8)
+    if len(segs) == 0:
+        return mask.astype(bool)
+    y0 = segs[:, 0, 1]
+    y1 = segs[:, 1, 1]
+    x0 = segs[:, 0, 0]
+    x1 = segs[:, 1, 0]
+    rows = origin[1] + (np.arange(height) + 0.5) * pitch
+    for row, y in enumerate(rows):
+        up = (y0 <= y) & (y < y1)
+        down = (y1 <= y) & (y < y0)
+        use = up | down
+        if not np.any(use):
+            continue
+        yy0 = y0[use]
+        yy1 = y1[use]
+        span = yy1 - yy0
+        t = (y - yy0) / np.where(np.abs(span) < 1e-12, 1.0, span)
+        cols = np.floor((x0[use] + t * (x1[use] - x0[use]) - origin[0]) / pitch).astype(np.int32)
+        cols.sort()
+        cols = np.clip(cols, 0, width - 1)
+        start = cols[0::2]
+        stop = cols[1::2]
+        n = min(len(start), len(stop))
+        for i in range(n):
+            if stop[i] > start[i]:
+                mask[row, start[i]:stop[i]] = 1
+    return mask.astype(bool)
+
+
+def _layer_check_raster(m: trimesh.Trimesh, step: float, max_layers: int, on_step=None) -> dict:
+    """Island and suction warnings from a 0.6 mm picture of each layer.
+
+    The polygon check on a wrinkled 800k-triangle shell spent about three minutes
+    building a path graph. This samples the same planes. A one-pixel close drops
+    cracks that are not a cup. A cup is a hole that stays off the open vat for
+    at least two layers. A drain that reaches that vat is not reported.
+    """
+    verts = np.asarray(m.vertices, dtype=np.float64)
+    faces = np.asarray(m.faces, dtype=np.int64)
+    if len(faces) == 0 or len(verts) == 0:
+        if on_step:
+            on_step(1, 1)
+        return {"islands": [], "suction": [], "step_mm": round(float(step), 3)}
+    z0, z1 = float(verts[:, 2].min()), float(verts[:, 2].max())
+    if z1 - z0 < step * 2:
+        if on_step:
+            on_step(1, 1)
+        return {"islands": [], "suction": []}
+    step = max(float(step), (z1 - z0) / max_layers)
+    zs = np.arange(z0 + step / 2, z1, step)
+    pitch = _LAYER_PITCH_MM
+    origin = verts[:, :2].min(axis=0) - pitch
+    hi = verts[:, :2].max(axis=0)
+    shape = (
+        int(np.ceil((hi[1] - origin[1]) / pitch)) + 2,
+        int(np.ceil((hi[0] - origin[0]) / pitch)) + 2,
+    )
+    tri = verts[faces]
+    zz = tri[:, :, 2]
+    xy = tri[:, :, :2]
+    struct = np.ones((3, 3), dtype=np.uint8)
+    if on_step:
+        on_step(0, len(zs))
+    prev = None
+    prev_ext = None
+    prev_lab = None
+    parent: dict[int, int] = {}
+    holes_meta = []
+    islands = []
+
+    def find(node: int) -> int:
+        while parent.get(node, node) != node:
+            node = parent[node]
+        return node
+
+    for i, height in enumerate(zs):
+        mat = _raster_even_odd(_section_segments(tri, zz, xy, float(height)), origin, pitch, shape)
+        mat = ndimage.binary_closing(mat, structure=struct)
+        labels, nlab = ndimage.label(mat, structure=struct)
+        if prev is not None and nlab:
+            touch = ndimage.binary_dilation(prev, structure=struct)
+            counts = np.bincount(labels.ravel(), minlength=nlab + 1)
+            for k in range(1, nlab + 1):
+                area = float(counts[k]) * pitch * pitch
+                if area < 0.5:
+                    continue
+                comp = labels == k
+                if np.any(comp & touch):
+                    continue
+                ys, xs = np.nonzero(comp)
+                cx = float(xs.mean() * pitch + origin[0])
+                cy = float(ys.mean() * pitch + origin[1])
+                islands.append({
+                    "z_mm": round(float(height), 2), "area_mm2": round(area, 2),
+                    "xy": [round(cx, 1), round(cy, 1)],
+                    "xyz": [round(cx, 2), round(cy, 2), round(float(height), 2)],
+                })
+        inv, ninv = ndimage.label(~mat, structure=struct)
+        border = np.zeros(ninv + 1, dtype=bool)
+        border[inv[0, :]] = True
+        border[inv[-1, :]] = True
+        border[inv[:, 0]] = True
+        border[inv[:, -1]] = True
+        hcounts = np.bincount(inv.ravel(), minlength=ninv + 1)
+        # Border-connected background is the open vat. A cup that reaches it is vented.
+        # Filling the silhouette would close a drain that exits through the bottom.
+        border[0] = False
+        exterior = border[inv]
+        current = []
+        for k in range(1, ninv + 1):
+            area = float(hcounts[k]) * pitch * pitch
+            if border[k] or area < 1.0:
+                continue
+            comp = inv == k
+            open_below = False
+            if prev_ext is not None and np.count_nonzero(comp & prev_ext) * pitch * pitch > 0.2:
+                open_below = True
+            hid = len(holes_meta)
+            ys, xs = np.nonzero(comp)
+            holes_meta.append({
+                "i": i, "area": area, "z": float(height), "open": open_below,
+                "xy": (float(xs.mean() * pitch + origin[0]), float(ys.mean() * pitch + origin[1])),
+            })
+            current.append((hid, comp))
+        if prev_lab is not None:
+            for hid, comp in current:
+                prev_ids = np.unique(prev_lab[comp])
+                for pid in prev_ids:
+                    if pid <= 0:
+                        continue
+                    parent[find(hid)] = find(int(pid) - 1)
+        new_lab = np.zeros(shape, dtype=np.int32)
+        for hid, comp in current:
+            new_lab[comp] = hid + 1
+        prev = mat
+        prev_ext = exterior
+        prev_lab = new_lab
+        if on_step and (i % 8 == 0 or i + 1 == len(zs)):
+            on_step(i + 1, len(zs))
+    groups: dict[int, list[int]] = {}
+    for hid in range(len(holes_meta)):
+        groups.setdefault(find(hid), []).append(hid)
+    suction = []
+    for group in groups.values():
+        if len(group) < 2 or any(holes_meta[k]["open"] for k in group):
+            continue
+        first = min(group, key=lambda k: holes_meta[k]["i"])
+        meta = holes_meta[first]
+        suction.append({
+            "z_mm": round(meta["z"], 2),
+            "layers": len({holes_meta[k]["i"] for k in group}),
+            "area_mm2": round(max(holes_meta[k]["area"] for k in group), 1),
+            "xyz": [round(meta["xy"][0], 2), round(meta["xy"][1], 2), round(meta["z"], 2)],
+        })
+    return {"islands": islands[:50], "suction": suction[:50], "step_mm": round(step, 3)}
+
+
 def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400, on_step=None) -> dict:
     """Slice the print every `step` mm (z=0 is the build plate) and look for:
     islands: a region with no overlap with the layer before it (starts in mid-air, nothing to hang from);
     suction cups: a hole in the layers that is closed on its plate side (sealed by material or the plate) so every
     peel pulls a vacuum. A hole that reaches open space on the plate side is vented."""
+    if len(m.faces) > _LAYER_RASTER_FACES:
+        return _layer_check_raster(m, step, max_layers, on_step)
     from shapely.geometry import Polygon
     from shapely.ops import unary_union
     z0, z1 = float(m.bounds[0][2]), float(m.bounds[1][2])
@@ -737,7 +937,16 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400, o
         polys = []
         if sec is not None:
             try:
-                polys = [p.buffer(0) for p in sec.polygons_full if p.area > 1e-4]
+                for poly in sec.polygons_full:
+                    if poly is None or poly.area <= 1e-4:
+                        continue
+                    buffered = poly.buffer(0)
+                    if buffered.is_empty:
+                        continue
+                    pieces = buffered.geoms if buffered.geom_type == "MultiPolygon" else (buffered,)
+                    for piece in pieces:
+                        if piece.geom_type == "Polygon" and piece.area > 1e-4:
+                            polys.append(piece)
             except Exception:
                 polys = []
         layers.append(polys)
@@ -939,7 +1148,10 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             # Drop the full pre-hollow solid before further work. add_holes splits the
             # hollowed mesh and SIGSEGV'd under the cap on a ~1M-face result, so large
             # models get drain+vent punched inside op_hollow from the cavity it already has.
-            envelope = _proxy_mesh(work, _SUPPORT_PROXY_FACES) if work.is_watertight else None
+            # The envelope is only for support points. Building it on a hollow-only
+            # prepare decimates the full shell and then throws the proxy away.
+            want_supports = bool(s["supports"] or island_supports or manual_supports)
+            envelope = _proxy_mesh(work, _SUPPORT_PROXY_FACES) if want_supports and work.is_watertight else None
             work = None
             memtrim.trim()
             if large:
@@ -949,7 +1161,8 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             work = hollowed
             _drop_query_cache(work)
             memtrim.trim()
-            rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
+            rep["hollow"] = {k: hr[k] for k in (
+                "message", "volume_saved_pct", "thinnest_wall_mm", "resolution_mm", "stages", "drain_axes") if k in hr}
             # one number everywhere: the note and the report both show the probe's thinnest spot (was 0.02 mm apart)
             if hr.get("wall_min_probe_mm") is not None:
                 rep["hollow"]["thinnest_wall_mm"] = hr["wall_min_probe_mm"]

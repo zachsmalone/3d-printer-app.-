@@ -61,7 +61,7 @@ def call(fn, args: tuple, *, timeout: float, mem_mb: int):
             proc = subprocess.run(
                 [sys.executable, "-m", "app.services.procjob", str(src), str(dst)],
                 cwd=str(ROOT),
-                env=affinity.single_thread_env(),
+                env=affinity.job_env(),
                 capture_output=True,
                 timeout=timeout,
                 check=False,
@@ -86,7 +86,7 @@ def call(fn, args: tuple, *, timeout: float, mem_mb: int):
 
 
 def _child(src: str, dst: str) -> None:
-    affinity.leave_one_cpu()
+    affinity.take_compute_cpus()
     request = pickle.loads(Path(src).read_bytes())
     try:
         # Import before the cap. A fresh interpreter's libraries reserve address space
