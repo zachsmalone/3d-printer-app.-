@@ -16,7 +16,7 @@ from pathlib import Path
 
 import trimesh
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 
 from .. import config
 from ..community import badges
@@ -188,17 +188,86 @@ def _note_worker():
         token = (token + 1) & 0xFFFFFFFF
 
 
-def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False, manual=None, avoid=None):
+def _stage_plan(s, manual, avoid):
+    """Named stages and their share of the bar. A share is used only after that stage reports a real count."""
+    rows = [
+        {"id": "load", "weight": 8, "label": "Loading the mesh"},
+        {"id": "orient", "weight": 6, "label": "Orienting the model"},
+        {"id": "surface", "weight": 10, "label": "Reading the surface"},
+    ]
+    if s.get("hollow"):
+        rows.append({"id": "hollow", "weight": 26, "label": "Hollowing"})
+    if s.get("supports") or manual or avoid:
+        rows.append({"id": "supports", "weight": 22, "label": "Building supports"})
+    rows.append({"id": "check", "weight": 18, "label": "Checking layers"})
+    rows.append({"id": "write", "weight": 10, "label": "Writing the mesh"})
+    return rows
+
+
+def _emit_progress(path, phase, state, done=None, total=None, label="", stages=None):
+    if not path:
+        return
+    body = {"phase": phase, "state": state, "label": label}
+    if done is not None and total:
+        body["done"] = int(done)
+        body["total"] = int(total)
+    if stages is not None:
+        body["stages"] = stages
+    with Path(path).open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(body) + "\n")
+        fh.flush()
+
+
+def _viewer_preview(mesh):
+    """A smaller mesh for the viewer only, when it stays inside the prepared shape. None keeps the full mesh."""
+    n = len(mesh.faces)
+    if n <= PREVIEW_FACES:
+        return None, n
+    try:
+        import numpy as np
+        import fast_simplification as fs
+        v = np.array(mesh.vertices, dtype=np.float32, copy=True)
+        f = np.array(mesh.faces, dtype=np.int32, copy=True)
+        v, f = fs.simplify(v, f, target_count=PREVIEW_FACES)
+        if len(f) >= n or len(f) < 4:
+            return None, n
+        lo, hi = mesh.bounds
+        pmin, pmax = v.min(axis=0), v.max(axis=0)
+        if (pmin < lo - 1.0).any() or (pmax > hi + 1.0).any():
+            return None, n
+        preview = trimesh.Trimesh(vertices=np.asarray(v, np.float64), faces=np.asarray(f, np.int64), process=False)
+        return preview.export(file_type="stl"), int(len(preview.faces))
+    except Exception:
+        return None, n
+
+
+def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False, manual=None, avoid=None, progress_path=""):
     _note_worker()
+    stages = _stage_plan(s, manual, avoid)
+    _emit_progress(progress_path, "plan", "start", label="Preparing", stages=stages)
+
+    def emit(phase, done=None, total=None, label=""):
+        state = "start" if done is None else ("done" if total and done >= total else "run")
+        _emit_progress(progress_path, phase, state, done, total, label)
+
+    emit("load", label="Loading the mesh")
     m, n_in, fit_note = _load_fit(data, ext, simplify)
+    emit("load", 1, 1, "Loading the mesh")
     note = note or fit_note
-    out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains, manual_supports=manual, avoid=avoid)
+    out, rep = resin.prepare(m, s, bed, island_supports=isl, drains=drains, manual_supports=manual, avoid=avoid, on_phase=emit)
     if note:
         rep.setdefault("notes", []).insert(0, note)
     rep["triangles_in"] = int(n_in)
     rep["triangles"] = int(len(out.faces))
     rep["simplified"] = bool(fit_note)
-    return out.export(file_type="stl"), out.export(file_type="3mf"), rep
+    emit("write", label="Writing the mesh")
+    stl, tmf = out.export(file_type="stl"), out.export(file_type="3mf")
+    viewer, vcount = _viewer_preview(out)
+    if viewer:
+        rep["_viewer_stl"] = viewer
+        rep["_viewer_tris"] = int(vcount)
+    emit("write", 1, 1, "Writing the mesh")
+    return stl, tmf, rep
 
 
 PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
@@ -365,7 +434,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             exposure_s: str = Form(""), bottom_exposure_s: str = Form(""), bottom_layers: str = Form(""),
             lift_mm: str = Form(""), lift_speed_mm_min: str = Form(""), tilt_deg: str = Form(""), tilt_y_deg: str = Form(""), simplify: str = Form("false"), hollow: str = Form("true"),
             wall_mm: str = Form(""), drain_mm: str = Form(""), supports: str = Form("true"), support_spacing_mm: str = Form(""),
-            base_lift_mm: str = Form(""), tip_mm: str = Form(""), shaft_mm: str = Form(""), raft_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), support_points: str = Form(""), avoid_points: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
+            base_lift_mm: str = Form(""), tip_mm: str = Form(""), shaft_mm: str = Form(""), raft_mm: str = Form(""), price: str = Form(""), price_unit: str = Form(""), upload_id: str = Form(""), file_name: str = Form(""), island_supports: str = Form(""), drains: str = Form(""), support_points: str = Form(""), avoid_points: str = Form(""), progress: str = Form(""), file: UploadFile | None = File(None), actor: Actor = Depends(get_actor)):
     try:
         s = resin.settings({k: v for k, v in locals().items() if k in (
             "material", "preset", "layer_mm", "exposure_s", "bottom_exposure_s", "bottom_layers", "lift_mm", "lift_speed_mm_min", "tilt_deg", "tilt_y_deg",
@@ -396,47 +465,126 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         data, ext = resolve_model(model_id, actor).read_bytes(), "stl"
     else:
         raise HTTPException(400, "Choose a model or upload an STL, 3MF or OBJ file.")
-    try:
-        if ext == "3mf":
-            # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
-            # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
-            # A package whose mesh is a separate large part needs the same budget as prepare. This does not raise the process-wide cap.
-            data, ext = procjob.call(_to_stl, (data,), timeout=120, mem_mb=RESIN_MEM_MB), "stl"
-        if not _one.acquire(timeout=ONE_WAIT_S):
-            raise guard.Busy()
+    want_progress = str(progress).lower() in ("1", "true", "on", "yes")
+    prog_path = str(_dir() / f"prog{uuid.uuid4().hex}.json") if want_progress else ""
+
+    def heavy():
         try:
-            do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
-            stl, tmf, rep = procjob.call(_work, (data, ext, s, bed, isl, drn, note, do_simplify, manual, avoid), timeout=240, mem_mb=RESIN_MEM_MB)
-        finally:
-            _one.release()
-    except meshedit.OpError as e:
-        raise HTTPException(422, str(e))
-    except guard.Busy:
-        raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
-    except guard.Tripped:
-        # UX2: the child hit its memory/time limit or died. Only suggest hollowing when it was on.
-        tip = " Simplify it, or turn hollowing off and try again." if s.get("hollow") else " Simplify it, or try a smaller file."
-        raise HTTPException(422, "Preparing this model ran out of memory or time on the server." + tip)
-    rid = uuid.uuid4().hex
-    d = _dir()
-    (d / f"{rid}.stl").write_bytes(stl); (d / f"{rid}.3mf").write_bytes(tmf)
-    from ..services import filenames as fnames
-    src = ((file.filename if file is not None and file.filename else file_name).rsplit(".", 1)[0]) or "TorchC0 model"
-    stem = fnames.default_stem(src, pname, s.get("layer_mm") if isinstance(s, dict) else None)
-    meta = {"sid": actor.sid, "name": stem}
-    if printer_meta:
-        meta["printer"] = printer_meta
-    (d / f"{rid}.json").write_text(json.dumps(meta))
-    (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
-    # The marks stay on the points the maker tapped. manual_contact is where a pillar
-    # was actually built, which can be a shorter list when a pillar would run through the model.
-    (d / f"{rid}.supports.json").write_text(json.dumps({
-        "manual": manual, "avoid": avoid, "sid": actor.sid,
-    }))
-    rep["support_edit"] = {"manual": manual, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
-    rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
-    rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
-    return badges.merge(rep, actor, "resin_slice")
+            if ext == "3mf":
+                # Parse the 3MF in its own short-lived child and hand the work child plain STL bytes: the XML parse leaves
+                # ~800 MB of address space behind, which pushed ordinary 8 MB 3MFs over the work child's budget (422).
+                # A package whose mesh is a separate large part needs the same budget as prepare. This does not raise the process-wide cap.
+                local_data, local_ext = procjob.call(_to_stl, (data,), timeout=120, mem_mb=RESIN_MEM_MB), "stl"
+            else:
+                local_data, local_ext = data, ext
+            if not _one.acquire(timeout=ONE_WAIT_S):
+                raise guard.Busy()
+            try:
+                do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
+                stl_b, tmf_b, rep = procjob.call(
+                    _work, (local_data, local_ext, s, bed, isl, drn, note, do_simplify, manual, avoid, prog_path),
+                    timeout=240, mem_mb=RESIN_MEM_MB)
+            finally:
+                _one.release()
+        except meshedit.OpError as e:
+            raise HTTPException(422, str(e))
+        except guard.Busy:
+            raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
+        except guard.Tripped:
+            # UX2: the child hit its memory/time limit or died. Only suggest hollowing when it was on.
+            tip = " Simplify it, or turn hollowing off and try again." if s.get("hollow") else " Simplify it, or try a smaller file."
+            raise HTTPException(422, "Preparing this model ran out of memory or time on the server." + tip)
+        rid = uuid.uuid4().hex
+        d = _dir()
+        (d / f"{rid}.stl").write_bytes(stl_b); (d / f"{rid}.3mf").write_bytes(tmf_b)
+        viewer = rep.pop("_viewer_stl", None)
+        vcount = rep.pop("_viewer_tris", None)
+        full_tris = int(rep.get("triangles") or 0)
+        if viewer and vcount and vcount < full_tris:
+            (d / f"{rid}.preview.stl").write_bytes(viewer)
+            rep["preview"] = {
+                "decimated": True, "triangles": int(vcount), "source_triangles": full_tris,
+                "note": "Preview only. Download and Slice use the full prepared model.",
+            }
+        else:
+            rep["preview"] = {
+                "decimated": False, "triangles": full_tris, "source_triangles": full_tris,
+                "note": "This view is the full prepared mesh.",
+            }
+        return rid, d, rep
+
+    def publish(rid, d, rep):
+        from ..services import filenames as fnames
+        src = ((file.filename if file is not None and file.filename else file_name).rsplit(".", 1)[0]) or "TorchC0 model"
+        stem = fnames.default_stem(src, pname, s.get("layer_mm") if isinstance(s, dict) else None)
+        meta = {"sid": actor.sid, "name": stem}
+        if printer_meta:
+            meta["printer"] = printer_meta
+        (d / f"{rid}.json").write_text(json.dumps(meta))
+        (d / f"{rid}.settings.json").write_text(json.dumps({"settings": s}))
+        # The marks stay on the points the maker tapped. manual_contact is where a pillar
+        # was actually built, which can be a shorter list when a pillar would run through the model.
+        (d / f"{rid}.supports.json").write_text(json.dumps({
+            "manual": manual, "avoid": avoid, "sid": actor.sid,
+        }))
+        rep["support_edit"] = {"manual": manual, "avoid": avoid, "saved": f"/api/resin/{rid}/supports"}
+        rep["downloads"] = {"stl": f"/api/resin/{rid}/torchc0.stl", "3mf": f"/api/resin/{rid}/torchc0.3mf"}
+        if rep.get("preview", {}).get("decimated") and (d / f"{rid}.preview.stl").is_file():
+            rep["downloads"]["preview"] = f"/api/resin/{rid}/preview.stl"
+        rep["export"] = {"rid": rid, "name": stem, "formats": [f"/api/resin/{rid}/torchc0.{k}" for k in RESIN_FORMATS]}
+        return badges.merge(rep, actor, "resin_slice")
+
+    if not want_progress:
+        rid, d, rep = heavy()
+        return publish(rid, d, rep)
+
+    box = {}
+
+    def run():
+        try:
+            box["out"] = heavy()
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+            box["err"] = {"status": exc.status_code, "message": detail}
+        except Exception:
+            box["err"] = {"status": 500, "message": "Preparing this model failed."}
+
+    threading.Thread(target=run, name="torchc0-prepare", daemon=True).start()
+
+    def gen():
+        pos = 0
+
+        def pull():
+            nonlocal pos
+            try:
+                text = Path(prog_path).read_text(encoding="utf-8")
+            except OSError:
+                return []
+            end = text.rfind("\n", pos)
+            if end < pos:
+                return []
+            lines = [ln for ln in text[pos:end].splitlines() if ln]
+            pos = end + 1
+            return lines
+
+        while "out" not in box and "err" not in box:
+            for line in pull():
+                yield line + "\n"
+            time.sleep(0.2)
+        for line in pull():
+            yield line + "\n"
+        if "err" in box:
+            yield json.dumps({"phase": "error", **box["err"]}) + "\n"
+        else:
+            rid, d, rep = box["out"]
+            yield json.dumps({"phase": "result", "result": publish(rid, d, rep)}) + "\n"
+        try:
+            Path(prog_path).unlink()
+        except OSError:
+            pass
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson", headers={
+        "Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
 RESIN_FORMATS = ("stl", "3mf", "obj", "ply", "glb", "amf")
@@ -556,6 +704,22 @@ def slice_layer(job_id: str, index: int, actor: Actor = Depends(get_actor)):
     except resin_slice.ResinSliceError as exc:
         raise HTTPException(404, str(exc))
     return FileResponse(path, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@router.get("/{rid}/preview.stl")
+def preview_mesh(rid: str, actor: Actor = Depends(get_actor)):
+    """Decimated mesh for the viewer. The full STL used by download and slice is torchc0.stl."""
+    if not _rid_ok(rid):
+        raise HTTPException(404, "Not found")
+    d = _dir()
+    try:
+        info = json.loads((d / f"{rid}.json").read_text())
+    except (OSError, ValueError):
+        raise HTTPException(404, "That preview has expired. Prepare it again.")
+    if info.get("sid") != actor.sid or not (d / f"{rid}.preview.stl").is_file():
+        raise HTTPException(404, "That preview has expired. Prepare it again.")
+    return Response((d / f"{rid}.preview.stl").read_bytes(), media_type="model/stl",
+                    headers={"Cache-Control": "no-store"})
 
 
 @router.get("/{rid}/torchc0.{fmt}")

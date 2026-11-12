@@ -70,9 +70,10 @@
     return v; }
   var torch = make({ id: "torchc0", title: "TorchC0", root: "#viewTorch", active: function () { return !!tRoot && !tRoot.hidden && !!$("#rzView"); },
     watch: ["#torchOut"], watchChildren: true,
+    obstacles: ["#saveInd"],
     panels: [
       { id: "out", el: "#torchOut", label: "Result & downloads", core: true, dock: true, def: function () { return { edge: "right", t: 0, min: phone() }; } },
-      { id: "settings", el: "#torchPanel", label: "Resin settings", dock: true, def: function () { return { edge: "left", t: 0, min: phone() }; } }
+      { id: "settings", el: "#torchPanel", label: "Resin settings", dock: true, def: function () { return phone() ? { edge: "bottom", t: 0, h: Math.round(innerHeight * 0.58), min: true } : { edge: "left", t: 0, w: 400 }; } }
     ] });
   if (torch && tOut) new MutationObserver(function () { var v = $("#rzView"); if (v && v.parentElement === tOut) { torch.setHidden("out", false); requestAnimationFrame(torchView); } }).observe(tOut, { childList: true });
   if (tRoot) tRoot.addEventListener("zws:layout", torchView);
