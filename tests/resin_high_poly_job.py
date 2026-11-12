@@ -4,6 +4,7 @@ Lives outside the test module so the memory-capped child can import it.
 `procjob` re-imports `function.__module__`, and pytest loads the test file
 under a name that is not importable in that child.
 """
+import gc
 import resource
 import time
 
@@ -54,6 +55,8 @@ def run_case(kind):
         raise AssertionError(f"{kind}: mesh is not one watertight shell")
     if not 600_000 <= faces_in <= 800_000:
         raise AssertionError(f"{kind}: expected 600k-800k triangles, got {faces_in}")
+    # split() leaves a large graph on the mesh; free it before the capped prepare.
+    gc.collect()
     out, rep = resin.prepare(mesh, resin.settings(opts))
     seconds = time.perf_counter() - started
     rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0

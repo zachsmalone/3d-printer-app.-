@@ -1101,7 +1101,7 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
         if d_i <= 0:
             continue
         holes.append((xyz, d_i, direc))
-    if not holes and drain > 0:
+    if not holes and drain > 0 and int(p.get("per_cavity") or 0) < 1:
         low = cav.vertices[cav.vertices[:, 2] < cav.bounds[0][2] + pitch * 1.5]
         xy = low[:, :2].mean(0)
         holes.append(([xy[0], xy[1], float(mm.bounds[0][2])], drain, None))
@@ -1125,8 +1125,42 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
     floor = wall - pitch                                                     # what a voxel method can promise
     if ((probe and probe[0] < floor) or (wall_min is not None and wall_min < floor)) and tries < 2:                             # enforce the minimum: deepen the margin and rebuild
         return _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra + pitch, tries + 1)
+    # Large prepares punch drain+vent here from the cavity we already have, so
+    # prepare does not have to split the hollowed mesh again (that hit the cap).
+    holes_made = []
+    per = int(p.get("per_cavity") or 0)
+    if per >= 1 and drain > 0 and not (p.get("drain_points") or []):
+        del sdf, vox
+        memtrim.trim()
+        from scipy.spatial import cKDTree
+        tree = cKDTree(np.ascontiguousarray(mm.vertices, dtype=np.float64))
+        for cav_part in parts:
+            v = cav_part.vertices
+            targets = [v[np.argmin(v[:, 2])], v[np.argmax(v[:, 2])]][:per]
+            n = 0
+            for t in targets:
+                _dist, idx = tree.query(np.asarray(t, dtype=np.float64), workers=1)
+                cp = np.ascontiguousarray(mm.vertices, dtype=np.float64)[int(idx)]
+                d = cp - t
+                L = float(np.linalg.norm(d))
+                if L < 1e-6:
+                    continue
+                axis = d / L
+                h = L + 2 * drain + 1.0
+                cyl = trimesh.creation.cylinder(radius=drain / 2, height=h, sections=32)
+                T = trimesh.geometry.align_vectors([0, 0, 1], axis)
+                T[:3, 3] = t + axis * (L / 2)
+                cyl.apply_transform(T)
+                try:
+                    out = _boolean(out, cyl, "difference")
+                    n += 1
+                except OpError:
+                    pass
+            holes_made.append(n)
     rep_extra = {"cavity_fragments_dropped": dropped, "floating_pieces_dropped": floating,
                  "thinnest_wall_mm": None if wall_min is None else round(wall_min, 2)}
+    if holes_made:
+        rep_extra["holes_made"] = holes_made
     if probe:
         rep_extra["wall_p1_mm"], rep_extra["wall_min_probe_mm"] = round(probe[0], 2), round(probe[1], 2)
     if probe and probe[1] < floor:
@@ -1139,8 +1173,9 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
     saved = 100 * (1 - out.volume / mm.volume) if out.volume > 0 else 0
     if len(out.faces) > 100_000:
         memtrim.trim()
+    n_holes = len(holes) or sum(holes_made)
     return out, {"message": f"hollowed: wall {wall:g} mm, volume −{saved:.0f}% (resolution ≈ {pitch:.2f} mm)"
-                 + (f", {len(holes)} drain hole(s)" if holes else ""), "resolution_mm": round(pitch, 3),
+                 + (f", {n_holes} drain hole(s)" if n_holes else ""), "resolution_mm": round(pitch, 3),
                  "volume_saved_pct": round(saved, 1), **rep_extra}
 
 

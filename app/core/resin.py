@@ -320,8 +320,22 @@ _FUSED_SUPPORT_MAX_FACES = 40_000
 _SUPPORT_PROXY_FACES = 25_000
 
 
+def _strided_proxy(m: trimesh.Trimesh, target: int) -> trimesh.Trimesh:
+    """A cheap stand-in with about `target` faces. Not used as the printed surface."""
+    faces = np.ascontiguousarray(m.faces[::max(1, int(math.ceil(len(m.faces) / max(int(target), 1))))], dtype=np.int64)
+    used = np.unique(faces)
+    remap = np.full(len(m.vertices), -1, dtype=np.int64)
+    remap[used] = np.arange(len(used))
+    return trimesh.Trimesh(np.ascontiguousarray(m.vertices[used], dtype=np.float64), remap[faces], process=False)
+
+
 def _proxy_mesh(m: trimesh.Trimesh, target: int) -> trimesh.Trimesh:
-    """Fewer triangles for choosing points. The printed mesh is not this copy."""
+    """Fewer triangles for choosing points. The printed mesh is not this copy.
+
+    The simplifier can itself run out of memory after a hollow. Falling back to the
+    full mesh then built a support index on every triangle and tripped the cap, so a
+    strided subset is used when the simplifier cannot finish.
+    """
     n = len(m.faces)
     if n <= target or n == 0:
         return m
@@ -331,10 +345,14 @@ def _proxy_mesh(m: trimesh.Trimesh, target: int) -> trimesh.Trimesh:
             np.ascontiguousarray(m.faces, dtype=np.int32),
             target_reduction=1.0 - target / n,
         )
+        out = trimesh.Trimesh(verts, faces, process=False)
+        if 0 < len(out.faces) <= int(target * 1.5):
+            return out
+    except MemoryError:
+        pass
     except Exception:
-        return m
-    out = trimesh.Trimesh(verts, faces, process=False)
-    return out if len(out.faces) else m
+        pass
+    return _strided_proxy(m, target)
 
 
 def _shift(m: trimesh.Trimesh, dz: float) -> trimesh.Trimesh:
@@ -648,18 +666,31 @@ def add_holes(m: trimesh.Trimesh, diameter: float, per_cavity: int = 2):
         # Hollow's voxel grids are freed but still reserved. The drain boolean SIGSEGV'd
         # under the prepare cap until that address space was given back.
         memtrim.trim()
-    cavs = _cavities(m)
+    # One split: a second pass plus a triangle rtree for two drain targets tripped the cap
+    # on a ~1M-face hollowed mesh.
+    parts = list(m.split(only_watertight=False))
+    cavs = [c for c in parts if c.is_watertight and c.volume < 0]
     if not cavs or diameter <= 0:
         return m, [0] * len(cavs)
-    outer = max(m.split(only_watertight=False), key=lambda c: c.volume)
+    outer = max(parts, key=lambda c: c.volume)
+    if len(outer.vertices) > 40_000:
+        from scipy.spatial import cKDTree
+        outer_tree = cKDTree(np.ascontiguousarray(outer.vertices, dtype=np.float64))
+    else:
+        outer_tree = None
     made = []
     for cav in cavs:
         v = cav.vertices
         targets = [v[np.argmin(v[:, 2])], v[np.argmax(v[:, 2])]][:per_cavity]
         n = 0
         for t in targets:
-            cp, dist, _ = trimesh.proximity.closest_point(outer, [t])
-            d = cp[0] - t
+            if outer_tree is not None:
+                _dist, idx = outer_tree.query(np.asarray(t, dtype=np.float64), workers=1)
+                cp = np.ascontiguousarray(outer.vertices, dtype=np.float64)[int(idx)]
+            else:
+                closest, _dist, _ = trimesh.proximity.closest_point(outer, [t])
+                cp = closest[0]
+            d = cp - t
             L = float(np.linalg.norm(d))
             if L < 1e-6:
                 continue
@@ -878,26 +909,30 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
         else:
             rep["notes"].append(f"The model has {len(shells)} separate or overlapping bodies that could not be joined into "
                                 "one solid; overlapping parts may hollow badly and their resin may be counted twice.")
+    del shells
     envelope = None
     if s["hollow"] and 0 < s["wall_mm"] < 1.0:
         rep["notes"].append(THIN_ASK_NOTE)          # a warning, never a refusal (warnings never block)
     if s["hollow"] and s["wall_mm"] > 0:
         try:
-            hollowed, hr = meshedit.op_hollow(work, {"wall": s["wall_mm"], "drain_diameter": 0})
-            hollowed, made = add_holes(hollowed, s["drain_mm"])
-            envelope = work if work.is_watertight else None
+            large = len(work.faces) > 80_000
+            hp = {"wall": s["wall_mm"], "drain_diameter": s["drain_mm"] if large else 0}
+            if large:
+                hp["per_cavity"] = 2
+            hollowed, hr = meshedit.op_hollow(work, hp)
+            # Drop the full pre-hollow solid before further work. add_holes splits the
+            # hollowed mesh and SIGSEGV'd under the cap on a ~1M-face result, so large
+            # models get drain+vent punched inside op_hollow from the cavity it already has.
+            envelope = _proxy_mesh(work, _SUPPORT_PROXY_FACES) if work.is_watertight else None
+            work = None
+            memtrim.trim()
+            if large:
+                made = list(hr.get("holes_made") or [])
+            else:
+                hollowed, made = add_holes(hollowed, s["drain_mm"])
             work = hollowed
-            if envelope is not None and len(work.faces) > _FUSED_SUPPORT_MAX_FACES:
-                # The solid is only needed to reject supports inside the cavity. Keep a small
-                # copy and drop the full one, including any triangle index hollow left behind.
-                _drop_query_cache(work)
-                _drop_query_cache(envelope)
-                small = _proxy_mesh(envelope, _SUPPORT_PROXY_FACES)
-                if not small.is_watertight:
-                    trimesh.repair.fill_holes(small, use_fan=False)
-                    trimesh.repair.fix_normals(small)
-                envelope = small if small.is_watertight and small.volume > 0 else None
-                memtrim.trim()
+            _drop_query_cache(work)
+            memtrim.trim()
             rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
             # one number everywhere: the note and the report both show the probe's thinnest spot (was 0.02 mm apart)
             if hr.get("wall_min_probe_mm") is not None:

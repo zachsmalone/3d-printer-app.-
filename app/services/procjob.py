@@ -98,7 +98,10 @@ def _child(src: str, dst: str) -> None:
     except MemoryError:
         result = ("mem", None)
     except BaseException as exc:  # noqa: BLE001 - shipped back to the parent and re-raised there
-        if type(exc).__name__ == "RTreeError" and "bad_alloc" in str(exc):
+        # libspatialindex raises RTreeError(std::bad_alloc) instead of MemoryError
+        # when the address-space cap is hit. Treat that like the memory trip so
+        # /prepare can return the same 422 tip as a killed child.
+        if type(exc).__name__ == "RTreeError" or "bad_alloc" in str(exc).lower():
             result = ("mem", None)
         else:
             try:
