@@ -11,6 +11,7 @@ import math
 import fast_simplification
 import numpy as np
 import trimesh
+from scipy.spatial import cKDTree
 
 from app.core import memtrim, meshedit
 
@@ -344,11 +345,28 @@ def _shift(m: trimesh.Trimesh, dz: float) -> trimesh.Trimesh:
     return trimesh.Trimesh(verts, np.asarray(m.faces, dtype=np.int64), process=False)
 
 
+def _drop_query_cache(mesh) -> None:
+    """Drop a triangle rtree. Building one on a hollowed high-poly mesh hit the prepare cap."""
+    cache = getattr(mesh, "_cache", None)
+    if cache is not None:
+        cache.clear()
+
+
 def _snap_onto(mesh: trimesh.Trimesh, pts: np.ndarray, max_dist: float) -> np.ndarray:
-    """Move sample points onto `mesh`. Drop any the proxy left too far from the real surface."""
+    """Move sample points onto `mesh`. Drop any the proxy left too far from the real surface.
+
+    A large mesh is snapped to its nearest vertex. trimesh's closest-point query builds an
+    rtree of every triangle, and that allocation failed once hollowing had already run.
+    """
     if pts is None or len(pts) == 0:
         return np.zeros((0, 3))
-    closest, dist, _face = trimesh.proximity.closest_point(mesh, np.asarray(pts, dtype=float))
+    pts = np.asarray(pts, dtype=float)
+    if len(mesh.faces) > _FUSED_SUPPORT_MAX_FACES:
+        verts = np.asarray(mesh.vertices, dtype=np.float64)
+        dist, index = cKDTree(verts).query(pts, workers=1)
+        keep = np.asarray(dist, dtype=float).reshape(-1) <= float(max_dist)
+        return verts[np.asarray(index).reshape(-1)[keep]]
+    closest, dist, _face = trimesh.proximity.closest_point(mesh, pts)
     keep = np.asarray(dist, dtype=float).reshape(-1) <= float(max_dist)
     return np.asarray(closest, dtype=float)[keep]
 
@@ -384,11 +402,14 @@ def _build_supports_overlapping(m, spacing, base_lift, tip_d, shaft_d, raft_mm, 
     fill_holes on that whole mesh. Overlapping shells are a normal resin-slicer input.
     """
     dz = float(base_lift) + float(raft_mm)
+    _drop_query_cache(m)
+    memtrim.trim()
     work = _shift(m, dz)
     env = _envelope_proxy(envelope, dz) if envelope is not None else None
     lift = np.array([0.0, 0.0, dz], dtype=float)
+    # Rays and containment stay on the proxy. The full mesh is only concatenated at the end.
+    proxy = _proxy_mesh(work, _SUPPORT_PROXY_FACES)
     if auto:
-        proxy = _proxy_mesh(work, _SUPPORT_PROXY_FACES)
         pts = support_points(proxy, spacing, envelope=env)
         pts = _snap_onto(work, pts, max(1.0, float(spacing) * 0.35))
     else:
@@ -404,11 +425,14 @@ def _build_supports_overlapping(m, spacing, base_lift, tip_d, shaft_d, raft_mm, 
     if manual is not None and len(np.asarray(manual)):
         snapped = []
         for src in np.asarray(manual, dtype=float).reshape(-1, 3):
-            hit, _moved = contact_point(work, src + lift)
+            hit, _moved = contact_point(proxy, src + lift)
             if hit is None:
                 continue
+            snapped_hit = _snap_onto(work, np.asarray(hit, dtype=float).reshape(1, 3), max(1.0, float(spacing) * 0.35))
+            if len(snapped_hit):
+                hit = snapped_hit[0]
             pre = hit - lift
-            if not pillar_reaches(float(pre[2]), base_lift, raft_mm) or not pillar_path_clear(work, hit):
+            if not pillar_reaches(float(pre[2]), base_lift, raft_mm) or not pillar_path_clear(proxy, hit):
                 plate_skipped += 1
                 continue
             snapped.append(hit)
@@ -416,7 +440,7 @@ def _build_supports_overlapping(m, spacing, base_lift, tip_d, shaft_d, raft_mm, 
         manual_pts = np.array(snapped, dtype=float).reshape(-1, 3)
         pts = _away_from(pts, manual_pts, max(float(spacing) * 0.75, 1.0))
     if extra is not None and len(extra):
-        ex = _surface_below(work, np.asarray(extra, dtype=float) + lift)
+        ex = _surface_below(proxy, np.asarray(extra, dtype=float) + lift)
         pts = _away_from(pts, ex, max(float(spacing) * 0.75, 1.0))
         manual_pts = np.vstack([manual_pts, ex]) if len(manual_pts) else ex
     n_manual = len(manual_pts)
@@ -425,7 +449,7 @@ def _build_supports_overlapping(m, spacing, base_lift, tip_d, shaft_d, raft_mm, 
     parts, skipped = [], 0
     if len(pts):
         org = pts - [0, 0, 0.05]
-        hit = _in_batches(work.ray.intersects_any, org, np.tile([0, 0, -1.0], (len(pts), 1)))
+        hit = _in_batches(proxy.ray.intersects_any, org, np.tile([0, 0, -1.0], (len(pts), 1)))
         tip_len = SUPPORT_TIP_LEN
         for p, h in zip(pts, hit):
             if h:
@@ -863,6 +887,17 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             hollowed, made = add_holes(hollowed, s["drain_mm"])
             envelope = work if work.is_watertight else None
             work = hollowed
+            if envelope is not None and len(work.faces) > _FUSED_SUPPORT_MAX_FACES:
+                # The solid is only needed to reject supports inside the cavity. Keep a small
+                # copy and drop the full one, including any triangle index hollow left behind.
+                _drop_query_cache(work)
+                _drop_query_cache(envelope)
+                small = _proxy_mesh(envelope, _SUPPORT_PROXY_FACES)
+                if not small.is_watertight:
+                    trimesh.repair.fill_holes(small, use_fan=False)
+                    trimesh.repair.fix_normals(small)
+                envelope = small if small.is_watertight and small.volume > 0 else None
+                memtrim.trim()
             rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
             # one number everywhere: the note and the report both show the probe's thinnest spot (was 0.02 mm apart)
             if hr.get("wall_min_probe_mm") is not None:

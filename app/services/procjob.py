@@ -98,11 +98,14 @@ def _child(src: str, dst: str) -> None:
     except MemoryError:
         result = ("mem", None)
     except BaseException as exc:  # noqa: BLE001 - shipped back to the parent and re-raised there
-        try:
-            pickle.dumps(exc)
-            result = ("err", exc)
-        except Exception:
-            result = ("err", RuntimeError(type(exc).__name__))
+        if type(exc).__name__ == "RTreeError" and "bad_alloc" in str(exc):
+            result = ("mem", None)
+        else:
+            try:
+                pickle.dumps(exc)
+                result = ("err", exc)
+            except Exception:
+                result = ("err", RuntimeError(type(exc).__name__))
     Path(dst).write_bytes(pickle.dumps(result, protocol=pickle.HIGHEST_PROTOCOL))
 
 
