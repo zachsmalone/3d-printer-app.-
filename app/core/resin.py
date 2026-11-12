@@ -708,7 +708,7 @@ def add_holes(m: trimesh.Trimesh, diameter: float, per_cavity: int = 2):
     return m, made
 
 
-def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -> dict:
+def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400, on_step=None) -> dict:
     """Slice the print every `step` mm (z=0 is the build plate) and look for:
     islands: a region with no overlap with the layer before it (starts in mid-air, nothing to hang from);
     suction cups: a hole in the layers that is closed on its plate side (sealed by material or the plate) so every
@@ -717,14 +717,21 @@ def layer_check(m: trimesh.Trimesh, step: float = 0.25, max_layers: int = 400) -
     from shapely.ops import unary_union
     z0, z1 = float(m.bounds[0][2]), float(m.bounds[1][2])
     if z1 - z0 < step * 2:
+        if on_step:
+            on_step(1, 1)
         return {"islands": [], "suction": []}
     step = max(step, (z1 - z0) / max_layers)
     zs = np.arange(z0 + step / 2, z1, step)
     # Section in batches: trimesh's multiplane builds a (vertices x planes) array, so 400 planes at once on a ~300k-face
     # hollowed model took many GB and tripped the guard ("too big or complex") on ordinary 9 MB STLs.
     secs = []
-    for i in range(0, len(zs), 20):
+    nplanes = len(zs)
+    if on_step:
+        on_step(0, nplanes)
+    for i in range(0, nplanes, 20):
         secs.extend(m.section_multiplane([0, 0, 0], [0, 0, 1], zs[i:i + 20]))
+        if on_step:
+            on_step(min(i + 20, nplanes), nplanes)
     layers = []
     for sec in secs:
         polys = []
@@ -878,14 +885,20 @@ def estimate(height_mm: float, volume_mm3: float, s: dict) -> dict:
             "slice_note": "This is an estimate until you slice. Slice writes .lumen, or .goo and .ctb through the separate mslicer program when the plate's stock file matches. Not printed on a machine."}
 
 
-def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None, manual_supports=None, avoid=None) -> tuple[trimesh.Trimesh, dict]:
+def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drains=None, manual_supports=None, avoid=None, *, on_phase=None) -> tuple[trimesh.Trimesh, dict]:
     """The TorchC0 pipeline: tilt -> hollow -> drain + vent holes -> supports + raft -> layer check (islands, suction cups).
     Warnings never block: they are notes; the files are always made."""
+    def phase(name, done=None, total=None, label=""):
+        if on_phase is not None:
+            on_phase(name, done, total, label)
+
     mat = MATERIALS[s.get("material") or DEFAULT_MATERIAL]
     rep = {"program": NAME, "settings": s, "notes": [], "safety": list(SAFETY) + list(mat["safety"]), "test_note": TEST_NOTE,
            "material": {"id": s.get("material") or DEFAULT_MATERIAL, "label": mat["label"]},
            "material_notes": list(mat["notes"])}
+    phase("orient", label="Orienting the model")
     work = orient(m, s["tilt_deg"], s.get("tilt_y_deg") or 0.0, bed_mm)
+    phase("orient", 1, 1, "Orienting the model")
     if s["tilt_deg"] == 0 and (s.get("tilt_y_deg") or 0) == 0:
         rep["placement"] = "File orientation kept. The model is moved onto the bed, centred, and not turned."
     else:
@@ -894,6 +907,7 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             "Supports grow on surfaces that face the plate. Turning the model chooses that side. "
             "Supports the print still needs are not removed."
         )
+    phase("surface", label="Reading the surface")
     shells = work.split(only_watertight=False)
     if len(shells) > 1:
         # overlapping bodies: join them FIRST, so hollowing sees one solid (not shells inside shells) and the shared
@@ -910,10 +924,12 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             rep["notes"].append(f"The model has {len(shells)} separate or overlapping bodies that could not be joined into "
                                 "one solid; overlapping parts may hollow badly and their resin may be counted twice.")
     del shells
+    phase("surface", 1, 1, "Reading the surface")
     envelope = None
     if s["hollow"] and 0 < s["wall_mm"] < 1.0:
         rep["notes"].append(THIN_ASK_NOTE)          # a warning, never a refusal (warnings never block)
     if s["hollow"] and s["wall_mm"] > 0:
+        phase("hollow", label="Hollowing")
         try:
             large = len(work.faces) > 80_000
             hp = {"wall": s["wall_mm"], "drain_diameter": s["drain_mm"] if large else 0}
@@ -951,6 +967,7 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             # meshedit's text ends "Try a thinner wall." for its own tool; here it would contradict the 1 mm advice
             why = str(e).replace(" Try a thinner wall.", "").replace(" Try a different wall thickness.", "")
             rep["notes"].append(f"Printed solid (not hollowed): {why} A part this small or thin prints fine solid.")
+        phase("hollow", 1, 1, "Hollowing")
     if drains:                                   # one-click "Add drain hole" for suction cups (points in the model frame)
         made = 0
         for at in drains[:20]:
@@ -965,6 +982,7 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
     manual_list = [list(map(float, p)) for p in (manual_supports or [])][:200]
     avoid_list = [list(map(float, p)) for p in (avoid or [])][:200]
     if s["supports"] or island_supports or manual_list:
+        phase("supports", label="Building supports")
         # supports off + named pillars only: the model stays on the plate (no lift, no raft); pillars stand on the plate
         bl, raft = (s["base_lift_mm"], s["raft_mm"]) if s["supports"] else (0.0, 0.0)
         lift = bl + raft
@@ -991,10 +1009,11 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
         if sr["skipped_inside"]:
             rep["notes"].append(f"{sr['skipped_inside']} overhang spot(s) sit above other parts of the model and got no support; "
                                 "check them in your slicer and add supports there if needed.")
+        phase("supports", 1, 1, "Building supports")
     if not s["supports"] and not island_supports and not manual_list:
         rep["notes"].append("Supports are off: only flat-bottomed models print without them. Add supports in your slicer otherwise.")
     try:
-        lc = layer_check(work, step=s["layer_mm"])      # sliced at the chosen layer height (capped at 400 slices)
+        lc = layer_check(work, step=s["layer_mm"], on_step=lambda done, total: phase("check", done, total, "Checking layers"))
     except Exception:
         lc = {"islands": [], "suction": []}
     # markers for the 3D view are in the output frame; "at" is the same point in the model frame (before the support

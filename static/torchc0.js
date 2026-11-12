@@ -9,7 +9,7 @@ import { createMeshCache, buildGrid, raycastGrid } from "/static/resin-view.js";
 
 /* OrbitControls in static/vendor/OrbitControls.js: LEFT rotate, MIDDLE dolly, RIGHT pan.
    Ctrl, Shift, or Meta swaps the left and right actions. The wheel dollies. */
-const CAM_HINT = "Camera: left drag orbits, right drag pans, scroll wheel or middle drag zooms. Ctrl, Shift, or ⌘ with the left button pans instead. Dragging does not turn the model.";
+const CAM_HINT = "left drag orbits, right drag pans, scroll or middle drag zooms. Dragging does not turn the model.";
 
 /* 3D view of the real STL (every triangle in the buffer, not a stand-in). Optional matrix puts the
    loaded mesh into the pose Prepare will use. Marks and a click handler live here so viewer.js stays shared. */
@@ -117,8 +117,8 @@ function supportStatus() {
   const mode = { orbit: "Orbit", add: "Add support", erase: "Erase", avoid: "Keep clear" }[supportEdit.mode] || "Orbit";
   const notice = supportEdit.notice ? `${supportEdit.notice} ` : "";
   el.textContent = notice + (n || a
-    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}. A green mark is the point you tapped. A red mark is the keep-clear point. Both stay on that point when the view turns. Automatic supports skip keep-clear marks. An unsupported island is still reported.`
-    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip. The mark stays on the point you tapped, on any face. Drag orbits, right-drag pans.`);
+    ? `${mode}. ${n} placed support${n === 1 ? "" : "s"}, ${a} keep-clear mark${a === 1 ? "" : "s"}.`
+    : `${mode}. Tap the model to place a support, or mark a spot automatic supports should skip.`);
 }
 function markMaterial(viewer, color) {
   const key = String(color);
@@ -153,8 +153,13 @@ function hookContext(viewer, el) {
     ev.preventDefault();
     viewer._contextLost = true;
     el.dataset.contextLost = "1";
-    supportEdit.notice = "The 3D view paused to free memory. Your support marks are kept.";
+    el.dataset.previewLoaded = "0";
+    const msg = "The 3D view stopped because the graphics context was lost. The preview is not loaded. Your support marks are kept.";
+    supportEdit.notice = msg;
     supportStatus();
+    stageMessage(el, msg, "err");
+    const stage = $("#rzView");
+    if (stage && stage !== el) stageMessage(stage, msg, "err");
   });
   canvas.addEventListener("webglcontextrestored", () => {
     viewer._contextLost = false;
@@ -163,6 +168,9 @@ function hookContext(viewer, el) {
     viewer.resize();
     supportEdit.notice = "The 3D view is back. Your support marks are still here.";
     supportStatus();
+    stageMessage(el, "");
+    const stage = $("#rzView");
+    if (stage && stage !== el) stageMessage(stage, "");
   });
   el.dataset.contextLost = "0";
 }
@@ -181,14 +189,227 @@ function bindModelRay(model, grid) {
     });
   };
 }
+function stageMessage(el, text, kind) {
+  if (!el) return;
+  let note = el.querySelector(":scope > .rzStageNote");
+  if (!text) {
+    if (note) note.hidden = true;
+    if (el.dataset.stage) el.dataset.stage = "";
+    return;
+  }
+  if (!note) {
+    note = document.createElement("p");
+    note.className = "help rzStageNote" + (kind === "err" ? " warn" : "");
+    note.setAttribute("role", "status");
+    el.appendChild(note);
+  }
+  note.hidden = false;
+  note.classList.toggle("warn", kind === "err");
+  note.textContent = text;
+  el.dataset.stage = kind === "err" ? "error" : "status";
+}
+function mountRun() {
+  let el = document.getElementById("rzRun");
+  const host = document.getElementById("viewTorch") || document.body;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "rzRun";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    el.innerHTML = `<p class="help" id="rzRunLabel"></p><progress id="rzRunBar" max="100"></progress><p class="help" id="rzRunPct"></p>`;
+  }
+  if (el.parentElement !== host) host.appendChild(el);
+  el.hidden = false;
+  return el;
+}
+function clearRun() {
+  const el = document.getElementById("rzRun");
+  if (el) el.hidden = true;
+}
+function paintRunLabel(label, mode, pct) {
+  const el = mountRun();
+  const lab = el.querySelector("#rzRunLabel");
+  const bar = el.querySelector("#rzRunBar");
+  const pctEl = el.querySelector("#rzRunPct");
+  if (lab) lab.textContent = label;
+  if (mode === "determinate" && pct != null && Number.isFinite(pct)) {
+    bar.value = pct;
+    bar.setAttribute("aria-valuenow", String(pct));
+    if (pctEl) pctEl.textContent = pct + "%";
+    el.dataset.mode = "determinate";
+    el.dataset.pct = String(pct);
+  } else {
+    bar.removeAttribute("value");
+    bar.removeAttribute("aria-valuenow");
+    if (pctEl) pctEl.textContent = "";
+    el.dataset.mode = "indeterminate";
+    delete el.dataset.pct;
+  }
+  el.dataset.seen = ((el.dataset.seen || "") + el.dataset.mode + ":" + label + "|").slice(-900);
+}
+function rememberCam(viewer) {
+  const panel = $("#rzPickView");
+  const cam = viewer._panelCam && viewer._stageEl ? viewer._panelCam : viewer.camera;
+  const p = cam.position;
+  const text = `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`;
+  if (panel) panel.dataset.cam = text;
+  if (viewer.el) viewer.el.dataset.cam = text;
+}
+function existingViewer(el) {
+  const own = views.get(el);
+  if (own && own.renderer && own.renderer.domElement.isConnected) return own;
+  if (el && el.id === "rzView") {
+    const pick = $("#rzPickView");
+    const shared = pick && views.get(pick);
+    if (shared && shared.renderer && shared.renderer.domElement.isConnected) return shared;
+  }
+  return null;
+}
+function shareWithStage(viewer, stageEl) {
+  const panel = $("#rzPickView");
+  if (!panel || !stageEl) return;
+  viewer._stageEl = stageEl;
+  views.set(stageEl, viewer);
+  views.set(panel, viewer);
+  let copy = stageEl.querySelector("canvas.rzStageCopy");
+  if (!copy) {
+    copy = document.createElement("canvas");
+    copy.className = "rzStageCopy";
+    copy.setAttribute("aria-hidden", "true");
+    stageEl.prepend(copy);
+  }
+  const ctx = copy.getContext("2d", { alpha: true });
+  viewer.beforeRender = () => {
+    viewer._viewH = panel.clientHeight || stageEl.clientHeight;
+    const r = panel.getBoundingClientRect();
+    panel.dataset.previewW = String(Math.round(r.width));
+    panel.dataset.previewH = String(Math.round(r.height));
+  };
+  viewer.afterRender = () => {
+    const src = viewer.renderer.domElement;
+    const w = stageEl.clientWidth, h = stageEl.clientHeight;
+    if (w < 2 || h < 2 || !src.width) return;
+    if (copy.width !== w || copy.height !== h) { copy.width = w; copy.height = h; }
+    ctx.drawImage(src, 0, 0, w, h);
+  };
+  if (!viewer._camWatch) {
+    viewer._camWatch = true;
+    viewer.controls.addEventListener("change", () => rememberCam(viewer));
+  }
+}
+function syncPanelCam(viewer) {
+  if (!viewer._panelCam || !viewer._panelCtl) return;
+  viewer._panelCam.position.copy(viewer.camera.position);
+  viewer._panelCam.quaternion.copy(viewer.camera.quaternion);
+  viewer._panelCam.up.copy(viewer.camera.up);
+  viewer._panelCam.near = viewer.camera.near;
+  viewer._panelCam.far = viewer.camera.far;
+  viewer._panelCam.fov = viewer.camera.fov;
+  viewer._panelCam.updateProjectionMatrix();
+  viewer._panelCtl.target.copy(viewer.controls.target);
+  viewer._panelCtl.update();
+  rememberCam(viewer);
+}
+const SNAP_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+function snapLocal(grid, local) {
+  let best = null;
+  for (const d of SNAP_DIRS) {
+    const origin = [local[0] - d[0] * 0.2, local[1] - d[1] * 0.2, local[2] - d[2] * 0.2];
+    const hit = raycastGrid(grid, origin, d);
+    if (!hit) continue;
+    const dist = Math.hypot(hit.point[0] - local[0], hit.point[1] - local[1], hit.point[2] - local[2]);
+    if (!best || dist < best.dist) best = { hit, dist };
+  }
+  return best;
+}
+function markerPoint(model, grid, world) {
+  const inv = new THREE.Matrix4().copy(model.matrixWorld).invert();
+  const local = new THREE.Vector3(world[0], world[1], world[2]).applyMatrix4(inv);
+  const best = grid && snapLocal(grid, [local.x, local.y, local.z]);
+  if (!best) return { world, gap: 999 };
+  const n = best.hit.normal;
+  const off = 0.25;
+  const p = new THREE.Vector3(
+    best.hit.point[0] + n[0] * off,
+    best.hit.point[1] + n[1] * off,
+    best.hit.point[2] + n[2] * off,
+  ).applyMatrix4(model.matrixWorld);
+  return { world: [p.x, p.y, p.z], gap: off };
+}
+const _markerPos = new THREE.Vector3();
+function screenMarker(viewer, mesh, px) {
+  mesh.onBeforeRender = (_r, _s, cam) => {
+    mesh.getWorldPosition(_markerPos);
+    const dist = Math.max(cam.position.distanceTo(_markerPos), 0.05);
+    const h = viewer._viewH || viewer.renderer.domElement.clientHeight || 1;
+    const world = 2 * Math.tan((cam.fov * Math.PI / 180) / 2) * dist / h * px;
+    mesh.scale.setScalar(Math.max(world, 1e-4));
+  };
+}
+async function fetchCounted(url, onBytes) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`The prepared preview did not load (HTTP ${res.status}).`);
+  const total = +res.headers.get("Content-Length") || 0;
+  if (!res.body || !res.body.getReader) {
+    const buf = await res.arrayBuffer();
+    if (onBytes) onBytes(buf.byteLength, total || buf.byteLength);
+    return buf;
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let loaded = 0;
+  for (;;) {
+    const step = await reader.read();
+    if (step.done) break;
+    chunks.push(step.value);
+    loaded += step.value.byteLength;
+    if (onBytes) onBytes(loaded, total);
+  }
+  const buf = new Uint8Array(loaded);
+  let offset = 0;
+  for (const chunk of chunks) { buf.set(chunk, offset); offset += chunk.byteLength; }
+  return buf.buffer;
+}
+function byteText(n) {
+  if (n < 1048576) return `${Math.max(1, Math.round(n / 1024))} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
 async function show3D(el, url, lc, buf, bed, opts) {
   opts = opts || {};
+  const pick = $("#rzPickView");
+  const prepared = !!url;
   try {
     const { Viewer } = await import("/static/viewer.js");
-    let viewer = views.get(el);
-    if (!viewer || !el.contains(viewer.el)) { viewer = new Viewer(el); views.set(el, viewer); }
-    hookContext(viewer, el);
-    if (!buf) buf = await (await fetch(url)).arrayBuffer();
+    let viewer = existingViewer(el);
+    if (!viewer) {
+      const host = el && el.id === "rzView" && pick ? pick : el;
+      viewer = new Viewer(host);
+      views.set(host, viewer);
+      views.set(el, viewer);
+    }
+    hookContext(viewer, pick || el);
+    const bedKey = bed ? bed.join(",") : "";
+    if (viewer._bedKey !== bedKey) { viewer.setBed(bed); viewer._bedKey = bedKey; }
+    if (el && el.id === "rzView") shareWithStage(viewer, el);
+    if (viewer._modelMesh && viewer._meshCache && viewer._meshCache.triangles) {
+      const n = String(viewer._meshCache.triangles);
+      if (pick) pick.dataset.triangles = n;
+      el.dataset.triangles = n;
+    }
+    if (!buf && url) {
+      const say = (loaded, total) => {
+        const text = total
+          ? `Loading the prepared preview… ${byteText(loaded)} of ${byteText(total)}`
+          : `Loading the prepared preview… ${byteText(loaded)}`;
+        stageMessage(el, text, "status");
+        if (pick && pick !== el) stageMessage(pick, text, "status");
+        if (total > 0) paintRunLabel(text, "determinate", Math.round(100 * loaded / total));
+        else paintRunLabel(text, "indeterminate");
+      };
+      say(0, 0);
+      buf = await fetchCounted(url, say);
+    }
+    if (!buf) throw new Error(prepared ? "The prepared preview did not arrive." : "No model to show.");
     if (!viewer._meshCache) viewer._meshCache = createMeshCache();
     const used = viewer._meshCache.use(buf);
     let model = viewer._modelMesh;
@@ -208,39 +429,39 @@ async function show3D(el, url, lc, buf, bed, opts) {
       viewer.group.add(model);
       viewer._modelMesh = model;
       viewer._pick = buildGrid(used.positions);
-      const sz = g.boundingBox.getSize(new THREE.Vector3());
-      viewer._markR = Math.max(0.8, Math.max(sz.x, sz.y, sz.z) / 60);
-      el.dataset.meshBuilds = String(viewer._meshCache.builds);
+      if (pick) pick.dataset.meshBuilds = String(viewer._meshCache.builds);
     }
     bindModelRay(model, viewer._pick);
-    const bedKey = bed ? bed.join(",") : "";
-    if (viewer._bedKey !== bedKey) { viewer.setBed(bed); viewer._bedKey = bedKey; }
     const M = opts.matrix || eye4();
     model.matrix.copy(threeMatrix(M));
     model.updateMatrixWorld(true);
-    if (!viewer._markGeo) viewer._markGeo = new THREE.SphereGeometry(1, 12, 8);
+    if (!viewer._markGeo) viewer._markGeo = new THREE.SphereGeometry(1, 10, 8);
     removeMarks(viewer);
-    const r = viewer._markR || 0.8;
-    const mark = (p, color, kind, index) => {
+    let gap = 0;
+    const mark = (raw, color, kind, index) => {
+      const spot = markerPoint(model, viewer._pick, raw);
+      if (spot.gap > gap) gap = spot.gap;
+      const p = spot.world;
       const solid = kind === "avoid" ? "#ff2d3a" : color;
-      const add = (radius, tint, order) => {
+      const add = (px, tint, order) => {
         const mesh = new THREE.Mesh(viewer._markGeo, markMaterial(viewer, tint));
-        mesh.scale.setScalar(radius);
         mesh.position.set(p[0], p[1], p[2]);
         mesh.renderOrder = order;
         mesh.userData.mark = kind;
         mesh.userData.index = index;
+        screenMarker(viewer, mesh, px);
         viewer.group.add(mesh);
       };
-      // The model is translucent and draws after opaque meshes, which hid a mark that sat on a face.
-      if (kind === "manual" || kind === "avoid") add(r * 1.55, "#ffffff", 10);
-      add(r, solid, 11);
+      if (kind === "manual" || kind === "avoid") add(10, "#ffffff", 10);
+      add(7, solid, 11);
     };
     ((lc && lc.islands) || []).forEach(i => i.xyz && mark(i.xyz, "#e5484d"));
     ((lc && lc.suction) || []).forEach(i => i.xyz && mark(i.xyz, "#f5a524"));
     (opts.manual || []).forEach((p, i) => mark(applyPoint(M, p), "#3dd68c", "manual", i));
     (opts.avoid || []).forEach((p, i) => mark(applyPoint(M, p), "#e5484d", "avoid", i));
     el.dataset.markSyncs = String((+el.dataset.markSyncs || 0) + 1);
+    el.dataset.markGap = gap ? gap.toFixed(3) : "";
+    if (pick) pick.dataset.markGap = el.dataset.markGap;
     if (!opts.keepCamera) {
       const box = new THREE.Box3().setFromObject(model);
       const c = box.getCenter(new THREE.Vector3());
@@ -251,14 +472,36 @@ async function show3D(el, url, lc, buf, bed, opts) {
       viewer.camera.updateProjectionMatrix();
       viewer.controls.target.copy(c);
       viewer.controls.update();
+      syncPanelCam(viewer);
     }
+    rememberCam(viewer);
+    const tris = viewer._meshCache.triangles || 0;
     el.dataset.markers = String(((lc && lc.islands) || []).filter(i => i.xyz).length + ((lc && lc.suction) || []).filter(i => i.xyz).length);
     el.dataset.supports = String((opts.manual || []).length);
     el.dataset.avoid = String((opts.avoid || []).length);
-    el.dataset.triangles = String(viewer._meshCache.triangles || 0);
-    const canvas = viewer.renderer.domElement;
-    if (viewer._resinPick) canvas.removeEventListener("pointerup", viewer._resinPick);
-    if (viewer._resinDownFn) canvas.removeEventListener("pointerdown", viewer._resinDownFn);
+    el.dataset.triangles = String(tris);
+    if (pick) {
+      pick.dataset.triangles = String(tris);
+      pick.dataset.supports = el.dataset.supports;
+      pick.dataset.avoid = el.dataset.avoid;
+      pick.dataset.markers = el.dataset.markers;
+    }
+    const noteEl = $("#rzPreviewNote");
+    if (tris > 0) {
+      el.dataset.previewLoaded = "1";
+      if (prepared) el.dataset.prepared = "1";
+      stageMessage(el, "");
+      if (pick && pick !== el) stageMessage(pick, "");
+      if (noteEl && opts.note) { noteEl.hidden = false; noteEl.textContent = opts.note; }
+      if (prepared) clearRun();
+    } else {
+      el.dataset.previewLoaded = "0";
+      el.dataset.prepared = "0";
+      stageMessage(el, "The prepared preview did not load.", "err");
+    }
+    const surface = (viewer._panelCam && viewer._stageEl && pick) ? pick : viewer.renderer.domElement;
+    if (viewer._resinPick) viewer._pickHost && viewer._pickHost.removeEventListener("pointerup", viewer._resinPick);
+    if (viewer._resinDownFn) viewer._pickHost && viewer._pickHost.removeEventListener("pointerdown", viewer._resinDownFn);
     viewer._resinDown = null;
     const down = ev => { viewer._resinDown = { x: ev.clientX, y: ev.clientY }; };
     const up = ev => {
@@ -266,31 +509,41 @@ async function show3D(el, url, lc, buf, bed, opts) {
       if (!start || !opts.onPick || supportEdit.mode === "orbit") return;
       const dx = ev.clientX - start.x, dy = ev.clientY - start.y;
       if (dx * dx + dy * dy > 64) return;
-      const rect = viewer.renderer.domElement.getBoundingClientRect();
+      const cam = (surface === pick && viewer._panelCam) ? viewer._panelCam : viewer.camera;
+      const rect = surface.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
       const ndc = new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -((ev.clientY - rect.top) / rect.height) * 2 + 1);
-      const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, viewer.camera);
+      const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, cam);
       const marksHit = ray.intersectObjects(viewer.group.children.filter(c => c.userData && c.userData.mark), false);
       const t0 = performance.now();
       const modelHit = ray.intersectObject(model, false);
-      el.dataset.pickMs = (performance.now() - t0).toFixed(2);
+      const host = pick || el;
+      host.dataset.pickMs = (performance.now() - t0).toFixed(2);
       if (modelHit[0]) {
-        const p = modelHit[0].point.clone().project(viewer.camera);
+        const p = modelHit[0].point.clone().project(cam);
         const sx = (p.x * 0.5 + 0.5) * rect.width + rect.left;
         const sy = (-p.y * 0.5 + 0.5) * rect.height + rect.top;
-        el.dataset.cursor = `${ev.clientX.toFixed(2)},${ev.clientY.toFixed(2)}`;
-        el.dataset.ray = `${sx.toFixed(2)},${sy.toFixed(2)}`;
+        host.dataset.cursor = `${ev.clientX.toFixed(2)},${ev.clientY.toFixed(2)}`;
+        host.dataset.ray = `${sx.toFixed(2)},${sy.toFixed(2)}`;
       }
       opts.onPick({ mark: marksHit[0] || null, hit: modelHit[0] || null, matrix: model.matrix });
     };
     viewer._resinDownFn = down;
     viewer._resinPick = up;
-    canvas.addEventListener("pointerdown", down);
-    canvas.addEventListener("pointerup", up);
+    viewer._pickHost = surface;
+    surface.addEventListener("pointerdown", down);
+    surface.addEventListener("pointerup", up);
   } catch (e) {
-    const msg = `3D preview hit a limit (${e.message}). The support marks are still kept.`;
+    const msg = prepared
+      ? `The prepared preview did not load (${e.message}).`
+      : `3D preview hit a limit (${e.message}). The support marks are still kept.`;
+    stageMessage(el, msg, "err");
+    if (pick && pick !== el) stageMessage(pick, msg, "err");
+    el.dataset.previewLoaded = "0";
+    if (prepared) el.dataset.prepared = "0";
     const note = $("#rzSupStatus");
-    if (note) note.textContent = msg;
-    if (!el.querySelector("canvas")) el.innerHTML = `<p class="help">${esc(msg)}</p>`;
+    if (note && !prepared) note.textContent = msg;
+    if (!el.querySelector("canvas") && !el.querySelector(".rzStageNote")) el.insertAdjacentHTML("beforeend", `<p class="help warn rzStageNote" role="status">${esc(msg)}</p>`);
   }
 }
 
@@ -321,6 +574,13 @@ function platesForPrinter(printer) {
 function plateBlock(plate, fmt) {
   return (plate.blocks && plate.blocks[fmt]) || "";
 }
+function modelFitsPlate(size, plate) {
+  if (!size || size.length < 3 || !plate) return true;
+  const xy = [+size[0], +size[1]].sort((a, b) => a - b);
+  const bed = [plate.build_width_um / 1000, plate.build_depth_um / 1000].sort((a, b) => a - b);
+  const tol = 1e-3;
+  return xy[0] <= bed[0] + tol && xy[1] <= bed[1] + tol && +size[2] <= plate.build_height_um / 1000 + tol;
+}
 function plateOptions(size, fmt) {
   const printer = selectedPrinter();
   const plates = platesForPrinter(printer);
@@ -332,7 +592,7 @@ function plateOptions(size, fmt) {
   const why = p => {
     const block = plateBlock(p, kind);
     if (block) return " (not written)";
-    if (size && (size[0] > p.build_width_um / 1000 + 1e-3 || size[1] > p.build_depth_um / 1000 + 1e-3 || size[2] > p.build_height_um / 1000 + 1e-3)) return " (model does not fit)";
+    if (size && !modelFitsPlate(size, p)) return " (model does not fit)";
     return "";
   };
   const open = plates.find(p => !why(p));
@@ -352,12 +612,14 @@ const num = (id, label, v, min, max, step, unit) => `<div class="field"><label f
 
 function panelHTML() {
   const brands = [...new Set(cat.printers.map(p => p.brand))];
-  return `<h2>Resin print settings</h2>
+  return `<div class="rzShell"><div class="rzPreviewDock" id="rzPreviewDock">
+      <div id="rzPickView" class="rzView" role="img" aria-label="Live preview of the build plate and model" hidden></div>
+    </div>
+    <p class="help rzCamLine" id="rzCamHint">${CAM_HINT}</p>
+    <div class="rzTools" id="rzTools"><h2>Resin print settings</h2>
     <div class="grid2 rzRow"><div class="field"><label for="rzPrinter">Resin printer</label><select id="rzPrinter">${brands.map(b => `<optgroup label="${esc(b)}">${cat.printers.filter(p => p.brand === b).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
     <div class="field rzFileCol"><label for="rzFile">Model (STL, 3MF or OBJ)</label><div class="drop rzDrop" id="rzDrop"><svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg><input type="file" id="rzFile" class="rzFileIn"><label for="rzFile" class="btn">Choose a model</label><span>or drop an STL, 3MF or OBJ file here</span></div>
       <p class="help" id="rzFileStatus" role="status" aria-live="polite"></p>
-      <div id="rzPickView" class="rzView" role="img" aria-label="3D view of the chosen model" hidden></div>
-      <p class="help" id="rzCamHint">${CAM_HINT}</p>
       <fieldset class="rzOrient" id="rzSupEdit" hidden><legend>Supports on the model</legend>
         <p class="help" id="rzSupRule">A green mark is the point you tapped for a support. A red mark is the keep-clear point you tapped. Both stay on that point when the view turns.</p>
         <p class="help" id="rzSupStatus"></p>
@@ -388,7 +650,7 @@ function panelHTML() {
     <label class="inl chk"><input type="checkbox" id="rzSup" checked> Supports and raft</label>
     <p class="help">${esc(cat.test_note)} ${esc(cat.formats_note)}</p>
     <details><summary>Resin safety</summary><ul id="rzSafety">${cat.safety.map(s => `<li>${esc(s)}</li>`).join("")}</ul></details>
-    <div class="row"><button class="btn primary big" id="rzGo">Prepare for resin</button><button type="button" class="btn" id="rzPublish" title="Open the Showcase form for this model. Nothing is published until you confirm in that form.">Send to Showcase</button></div>`;
+    <div class="row"><button class="btn primary big" id="rzGo">Prepare for resin</button><button type="button" class="btn" id="rzPublish" title="Open the Showcase form for this model. Nothing is published until you confirm in that form.">Send to Showcase</button></div></div></div>`;
 }
 
 function wire() {
@@ -466,7 +728,9 @@ function wire() {
       const kind = ev.mark.object.userData.mark, i = ev.mark.object.userData.index;
       (kind === "avoid" ? supportEdit.avoid : supportEdit.manual).splice(i, 1);
       supportEdit.notice = "Removed that mark.";
-      saveSupportLocal(); redrawPick(true); return;
+      saveSupportLocal(); redrawPick(true);
+      markStale("Supports changed. Prepare again to update.");
+      return;
     }
     if (supportEdit.mode !== "add" && supportEdit.mode !== "avoid") return;
     if (!ev.hit) { supportEdit.notice = "That tap missed the model. Tap the part itself. Drag orbits."; supportStatus(); return; }
@@ -490,14 +754,15 @@ function wire() {
         : "The green mark is the point you tapped.";
       saveSupportLocal();
       await redrawPick(true);
+      markStale("Supports changed. Prepare again to update.");
     } finally { contactBusy = false; }
   }
   $("#rzModeOrbit").onclick = () => setMode("orbit");
   $("#rzModeAdd").onclick = () => setMode("add");
   $("#rzModeErase").onclick = () => setMode("erase");
   $("#rzModeAvoid").onclick = () => setMode("avoid");
-  $("#rzSupUndo").onclick = () => { const prev = supportEdit.undo.pop(); if (!prev) return; supportEdit.manual = prev.manual; supportEdit.avoid = prev.avoid; saveSupportLocal(); redrawPick(true); };
-  $("#rzSupReset").onclick = () => { pushUndo(); supportEdit.manual = []; supportEdit.avoid = []; saveSupportLocal(); redrawPick(true); };
+  $("#rzSupUndo").onclick = () => { const prev = supportEdit.undo.pop(); if (!prev) return; supportEdit.manual = prev.manual; supportEdit.avoid = prev.avoid; saveSupportLocal(); redrawPick(true); markStale("Supports changed. Prepare again to update."); };
+  $("#rzSupReset").onclick = () => { pushUndo(); supportEdit.manual = []; supportEdit.avoid = []; saveSupportLocal(); redrawPick(true); markStale("Supports changed. Prepare again to update."); };
   $("#rzPrinter").onchange = () => { info(); const f = $("#rzFile") && $("#rzFile").files[0]; if (f) show(); if (last && last.rep) dropResult("Printer changed. Prepare again so the supports and the slice match this bed."); }; info();
   pr.onchange = () => { const mat = matOf(); if (mat && mat.settings) return; applyPrint(cat.presets.find(x => x.id === pr.value)); };
   $("#rzMaterial").onchange = () => paintMaterial(true);
@@ -509,7 +774,11 @@ function wire() {
   $("#rzWall").addEventListener("input", () => { wallOk = false; wallWarn(); }); $("#rzHollow").addEventListener("change", wallWarn);
   const drainWarn = () => { $("#rzDrainWarn").hidden = !($("#rzHollow").checked && !(+$("#rzDrain").value > 0)); };   // UX10
   $("#rzDrain").addEventListener("input", drainWarn); $("#rzHollow").addEventListener("change", drainWarn);
-  $("#rzSup").addEventListener("change", () => { recontactMarks(); });
+  $("#rzSup").addEventListener("change", () => { recontactMarks(); markStale("Settings changed. Prepare again to update."); });
+  for (const id of ["rzHollow", "rzWall", "rzDrain", "rzLayer", "rzExp", "rzBExp", "rzBL", "rzLift", "rzLiftS", "rzSupSpace", "rzBaseLift", "rzTip", "rzShaft", "rzRaft", "rzMaterial", "rzPreset"]) {
+    const ctl = $(id);
+    if (ctl) ctl.addEventListener("change", () => markStale("Settings changed. Prepare again to update."));
+  }
   $("#rzBaseLift").addEventListener("change", () => { recontactMarks(); });
   $("#rzRaft").addEventListener("change", () => { recontactMarks(); });
   $("#rzWallDismiss").onclick = () => { wallOk = true; wallWarn(); };
@@ -595,10 +864,35 @@ function wire() {
   const dropResult = (msg) => {
     if (!last || !last.rep) return;
     stopSlicePoll();
-    last.rep = null; last.isl = []; last.drains = [];
+    last.rep = null; last.isl = []; last.drains = []; last.stale = "";
     delete document.body.dataset.torchStl;
     const box = $("#torchOut");
     if (box) { box.classList.remove("rzResult"); box.innerHTML = `<p class="help warn" id="rzStale" role="status">${msg}</p>`; }
+  };
+  const markStale = (msg) => {
+    if (!last || !last.rep) return;
+    last.stale = msg;
+    const box = $("#torchOut");
+    if (box) box.classList.add("is-stale");
+    let note = $("#rzStale");
+    if (!note && box) {
+      note = document.createElement("p");
+      note.id = "rzStale";
+      note.className = "help warn";
+      note.setAttribute("role", "status");
+      box.prepend(note);
+    }
+    if (note) note.textContent = msg;
+    const head = box && box.querySelector(".rzResHead");
+    if (head) head.textContent = "Last prepare";
+    const view = $("#rzView");
+    if (view) { view.dataset.stale = "1"; view.setAttribute("aria-label", msg); }
+    const slice = $("#rzSlice");
+    if (slice) slice.dataset.stale = "1";
+    const exp = $("#rzExport");
+    if (exp) { exp.dataset.stale = "1"; exp.disabled = true; exp.removeAttribute("data-export-rid"); }
+    const quick = $("#rzQuickStl");
+    if (quick) quick.textContent = "Last prepare STL";
   };
   const refreshPlacement = async () => {
     if (!picked) return;
@@ -638,6 +932,10 @@ function wire() {
   async function startSlice() {
     stopSlicePoll();
     const box = $("#rzSliceOut");
+    if (last && last.stale) {
+      if (box) box.innerHTML = `<p class="help warn" role="status">${esc(last.stale)} Slice needs a new prepare.</p>`;
+      return;
+    }
     const rid = last && last.rep && last.rep.export && last.rep.export.rid;
     if (!rid) { box.innerHTML = `<p class="help warn" role="alert">Prepare the model first.</p>`; return; }
     const fd = new FormData();
@@ -648,15 +946,21 @@ function wire() {
     fd.append("file_format", sliceFmt);
     const btn = $("#rzSlice"); if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
     box.innerHTML = `<p class="help" role="status">Slicing…</p>`;
+    paintRunLabel("Slicing", "indeterminate");
     try {
       const job = await api(`/api/resin/${rid}/slice`, { method: "POST", body: fd });
       sliceJob = job.job_id;
       let keep = true;
       const tick = async () => {
         const j = await api(`/api/resin/jobs/${sliceJob}`);
+        if (j.status === "running" || j.status === "queued") {
+          if (j.layers > 0) paintRunLabel(`Slicing, ${j.done_layers || 0} of ${j.layers} layers`, "determinate", Math.round(100 * (j.done_layers || 0) / j.layers));
+          else paintRunLabel("Slicing", "indeterminate");
+        }
         if (j.status === "done") {
           keep = false;
           stopSlicePoll();
+          clearRun();
           const layers = j.layers || 1;
           const ext = j.format || "lumen";
           const native = (j.report && j.report.native_format) || "";
@@ -680,6 +984,7 @@ function wire() {
         if (j.status === "error" || j.status === "cancelled") {
           keep = false;
           stopSlicePoll();
+          clearRun();
           box.innerHTML = `<p class="help ${j.status === "error" ? "warn" : ""}" role="status">${esc(j.error || "Slice cancelled.")}</p>`;
           return;
         }
@@ -721,13 +1026,68 @@ function wire() {
     if (kept.length) fd.append("avoid_points", JSON.stringify(kept));
     const sentManual = placed.map(p => p.slice());
     const sentAvoid = kept.map(p => p.slice());
-    out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing… TorchC0 is hollowing, tilting and adding supports. Larger models can take a minute.</p>`;
+    out.innerHTML = `<p class="help" role="status" aria-live="polite">Preparing…</p>`;
+    paintRunLabel("Preparing", "indeterminate");
     const go = $("#rzGo"); go.disabled = true; go.setAttribute("aria-busy", "true"); go.textContent = "Preparing…";
     try {
       let r;
-      try { r = await api("/api/resin/prepare", { method: "POST", body: fd }); }
+      const readPrep = async (body) => {
+        body.set("progress", "1");
+        const res = await fetch("/api/resin/prepare", { method: "POST", body, credentials: "same-origin" });
+        const type = res.headers.get("content-type") || "";
+        if (!type.includes("ndjson")) {
+          const text = await res.text();
+          let msg = `HTTP ${res.status}`;
+          try { const j = JSON.parse(text); msg = j.detail || msg; } catch { /* keep the status */ }
+          const err = new Error(typeof msg === "string" ? msg : "Prepare failed.");
+          err.status = res.status;
+          throw err;
+        }
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "", result = null, stages = [], finished = new Set();
+        const apply = (ev) => {
+          if (ev.stages) stages = ev.stages;
+          if (ev.phase === "result") { result = ev.result; return; }
+          if (ev.phase === "error") {
+            const err = new Error(ev.message || "Prepare failed.");
+            err.status = ev.status || 500;
+            throw err;
+          }
+          if (ev.phase === "plan") { paintRunLabel(ev.label || "Preparing", "indeterminate"); return; }
+          const label = ev.label || "Preparing";
+          const measured = ev.done != null && ev.total > 0 && ev.state !== "start";
+          if (ev.state === "done" || (measured && ev.done >= ev.total)) finished.add(ev.phase);
+          if (!measured) { paintRunLabel(label, "indeterminate"); return; }
+          const totalW = stages.reduce((sum, stage) => sum + (+stage.weight || 0), 0);
+          let pct;
+          if (totalW > 0) {
+            let got = 0;
+            for (const stage of stages) {
+              if (stage.id === ev.phase) got += (+stage.weight || 0) * Math.min(1, ev.done / ev.total);
+              else if (finished.has(stage.id)) got += +stage.weight || 0;
+            }
+            pct = Math.max(0, Math.min(100, Math.round(100 * got / totalW)));
+          } else pct = Math.max(0, Math.min(100, Math.round(100 * ev.done / ev.total)));
+          paintRunLabel(`${label}, ${ev.done} of ${ev.total}`, "determinate", pct);
+        };
+        for (;;) {
+          const step = await reader.read();
+          if (step.done) break;
+          buf += dec.decode(step.value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (line) apply(JSON.parse(line));
+          }
+        }
+        if (!result) throw new Error("Prepare finished without a result.");
+        return result;
+      };
+      try { r = await readPrep(fd); }
       catch (err) { if (err.status !== 410 || !uid) throw err;      // the loaded copy expired: send the file itself
-        picked = null; fd.delete("upload_id"); fd.delete("file_name"); fd.append("file", f); r = await api("/api/resin/prepare", { method: "POST", body: fd }); }
+        picked = null; fd.delete("upload_id"); fd.delete("file_name"); fd.append("file", f); r = await readPrep(fd); }
       const e = r.estimate;
       last.rep = r; preparedKey = poseKey(); document.body.dataset.torchStl = r.downloads.stl;   // Send to… hands over the prepared model
       const built = (r.support_edit && r.support_edit.manual) || [];
@@ -756,7 +1116,7 @@ function wire() {
         <p class="slicestats"><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-clock></use></svg> about ${esc(e.print_time_human)}</span><span class="pill"><svg class=i aria-hidden=true focusable=false><use href=#i-flask></use></svg> about ${e.resin_ml} ml</span><span class="pill" id="rzCostOut">${costTxt}</span><span class="pill">${e.layers} layers, estimate</span>${r.material && r.material.id !== "standard" ? `<span class="pill">${esc(r.material.label)}</span>` : ""}${r.support ? `<span class="pill">${r.support.supports} supports</span>` : ""}${r.fits === false ? `<span class="pill warn">Too big</span>` : ""}</p>
         <p class="help">${esc(r.placement || "")}</p>
         <p class="help">${esc(e.slice_note || "Slice writes the layer file for the printer selected above. It has not been printed on a machine.")}</p>
-        <p class="help">${CAM_HINT}</p>
+        <p class="help" id="rzMeshNote">${esc((r.preview && r.preview.note) || "")}</p>
         <div class="row rzSliceRow">
           <div class="field"><label for="rzPlate">Plate</label><select id="rzPlate">${plateOptions(r.size_mm, "lumen")}</select></div>
           <div class="field"><label for="rzSliceFmt">Layer file</label><select id="rzSliceFmt"><option value="lumen">.lumen</option><option value="goo">.goo</option><option value="ctb">.ctb</option></select></div>
@@ -782,7 +1142,7 @@ function wire() {
         const p = plates.find(x => x.id === plateSel.value) || plates[0];
         const fmt = (fmtSel && fmtSel.value) || "lumen";
         const block = plateBlock(p, fmt);
-        const fit = r.size_mm && (r.size_mm[0] > p.build_width_um / 1000 + 1e-3 || r.size_mm[1] > p.build_depth_um / 1000 + 1e-3 || r.size_mm[2] > p.build_height_um / 1000 + 1e-3);
+        const fit = r.size_mm && !modelFitsPlate(r.size_mm, p);
         note.textContent = block || (fit ? "The prepared model does not fit this bed." : `${p.manufacturer} ${p.name}: ${p.width_px}×${p.height_px} px, build ${(p.build_width_um / 1000).toFixed(1)} × ${(p.build_depth_um / 1000).toFixed(1)} × ${(p.build_height_um / 1000).toFixed(1)} mm. This slice writes .${fmt} for the printer selected above. Not printed on a machine.`);
       };
       const paintPlates = () => {
@@ -799,7 +1159,8 @@ function wire() {
         if ([...fmtSel.options].some(o => o.value === prefer)) fmtSel.value = prefer;
       }
       if (plateSel) { paintPlates(); plateSel.onchange = sayPlate; if (fmtSel) fmtSel.onchange = paintPlates; }
-      show3D($("#rzView"), r.downloads.stl, lc, null, bedNow());
+      const meshUrl = (r.downloads && r.downloads.preview) || r.downloads.stl;
+      await show3D($("#rzView"), meshUrl, lc, null, bedNow(), { note: (r.preview && r.preview.note) || "" });
     } catch (err) { out.innerHTML = `<p class="help warn" role="alert">${esc(err.message)}</p>`; }
     finally { const go = $("#rzGo"); go.disabled = false; go.removeAttribute("aria-busy"); go.textContent = "Prepare for resin"; }
   }

@@ -1,4 +1,5 @@
 """TorchC0: a picked model loads into the view right away (POST /api/resin/preview), for STL, ASCII STL, 3MF and OBJ."""
+import json
 import struct
 from pathlib import Path
 
@@ -33,6 +34,9 @@ def test_preview_loads_every_format(c, name, kind):
 
 def test_preview_keeps_every_triangle_unless_simplify_is_asked(c, monkeypatch):
     from app.api import resin as api
+    # The simplify cap is re-read in the procjob child, so patching the parent
+    # constant alone has no effect (these two tests already failed on zeim).
+    monkeypatch.setenv("ZEIM_RESIN_MAX_FACES", "2000")
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=30, count=[80, 80])
     data = m.export(file_type="3mf")
@@ -77,6 +81,7 @@ def test_big_binary_stl_keeps_every_triangle_and_prepare_reuses_it(c, monkeypatc
     """A large binary STL used to be simplified before preview and again before prepare.
     The default path keeps the triangle count. Prepare reuses the loaded copy by id."""
     from app.api import resin as api
+    monkeypatch.setenv("ZEIM_RESIN_MAX_FACES", "2000")
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=20, count=[80, 80])
     m.apply_translation((0, 0, 20))
@@ -103,3 +108,41 @@ def test_prepare_upload_id_is_checked(c):
 def test_prepare_waits_for_the_pick_and_sends_its_id():
     js = (ROOT / "static/torchc0.js").read_text()
     assert "await pickLoad" in js and 'fd.append("upload_id", uid)' in js and "X-Zeim-Upload" in js
+
+
+def test_prepare_progress_names_real_stages(c):
+    data = trimesh.creation.box((20, 16, 10)).export(file_type="stl")
+    r = c.post("/api/resin/prepare", data={"hollow": "false", "supports": "false", "progress": "true"},
+               files={"file": ("box.stl", data, "model/stl")})
+    assert r.status_code == 200, r.text
+    assert "ndjson" in r.headers["content-type"]
+    lines = [json.loads(ln) for ln in r.text.splitlines() if ln.strip()]
+    phases = [ln["phase"] for ln in lines]
+    assert "orient" in phases and "check" in phases and phases[-1] == "result"
+    for ln in lines:
+        if ln.get("state") == "start":
+            assert "done" not in ln
+    result = lines[-1]["result"]
+    assert result["preview"]["decimated"] is False
+    assert "full prepared mesh" in result["preview"]["note"]
+    assert "full resolution" not in result["preview"]["note"].lower()
+    assert "preview" not in result["downloads"]
+    stl = c.get(result["downloads"]["stl"])
+    assert stl.status_code == 200 and _faces(stl.content) >= 12
+
+
+def test_viewer_preview_is_separate_from_the_full_stl(c, monkeypatch):
+    monkeypatch.setenv("ZEIM_RESIN_PREVIEW_FACES", "400")
+    mesh = trimesh.creation.uv_sphere(radius=18, count=[36, 36])
+    data = mesh.export(file_type="stl")
+    r = c.post("/api/resin/prepare", data={"hollow": "false", "supports": "false"},
+               files={"file": ("ball.stl", data, "model/stl")})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["preview"]["decimated"] is True
+    assert "full resolution" not in body["preview"]["note"].lower()
+    assert body["preview"]["note"].startswith("Preview only")
+    full = c.get(body["downloads"]["stl"]).content
+    prev = c.get(body["downloads"]["preview"]).content
+    assert _faces(full) > _faces(prev)
+    assert _faces(prev) <= 800

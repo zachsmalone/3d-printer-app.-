@@ -22,9 +22,16 @@ export class Viewer {
     this.group = new THREE.Group(); this.scene.add(this.group);
     this.wire = false;
     this._controlsFrozen = false;   // plate drag: skip controls.update so orbit damping can't move the camera mid-drag
-    new ResizeObserver(() => this.resize()).observe(el);
+    this._ro = new ResizeObserver(() => this.resize());
+    this._ro.observe(el);
     this.resize();
-    const loop = () => { requestAnimationFrame(loop); if (!this._controlsFrozen) this.controls.update(); this.renderer.render(this.scene, this.camera); };
+    const loop = () => {
+      requestAnimationFrame(loop);
+      if (!this._controlsFrozen) this.controls.update();
+      if (this.beforeRender) this.beforeRender();
+      this.renderer.render(this.scene, this.camera);
+      if (this.afterRender) this.afterRender();
+    };
     loop();
   }
   /* Freeze orbit/pan/zoom (and kill in-flight damping) while the plate editor drags an object on the bed. */
