@@ -933,7 +933,8 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             work = hollowed
             _drop_query_cache(work)
             memtrim.trim()
-            rep["hollow"] = {k: hr[k] for k in ("message", "volume_saved_pct", "thinnest_wall_mm") if k in hr}
+            rep["hollow"] = {k: hr[k] for k in (
+                "message", "volume_saved_pct", "thinnest_wall_mm", "resolution_mm", "stages", "drain_axes") if k in hr}
             # one number everywhere: the note and the report both show the probe's thinnest spot (was 0.02 mm apart)
             if hr.get("wall_min_probe_mm") is not None:
                 rep["hollow"]["thinnest_wall_mm"] = hr["wall_min_probe_mm"]
