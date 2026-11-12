@@ -184,8 +184,11 @@ def test_export_download_carries_both_slots_at_phone_and_desktop(base):
             # The click saves this URL. Read it back through the same session: Chrome's
             # disk cache can leave the click's network body empty in Playwright.
             data = page.request.get(base + href).body()
-            xml = zipfile.ZipFile(io.BytesIO(data)).read("3D/3dmodel.model").decode()
-            assert "Left" in xml and "Right" in xml
+            zipped = zipfile.ZipFile(io.BytesIO(data))
+            settings = zipped.read("Metadata/model_settings.config").decode()
+            slic3r = zipped.read("Metadata/Slic3r_PE_model.config").decode()
+            assert "Left" in settings and "Right" in settings
+            assert "Left" in slic3r and "Right" in slic3r
             got = _extruders(data)
             assert 1 in got and 2 in got, got
             page.evaluate("() => { document.getElementById('dlgSendSheet')?.close(); document.getElementById('fdmDone')?.close(); }")

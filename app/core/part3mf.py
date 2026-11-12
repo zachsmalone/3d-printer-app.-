@@ -1,15 +1,26 @@
 """3MF export of each part's filament slot.
 
 A printer with one slot keeps today's single-object 3MF. A printer with more than
-one slot writes one object per part, or several volumes of one object when the
-parts overlap or still sit in their file positions (the same cases the slicer
-keeps as one mesh).
+one slot writes one object per part when those parts were arranged on the bed and
+do not overlap. Otherwise the parts stay one object: their triangles are stored in
+part order, and each part is a volume whose ``firstid``/``lastid`` is that run of
+triangles.
 
-The slot number is 1-based. PrusaSlicer and OrcaSlicer read it from
-``Metadata/Slic3r_PE_model.config`` (object or volume ``extruder``). Bambu Studio,
-OrcaSlicer and Creality Print read it from ``Metadata/model_settings.config``.
+PrusaSlicer 2.8 and 2.9 read ``Metadata/Slic3r_PE_model.config``. A ``<volume>``
+range is applied only to the mesh object with the same id (``3mf.cpp``,
+``_generate_volumes``). A component assembly has no triangles, so a volume list on
+the assembly is ignored and every part stays extruder 1. ``type="volume"`` is how
+a key is stored on the volume rather than the object. ``extruder`` on the volume
+is the 1-based slot. The volume matrix is written; an identity matrix is not
+applied. ``source_*`` keys are optional and are omitted here.
+
+Bambu Studio, OrcaSlicer and Creality Print read ``Metadata/model_settings.config``.
+Each part stays a ``<part id subtype="normal_part">`` with ``extruder``, ``name``
+and ``matrix`` (Orca ``bbs_3mf.cpp``). Orca matches that part id to a component
+object id. This together file is one mesh, because that is the form PrusaSlicer
+applies, and the part entries are still written in Orca's element shape.
+
 A missing slot is slot 1. A slot past this printer is clamped to the last slot.
-
 Nothing here changes slicing. No printer has run these files.
 """
 from __future__ import annotations
@@ -144,22 +155,61 @@ def _color_index(parts: list[dict]) -> tuple[list[str], list[int | None]]:
     return rows, used
 
 
-def _mesh_body(mesh) -> str:
+def _mesh_body(mesh, pindex: int | None = None) -> str:
     out = io.StringIO()
     out.write("<vertices>")
     np.savetxt(out, np.asarray(mesh.vertices, float), fmt='<vertex x="%.5f" y="%.5f" z="%.5f"/>', newline="")
     out.write("</vertices><triangles>")
-    np.savetxt(out, np.asarray(mesh.faces, np.int64), fmt='<triangle v1="%d" v2="%d" v3="%d"/>', newline="")
+    if pindex is None:
+        fmt = '<triangle v1="%d" v2="%d" v3="%d"/>'
+    else:
+        fmt = f'<triangle v1="%d" v2="%d" v3="%d" pid="1" p1="{int(pindex)}"/>'
+    np.savetxt(out, np.asarray(mesh.faces, np.int64), fmt=fmt, newline="")
     out.write("</triangles>")
     return out.getvalue()
 
 
+def _combined_mesh(pieces, paint: list[int | None]) -> tuple[str, list[tuple[int, int]]]:
+    """One mesh. Triangles stay in part order, and each range is that part.
+
+    Vertex indexes of a later part are shifted so each volume's vertices are a
+    contiguous span. PrusaSlicer copies vertices from the lowest index a volume
+    uses to the highest, then rebases the triangles.
+    """
+    blocks = []
+    ranges = []
+    v_off = 0
+    t_off = 0
+    for piece, pindex in zip(pieces, paint):
+        verts = np.asarray(piece.vertices, float)
+        faces = np.asarray(piece.faces, np.int64)
+        n = int(len(faces))
+        ranges.append((t_off, t_off + n - 1))
+        blocks.append((verts, faces + v_off, pindex))
+        v_off += int(len(verts))
+        t_off += n
+    out = io.StringIO()
+    out.write("<vertices>")
+    np.savetxt(
+        out, np.vstack([block[0] for block in blocks]),
+        fmt='<vertex x="%.5f" y="%.5f" z="%.5f"/>', newline="",
+    )
+    out.write("</vertices><triangles>")
+    for _verts, faces, pindex in blocks:
+        if pindex is None:
+            fmt = '<triangle v1="%d" v2="%d" v3="%d"/>'
+        else:
+            fmt = f'<triangle v1="%d" v2="%d" v3="%d" pid="1" p1="{int(pindex)}"/>'
+        np.savetxt(out, faces, fmt=fmt, newline="")
+    out.write("</triangles>")
+    return out.getvalue(), ranges
+
+
 def _object_xml(oid: int, name: str, mesh, pindex: int | None) -> str:
     paint = f' pid="1" pindex="{pindex}"' if pindex is not None else ""
-    body = _mesh_body(mesh)
     return (
         f'<object id="{oid}" type="model" name={quoteattr(name)}{paint}>'
-        f"<mesh>{body}</mesh></object>"
+        f"<mesh>{_mesh_body(mesh)}</mesh></object>"
     )
 
 
@@ -173,11 +223,14 @@ def _model_settings(entries: list[dict], together: bool, parent_id: int | None) 
     """Bambu Studio / OrcaSlicer / Creality Print extruder metadata."""
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<config>"]
     if together and parent_id is not None:
+        # Orca reads <part> (not <volume>) and deserializes extruder onto that
+        # part. firstid/lastid are left off: a lastid above 0 makes Orca store a
+        # triangle range with no part id, and then it does not apply the extruder.
         lines.append(f'  <object id="{parent_id}">')
         lines.append("    " + _meta("", "name", "model", False))
         lines.append(f'    <metadata key="extruder" value="{entries[0]["slot"]}"/>')
-        for entry in entries:
-            lines.append(f'    <part id="{entry["id"]}" subtype="normal_part">')
+        for index, entry in enumerate(entries, start=1):
+            lines.append(f'    <part id="{index}" subtype="normal_part">')
             lines.append("      " + _meta("", "name", entry["name"], False))
             lines.append(f'      <metadata key="extruder" value="{entry["slot"]}"/>')
             lines.append(f'      <metadata key="matrix" value="{_MATRIX}"/>')
@@ -197,35 +250,48 @@ def _slic3r_config(entries: list[dict], together: bool, parent_id: int | None) -
     """PrusaSlicer / OrcaSlicer extruder metadata. ``extruder`` is the 1-based slot."""
     lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<config>"]
 
-    def volume(entry: dict) -> list[str]:
-        last = max(0, int(entry["triangles"]) - 1)
-        return [
-            f'    <volume firstid="0" lastid="{last}">',
+    def volume(entry: dict, ranged: bool) -> list[str]:
+        if ranged:
+            first = int(entry["first"])
+            last = int(entry["last"])
+        else:
+            first = 0
+            last = max(0, int(entry["triangles"]) - 1)
+        lines_out = [
+            f'    <volume firstid="{first}" lastid="{last}">',
             "      " + _meta("volume", "name", entry["name"], True),
             "      " + _meta("volume", "volume_type", "ModelPart", True),
             "      " + _meta("volume", "extruder", str(entry["slot"]), True),
             "      " + _meta("volume", "matrix", _MATRIX, True),
-            "      " + _meta("volume", "source_object_id", "0", True),
-            "      " + _meta("volume", "source_volume_id", "0", True),
-            "      " + _meta("volume", "source_offset_x", "0", True),
-            "      " + _meta("volume", "source_offset_y", "0", True),
-            "      " + _meta("volume", "source_offset_z", "0", True),
-            "    </volume>",
         ]
+        # Arranged objects keep the source keys this file already wrote.
+        # Together volumes omit them: PrusaSlicer writes source_* only when the
+        # volume has a source file, and the reader does not need them to apply extruder.
+        if not ranged:
+            lines_out.extend([
+                "      " + _meta("volume", "source_object_id", "0", True),
+                "      " + _meta("volume", "source_volume_id", "0", True),
+                "      " + _meta("volume", "source_offset_x", "0", True),
+                "      " + _meta("volume", "source_offset_y", "0", True),
+                "      " + _meta("volume", "source_offset_z", "0", True),
+            ])
+        lines_out.append("    </volume>")
+        return lines_out
 
     if together and parent_id is not None:
         lines.append(f'  <object id="{parent_id}" instances_count="1">')
         lines.append("    " + _meta("object", "name", "model", True))
-        lines.append("    " + _meta("object", "extruder", str(entries[0]["slot"]), True))
+        # Each volume carries its own extruder. An object-level extruder is only
+        # the fallback PrusaSlicer uses when a volume has none.
         for entry in entries:
-            lines.extend(volume(entry))
+            lines.extend(volume(entry, True))
         lines.append("  </object>")
     else:
         for entry in entries:
             lines.append(f'  <object id="{entry["id"]}" instances_count="1">')
             lines.append("    " + _meta("object", "name", entry["name"], True))
             lines.append("    " + _meta("object", "extruder", str(entry["slot"]), True))
-            lines.extend(volume(entry))
+            lines.extend(volume(entry, False))
             lines.append("  </object>")
     lines.append("</config>")
     return "\n".join(lines) + "\n"
@@ -253,27 +319,40 @@ def build(mesh, meta: dict | None, slot_count: int) -> tuple[bytes, list[int]] |
     entries = []
     objects = []
     first = 2
-    for i, (part, piece, slot, pindex) in enumerate(zip(parts, pieces, slots, paint)):
-        oid = first + i
-        name = part.get("name") or f"Part {i + 1}"
-        objects.append(_object_xml(oid, name, piece, pindex))
-        entries.append({
-            "id": oid,
-            "name": name,
-            "slot": slot,
-            "triangles": int(len(piece.faces)),
-            "color": part.get("color"),
-            "part_id": part.get("id"),
-        })
     parent_id = None
     if together:
-        parent_id = first + len(entries)
-        comps = "".join(
-            f'<component objectid="{entry["id"]}" transform="{_TRANSFORM}"/>' for entry in entries
-        )
-        objects.append(f'<object id="{parent_id}" type="model" name="model"><components>{comps}</components></object>')
+        # One mesh object. PrusaSlicer deletes an object that has only components,
+        # then instances each component on its own, and never applies the assembly's
+        # volume list. The build item is this mesh, so the volume ranges below refer
+        # to triangles PrusaSlicer actually loads.
+        parent_id = first
+        body, ranges = _combined_mesh(pieces, paint)
+        objects.append(f'<object id="{parent_id}" type="model" name="model"><mesh>{body}</mesh></object>')
+        for i, (part, piece, slot, span) in enumerate(zip(parts, pieces, slots, ranges)):
+            entries.append({
+                "id": i + 1,
+                "name": part.get("name") or f"Part {i + 1}",
+                "slot": slot,
+                "triangles": int(len(piece.faces)),
+                "first": span[0],
+                "last": span[1],
+                "color": part.get("color"),
+                "part_id": part.get("id"),
+            })
         build_items = f'<item objectid="{parent_id}" transform="{_TRANSFORM}"/>'
     else:
+        for i, (part, piece, slot, pindex) in enumerate(zip(parts, pieces, slots, paint)):
+            oid = first + i
+            name = part.get("name") or f"Part {i + 1}"
+            objects.append(_object_xml(oid, name, piece, pindex))
+            entries.append({
+                "id": oid,
+                "name": name,
+                "slot": slot,
+                "triangles": int(len(piece.faces)),
+                "color": part.get("color"),
+                "part_id": part.get("id"),
+            })
         build_items = "".join(
             f'<item objectid="{entry["id"]}" transform="{_TRANSFORM}"/>' for entry in entries
         )
