@@ -399,8 +399,14 @@ def test_admin_sees_plan_status_without_card_data(monkeypatch):
 
     USERS.update(poison)
     again = c.get("/api/subscriptions/admin", headers={"X-Admin-Token": "t0k"}, params={"user_id": uid}).json()
-    dumped = json.dumps(again)
+    # Same rule as _stored_text: a random user_id can contain "1985" or "4242"
+    # (CI failed when the id was ef0b1985b659). The leak check skips that field.
+    dumped = json.dumps({
+        k: ([{ik: iv for ik, iv in row.items() if ik != "user_id"} for row in v] if k == "accounts" else v)
+        for k, v in again.items()
+    })
     assert "4242" not in dumped and "1985" not in dumped
+    assert all("last4" not in a and "card" not in a and "dob" not in a for a in again["accounts"])
     assert again["accounts"][0]["plan"] == "semi_pro"
     del user
 
