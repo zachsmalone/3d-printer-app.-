@@ -162,6 +162,8 @@ def download_export(
     slots: str = Query("", max_length=60, description="Filament slots to use, e.g. '2' or '1,3' (default Slot 1)"),
     preset: str = Query("", pattern="^(|bambu_litho)$", description="bambu_litho: add lithophane print settings for Bambu Studio (3MF, lithophanes)"),
     part: str = Query("", max_length=40, description="Optional body name: lithophane | stand (empty = whole model)"),
+    unit_id: str = Query("", max_length=40, description="Saved multi-material add-on. Empty uses the account or the catalog default."),
+    unit_count: str = Query("", max_length=8),
     actor: Actor = Depends(get_actor),
 ):
     """Download in the picked format, sized and named for the printer. A 3MF that cannot be built returns an error, not a different file."""
@@ -176,7 +178,7 @@ def download_export(
     try:
         data, filename, ext, mime, info = ue.export_build_for_printer(
             bid, actor, printer_id=pref_pid, force_format=format, name=name or None, nozzle=_noz(nozzle),
-            slots=picked, preset=preset, part=part)
+            slots=picked, preset=preset, part=part, unit_id=unit_id, unit_count=unit_count)
     except HTTPException:
         raise
     except Exception as e:

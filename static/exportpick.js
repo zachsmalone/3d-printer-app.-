@@ -116,9 +116,24 @@ export async function open(o) {
     ? `This model has ${colours} colours. Tick one slot per colour, or keep one slot to print it in a single colour.`
     : "Use one slot: only the slot you tick goes in the file. Unused slots are never checked or mapped.";
   $("#expSlotWarnOk").onclick = () => { warnOff = true; $("#expSlotWarn").hidden = true; };
+  const printerParams = () => {
+    let pref = null;
+    try {
+      if (window.P && window.P.pref && window.P.pref.printer_id) pref = window.P.pref;
+      else if (window.__cad && window.__cad.S && window.__cad.S.printer) pref = window.__cad.S.printer;
+    } catch { pref = null; }
+    if (!pref) return "";
+    const id = pref.printer_id || pref.id || "";
+    if (!id) return "";
+    let q = "&printer_id=" + encodeURIComponent(id);
+    if (pref.unit_id != null && pref.unit_id !== "") q += "&unit_id=" + encodeURIComponent(pref.unit_id);
+    if (pref.unit_count != null && String(pref.unit_count) !== "") q += "&unit_count=" + encodeURIComponent(pref.unit_count);
+    return q;
+  };
   const url = () => {
     const f = d.querySelector("input[name=expFmt]:checked")?.value || "3mf";
     if (!o.rid) return `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}&slots=${slots().join(",")}`
+      + printerParams()
       + (preset() ? `&preset=${preset()}` : "") + (part() ? `&part=${encodeURIComponent(part())}` : "");
     return o.rid ? `/api/resin/${o.rid}/torchc0.${f}?name=${encodeURIComponent(name)}`
       : `/api/export/${encodeURIComponent(o.bid)}/download?format=${f}&name=${encodeURIComponent(name)}`;

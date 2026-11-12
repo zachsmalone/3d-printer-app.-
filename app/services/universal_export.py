@@ -15,6 +15,7 @@ import numpy as np
 import trimesh
 
 from app.community.identity import Actor
+from app.core import part3mf
 from app.core.exporters import mesh_3mf
 from app.services import print_setup as ps
 from app.services.history import store
@@ -259,6 +260,8 @@ def export_build_for_printer(
     slots=None,
     preset: str = "",
     part: str = "",
+    unit_id: str = "",
+    unit_count: str = "",
 ) -> tuple[bytes, str, str, str, dict]:
     """Export a build for the chosen printer.
 
@@ -282,9 +285,17 @@ def export_build_for_printer(
     mesh, meta = load_build_mesh(bid, actor, part=part)
     prepared, info = prepare_mesh_for_printer(mesh, pid)
     data, ext, mime = export_mesh_data(prepared, force_format=force_format)
-    plan = fs.plan([], fs.parse_slots(slots))           # one merged mesh = one material = one slot (the first picked)
-    if ext == "3mf":
-        data = fs.annotate_3mf(data, plan)
+    stored = ((getattr(actor, "user", None) or {}).get("printer") or {}) if actor is not None else {}
+    slot_count = ps.export_slot_count(pid, unit_id, unit_count, stored)
+    baked = part3mf.build(prepared, meta, slot_count) if ext == "3mf" and not (part or "").strip() else None
+    if baked is not None:
+        data, used = baked
+        plan = {"slots": sorted(set(used)), "notes": []}
+    else:
+        # One merged mesh, or a one-slot printer: the file is the same shape as before.
+        plan = fs.plan([], fs.parse_slots(slots))           # one merged mesh = one material = one slot (the first picked)
+        if ext == "3mf":
+            data = fs.annotate_3mf(data, plan)
     info.update({"slots": plan["slots"], "slot_notes": plan["notes"], "preset": "", "part": (part or "").strip()})
     if preset:
         from app.services import litho_preset as lp

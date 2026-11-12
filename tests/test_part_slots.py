@@ -1,7 +1,7 @@
 """Filament slot on each part: auto-map, override, clamp, and the single-slot warning.
 
-Slicing and export still receive one mesh. The warning is a sentence. Turning single
-slot on does not rewrite the slots.
+Slicing still receives one mesh. A multi-slot 3MF export carries the slots.
+The warning is a sentence. Turning single slot on does not rewrite the slots.
 """
 import io
 import json
