@@ -13,6 +13,16 @@ from pathlib import Path
 
 import numpy as np
 import trimesh
+from trimesh.transformations import scale_and_translate
+from trimesh.voxel.base import VoxelGrid
+from trimesh.voxel.encoding import SparseBinaryEncoding
+
+try:
+    import manifold3d
+except Exception:
+    manifold3d = None
+
+from . import memtrim
 
 MAX_FACES = 3_000_000
 UNIT_MM = {"mm": 1.0, "cm": 10.0, "in": 25.4, "m": 1000.0}
@@ -471,6 +481,15 @@ def _prep_solid(m, what="model"):
 
 def _boolean(a, b, kind):
     _need_boolean()
+    # A large difference used to run while the voxel grids were still charged to this
+    # process. glibc does not return that address space, and the next Manifold build
+    # then died with SIGSEGV under the prepare cap. Trim first, and build Manifold
+    # ourselves so a non-manifold input becomes an error instead of an abort.
+    large = len(getattr(a, "faces", [])) > 100_000 or len(getattr(b, "faces", [])) > 100_000
+    if large:
+        memtrim.trim()
+        if kind == "difference":
+            return _boolean_large_difference(a, b)
     a = _prep_solid(a); b = _prep_solid(b, "tool shape")
     try:
         r = {"union": trimesh.boolean.union, "difference": trimesh.boolean.difference,
@@ -480,6 +499,42 @@ def _boolean(a, b, kind):
     if r is None or len(r.faces) == 0:
         raise OpError("The result is empty (shapes may not overlap).")
     return _check(_new(r.vertices, r.faces))
+
+
+def _boolean_large_difference(a, b):
+    """Difference of a large solid minus a tool. Same manifold engine, without an unbounded repair."""
+    if manifold3d is None:
+        raise OpError("Boolean operations need the 'manifold3d' package (pip install manifold3d).")
+    a = _solid_ready(a, "model")
+    b = _solid_ready(b, "tool shape")
+    try:
+        result = _manifold_mesh(a) - _manifold_mesh(b)
+    except OpError:
+        raise
+    except Exception as e:
+        raise OpError(f"Boolean failed: {e}") from None
+    if result.status() != manifold3d.Error.NoError or result.is_empty() or result.num_tri() == 0:
+        raise OpError("The result is empty (shapes may not overlap).")
+    mesh = result.to_mesh()
+    return _check(_new(np.asarray(mesh.vert_properties)[:, :3], np.asarray(mesh.tri_verts)))
+
+
+def _solid_ready(m, what):
+    """A closed solid for a large boolean. Do not fan-fill a huge hole; that path crashed."""
+    if len(m.faces) > 100_000 and not m.is_watertight:
+        raise OpError(f"The {what} isn't watertight, so a boolean can't be computed. Run Fix (repair) first.")
+    return _prep_solid(m, what)
+
+
+def _manifold_mesh(m):
+    verts = np.ascontiguousarray(m.vertices, dtype=np.float32)
+    faces = np.ascontiguousarray(m.faces, dtype=np.uint32)
+    if len(faces) == 0 or not np.isfinite(verts).all() or int(faces.max()) >= len(verts):
+        raise OpError("Could not hollow this shape. Try a thicker wall, or turn hollowing off.")
+    man = manifold3d.Manifold(manifold3d.Mesh(vert_properties=verts, tri_verts=faces))
+    if man.status() != manifold3d.Error.NoError or man.is_empty():
+        raise OpError("Could not hollow this shape. Try a thicker wall, or turn hollowing off.")
+    return man
 
 
 def primitive(spec: dict) -> trimesh.Trimesh:
@@ -801,12 +856,17 @@ def _measure_wall(outer, cavity, n=2500):
 
 
 VOX_FACES = 120_000
+# Dense SDF working set (bool grid + two float64 distances + the field). 6e6 cells is about 200 MB.
+HOLLOW_MAX_VOXELS = 6_000_000
 
 
 def _vox_source(mm):
-    """The mesh to voxelize. trimesh subdivides every face down to the voxel pitch first, so a 500k-face model
-    (an ordinary 8 MB 3MF) needed well over the 1.5 GB worker budget. The grid is only ~one-pitch accurate anyway,
-    so voxelize a decimated copy above VOX_FACES; the boolean and wall checks still use the full mesh."""
+    """Decimated copy used only when the global trimesh voxelizer is still cheap.
+
+    That voxelizer subdivides every long edge in one mesh. A detailed model decimated to
+    VOX_FACES still has edges many times the pitch, and the temporary mesh tripped the
+    prepare memory cap. The boolean and the wall checks keep the full outer surface.
+    """
     n0 = len(mm.faces)
     if n0 <= VOX_FACES:
         return mm
@@ -819,28 +879,132 @@ def _vox_source(mm):
         return mm
 
 
+def _hollow_pitch(ext, wall):
+    """Voxel size for this wall and this bounding box. Coarser when the grid would not fit."""
+    span = np.asarray(ext, dtype=np.float64) + 2.0 * float(wall)
+    span = np.maximum(span, 1e-6)
+    pitch = max(float(wall) / 3.0, float((np.prod(span) / HOLLOW_MAX_VOXELS) ** (1.0 / 3.0)))
+    if pitch > float(wall) / 1.5:
+        raise OpError(f"Wall {wall:g} mm is too thin for a model this big (needs ≈{pitch * 1.5:.1f} mm+). "
+                      "Increase the wall or scale the model down first.")
+    dims = np.ceil(span / pitch).astype(np.int64)
+    if int(np.prod(dims)) > HOLLOW_MAX_VOXELS * 2:
+        raise MemoryError("hollow voxel grid does not fit in the prepare memory budget")
+    return pitch
+
+
+def _bounded_voxels(mm, pitch):
+    """True when trimesh's one-shot subdivide voxelizer is likely to exceed the budget."""
+    n = len(mm.faces)
+    if n > 80_000:
+        return True
+    if n < 2_000:
+        return False
+    step = max(1, n // 2_000)
+    tri = mm.triangles[::step]
+    if len(tri) == 0:
+        return False
+    longest = float(np.linalg.norm(tri[:, 0] - tri[:, 1], axis=1).max())
+    return longest > float(pitch) * 8.0
+
+
+def _emit_surface_batch(vertices, faces, max_edge, pitch, chunks):
+    """Round surface samples of one face batch into voxel indices. Subdivide only this batch."""
+    faces = np.asarray(faces, np.int64)
+    if len(faces) == 0:
+        return
+    tri = vertices[faces]
+    ab = np.linalg.norm(tri[:, 0] - tri[:, 1], axis=1)
+    bc = np.linalg.norm(tri[:, 1] - tri[:, 2], axis=1)
+    ca = np.linalg.norm(tri[:, 2] - tri[:, 0], axis=1)
+    long = np.maximum(np.maximum(ab, bc), ca) > max_edge
+    if np.any(~long):
+        chunks.append(np.round(tri[~long].reshape(-1, 3) / pitch).astype(np.int32))
+    if not np.any(long):
+        return
+    if len(faces) > 20_000:
+        mid = len(faces) // 2
+        _emit_surface_batch(vertices, faces[:mid], max_edge, pitch, chunks)
+        _emit_surface_batch(vertices, faces[mid:], max_edge, pitch, chunks)
+        return
+    used = np.unique(faces[long])
+    remap = np.full(len(vertices), -1, np.int64)
+    remap[used] = np.arange(len(used))
+    sv = vertices[used]
+    lf = remap[faces[long]]
+    for _ in range(12):
+        if len(lf) > 40_000:
+            mid = len(lf) // 2
+            _emit_surface_batch(sv, lf[:mid], max_edge, pitch, chunks)
+            _emit_surface_batch(sv, lf[mid:], max_edge, pitch, chunks)
+            return
+        tri = sv[lf]
+        ab = np.linalg.norm(tri[:, 0] - tri[:, 1], axis=1)
+        bc = np.linalg.norm(tri[:, 1] - tri[:, 2], axis=1)
+        ca = np.linalg.norm(tri[:, 2] - tri[:, 0], axis=1)
+        still = np.maximum(np.maximum(ab, bc), ca) > max_edge
+        if np.any(~still):
+            chunks.append(np.round(tri[~still].reshape(-1, 3) / pitch).astype(np.int32))
+        if not np.any(still):
+            return
+        sv, lf = trimesh.remesh.subdivide(sv, lf[still])
+    tri = sv[lf]
+    chunks.append(np.round(tri.reshape(-1, 3) / pitch).astype(np.int32))
+
+
+def _voxel_fill_bounded(mm, pitch):
+    """Filled voxel grid without building one subdivided copy of the whole mesh.
+
+    Samples match trimesh's subdivide voxelizer (vertices of edges shorter than pitch/2,
+    rounded to the grid) so the shell stays closed enough to fill. The dense grid is
+    capped by the pitch chosen in `_hollow_pitch`.
+    """
+    max_edge = float(pitch) / 2.0
+    verts = np.asarray(mm.vertices, np.float64)
+    faces = np.asarray(mm.faces, np.int64)
+    chunks = []
+    batch = 16_000
+    for start in range(0, len(faces), batch):
+        _emit_surface_batch(verts, faces[start:start + batch], max_edge, pitch, chunks)
+    if not chunks:
+        raise OpError("Could not build a cavity for this shape. Try a thicker wall.")
+    idx = np.unique(np.vstack(chunks), axis=0)
+    del chunks
+    origin = idx.min(axis=0)
+    local = (idx - origin).astype(np.int64, copy=False)
+    dims = local.max(axis=0) + 1
+    if int(np.prod(dims, dtype=np.int64)) > HOLLOW_MAX_VOXELS * 4:
+        raise MemoryError("hollow voxel grid does not fit in the prepare memory budget")
+    grid = VoxelGrid(
+        SparseBinaryEncoding(local),
+        transform=scale_and_translate(scale=float(pitch), translate=origin.astype(np.float64) * float(pitch)),
+    )
+    return grid.fill()
+
+
 def op_hollow(m, p):
     """Hollow with wall thickness via a distance field (voxel SDF → marching cubes → boolean difference).
-    Accuracy is ~ one voxel, shown in the report. Optional drain hole at the lowest point of the cavity."""
+    Accuracy is ~ one voxel, shown in the report. Optional drain hole at the lowest point of the cavity.
+    The outer surface is the original mesh; only the cavity comes from the voxel grid."""
     if not have_hollow():
         raise OpError("Hollow needs 'manifold3d' and 'scikit-image'.")
     from scipy import ndimage
-    from skimage import measure
     wall = _num(p, "wall", 2, 0.2, 100); drain = _num(p, "drain_diameter", 0, 0, 100)
     mm = _prep_solid(m)
     ext = mm.extents
     if wall * 2.2 >= ext.min():
         raise OpError(f"Wall {wall:g} mm is too thick for this model (thinnest side is {ext.min():.1f} mm). "
                       "Lithophanes and thin plates can't be hollowed.")
-    pitch = max(wall / 3.0, float((np.prod(ext + 2 * wall) / 6e6) ** (1 / 3)))
-    if pitch > wall / 1.5:
-        raise OpError(f"Wall {wall:g} mm is too thin for a model this big (needs ≈{pitch * 1.5:.1f} mm+). "
-                      "Increase the wall or scale the model down first.")
-    vox = _vox_source(mm).voxelized(pitch).fill()
+    pitch = _hollow_pitch(ext, wall)
+    if _bounded_voxels(mm, pitch):
+        vox = _voxel_fill_bounded(mm, pitch)
+    else:
+        vox = _vox_source(mm).voxelized(pitch).fill()
     inside = np.pad(vox.matrix, 2)
     d_in = ndimage.distance_transform_edt(inside) * pitch
     d_out = ndimage.distance_transform_edt(~inside) * pitch
     sdf = np.where(inside, d_in - 0.5 * pitch, -(d_out - 0.5 * pitch))      # +ve inside, ≈ signed distance to surface
+    del d_in, d_out, inside
     return _hollow_from(mm, sdf, vox, pitch, wall, drain, p)
 
 
@@ -861,17 +1025,45 @@ def _ray_wall(m, n=1500):
         return None
 
 
+def _close_cavity(cav):
+    """Make a large marching-cubes cavity a solid. Holes bigger than a quad are left open.
+
+    Fan-filling a boundary of a clipped isosurface builds a self-intersecting sheet.
+    Manifold then aborted (SIGSEGV) instead of returning an error.
+    """
+    cav.merge_vertices()
+    cav.update_faces(cav.nondegenerate_faces())
+    cav.remove_unreferenced_vertices()
+    if len(cav.faces) == 0 or not np.isfinite(cav.vertices).all():
+        raise OpError("Could not build a clean cavity for this shape. Try a different wall thickness.")
+    trimesh.repair.fix_normals(cav, multibody=True)
+    if not cav.is_watertight:
+        trimesh.repair.fill_holes(cav, use_fan=False)
+    if len(cav.faces) and cav.volume < 0:
+        cav.invert()
+    return cav
+
+
 def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
     from skimage import measure
-    field = sdf - (wall + extra)                                             # cavity = points deeper than `wall` (+ margin on retries)
+    field = np.ascontiguousarray(sdf - (wall + extra))                       # cavity = points deeper than `wall` (+ margin on retries)
     if field.max() <= 0:
         raise OpError("Nothing left to hollow with this wall thickness.")
     verts, faces, _, _ = measure.marching_cubes(field, 0.0, spacing=(pitch, pitch, pitch))
     # grid index -> world (voxel transform, minus the 2-voxel pad)
     idx = verts / pitch - 2
     world = trimesh.transform_points(idx, vox.transform)
+    del field, verts, idx
     cav = _new(world, faces[:, ::-1])
-    cav.merge_vertices(); trimesh.repair.fix_normals(cav); trimesh.repair.fill_holes(cav)
+    del world, faces
+    large = len(mm.faces) > 80_000 or len(cav.faces) > 150_000
+    if large:
+        # sdf stays alive for a possible retry. Trim the voxel step's freed arenas
+        # before the boolean so Manifold can allocate under the prepare cap.
+        memtrim.trim()
+        cav = _close_cavity(cav)
+    else:
+        cav.merge_vertices(); trimesh.repair.fix_normals(cav); trimesh.repair.fill_holes(cav)
     if cav.volume < 0:
         cav.invert()
     if not cav.is_watertight or len(cav.faces) == 0:
@@ -945,6 +1137,8 @@ def _hollow_from(mm, sdf, vox, pitch, wall, drain, p, extra=0.0, tries=0):
         rep_extra["note"] = (f"The thinnest wall is about {wall_min:.1f} mm, less than the {wall:g} mm you asked for "
                              "(thin or very detailed parts of the shape). It may print badly: try a thicker wall or check it in your slicer.")
     saved = 100 * (1 - out.volume / mm.volume) if out.volume > 0 else 0
+    if len(out.faces) > 100_000:
+        memtrim.trim()
     return out, {"message": f"hollowed: wall {wall:g} mm, volume −{saved:.0f}% (resolution ≈ {pitch:.2f} mm)"
                  + (f", {len(holes)} drain hole(s)" if holes else ""), "resolution_mm": round(pitch, 3),
                  "volume_saved_pct": round(saved, 1), **rep_extra}

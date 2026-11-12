@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import math
 
+import fast_simplification
 import numpy as np
 import trimesh
 
-from app.core import meshedit
+from app.core import memtrim, meshedit
 
 NAME = "TorchC0"
 
@@ -310,6 +311,57 @@ def _away_from(pts: np.ndarray, blocked, radius: float) -> np.ndarray:
 
 
 SUPPORT_TIP_LEN = 1.2
+# A boolean union of the model plus every pillar rewrites the model (manifold simplify
+# dropped triangles) and the body count then runs fill_holes on that fused mesh.
+# Past this size, pillars and the raft are concatenated. Resin slicers print overlapping shells.
+_FUSED_SUPPORT_MAX_FACES = 40_000
+# Support points are chosen on this proxy, then snapped back onto the full mesh.
+_SUPPORT_PROXY_FACES = 25_000
+
+
+def _proxy_mesh(m: trimesh.Trimesh, target: int) -> trimesh.Trimesh:
+    """Fewer triangles for choosing points. The printed mesh is not this copy."""
+    n = len(m.faces)
+    if n <= target or n == 0:
+        return m
+    try:
+        verts, faces = fast_simplification.simplify(
+            np.ascontiguousarray(m.vertices, dtype=np.float64),
+            np.ascontiguousarray(m.faces, dtype=np.int32),
+            target_reduction=1.0 - target / n,
+        )
+    except Exception:
+        return m
+    out = trimesh.Trimesh(verts, faces, process=False)
+    return out if len(out.faces) else m
+
+
+def _shift(m: trimesh.Trimesh, dz: float) -> trimesh.Trimesh:
+    """A mesh moved up by dz. One new vertex array; the original is left as it was."""
+    if dz == 0.0:
+        return m
+    verts = np.asarray(m.vertices, dtype=np.float64) + np.array([0.0, 0.0, dz])
+    return trimesh.Trimesh(verts, np.asarray(m.faces, dtype=np.int64), process=False)
+
+
+def _snap_onto(mesh: trimesh.Trimesh, pts: np.ndarray, max_dist: float) -> np.ndarray:
+    """Move sample points onto `mesh`. Drop any the proxy left too far from the real surface."""
+    if pts is None or len(pts) == 0:
+        return np.zeros((0, 3))
+    closest, dist, _face = trimesh.proximity.closest_point(mesh, np.asarray(pts, dtype=float))
+    keep = np.asarray(dist, dtype=float).reshape(-1) <= float(max_dist)
+    return np.asarray(closest, dtype=float)[keep]
+
+
+def _envelope_proxy(envelope: trimesh.Trimesh, dz: float) -> trimesh.Trimesh | None:
+    """A small watertight stand-in for the pre-hollow solid, in the lifted frame."""
+    env = _proxy_mesh(envelope, _SUPPORT_PROXY_FACES)
+    if not env.is_watertight:
+        trimesh.repair.fill_holes(env, use_fan=False)
+        trimesh.repair.fix_normals(env)
+    if not env.is_watertight or env.volume <= 0:
+        return None
+    return _shift(env, dz)
 
 
 def pillar_reaches(contact_z: float, base_lift: float, raft_mm: float, tip_len: float = SUPPORT_TIP_LEN) -> bool:
@@ -325,11 +377,106 @@ def pillar_path_clear(mesh: trimesh.Trimesh, contact) -> bool:
     return not bool(hit[0]) if len(hit) else True
 
 
+def _build_supports_overlapping(m, spacing, base_lift, tip_d, shaft_d, raft_mm, envelope, extra, auto, avoid, manual):
+    """Pillars and a raft concatenated onto the full-resolution model.
+
+    The fused boolean rewrote the user's triangles and the body count then called
+    fill_holes on that whole mesh. Overlapping shells are a normal resin-slicer input.
+    """
+    dz = float(base_lift) + float(raft_mm)
+    work = _shift(m, dz)
+    env = _envelope_proxy(envelope, dz) if envelope is not None else None
+    lift = np.array([0.0, 0.0, dz], dtype=float)
+    if auto:
+        proxy = _proxy_mesh(work, _SUPPORT_PROXY_FACES)
+        pts = support_points(proxy, spacing, envelope=env)
+        pts = _snap_onto(work, pts, max(1.0, float(spacing) * 0.35))
+    else:
+        pts = np.zeros((0, 3))
+    avoided = 0
+    if avoid is not None and len(np.asarray(avoid)):
+        before = len(pts)
+        pts = _away_from(pts, np.asarray(avoid, dtype=float).reshape(-1, 3) + lift, max(float(spacing), 1.5))
+        avoided = before - len(pts)
+    manual_pts = np.zeros((0, 3))
+    manual_contact = []
+    plate_skipped = 0
+    if manual is not None and len(np.asarray(manual)):
+        snapped = []
+        for src in np.asarray(manual, dtype=float).reshape(-1, 3):
+            hit, _moved = contact_point(work, src + lift)
+            if hit is None:
+                continue
+            pre = hit - lift
+            if not pillar_reaches(float(pre[2]), base_lift, raft_mm) or not pillar_path_clear(work, hit):
+                plate_skipped += 1
+                continue
+            snapped.append(hit)
+            manual_contact.append([round(float(x), 3) for x in (hit - lift)])
+        manual_pts = np.array(snapped, dtype=float).reshape(-1, 3)
+        pts = _away_from(pts, manual_pts, max(float(spacing) * 0.75, 1.0))
+    if extra is not None and len(extra):
+        ex = _surface_below(work, np.asarray(extra, dtype=float) + lift)
+        pts = _away_from(pts, ex, max(float(spacing) * 0.75, 1.0))
+        manual_pts = np.vstack([manual_pts, ex]) if len(manual_pts) else ex
+    n_manual = len(manual_pts)
+    if len(manual_pts):
+        pts = np.vstack([manual_pts, pts]) if len(pts) else manual_pts
+    parts, skipped = [], 0
+    if len(pts):
+        org = pts - [0, 0, 0.05]
+        hit = _in_batches(work.ray.intersects_any, org, np.tile([0, 0, -1.0], (len(pts), 1)))
+        tip_len = SUPPORT_TIP_LEN
+        for p, h in zip(pts, hit):
+            if h:
+                skipped += 1
+                continue
+            top = p[2]
+            bot = raft_mm * 0.5
+            if not pillar_reaches(float(p[2]) - float(lift[2]), base_lift, raft_mm, tip_len):
+                continue
+            cone = trimesh.creation.cone(radius=shaft_d / 2, height=tip_len, sections=10)
+            cone.apply_translation([p[0], p[1], top - tip_len])
+            tipc = trimesh.creation.cylinder(radius=tip_d / 2, height=0.4, sections=8)
+            tipc.apply_translation([p[0], p[1], top + 0.1])
+            h_shaft = top - tip_len - bot
+            shaft = trimesh.creation.cylinder(radius=shaft_d / 2, height=h_shaft + 0.1, sections=10)
+            shaft.apply_translation([p[0], p[1], bot + h_shaft / 2 + 0.05])
+            parts += [cone, tipc, shaft]
+    used = len(parts) // 3
+    if used:
+        xy = np.array([q.centroid[:2] for q in parts[2::3]])
+        lo, hi = xy.min(0) - 3, xy.max(0) + 3
+    else:
+        lo, hi = work.bounds[0][:2] - 2, work.bounds[1][:2] + 2
+    rafts = []
+    if raft_mm > 0:
+        raft = trimesh.creation.box(extents=[hi[0] - lo[0], hi[1] - lo[1], raft_mm])
+        raft.apply_translation([(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, raft_mm / 2])
+        rafts = [raft]
+    support_mesh = trimesh.util.concatenate([*rafts, *parts]) if (rafts or parts) else None
+    out = trimesh.util.concatenate([work, support_mesh]) if support_mesh is not None else work
+    extra_vol = float(sum(abs(r.volume) for r in rafts) + sum(abs(q.volume) for q in parts))
+    # Each primitive is its own shell. Counting them here avoids split()/fill_holes on the model.
+    body_count = 1 + len(parts) + len(rafts)
+    return out, {
+        "_volume": extra_vol, "merged": False, "overlapping": True, "bodies": body_count,
+        "watertight": False, "supports": used, "skipped_inside": skipped, "raft_mm": raft_mm,
+        "tip_mm": tip_d, "shaft_mm": shaft_d, "avoid_skipped": avoided, "manual_requested": int(n_manual),
+        "manual_contact": manual_contact, "plate_skipped": int(plate_skipped),
+    }
+
+
 def build_supports(m: trimesh.Trimesh, spacing: float, base_lift: float, tip_d=DEFAULT_TIP_MM, shaft_d=DEFAULT_SHAFT_MM, raft_mm=DEFAULT_RAFT_MM, envelope=None,
                    extra=None, auto=True, avoid=None, manual=None):
     """Model raised by base_lift; a cone tip + cylinder pillar to a raft under each support point.
     Points whose straight path down hits the model itself are skipped (counted) instead of piercing it.
     `avoid` points (pre-lift frame) stop automatic supports only. `manual` points are always requested."""
+    heavy = len(m.faces) > _FUSED_SUPPORT_MAX_FACES or (
+        envelope is not None and len(envelope.faces) > _FUSED_SUPPORT_MAX_FACES)
+    if heavy:
+        return _build_supports_overlapping(
+            m, spacing, base_lift, tip_d, shaft_d, raft_mm, envelope, extra, auto, avoid, manual)
     m = m.copy(); m.apply_translation([0, 0, base_lift + raft_mm])
     if envelope is not None:
         envelope = envelope.copy(); envelope.apply_translation([0, 0, base_lift + raft_mm])
@@ -473,6 +620,10 @@ def _cavities(m: trimesh.Trimesh):
 def add_holes(m: trimesh.Trimesh, diameter: float, per_cavity: int = 2):
     """Drain + vent: per sealed cavity, one hole at its plate-side end (lowest z) and one at the far end (highest z),
     each drilled straight through the nearest outer wall. Returns (mesh, holes made per cavity)."""
+    if len(m.faces) > 100_000:
+        # Hollow's voxel grids are freed but still reserved. The drain boolean SIGSEGV'd
+        # under the prepare cap until that address space was given back.
+        memtrim.trim()
     cavs = _cavities(m)
     if not cavs or diameter <= 0:
         return m, [0] * len(cavs)
@@ -761,8 +912,12 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
         rep["support"] = sr
         vol += sr.pop("_volume")
         if not sr["merged"]:
-            rep["notes"].append("Supports could not be joined to the model into one solid; the file has separate overlapping "
-                                "pieces. Most resin slicers still print it, but check it there.")
+            if sr.get("overlapping"):
+                rep["notes"].append("Supports and the raft overlap the model as separate shells, so the model keeps every triangle. "
+                                    "Resin slicers print overlapping shells.")
+            else:
+                rep["notes"].append("Supports could not be joined to the model into one solid; the file has separate overlapping "
+                                    "pieces. Most resin slicers still print it, but check it there.")
         if sr["skipped_inside"]:
             rep["notes"].append(f"{sr['skipped_inside']} overhang spot(s) sit above other parts of the model and got no support; "
                                 "check them in your slicer and add supports there if needed.")

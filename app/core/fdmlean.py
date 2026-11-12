@@ -56,8 +56,9 @@ def shrink(data: bytes, max_faces: int = None) -> tuple[bytes, int, int]:
 
 
 # ---- run in a fresh interpreter, not a fork of the server ----
-# A fork inherits the ~1.1 GB server heap and Python's refcounting/gc copies those pages, so the guard child of a
-# 2.1M-triangle STL reached 1.7 GB and the 3 GB container OOM-killed it. A new interpreter needs only ~1 GB.
+# A fork inherits the server heap and Python's refcounting copies those pages, so a big STL in a
+# forked child got much larger than the same work in a fresh interpreter. The app container is
+# 14 GB and 2 CPUs. A new interpreter still keeps this job off the web process heap.
 import threading as _th
 
 _one = _th.BoundedSemaphore(1)
