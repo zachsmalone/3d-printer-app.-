@@ -35,6 +35,34 @@ export function slotCount(printer) {
   return n;
 }
 
+/* Saved add-on on this printer. No unit_id means the catalog default (a listed unit, or none). */
+export function choiceFor(printer, pref) {
+  const units = printer?.multi_material_units || [];
+  const explicit = pref && Object.prototype.hasOwnProperty.call(pref, "unit_id");
+  const saved = explicit ? pref.unit_id : undefined;
+  let unit = null;
+  if (saved === "none" || saved === "") unit = null;
+  else if (saved) unit = units.find(u => u.id === saved) || null;
+  else unit = units.find(u => u.default) || null;
+  if (!unit) return { unit: null, count: 1, slots: 1, systems: [] };
+  const max = +unit.max_units || 1;
+  const count = Math.min(max, Math.max(1, +pref?.unit_count || 1));
+  return { unit, count, slots: Math.min(16, (+unit.slots_per_unit || 1) * count), systems: [unit.name] };
+}
+
+/* Catalog row with filament_slots and multi_color_system set from the saved add-on. */
+export function effectivePrinter(printer, pref) {
+  if (!printer || !(printer.multi_material_units || []).length) return printer;
+  const choice = choiceFor(printer, pref && pref.printer_id && pref.printer_id !== printer.id ? {} : pref);
+  return {
+    ...printer,
+    filament_slots: choice.slots,
+    multi_color_system: choice.systems,
+    unit_id: choice.unit ? choice.unit.id : "none",
+    unit_count: choice.count,
+  };
+}
+
 export function coloursForPrinter(printer) {
   const n = slotCount(printer);
   const saved = readSavedColours();
@@ -55,6 +83,8 @@ export function appendSlotFields(fd, printer) {
   const id = printer.id || printer.printer_id || "";
   if (id && !fd.has("printer_id")) fd.append("printer_id", id);
   if (!fd.has("slot_colours")) fd.append("slot_colours", JSON.stringify(coloursForPrinter(printer)));
+  if (printer.unit_id != null && !fd.has("unit_id")) fd.append("unit_id", printer.unit_id);
+  if (printer.unit_count != null && !fd.has("unit_count")) fd.append("unit_count", String(printer.unit_count));
 }
 
 export async function printerForImport() {
@@ -62,11 +92,15 @@ export async function printerForImport() {
   try { cat = await (await fetch("/api/printers/catalog")).json(); } catch { /* keep the default */ }
   try {
     const me = await (await fetch("/api/me/printer")).json();
-    if (me && me.signed_up && me.saved && me.printer_id) pref = { printer_id: me.printer_id };
+    if (me && me.signed_up && me.saved && me.printer_id) {
+      pref = { printer_id: me.printer_id, nozzle: me.nozzle };
+      if (me.unit_id != null) { pref.unit_id = me.unit_id; pref.unit_count = me.unit_count || 1; }
+    }
   } catch { /* unsigned */ }
   if (!pref) {
     try { pref = JSON.parse(localStorage.getItem("zeim.printer") || "null"); } catch { pref = null; }
   }
   const id = pref?.printer_id || cat?.default?.printer_id || "creality_k1";
-  return (cat?.printers || []).find(p => p.id === id) || { id, filament_slots: 1, multi_color_system: [] };
+  const row = (cat?.printers || []).find(p => p.id === id) || { id, filament_slots: 1, multi_color_system: [] };
+  return effectivePrinter(row, pref && pref.printer_id === id ? pref : {}) || row;
 }

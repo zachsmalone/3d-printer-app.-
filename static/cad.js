@@ -1029,6 +1029,11 @@ function applyCadSlotColours() {
     if (slot >= 1 && colours[slot - 1]) b.color = colours[slot - 1];
   }
 }
+document.addEventListener("zeim:printer", () => {
+  S.printer = null;
+  if (!S.bid) return;
+  syncCadSlots().then(() => { if ($("#cwItems")) renderItems(); }).catch(() => { });
+});
 async function syncCadSlots() {
   if (!S.bid || !S.scene) return;
   if (!S.printer) S.printer = await printerForImport();

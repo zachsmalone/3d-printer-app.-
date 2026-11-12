@@ -5,7 +5,7 @@ import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
 import { gcodePreviewHTML, wireGcodePreview } from "/static/gcodeview.js";
 import { mountPaint, getStrokes } from "/static/supportpaint.js";
 import { costHTML, wireCost } from "/static/cost.js";
-import { DEFAULT_COLOURS, readSavedColours, writeSavedColours } from "/static/partslots.js";
+import { DEFAULT_COLOURS, UNIT_NOTE, choiceFor, effectivePrinter, readSavedColours, writeSavedColours } from "/static/partslots.js";
 const HAS_GL = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } })();
 let gcDispose = null;  // previous G-code preview (freed on the next slice)
 
@@ -21,6 +21,7 @@ export async function loadCatalog() {
     P.chosen = false;
     if (me.signed_up && me.saved) {
       P.pref = { printer_id: me.printer_id, nozzle: me.nozzle };
+      if (me.unit_id != null) { P.pref.unit_id = me.unit_id; P.pref.unit_count = me.unit_count || 1; }
       P.chosen = true;
     } else {
       const l = JSON.parse(localStorage.getItem(KEY) || "null");
@@ -52,6 +53,16 @@ const prOptions = (sel, optional, q = "") => {
   const list = P.cat.printers.filter(p => hit(p) || p.id === sel);   // the chosen printer always stays visible
   return (optional ? `<option value="">Not now</option>` : "") + [...new Set(list.map(p => p.brand))].sort((a, b) => a.localeCompare(b)).map(b => `<optgroup label="${esc(b)}">` + list.filter(p => p.brand === b).map(p => `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.name)}${p.technology === "Resin" ? " (TorchC0 resin)" : ""}</option>`).join("") + `</optgroup>`).join("");  // grouped by brand
 };
+const unitBits = units => units.map(u => u.max_units > 1 ? `${u.name} (${u.slots_per_unit} slots, up to ${u.max_units})` : `${u.name} (${u.slots_per_unit} slots)`).join(", ");
+const unitNote = (units, choice) => {
+  if (!choice?.unit) {
+    const mix = units.some(u => u.id === "ams_lite") && units.some(u => u.id === "ams")
+      ? " AMS lite cannot be combined with AMS, AMS 2 Pro, or AMS HT." : "";
+    return `${UNIT_NOTE} Official add-ons: ${unitBits(units)}.${mix}`;
+  }
+  const n = choice.slots;
+  return choice.count > 1 ? `${choice.unit.name} × ${choice.count}: ${n} slots.` : `${choice.unit.name}: ${n} slots.`;
+};
 /* Picker markup. `uid` keeps ids unique when the picker appears twice on a page (sign-up + Account). */
 export function pickerHTML(uid, pref = P.pref, { optional = false } = {}) {
   const opts = prOptions(optional ? "" : pref.printer_id, optional);
@@ -61,17 +72,60 @@ export function pickerHTML(uid, pref = P.pref, { optional = false } = {}) {
     <div class="field prsearch" style="grid-column:1/-1"><label for="${uid}_q">Find your printer</label><input id="${uid}_q" type="search" autocomplete="off" enterkeyhint="search" placeholder="Brand or model, e.g. Longer LK5" aria-describedby="${uid}_qn"><span class="help" id="${uid}_qn" aria-live="polite">${P.cat.printers.length} printers from ${nb} brands</span></div>
     <div class="field"><label for="${uid}_pr">Printer${optional ? " <em>optional</em>" : ""}</label><select id="${uid}_pr">${opts}</select></div>
     <div class="field" id="${uid}_nzf"><label for="${uid}_nz">Nozzle size</label><select id="${uid}_nz">${nozOptions(pid, pickNozzle(pid, pref.nozzle))}</select></div>
+    <div class="field" id="${uid}_uf" style="grid-column:1/-1" hidden><label for="${uid}_unit">Multi-material unit</label><select id="${uid}_unit"></select></div>
+    <div class="field" id="${uid}_ucf" style="grid-column:1/-1" hidden><label for="${uid}_uc">Units</label><select id="${uid}_uc"></select></div>
+    <p class="help" id="${uid}_unote" style="grid-column:1/-1" hidden></p>
     <p class="help" id="${uid}_info" aria-live="polite" style="grid-column:1/-1"></p></div>`;
 }
 export function wirePicker(uid, onChange) {
-  const pr = $(`#${uid}_pr`), nz = $(`#${uid}_nz`);
-  const info = () => {
+  const pr = $(`#${uid}_pr`), nz = $(`#${uid}_nz`), unit = $(`#${uid}_unit`), count = $(`#${uid}_uc`);
+  let unitPid = "";
+  const savedFor = pid => (P.pref?.printer_id === pid ? P.pref : {});
+  const paintUnit = (reset) => {
+    const p = printerOf(pr.value);
+    const units = p?.multi_material_units || [];
+    const box = $(`#${uid}_uf`), countBox = $(`#${uid}_ucf`), note = $(`#${uid}_unote`);
+    if (!p || p.technology === "Resin" || !units.length) {
+      unitPid = "";
+      if (box) box.hidden = true;
+      if (countBox) countBox.hidden = true;
+      if (note) { note.hidden = true; note.textContent = ""; }
+      return;
+    }
+    if (reset || unitPid !== p.id) {
+      const pref = savedFor(p.id);
+      const explicit = Object.prototype.hasOwnProperty.call(pref, "unit_id");
+      const selected = explicit ? (pref.unit_id || "none") : (units.find(u => u.default)?.id || "none");
+      unit.innerHTML = `<option value="none">None</option>` + units.map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`).join("");
+      unit.value = units.some(u => u.id === selected) || selected === "none" ? selected : "none";
+      unitPid = p.id;
+    }
+    const chosen = units.find(u => u.id === unit.value);
+    const prev = count.value;
+    if (countBox) countBox.hidden = !chosen || chosen.max_units <= 1;
+    if (chosen && chosen.max_units > 1) {
+      const pref = savedFor(p.id);
+      const fromSaved = reset && pref.unit_id === chosen.id ? +pref.unit_count || 1 : 0;
+      const want = fromSaved || (prev && +prev <= chosen.max_units ? +prev : 1);
+      count.innerHTML = Array.from({ length: chosen.max_units }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
+      count.value = String(Math.min(chosen.max_units, Math.max(1, want)));
+    }
+    box.hidden = false;
+    const n = chosen ? chosen.slots_per_unit * (chosen.max_units > 1 ? +count.value : 1) : 0;
+    const live = chosen ? { unit: chosen, count: chosen.max_units > 1 ? +count.value : 1, slots: n } : null;
+    note.hidden = false;
+    note.textContent = unitNote(units, live);
+  };
+  const info = (resetUnit) => {
     const p = printerOf(pr.value);
     $(`#${uid}_nzf`).hidden = !p || p.technology === "Resin";
+    paintUnit(!!resetUnit);
     $(`#${uid}_info`).innerHTML = !p ? "" : `Build volume ${p.bed_mm.map(v => +v).join(" × ")} mm. ` + (p.technology === "Resin" ? "Resin printer: no nozzle. Prepare it in the TorchC0 tab. TorchC0 can write a .lumen layer file. " + esc(p.official_slicer || "The printer's own slicer") + " still makes this machine's stock file." : mfrHTML(p.id, +nz.value));
   };
-  pr.onchange = () => { const p = printerOf(pr.value); if (p) nz.innerHTML = nozOptions(p.id, pickNozzle(p.id, +nz.value)); info(); onChange?.(readPicker(uid)); };
-  nz.onchange = () => { info(); onChange?.(readPicker(uid)); };
+  pr.onchange = () => { const p = printerOf(pr.value); if (p) nz.innerHTML = nozOptions(p.id, pickNozzle(p.id, +nz.value)); info(true); onChange?.(readPicker(uid)); };
+  nz.onchange = () => { info(false); onChange?.(readPicker(uid)); };
+  if (unit) unit.onchange = () => { paintUnit(false); onChange?.(readPicker(uid)); };
+  if (count) count.onchange = () => { paintUnit(false); onChange?.(readPicker(uid)); };
   const q = $(`#${uid}_q`);
   if (q) q.oninput = () => {
     const before = pr.value, optional = !!pr.closest(".printerpick")?.dataset.optional;
@@ -81,12 +135,20 @@ export function wirePicker(uid, onChange) {
     // one match: select it straight away (saves a tap on phones)
     if (q.value.trim() && n === 1 && matches[0].id !== before) { pr.innerHTML = prOptions(matches[0].id, optional, q.value); pr.value = matches[0].id; pr.onchange(); }
   };
-  info();
+  info(true);
 }
 export function readPicker(uid) {
   const id = $(`#${uid}_pr`)?.value;
   if (!id) return null;
-  return { printer_id: id, nozzle: isResin(id) ? null : +$(`#${uid}_nz`).value };
+  const pref = { printer_id: id, nozzle: isResin(id) ? null : +$(`#${uid}_nz`).value };
+  const unit = $(`#${uid}_unit`);
+  const box = $(`#${uid}_uf`);
+  if (unit && box && !box.hidden) {
+    pref.unit_id = unit.value || "none";
+    const countBox = $(`#${uid}_ucf`);
+    pref.unit_count = pref.unit_id === "none" || !countBox || countBox.hidden ? 1 : (+$(`#${uid}_uc`)?.value || 1);
+  }
+  return pref;
 }
 export async function savePref(pref) {
   P.pref = pref; P.chosen = true; localStorage.setItem(KEY, JSON.stringify(pref));
@@ -94,7 +156,14 @@ export async function savePref(pref) {
   document.dispatchEvent(new CustomEvent("zeim:printer", { detail: pref }));
   return r;
 }
-export const prefLabel = (pref = P.pref) => { const p = printerOf(pref.printer_id); return p ? p.name + (pref.nozzle ? ` · ${pref.nozzle} mm` : "") : ""; };
+export const prefLabel = (pref = P.pref) => {
+  const p = printerOf(pref.printer_id);
+  if (!p) return "";
+  const choice = choiceFor(p, pref);
+  const named = pref && Object.prototype.hasOwnProperty.call(pref, "unit_id") ? choice.unit : null;
+  const unit = named ? (choice.count > 1 ? `${named.name} × ${choice.count}` : named.name) : "";
+  return p.name + (pref.nozzle ? ` · ${pref.nozzle} mm` : "") + (unit ? ` · ${unit}` : "");
+};
 export function troubleshootingPrinterLabel() {
   if (!P.chosen) return "No printer saved yet. Fixes stay general until you save one in Account.";
   return prefLabel() || "No printer saved yet. Fixes stay general until you save one in Account.";
@@ -137,8 +206,11 @@ const presetOf = id => P.cat.presets.find(x => x.id === id) || P.cat.presets.fin
 export const presetLayer = (pv, rec, lo, hi) => +Math.min(Math.max(rec * (pv.layer_frac ?? 0.5) / 0.5, lo), hi).toFixed(3);
 /* Per-slot filament + colour when the printer has AMS / CFS / MMU / ACE. Single-head printers stay simple. */
 function slotsHTML(p, mats) {
-  const n = +p?.filament_slots || 1, systems = p?.multi_color_system || [];
-  if (n <= 1 || !systems.length) return "";
+  const eff = effectivePrinter(p, P.pref);
+  const n = +eff?.filament_slots || 1, systems = eff?.multi_color_system || [];
+  if (n <= 1 || !systems.length) {
+    return (p?.multi_material_units || []).length ? `<p class="help" id="spUnitNote">${esc(UNIT_NOTE)}</p>` : "";
+  }
   const label = systems.join(" / ");
   const saved = readSavedColours();
   return `<fieldset class="spslots" id="spSlots"><legend>Filament per ${esc(label)} slot</legend>
@@ -161,7 +233,8 @@ const SINGLE_WARN = "This skips the printer's calibration and bed leveling. The 
 function singleSlotHTML(p) {
   const o = p?.single_slot_option;
   if (!o) return "";
-  const n = +o.slots || 4;
+  const eff = effectivePrinter(p, P.pref);
+  const n = (p?.multi_material_units || []).length ? Math.max(1, +eff?.filament_slots || 1) : (+o.slots || 4);
   const opts = Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${i === 0 ? " selected" : ""}>${i + 1}</option>`).join("");
   const x = `<svg class="i" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
   return `<fieldset class="spslots" id="spSingleSlotBox"><legend>One filament slot</legend>

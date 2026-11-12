@@ -15,6 +15,7 @@ from ..community.identity import Actor, get_actor
 from ..community.store import USERS, LISTINGS
 from ..core import ratelimit
 from ..services import credits as _credits
+from ..services.material_units import UnitError
 from . import guards
 from .textcap import ip as _ip, text_in
 
@@ -125,8 +126,9 @@ def signup(request: Request, body: dict, actor: Actor = Depends(get_actor)):
         from app.api.printsetup import save_pref
         from app.services.print_setup import SetupError
         try:
-            save_pref(actor.sid, body.get("printer_id"), body.get("nozzle"))
-        except SetupError:
+            save_pref(actor.sid, body.get("printer_id"), body.get("nozzle"),
+                      body.get("unit_id"), body.get("unit_count"), remember_unit="unit_id" in body)
+        except (SetupError, UnitError):
             pass                                            # never fail a sign-up over an optional choice
     badges.seed()
     me_now = Actor(actor.sid, USERS.read()[actor.sid])
