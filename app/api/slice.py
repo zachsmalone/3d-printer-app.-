@@ -21,6 +21,7 @@ from app import config
 from app.community import badges
 from app.community.identity import Actor, get_actor
 from app.services import editproj
+from app.services.history import store
 from app.core.exporters import mesh_3mf
 from app.services import filament_slots as fslots
 from app.services import single_slot as single_slot_file
@@ -306,7 +307,10 @@ def slice_model(
                     paint_info = {**paint_info, "support_filament": filament_info}
             prof, slot_plan, slot_spec = _arm_single_slot(prof, slot_plan, slot_flag)
             parts = None
-            if model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2:
+            # Separate engine objects only for a bed the maker arranged, and only when those
+            # objects do not intersect. Imported parts stay one STL, the same mesh export uses.
+            if (model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2
+                    and separate_plate_objects(model_id, plate_objs)):
                 parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
             try:
                 res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
@@ -406,7 +410,6 @@ def plate_on_bed(model_id: str, prof) -> tuple[list | None, list[str]]:
     Bed is centred on (0, 0) like the plate editor. Not a plate / nothing on the bed -> (None or objs, [])."""
     from app.core import plate
     from app.services import editproj
-    from app.services.history import store
     try:
         meta = store.get(model_id)
         if not meta or meta.get("kind") != "edit":
@@ -432,6 +435,57 @@ def plate_on_bed(model_id: str, prof) -> tuple[list | None, list[str]]:
         return [o for _, o in on], [f"Object {i + 1}" for i, _ in off]
     except Exception:
         return None, []
+
+
+_OVERLAP_TOL_MM = 0.05
+
+
+def bounds_intersect(objs: list, tol: float = _OVERLAP_TOL_MM) -> bool:
+    """True when two axis-aligned bounds overlap by more than `tol` mm on every axis."""
+    boxes = []
+    for o in objs:
+        try:
+            lo, hi = o.bounds
+        except Exception:
+            return True
+        boxes.append((lo, hi))
+    for i in range(len(boxes)):
+        lo_a, hi_a = boxes[i]
+        for j in range(i + 1, len(boxes)):
+            lo_b, hi_b = boxes[j]
+            if all(float(hi_a[k]) > float(lo_b[k]) + tol and float(hi_b[k]) > float(lo_a[k]) + tol for k in range(3)):
+                return True
+    return False
+
+
+def arranged_on_bed(meta: dict) -> bool:
+    """True when these objects were placed on the bed on purpose.
+
+    A multi-part import stores a plate layout in the file's own positions. A plate-editor
+    step, a multi-file plate, or a Memory Box (its parts are laid out to print) counts as arranged.
+    """
+    try:
+        head = int(meta.get("head") or 0)
+    except (TypeError, ValueError):
+        head = 0
+    ops = meta.get("ops") or []
+    if any(isinstance(o, dict) and o.get("op") == "plate" for o in ops[:head]):
+        return True
+    base = meta.get("base") if isinstance(meta.get("base"), dict) else {}
+    if base.get("type") == "plate":
+        return True
+    return base.get("from_mode") == "memorybox"
+
+
+def separate_plate_objects(model_id: str, objs: list) -> bool:
+    """Separate engine objects only for an arranged bed whose parts do not intersect."""
+    if len(objs) < 2 or bounds_intersect(objs):
+        return False
+    try:
+        meta = store.get(model_id)
+    except Exception:
+        return False
+    return arranged_on_bed(meta)
 
 
 def plate_parts(objs: list, work: Path, scale: float = 1.0) -> list[Path] | None:
