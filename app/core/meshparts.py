@@ -3,7 +3,7 @@
 The editor, the plate, slicing, supports, export, Smart Split, and the lithophane and
 TorchC0 handoffs still share one triangle mesh. A part is a reference into that mesh
 (runs of faces) plus a name, an optional detected colour, the source material id, and
-a filament slot. The slot stays null until a later step assigns one.
+a filament slot. The slot is assigned by the colour editor (app/core/partslots.py).
 
 A saved project that has no parts list is one part covering every face.
 """
@@ -17,6 +17,8 @@ from collections import Counter
 import numpy as np
 import trimesh
 from trimesh.util import unique_name
+
+from .partslots import display_color
 
 # Same budget as the plate editor: above this, walking shells costs more than opening the file.
 AUTO_MAX_FACES = 400_000
@@ -87,12 +89,12 @@ def _material_id(pid, index) -> str | None:
     return f"{text}:{n}"
 
 
-def _record(pid: str, name: str, color, material, runs, slot=None) -> dict:
-    if not isinstance(slot, int):
+def _record(pid: str, name: str, color, material, runs, slot=None, slot_clamped=False) -> dict:
+    if type(slot) is not int:
         slot = None
     if not isinstance(material, str) or not material:
         material = None
-    return {
+    rec = {
         "id": pid,
         "name": _clean_name(name, pid),
         "color": _norm_color(color),
@@ -100,6 +102,9 @@ def _record(pid: str, name: str, color, material, runs, slot=None) -> dict:
         "slot": slot,
         "mesh": {"runs": [[int(s), int(c)] for s, c in runs]},
     }
+    if slot_clamped:
+        rec["slot_clamped"] = True
+    return rec
 
 
 def single(n_faces: int, name: str = "Model") -> list[dict]:
@@ -168,14 +173,14 @@ def validate(raw, n_faces: int) -> list[dict] | None:
         if not isinstance(pid, str) or not _ID.match(pid):
             pid = f"p{i + 1}"
         slot = item.get("slot", None)
-        if slot is not None and not isinstance(slot, int):
+        if slot is not None and type(slot) is not int:
             return None
         material = item.get("material")
         if material is not None and not isinstance(material, str):
             return None
         out.append(_record(
             pid, item.get("name") or f"Part {i + 1}", item.get("color"),
-            material, clean_runs, slot,
+            material, clean_runs, slot, item.get("slot_clamped") is True,
         ))
     if not np.all(seen == 1):
         return None
@@ -197,7 +202,7 @@ def worth_storing(parts: list[dict] | None) -> bool:
     if len(parts) > 1:
         return True
     part = parts[0]
-    if part.get("color") or part.get("material"):
+    if part.get("color") or part.get("material") or type(part.get("slot")) is int or part.get("slot_clamped"):
         return True
     return part.get("name") not in (None, "", "Model", "Part 1")
 
@@ -215,6 +220,8 @@ def public(parts: list[dict]) -> list[dict]:
             "mesh": {"runs": [list(run) for run in runs]},
             "triangles": int(sum(int(c) for _, c in runs)),
         })
+        if part.get("slot_clamped") is True:
+            out[-1]["slot_clamped"] = True
     return out
 
 
@@ -237,10 +244,10 @@ def plate_layout(parts: list[dict], n_faces: int) -> dict | None:
     return {"counts": counts, "groups": list(range(n)), "hidden": [False] * n}
 
 
-def colors_for_bodies(mesh: trimesh.Trimesh, parts: list[dict], body_meshes) -> list:
-    """Display colour for each CAD body when the part list is the same set of shells."""
+def body_part_ids(mesh: trimesh.Trimesh, parts: list[dict], body_meshes) -> list:
+    """Part id for each CAD body when the two lists are the same shells, matched by centre."""
     n = len(body_meshes)
-    if n == 0 or len(parts) != n or len(mesh.faces) > 200_000 or not any(p.get("color") for p in parts):
+    if n == 0 or len(parts) != n or len(mesh.faces) > 200_000:
         return [None] * n
 
     def part_centre(part):
@@ -251,9 +258,23 @@ def colors_for_bodies(mesh: trimesh.Trimesh, parts: list[dict], body_meshes) -> 
 
     order_p = sorted(range(n), key=lambda i: part_centre(parts[i]))
     order_b = sorted(range(n), key=lambda i: tuple(np.round(np.asarray(body_meshes[i].bounds.mean(axis=0), float), 3)))
-    cols: list = [None] * n
+    ids: list = [None] * n
     for pi, bi in zip(order_p, order_b):
-        cols[bi] = parts[pi].get("color")
+        ids[bi] = parts[pi]["id"]
+    return ids
+
+
+def colors_for_bodies(mesh: trimesh.Trimesh, parts: list[dict], body_meshes) -> list:
+    """Display colour for each CAD body: the slot colour, or the detected colour when no slot is set."""
+    n = len(body_meshes)
+    ids = body_part_ids(mesh, parts, body_meshes)
+    by_id = {p["id"]: p for p in parts}
+    cols = []
+    for pid in ids:
+        part = by_id.get(pid) if pid else None
+        cols.append(display_color(part) if part else None)
+    if not any(cols):
+        return [None] * n
     return cols
 
 
@@ -349,6 +370,7 @@ def _parts_from_groups(mesh: trimesh.Trimesh, groups: list[np.ndarray], previous
             used.add(prev["id"])
             built.append(_record(
                 prev["id"], prev["name"], prev.get("color"), prev.get("material"), runs, prev.get("slot"),
+                prev.get("slot_clamped") is True,
             ))
             continue
         while f"p{nxt}" in used:

@@ -273,11 +273,14 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
         raise _too_big(real_n)
     model_parts = meshparts.resolve(meta.get("parts"), real_n, meta.get("title") or "Model")
     body_colors = meshparts.colors_for_bodies(m, model_parts, parts) if not simplified else [None] * len(parts)
+    body_parts = meshparts.body_part_ids(m, model_parts, parts) if not simplified else [None] * len(parts)
     out, shown = [], 0
     for i, b in enumerate(parts):
         packed, nfaces = _scene_body(i, b)
         if i < len(body_colors) and body_colors[i]:
             packed["color"] = body_colors[i]
+        if i < len(body_parts) and body_parts[i]:
+            packed["part"] = body_parts[i]
         shown += nfaces
         out.append(packed)
     if simplified and shown > MAX_SCENE_FACES:

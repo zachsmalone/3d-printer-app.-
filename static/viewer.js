@@ -56,7 +56,7 @@ export class Viewer {
       gg.computeVertexNormals();
       const color = b.color || (mode === "lithophane" ? "#f2ead8" : "#8fb0e0");
       const m = new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0.05, flatShading: false, wireframe: this.wire });
-      const mesh = new THREE.Mesh(gg, m); mesh.userData.object = b.object ?? null; mesh.userData.name = b.name || ""; this.group.add(mesh);
+      const mesh = new THREE.Mesh(gg, m); mesh.userData.object = b.object ?? null; mesh.userData.name = b.name || ""; mesh.userData.part = b.part || ""; this.group.add(mesh);
     }
     if (this.el) this.el.dataset.viewTriangles = String(drawn);
     this.backlit = false; this.scene.background = null;

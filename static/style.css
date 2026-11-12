@@ -1287,8 +1287,21 @@ html[data-theme=dark] main.zws>.proc-sheet{background:color-mix(in srgb,var(--pa
 #viewEdit .bed-sheet-body{padding:12px 16px;overflow:auto}
 #bedPartsList{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:4px}
 #bedPartsList li{display:flex;align-items:center;gap:8px;min-height:44px}
+#bedPartsList .bed-part{flex:1;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+#bedPartsList .bed-part[aria-pressed=true]{background:var(--tint)}
+#bedPartsList .bed-part .nm{flex:1}
+#bedPartsList .bed-part small{color:var(--mut);font-weight:500}
 #bedPartsList .bed-swatch{width:16px;height:16px;border-radius:5px;border:1px solid var(--ctl);flex:none}
+.slot-picks{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.slot-picks button{width:44px;height:44px;border-radius:8px;border:1px solid var(--ctl);padding:0;font:inherit;font-size:13px;font-weight:650;cursor:pointer}
+.slot-picks button[aria-pressed=true]{outline:3px solid var(--focus,#6AA6FF);outline-offset:2px}
+#bedPartActions{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+#bedPartActions .btn{min-height:44px}
 #partsSheet #editDetectParts{min-height:44px}
+#cwSlotPick{margin:4px 8px 8px}
+#cwPartActions{display:flex;flex-wrap:wrap;gap:8px;margin:0 8px 8px}
+#cwPartActions .btn{min-height:44px}
+button.cw-item{width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 #viewEdit .bed-check{min-width:44px;font-size:18px}
 #viewEdit .bed-view{position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:4px}
 #viewEdit .bed-view button{min-width:44px;min-height:44px;padding:0 8px;border-radius:10px;border:1px solid var(--line);background:color-mix(in srgb,var(--panel) 90%,transparent);color:var(--txt);font:inherit;font-size:12px;font-weight:650;cursor:pointer}

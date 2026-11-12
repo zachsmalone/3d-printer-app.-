@@ -1,5 +1,9 @@
 """Parts and Detect parts are on the FDM bed, not only in the hidden side panel.
 
+The colour editor (slot swatches, assign, reset) has to be on screen too, at phone
+and desktop size. A control that is only in the DOM does not count.
+
+
 The check is a real browser at phone and desktop size. It fails when the control
 is in the DOM but display:none, or when its box is outside the viewport.
 Skipped when Playwright or Chrome is missing.
@@ -12,6 +16,9 @@ import tempfile
 import time
 
 import pytest
+
+from app.core.partslots import PRINT_NOTE, SINGLE_NOTE
+from tests.test_mesh_parts import _coloured_3mf
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -145,5 +152,104 @@ def test_parts_sheet_is_on_screen_at_phone_and_desktop(base):
             page.locator("#partsClose").click()
             page.locator("#bedPin").click()
             page.wait_for_timeout(100)
+        assert errors == [], errors
+        browser.close()
+
+
+def _reveal(page, selector):
+    page.evaluate(
+        """(sel) => {
+          const el = document.querySelector(sel);
+          if (el) el.scrollIntoView({block: "center", inline: "center"});
+        }""",
+        selector,
+    )
+    page.wait_for_timeout(200)
+
+
+def _see(page, selector, where):
+    _reveal(page, selector)
+    assert _on_screen(page, selector), f"{where}: {selector} is not on screen"
+
+
+def test_slot_controls_and_single_slot_warning_are_on_screen(base):
+    folder = tempfile.mkdtemp(prefix="zeim-slot-ui-")
+    path = os.path.join(folder, "colour.3mf")
+    with open(path, "wb") as fh:
+        fh.write(_coloured_3mf())
+    with sync_playwright() as p:
+        browser = _launch(p)
+        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        page.add_init_script(
+            "localStorage.setItem('zeim.printer', JSON.stringify({printer_id: 'bambu_x1c', nozzle: 0.4}))"
+        )
+        errors = []
+        page.on("pageerror", lambda err: errors.append(str(err)))
+        page.goto(base + "/#slicer", wait_until="domcontentloaded")
+        page.wait_for_selector("#editFile", state="attached", timeout=20000)
+        page.set_input_files("#editFile", path)
+        _wait(page, "document.querySelectorAll('#bedPartsList [data-part]').length >= 4", timeout=90)
+        _wait(page, "document.querySelectorAll('#bedSlotPick button').length >= 4", timeout=30)
+        for width, height in ((1280, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.wait_for_timeout(300)
+            where = f"{width}x{height}"
+            _reveal(page, "#bedParts")
+            page.locator("#bedParts").click()
+            page.wait_for_timeout(200)
+            for sel in ("#bedPartsList [data-part]", "#bedSlotPick button", "#bedAssignSlot",
+                        "#bedResetSlots", "#editDetectParts", "#bedPartsPrint"):
+                _see(page, sel, where)
+            assert PRINT_NOTE in page.locator("#bedPartsPrint").inner_text()
+            before = page.locator("#bedPartsList").inner_text()
+            page.locator("#partsClose").click()
+            page.locator("#bedPin").click()
+            _reveal(page, "#bedFilament")
+            page.locator("#bedFilament").click()
+            _reveal(page, "#bedTools [data-bed-tab=filament]")
+            page.locator("#bedTools [data-bed-tab=filament]").click()
+            page.wait_for_timeout(200)
+            if page.locator("#spSingleOn").get_attribute("aria-pressed") != "true":
+                _reveal(page, "#spSingleOn")
+                page.locator("#spSingleOn").click()
+                page.locator("#spSingleTurnOn").click()
+                page.wait_for_timeout(200)
+            _see(page, "#spPartSlotWarn", where)
+            assert SINGLE_NOTE in page.locator("#spPartSlotWarn").inner_text()
+            page.locator("#processClose").click()
+            page.locator("#bedPin").click()
+            _reveal(page, "#bedParts")
+            page.locator("#bedParts").click()
+            page.wait_for_timeout(200)
+            _see(page, "#bedPartsSingle", where)
+            assert page.locator("#bedPartsList").inner_text() == before
+            assert SINGLE_NOTE in page.locator("#bedPartsSingle").inner_text()
+            page.locator("#partsClose").click()
+            page.locator("#bedPin").click()
+        # One slot in use: the one-colour note and the single-slot warning are no longer true.
+        page.set_viewport_size({"width": 1280, "height": 900})
+        _reveal(page, "#bedParts")
+        page.locator("#bedParts").click()
+        page.wait_for_timeout(200)
+        for btn in page.locator("#bedPartsList [data-part]").all():
+            if btn.get_attribute("aria-pressed") != "true":
+                btn.click()
+        page.locator("#bedSlotPick button[data-slot='1']").click()
+        _wait(page, "[...document.querySelectorAll('#bedPartsList [data-part] small')].every(el => el.textContent.trim() === 'Slot 1')")
+        assert page.locator("#bedPartsPrint").get_attribute("hidden") is not None
+        assert page.locator("#bedPartsSingle").get_attribute("hidden") is not None
+        href = page.locator("#editOpenCad").get_attribute("href")
+        page.goto(base + href, wait_until="domcontentloaded")
+        page.wait_for_selector("#tabItems", timeout=20000)
+        _wait(page, "document.querySelectorAll('#cwItems [data-part]').length >= 4", timeout=60)
+        for width, height in ((1280, 900), (390, 844)):
+            page.set_viewport_size({"width": width, "height": height})
+            page.wait_for_timeout(400)
+            page.locator("#tabItems").click()
+            page.wait_for_timeout(400)
+            where = f"CAD {width}x{height}"
+            for sel in ("#cwItems [data-part]", "#cwSlotPick button", "#cwAssignSlot", "#cwResetSlots", "#cwDetectParts"):
+                _see(page, sel, where)
+            assert PRINT_NOTE not in page.locator("#cwItems").inner_text()
         assert errors == [], errors
         browser.close()
