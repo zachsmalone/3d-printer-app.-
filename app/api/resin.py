@@ -275,13 +275,14 @@ def _work(data, ext, s, bed, isl=None, drains=None, note="", simplify=False, man
     rep["triangles"] = int(len(out.faces))
     rep["simplified"] = bool(fit_note)
     emit("write", label="Writing the mesh")
-    stl, tmf = out.export(file_type="stl"), out.export(file_type="3mf")
+    # STL is what Prepare stores. 3MF is built on download from that STL.
+    stl = out.export(file_type="stl")
     viewer, vcount = _viewer_preview(out)
     if viewer:
         rep["_viewer_stl"] = viewer
         rep["_viewer_tris"] = int(vcount)
     emit("write", 1, 1, "Writing the mesh")
-    return stl, tmf, rep
+    return stl, rep
 
 
 PREVIEW_FACES = int(os.environ.get("ZEIM_RESIN_PREVIEW_FACES", "150000"))
@@ -495,7 +496,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
                 raise guard.Busy()
             try:
                 do_simplify = str(simplify).lower() in ("1", "true", "on", "yes")
-                stl_b, tmf_b, rep = procjob.call(
+                stl_b, rep = procjob.call(
                     _work, (local_data, local_ext, s, bed, isl, drn, note, do_simplify, manual, avoid, prog_path),
                     timeout=240, mem_mb=RESIN_MEM_MB)
             finally:
@@ -510,7 +511,7 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
             raise HTTPException(422, "Preparing this model ran out of memory or time on the server." + _oom_tip(s))
         rid = uuid.uuid4().hex
         d = _dir()
-        (d / f"{rid}.stl").write_bytes(stl_b); (d / f"{rid}.3mf").write_bytes(tmf_b)
+        (d / f"{rid}.stl").write_bytes(stl_b)
         viewer = rep.pop("_viewer_stl", None)
         vcount = rep.pop("_viewer_tris", None)
         full_tris = int(rep.get("triangles") or 0)

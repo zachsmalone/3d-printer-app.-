@@ -121,8 +121,10 @@ def run_detail(kind):
         for inner_pt, outer_pt in axes:
             if not meshedit._hole_is_open(np.asarray(out.vertices), np.asarray(out.faces), inner_pt, outer_pt):
                 raise AssertionError(f"{kind}: drain axis is still blocked")
-    if seconds > 240:
-        raise AssertionError(f"{kind}: {seconds:.0f}s is not inside the 240s prepare limit")
+    # 180 s leaves margin under the 240 s prepare kill. The 2-core child is about a minute
+    # on this mesh; a run near 240 s is the old single-core layer check coming back.
+    if seconds > 180:
+        raise AssertionError(f"{kind}: {seconds:.0f}s is not inside the 180s prepare budget")
     return {
         "seconds": round(seconds, 2),
         "rss_mb": round(rss_mb, 1),
@@ -200,8 +202,8 @@ def run_case(kind):
         raise AssertionError(f"{kind}: outer surface was not kept ({kept:.2f} of sampled vertices)")
     if len(out.faces) < faces_in:
         raise AssertionError(f"{kind}: triangle count fell from {faces_in} to {len(out.faces)}")
-    if seconds > 230:
-        raise AssertionError(f"{kind}: {seconds:.0f}s is not inside the 240s prepare limit")
+    if seconds > 180:
+        raise AssertionError(f"{kind}: {seconds:.0f}s is not inside the 180s prepare budget")
     return {
         "seconds": round(seconds, 2),
         "rss_mb": round(rss_mb, 1),

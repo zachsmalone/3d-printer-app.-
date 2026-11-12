@@ -21,7 +21,9 @@ def test_high_poly_prepare_fits_the_production_cap():
     for kind, row in results.items():
         assert row["faces_in"] == 694_400
         assert row["faces_out"] >= row["faces_in"]
-        assert row["seconds"] < 230
+        # The prepare child uses at most 2 CPUs. 180 s is under the 240 s kill, with room
+        # for a slower runner. The detailed shell is the one that used to sit on that kill.
+        assert row["seconds"] < 180
         assert row["kept"] >= 0.85
         assert row["rss_mb"] < 2800
     assert results["supports"]["pillars"] >= 80 and results["supports"]["touch"] >= 0.5
@@ -47,7 +49,7 @@ def test_detailed_hollow_fits_the_production_cap():
     for kind, row in results.items():
         assert row["faces_in"] == 694_400
         assert row["faces_out"] >= row["faces_in"]
-        assert row["seconds"] < 240
+        assert row["seconds"] < 180
         assert row["rss_mb"] < RESIN_MEM_MB
         assert row["kept"] >= 0.99
         assert row["saved"] > 50
