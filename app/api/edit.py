@@ -419,7 +419,7 @@ def put_part_slots(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     the mesh this request commits against.
     """
     try:
-        return editlane.run(lambda: _put_part_slots(bid, body, actor))
+        return editlane.run(bid, lambda: _put_part_slots(bid, body, actor))
     except editlane.Busy:
         raise HTTPException(503, editlane.BUSY)
 
@@ -531,7 +531,7 @@ def _act(bid, actor, fn):
 @router.post("/{bid}/op")
 def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     try:
-        return editlane.run(lambda: _apply_op(bid, body, actor))
+        return editlane.run(bid, lambda: _apply_op(bid, body, actor))
     except editlane.Busy:
         raise HTTPException(503, editlane.BUSY)
 
@@ -596,7 +596,7 @@ def delete_step(bid: str, i: int, actor: Actor = Depends(get_actor)):
 @router.post("/{bid}/undo")
 def undo(bid: str, actor: Actor = Depends(get_actor)):
     try:
-        return editlane.run(lambda: _act(bid, actor, lambda: editproj.undo(bid)))
+        return editlane.run(bid, lambda: _act(bid, actor, lambda: editproj.undo(bid)))
     except editlane.Busy:
         raise HTTPException(503, editlane.BUSY)
 
@@ -604,7 +604,7 @@ def undo(bid: str, actor: Actor = Depends(get_actor)):
 @router.post("/{bid}/redo")
 def redo(bid: str, actor: Actor = Depends(get_actor)):
     try:
-        return editlane.run(lambda: _act(bid, actor, lambda: editproj.redo(bid)))
+        return editlane.run(bid, lambda: _act(bid, actor, lambda: editproj.redo(bid)))
     except editlane.Busy:
         raise HTTPException(503, editlane.BUSY)
 

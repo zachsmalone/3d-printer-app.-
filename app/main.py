@@ -75,6 +75,17 @@ def _start_slicer_warm():
 
 
 @app.on_event("startup")
+def _start_edit_pool():
+    """Warm mesh-edit workers so a large step does not pay to import NumPy again.
+
+    The workers are spawned interpreters. This does not fork the server, and
+    /healthz does not wait on them.
+    """
+    from .core import guard
+    guard.warm()
+
+
+@app.on_event("startup")
 def _start_account_purge():
     """Remove accounts marked by 'Delete my account': now, then hourly (in-process; no cron)."""
     from .community import account_delete
