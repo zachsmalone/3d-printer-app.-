@@ -34,6 +34,9 @@ def test_preview_loads_every_format(c, name, kind):
 
 def test_preview_keeps_every_triangle_unless_simplify_is_asked(c, monkeypatch):
     from app.api import resin as api
+    # The simplify cap is re-read in the procjob child, so patching the parent
+    # constant alone has no effect (these two tests already failed on zeim).
+    monkeypatch.setenv("ZEIM_RESIN_MAX_FACES", "2000")
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=30, count=[80, 80])
     data = m.export(file_type="3mf")
@@ -78,6 +81,7 @@ def test_big_binary_stl_keeps_every_triangle_and_prepare_reuses_it(c, monkeypatc
     """A large binary STL used to be simplified before preview and again before prepare.
     The default path keeps the triangle count. Prepare reuses the loaded copy by id."""
     from app.api import resin as api
+    monkeypatch.setenv("ZEIM_RESIN_MAX_FACES", "2000")
     monkeypatch.setattr(api, "RESIN_MAX_FACES", 2000)
     m = trimesh.creation.uv_sphere(radius=20, count=[80, 80])
     m.apply_translation((0, 0, 20))
