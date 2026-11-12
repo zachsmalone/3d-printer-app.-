@@ -30,6 +30,19 @@ _STRIPE_KEYS = (
     "STRIPE_PRICE_SEMI_PRO", "STRIPE_PRICE_PRO",
     "STRIPE_PRICE_FEE_SEMI_PRO", "STRIPE_PRICE_FEE_PRO",
 )
+# A random user id or recovery token can contain "4242" by chance. Card checks skip those fields.
+_RANDOM_USER_KEYS = {"id", "recovery", "username", "created", "recovery_issued"}
+
+
+def _stored_text(user: dict) -> str:
+    body = {k: v for k, v in user.items() if k not in _RANDOM_USER_KEYS}
+    badges = body.get("badges")
+    if isinstance(badges, dict):
+        body["badges"] = {
+            name: ({bk: bv for bk, bv in info.items() if bk != "earned_at"} if isinstance(info, dict) else info)
+            for name, info in badges.items()
+        }
+    return json.dumps(body)
 
 
 @pytest.fixture(autouse=True)
@@ -217,7 +230,7 @@ def test_open_checkout_checks_price_and_stores_customer_id_only(monkeypatch):
     assert saved.get("plan") in (None, "free")
     assert saved["billing"]["customer_id"] == "cus_test123"
     assert saved["billing"].keys() <= billing._BILLING_KEYS
-    assert "4242" not in json.dumps(saved)
+    assert "4242" not in _stored_text(saved)
     # Wrong Dashboard amount must not open Checkout.
     api.amounts[PRICE_SEMI] = 999
     api.sessions = 0
@@ -261,7 +274,7 @@ def test_webhook_sets_plan_for_gating_and_ignores_card_fields(monkeypatch):
     user = _user(uid)
     assert user["billing"]["customer_id"] == "cus_test123"
     assert user["billing"]["subscription_id"] == "sub_test123"
-    dumped = json.dumps(user)
+    dumped = _stored_text(user)
     for banned in ("4242", "pm_card", "cvc", "last4"):
         assert banned not in dumped
     assert subs.has_paid_plan(user, "pro") and ai3d.is_pro(type("A", (), {"user": user})())
