@@ -879,6 +879,12 @@ HOLLOW_SHELL_FACES = 80_000
 HOLLOW_PROXY_FACES = 80_000
 HOLLOW_SHELL_VOXELS = 2_000_000
 CAVITY_FACE_CAP = 120_000
+# Voids smaller than this share of the main cavity are pockets. They are not cut
+# out, so the resin there stays solid instead of a sealed cup.
+CAVITY_KEEP_FRAC = 0.05
+# A hollow that keeps less of the model than this is not worth the drains.
+MIN_HOLLOW_SAVE_PCT = 10.0
+LEFT_SOLID_NOTE = "This model is mostly thin walls, so hollowing saved little; it was left solid."
 
 
 def _vox_source(mm):
@@ -1169,11 +1175,75 @@ def _cavity_from_sdf(sdf, vox, pitch, offset):
 
 
 def _cavity_parts(cav, wall):
-    """Keep void pieces big enough to drain. Tiny pockets would trap resin."""
-    min_cav = (1.5 * wall) ** 3
+    """Keep voids large enough to drain. Dropped pieces are not cut out of the shell.
+
+    A pocket under a few percent of the main void, or a thin crumb beside it, would
+    be a sealed cup if it were left in and not drained. Leaving it out fills that
+    region solid. The largest void is kept here; the save check can still reject it.
+    """
+    min_abs = (1.5 * float(wall)) ** 3
     all_parts = [c for c in cav.split(only_watertight=False) if c.volume > 0]
-    kept = [c for c in all_parts if c.volume >= min_cav]
+    if not all_parts:
+        return [], 0
+    main = max(float(c.volume) for c in all_parts)
+    floor = max(min_abs, CAVITY_KEEP_FRAC * main)
+    thin_span = max(1.5, float(wall) * 0.75)
+    kept = []
+    for part in all_parts:
+        vol = float(part.volume)
+        span = float(np.min(part.extents))
+        if vol + 1e-6 >= main:
+            kept.append(part)
+            continue
+        if vol < floor or (span < thin_span and vol < 0.25 * main):
+            continue
+        kept.append(part)
     return kept, len(all_parts) - len(kept)
+
+
+def _merge_cavity_parts(parts, gap):
+    """Union voids whose boxes meet, so one pocket is not stored as two shells."""
+    if len(parts) <= 1:
+        return parts
+    parent = list(range(len(parts)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    boxes = []
+    for part in parts:
+        lo, hi = np.asarray(part.bounds, dtype=np.float64)
+        boxes.append((lo - gap, hi + gap))
+    for i in range(len(parts)):
+        for j in range(i + 1, len(parts)):
+            lo_i, hi_i = boxes[i]
+            lo_j, hi_j = boxes[j]
+            if np.all(lo_i <= hi_j) and np.all(lo_j <= hi_i):
+                parent[find(i)] = find(j)
+    groups = {}
+    for i, part in enumerate(parts):
+        groups.setdefault(find(i), []).append(part)
+    if all(len(group) == 1 for group in groups.values()):
+        return parts
+    merged = []
+    for group in groups.values():
+        if len(group) == 1:
+            merged.append(group[0])
+            continue
+        try:
+            union = trimesh.boolean.union(group, engine="manifold")
+        except Exception:
+            merged.extend(group)
+            continue
+        if union is None or len(union.faces) == 0:
+            merged.extend(group)
+            continue
+        pieces = [c for c in union.split(only_watertight=False) if c.volume > 0]
+        merged.extend(pieces or group)
+    return merged or parts
 
 
 def _face_spans(faces, nvert):
@@ -1223,11 +1293,12 @@ def _closest_clearance(point, tris):
     return float(dist[k]), float(signed[k]), closest[k]
 
 
-def _min_wall(outer, cavity):
+def _min_wall(outer, cavity, tree=None, spans=None):
     """Thinnest distance from cavity vertices to the full-resolution outer surface.
 
     Uses a vertex tree and the faces around the nearest vertices, not a triangle rtree.
     Returns (millimetres or None, count of cavity samples that landed outside the shell).
+    `tree` and `spans` belong to the outer shell and are reused across cavities and retries.
     """
     overts = np.ascontiguousarray(outer.vertices, dtype=np.float64)
     ofaces = np.ascontiguousarray(outer.faces, dtype=np.int64)
@@ -1235,10 +1306,15 @@ def _min_wall(outer, cavity):
     if len(cverts) == 0 or len(ofaces) == 0:
         return None, 0
     k = min(16, len(overts))
-    dist, nn = cKDTree(overts).query(cverts, k=k, workers=1)
+    if tree is None:
+        tree = cKDTree(overts)
+    dist, nn = tree.query(cverts, k=k, workers=1)
     nearest = dist if dist.ndim == 1 else dist[:, 0]
     order = np.argsort(nearest)[:min(2500, len(cverts))]
-    start, count, flat_f = _face_spans(ofaces, len(overts))
+    if spans is None:
+        start, count, flat_f = _face_spans(ofaces, len(overts))
+    else:
+        start, count, flat_f = spans
     # Face normals flip on a wrinkle even when the sample is inside the solid.
     # The nearest vertex normal is the inside/outside test; the faces give the distance.
     normals = np.asarray(outer.vertex_normals, dtype=np.float64)
@@ -1258,12 +1334,17 @@ def _min_wall(outer, cavity):
     return worst, outside
 
 
-def _nearest_outer_point(outer, point):
+def _nearest_outer_point(outer, point, tree=None, spans=None):
     """Closest point of the full-resolution shell to `point`."""
     overts = np.ascontiguousarray(outer.vertices, dtype=np.float64)
     ofaces = np.ascontiguousarray(outer.faces, dtype=np.int64)
-    _d, nn = cKDTree(overts).query(np.asarray(point, dtype=np.float64), k=min(16, len(overts)), workers=1)
-    start, count, flat_f = _face_spans(ofaces, len(overts))
+    if tree is None:
+        tree = cKDTree(overts)
+    _d, nn = tree.query(np.asarray(point, dtype=np.float64), k=min(16, len(overts)), workers=1)
+    if spans is None:
+        start, count, flat_f = _face_spans(ofaces, len(overts))
+    else:
+        start, count, flat_f = spans
     fis = _faces_of(nn, start, count, flat_f)
     if len(fis) == 0:
         return overts[int(np.atleast_1d(nn)[0])]
@@ -1302,6 +1383,29 @@ def _ray_first_t(origin, direction, verts, faces):
     return float(t[hit].min())
 
 
+def _faces_along_hole(verts, faces, inner_pt, outer_pt, radius):
+    """Triangles that can meet a ray down the drain. The rest cannot change the answer."""
+    direction = outer_pt - inner_pt
+    length = float(np.linalg.norm(direction))
+    if length < 1e-8:
+        return verts, faces
+    direction = direction / length
+    rel = verts - inner_pt
+    along = rel @ direction
+    radial = np.linalg.norm(rel - along[:, None] * direction, axis=1)
+    near = (radial <= float(radius)) & (along >= -float(radius)) & (along <= length + float(radius))
+    if not np.any(near):
+        return verts, faces
+    mask = near[faces].any(axis=1)
+    if not np.any(mask):
+        return verts, faces
+    sub = faces[mask]
+    used = np.unique(sub)
+    remap = np.full(len(verts), -1, dtype=np.int64)
+    remap[used] = np.arange(len(used))
+    return np.ascontiguousarray(verts[used]), np.ascontiguousarray(remap[sub])
+
+
 def _hole_is_open(verts, faces, inner_pt, outer_pt):
     """True when the wall midpoint can see both out of the hole and into the cavity.
 
@@ -1310,11 +1414,15 @@ def _hole_is_open(verts, faces, inner_pt, outer_pt):
     """
     inner_pt = np.asarray(inner_pt, dtype=np.float64)
     outer_pt = np.asarray(outer_pt, dtype=np.float64)
+    verts = np.asarray(verts, dtype=np.float64)
+    faces = np.asarray(faces, dtype=np.int64)
     direction = outer_pt - inner_pt
     length = float(np.linalg.norm(direction))
     if length < 1e-5:
         return False
     direction /= length
+    if len(faces) > 20_000:
+        verts, faces = _faces_along_hole(verts, faces, inner_pt, outer_pt, 6.0)
     mid = (inner_pt + outer_pt) * 0.5
     limit = max(length * 0.75, 0.4)
     # A straight axis can clip a jagged but still open tunnel. Accept the hole when any
@@ -1334,35 +1442,86 @@ def _hole_is_open(verts, faces, inner_pt, outer_pt):
     return clear >= 1
 
 
-def _punch_hole(verts, faces, inner_pt, outer_pt, radius):
-    """Cut one drain with a small cylinder. The cavity itself is not a boolean of the shell.
-
-    A cylinder through the wall is a few hundred triangles. Vertices far from it stay
-    at their float32 positions, which still match the original shell at 0.001 mm.
-    """
+def _drain_cylinder(inner_pt, outer_pt, radius):
+    """Cylinder through one wall, or None when the segment is degenerate."""
     inner_pt = np.asarray(inner_pt, dtype=np.float64)
     outer_pt = np.asarray(outer_pt, dtype=np.float64)
     direction = outer_pt - inner_pt
     length = float(np.linalg.norm(direction))
-    if length < 1e-5 or radius <= 0:
-        return verts, faces, False
-    direction /= length
+    if length < 1e-5 or radius <= 0.0:
+        return None
+    direction = direction / length
     height = length + 2.0 * float(radius) + 1.2
     cyl = trimesh.creation.cylinder(radius=float(radius), height=height, sections=24)
     cyl.apply_transform(trimesh.geometry.align_vectors([0.0, 0.0, 1.0], direction))
     cyl.apply_translation((inner_pt + outer_pt) * 0.5)
-    memtrim.trim()
-    try:
-        cut = _boolean(_new(verts, faces), _new(cyl.vertices, cyl.faces), "difference")
-    except MemoryError:
-        raise
-    except OpError:
-        return verts, faces, False
-    cut_v = np.asarray(cut.vertices, dtype=np.float64)
-    cut_f = np.asarray(cut.faces, dtype=np.int64)
-    if not _hole_is_open(cut_v, cut_f, inner_pt, outer_pt):
-        return verts, faces, False
-    return cut_v, cut_f, True
+    return cyl
+
+
+def _union_cutters(meshes):
+    """One solid from the drain cylinders. They do not overlap the outer shell's far vertices."""
+    if len(meshes) == 1:
+        return meshes[0]
+    if manifold3d is None:
+        raise OpError("Boolean operations need the 'manifold3d' package (pip install manifold3d).")
+    parts = []
+    for mesh in meshes:
+        parts.append(_manifold_mesh(mesh))
+    union = manifold3d.Manifold.batch_boolean(parts, manifold3d.OpType.Add)
+    if union.status() != manifold3d.Error.NoError or union.is_empty():
+        raise OpError("Could not hollow this shape. Try a thicker wall, or turn hollowing off.")
+    out = union.to_mesh()
+    return _new(np.asarray(out.vert_properties)[:, :3], np.asarray(out.tri_verts))
+
+
+def _batch_punch(verts, faces, holes):
+    """Cut every drain in one boolean, then keep the ray check along each hole.
+
+    A 694k-triangle shell pays for the whole mesh on every boolean. One pass for
+    all cylinders is the same cut as punching them one by one. Holes that stay
+    blocked are omitted and the shell is cut once more without them.
+    """
+    source_v = np.asarray(verts, dtype=np.float64)
+    source_f = np.asarray(faces, dtype=np.int64)
+    pending = [(np.asarray(inner, dtype=np.float64), np.asarray(outer, dtype=np.float64), float(radius))
+               for inner, outer, radius in holes]
+    opened = [False] * len(pending)
+    best_v, best_f = source_v, source_f
+    if not pending:
+        return source_v, source_f, opened
+    for scale in (1.0, 1.35):
+        if scale != 1.0 and all(opened):
+            break
+        tools = []
+        which = []
+        for i, (inner, outer, radius) in enumerate(pending):
+            used = radius if opened[i] else radius * scale
+            tool = _drain_cylinder(inner, outer, used)
+            if tool is None:
+                continue
+            tools.append(tool)
+            which.append(i)
+        if not tools:
+            break
+        try:
+            memtrim.trim()
+            cut = _boolean(_new(source_v, source_f), _union_cutters(tools), "difference")
+        except MemoryError:
+            raise
+        except OpError:
+            continue
+        cut_v = np.asarray(cut.vertices, dtype=np.float64)
+        cut_f = np.asarray(cut.faces, dtype=np.int64)
+        now = [False] * len(pending)
+        for i in which:
+            inner, outer, _radius = pending[i]
+            now[i] = _hole_is_open(cut_v, cut_f, inner, outer)
+        if sum(now) >= sum(opened) and any(now):
+            best_v, best_f = cut_v, cut_f
+            opened = now
+        if all(opened[i] for i in which):
+            break
+    return best_v, best_f, opened
 
 
 def _concat_cavity(outer, parts):
@@ -1405,6 +1564,124 @@ def _parse_drain_specs(p, drain):
     return specs
 
 
+def _shell_volume(mm, parts, body):
+    """Outer shell plus flipped cavities. Returns vertices, faces, and the shell volume."""
+    verts, faces = _concat_cavity(mm, parts)
+    shell_vol = float(_new(verts, faces).volume)
+    if shell_vol <= 0.0 or (body > 0 and shell_vol >= body * 0.98):
+        n_outer = len(mm.faces)
+        faces = np.array(faces, copy=True)
+        faces[n_outer:, :] = faces[n_outer:, ::-1]
+        shell_vol = float(_new(verts, faces).volume)
+    return verts, faces, shell_vol
+
+
+def _open_shell_drains(mm, parts, wall, drain, p, body, tree, spans, stages=None):
+    """Punch two drains per kept cavity. A cavity that does not open is left out of the shell."""
+    per = int(p.get("per_cavity") or 0)
+    specs = _parse_drain_specs(p, drain)
+    need = min(per, 2) if per >= 1 and drain > 0 and not specs else 0
+    active = list(parts)
+    dropped_now = 0
+    verts = faces = None
+    holes_made = []
+    axes = []
+    shell_vol = 0.0
+    marked_shell = False
+    rounds = max(1, len(active))
+    for _round in range(rounds):
+        if not active:
+            break
+        verts, faces, shell_vol = _shell_volume(mm, active, body)
+        if shell_vol <= 0.0 or (body > 0 and shell_vol >= body * 0.98):
+            raise OpError("Could not build a hollow shell for this shape. Try a thicker wall.")
+        if stages is not None and not marked_shell:
+            stages.mark("shell", volume_mm3=round(shell_vol))
+            marked_shell = True
+        targets = []
+        holes_made = []
+        if specs:
+            for xyz, diameter, direc in specs:
+                inner_pt = None
+                best = None
+                for part in active:
+                    dist = np.linalg.norm(np.asarray(part.vertices, dtype=np.float64) - xyz, axis=1)
+                    k = int(np.argmin(dist))
+                    if best is None or dist[k] < best:
+                        best = float(dist[k])
+                        inner_pt = np.asarray(part.vertices[k], dtype=np.float64)
+                outer_pt = np.asarray(xyz, dtype=np.float64)
+                if direc and len(direc) == 3:
+                    axis = np.asarray(direc, dtype=np.float64)
+                    norm = float(np.linalg.norm(axis))
+                    if norm > 1e-8 and inner_pt is not None:
+                        outer_pt = inner_pt + axis / norm * max(float(wall), 0.5)
+                if inner_pt is not None:
+                    targets.append((inner_pt, outer_pt, diameter / 2.0))
+            groups = [list(range(len(targets)))]
+        elif per >= 1 and drain > 0:
+            groups = []
+            for part in active:
+                v = np.asarray(part.vertices, dtype=np.float64)
+                picks = [v[int(np.argmin(v[:, 2]))], v[int(np.argmax(v[:, 2]))]][:per]
+                groups.append(list(range(len(targets), len(targets) + len(picks))))
+                for inner_pt in picks:
+                    targets.append((np.asarray(inner_pt, dtype=np.float64), None, drain / 2.0))
+        elif drain > 0:
+            part = max(active, key=lambda c: c.volume)
+            v = np.asarray(part.vertices, dtype=np.float64)
+            targets.append((v[int(np.argmin(v[:, 2]))], None, drain / 2.0))
+            groups = [list(range(len(targets)))]
+        else:
+            groups = []
+        resolved = []
+        for inner_pt, outer_pt, radius in targets:
+            if outer_pt is None:
+                outer_pt = _nearest_outer_point(mm, inner_pt, tree=tree, spans=spans)
+            resolved.append((inner_pt, np.asarray(outer_pt, dtype=np.float64), radius))
+        if resolved:
+            verts, faces, oks = _batch_punch(verts, faces, resolved)
+        else:
+            oks = []
+        made_counts = []
+        axes = []
+        for group in groups:
+            n = 0
+            for ti in group:
+                if ti < len(oks) and oks[ti]:
+                    n += 1
+                    inner_pt, outer_pt, _radius = resolved[ti]
+                    axes.append([[round(float(c), 3) for c in inner_pt], [round(float(c), 3) for c in outer_pt]])
+            made_counts.append(n)
+        holes_made = made_counts
+        if need < 1 or not holes_made or all(n >= need for n in holes_made):
+            break
+        kept = [part for part, n in zip(active, holes_made) if n >= need]
+        dropped_now += len(active) - len(kept)
+        if not kept or len(kept) == len(active):
+            active = kept
+            break
+        active = kept
+    return verts, faces, shell_vol, holes_made, axes, active, dropped_now
+
+
+def _left_solid(mm, pitch, stages, dropped=0):
+    """The solid shell, with the note prepare shows when hollowing is not worth it."""
+    stages.mark("left_solid", save_pct=0.0)
+    return mm, {
+        "message": "Left solid.",
+        "resolution_mm": round(float(pitch), 3),
+        "volume_saved_pct": 0.0,
+        "left_solid": True,
+        "note": LEFT_SOLID_NOTE,
+        "cavity_fragments_dropped": int(dropped),
+        "floating_pieces_dropped": 0,
+        "thinnest_wall_mm": None,
+        "holes_made": [],
+        "stages": stages.rows,
+    }
+
+
 def _hollow_shell(mm, wall, drain, p):
     """Hollow a large mesh without booleaning or decimating the printed shell.
 
@@ -1429,118 +1706,102 @@ def _hollow_shell(mm, wall, drain, p):
         gap = 0.0
         vox_vol = filled * float(pitch) ** 3
         if body > 0 and (vox_vol < 0.35 * body or vox_vol > 1.45 * body):
-            raise OpError("Could not build a cavity for this shape. Try a thicker wall.")
+            # The sheet is too thin for this grid. Hollowing it would not be an honest cavity.
+            del sdf, vox
+            memtrim.trim()
+            return _left_solid(mm, pitch, stages, 0)
     stages.mark("sdf", cells=int(sdf.size), mb=round(sdf.nbytes / (1024.0 * 1024.0), 1))
     del proxy
     floor = float(wall) - pitch
     target = float(wall) - 0.25 * pitch
-    offset = float(wall) + min(float(wall), max(0.0, gap)) + 0.5 * pitch
+    base_offset = float(wall) + min(float(wall), max(0.0, gap)) + 0.5 * pitch
+    offset = base_offset
     parts = None
     wall_min = None
     dropped = 0
     outside = 0
+    save_est = 0.0
+    stop_solid = False
+    overts = np.ascontiguousarray(mm.vertices, dtype=np.float64)
+    shell_tree = cKDTree(overts)
+    shell_spans = _face_spans(np.ascontiguousarray(mm.faces, dtype=np.int64), len(overts))
     for attempt in range(4):
         cav = _cavity_from_sdf(sdf, vox, pitch, offset)
-        if cav is None:
-            raise OpError("Nothing left to hollow with this wall thickness.")
+        if cav is None or len(cav.faces) == 0:
+            stop_solid = True
+            stages.mark("cavity", attempt=attempt, offset_mm=round(offset, 2), empty=True)
+            break
         parts, dropped = _cavity_parts(cav, wall)
+        if parts:
+            parts = _merge_cavity_parts(parts, float(pitch))
         if not parts:
-            raise OpError("Nothing left to hollow with this wall thickness (only tiny pockets would remain). Try a thinner wall.")
+            stop_solid = True
+            stages.mark("cavity", attempt=attempt, offset_mm=round(offset, 2), kept=0, dropped=int(dropped))
+            break
+        save_est = 100.0 * sum(float(part.volume) for part in parts) / body if body > 0.0 else 0.0
         wall_min = None
         outside = 0
         for part in parts:
-            measured, n_out = _min_wall(mm, part)
+            measured, n_out = _min_wall(mm, part, tree=shell_tree, spans=shell_spans)
             outside += n_out
             if measured is not None:
                 wall_min = measured if wall_min is None else min(wall_min, measured)
-        stages.mark("cavity", attempt=attempt, faces=int(sum(len(part.faces) for part in parts)),
-                    wall_mm=None if wall_min is None else round(wall_min, 2),
-                    offset_mm=round(offset, 2), outside=int(outside))
-        if wall_min is not None and wall_min + 1e-6 >= target and outside == 0:
+        wall_ok = wall_min is not None and wall_min + 1e-6 >= target and outside == 0
+        broke = outside > 0 or (wall_min is not None and wall_min < 0.35)
+        far = offset > base_offset + float(wall)
+        stages.mark(
+            "cavity", attempt=attempt, faces=int(sum(len(part.faces) for part in parts)),
+            wall_mm=None if wall_min is None else round(wall_min, 2),
+            offset_mm=round(offset, 2), outside=int(outside),
+            save_pct=round(save_est, 1), kept=len(parts),
+        )
+        # A deeper offset only shrinks the void. Stop once the shell is thin,
+        # or the wall only appears after the inset has moved well past the request.
+        if wall_ok and save_est + 1e-6 < MIN_HOLLOW_SAVE_PCT:
+            stop_solid = True
+            break
+        if wall_ok:
+            break
+        if save_est + 1e-6 < MIN_HOLLOW_SAVE_PCT and (not broke or attempt >= 1):
+            stop_solid = True
+            break
+        if far and (broke or save_est < MIN_HOLLOW_SAVE_PCT + 5.0):
+            stop_solid = True
             break
         if attempt == 3:
             break
         short = target - (wall_min if wall_min is not None else 0.0)
-        offset += max(pitch * 0.5, short + 0.05 * pitch, pitch if outside else 0.0)
+        step = max(pitch * 0.5, short + 0.05 * pitch, pitch if outside else 0.0)
+        # A cavity that breaks the surface only needs a small pull-back. A big
+        # jump shrinks a thin relief until the void is not worth keeping.
+        if broke and save_est < 40.0:
+            step = min(step, pitch * 0.5)
+        if save_est < 25.0:
+            room = base_offset + float(wall) - offset
+            if room <= 0.05:
+                stop_solid = True
+                break
+            step = min(step, room)
+        offset += step
+    if stop_solid:
+        del sdf, vox
+        memtrim.trim()
+        return _left_solid(mm, pitch, stages, dropped)
     del sdf, vox
     memtrim.trim()
     if parts is None or wall_min is None or wall_min < floor or outside:
+        # Still breaking through after the allowed inset. Leave the solid rather
+        # than ship a cavity that crosses the surface.
+        if outside or wall_min is None or wall_min < 0.35:
+            return _left_solid(mm, pitch, stages, dropped)
         raise OpError("Could not keep the wall thickness on this shape. Try a thicker wall.")
     if sum(len(part.faces) for part in parts) > CAVITY_FACE_CAP * 3:
         raise MemoryError("hollow cavity does not fit in the prepare memory budget")
-    verts, faces = _concat_cavity(mm, parts)
-    shell_vol = float(_new(verts, faces).volume)
-    if shell_vol <= 0.0 or (body > 0 and shell_vol >= body * 0.98):
-        n_outer = len(mm.faces)
-        faces = np.array(faces, copy=True)
-        faces[n_outer:, :] = faces[n_outer:, ::-1]
-        shell_vol = float(_new(verts, faces).volume)
-    if shell_vol <= 0.0 or (body > 0 and shell_vol >= body * 0.98):
-        raise OpError("Could not build a hollow shell for this shape. Try a thicker wall.")
-    stages.mark("shell", volume_mm3=round(shell_vol))
-    holes_made = []
-    axes = []
-    per = int(p.get("per_cavity") or 0)
-    specs = _parse_drain_specs(p, drain)
-    targets = []
-    if specs:
-        for xyz, diameter, direc in specs:
-            inner_pt = None
-            best = None
-            for part in parts:
-                d = np.linalg.norm(np.asarray(part.vertices, dtype=np.float64) - xyz, axis=1)
-                k = int(np.argmin(d))
-                if best is None or d[k] < best:
-                    best = float(d[k])
-                    inner_pt = np.asarray(part.vertices[k], dtype=np.float64)
-            outer_pt = np.asarray(xyz, dtype=np.float64)
-            if direc and len(direc) == 3:
-                axis = np.asarray(direc, dtype=np.float64)
-                norm = float(np.linalg.norm(axis))
-                if norm > 1e-8 and inner_pt is not None:
-                    outer_pt = inner_pt + axis / norm * max(float(wall), 0.5)
-            if inner_pt is not None:
-                targets.append((inner_pt, outer_pt, diameter / 2.0, None))
-    elif per >= 1 and drain > 0:
-        for part in parts:
-            v = np.asarray(part.vertices, dtype=np.float64)
-            picks = [v[int(np.argmin(v[:, 2]))], v[int(np.argmax(v[:, 2]))]][:per]
-            made = 0
-            for inner_pt in picks:
-                targets.append((inner_pt, None, drain / 2.0, made))
-            holes_made.append(0)
-    elif drain > 0:
-        part = max(parts, key=lambda c: c.volume)
-        v = np.asarray(part.vertices, dtype=np.float64)
-        targets.append((v[int(np.argmin(v[:, 2]))], None, drain / 2.0, None))
-    punch_groups = []
-    if holes_made:
-        # per-cavity counts stay aligned with `parts`
-        cursor = 0
-        for part in parts:
-            n = min(per, 2)
-            punch_groups.append(list(range(cursor, cursor + n)))
-            cursor += n
-    else:
-        punch_groups.append(list(range(len(targets))))
-    made_counts = [0 for _ in punch_groups]
-    for group_i, group in enumerate(punch_groups):
-        for ti in group:
-            inner_pt, outer_pt, radius, _tag = targets[ti]
-            if outer_pt is None:
-                outer_pt = _nearest_outer_point(mm, inner_pt)
-            new_v, new_f, ok = _punch_hole(verts, faces, inner_pt, outer_pt, radius)
-            if not ok:
-                # A slightly wider cutter still only removes the local disk.
-                new_v, new_f, ok = _punch_hole(verts, faces, inner_pt, outer_pt, radius * 1.35)
-            if ok:
-                verts, faces = new_v, new_f
-                made_counts[group_i] += 1
-                axes.append([[round(float(c), 3) for c in inner_pt], [round(float(c), 3) for c in outer_pt]])
-    if holes_made:
-        holes_made = made_counts
-    elif made_counts and made_counts[0]:
-        holes_made = made_counts
+    verts, faces, shell_vol, holes_made, axes, parts, missed = _open_shell_drains(
+        mm, parts, wall, drain, p, body, shell_tree, shell_spans, stages)
+    dropped += missed
+    if not parts or verts is None:
+        return _left_solid(mm, pitch, stages, dropped)
     out = _new(verts, faces)
     out.remove_unreferenced_vertices()
     shell_vol = float(out.volume)

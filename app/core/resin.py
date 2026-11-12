@@ -1154,7 +1154,9 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             envelope = _proxy_mesh(work, _SUPPORT_PROXY_FACES) if want_supports and work.is_watertight else None
             work = None
             memtrim.trim()
-            if large:
+            if hr.get("left_solid"):
+                made = []
+            elif large:
                 made = list(hr.get("holes_made") or [])
             else:
                 hollowed, made = add_holes(hollowed, s["drain_mm"])
@@ -1163,12 +1165,16 @@ def prepare(m: trimesh.Trimesh, s: dict, bed_mm=None, island_supports=None, drai
             memtrim.trim()
             rep["hollow"] = {k: hr[k] for k in (
                 "message", "volume_saved_pct", "thinnest_wall_mm", "resolution_mm", "stages", "drain_axes") if k in hr}
+            if hr.get("left_solid"):
+                rep["hollow"]["left_solid"] = True
+                if hr.get("note"):
+                    rep["notes"].append(hr["note"])
             # one number everywhere: the note and the report both show the probe's thinnest spot (was 0.02 mm apart)
             if hr.get("wall_min_probe_mm") is not None:
                 rep["hollow"]["thinnest_wall_mm"] = hr["wall_min_probe_mm"]
             rep["hollow"]["cavities"] = len(made); rep["hollow"]["holes"] = made
             thin = hr.get("wall_min_probe_mm", hr.get("thinnest_wall_mm"))
-            if thin is not None and thin < s["wall_mm"] - 0.05:
+            if thin is not None and thin < s["wall_mm"] - 0.05 and not hr.get("left_solid"):
                 # one wording for every thin-wall case (meshedit's own note says the same thing differently: not used)
                 rep["hollow"]["thin_wall"] = True
                 rep["notes"].append(thin_wall_note(thin, s["wall_mm"]))
