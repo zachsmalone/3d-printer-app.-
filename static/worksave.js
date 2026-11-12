@@ -99,6 +99,101 @@
         : indicatorLabel() + ". This label is not a server confirmation. ";
     ind.title = title + whereText();
     ind.setAttribute("aria-label", label + ". Open saving settings");
+    dodge();
+  }
+
+  /* The pill is position:fixed, so a control can scroll into that corner.
+     Slide it to the nearest free spot. Font, padding, border, and the words stay put. */
+  var DODGE_SEL = "a,button,input,select,textarea,summary,label,[role='button'],[role='tab']";
+  var dodgeLock = false;
+  function boxOf(el) {
+    if (!el || !el.getBoundingClientRect) return null;
+    var cs; try { cs = getComputedStyle(el); } catch (e) { return null; }
+    if (cs.display === "none" || cs.visibility === "hidden" || cs.pointerEvents === "none") return null;
+    var r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return null;
+    if (el.tagName === "INPUT" && (el.type === "hidden" || el.type === "file") && (r.width < 8 || r.height < 8 || cs.opacity === "0")) return null;
+    return r;
+  }
+  function rectsHit(a, b) {
+    return a.left < b.right - 0.5 && a.right > b.left + 0.5 && a.top < b.bottom - 0.5 && a.bottom > b.top + 0.5;
+  }
+  /* A control scrolled under overflow:hidden still has a full box. Only the part
+     that is actually painted can cover, or be covered. */
+  function visibleBox(el, r) {
+    var node = el.parentElement, cs, c, left, top, right, bottom;
+    while (node && node !== document.body) {
+      try { cs = getComputedStyle(node); } catch (e) { break; }
+      if (/auto|scroll|hidden|clip/.test(cs.overflow + cs.overflowX + cs.overflowY)) {
+        c = node.getBoundingClientRect();
+        left = Math.max(r.left, c.left); top = Math.max(r.top, c.top);
+        right = Math.min(r.right, c.right); bottom = Math.min(r.bottom, c.bottom);
+        if (right - left < 1 || bottom - top < 1) return null;
+        r = { left: left, top: top, right: right, bottom: bottom, width: right - left, height: bottom - top };
+      }
+      node = node.parentElement;
+    }
+    if (r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) return null;
+    return r;
+  }
+  function controlRects() {
+    var out = [], list = document.querySelectorAll(DODGE_SEL), i, el, r;
+    for (i = 0; i < list.length; i++) {
+      el = list[i];
+      if (el === ind || (ind.contains && ind.contains(el))) continue;
+      r = boxOf(el);
+      if (!r) continue;
+      r = visibleBox(el, r);
+      if (r) out.push(r);
+    }
+    return out;
+  }
+  function spotClear(rect, rects) {
+    var i;
+    for (i = 0; i < rects.length; i++) if (rectsHit(rect, rects[i])) return false;
+    return true;
+  }
+  function shift(dx, dy) {
+    var root = document.documentElement;
+    var x = Math.round(dx) + "px", y = Math.round(dy) + "px";
+    if (root.style.getPropertyValue("--saveind-dx") !== x) root.style.setProperty("--saveind-dx", x);
+    if (root.style.getPropertyValue("--saveind-dy") !== y) root.style.setProperty("--saveind-dy", y);
+  }
+  function dodge() {
+    if (dodgeLock || !ind || !ind.classList) return;
+    if (ind.classList.contains("inline")) { shift(0, 0); return; }
+    dodgeLock = true;
+    try {
+      shift(0, 0);
+      var nat = boxOf(ind);
+      if (!nat) return;
+      var rects = controlRects(), w = nat.width, h = nat.height;
+      function consider(left, top) {
+        if (left < 4 || top < 4 || left + w > innerWidth - 4 || top + h > innerHeight - 4) return null;
+        var rect = { left: left, top: top, right: left + w, bottom: top + h, width: w, height: h };
+        return spotClear(rect, rects) ? rect : null;
+      }
+      if (consider(nat.left, nat.top)) return;
+      var best = null, dy, dx, lefts, li;
+      for (dy = 4; dy < innerHeight && !best; dy += 4) best = consider(nat.left, nat.top - dy);
+      if (!best) {
+        lefts = [8, Math.max(8, innerWidth - 8 - w), Math.max(8, (innerWidth - w) / 2)];
+        for (li = 0; li < lefts.length && !best; li++) {
+          for (dy = 0; dy < innerHeight && !best; dy += 8) best = consider(lefts[li], nat.top - dy);
+        }
+      }
+      if (!best) {
+        for (dy = innerHeight - h - 4; dy >= 4 && !best; dy -= 12) {
+          for (dx = 8; dx <= innerWidth - w - 4 && !best; dx += 24) best = consider(dx, dy);
+        }
+      }
+      if (best) shift(best.left - nat.left, best.top - nat.top);
+    } finally { dodgeLock = false; }
+  }
+  var dodgeFrame = 0;
+  function queueDodge() {
+    if (dodgeFrame || typeof requestAnimationFrame !== "function") { if (!dodgeFrame) dodge(); return; }
+    dodgeFrame = requestAnimationFrame(function () { dodgeFrame = 0; dodge(); });
   }
 
   /* ---- saving ---- */
@@ -305,6 +400,19 @@
   function boot() {
     indicator(); wireForm(); schedule();
     setInterval(paint, 5000);   /* UX1: picks up typing (dirty) and the countdown; paint() only writes when the label changes */
+    if (window.addEventListener) {
+      window.addEventListener("resize", queueDodge);
+      window.addEventListener("hashchange", queueDodge);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", queueDodge);
+        window.visualViewport.addEventListener("scroll", queueDodge);
+      }
+    }
+    /* scroll does not bubble; capture on document still hears a panel or the page. */
+    if (document.addEventListener) {
+      document.addEventListener("scroll", queueDodge, true);
+      document.addEventListener("zws:layout", queueDodge);
+    }
     if (document.addEventListener) { document.addEventListener("input", noteEarly, true); document.addEventListener("change", noteEarly, true); }
     var meDone = fetch("/api/me", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(applyMe).catch(function () { });
     fetch("/api/me/save-prefs", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
