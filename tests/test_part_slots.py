@@ -1,7 +1,8 @@
 """Filament slot on each part: auto-map, override, clamp, and the single-slot warning.
 
-Slicing still receives one mesh. A multi-slot 3MF export carries the slots.
-The warning is a sentence. Turning single slot on does not rewrite the slots.
+A multi-slot 3MF export carries the slots. The FDM slice uses them when the
+printer has a multi-material unit. The warning is a sentence. Turning single
+slot on does not rewrite the slots.
 """
 import io
 import json

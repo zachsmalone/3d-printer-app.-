@@ -428,6 +428,9 @@ function readPanel() {
   if ($("#spPattern")) fd.append("infill_pattern", $("#spPattern").value);
   if ($("#spBrim")) fd.append("brim", $("#spBrim").value);
   if ($("#spFit").checked) fd.append("scale_to_fit", "true");
+  const eff = effectivePrinter(printerOf(pref.printer_id), pref);
+  if (eff && eff.unit_id != null) fd.append("unit_id", String(eff.unit_id));
+  if (eff && eff.unit_count != null) fd.append("unit_count", String(eff.unit_count));
   const paint = getStrokes();
   if (paint.length) fd.append("support_paint", JSON.stringify(paint));
   const singleOn = $("#spSingleOn")?.getAttribute("aria-pressed") === "true";
@@ -642,6 +645,9 @@ export function wirePanel(getModelId) {
         ${r.skipped_objects?.length ? `<div class="help warn" role="alert" id="spSkipped"><p>${esc(r.skipped_note)}</p><div class="row"><button type="button" class="btn small" id="spSplit">Split onto another plate</button><button type="button" class="btn small ghost" id="spSkipX" aria-label="Dismiss this warning">Dismiss</button></div></div>` : ""}
         ${r.grams_note ? `<p class="help">${esc(r.grams_note)}</p>` : ""}
         ${(r.slot_notes || []).map(n => `<p class="help">${esc(n)}</p>`).join("")}
+        ${(r.part_extruders || []).length ? `<p class="help" id="spPartExtruders">${r.part_extruders.map(p => `${esc(p.name || "Part")}: slot ${p.slot}`).join(". ")}.</p>` : ""}
+        ${r.multi_extruder_label ? `<p class="help" id="spMultiNote">${esc(r.multi_extruder_label)}</p>` : ""}
+        ${r.multi_fallback ? `<p class="help" id="spMultiFallback">${esc(r.multi_fallback)}</p>` : ""}
         ${r.single_slot ? `<p class="help">Single slot ${esc(r.single_slot_tool || "")}. Not confirmed on a printer.</p>` : (r.slots ? `<p class="help">Filament slots used: ${esc((r.slots || []).join(", "))}. Unused ports are not heated, primed or purged.</p>` : "")}
         ${notes.map(n => `<p class="help warn">${esc(n)}</p>`).join("")}
         ${badgeHTML(r.will_print, { detail: true })}
