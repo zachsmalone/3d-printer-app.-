@@ -79,13 +79,28 @@ def _points(raw: str, what: str):
     return pts
 
 
-# Address-space budget for one TorchC0 prepare child. Hollow + supports + layer checks on an ordinary ~9 MB STL
-# (~180k triangles) peak around 1.4 GB resident, which the shared 1.5 GB default could not hold (422 / crash).
+def _oom_tip(settings: dict) -> str:
+    """What to try after prepare runs out of memory or time. Never blames the file size."""
+    supports_on = bool(settings.get("supports"))
+    hollow_on = bool(settings.get("hollow"))
+    if supports_on and hollow_on:
+        return " Turn supports off, turn hollowing off, or simplify the model and try again."
+    if supports_on:
+        return " Turn supports off, or simplify the model and try again."
+    if hollow_on:
+        return " Turn hollowing off, or simplify the model and try again."
+    return " Try a simpler model."
+
+
+# Address-space budget for one TorchC0 prepare child, added to the process size after import.
+# The app container is 14 GB and 2 CPUs (reports/deploy/docker-compose.yml). Prepare is one at a
+# time, but a LUMEN or DragonFruit slice and an FDM slice can run beside it, and the web process
+# stays resident. 2500 MB leaves that room. A higher default would turn a clean 422 into a cgroup kill.
 RESIN_MEM_MB = int(os.environ.get("ZEIM_RESIN_MEM_MB", "2500"))
 # One visitor's preview + prepare run back to back; waiting only 20 s for a slot answered "busy" to a Prepare
 # pressed while a big model was still loading.
 ONE_WAIT_S = float(os.environ.get("ZEIM_RESIN_WAIT_S", "150"))
-_one = threading.BoundedSemaphore(1)      # one prepare at a time: two 2.5 GB children would not fit the 3 GB container
+_one = threading.BoundedSemaphore(1)      # one prepare at a time: the 2 CPUs also have to answer /healthz
 
 
 # Hollowing, supports and the layer checks grow with triangle count (trimesh ray/section queries): a 545k-triangle
@@ -111,9 +126,8 @@ def _fit_faces(m):
 def _lean_binary_stl(data):
     """A big binary STL welded and simplified straight from its bytes, or None when it is not one.
 
-    trimesh's load + merge + simplify of a 2.1M-triangle STL peaks near 1.8 GB, which does not fit next to the
-    server (about 1.3 GB resident) inside the 3 GB container: the kernel killed the child and the user saw
-    "busy" then "too big, turn hollowing off". numpy + fast-simplification does the same job in about 1 GB."""
+    trimesh's load + merge + simplify of a 2.1M-triangle STL peaks near 1.8 GB. numpy + fast-simplification
+    does the same job in about 1 GB, which fits the prepare budget on the 14 GB container."""
     if len(data) < 84:
         return None
     n = int.from_bytes(data[80:84], "little")
@@ -491,9 +505,9 @@ def prepare(model_id: str = Form(""), printer_id: str = Form(""), material: str 
         except guard.Busy:
             raise HTTPException(503, "TorchC0 is busy. Try again in a moment.")
         except guard.Tripped:
-            # UX2: the child hit its memory/time limit or died. Only suggest hollowing when it was on.
-            tip = " Simplify it, or turn hollowing off and try again." if s.get("hollow") else " Simplify it, or try a smaller file."
-            raise HTTPException(422, "Preparing this model ran out of memory or time on the server." + tip)
+            # The child hit its memory cap, died, or ran past 240 s. Say which option was on.
+            # File size is not the lever: a huge triangle count can live in a small STL.
+            raise HTTPException(422, "Preparing this model ran out of memory or time on the server." + _oom_tip(s))
         rid = uuid.uuid4().hex
         d = _dir()
         (d / f"{rid}.stl").write_bytes(stl_b); (d / f"{rid}.3mf").write_bytes(tmf_b)
