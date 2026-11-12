@@ -18,6 +18,80 @@ _COUNT = (250, 700)
 _LIFT = resin.DEFAULT_BASE_LIFT_MM + resin.DEFAULT_RAFT_MM
 
 
+def _relief_mask(nu=380, nv=460, base_mm=2.8, bosses=True):
+    """Watertight relief shell, about 130 x 165 mm, one connected solid.
+
+    The sheet is thinner than two hollow walls, so it stays solid. Bosses are
+    thick enough to leave separate cavities. `bosses=False` is the thin mask
+    that should be returned solid.
+    """
+    u = np.linspace(-1.0, 1.0, nu)
+    v = np.linspace(-1.0, 1.0, nv)
+    uu, vv = np.meshgrid(u, v, indexing="ij")
+    x = 65.0 * uu
+    y = 82.5 * vv
+    z = 18.0 * np.cos(uu * np.pi / 2.0) * np.cos(vv * np.pi / 2.0)
+    # Low-frequency relief only. Tighter wrinkles sit inside one voxel and the
+    # cavity then crosses the real surface.
+    z = z + 0.40 * np.sin(x * 0.22) * np.cos(y * 0.18)
+    thick = np.full(uu.shape, float(base_mm), dtype=np.float64)
+    if bosses:
+        for bx, by, bh, sx, sy in (
+            (0.00, 0.12, 22.0, 0.16, 0.13),
+            (-0.55, 0.50, 20.0, 0.15, 0.12),
+            (0.55, 0.46, 20.0, 0.15, 0.12),
+            (0.08, -0.50, 21.0, 0.16, 0.13),
+            (-0.48, -0.18, 19.0, 0.14, 0.12),
+        ):
+            r2 = ((uu - bx) / sx) ** 2 + ((vv - by) / sy) ** 2
+            thick = thick + bh * np.exp(-r2)
+    points = np.stack([x, y, z], axis=-1)
+    du = np.empty_like(points)
+    dv = np.empty_like(points)
+    du[1:-1] = points[2:] - points[:-2]
+    du[0] = points[1] - points[0]
+    du[-1] = points[-1] - points[-2]
+    dv[:, 1:-1] = points[:, 2:] - points[:, :-2]
+    dv[:, 0] = points[:, 1] - points[:, 0]
+    dv[:, -1] = points[:, -1] - points[:, -2]
+    normal = np.cross(du, dv)
+    normal /= np.maximum(np.linalg.norm(normal, axis=-1, keepdims=True), 1e-12)
+    if normal[nu // 2, nv // 2, 2] < 0.0:
+        normal = -normal
+    inner = points - normal * thick[..., None]
+
+    def vid(i, j, side):
+        return side * nu * nv + i * nv + j
+
+    faces = []
+    for i in range(nu - 1):
+        i0 = i * nv
+        i1 = (i + 1) * nv
+        for j in range(nv - 1):
+            a, b = i0 + j, i1 + j
+            c, d = i1 + j + 1, i0 + j + 1
+            faces.append((a, b, d))
+            faces.append((b, c, d))
+            shift = nu * nv
+            faces.append((a + shift, d + shift, b + shift))
+            faces.append((b + shift, d + shift, c + shift))
+    # Stitch the rim so the sheet is one solid, not two nested shells.
+    def rim(outer_loop, inner_loop):
+        for k in range(len(outer_loop) - 1):
+            a, b = outer_loop[k], outer_loop[k + 1]
+            c, d = inner_loop[k + 1], inner_loop[k]
+            faces.append((a, b, c))
+            faces.append((a, c, d))
+    rim([vid(0, j, 0) for j in range(nv)], [vid(0, j, 1) for j in range(nv)])
+    rim([vid(nu - 1, j, 0) for j in range(nv - 1, -1, -1)], [vid(nu - 1, j, 1) for j in range(nv - 1, -1, -1)])
+    rim([vid(i, 0, 0) for i in range(nu - 1, -1, -1)], [vid(i, 0, 1) for i in range(nu - 1, -1, -1)])
+    rim([vid(i, nv - 1, 0) for i in range(nu)], [vid(i, nv - 1, 1) for i in range(nv)])
+    mesh = trimesh.Trimesh(np.vstack([points.reshape(-1, 3), inner.reshape(-1, 3)]), np.asarray(faces, np.int64), process=False)
+    if mesh.volume < 0:
+        mesh.invert()
+    return mesh
+
+
 def _organic():
     mesh = trimesh.creation.uv_sphere(radius=1.0, count=list(_COUNT))
     mesh.apply_scale([65.0, 82.5, 36.5])
@@ -214,4 +288,104 @@ def run_case(kind):
         "touch": None if touch is None else round(touch, 3),
         "raft_span": None if raft_span is None else round(raft_span, 1),
         "saved": None if not hollow_on else round(float(hol["volume_saved_pct"]), 1),
+    }
+
+
+def _stage_table(rep):
+    rows = ((rep.get("hollow") or {}).get("stages")) or []
+    return [{k: row.get(k) for k in ("name", "ms", "attempt", "offset_mm", "wall_mm", "save_pct", "kept", "holes")} for row in rows]
+
+
+def run_relief(kind):
+    """Hollow a detailed relief mask. Several cavities, each drained, outer surface kept."""
+    if kind not in ("hollow", "both"):
+        raise AssertionError(kind)
+    opts = {
+        "hollow": {"hollow": "true", "supports": "false", "tilt_deg": 0},
+        "both": {"hollow": "true", "supports": "true", "tilt_deg": 0},
+    }[kind]
+    started = time.perf_counter()
+    mesh = _relief_mask()
+    faces_in = int(len(mesh.faces))
+    if not mesh.is_watertight or len(mesh.split(only_watertight=False)) != 1:
+        raise AssertionError(f"{kind}: relief is not one watertight shell")
+    if not 600_000 <= faces_in <= 800_000:
+        raise AssertionError(f"{kind}: expected 600k-800k triangles, got {faces_in}")
+    gc.collect()
+    out, rep = resin.prepare(mesh, resin.settings(opts))
+    seconds = time.perf_counter() - started
+    rss_mb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    placed = resin.place_on_bed(mesh, 0.0, 0.0)
+    supports_on = kind == "both"
+    shift = np.array([0.0, 0.0, _LIFT if supports_on else 0.0])
+    kept = _kept_fraction(placed.vertices, out.vertices - shift)
+    hol = rep.get("hollow") or {}
+    holes = list(hol.get("holes") or [])
+    saved = float(hol.get("volume_saved_pct") or 0.0)
+    if hol.get("left_solid") or saved < 10.0 or len(holes) < 3 or any(n != 2 for n in holes):
+        raise AssertionError(f"{kind}: expected several drained cavities ({hol})")
+    suction = (rep.get("layer_check") or {}).get("suction") or []
+    if suction:
+        raise AssertionError(f"{kind}: sealed cavity still flagged ({suction[:2]})")
+    if kept < 0.99:
+        raise AssertionError(f"{kind}: outer surface was not kept ({kept:.4f})")
+    axes = hol.get("drain_axes") or []
+    if len(axes) != sum(holes):
+        raise AssertionError(f"{kind}: drain axes missing ({len(axes)} for {holes})")
+    if not supports_on:
+        # Supports lift the mesh. The hollow-only result is still in the placed frame.
+        for inner_pt, outer_pt in axes:
+            if not meshedit._hole_is_open(np.asarray(out.vertices), np.asarray(out.faces), inner_pt, outer_pt):
+                raise AssertionError(f"{kind}: drain axis is still blocked")
+    if seconds > 120:
+        raise AssertionError(f"{kind}: {seconds:.0f}s is over the 120s budget on 2 cores")
+    return {
+        "seconds": round(seconds, 2),
+        "rss_mb": round(rss_mb, 1),
+        "faces_in": faces_in,
+        "faces_out": int(len(out.faces)),
+        "kept": round(kept, 4),
+        "saved": round(saved, 1),
+        "holes": holes,
+        "suction": len(suction),
+        "stages": _stage_table(rep),
+    }
+
+
+def run_thin_mask(kind="hollow"):
+    """A thin relief saves too little to hollow. It comes back solid, with the note."""
+    opts = {"hollow": "true", "supports": "false" if kind == "hollow" else "true", "tilt_deg": 0}
+    started = time.perf_counter()
+    mesh = _relief_mask(bosses=False, base_mm=2.6)
+    faces_in = int(len(mesh.faces))
+    if not mesh.is_watertight:
+        raise AssertionError("thin relief is not watertight")
+    gc.collect()
+    out, rep = resin.prepare(mesh, resin.settings(opts))
+    seconds = time.perf_counter() - started
+    placed = resin.place_on_bed(mesh, 0.0, 0.0)
+    supports_on = opts["supports"] == "true"
+    shift = np.array([0.0, 0.0, _LIFT if supports_on else 0.0])
+    kept = _kept_fraction(placed.vertices, out.vertices - shift)
+    hol = rep.get("hollow") or {}
+    note = meshedit.LEFT_SOLID_NOTE
+    if not hol.get("left_solid") or note not in rep.get("notes", []):
+        raise AssertionError(f"thin mask was hollowed ({hol}, notes {rep.get('notes')})")
+    suction = (rep.get("layer_check") or {}).get("suction") or []
+    if suction:
+        raise AssertionError(f"solid mask reported a sealed cavity ({suction[:2]})")
+    if kept < 0.99:
+        raise AssertionError(f"outer surface was not kept ({kept:.4f})")
+    if abs(float(hol.get("volume_saved_pct") or 0.0)) > 0.1:
+        raise AssertionError(f"solid result saved volume ({hol})")
+    if seconds > 120:
+        raise AssertionError(f"{seconds:.0f}s is over the 120s budget on 2 cores")
+    return {
+        "seconds": round(seconds, 2),
+        "faces_in": faces_in,
+        "kept": round(kept, 4),
+        "saved": hol.get("volume_saved_pct"),
+        "note": note,
+        "stages": _stage_table(rep),
+        "suction": len(suction),
     }
