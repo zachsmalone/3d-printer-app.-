@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app import printers as catalog
 from app.services import slice_engine as slice_eng
-from app.services.filament_slots import slot_count_for_systems
+from app.services.material_units import default_slots, units_from_profile
 from app.services.single_slot import option_for as single_slot_option
 from app.services.support_extruder import idle as support_filament_idle, status as support_filament_status
 
@@ -154,7 +154,10 @@ def printer_public(pid: str) -> dict:
             "native_formats": _v(p, "native_file_formats") or [], "firmware": _v(p, "firmware", "unknown"),
             "xy_resolution_um": _v(p, "xy_resolution_um"), "layer_range_mm": _v(p, "layer_height_range_mm"),
             # Multi-head / multi-material (AMS, CFS, MMU, ACE): FDM Slicer only. 1 = single-head, stay simple.
-            "multi_color_system": list(systems), "filament_slots": 1 if resin else slot_count_for_systems(systems),
+            # multi_material_units are official add-ons. A unit already named above is the default.
+            "multi_color_system": list(systems),
+            "multi_material_units": [] if resin else units_from_profile(p),
+            "filament_slots": 1 if resin else default_slots(p, systems),
             # Filament-tab control. None when this model has no CFS / AMS / MMU / ACE path.
             "single_slot_option": None if resin else single_slot_option(pid)}
 

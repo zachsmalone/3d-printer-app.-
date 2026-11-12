@@ -264,7 +264,8 @@ def test_one_plate_bed_check_uses_the_chosen_printer():
     mini = c.post("/api/edit/multi", files=two, data={"mode": "plate", "printer_id": "bambu_a1_mini"}).json()       # 180 x 180 bed
     assert k1max["plate"]["fits"] is True and mini["plate"]["fits"] is False and mini["plate"]["bed_mm"][:2] == [180.0, 180.0]
     assert c.post("/api/edit/multi", files=two, data={"mode": "plate", "printer_id": "nope"}).status_code == 400
-    assert 'fd.append("printer_id", P.pref.printer_id)' in (ROOT / "static/edit.js").read_text()
+    js = (ROOT / "static/edit.js").read_text()
+    assert "appendSlotFields(fd, pr)" in js and "currentPrinter()" in js
 
 
 def test_willprint_worker_exits_when_the_server_dies(tmp_path):

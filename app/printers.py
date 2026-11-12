@@ -14,6 +14,7 @@ PRINTER_FIELDS = {
     "retraction_speed_mm_s": ("mm/s", 0), "deretraction_speed_mm_s": ("mm/s", 0),
     "z_hop_mm": ("mm", 0), "brand": ("text", "text"), "model": ("text", "text"),
     "technology": ("enum", "technology"), "multi_color_system": ("system", "list"),
+    "optional_units": ("system", "units"),
     "native_file_formats": ("format", "formats"), "official_slicer_name": ("text", "text"),
     "official_slicer_download_url": ("url", "url"),
     "firmware": ("enum", "firmware"), "xy_resolution_um": ("um", "pair"), "layer_height_range_mm": ("mm", 2),
@@ -40,6 +41,36 @@ def _url(url):
             raise ValueError()
     except ValueError:
         raise ProfileValidationError("Expected HTTPS URL without credentials") from None
+
+
+def _whole(value, key, label):
+    if type(value) is not int or isinstance(value, bool) or value < 1 or value > 16:
+        raise ProfileValidationError(f"{key}: {label} must be a whole number from 1 to 16")
+    return value
+
+
+def _validate_units(key, value, sources):
+    if not isinstance(value, list) or not value:
+        raise ProfileValidationError(f"{key}: expected a list of units")
+    ids, names = [], []
+    for item in value:
+        if not isinstance(item, dict) or set(item) != {"id", "name", "slots_per_unit", "max_units", "source"}:
+            raise ProfileValidationError(f"{key}: unit needs id, name, slots_per_unit, max_units, source")
+        if not isinstance(item["id"], str) or not re.fullmatch(r"[a-z][a-z0-9_]*", item["id"]):
+            raise ProfileValidationError(f"{key}: unit id must be a lowercase slug")
+        if not isinstance(item["name"], str) or not item["name"].strip() or item["name"] != item["name"].strip():
+            raise ProfileValidationError(f"{key}: unit name must be text")
+        slots = _whole(item["slots_per_unit"], key, "slots per unit")
+        maximum = _whole(item["max_units"], key, "max units")
+        if slots * maximum > 16:
+            raise ProfileValidationError(f"{key}: slots per unit times max units cannot pass 16")
+        if not isinstance(item["source"], str) or item["source"] not in sources:
+            raise ProfileValidationError(f"{key}: unit source must be listed in sources")
+        _url(item["source"])
+        ids.append(item["id"])
+        names.append(item["name"])
+    if len(ids) != len(set(ids)) or len(names) != len(set(names)):
+        raise ProfileValidationError(f"{key}: duplicate units")
 
 
 def validate_profile(profile, *, material=False):
@@ -81,6 +112,8 @@ def validate_profile(profile, *, material=False):
                 raise ProfileValidationError(f"{key}: duplicate values")
             if kind == "formats" and any(not re.fullmatch(r"[a-z0-9]+(?:\.[a-z0-9]+)*", v) for v in value):
                 raise ProfileValidationError("Formats use lowercase suffixes without leading dots")
+        elif kind == "units":
+            _validate_units(key, value, entry["sources"])
         else:
             if kind == "pair":
                 kind = 2 if isinstance(value, list) and len(value) == 2 else -1
@@ -106,6 +139,8 @@ def validate_profile(profile, *, material=False):
             resin = settings["technology"]["value"] == "Resin"
             if resin and {"nozzle_diameter_mm", "max_nozzle_temperature_c", "max_bed_temperature_c"} & set(settings):
                 raise ProfileValidationError("Resin profile cannot contain FDM nozzle/heatbed fields")
+            if resin and "optional_units" in settings:
+                raise ProfileValidationError("Resin profile cannot list a filament unit")
             if "firmware" not in settings:
                 raise ProfileValidationError("Catalog printer needs a firmware field (use 'unknown' when unsourced)")
             if (settings["firmware"]["value"] == "resin") != resin:

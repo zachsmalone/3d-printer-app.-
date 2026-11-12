@@ -10,7 +10,7 @@ import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as pa
 import { previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo } from "/static/gizmo-view.js";
 import { P, loadCatalog, printerOf, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
-import { appendSlotFields, coloursForPrinter, slotCount, ink, UNIT_NOTE, PRINT_NOTE, SINGLE_NOTE } from "/static/partslots.js";
+import { appendSlotFields, coloursForPrinter, effectivePrinter, slotCount, ink, UNIT_NOTE, PRINT_NOTE, SINGLE_NOTE } from "/static/partslots.js";
 import { bindViewer, bindProject, setStrokes } from "/static/supportpaint.js";
 import { sampleBinaryStl } from "/static/stl-sample.js";
 import { createLineParser } from "/static/ndjson-lines.js";
@@ -125,7 +125,7 @@ async function create(fd, retry, opt = {}) {
   const ctl = importCtl = new AbortController();
   try {
     await loadCatalog();
-    if (typeof fd?.has === "function") appendSlotFields(fd, printerOf(P.pref?.printer_id));
+    if (typeof fd?.has === "function") appendSlotFields(fd, currentPrinter());
   } catch { /* the server uses the saved printer, or one slot */ }
   const streaming = typeof fd?.has === "function" && fd.has("progress");
   // A local sample is already on screen. Covering it again would hide a view the user can orbit.
@@ -313,7 +313,7 @@ async function sendMulti(mode, auto = false) {
   multiFiles.forEach(f => fd.append("files", f));
   fd.append("mode", mode); fd.append("units", $("#editUnits").value); fd.append("beginner", !isExpert());
   if (auto) fd.append("auto_delete_oldest", "true");
-  try { await loadCatalog(); fd.append("printer_id", P.pref.printer_id); fd.append("slot_colours", JSON.stringify(coloursForPrinter(printerOf(P.pref.printer_id)))); } catch { }   // one-plate bed check uses the chosen printer's bed
+  try { await loadCatalog(); const pr = currentPrinter(); appendSlotFields(fd, pr); } catch { }   // one-plate bed check uses the chosen printer's bed
   $("#multiMsg").textContent = mode === "plate" ? "Arranging the parts on one plate…" : "Importing each file…";
   busy(true, "Importing…");
   try {
@@ -936,7 +936,8 @@ function renderTools() {
 }
 wirePlatePanel($("#editPanel"));
 function currentPrinter() {
-  return (P.cat && P.pref) ? printerOf(P.pref.printer_id) : null;
+  const row = (P.cat && P.pref) ? printerOf(P.pref.printer_id) : null;
+  return effectivePrinter(row, P.pref);
 }
 function slotCtx() {
   const printer = currentPrinter();

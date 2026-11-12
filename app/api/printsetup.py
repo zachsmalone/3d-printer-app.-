@@ -7,6 +7,7 @@ from app.api import guards
 from app.community import catalog
 from app.community.identity import Actor, get_actor
 from app.community.store import USERS
+from app.services import material_units
 from app.services import print_setup as ps
 from app.services import willprint
 
@@ -42,6 +43,17 @@ def printer_catalog():
             "open_in_note": "These buttons download the file; your slicer opens it from there. No account linking."}
 
 
+def _unit_fields(pid: str, pr: dict) -> dict:
+    """Saved add-on, re-checked against the catalog. Dropped when it no longer fits this printer."""
+    if "unit_id" not in pr or pr.get("printer_id") != pid:
+        return {}
+    try:
+        uid, count = material_units.resolve_choice(pid, pr.get("unit_id"), pr.get("unit_count"))
+    except material_units.UnitError:
+        return {}
+    return {"unit_id": uid, "unit_count": count}
+
+
 def _pref(actor: Actor) -> dict:
     u = actor.user or {}
     pr = u.get("printer") or {}
@@ -51,13 +63,31 @@ def _pref(actor: Actor) -> dict:
     except ps.SetupError:
         pid, n = ps.resolve()
         saved = False
-    return {"printer_id": pid, "nozzle": n, "saved": saved}
+    return {"printer_id": pid, "nozzle": n, "saved": saved, **_unit_fields(pid, pr)}
 
 
-def save_pref(sid: str, printer_id, nozzle) -> dict:
+def save_pref(sid: str, printer_id, nozzle, unit_id=None, unit_count=None, *, remember_unit=False) -> dict:
     pid, n = ps.resolve(printer_id, nozzle)
-    USERS.update(lambda d: d[sid].__setitem__("printer", {"printer_id": pid, "nozzle": n}) if sid in d else None)
-    return {"printer_id": pid, "nozzle": n}
+    if remember_unit:
+        uid, count = material_units.resolve_choice(pid, unit_id, unit_count)
+        fresh = {"unit_id": uid, "unit_count": count}
+    else:
+        fresh = None
+
+    def apply(d):
+        if sid not in d:
+            return
+        prev = d[sid].get("printer") or {}
+        rec = {"printer_id": pid, "nozzle": n}
+        if fresh is not None:
+            rec.update(fresh)
+        elif prev.get("printer_id") == pid and "unit_id" in prev:
+            rec.update(_unit_fields(pid, {**prev, "printer_id": pid}))
+        d[sid]["printer"] = rec
+
+    USERS.update(apply)
+    stored = (USERS.read().get(sid) or {}).get("printer") or {"printer_id": pid, "nozzle": n}
+    return {k: stored[k] for k in ("printer_id", "nozzle", "unit_id", "unit_count") if k in stored}
 
 
 @router.get("/api/me/printer")
@@ -67,13 +97,22 @@ def get_my_printer(actor: Actor = Depends(get_actor)):
 
 @router.put("/api/me/printer")
 def put_my_printer(body: dict, actor: Actor = Depends(get_actor)):
+    remember = "unit_id" in body
     try:
         pid, n = ps.resolve(body.get("printer_id"), body.get("nozzle"))
-    except ps.SetupError as e:
+        if remember:
+            material_units.resolve_choice(pid, body.get("unit_id"), body.get("unit_count"))
+    except (ps.SetupError, material_units.UnitError) as e:
         raise HTTPException(400, str(e))
     if not actor.user:                         # anonymous: validated here, kept in the browser (localStorage) by the page
-        return {"signed_up": False, "stored": "browser", "printer_id": pid, "nozzle": n}
-    return {"signed_up": True, "stored": "profile", **save_pref(actor.sid, pid, n)}
+        out = {"signed_up": False, "stored": "browser", "printer_id": pid, "nozzle": n}
+        if remember:
+            uid, count = material_units.resolve_choice(pid, body.get("unit_id"), body.get("unit_count"))
+            out["unit_id"] = uid
+            out["unit_count"] = count
+        return out
+    return {"signed_up": True, "stored": "profile", **save_pref(
+        actor.sid, pid, n, body.get("unit_id"), body.get("unit_count"), remember_unit=remember)}
 
 
 @router.get("/api/me/printer-kind")

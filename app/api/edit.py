@@ -19,7 +19,7 @@ from ..core import features as features_mod
 from ..core import printcheck as printcheck_mod
 from ..core import volcost as volcost_mod
 from ..core import thickness as thickness_mod
-from ..services import editproj, print_setup
+from ..services import editproj, material_units, print_setup
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
 from .textcap import plain_text, text_in
@@ -27,26 +27,39 @@ from .textcap import plain_text, text_in
 router = APIRouter(prefix="/api/edit")
 
 
-def _slot_context(actor: Actor, printer_id: str, slot_colours: str) -> tuple[int, list | None]:
-    """How many filament slots this printer offers, and the colours the client configured."""
+def _slot_context(actor: Actor, printer_id: str, slot_colours: str, unit_id: str = "", unit_count: str = "") -> tuple[int, list | None]:
+    """How many filament slots this printer offers, and the colours the client configured.
+
+    A saved add-on on the account wins when the upload did not name one. An explicit
+    unit id from the form is checked against the catalog and never raises out of an upload.
+    """
     pid = (printer_id or "").strip()
-    if not pid and actor.user:
-        pid = ((actor.user.get("printer") or {}).get("printer_id") or "")
+    stored = (actor.user or {}).get("printer") or {}
+    if not pid and stored.get("printer_id"):
+        pid = stored.get("printer_id") or ""
     try:
         resolved, _nozzle = print_setup.resolve(pid or None)
         pub = print_setup.printer_public(resolved)
-        count = int(pub.get("filament_slots") or 1)
-        if not pub.get("multi_color_system"):
-            count = 1
-    except (print_setup.SetupError, KeyError, TypeError, ValueError):
+        chosen = (unit_id or "").strip()
+        count_raw = unit_count
+        if not chosen and stored.get("printer_id") == resolved and stored.get("unit_id"):
+            chosen = stored.get("unit_id") or ""
+            count_raw = stored.get("unit_count")
+        if chosen:
+            count = material_units.effective_slots(resolved, chosen, count_raw)
+        else:
+            count = int(pub.get("filament_slots") or 1)
+            if not pub.get("multi_color_system"):
+                count = 1
+    except (print_setup.SetupError, material_units.UnitError, KeyError, TypeError, ValueError):
         count = 1
     return count, partslots.parse_colours(slot_colours)
 
 
-def _with_slots(parts, actor: Actor, printer_id: str, slot_colours: str):
+def _with_slots(parts, actor: Actor, printer_id: str, slot_colours: str, unit_id: str = "", unit_count: str = ""):
     if not parts:
         return parts
-    count, colours = _slot_context(actor, printer_id, slot_colours)
+    count, colours = _slot_context(actor, printer_id, slot_colours, unit_id, unit_count)
     assigned, _flags = partslots.prepare(parts, count, colours)
     return assigned
 
@@ -243,6 +256,8 @@ def new_project(
     mtl: UploadFile | None = File(None),        # optional OBJ material library (Kd colours)
     printer_id: str = Form(""),             # filament-slot count for the colour editor
     slot_colours: str = Form(""),           # JSON list of #RRGGBB, one per slot, as set in the slicer
+    unit_id: str = Form(""),                # saved multi-material add-on, when the maker picked one
+    unit_count: str = Form(""),
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -382,7 +397,7 @@ def new_project(
                                    original=original, original_ext=ext, mesh=mesh, beginner=beginner,
                                    warnings=warnings, import_scale=scale, import_units=units, source_image=source_image,
                                    parent_build=from_build or "",
-                                   parts=_with_slots(build_parts, actor, printer_id, slot_colours))
+                                   parts=_with_slots(build_parts, actor, printer_id, slot_colours, unit_id, unit_count))
         except meshedit.OpError as e:
             raise HTTPException(422, str(e))
         if ack is not None:
@@ -662,6 +677,8 @@ def new_multi(
     gap_mm: float = Form(5.0),
     printer_id: str = Form(""),
     slot_colours: str = Form(""),
+    unit_id: str = Form(""),
+    unit_count: str = Form(""),
 ):
     """Several STL / OBJ / 3MF files at once. mode=plate: 'Parts of one print' (auto-spaced on one plate + bed-fit check, one project);
     mode=separate: 'Separate prints' (one project each)."""
@@ -755,7 +772,7 @@ def new_multi(
                                            original=x["data"], original_ext=x["ext"], mesh=x["mesh"], beginner=beginner,
                                            warnings=x["warnings"], import_scale=x["scale"], import_units=units,
                                            ai=x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]),
-                                           parts=_with_slots(x.get("parts"), actor, printer_id, slot_colours))
+                                           parts=_with_slots(x.get("parts"), actor, printer_id, slot_colours, unit_id, unit_count))
                 except meshedit.OpError as e:
                     raise HTTPException(422, f"File {x['n']}: {e}")
                 made.append(meta["id"])
