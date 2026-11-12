@@ -2,7 +2,7 @@
    The sentences match app/core/partslots.py. */
 export const DEFAULT_COLOURS = ["#FFFFFF", "#FF0000", "#00AA00", "#0066FF", "#FFD000", "#FF00AA", "#00DDDD", "#222222"];
 export const UNIT_NOTE = "Multi-color needs a multi-material unit. Every part uses slot 1.";
-export const PRINT_NOTE = "This print uses one colour until per-part printing ships.";
+export const PRINT_NOTE = "Each part slices on its filament slot. Not yet tested on a printer.";
 export const SINGLE_NOTE = "Single slot is on, and these parts use more than one slot. The slot choices stay as they are.";
 const KEY = "zeim.slotColours";
 

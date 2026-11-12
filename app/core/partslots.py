@@ -4,8 +4,10 @@ A part keeps the colour read from the file. The slot is which CFS, AMS, MMU, or 
 port prints it. The slicer's slot colours are the configured colours. On import, a
 detected colour maps to the nearest of those. With one slot, every part uses slot 1.
 
-A multi-slot 3MF export writes each part's slot. Slicing still joins the parts
-into one mesh. These numbers are the editor's assignment until slicing uses them.
+A multi-slot 3MF export writes each part's slot. The FDM slice uses those slots
+when the printer has a multi-material unit. One slot, or a printer that cannot
+drive them, still slices as one colour. A multi-slot print says it is not yet
+tested on a printer.
 """
 from __future__ import annotations
 
@@ -21,7 +23,7 @@ DEFAULT_SLOT_COLOURS = (
 MAX_SLOT = 16
 
 UNIT_NOTE = "Multi-color needs a multi-material unit. Every part uses slot 1."
-PRINT_NOTE = "This print uses one colour until per-part printing ships."
+PRINT_NOTE = "Each part slices on its filament slot. Not yet tested on a printer."
 SINGLE_NOTE = (
     "Single slot is on, and these parts use more than one slot. "
     "The slot choices stay as they are."

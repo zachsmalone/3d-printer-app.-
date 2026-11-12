@@ -206,13 +206,17 @@ def _slice_rlimits():
 _STAGE_LINE = re.compile(r"\d+\s*=>\s*(.+)")
 
 
-def _engine_cmd(engine: str, ini: Path, model: Path, out: Path, center, parts: list[Path] | None) -> list[str]:
+def _engine_cmd(engine: str, ini: Path, model: Path, out: Path, center, parts: list[Path] | None,
+                placed: bool = False) -> list[str]:
     # Argument list, no shell: nothing user-controlled is interpreted.
     # model is an STL or a PrusaSlicer-friendly 3MF (paint-on support enforcers/blockers).
     # parts: a multi-object plate, one STL per object already placed in bed coordinates -> one plate,
     # --merge --dont-arrange keeps ZEIM's own layout (PrusaSlicer is only called, never copied).
+    # placed: one file whose vertices are already on the bed (a per-part 3MF). Do not center it again.
     if parts:
         return [engine, "--export-gcode", "--merge", "--dont-arrange", "--load", str(ini), "--output", str(out), *map(str, parts)]
+    if placed:
+        return [engine, "--export-gcode", "--dont-arrange", "--load", str(ini), "--output", str(out), str(model)]
     return [engine, "--export-gcode", "--center", f"{center[0]:g},{center[1]:g}", "--load", str(ini), "--output", str(out), str(model)]
 
 
@@ -226,8 +230,8 @@ def _last_stage(output: str) -> str:
 
 
 def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SLICE_TIMEOUT_S, center=(110, 110),
-               parts: list[Path] | None = None) -> None:
-    cmd = _engine_cmd(engine, ini, model, out, center, parts)
+               parts: list[Path] | None = None, placed: bool = False) -> None:
+    cmd = _engine_cmd(engine, ini, model, out, center, parts, placed)
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, preexec_fn=_slice_rlimits)
     except subprocess.TimeoutExpired as e:
@@ -399,7 +403,8 @@ class SliceResult:
 
 
 def slice_model_path(model: Path, profile: PrinterProfile, out_gcode: Path, *,
-                    bounds_stl: Path | None = None, parts: list[Path] | None = None) -> SliceResult:
+                    bounds_stl: Path | None = None, parts: list[Path] | None = None,
+                    placed: bool = False) -> SliceResult:
     """Slice an STL or a paint-on-supports 3MF. Bed-fit uses `bounds_stl` (the plain model) when given,
     so painted enforcer/blocker volumes never change the size check."""
     src = bounds_stl or model
@@ -415,7 +420,11 @@ def slice_model_path(model: Path, profile: PrinterProfile, out_gcode: Path, *,
     with tempfile.TemporaryDirectory(prefix="zeim-slice-") as td:
         ini = Path(td) / "profile.ini"
         ini.write_text(profile.ini.strip() + "\n")
-        kw = {"parts": parts} if parts else {}       # single-model calls keep the old signature (test doubles patch it)
+        kw = {}
+        if parts:
+            kw["parts"] = parts       # single-model calls keep the old signature (test doubles patch it)
+        if placed:
+            kw["placed"] = True
         run_engine(engine, ini, model, out_gcode, center=(profile.bed_x / 2, profile.bed_y / 2), **kw)
     seconds, grams = parse_gcode_stats(out_gcode)
     return SliceResult(out_gcode, seconds, grams, size, profile)

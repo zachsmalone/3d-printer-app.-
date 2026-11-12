@@ -23,7 +23,9 @@ from app.community.identity import Actor, get_actor
 from app.services import editproj
 from app.services.history import store
 from app.core.exporters import mesh_3mf
+from app.core.partslots import PRINT_NOTE
 from app.services import filament_slots as fslots
+from app.services import part_extrude
 from app.services import single_slot as single_slot_file
 from app.services import slice_inflight
 from app.services import slice_engine as eng
@@ -65,6 +67,21 @@ def _arm_single_slot(prof, slot_plan: dict, flag: bool | None):
     if spec is None:
         return prof, slot_plan, None
     return single_slot_file.apply_profile(prof, spec), {**slot_plan, **single_slot_file.plan_fields(spec)}, spec
+
+
+def _drive_parts(prof, slot_plan, slot_flag, *, model_id, work, scaling, model_for_engine, unit_id, unit_count):
+    """Per-part slots when this printer can drive them. One slot stays on today's file and profile."""
+    painted = model_for_engine.name == "model_paint.3mf"
+    info = part_extrude.build(
+        model_id, prof, slot_plan, work, scaling,
+        unit_id=unit_id, unit_count=unit_count, painted=painted,
+    ) if model_id else None
+    if info and info["mode"] == "multi":
+        return info["profile"], info["plan"], None, info["path"], True, info
+    prof, slot_plan, spec = _arm_single_slot(prof, slot_plan, slot_flag)
+    if not info:
+        info = {"mode": "single", "message": "", "parts": [], "header_extra": ""}
+    return prof, slot_plan, spec, model_for_engine, False, info
 
 
 def _with_support_extruder(prof, strokes: list):
@@ -196,6 +213,8 @@ def slice_model(
     slot_materials: Optional[str] = Form(None),
     slot_colours: Optional[str] = Form(None),
     single_slot: Optional[str] = Form(None),
+    unit_id: Optional[str] = Form(None),
+    unit_count: Optional[str] = Form(None),
     actor: Actor = Depends(get_actor),
 ):
     from app.core import memtrim
@@ -305,16 +324,21 @@ def slice_model(
                 slot_plan = _keep_support_toolchange(slot_plan, filament_info)
                 if paint_info is not None:
                     paint_info = {**paint_info, "support_filament": filament_info}
-            prof, slot_plan, slot_spec = _arm_single_slot(prof, slot_plan, slot_flag)
+            prof, slot_plan, slot_spec, model_for_engine, placed, multi_info = _drive_parts(
+                prof, slot_plan, slot_flag, model_id=model_id, work=work, scaling=scaling,
+                model_for_engine=model_for_engine, unit_id=unit_id, unit_count=unit_count)
             parts = None
             # Separate engine objects only for a bed the maker arranged, and only when those
             # objects do not intersect. Imported parts stay one STL, the same mesh export uses.
-            if (model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2
+            # A per-part 3MF already carries those objects, so it is not split into STLs again.
+            if (not placed and model_id and model_for_engine == work / "model.stl" and len(plate_objs or []) >= 2
                     and separate_plate_objects(model_id, plate_objs)):
                 parts = plate_parts(plate_objs, work, scaling.get("scale", 1.0))
+            slice_kw = {"bounds_stl": work / "model.stl", "parts": parts}
+            if placed:
+                slice_kw["placed"] = True
             try:
-                res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
-                                           bounds_stl=work / "model.stl", parts=parts)
+                res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode", **slice_kw)
             except eng.SliceError as e:
                 # Sculptures that stand on a point (busts, figures) have an empty first layer with supports off and
                 # PrusaSlicer refuses them. Retry once with Supports: Auto and say so, instead of a dead end.
@@ -325,9 +349,13 @@ def slice_model(
                 prof, filament_info = _with_support_extruder(prof, paint_strokes)
                 if paint_info is not None and filament_info is not None:
                     paint_info = {**paint_info, "support_filament": filament_info}
-                prof, slot_plan, slot_spec = _arm_single_slot(prof, slot_plan, slot_flag)
-                res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode",
-                                           bounds_stl=work / "model.stl", parts=parts)
+                prof, slot_plan, slot_spec, model_for_engine, placed, multi_info = _drive_parts(
+                    prof, slot_plan, slot_flag, model_id=model_id, work=work, scaling=scaling,
+                    model_for_engine=model_for_engine, unit_id=unit_id, unit_count=unit_count)
+                retry_kw = {"bounds_stl": work / "model.stl", "parts": None if placed else parts}
+                if placed:
+                    retry_kw["placed"] = True
+                res = eng.slice_model_path(model_for_engine, prof, work / "model.gcode", **retry_kw)
         except eng.SliceError as e:
             shutil.rmtree(work, ignore_errors=True)
             _fail(e.status, e.code, e.message)
@@ -339,10 +367,14 @@ def slice_model(
             (work / "input.stl").unlink(missing_ok=True)
             memtrim.trim()
         _g = work / "model.gcode"
-        _body = fslots.strip_unused_heads(_g.read_text(errors="ignore"), slot_plan)
+        _body = _g.read_text(errors="ignore")
+        # A multi-extruder run only lists the slots this print uses, so its tool changes stay.
+        # One slot still drops every other tool, the same as before.
+        if multi_info.get("mode") != "multi":
+            _body = fslots.strip_unused_heads(_body, slot_plan)
         if slot_spec is not None:
             _body = single_slot_file.finish_gcode(_body, slot_spec)
-        _g.write_text(fslots.gcode_header(slot_plan) + _body)
+        _g.write_text(fslots.gcode_header(slot_plan) + (multi_info.get("header_extra") or "") + _body)
         (work / "slots.json").write_text(json.dumps(slot_plan))
         from app.services import slicer as _sl, willprint
         stats = _sl.parse_stats((work / "model.gcode").read_text(errors="ignore"))
@@ -381,6 +413,10 @@ def slice_model(
             "scaled_pct": fitted, "scaling": scaling, "will_print": badge,
             "material_warning": chosen.get("material_warning"), "temp_notes": chosen.get("temp_notes") or [],
             "support_paint": paint_info, "slots": slot_plan["slots"], "slot_notes": slot_plan["notes"],
+            "multi_extruder": multi_info.get("mode") == "multi",
+            "multi_extruder_label": PRINT_NOTE if multi_info.get("mode") == "multi" else "",
+            "multi_fallback": multi_info.get("message") or "",
+            "part_extruders": multi_info.get("parts") or [],
             "single_slot": bool(slot_plan.get("single_slot")),
             "single_slot_family": slot_plan.get("family") or "",
             "single_slot_tool": slot_plan.get("tool") or "",
@@ -559,6 +595,9 @@ def download_model(slice_id: str, ext: str):
         _fail(404, "not_found", "That file has expired. Please slice again.")
     if ext == "stl":
         return badges.stamp_sid(FileResponse(stl, media_type="model/stl", filename="zeim-model.stl"), _slice_owner(slice_id), "export")
+    baked = stl.parent / "model_parts.3mf"
+    if baked.is_file():
+        return badges.stamp_sid(FileResponse(baked, media_type="model/3mf", filename="zeim-model.3mf"), _slice_owner(slice_id), "export")
     out = stl.with_suffix(".3mf")
     if not out.is_file():
         sj = stl.parent / "slots.json"
