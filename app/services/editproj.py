@@ -155,19 +155,33 @@ def mesh_at(bid: str, meta: dict | None = None, head: int | None = None) -> trim
         hit = _cache_hit(bid, head, meta)
         if hit is not None:
             return hit
+        rev = geometry_revision(meta, head)
         slot = _STATES.get(bid) or {}
         start = None
         for h in sorted((h for h in slot if isinstance(h, int) and h <= head), reverse=True):
             if _cache_hit(bid, h, meta) is not None:
                 start = h
                 break
-        m = slot[start][1] if start is not None else _base(bid, meta)
+        source = slot[start][1] if start is not None else _base(bid, meta)
+        # Replay outside this lock. A CAD drag otherwise holds it across every heavy step,
+        # and scene/slots/undo pile up behind one translate.
+        m = source.copy()
+        pending = []
         for k in range(start or 0, head):
             o = meta["ops"][k]
-            if not _replay_safe(o):
-                continue
-            m, _ = _apply(meta, m, o)
-        _cache_put(bid, head, m, meta)
+            if _replay_safe(o):
+                pending.append(o)
+        dims = copy.deepcopy(meta.get("dims"))
+    replay_meta = {"dims": dims}
+    for o in pending:
+        m, _ = _apply(replay_meta, m, o)
+    with _lock:
+        try:
+            fresh = store.get(bid)
+        except KeyError:
+            return m
+        if geometry_revision(fresh, head) == rev:
+            _cache_put(bid, head, m, fresh)
         return m
 
 
@@ -907,41 +921,61 @@ def printable_at(bid: str, meta: dict) -> trimesh.Trimesh:
 
 def add_op(bid: str, op: str, params: dict) -> dict:
     params = check_op_text(op, params)
-    with _lock:
-        meta = _migrate_body_refs(bid, store.get(bid))
-        cur = mesh_at(bid, meta)
-        if meta.get("appearance"):
-            meta["appearance"] = cadops.bind_appearance(meta["appearance"], cur)
-        params, _ = cadops.bind_legacy_body_refs(cur, op, params)
-        if op == "plate":                                 # the server's own layout + bed, never the client's
-            params = {**params, "layout": layout_at(meta, cur)}
-            params = _plate_bed(params)
-            params.setdefault("bed", bed_of(meta))
-        new, rep = _apply(meta, cur, {"op": op, "params": params})       # raises OpError → nothing is stored
-        # an op may resolve derived values once and ask for them to be SAVED with the step
-        # (sculpt's flatten plane): replay then reuses the stored value instead of
-        # re-deriving a different one after an earlier step changed. Same pattern as "plate".
+    for _attempt in range(2):
+        prepared = copy.deepcopy(params)
+        with _lock:
+            meta = _migrate_body_refs(bid, store.get(bid))
+            head = int(meta["head"])
+            rev = geometry_revision(meta, head)
+        cur = mesh_at(bid, store.get(bid))
+        with _lock:
+            meta = store.get(bid)
+            if int(meta["head"]) != head or geometry_revision(meta, head) != rev:
+                continue
+            title = meta.get("title") or "Model"
+            if meta.get("appearance"):
+                bound_appearance = cadops.bind_appearance(meta["appearance"], cur)
+            else:
+                bound_appearance = None
+            prepared, _bound = cadops.bind_legacy_body_refs(cur, op, prepared)
+            if op == "plate":                                 # the server's own layout + bed, never the client's
+                prepared = {**prepared, "layout": layout_at(meta, cur)}
+                prepared = _plate_bed(prepared)
+                prepared.setdefault("bed", bed_of(meta))
+            dims = copy.deepcopy(meta.get("dims"))
+            before_faces = len(cur.faces)
+            work = cur.copy()
+        # The heavy step (and its memory-capped process) stays outside the project lock.
+        new, rep = _apply({"dims": dims}, work, {"op": op, "params": prepared})
         persist = rep.pop("_persist", None) if isinstance(rep, dict) else None
         if persist:
-            params = {**params, **persist}
-        ops = meta["ops"][:meta["head"]]                  # drop the redo tail
-        ops.append({"op": op, "params": params, "label": meshedit.label(op, params)})
-        meta["ops"] = ops
-        meta["head"] = len(ops)
-        for h in [h for h in list(_STATES.get(bid, {})) if h >= meta["head"]]:
-            _STATES[bid].pop(h, None)
-        meta["stats"] = _stats(new, meta["title"])
-        meta["last_report"] = rep
-        pl = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < meta["head"]}
-        if op == "plate" and isinstance(rep, dict) and rep.get("layout"):
-            pl[str(meta["head"])] = rep["layout"]
-        elif pl.get(str(meta["head"] - 1)) and len(new.faces) == len(cur.faces):   # move/rotate/scale keep the objects
-            pl[str(meta["head"])] = pl[str(meta["head"] - 1)]
-        meta["plate_layouts"] = pl
-        _cache_put(bid, meta["head"], new, meta)
-        store.save(meta)
-        store.cache.pop(bid, None)
-    return rep
+            prepared = {**prepared, **persist}
+        stats = _stats(new, title)
+        with _lock:
+            meta = store.get(bid)
+            if int(meta["head"]) != head or geometry_revision(meta, head) != rev:
+                continue
+            if bound_appearance is not None:
+                meta["appearance"] = bound_appearance
+            ops = meta["ops"][:meta["head"]]                  # drop the redo tail
+            ops.append({"op": op, "params": prepared, "label": meshedit.label(op, prepared)})
+            meta["ops"] = ops
+            meta["head"] = len(ops)
+            for h in [h for h in list(_STATES.get(bid, {})) if h >= meta["head"]]:
+                _STATES[bid].pop(h, None)
+            meta["stats"] = stats
+            meta["last_report"] = rep
+            pl = {k: v for k, v in (meta.get("plate_layouts") or {}).items() if int(k) < meta["head"]}
+            if op == "plate" and isinstance(rep, dict) and rep.get("layout"):
+                pl[str(meta["head"])] = rep["layout"]
+            elif pl.get(str(meta["head"] - 1)) and len(new.faces) == before_faces:   # move/rotate/scale keep the objects
+                pl[str(meta["head"])] = pl[str(meta["head"] - 1)]
+            meta["plate_layouts"] = pl
+            _cache_put(bid, meta["head"], new, meta)
+            store.save(meta)
+            store.cache.pop(bid, None)
+        return rep
+    raise meshedit.OpError("That step was not applied because the model changed. Try it again.")
 
 
 def _rewrite(bid: str, i: int, new_op: dict | None) -> dict:
@@ -1062,8 +1096,19 @@ def goto(bid: str, head: int):
         meta = store.get(bid)
         if not 0 <= head <= len(meta["ops"]):
             raise meshedit.OpError("no such step")
+        rev = geometry_revision(meta, head)
+        title = meta.get("title") or "Model"
+    m = mesh_at(bid, store.get(bid), head)
+    stats = _stats(m, title)
+    with _lock:
+        meta = store.get(bid)
+        if not 0 <= head <= len(meta["ops"]) or geometry_revision(meta, head) != rev:
+            raise meshedit.OpError("That step was not applied because the model changed. Try it again.")
         meta["last_report"] = None
-        _commit(bid, meta, head)
+        meta["head"] = head
+        meta["stats"] = stats
+        store.save(meta)
+        store.cache.pop(bid, None)
 
 
 def undo(bid):
@@ -1092,13 +1137,18 @@ def _parts_public(meta: dict, n_faces: int) -> list[dict]:
 
 
 def save_parts(bid: str, parts: list[dict]) -> list[dict]:
-    """Replace the part list for the current mesh. The mesh itself is unchanged."""
+    """Replace the part list for the current mesh. The mesh itself is unchanged.
+
+    A list built against an older mesh (a step changed the triangles, or the ids are from
+    before that step) is not an error. The parts that still match this mesh stay.
+    """
     with _lock:
         meta = store.get(bid)
         m = mesh_at(bid, meta)
+        title = meta.get("title") or "Model"
         stored = meshparts.validate(parts, len(m.faces))
         if not stored:
-            raise meshedit.OpError("Those parts don't match this model.")
+            return meshparts.resolve(meta.get("parts"), len(m.faces), title)
         meta = store.get(bid)
         meta["parts"] = stored
         layout = meshparts.plate_layout(stored, len(m.faces))
@@ -1109,6 +1159,62 @@ def save_parts(bid: str, parts: list[dict]) -> list[dict]:
         store.save(meta)
         store.cache.pop(bid, None)
     return stored
+
+
+def update_part_slots(bid: str, body: dict) -> tuple[list[dict], list[dict]]:
+    """Apply a slot action to the parts on the mesh as it is right now.
+
+    The whole read-modify-write holds the project lock. A step that lands between
+    reading the parts and saving them used to fail with "Those parts don't match this model."
+    Ids the client still has from before that step are ignored.
+    """
+    action = body.get("action") or "prepare"
+    with _lock:
+        meta = store.get(bid)
+        m = mesh_at(bid, meta)
+        title = meta.get("title") or "Model"
+        n_faces = len(m.faces)
+        stored_ok = meshparts.validate(meta.get("parts"), n_faces)
+        current = stored_ok or meshparts.resolve(meta.get("parts"), n_faces, title)
+        raw_ids = body.get("ids") or []
+        if not isinstance(raw_ids, list):
+            raw_ids = []
+        known = {p.get("id") for p in current}
+        ids = [i for i in raw_ids if i in known]
+        if action in ("assign", "reset") and raw_ids and not ids:
+            updated, flags = current, []
+        else:
+            count = partslots.clamp_count(body.get("slot_count", 1))
+            updated, flags = partslots.apply(
+                current, action, ids=ids, slot=body.get("slot"), slot_count=count,
+                colours=partslots.parse_colours(body.get("colours")),
+            )
+        healed = meshparts.validate(updated, n_faces) or current
+        if stored_ok and partslots.same(current, healed):
+            return current, flags
+        meta = store.get(bid)
+        meta["parts"] = healed
+        layout = meshparts.plate_layout(healed, n_faces)
+        if layout:
+            layouts = dict(meta.get("plate_layouts") or {})
+            layouts[str(meta.get("head") or 0)] = layout
+            meta["plate_layouts"] = layouts
+        store.save(meta)
+        store.cache.pop(bid, None)
+    return healed, flags
+
+
+def step_view(meta: dict, mesh: trimesh.Trimesh) -> dict:
+    """History fields for the CAD scene. Does not rebuild export files or the editor preview."""
+    ops = [{"i": i + 1, "op": o["op"], "label": o["label"], "name": o.get("name") or "",
+            "params": {k: v for k, v in (o.get("params") or {}).items() if k != "layout" and isinstance(v, (str, int, float, bool, dict, list, type(None)))},
+            "editable": o["op"] not in ("plate", "import")} for i, o in enumerate(meta.get("ops") or [])]
+    rev = geometry_revision(meta)
+    stored = meta.get("analysis") if meta.get("analysis_rev") == rev else None
+    analysis = stored if isinstance(stored, dict) else meshedit.analyze(mesh)
+    head = int(meta.get("head") or 0)
+    return {"ops": ops, "head": head, "can_undo": head > 0,
+            "can_redo": head < len(meta.get("ops") or []), "analysis": analysis}
 
 
 def preview(m: trimesh.Trimesh) -> dict:

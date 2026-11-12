@@ -307,8 +307,8 @@ def service_worker():
 async def healthz():
     """Liveness probe for containers / uptime monitors: no auth, no cookies, no user data.
 
-    Async so a full worker-thread pool (every thread waiting on a slice or prepare)
-    cannot stop the probe. The probe does no disk or session work.
+    Async so a full worker-thread pool (every thread waiting on a slice, a prepare,
+    or a CAD edit) cannot stop the probe. The probe does no disk, session, or mesh work.
     """
     return {"status": "ok"}
 

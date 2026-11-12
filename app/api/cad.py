@@ -23,7 +23,7 @@ from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
 from ..core import cadops, meshedit, meshparts
 from ..core import sketch as sk
-from ..services import editproj
+from ..services import editlane, editproj
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, disk_guard, meta_for, summary
 from .textcap import plain_text, text_in
@@ -251,6 +251,13 @@ def _scene_body(i: int, b: trimesh.Trimesh) -> tuple[dict, int]:
 
 @router.get("/{bid}/scene")
 def scene(bid: str, actor: Actor = Depends(get_actor)):
+    try:
+        return editlane.run(lambda: _scene(bid, actor))
+    except editlane.Busy:
+        raise HTTPException(503, editlane.BUSY)
+
+
+def _scene(bid: str, actor: Actor):
     """Per-body geometry for the workspace viewer (base64 float32 positions / uint32 indices) plus the
     sharp 'feature' edges (segments, for display and edge picking), the appearance and the history.
 
@@ -259,6 +266,7 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
     """
     meta = _edit(bid, actor)
     m = editproj.mesh_at(bid, meta)
+    meta = store.get(bid)
     real_n = int(len(m.faces))
     view, simplified = _display_mesh(m)
     if view is None:
@@ -285,7 +293,7 @@ def scene(bid: str, actor: Actor = Depends(get_actor)):
         out.append(packed)
     if simplified and shown > MAX_SCENE_FACES:
         raise _too_big(real_n)
-    p = editproj.payload(bid)
+    p = editproj.step_view(meta, m)
     return {"id": bid, "title": meta.get("title"), "bodies": out,
             "parts": meshparts.public(model_parts),
             "appearance": cadops.appearance_for_viewer(meta.get("appearance") or {}, m),

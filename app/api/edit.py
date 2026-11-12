@@ -19,7 +19,7 @@ from ..core import features as features_mod
 from ..core import printcheck as printcheck_mod
 from ..core import volcost as volcost_mod
 from ..core import thickness as thickness_mod
-from ..services import editproj, print_setup
+from ..services import editlane, editproj, print_setup
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
 from .textcap import plain_text, text_in
@@ -415,28 +415,27 @@ def put_part_slots(bid: str, body: dict, actor: Actor = Depends(get_actor)):
     """Assign, reset, or re-check filament slots. The mesh is not modified.
 
     `single_slot` only chooses the warning. It does not change the slots the parts use.
+    Ids from before a step changed the parts are ignored. The saved parts always match
+    the mesh this request commits against.
     """
+    try:
+        return editlane.run(lambda: _put_part_slots(bid, body, actor))
+    except editlane.Busy:
+        raise HTTPException(503, editlane.BUSY)
+
+
+def _put_part_slots(bid: str, body: dict, actor: Actor):
     meta = _edit_meta(bid, actor, owner_only=True)
     if not isinstance(body, dict):
         raise HTTPException(400, "Send a slot assignment.")
     blocked = editproj.not_ready(meta)
     if blocked:
         raise HTTPException(409, blocked)
-    mesh = editproj.mesh_at(bid, meta)
-    title = meta.get("title") or "Model"
-    current = meshparts.resolve(meta.get("parts"), len(mesh.faces), title)
     try:
-        count = partslots.clamp_count(body.get("slot_count", 1))
-        updated, flags = partslots.apply(
-            current, body.get("action") or "prepare",
-            ids=body.get("ids") or [], slot=body.get("slot"), slot_count=count,
-            colours=partslots.parse_colours(body.get("colours")),
-        )
+        stored, flags = editproj.update_part_slots(bid, body)
     except partslots.SlotError as e:
         raise HTTPException(400, str(e))
-    if not partslots.same(current, updated):
-        editproj.save_parts(bid, updated)
-    stored = meshparts.resolve(store.get(bid).get("parts"), len(mesh.faces), title)
+    count = partslots.clamp_count(body.get("slot_count", 1))
     return {**editproj.payload(bid), "slot_flags": flags,
             "parts_notes": partslots.notes(stored, count, bool(body.get("single_slot")))}
 
@@ -531,6 +530,13 @@ def _act(bid, actor, fn):
 
 @router.post("/{bid}/op")
 def apply_op(bid: str, body: dict, actor: Actor = Depends(get_actor)):
+    try:
+        return editlane.run(lambda: _apply_op(bid, body, actor))
+    except editlane.Busy:
+        raise HTTPException(503, editlane.BUSY)
+
+
+def _apply_op(bid: str, body: dict, actor: Actor):
     op = body.get("op")
     if op not in meshedit.OPS:
         raise HTTPException(400, f"unknown operation; choose from {sorted(meshedit.OPS)}")
@@ -589,12 +595,18 @@ def delete_step(bid: str, i: int, actor: Actor = Depends(get_actor)):
 
 @router.post("/{bid}/undo")
 def undo(bid: str, actor: Actor = Depends(get_actor)):
-    return _act(bid, actor, lambda: editproj.undo(bid))
+    try:
+        return editlane.run(lambda: _act(bid, actor, lambda: editproj.undo(bid)))
+    except editlane.Busy:
+        raise HTTPException(503, editlane.BUSY)
 
 
 @router.post("/{bid}/redo")
 def redo(bid: str, actor: Actor = Depends(get_actor)):
-    return _act(bid, actor, lambda: editproj.redo(bid))
+    try:
+        return editlane.run(lambda: _act(bid, actor, lambda: editproj.redo(bid)))
+    except editlane.Busy:
+        raise HTTPException(503, editlane.BUSY)
 
 
 @router.post("/{bid}/goto")
