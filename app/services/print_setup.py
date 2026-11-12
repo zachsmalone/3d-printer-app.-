@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app import printers as catalog
 from app.services import slice_engine as slice_eng
-from app.services.material_units import default_slots, units_from_profile
+from app.services.material_units import UnitError, default_slots, effective_slots, units_from_profile
 from app.services.single_slot import option_for as single_slot_option
 from app.services.support_extruder import idle as support_filament_idle, status as support_filament_status
 
@@ -202,6 +202,35 @@ def public() -> dict:
             "presets": [{"id": k, **{x: v[x] for x in PRESET_PUBLIC}} for k, v in PRESETS.items()], "default_preset": DEFAULT_PRESET,
             "materials": {m: {**material_temps(m), "warning": material_safety(m)} for m in mats}, "layer_fraction": [LAYER_MIN, LAYER_MAX],
             "nozzle_validation": specs()["scope"]["validation"], "advanced_note": ADVANCED_NOTE}
+
+
+def export_slot_count(printer_id: str = "", unit_id: str = "", unit_count: str = "", stored: dict | None = None) -> int:
+    """How many filament slots an export should honour for this printer.
+
+    A saved add-on wins when the request did not name one. No unit, and no
+    multi-material system on the printer, is one slot: the 3MF stays the
+    single-object file. A bad unit id is one slot, never an error on download.
+    """
+    stored = stored or {}
+    pid = (printer_id or "").strip()
+    if not pid and stored.get("printer_id"):
+        pid = stored.get("printer_id") or ""
+    try:
+        resolved, _nozzle = resolve(pid or None)
+        pub = printer_public(resolved)
+        chosen = (unit_id or "").strip()
+        count_raw = unit_count
+        if not chosen and stored.get("printer_id") == resolved and stored.get("unit_id"):
+            chosen = stored.get("unit_id") or ""
+            count_raw = stored.get("unit_count")
+        if chosen:
+            return effective_slots(resolved, chosen, count_raw)
+        count = int(pub.get("filament_slots") or 1)
+        if not pub.get("multi_color_system"):
+            return 1
+        return count if count >= 1 else 1
+    except (SetupError, UnitError, KeyError, TypeError, ValueError):
+        return 1
 
 
 def resolve(printer_id=None, nozzle=None) -> tuple[str, float | None]:

@@ -19,7 +19,7 @@ from ..core import features as features_mod
 from ..core import printcheck as printcheck_mod
 from ..core import volcost as volcost_mod
 from ..core import thickness as thickness_mod
-from ..services import editproj, material_units, print_setup
+from ..services import editproj, print_setup
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
 from .textcap import plain_text, text_in
@@ -33,26 +33,8 @@ def _slot_context(actor: Actor, printer_id: str, slot_colours: str, unit_id: str
     A saved add-on on the account wins when the upload did not name one. An explicit
     unit id from the form is checked against the catalog and never raises out of an upload.
     """
-    pid = (printer_id or "").strip()
     stored = (actor.user or {}).get("printer") or {}
-    if not pid and stored.get("printer_id"):
-        pid = stored.get("printer_id") or ""
-    try:
-        resolved, _nozzle = print_setup.resolve(pid or None)
-        pub = print_setup.printer_public(resolved)
-        chosen = (unit_id or "").strip()
-        count_raw = unit_count
-        if not chosen and stored.get("printer_id") == resolved and stored.get("unit_id"):
-            chosen = stored.get("unit_id") or ""
-            count_raw = stored.get("unit_count")
-        if chosen:
-            count = material_units.effective_slots(resolved, chosen, count_raw)
-        else:
-            count = int(pub.get("filament_slots") or 1)
-            if not pub.get("multi_color_system"):
-                count = 1
-    except (print_setup.SetupError, material_units.UnitError, KeyError, TypeError, ValueError):
-        count = 1
+    count = print_setup.export_slot_count(printer_id, unit_id, unit_count, stored)
     return count, partslots.parse_colours(slot_colours)
 
 

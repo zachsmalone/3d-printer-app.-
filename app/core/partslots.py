@@ -4,8 +4,8 @@ A part keeps the colour read from the file. The slot is which CFS, AMS, MMU, or 
 port prints it. The slicer's slot colours are the configured colours. On import, a
 detected colour maps to the nearest of those. With one slot, every part uses slot 1.
 
-Export and slicing still join the parts into one mesh. These numbers are only the
-editor's assignment until a later step sends them to the slicer.
+A multi-slot 3MF export writes each part's slot. Slicing still joins the parts
+into one mesh. These numbers are the editor's assignment until slicing uses them.
 """
 from __future__ import annotations
 

@@ -16,6 +16,7 @@ from collections import Counter
 
 import numpy as np
 import trimesh
+from lxml import etree
 from trimesh.util import unique_name
 
 from .partslots import display_color
@@ -491,21 +492,155 @@ def _3mf_has_colour(archive: zipfile.ZipFile) -> bool:
     return False
 
 
+def _slot_num(value) -> int | None:
+    if value is None:
+        return None
+    try:
+        n = int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if n < 1 or n > 16:
+        return None
+    return n
+
+
+def _xml_parser():
+    return etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False, huge_tree=False, remove_comments=True)
+
+
+def _direct_extruder(el) -> int | None:
+    for child in el:
+        if _local(child.tag) != "metadata":
+            continue
+        if child.get("key") == "extruder":
+            return _slot_num(child.get("value"))
+    return None
+
+
+def _config_extruders(archive: zipfile.ZipFile, name: str | None) -> dict:
+    empty = {"object": {}, "part": {}, "volumes": {}}
+    if not name:
+        return empty
+    try:
+        raw = archive.read(name)
+    except KeyError:
+        return empty
+    if len(raw) > 1_000_000:
+        return empty
+    try:
+        root = etree.fromstring(raw, _xml_parser())
+    except etree.XMLSyntaxError:
+        return empty
+    out = {"object": {}, "part": {}, "volumes": {}}
+    for el in root.iter():
+        if _local(el.tag) != "object":
+            continue
+        oid = el.get("id")
+        if not oid:
+            continue
+        slot = _direct_extruder(el)
+        if slot is not None:
+            out["object"][oid] = slot
+        volumes = []
+        for child in list(el):
+            kind = _local(child.tag)
+            if kind not in ("part", "volume"):
+                continue
+            child_slot = _direct_extruder(child)
+            volumes.append(child_slot)
+            if kind == "part" and child.get("id") and child_slot is not None:
+                out["part"][child.get("id")] = child_slot
+        if volumes:
+            out["volumes"][oid] = volumes
+    return out
+
+
+def _extruder_by_object_id(archive: zipfile.ZipFile) -> dict[str, int]:
+    """Mesh object id -> 1-based slot, from the slicer config files.
+
+    A package with a single object-level extruder and no per-part entry is the
+    old one-object export. Leave those slots unset so re-import stays as it was.
+    """
+    names = {n.lower(): n for n in archive.namelist()}
+    model_name = names.get("3d/3dmodel.model")
+    if not model_name:
+        return {}
+    if "metadata/model_settings.config" not in names and "metadata/slic3r_pe_model.config" not in names:
+        return {}
+    try:
+        root = etree.fromstring(archive.read(model_name))
+    except etree.XMLSyntaxError:
+        return {}
+    children: dict[str, list[str]] = {}
+    mesh_ids: list[str] = []
+    for el in root.iter():
+        if _local(el.tag) != "object":
+            continue
+        oid = el.get("id")
+        if not oid:
+            continue
+        kids = []
+        has_mesh = False
+        for node in el.iter():
+            if node is el:
+                continue
+            kind = _local(node.tag)
+            if kind == "component" and node.get("objectid"):
+                kids.append(node.get("objectid"))
+            elif kind == "mesh":
+                has_mesh = True
+        if kids:
+            children[oid] = kids
+        if has_mesh:
+            mesh_ids.append(oid)
+    settings = _config_extruders(archive, names.get("metadata/model_settings.config"))
+    slic3r = _config_extruders(archive, names.get("metadata/slic3r_pe_model.config"))
+    found: dict[str, int] = {}
+    part_level = False
+    for oid in mesh_ids:
+        slot = None
+        if oid in settings["part"]:
+            slot = settings["part"][oid]
+            part_level = True
+        elif oid in slic3r["part"]:
+            slot = slic3r["part"][oid]
+            part_level = True
+        else:
+            for parent, kids in children.items():
+                if oid not in kids:
+                    continue
+                idx = kids.index(oid)
+                volumes = settings["volumes"].get(parent) or slic3r["volumes"].get(parent) or []
+                if idx < len(volumes) and volumes[idx] is not None:
+                    slot = volumes[idx]
+                    part_level = True
+                break
+        if slot is None and oid in settings["object"]:
+            slot = settings["object"][oid]
+        if slot is None and oid in slic3r["object"]:
+            slot = slic3r["object"][oid]
+        if slot is not None:
+            found[oid] = slot
+    if not part_level and len(found) <= 1:
+        return {}
+    return found
+
+
 def _3mf_color_table(data: bytes) -> dict[str, dict]:
-    """Geometry name -> display name, colour, source material id. Empty when the file has no colours."""
+    """Geometry name -> display name, colour, source material id, and slot.
+
+    Empty when the file has neither a colour nor a per-part extruder.
+    """
     try:
         archive = zipfile.ZipFile(io.BytesIO(data))
     except zipfile.BadZipFile:
         return {}
-    if not _3mf_has_colour(archive):
+    slots = _extruder_by_object_id(archive)
+    if not _3mf_has_colour(archive) and not slots:
         return {}
     names = {n.lower(): n for n in archive.namelist()}
     root_name = names.get("3d/3dmodel.model")
     if not root_name:
-        return {}
-    try:
-        from lxml import etree
-    except ImportError:
         return {}
     try:
         root = etree.fromstring(archive.read(root_name))
@@ -548,8 +683,13 @@ def _3mf_color_table(data: bytes) -> dict[str, dict]:
             voted, voted_mat, varied = _triangle_vote(mesh_el, resources, 50_000)
             if varied and voted:
                 color, material = voted, voted_mat
-        table[geom] = {"name": _clean_name(el.get("name") or f"Object {oid}", f"Object {oid}"),
-                       "color": color, "material": material}
+        slot = slots.get(str(oid))
+        table[geom] = {
+            "name": _clean_name(el.get("name") or f"Object {oid}", f"Object {oid}"),
+            "color": color,
+            "material": material,
+            "slot": slot if type(slot) is int else None,
+        }
     return table
 
 
@@ -698,11 +838,17 @@ def _parts_from_geoms(geoms: list[tuple], *, concatenate: bool) -> tuple[trimesh
         return mesh, single(len(mesh.faces))
     parts = []
     cursor = 0
-    for i, (_mesh, name, color, material) in enumerate(geoms):
+    for i, item in enumerate(geoms):
+        _mesh, name, color, material = item[0], item[1], item[2], item[3]
+        slot = item[4] if len(item) > 4 else None
+        if type(slot) is not int:
+            slot = None
         count = int(len(_mesh.faces))
         if count <= 0:
             continue
-        parts.append(_record(f"p{len(parts) + 1}", name or f"Part {i + 1}", color, material, [(cursor, count)]))
+        parts.append(_record(
+            f"p{len(parts) + 1}", name or f"Part {i + 1}", color, material, [(cursor, count)], slot,
+        ))
         cursor += count
     if cursor != len(mesh.faces) or not parts:
         return mesh, single(len(mesh.faces))
@@ -754,13 +900,17 @@ def load_document(data: bytes, ext: str, units_scale: float = 1.0, mtl: bytes | 
             geoms = []
             for i, geom in enumerate(dumped):
                 name, color, material = f"Part {i + 1}", None, None
+                info = {}
                 if i < len(nodes):
                     _transform, geom_name = loaded.graph[nodes[i]]
                     info = table.get(str(geom_name), {})
                     name = info.get("name") or str(geom_name or nodes[i])
                     color = info.get("color")
                     material = info.get("material")
-                geoms.append((geom, name, color, material))
+                slot = info.get("slot")
+                if type(slot) is not int:
+                    slot = None
+                geoms.append((geom, name, color, material, slot))
             explicit = len(geoms) > 1
             concatenate = True
         else:

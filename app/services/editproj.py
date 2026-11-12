@@ -26,7 +26,7 @@ from PIL import Image
 
 from ..core import cadops
 from ..core import dims as dimmod
-from ..core import exporters, geometry, meshedit, meshparts, meshthumb, partslots
+from ..core import exporters, geometry, meshedit, meshparts, meshthumb, part3mf, partslots
 from ..core.geometry import Body, Model
 from .history import store
 
@@ -189,6 +189,24 @@ def model(bid: str) -> Model:
     return as_model(printable_at(bid, meta), meta["title"])
 
 
+def _parts_stamp(meta: dict) -> str:
+    """Identity of the part names and slots. Geometry can stay put while a slot changes."""
+    parts = meta.get("parts") or []
+    blob = json.dumps(
+        [{"id": p.get("id"), "name": p.get("name"), "color": p.get("color"), "slot": p.get("slot")} for p in parts if isinstance(p, dict)],
+        sort_keys=True, separators=(",", ":"), default=str,
+    )
+    return hashlib.sha256(blob.encode()).hexdigest()[:20]
+
+
+def _model_3mf_bytes(mesh: trimesh.Trimesh, meta: dict) -> bytes:
+    """Cached 3MF. One slot, or every part on slot 1, stays the single-object file."""
+    baked = part3mf.build(mesh, meta, part3mf.stored_slot_count(meta.get("parts")))
+    if baked is not None:
+        return baked[0]
+    return exporters.to_3mf(as_model(mesh, meta.get("title") or "Model"))
+
+
 def ensure_exports(bid: str):
     """(Re)write model.stl/obj/3mf + thumb.png when they are stale. No-op for photo builds."""
     try:
@@ -199,7 +217,9 @@ def ensure_exports(bid: str):
         return
     d = store.dir(bid)
     rev = geometry_revision(meta)
-    if meta.get("exports_rev") == rev and all((d / f"model.{e}").exists() for e in exporters.WRITERS):
+    stamp = _parts_stamp(meta)
+    files_ready = all((d / f"model.{e}").exists() for e in exporters.WRITERS)
+    if meta.get("exports_rev") == rev and meta.get("parts_export") == stamp and files_ready:
         return
     with _lock:
         meta = store.get(bid)
@@ -207,7 +227,16 @@ def ensure_exports(bid: str):
             return
         d = store.dir(bid)
         rev = geometry_revision(meta)
-        if meta.get("exports_rev") == rev and all((d / f"model.{e}").exists() for e in exporters.WRITERS):
+        stamp = _parts_stamp(meta)
+        files_ready = all((d / f"model.{e}").exists() for e in exporters.WRITERS)
+        if meta.get("exports_rev") == rev and meta.get("parts_export") == stamp and files_ready:
+            return
+        if meta.get("exports_rev") == rev and files_ready:
+            # The mesh is unchanged. Only the 3MF carries part slots.
+            m = printable_at(bid, meta)
+            (d / "model.3mf").write_bytes(_model_3mf_bytes(m, meta))
+            meta["parts_export"] = stamp
+            store.save(meta)
             return
         m = printable_at(bid, meta)
         quality = export_quality(m)
@@ -219,11 +248,15 @@ def ensure_exports(bid: str):
         meta["warnings"] = list(dict.fromkeys(kept + replay_omissions(meta) + ([] if quality["ok"] else [quality["message"]])))
         mdl = as_model(m, meta["title"])
         for ext, fn in exporters.WRITERS.items():
-            (d / f"model.{ext}").write_bytes(fn(mdl))
+            if ext == "3mf":
+                (d / "model.3mf").write_bytes(_model_3mf_bytes(m, meta))
+            else:
+                (d / f"model.{ext}").write_bytes(fn(mdl))
         (d / "model.gcode").unlink(missing_ok=True)       # stale slice
         Image.fromarray(meshthumb.render(m.vertices, m.faces)).save(d / "thumb.png")
         meta["exports_rev"] = rev
         meta["stl_rev"] = rev
+        meta["parts_export"] = stamp
         meta.pop("exports_head", None)
         store.save(meta)
 
