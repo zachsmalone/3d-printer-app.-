@@ -855,6 +855,121 @@ def _parts_from_geoms(geoms: list[tuple], *, concatenate: bool) -> tuple[trimesh
     return mesh, parts
 
 
+def _range_mesh(mesh: trimesh.Trimesh, first: int, count: int) -> trimesh.Trimesh:
+    """Faces ``first`` .. ``first + count`` as their own mesh, in that order."""
+    faces = np.asarray(mesh.faces)[int(first):int(first) + int(count)]
+    used, inv = np.unique(faces.ravel(), return_inverse=True)
+    return trimesh.Trimesh(np.asarray(mesh.vertices)[used], inv.reshape(-1, 3), process=False)
+
+
+def _meta_value(el, key: str) -> str | None:
+    for child in el:
+        if _local(child.tag) == "metadata" and child.get("key") == key:
+            return child.get("value")
+    return None
+
+
+def _slic3r_volume_parts(data: bytes) -> list[dict] | None:
+    """Parts of one built mesh, split on PrusaSlicer's volume triangle ranges.
+
+    None unless the build is a single mesh object and ``Slic3r_PE_model.config``
+    lists two or more volumes whose ``firstid``/``lastid`` partition that mesh
+    in order. A component assembly is left to the geometry loader.
+    """
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        return None
+    names = {n.lower(): n for n in archive.namelist()}
+    model_name = names.get("3d/3dmodel.model")
+    slic3r_name = names.get("metadata/slic3r_pe_model.config")
+    if not model_name or not slic3r_name:
+        return None
+    try:
+        root = etree.fromstring(archive.read(model_name), _xml_parser())
+        cfg = etree.fromstring(archive.read(slic3r_name), _xml_parser())
+    except etree.XMLSyntaxError:
+        return None
+    items = [el for el in root.iter() if _local(el.tag) == "item"]
+    if len(items) != 1:
+        return None
+    oid = items[0].get("objectid")
+    if not oid:
+        return None
+    obj = next((el for el in root.iter() if _local(el.tag) == "object" and el.get("id") == oid), None)
+    if obj is None:
+        return None
+    if any(_local(node.tag) == "component" for node in obj.iter() if node is not obj):
+        return None
+    mesh_el = next((child for child in obj if _local(child.tag) == "mesh"), None)
+    if mesh_el is None:
+        return None
+    triangles_el = next((child for child in mesh_el if _local(child.tag) == "triangles"), None)
+    if triangles_el is None:
+        return None
+    triangles = [tri for tri in triangles_el if _local(tri.tag) == "triangle"]
+    n = len(triangles)
+    if n < 2:
+        return None
+    cfg_obj = next((el for el in cfg.iter() if _local(el.tag) == "object" and el.get("id") == oid), None)
+    if cfg_obj is None:
+        return None
+    volumes = [el for el in cfg_obj if _local(el.tag) == "volume"]
+    if len(volumes) < 2:
+        return None
+    resources = _parse_color_resources(root)
+    out = []
+    cursor = 0
+    for vol in volumes:
+        try:
+            first = int(vol.get("firstid"))
+            last = int(vol.get("lastid"))
+        except (TypeError, ValueError):
+            return None
+        if first != cursor or last < first or last >= n:
+            return None
+        color, material = _range_color(triangles, resources, obj, first, last)
+        slot = _direct_extruder(vol)
+        name = _meta_value(vol, "name") or f"Part {len(out) + 1}"
+        out.append({
+            "name": name,
+            "slot": slot,
+            "color": color,
+            "material": material,
+            "first": first,
+            "count": last - first + 1,
+        })
+        cursor = last + 1
+    if cursor != n:
+        return None
+    return out
+
+
+def _range_color(triangles, resources, obj, first: int, last: int):
+    votes: Counter = Counter()
+    for tri in triangles[first:last + 1]:
+        pid = tri.get("pid")
+        index = tri.get("pindex", tri.get("p1"))
+        if pid is None and index is None:
+            pid = obj.get("pid")
+            index = obj.get("pindex", obj.get("p1"))
+        if pid is None and index is None:
+            continue
+        votes[(pid, index)] += 1
+    if not votes:
+        return None, None
+    (pid, index), _n = votes.most_common(1)[0]
+    return _lookup(resources, pid, index)
+
+
+def _loaded_meshes(loaded) -> list:
+    if isinstance(loaded, trimesh.Trimesh):
+        return [loaded]
+    if isinstance(loaded, trimesh.Scene):
+        return [g for g in loaded.dump() if isinstance(g, trimesh.Trimesh)]
+    return []
+
+
 def _load_trimesh(data: bytes, ft: str):
     if ft == "3mf":
         return trimesh.load(io.BytesIO(data), file_type=ft, process=False)
@@ -891,7 +1006,20 @@ def load_document(data: bytes, ext: str, units_scale: float = 1.0, mtl: bytes | 
             raise
         except Exception as exc:
             raise meshedit.OpError(f"Could not read the {ft.upper()} file: {exc}")
-        if isinstance(loaded, trimesh.Scene):
+        volume_parts = _slic3r_volume_parts(data) if ft == "3mf" else None
+        meshes = _loaded_meshes(loaded)
+        covered = sum(int(v["count"]) for v in volume_parts) if volume_parts else 0
+        if volume_parts and len(meshes) == 1 and len(meshes[0].faces) == covered:
+            geoms = []
+            for vol in volume_parts:
+                slot = vol["slot"] if type(vol["slot"]) is int else None
+                geoms.append((
+                    _range_mesh(meshes[0], vol["first"], vol["count"]),
+                    vol["name"], vol["color"], vol["material"], slot,
+                ))
+            explicit = True
+            concatenate = True
+        elif isinstance(loaded, trimesh.Scene):
             dumped = [g for g in loaded.dump() if isinstance(g, trimesh.Trimesh)]
             if not dumped:
                 raise meshedit.OpError("The file contains no triangle meshes.")
