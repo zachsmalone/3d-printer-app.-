@@ -21,11 +21,12 @@ def test_viewer_is_not_capped_in_the_right_column():
     assert panel.index('id="rzMaterial"') < panel.index('id="rzAdv"')
 
 
-def test_wide_screen_puts_the_support_panel_beside_the_viewer():
-    wide = CSS.split("@media (min-width:960px){", 1)[1].split("@media", 1)[0]
-    assert "#viewTorch.has-model .rzFileCol" in wide
-    assert "minmax(0,1fr) minmax(280px,min(400px,32%))" in wide
-    assert '"view supports"' in wide
-    assert "#viewTorch.has-model #rzPickView{grid-area:view" in wide
-    assert "#viewTorch.has-model #rzSupEdit{grid-area:supports" in wide
+def test_preview_dock_sits_above_the_scrolling_tools():
+    panel = _panel()
+    assert 'id="rzPreviewDock"' in panel and 'id="rzTools"' in panel
+    assert panel.index('id="rzPreviewDock"') < panel.index('id="rzPickView"') < panel.index('id="rzTools"')
+    assert panel.index('id="rzTools"') < panel.index('id="rzSupEdit"')
+    assert "minmax(280px,min(400px,32%))" not in CSS
+    assert "main.zws #torchPanel .rzPreviewDock{flex:1 1 42%" in CSS
+    assert "main.zws #torchPanel .rzTools{flex:1 1 auto" in CSS
     assert "@media (max-width:480px){.rzRow{grid-template-columns:1fr}" in CSS
