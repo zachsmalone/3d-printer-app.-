@@ -1,7 +1,7 @@
 """Give freed heap back to the OS after a heavy request.
 
-glibc keeps freed memory inside the process: after the FDM tab imported and sliced three big STLs the server sat at
-2.5 GB resident in the 3 GB container, and the next PrusaSlicer run was OOM-killed. gc + malloc_trim(0) returns it."""
+glibc keeps freed memory in the process. After a large mesh the address space stays high, and the
+next boolean or slice can hit the job cap or the 14 GB app container. gc + malloc_trim(0) returns it."""
 import ctypes
 import gc
 

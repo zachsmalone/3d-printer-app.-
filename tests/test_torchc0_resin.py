@@ -805,6 +805,20 @@ def test_api_support_fields_and_formats_note(c):
     assert "not a resin slicer" in note.lower() or "reverse-engineering" in note.lower()
 
 
+def test_proxy_mesh_falls_back_to_a_small_stand_in(monkeypatch):
+    """A failed simplifier must not hand the full mesh to support queries."""
+    mesh = trimesh.creation.icosphere(subdivisions=6)
+    assert len(mesh.faces) > 40_000
+
+    def boom(*_a, **_k):
+        raise MemoryError("simplifier")
+
+    monkeypatch.setattr(resin.fast_simplification, "simplify", boom)
+    proxy = resin._proxy_mesh(mesh, 2_500)
+    assert 0 < len(proxy.faces) <= 2_500
+    assert len(proxy.faces) < len(mesh.faces)
+
+
 def test_torchc0_islands_cups_cost_in_chromium():
     from test_b4_ui import _run
     out = _run("ui_torchc0_islands.py")
