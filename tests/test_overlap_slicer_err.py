@@ -75,6 +75,52 @@ def test_real_model_failure_still_model_error(monkeypatch, tmp_path):
     assert e.code == "too_big"
 
 
+def test_classifier_ignores_a_signal_before_any_model_output():
+    assert eng.is_startup_failure(-11, "") is True
+    assert eng.is_startup_failure(-11, "segmentation fault (core dumped)") is True
+    assert eng.is_startup_failure(127, "error while loading shared libraries") is True
+
+
+def test_classifier_treats_model_stages_as_the_model():
+    assert eng.is_startup_failure(-11, "Searching support spots") is False
+    assert eng.is_startup_failure(-11, "gcode path conflicts found between part_02.stl and part_01.stl") is False
+    assert eng.is_startup_failure(-11, "object with no extrusions in the first layer") is False
+    assert eng.is_startup_failure(-11, "30 => Slicing") is False
+    assert eng.is_startup_failure(-11, "10 => Processing triangulated mesh") is False
+    assert eng.model_work_started("empty first layer") is True
+    assert eng.model_work_started("") is False
+
+
+def test_support_spot_crash_is_a_model_error(monkeypatch, tmp_path):
+    e = _run(monkeypatch, tmp_path, lambda *a, **k: _P(-11, "Searching support spots\nSegmentation fault"))
+    assert e.code == "slice_failed" and e.status == 500
+    assert "support spots" in e.message
+    assert "isn't your model" not in e.message and "couldn't start" not in e.message
+
+
+def test_slicing_stage_crash_is_a_model_error(monkeypatch, tmp_path):
+    e = _run(monkeypatch, tmp_path, lambda *a, **k: _P(-11, "10 => Processing triangulated mesh\n20 => Slicing\n"))
+    assert e.code == "slice_failed" and e.status == 500
+    assert "slicing" in e.message
+    assert "isn't your model" not in e.message and "couldn't start" not in e.message
+
+
+def test_path_conflict_outranks_the_empty_first_layer(monkeypatch, tmp_path):
+    err = ("There is an object with no extrusions in the first layer.\n"
+           "gcode path conflicts found between part_02.stl and part_01.stl\n")
+    e = _run(monkeypatch, tmp_path, lambda *a, **k: _P(-11, err))
+    assert e.code == "slice_failed" and e.status == 422
+    assert "conflicting paths" in e.message
+    assert "isn't your model" not in e.message and "couldn't start" not in e.message
+
+
+def test_empty_first_layer_stays_honest_when_the_process_is_signalled(monkeypatch, tmp_path):
+    e = _run(monkeypatch, tmp_path, lambda *a, **k: _P(-11, "object with no extrusions in the first layer"))
+    assert e.code == "first_layer_empty" and e.status == 422
+    assert "first layer" in e.message
+    assert "isn't your model" not in e.message and "couldn't start" not in e.message
+
+
 def test_api_slice_startup_message(monkeypatch, client):
     def boom(*a, **k): raise eng.SliceError("slicer_unavailable", eng.SLICER_ENV_MSG, 503)
     monkeypatch.setattr(eng, "run_engine", boom)

@@ -251,39 +251,86 @@ def run_engine(engine: str, ini: Path, model: Path, out: Path, timeout: int = SL
         slicer_warm.note_slice()
     except Exception:
         pass
+    output = (proc.stderr or "") + (proc.stdout or "")
     tail = (proc.stderr or "")[-600:] + (proc.stdout or "")[-600:]
     if proc.returncode != 0 or not out.exists() or out.stat().st_size == 0:
         log.error("slicer failed rc=%s: %s", proc.returncode, tail)
-        if is_startup_failure(proc.returncode, (proc.stderr or "") + (proc.stdout or "")):
+        if is_startup_failure(proc.returncode, output):
             raise SliceError("slicer_unavailable", SLICER_ENV_MSG, 503)
-        if "could not fit" in tail.lower():
-            raise SliceError("too_big", "This model doesn't fit on the printer bed. Try scaling it down, or cut it into pieces with Edit → Split.", 422)
-        if "no extrusions in the first layer" in tail.lower():
-            raise SliceError("first_layer_empty", "Only a tiny point of this model touches the bed, so nothing prints on "
-                             "the first layer. Turn Supports on, or lay it flat in the Edit tab.", 422)
-        raise SliceError("slice_failed", "The slicer couldn't process this model. If it has holes or "
-                         "broken surfaces, run Fix in the Edit tab and try again.", 500)
+        raise model_slice_error(proc.returncode, output)
 
 
 SLICER_ENV_MSG = "The slicer couldn't start on the server. This isn't your model. Please try again later."
+TOO_BIG_MSG = "This model doesn't fit on the printer bed. Try scaling it down, or cut it into pieces with Edit → Split."
+FIRST_LAYER_MSG = ("Only a tiny point of this model touches the bed, so nothing prints on "
+                   "the first layer. Turn Supports on, or lay it flat in the Edit tab.")
+PATH_CONFLICT_MSG = ("Parts of this model overlap, so the slicer found conflicting paths between them. "
+                     "Nothing was sent to a printer. Keep intersecting parts as one object, or move them apart, and try again.")
+GENERIC_SLICE_MSG = ("The slicer couldn't process this model. If it has holes or "
+                     "broken surfaces, run Fix in the Edit tab and try again.")
 _STARTUP_MARKERS = ("error while loading shared libraries", "cannot open shared object", "not found (required by",
                     "symbol lookup error", "exec format error", "glibc_", "no such file or directory: '",
                     "cannot execute", "permission denied", "could not load the qt platform plugin",
                     "segmentation fault", "core dumped", "bus error")
-_MODEL_MARKERS = ("loading of a model file failed", "slicing", "objects were loaded", "could not fit", "empty layer")
+_MODEL_MARKERS = ("loading of a model file failed", "slicing", "objects were loaded", "could not fit", "empty layer",
+                  "no extrusions in the first layer", "empty first layer", "first layer", "path conflict", "support spot")
+
+
+def model_work_started(output: str) -> bool:
+    """True once the engine has logged a model stage, not merely that the process was launched."""
+    text = output or ""
+    low = text.lower()
+    if any(m in low for m in _MODEL_MARKERS):
+        return True
+    return _STAGE_LINE.search(text) is not None
 
 
 def is_startup_failure(rc: int | None, output: str) -> bool:
     """True when the slicer died before it got to the model (missing binary/libs, killed by a signal before any
-    slicing output, shell 'command not found'), so the error must not blame the user's model."""
-    low = (output or "").lower()
-    if any(m in low for m in _MODEL_MARKERS):
+    slicing output, shell 'command not found'), so the error must not blame the user's model.
+
+    A negative exit after model stages have started (path conflicts, an empty first layer, support-spot search,
+    or a numbered slicing stage) is a model failure, not a startup failure.
+    """
+    if model_work_started(output):
         return False
     if rc in (126, 127):
         return True
+    low = (output or "").lower()
     if any(m in low for m in _STARTUP_MARKERS):
         return True
     return rc is not None and rc < 0                       # signal (SIGSEGV/SIGABRT/SIGKILL) with no model output
+
+
+def _crash_detail(output: str) -> str:
+    low = (output or "").lower()
+    if "support spot" in low:
+        return "searching for support spots"
+    stage = _last_stage(output)
+    if stage:
+        return stage[0].lower() + stage[1:]
+    return "working on this model"
+
+
+def model_slice_error(rc: int | None, output: str) -> SliceError:
+    """Classify a failure after the slicer has started. Never the startup message."""
+    low = (output or "").lower()
+    if "could not fit" in low:
+        return SliceError("too_big", TOO_BIG_MSG, 422)
+    # Overlapping parts report this together with an empty first layer. Supports will not
+    # separate them, and the Auto retry can crash while searching for support spots.
+    if "path conflict" in low:
+        return SliceError("slice_failed", PATH_CONFLICT_MSG, 422)
+    if "no extrusions in the first layer" in low or "empty first layer" in low:
+        return SliceError("first_layer_empty", FIRST_LAYER_MSG, 422)
+    if rc is not None and rc < 0:
+        return SliceError(
+            "slice_failed",
+            f"The slicer crashed while {_crash_detail(output)}. It had already started on this model. "
+            "Nothing was sent to a printer.",
+            500,
+        )
+    return SliceError("slice_failed", GENERIC_SLICE_MSG, 500)
 
 
 # --------------------------------------------------------------------------- G-code stats
