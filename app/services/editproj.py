@@ -26,7 +26,7 @@ from PIL import Image
 
 from ..core import cadops
 from ..core import dims as dimmod
-from ..core import exporters, geometry, meshedit, meshparts, meshthumb
+from ..core import exporters, geometry, meshedit, meshparts, meshthumb, partslots
 from ..core.geometry import Body, Model
 from .history import store
 
@@ -1093,7 +1093,7 @@ def preview(m: trimesh.Trimesh) -> dict:
             "indices": base64.b64encode(np.asarray(f).astype("<u4").tobytes()).decode()}]}
 
 
-def preview_objects(m: trimesh.Trimesh, layout: dict, colors=None, names=None) -> dict:
+def preview_objects(m: trimesh.Trimesh, layout: dict, colors=None, names=None, part_ids=None) -> dict:
     """One preview body per plate object (so the viewer can select / highlight each)."""
     from ..core import plate as _plate
     objs = _plate.objects(m, layout)
@@ -1107,7 +1107,8 @@ def preview_objects(m: trimesh.Trimesh, layout: dict, colors=None, names=None) -
             f = f[np.linspace(0, len(f) - 1, cap).astype(int)]
         color = colors[i] if colors and i < len(colors) else None
         name = names[i] if names and i < len(names) and names[i] else f"Object {i + 1}"
-        bodies.append({"name": name, "color": color, "object": i,
+        part_id = part_ids[i] if part_ids and i < len(part_ids) else None
+        bodies.append({"name": name, "color": color, "object": i, "part": part_id,
                        "positions": base64.b64encode(np.asarray(o.vertices).astype("<f4").tobytes()).decode(),
                        "indices": base64.b64encode(np.asarray(f).astype("<u4").tobytes()).decode()})
     return {"decimated": dec, "bodies": bodies}
@@ -1119,7 +1120,8 @@ def preview_parts(m: trimesh.Trimesh, parts: list[dict]) -> dict:
     for part in parts:
         sub = meshparts.submesh(m, part)
         bodies.append({
-            "name": part["name"], "color": part.get("color"), "object": 0,
+            "name": part["name"], "color": partslots.display_color(part), "object": 0,
+            "part": part["id"],
             "positions": base64.b64encode(np.asarray(sub.vertices).astype("<f4").tobytes()).decode(),
             "indices": base64.b64encode(np.asarray(sub.faces).astype("<u4").tobytes()).decode(),
         })
@@ -1205,13 +1207,19 @@ def payload(bid: str, report=None, *, include_preview: bool = True) -> dict:
     if len(pinfo["objects"]) > 1:
         matched = meshparts.labels_for_counts(parts, pinfo["layout"]["counts"], len(m.faces))
         if matched:
-            prev = preview_objects(m, pinfo["layout"], colors=[p.get("color") for p in matched], names=[p["name"] for p in matched])
+            prev = preview_objects(
+                m, pinfo["layout"], colors=[partslots.display_color(p) for p in matched],
+                names=[p["name"] for p in matched], part_ids=[p["id"] for p in matched])
         else:
             prev = preview_objects(m, pinfo["layout"])
     elif len(parts) > 1 and len(m.faces) <= MAX_PREVIEW_FACES:
         prev = preview_parts(m, parts)
     else:
         prev = preview(m)
+        if len(parts) == 1 and prev.get("bodies"):
+            prev["bodies"][0]["color"] = partslots.display_color(parts[0])
+            prev["bodies"][0]["part"] = parts[0]["id"]
+            prev["bodies"][0]["name"] = parts[0]["name"]
     analysis = meshedit.analyze(m)
     quality = export_quality(m)
     return {**summary(meta), "params": {}, "auto_notes": [], "info": {}, "preview": prev, "plate": pinfo,

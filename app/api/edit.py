@@ -14,17 +14,41 @@ import json
 from ..community import badges, privacy, safety
 from ..community.identity import Actor, get_actor
 from ..config import MAX_BUILDS
-from ..core import autotune, exporters, geometry, imagesafe, meshedit, meshparts
+from ..core import autotune, exporters, geometry, imagesafe, meshedit, meshparts, partslots
 from ..core import features as features_mod
 from ..core import printcheck as printcheck_mod
 from ..core import volcost as volcost_mod
 from ..core import thickness as thickness_mod
-from ..services import editproj
+from ..services import editproj, print_setup
 from ..services.history import HistoryFull, store
 from .builds import _safe_title, load_model, meta_for, summary
 from .textcap import plain_text, text_in
 
 router = APIRouter(prefix="/api/edit")
+
+
+def _slot_context(actor: Actor, printer_id: str, slot_colours: str) -> tuple[int, list | None]:
+    """How many filament slots this printer offers, and the colours the client configured."""
+    pid = (printer_id or "").strip()
+    if not pid and actor.user:
+        pid = ((actor.user.get("printer") or {}).get("printer_id") or "")
+    try:
+        resolved, _nozzle = print_setup.resolve(pid or None)
+        pub = print_setup.printer_public(resolved)
+        count = int(pub.get("filament_slots") or 1)
+        if not pub.get("multi_color_system"):
+            count = 1
+    except (print_setup.SetupError, KeyError, TypeError, ValueError):
+        count = 1
+    return count, partslots.parse_colours(slot_colours)
+
+
+def _with_slots(parts, actor: Actor, printer_id: str, slot_colours: str):
+    if not parts:
+        return parts
+    count, colours = _slot_context(actor, printer_id, slot_colours)
+    assigned, _flags = partslots.prepare(parts, count, colours)
+    return assigned
 
 
 def _gate(data: bytes, actor: Actor):
@@ -217,6 +241,8 @@ def new_project(
     client_view: str = Form(""),                # "1": the browser already drew a sample; do not send those triangles back
     select: str = Form(""),                     # Select mode: traced selection for a photo base (app/core/selectmask.py)
     mtl: UploadFile | None = File(None),        # optional OBJ material library (Kd colours)
+    printer_id: str = Form(""),             # filament-slot count for the colour editor
+    slot_colours: str = Form(""),           # JSON list of #RRGGBB, one per slot, as set in the slicer
 ):
     """Start an edit project from an uploaded mesh, an uploaded photo (lithophane/relief base) or an existing build."""
     try:
@@ -355,7 +381,8 @@ def new_project(
             meta = editproj.create(actor.sid, privacy.default_level(actor), title=title.strip(), base=base,
                                    original=original, original_ext=ext, mesh=mesh, beginner=beginner,
                                    warnings=warnings, import_scale=scale, import_units=units, source_image=source_image,
-                                   parent_build=from_build or "", parts=build_parts)
+                                   parent_build=from_build or "",
+                                   parts=_with_slots(build_parts, actor, printer_id, slot_colours))
         except meshedit.OpError as e:
             raise HTTPException(422, str(e))
         if ack is not None:
@@ -382,8 +409,39 @@ def detect_parts(bid: str, actor: Actor = Depends(get_actor)):
         parts = meshparts.detect(mesh, meta.get("parts"))
     except meshparts.PartsError as e:
         raise HTTPException(422, str(e))
-    editproj.save_parts(bid, parts)
+    editproj.save_parts(bid, _with_slots(parts, actor, "", ""))
     return editproj.payload(bid)
+
+
+@router.put("/{bid}/parts/slots")
+def put_part_slots(bid: str, body: dict, actor: Actor = Depends(get_actor)):
+    """Assign, reset, or re-check filament slots. The mesh is not modified.
+
+    `single_slot` only chooses the warning. It does not change the slots the parts use.
+    """
+    meta = _edit_meta(bid, actor, owner_only=True)
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Send a slot assignment.")
+    blocked = editproj.not_ready(meta)
+    if blocked:
+        raise HTTPException(409, blocked)
+    mesh = editproj.mesh_at(bid, meta)
+    title = meta.get("title") or "Model"
+    current = meshparts.resolve(meta.get("parts"), len(mesh.faces), title)
+    try:
+        count = partslots.clamp_count(body.get("slot_count", 1))
+        updated, flags = partslots.apply(
+            current, body.get("action") or "prepare",
+            ids=body.get("ids") or [], slot=body.get("slot"), slot_count=count,
+            colours=partslots.parse_colours(body.get("colours")),
+        )
+    except partslots.SlotError as e:
+        raise HTTPException(400, str(e))
+    if not partslots.same(current, updated):
+        editproj.save_parts(bid, updated)
+    stored = meshparts.resolve(store.get(bid).get("parts"), len(mesh.faces), title)
+    return {**editproj.payload(bid), "slot_flags": flags,
+            "parts_notes": partslots.notes(stored, count, bool(body.get("single_slot")))}
 
 
 @router.put("/{bid}/support-paint")
@@ -603,6 +661,7 @@ def new_multi(
     bed_z: float = Form(250.0),
     gap_mm: float = Form(5.0),
     printer_id: str = Form(""),
+    slot_colours: str = Form(""),
 ):
     """Several STL / OBJ / 3MF files at once. mode=plate: 'Parts of one print' (auto-spaced on one plate + bed-fit check, one project);
     mode=separate: 'Separate prints' (one project each)."""
@@ -695,7 +754,8 @@ def new_multi(
                                            base={"type": "upload", "format": x["ext"], "units": units if x["ext"] != "3mf" else "from file"},
                                            original=x["data"], original_ext=x["ext"], mesh=x["mesh"], beginner=beginner,
                                            warnings=x["warnings"], import_scale=x["scale"], import_units=units,
-                                           ai=x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]), parts=x.get("parts"))
+                                           ai=x["ext"] == "3mf" and editproj.ai_in_3mf(x["data"]),
+                                           parts=_with_slots(x.get("parts"), actor, printer_id, slot_colours))
                 except meshedit.OpError as e:
                     raise HTTPException(422, f"File {x['n']}: {e}")
                 made.append(meta["id"])

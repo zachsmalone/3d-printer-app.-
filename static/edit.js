@@ -9,7 +9,8 @@ import { photoBlock, mountPhoto } from "/static/photo.js";
 import { renderPlate, pickAt, wireDrag, wirePanel as wirePlatePanel, paint as paintPlate, dropPlateGizmo } from "/static/plate.js";
 import { previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo } from "/static/gizmo-view.js";
-import { P, loadCatalog, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
+import { P, loadCatalog, printerOf, panelHTML, wirePanel, badgeHTML, checkBuild } from "/static/printer.js";
+import { appendSlotFields, coloursForPrinter, slotCount, ink, UNIT_NOTE, PRINT_NOTE, SINGLE_NOTE } from "/static/partslots.js";
 import { bindViewer, bindProject, setStrokes } from "/static/supportpaint.js";
 import { sampleBinaryStl } from "/static/stl-sample.js";
 import { createLineParser } from "/static/ndjson-lines.js";
@@ -17,7 +18,7 @@ import { createLineParser } from "/static/ndjson-lines.js";
 const J = (method, body) => ({ method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
 const UNITS = { mm: 1, cm: 10, in: 25.4 };
 const FILE_MM = { mm: 1, cm: 10, in: 25.4, m: 1000 };   // file units → millimetres, same factors as the server
-const E = { p: null, unit: localStorage.eunit || "mm", tool: null, measure: false, pts: [], last: null };
+const E = { p: null, unit: localStorage.eunit || "mm", tool: null, measure: false, pts: [], last: null, partSel: new Set(), slotPick: 1, slotFlags: [] };
 let viewer = null, ghost = null, measureObjs = [];
 let copyFromPhoto = "";
 
@@ -122,6 +123,10 @@ async function create(fd, retry, opt = {}) {
   const localView = !!opt.localView;
   if (importCtl) importCtl.abort();
   const ctl = importCtl = new AbortController();
+  try {
+    await loadCatalog();
+    if (typeof fd?.has === "function") appendSlotFields(fd, printerOf(P.pref?.printer_id));
+  } catch { /* the server uses the saved printer, or one slot */ }
   const streaming = typeof fd?.has === "function" && fd.has("progress");
   // A local sample is already on screen. Covering it again would hide a view the user can orbit.
   if (!localView) busy(true, streaming ? "Uploading…" : "Importing…", () => ctl.abort());
@@ -308,7 +313,7 @@ async function sendMulti(mode, auto = false) {
   multiFiles.forEach(f => fd.append("files", f));
   fd.append("mode", mode); fd.append("units", $("#editUnits").value); fd.append("beginner", !isExpert());
   if (auto) fd.append("auto_delete_oldest", "true");
-  try { await loadCatalog(); fd.append("printer_id", P.pref.printer_id); } catch { }   // one-plate bed check uses the chosen printer's bed
+  try { await loadCatalog(); fd.append("printer_id", P.pref.printer_id); fd.append("slot_colours", JSON.stringify(coloursForPrinter(printerOf(P.pref.printer_id)))); } catch { }   // one-plate bed check uses the chosen printer's bed
   $("#multiMsg").textContent = mode === "plate" ? "Arranging the parts on one plate…" : "Importing each file…";
   busy(true, "Importing…");
   try {
@@ -388,7 +393,10 @@ document.addEventListener("zeim:level", () => { if (E.p) renderTools(); });
 function loadProject(p, keepCamera = false, keepMesh = false) {
   { const oc = $("#editOpenCad"); if (oc) oc.href = "/static/cad.html?bid=" + encodeURIComponent(p.id); }
   try { sessionStorage.setItem("zeim.edit.last", p.id); } catch { }   // so Back from CAD (full page load) can restore it
+  const sameProject = E.p && E.p.id === p.id;
   E.p = p; E.measure = false; E.facePick = false; E.planes = null; clearFaceMark(); clearMeasure(); clearGhost();
+  if (!sameProject) { E.partSel = new Set(); E.slotFlags = []; E.slotPick = 1; }
+  else E.partSel = new Set([...E.partSel].filter(id => (p.parts || []).some(part => part.id === id)));
   $("#editStart").hidden = true; $("#editPanel").hidden = false; $("#editEmpty").hidden = true; $("#editVtools").hidden = false; $("#editResult").hidden = false;
   if (!p.plate) document.body.dataset.bedSel = "1";
   else delete document.body.dataset.bedSel;
@@ -450,6 +458,8 @@ async function renderSlicePanel() {
   if (window.zeimSave && window.zeimSave.hold) window.zeimSave.hold("slicer");
   $("#slicePanel").innerHTML = panelHTML(lithoHint);
   try { wirePanel(() => E.p.id); } catch (e) { console.error(e); }
+  paintBedParts();
+  syncSlots();
   if (E.p.slice_ready === false) {
     const go = document.getElementById("spGo");
     if (go) { go.disabled = true; go.title = "Slice stays off until the full model check finishes."; }
@@ -925,18 +935,141 @@ function renderTools() {
   document.dispatchEvent(new CustomEvent("zeim:edit-loaded"));
 }
 wirePlatePanel($("#editPanel"));
+function currentPrinter() {
+  return (P.cat && P.pref) ? printerOf(P.pref.printer_id) : null;
+}
+function slotCtx() {
+  const printer = currentPrinter();
+  return { count: slotCount(printer), colours: coloursForPrinter(printer), multi: slotCount(printer) > 1 };
+}
+function partSwatch(part, ctx) {
+  const slot = part?.slot;
+  if (slot && ctx.colours[slot - 1]) return ctx.colours[slot - 1];
+  return part?.color || "transparent";
+}
+function showNote(id, text) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !text;
+  el.textContent = text || "";
+}
+function singleSlotOn() {
+  return document.getElementById("spSingleOn")?.getAttribute("aria-pressed") === "true";
+}
 function paintBedParts() {
   const list = document.getElementById("bedPartsList");
   if (!list) return;
   const parts = E.p?.parts || [];
+  const ctx = slotCtx();
   const swatch = (color) => `<span class="bed-swatch" style="background:${color ? esc(color) : "transparent"}"></span>`;
   list.innerHTML = parts.length
-    ? parts.map(part => `<li>${swatch(part.color)}<span>${esc(part.name || "Part")}</span></li>`).join("")
+    ? parts.map(part => {
+      const on = E.partSel.has(part.id);
+      const adjusted = part.slot_clamped ? ` <small>adjusted</small>` : "";
+      return `<li><button type="button" class="bed-part" data-part="${esc(part.id)}" aria-pressed="${on}">${swatch(partSwatch(part, ctx))}<span class="nm">${esc(part.name || "Part")}${adjusted}</span><small>Slot ${part.slot || "—"}</small></button></li>`;
+    }).join("")
     : `<li><span>One part.</span></li>`;
+  const pick = document.getElementById("bedSlotPick");
+  if (pick) {
+    pick.hidden = !ctx.multi;
+    pick.innerHTML = ctx.multi ? ctx.colours.map((col, i) => {
+      const s = i + 1;
+      const pressed = E.slotPick === s;
+      return `<button type="button" data-slot="${s}" aria-pressed="${pressed}" aria-label="Slot ${s}" style="background:${esc(col)};color:${ink(col)}">${s}</button>`;
+    }).join("") : "";
+  }
+  const assign = document.getElementById("bedAssignSlot");
+  if (assign) {
+    assign.hidden = !ctx.multi;
+    assign.disabled = !ctx.multi || !E.partSel.size;
+  }
+  const used = new Set(parts.map(p => p.slot).filter(s => s));
+  showNote("bedPartsUnit", ctx.multi ? "" : UNIT_NOTE);
+  showNote("bedPartsPrint", used.size > 1 ? PRINT_NOTE : "");
+  showNote("bedPartsSingle", singleSlotOn() && used.size > 1 ? SINGLE_NOTE : "");
+  showNote("bedPartsFlag", (E.slotFlags || []).map(f => f.message).filter(Boolean).join(" "));
+  const warn = document.getElementById("spPartSlotWarn");
+  if (warn) {
+    const text = singleSlotOn() && used.size > 1 ? SINGLE_NOTE : "";
+    warn.hidden = !text;
+    warn.textContent = text;
+  }
+  paintSlotColors();
+}
+function paintSlotColors() {
+  if (!viewer) return;
+  const parts = E.p?.parts || [];
+  const byId = Object.fromEntries(parts.map(p => [p.id, p]));
+  const ctx = slotCtx();
+  for (const mesh of viewer.group.children) {
+    if (!mesh.isMesh || mesh.userData.bed || !mesh.material?.color) continue;
+    const part = byId[mesh.userData.part];
+    if (!part) continue;
+    const col = partSwatch(part, ctx);
+    if (col && col !== "transparent") mesh.material.color.set(col);
+    if (!mesh.material.emissive) mesh.material.emissive = new THREE.Color();
+    const on = E.partSel.has(part.id);
+    mesh.material.emissive.set(on ? "#1a3a66" : "#000000");
+    mesh.material.emissiveIntensity = on ? 0.45 : 0;
+  }
+}
+let slotSync = 0;
+async function syncSlots() {
+  const id = E.p?.id;
+  if (!id) return;
+  const gen = ++slotSync;
+  const ctx = slotCtx();
+  try {
+    const r = await api(`/api/edit/${id}/parts/slots`, J("PUT", {
+      action: "prepare", slot_count: ctx.count, colours: ctx.colours, single_slot: singleSlotOn(),
+    }));
+    if (gen !== slotSync || E.p?.id !== id) return;
+    E.p.parts = r.parts || E.p.parts;
+    E.slotFlags = r.slot_flags || [];
+    paintBedParts();
+  } catch { /* the list still shows the slots already on the project */ }
+}
+async function sendSlots(body) {
+  if (!E.p?.id) return;
+  const id = E.p.id;
+  const gen = ++slotSync;
+  const ctx = slotCtx();
+  const r = await api(`/api/edit/${id}/parts/slots`, J("PUT", {
+    slot_count: ctx.count, colours: ctx.colours, single_slot: singleSlotOn(), ...body,
+  }));
+  if (gen !== slotSync || E.p?.id !== id) return;
+  E.p.parts = r.parts || E.p.parts;
+  E.slotFlags = r.slot_flags || [];
+  paintBedParts();
 }
 $("#partsSheet")?.addEventListener("click", e => {
+  if (!E.p?.id) return;
   if (e.target.closest("#editDetectParts")) { e.preventDefault(); return act(`/api/edit/${E.p.id}/parts/detect`, {}, "Finding parts…"); }
+  const partBtn = e.target.closest("[data-part]");
+  if (partBtn) {
+    const id = partBtn.getAttribute("data-part");
+    if (E.partSel.has(id)) E.partSel.delete(id); else E.partSel.add(id);
+    paintBedParts();
+    return;
+  }
+  const slotBtn = e.target.closest("[data-slot]");
+  if (slotBtn) {
+    E.slotPick = +slotBtn.getAttribute("data-slot");
+    if (E.partSel.size) return sendSlots({ action: "assign", ids: [...E.partSel], slot: E.slotPick }).catch(er => toast(er.message, "err"));
+    paintBedParts();
+    return;
+  }
+  if (e.target.closest("#bedAssignSlot")) {
+    if (!E.partSel.size) return;
+    return sendSlots({ action: "assign", ids: [...E.partSel], slot: E.slotPick }).catch(er => toast(er.message, "err"));
+  }
+  if (e.target.closest("#bedResetSlots")) {
+    const ids = E.partSel.size ? [...E.partSel] : (E.p.parts || []).map(p => p.id);
+    return sendSlots({ action: "reset", ids }).catch(er => toast(er.message, "err"));
+  }
 });
+document.addEventListener("zeim:single-slot", () => { if (E.p) paintBedParts(); });
+document.addEventListener("zeim:slot-colours", () => { if (E.p) paintSlotColors(); });
 $("#editPanel").addEventListener("click", e => {
   const u = e.target.closest("[data-unit]"); if (u) { E.unit = u.dataset.unit; localStorage.eunit = E.unit; loadProject(E.p, true); return; }
   const big = e.target.closest("[data-big]");
@@ -1220,6 +1353,13 @@ function onPick(e) {
     const ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, viewer.camera);
     const hit = rc.intersectObjects(viewer.group.children, false)[0];
+    const partId = hit && !hit.object.userData.bed ? hit.object.userData.part : "";
+    if (partId) {
+      if (e.shiftKey || e.metaKey) {
+        if (E.partSel.has(partId)) E.partSel.delete(partId); else E.partSel.add(partId);
+      } else E.partSel = new Set([partId]);
+    } else if (!hit) E.partSel = new Set();
+    if (partId || !hit) paintBedParts();
     document.body.dataset.bedSel = hit ? "1" : "";
     document.dispatchEvent(new CustomEvent("zeim:bed-sel"));
     return;

@@ -199,7 +199,7 @@ def test_edit_api_round_trip_keeps_parts():
     assert opened.status_code == 200, opened.text
     body = opened.json()
     assert [p["color"] for p in body["parts"]] == ["#FF0000", "#00FF00", "#FF0000", "#0000FF"]
-    assert all(p["slot"] is None for p in body["parts"])
+    assert all(p["slot"] == 1 for p in body["parts"])
     assert not any("not kept" in w or "Colours" in w for w in body["warnings"])
     editproj._BASES.clear()
     editproj._STATES.clear()
@@ -208,7 +208,7 @@ def test_edit_api_round_trip_keeps_parts():
     assert again.status_code == 200, again.text
     assert again.json()["parts"] == body["parts"]
     saved = json.loads((store.dir(body["id"]) / "meta.json").read_text())
-    assert saved["parts"][0]["slot"] is None and saved["parts"][1]["material"] == "10:1"
+    assert saved["parts"][0]["slot"] == 1 and saved["parts"][1]["material"] == "10:1"
     scene = client.get(f"/api/cad/{body['id']}/scene")
     assert scene.status_code == 200, scene.text
     assert [p["name"] for p in scene.json()["parts"]] == ["Box", "Peg", "Box", "Ball"]

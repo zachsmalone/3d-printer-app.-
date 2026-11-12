@@ -570,7 +570,16 @@
     </div>
     <div class="bed-sheet-body">
       <ul id="bedPartsList"></ul>
-      <button type="button" class="btn" id="editDetectParts">Detect parts</button>
+      <p class="help" id="bedPartsUnit" hidden></p>
+      <p class="help" id="bedPartsPrint" hidden></p>
+      <p class="help warn" id="bedPartsSingle" hidden></p>
+      <p class="help" id="bedPartsFlag" hidden></p>
+      <div id="bedSlotPick" class="slot-picks" role="group" aria-label="Filament slot" hidden></div>
+      <div class="row" id="bedPartActions">
+        <button type="button" class="btn" id="bedAssignSlot">Assign to slot</button>
+        <button type="button" class="btn" id="bedResetSlots">Reset to detected</button>
+        <button type="button" class="btn" id="editDetectParts">Detect parts</button>
+      </div>
     </div>
   </section>
   <section id="deviceSheet" class="bed-sheet proc-sheet" hidden aria-labelledby="deviceTitle">

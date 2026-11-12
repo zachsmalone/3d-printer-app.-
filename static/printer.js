@@ -5,6 +5,7 @@ import { layerPreviewHTML, wireLayerPreview } from "/static/layers.js";
 import { gcodePreviewHTML, wireGcodePreview } from "/static/gcodeview.js";
 import { mountPaint, getStrokes } from "/static/supportpaint.js";
 import { costHTML, wireCost } from "/static/cost.js";
+import { DEFAULT_COLOURS, readSavedColours, writeSavedColours } from "/static/partslots.js";
 const HAS_GL = (() => { try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")); } catch { return false; } })();
 let gcDispose = null;  // previous G-code preview (freed on the next slice)
 
@@ -139,11 +140,11 @@ function slotsHTML(p, mats) {
   const n = +p?.filament_slots || 1, systems = p?.multi_color_system || [];
   if (n <= 1 || !systems.length) return "";
   const label = systems.join(" / ");
-  const defCols = ["#FFFFFF", "#FF0000", "#00AA00", "#0066FF", "#FFD000", "#FF00AA", "#00DDDD", "#222222"];
+  const saved = readSavedColours();
   return `<fieldset class="spslots" id="spSlots"><legend>Filament per ${esc(label)} slot</legend>
     <p class="help">Turn on only the slots this print uses. Unused ports are not heated, primed or purged.</p>
     ${Array.from({ length: n }, (_, i) => {
-      const s = i + 1, col = defCols[i % defCols.length];
+      const s = i + 1, col = saved[i] || DEFAULT_COLOURS[i % DEFAULT_COLOURS.length];
       return `<div class="spslot" data-slot="${s}">
         <label class="inl chk"><input type="checkbox" name="spSlotOn" value="${s}" ${s === 1 ? "checked" : ""}> Slot ${s}</label>
         <label class="sr-only" for="spSlotMat${s}">Slot ${s} material</label>
@@ -173,7 +174,8 @@ function singleSlotHTML(p) {
       <p class="help" id="spSingleSlotBeside">${esc(o.short_note || SINGLE_SHORT)}</p>
     </div>
     <div class="spslot"><label for="spSingleSlotN">Slot</label><select id="spSingleSlotN" disabled>${opts}</select></div>
-    <p class="help" id="spSingleSlotNote">${esc(o.note || "")}</p></fieldset>
+    <p class="help" id="spSingleSlotNote">${esc(o.note || "")}</p>
+    <p class="help warn" id="spPartSlotWarn" hidden></p></fieldset>
     <dialog id="spSingleAsk" aria-labelledby="spSingleAskTitle">
       <div class="dlg">
         <div class="dh"><h3 id="spSingleAskTitle">Skip calibration and bed leveling?</h3><button type="button" class="x" id="spSingleAskX" aria-label="Close">${x}</button></div>
@@ -408,6 +410,7 @@ export function wirePanel(getModelId) {
     $("#spSingleOff")?.setAttribute("aria-pressed", on ? "false" : "true");
     $("#spSingleOn")?.setAttribute("aria-pressed", on ? "true" : "false");
     syncSingle();
+    document.dispatchEvent(new CustomEvent("zeim:single-slot"));
   };
   const singleAsk = () => {
     const inPanel = document.querySelector("#slicePanel #spSingleAsk");
@@ -454,7 +457,17 @@ export function wirePanel(getModelId) {
         ? `Only slot ${on[0]} will be heated and primed. Other ports stay unused.`
         : `Slots ${on.join(", ")} will be used. Other ports are not heated, primed or purged.`;
     };
+    const rememberColours = () => {
+      const cols = [];
+      slotBox.querySelectorAll("[name=spSlotOn]").forEach(c => {
+        const s = +c.value;
+        cols[s - 1] = $("#spSlotCol" + s)?.value || DEFAULT_COLOURS[(s - 1) % DEFAULT_COLOURS.length];
+      });
+      writeSavedColours(cols);
+      document.dispatchEvent(new CustomEvent("zeim:slot-colours"));
+    };
     slotBox.addEventListener("change", syncSlots);
+    slotBox.addEventListener("input", e => { if (e.target?.type === "color") rememberColours(); });
     syncSlots();
   }
   const mode = adv => {

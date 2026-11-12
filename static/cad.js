@@ -13,6 +13,7 @@ import { clipHalfSpace, clipByW, screenOf, screenDist, inFrontOfHit, chainStraig
 import { overlapsChrome, previewPlacement } from "/static/gizmo-math.js";
 import { createGizmo, chromeRects } from "/static/gizmo-view.js";
 import { applyPrepared, brushTitle, prepareStroke, sculptIdle } from "/static/sculptbrush.js";
+import { appendSlotFields, coloursForPrinter, ink, printerForImport, slotCount, UNIT_NOTE, PRINT_NOTE } from "/static/partslots.js";
 import {
   PAINT, pickChoice, edgeKey, curvePaint, bodyGlow, constraintBlock, constraintSummary,
   filletBlock, faceOffsetBlock, extrudeBlock, revolveBlock, measureBlock, jointBlock, mergeFeel, boxesOverlap, facePair, measureLine, anchorClear, subdivideBlock,
@@ -73,7 +74,7 @@ const OP_ICON = { sketch_extrude: "extrude", revolve: "revolve", body_boolean: "
 const S = {
   bid: new URLSearchParams(location.search).get("bid"), scene: null, mode: "model", tool: null,
   grid: 10, snap: true, selBody: -1, selFace: null, selEdges: [], hidden: new Set(), openStep: 0,
-  appearance: {}, section: false, measure: false, measPts: [],
+  appearance: {}, section: false, measure: false, measPts: [], partSel: new Set(), slotPick: 1, slotFlags: [], partsNotes: {}, slotColours: null, printer: null,
   sk: null,   // sketch session: {plane, entities, constraints, sel:Set, tool, draft, editStep, auto, showCons}
 };
 let gzKind = "move";
@@ -872,6 +873,7 @@ async function load(keepCam) {
   displayLite(S.scene);
   S.appearance = S.scene.appearance || {};
   $("#cwTitle").value = S.scene.title || "My design";
+  await syncCadSlots();
   buildWorld(keepCam); renderHist(); updateTop(); lessons.tick();
   if (S.mode !== "sketch") renderRail();
   paintCadChrome();
@@ -1016,14 +1018,62 @@ $("#cwHist").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key 
 $("#cwHist").addEventListener("dblclick", e => { const o = e.target.closest("[data-open]"); if (o) { S.openStep = +o.dataset.open; renderHist(); $(`.hbody [data-act=rename]`)?.click(); } });
 
 /* ---------------------------------------------------------------- Items panel */
+function applyCadSlotColours() {
+  const parts = S.scene?.parts || [];
+  const byId = Object.fromEntries(parts.map(p => [p.id, p]));
+  const colours = S.slotColours || [];
+  for (const b of S.scene?.bodies || []) {
+    const part = byId[b.part];
+    if (!part || (S.appearance[b.index] || {}).color) continue;
+    const slot = part.slot;
+    if (slot >= 1 && colours[slot - 1]) b.color = colours[slot - 1];
+  }
+}
+async function syncCadSlots() {
+  if (!S.bid || !S.scene) return;
+  if (!S.printer) S.printer = await printerForImport();
+  S.slotColours = coloursForPrinter(S.printer);
+  try {
+    const r = await api(`/api/edit/${S.bid}/parts/slots`, { method: "PUT", json: {
+      action: "prepare", slot_count: slotCount(S.printer), colours: S.slotColours,
+    }});
+    if (r.parts) S.scene.parts = r.parts;
+    S.slotFlags = r.slot_flags || [];
+    S.partsNotes = r.parts_notes || {};
+  } catch { /* the scene already lists the parts */ }
+  applyCadSlotColours();
+}
+async function cadSendSlots(body) {
+  if (!S.bid || !S.scene) return;
+  if (!S.printer) S.printer = await printerForImport();
+  S.slotColours = coloursForPrinter(S.printer);
+  const r = await api(`/api/edit/${S.bid}/parts/slots`, { method: "PUT", json: {
+    slot_count: slotCount(S.printer), colours: S.slotColours, ...body,
+  }});
+  if (r.parts) S.scene.parts = r.parts;
+  S.slotFlags = r.slot_flags || [];
+  S.partsNotes = r.parts_notes || {};
+  applyCadSlotColours();
+  buildWorld(true);
+}
 function renderItems() {
   const box = $("#cwItems"), bs = S.scene?.bodies || [];
   const eye = (on, lbl, attr) => `<button class="cw-eye" ${attr} aria-pressed="${on}" aria-label="${on ? "Hide" : "Show"} ${esc(lbl)}">${on ? IC.eye : IC.eyeoff}</button>`;
   const sketches = (S.scene?.ops || []).filter(o => o.params?.sketch).map(o => `<div class="cw-item"><span class="nm">Sketch of step ${o.i}<br><small>${T(typeof o.params.plane === "string" ? o.params.plane + " plane" : o.params.plane?.construct === "midplane" ? "on a midplane" : o.params.plane?.construct === "offset" ? "on an offset plane" : "on a face")} · ${(o.params.sketch.entities || []).length} curves</small></span><button class="cw-eye" data-skedit="${o.i}" aria-label="Edit the sketch of step ${o.i}">✎</button></div>`).join("");
   const imported = S.scene?.parts || [];
-  const partRows = imported.map(p => `<div class="cw-item"><span class="sw" style="background:${esc(p.color || "transparent")}"></span><span class="nm">${esc(p.name || "Part")}</span></div>`).join("");
-  const partsHead = imported.length ? `<h3>Parts</h3>${partRows}` : "";
-  box.innerHTML = `${partsHead}<button type="button" class="btn small" id="cwDetectParts">Detect parts</button><h3>Bodies</h3>${bs.length ? bs.map(b => `<div class="cw-item ${b.index === S.selBody ? "sel" : ""}" data-body="${b.index}"><span class="sw" style="background:${(S.appearance[b.index] || {}).color || b.color || PALETTE[b.index % PALETTE.length]}"></span>
+  const colours = S.slotColours || [];
+  const multi = colours.length > 1;
+  const swatchOf = p => (p.slot && colours[p.slot - 1]) || p.color || "transparent";
+  const partRows = imported.map(p => `<button type="button" class="cw-item ${S.partSel.has(p.id) ? "sel" : ""}" data-part="${esc(p.id)}" aria-pressed="${S.partSel.has(p.id)}"><span class="sw" style="background:${esc(swatchOf(p))}"></span><span class="nm">${esc(p.name || "Part")}<br><small>Slot ${p.slot || "—"}${p.slot_clamped ? " · adjusted" : ""}</small></span></button>`).join("");
+  const picks = multi ? `<div id="cwSlotPick" class="slot-picks" role="group" aria-label="Filament slot">${colours.map((col, i) => `<button type="button" data-slot="${i + 1}" aria-pressed="${S.slotPick === i + 1}" aria-label="Slot ${i + 1}" style="background:${esc(col)};color:${ink(col)}">${i + 1}</button>`).join("")}</div>` : "";
+  const notes = S.partsNotes || {};
+  const unit = notes.unit || (!multi && imported.length ? UNIT_NOTE : "");
+  const printNote = notes.print || "";
+  const flag = (S.slotFlags || []).map(f => f.message).filter(Boolean).join(" ");
+  const note = (text, warn) => text ? `<p class="help${warn ? " warn" : ""}">${esc(text)}</p>` : "";
+  const partsHead = imported.length ? `<h3>Parts</h3>${partRows}${note(unit)}${note(printNote)}${note(flag)}` : (unit ? note(unit) : "");
+  const actions = `<div id="cwPartActions">${multi ? `<button type="button" class="btn small" id="cwAssignSlot"${S.partSel.size ? "" : " disabled"}>Assign to slot</button>` : ""}<button type="button" class="btn small" id="cwResetSlots">Reset to detected</button></div>`;
+  box.innerHTML = `${partsHead}${picks}${actions}<button type="button" class="btn small" id="cwDetectParts">Detect parts</button><h3>Bodies</h3>${bs.length ? bs.map(b => `<div class="cw-item ${b.index === S.selBody ? "sel" : ""}" data-body="${b.index}"><span class="sw" style="background:${(S.appearance[b.index] || {}).color || b.color || PALETTE[b.index % PALETTE.length]}"></span>
       <span class="nm">${T(b.name)}<br><small>${b.size.map(fmt).join(" × ")} mm</small></span>${eye(!S.hidden.has(b.index), b.name, `data-eye="${b.index}"`)}</div>`).join("") : `<p class="help">None yet.</p>`}
     <h3>Sketches</h3>${sketches || `<p class="help">None yet.</p>`}
     <h3>Planes &amp; axes</h3>
@@ -1035,6 +1085,29 @@ $("#cwItems").addEventListener("click", e => {
   if (e.target.closest("#cwDetectParts")) {
     if (!S.bid) return;
     return run(async () => { await api(`/api/edit/${S.bid}/parts/detect`, { method: "POST" }); await load(true); }, "Parts updated.");
+  }
+  if (e.target.closest("#cwAssignSlot")) {
+    if (!S.partSel.size) return;
+    return run(() => cadSendSlots({ action: "assign", ids: [...S.partSel], slot: S.slotPick }), "Slot assigned.");
+  }
+  if (e.target.closest("#cwResetSlots")) {
+    const ids = S.partSel.size ? [...S.partSel] : (S.scene?.parts || []).map(p => p.id);
+    return run(() => cadSendSlots({ action: "reset", ids }), "Reset to the detected colour.");
+  }
+  const slotBtn = e.target.closest("#cwSlotPick [data-slot]");
+  if (slotBtn) {
+    S.slotPick = +slotBtn.getAttribute("data-slot");
+    if (S.partSel.size) return run(() => cadSendSlots({ action: "assign", ids: [...S.partSel], slot: S.slotPick }), "Slot assigned.");
+    return renderItems();
+  }
+  const partBtn = e.target.closest("[data-part]");
+  if (partBtn) {
+    const id = partBtn.getAttribute("data-part");
+    if (S.partSel.has(id)) S.partSel.delete(id); else S.partSel.add(id);
+    const body = (S.scene?.bodies || []).find(b => b.part === id);
+    if (body && S.partSel.has(id)) { S.selBody = body.index; drawSelection(); }
+    else renderItems();
+    return;
   }
   const ey = e.target.closest("[data-eye]"); if (ey) {
     const i = +ey.dataset.eye; S.hidden.has(i) ? S.hidden.delete(i) : S.hidden.add(i);
@@ -2123,8 +2196,17 @@ function modelTap(ev) {
     if (onEdge(e, h)) {
       S.selEdges = [e]; S.selFace = null; S.selBody = e.body; S.measPts = []; drawSelection(); showCtx("edge", e.a.clone().add(e.b).multiplyScalar(0.5)); return;
     }
-    if (h) { S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal }; S.selEdges = []; setMeasLabel(null); renderSkLabels(); drawSelection(); showCtx("face", h.point); return; }
-    hideCtx(); deselect(); return;
+    if (h) {
+      S.selBody = h.body; S.selFace = { point: h.point, normal: h.normal }; S.selEdges = []; setMeasLabel(null); renderSkLabels();
+      const body = (S.scene?.bodies || []).find(b => b.index === h.body);
+      if (body?.part && !S.tool) {
+        if (ev.shiftKey || ev.metaKey) {
+          if (S.partSel.has(body.part)) S.partSel.delete(body.part); else S.partSel.add(body.part);
+        } else S.partSel = new Set([body.part]);
+      }
+      drawSelection(); showCtx("face", h.point); return;
+    }
+    S.partSel = new Set(); deselect(); return;
   }
   if (S.measure) {
     const e = pickEdge(ev), h = pickBody(ev);
@@ -2278,6 +2360,7 @@ async function importFile(f) {
   try {
     const fd = new FormData(); fd.append("file", f); fd.append("title", importTitle());
     fd.append("units", UNITS.includes($("#cwUnits").value) ? $("#cwUnits").value : "mm");
+    try { appendSlotFields(fd, await printerForImport()); } catch { /* the server uses one slot */ }
     const j = await api("/api/edit/new", { method: "POST", body: fd, signal: ctl.signal });
     if (ctl.signal.aborted || ctl !== importCtl) return;
     const id = j.id || j.project?.id; if (!id) throw new Error("Your recent builds are full. Delete one on the main page, then try again.");
@@ -2310,7 +2393,9 @@ $("#cwFromBuild").onclick = async e => {
     list.innerHTML = (j.builds || []).map(b => `<li role="option" data-id="${esc(b.id)}" data-kind="${esc(b.kind || "")}"><span>${esc(b.title || "Untitled")}</span><small>${esc(b.kind === "edit" ? "editable" : b.mode || "")}</small></li>`).join("") || "<li>No builds yet.</li>";
     list.onclick = async ev => { const li = ev.target.closest("[data-id]"); if (!li) return; $("#cwBuildsDlg").close();
       if (li.dataset.kind === "edit") return run(() => openProject(li.dataset.id));
-      await run(async () => { const fd = new FormData(); fd.append("from_build", li.dataset.id); const r = await api("/api/edit/new", { method: "POST", body: fd });
+      await run(async () => { const fd = new FormData(); fd.append("from_build", li.dataset.id);
+        try { appendSlotFields(fd, await printerForImport()); } catch { /* the server uses one slot */ }
+        const r = await api("/api/edit/new", { method: "POST", body: fd });
         const id = r.id || r.project?.id; if (!id) throw new Error("Your recent builds are full."); await openProject(id); }, "Opened as an editable copy (the original build is unchanged)."); };
     $("#cwBuildsDlg").showModal();
   } catch (er) { msg(er.message); }
