@@ -1015,7 +1015,39 @@ function paintSlotColors() {
   }
 }
 let slotSync = 0;
-async function syncSlots() {
+/* A step reloads the panel, and that asks for slots again. Share one request
+   and run at most one more for whatever changed while it was in flight. */
+function coalesceLatest(run) {
+  let queue = [];
+  let pumping = false;
+  async function pump() {
+    if (pumping) return;
+    pumping = true;
+    try {
+      while (queue.length) {
+        const batch = queue.splice(0, queue.length);
+        try {
+          await run();
+          batch.forEach(item => item.resolve());
+        } catch (e) {
+          batch.forEach(item => item.reject(e));
+        }
+      }
+    } finally {
+      pumping = false;
+      if (queue.length) pump();
+    }
+  }
+  return function queued() {
+    let resolve, reject;
+    const gate = new Promise((res, rej) => { resolve = res; reject = rej; });
+    queue.push({ resolve, reject });
+    pump();
+    return gate;
+  };
+}
+const syncSlots = coalesceLatest(() => syncSlotsNow());
+async function syncSlotsNow() {
   const id = E.p?.id;
   if (!id) return;
   const gen = ++slotSync;

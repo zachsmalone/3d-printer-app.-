@@ -192,3 +192,248 @@ def test_healthz_answers_during_concurrent_edits(tmp_path, monkeypatch):
         _stop(server, thread)
         if bid:
             shutil.rmtree(store.dir(bid), ignore_errors=True)
+
+
+def _nap(seconds):
+    time.sleep(seconds)
+
+
+def _pid():
+    return os.getpid()
+
+
+def _heavy_sphere():
+    mesh = trimesh.creation.icosphere(subdivisions=5, radius=10)
+    assert len(mesh.faces) == 20_480
+    return mesh
+
+
+def test_editor_busy_only_when_the_queue_is_full():
+    """A full queue still says the same thing. A free place waits instead of refusing."""
+    from app.services import editlane
+    assert editlane.BUSY == "The editor is busy with other steps. Try again in a moment."
+    release = threading.Event()
+
+    def hold():
+        release.wait(5)
+
+    threads = [threading.Thread(target=lambda n=i: editlane.run(f"p{n}", hold)) for i in range(editlane.ADMIT)]
+    for worker in threads:
+        worker.start()
+    try:
+        deadline = time.monotonic() + 5
+        while editlane.admitted() < editlane.ADMIT:
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        with pytest.raises(editlane.Busy):
+            editlane.run("overflow", lambda: None)
+    finally:
+        release.set()
+        for worker in threads:
+            worker.join(5)
+        assert all(not worker.is_alive() for worker in threads)
+    editlane.run("after", lambda: None)
+
+
+def test_one_project_runs_one_edit_at_a_time_and_two_projects_overlap():
+    from app.services import editlane
+    order = []
+    gate = threading.Lock()
+
+    def work(tag):
+        def inner():
+            with gate:
+                order.append("start")
+            time.sleep(0.05)
+            with gate:
+                order.append("end")
+        editlane.run("same", inner)
+
+    pair = [threading.Thread(target=work, args=(n,)) for n in (1, 2)]
+    for worker in pair:
+        worker.start()
+    for worker in pair:
+        worker.join(5)
+    assert order == ["start", "end", "start", "end"]
+
+    started = threading.Barrier(2)
+
+    def together(project):
+        def inner():
+            started.wait(2)
+        editlane.run(project, inner)
+
+    both = [threading.Thread(target=together, args=(name,)) for name in ("a", "b")]
+    for worker in both:
+        worker.start()
+    for worker in both:
+        worker.join(5)
+    assert all(not worker.is_alive() for worker in both)
+
+
+def test_warm_pool_heavy_translate_is_under_half_a_second():
+    """After the workers have imported, a 20,480-face move stays well under half a second."""
+    from app.core import meshedit
+    guard.warm()
+    assert guard.worker_pids()
+    assert all(pid != os.getpid() for pid in guard.worker_pids())
+    from app.core import cadops
+    mesh = _heavy_sphere()
+    started = time.perf_counter()
+    raw, _ = meshedit.op_translate(mesh, {"dx": 1, "dy": 0, "dz": 0})
+    cadops.preserve_body_ids(mesh, meshedit._check(raw))
+    in_process = time.perf_counter() - started
+    meshedit.apply(mesh, "translate", {"dx": 0, "dy": 0, "dz": 0})
+    samples = []
+    for i in range(5):
+        started = time.perf_counter()
+        out, _ = meshedit.apply(mesh, "translate", {"dx": 1, "dy": 0, "dz": 0})
+        samples.append(time.perf_counter() - started)
+        assert len(out.faces) == 20_480
+        assert abs(float(out.vertices[:, 0].mean() - mesh.vertices[:, 0].mean()) - 1) < 1e-6
+    mean = sum(samples) / len(samples)
+    print(
+        f"WARM_POOL_TRANSLATE_S in_process={in_process:.4f} "
+        f"min={min(samples):.4f} mean={mean:.4f} max={max(samples):.4f} "
+        f"samples={[round(t, 4) for t in samples]}"
+    )
+    assert max(samples) < 0.5, samples
+
+
+def test_worker_timeout_respawns_and_healthz_stays_up():
+    """A stuck task is killed, the next task runs on a new worker, and /healthz stays under a second."""
+    guard.warm()
+    before = set(guard.worker_pids())
+    assert before
+    server, thread, port = _serve()
+    base = f"http://127.0.0.1:{port}"
+    stop = threading.Event()
+    slow = []
+    codes = []
+
+    def probe():
+        with httpx.Client(base_url=base, timeout=1.0) as client:
+            while not stop.is_set():
+                started = time.perf_counter()
+                try:
+                    response = client.get("/healthz")
+                except httpx.TimeoutException:
+                    slow.append(1.0)
+                    codes.append(0)
+                    continue
+                if time.perf_counter() - started >= 1.0:
+                    slow.append(time.perf_counter() - started)
+                codes.append(response.status_code)
+                time.sleep(0.05)
+
+    watcher = threading.Thread(target=probe, daemon=True)
+    watcher.start()
+    try:
+        with pytest.raises(guard.Tripped) as caught:
+            guard.run(_nap, 30, timeout=0.4)
+        assert caught.value.args[0] == "timeout"
+        again = guard.run(_pid)
+        assert again != os.getpid()
+        assert again not in before
+        assert guard.run(abs, -2) == 2
+        stop.set()
+        watcher.join(2)
+        assert codes and set(codes) == {200}
+        assert not slow, slow
+        still = httpx.get(base + "/healthz", timeout=1.0)
+        assert still.status_code == 200 and still.elapsed.total_seconds() < 1.0
+    finally:
+        stop.set()
+        _stop(server, thread)
+
+
+def test_worker_recycles_after_its_task_budget(monkeypatch):
+    monkeypatch.setenv("PHOTO3D_HEAVY_TASKS", "1")
+    guard.warm()
+    first = guard.run(_pid)
+    second = guard.run(_pid)
+    assert first != os.getpid() and second != os.getpid()
+    assert first != second
+
+
+def test_one_user_rapid_edits_are_not_busy():
+    """More than two overlapping calls for one project wait, and none come back busy."""
+    from app.core import meshedit
+    server, thread, port = _serve()
+    base = f"http://127.0.0.1:{port}"
+    bid = None
+    stop = threading.Event()
+    slow = []
+    codes = []
+    try:
+        stl = _heavy_sphere().export(file_type="stl")
+        with httpx.Client(base_url=base, timeout=120) as setup:
+            opened = setup.post("/api/edit/new", files={"file": ("sphere.stl", stl, "model/stl")}, data={"title": "Sphere"})
+            assert opened.status_code == 200, opened.text
+            bid = opened.json()["id"]
+            assert opened.json()["analysis"]["triangles"] >= 20_000
+            cookies = dict(setup.cookies)
+        watcher = threading.Thread(target=lambda: _probe(base, stop, slow, codes), daemon=True)
+        watcher.start()
+        barrier = threading.Barrier(6)
+        outcomes = []
+
+        def one(kind, n):
+            barrier.wait(5)
+            with httpx.Client(base_url=base, timeout=60, cookies=cookies) as client:
+                if kind == "op":
+                    response = client.post(f"/api/edit/{bid}/op", json={"op": "translate", "params": {"dx": 1, "dy": 0, "dz": 0}})
+                elif kind == "scene":
+                    response = client.get(f"/api/cad/{bid}/scene")
+                else:
+                    response = client.put(f"/api/edit/{bid}/parts/slots", json={
+                        "action": "prepare", "slot_count": 4,
+                        "colours": ["#FFFFFF", "#FF0000", "#00AA00", "#0000FF"],
+                    })
+                outcomes.append((kind, n, response.status_code))
+
+        kinds = ("op", "op", "op", "scene", "scene", "slots")
+        workers = [threading.Thread(target=one, args=(kind, i)) for i, kind in enumerate(kinds)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join(60)
+        assert all(not worker.is_alive() for worker in workers)
+        assert len(outcomes) == 6
+        busy = [row for row in outcomes if row[2] == 503]
+        bad = [row for row in outcomes if row[2] >= 500]
+        assert not busy and not bad, outcomes
+        with httpx.Client(base_url=base, timeout=30, cookies=cookies) as client:
+            rapid = []
+            for _ in range(4):
+                started = time.perf_counter()
+                response = client.post(f"/api/edit/{bid}/op", json={"op": "translate", "params": {"dx": 1, "dy": 0, "dz": 0}})
+                rapid.append((response.status_code, time.perf_counter() - started))
+            print(f"RAPID_HTTP_TRANSLATE {rapid}")
+            assert all(code == 200 for code, _elapsed in rapid), rapid
+        stop.set()
+        watcher.join(2)
+        assert codes and set(codes) == {200}
+        assert not slow, slow
+        assert meshedit.HEAVY_MIN_FACES == 20_000
+    finally:
+        stop.set()
+        _stop(server, thread)
+        if bid:
+            shutil.rmtree(store.dir(bid), ignore_errors=True)
+
+
+def _probe(base, stop, slow, codes):
+    with httpx.Client(base_url=base, timeout=1.0) as client:
+        while not stop.is_set():
+            started = time.perf_counter()
+            try:
+                response = client.get("/healthz")
+            except httpx.TimeoutException:
+                slow.append(1.0)
+                codes.append(0)
+                continue
+            if time.perf_counter() - started >= 1.0:
+                slow.append(time.perf_counter() - started)
+            codes.append(response.status_code)
+            time.sleep(0.05)

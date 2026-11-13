@@ -1,6 +1,6 @@
 """Runtime ceiling for heavy geometry work (CADRT-1 / QA B1 / B4).
 
-Pre-flight estimates can be wrong, so heavy ops run in a fresh interpreter with a hard
+Pre-flight estimates can be wrong, so heavy ops run outside the server with a hard
 address-space limit (RLIMIT_AS) and a wall-clock timeout. If that process runs out of memory,
 crashes or times out, the caller gets a friendly error and nothing in the server (the scene,
 the project) has changed.
@@ -8,8 +8,12 @@ the project) has changed.
 The server must not os.fork() for this. It is a multi-threaded process and NumPy's OpenBLAS
 pool is already running. Python 3.12 stops every thread before fork; a thread inside OpenBLAS
 does not stop, and the whole interpreter waits forever. /healthz is on that interpreter, so
-the probe times out and the proxy takes the site down. A fresh interpreter does not copy the
-listening socket, the locks, or those threads. The server only waits.
+the probe times out and the proxy takes the site down.
+
+The usual path is a small pool of long-lived workers started with the spawn method
+(app/core/guardpool.py). They import NumPy and trimesh once. A one-shot interpreter is
+only the fallback when a warm worker cannot take the address cap (a tight ulimit).
+Neither path copies the listening socket, the locks, or the server's threads.
 """
 from __future__ import annotations
 
@@ -27,7 +31,7 @@ import traceback
 import types
 from pathlib import Path
 
-from app.core import affinity
+from app.core import affinity, guardpool
 
 MEM_MB = int(os.environ.get("PHOTO3D_HEAVY_MEM_MB", "1500"))     # budget on top of the server's address size (N3)
 # Tests set this in the server process. A forked copy would still see it; a fresh interpreter does not.
@@ -174,9 +178,25 @@ def _child_main(src: str, dst: str) -> None:
     Path(dst).write_bytes(pickle.dumps(result, protocol=pickle.HIGHEST_PROTOCOL))
 
 
+def warm() -> None:
+    """Start the mesh workers and import their libraries. No-op when the guard is off."""
+    if not ENABLED or os.environ.get("ZEIM_GUARD_WORKER") == "1":
+        return
+    guardpool.ensure(MAX_CHILDREN)
+    guardpool.warm()
+
+
+def worker_pids() -> list[int]:
+    return guardpool.worker_pids()
+
+
 def run(fn, *args, mem_mb: int | None = None, timeout: float | None = None, **kwargs):
-    """fn(*args) in a memory-capped process. Raises Tripped on OOM/timeout/crash; re-raises fn's own errors."""
-    if not ENABLED:
+    """fn(*args) in a memory-capped process. Raises Tripped on OOM/timeout/crash; re-raises fn's own errors.
+
+    A worker that is itself already inside this guard runs the call directly. Spawning
+    another interpreter from there would nest the cap and can deadlock the pool.
+    """
+    if os.environ.get("ZEIM_GUARD_WORKER") == "1" or not ENABLED:
         return fn(*args, **kwargs)
     limit = _clamp(_vm_bytes() + (mem_mb or MEM_MB) * 1024 * 1024)
     if limit is None:
@@ -184,7 +204,18 @@ def run(fn, *args, mem_mb: int | None = None, timeout: float | None = None, **kw
     if not _slots.acquire(timeout=WAIT_S):
         raise Busy()
     try:
-        return _run(fn, args, kwargs, limit, timeout)
+        guardpool.ensure(MAX_CHILDREN)
+        try:
+            return guardpool.call(_pack_fn(fn), args, kwargs, limit, timeout or TIMEOUT_S)
+        except guardpool.Down:
+            return _run(fn, args, kwargs, limit, timeout)
+        except guardpool.Failed as exc:
+            # The warm worker's imports do not fit this cap. A one-shot interpreter is smaller.
+            if exc.kind == "fresh":
+                return _run(fn, args, kwargs, limit, timeout)
+            if exc.kind == "err":
+                raise exc.value
+            raise Tripped(exc.kind)
     finally:
         _slots.release()
 

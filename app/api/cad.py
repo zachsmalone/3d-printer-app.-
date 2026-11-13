@@ -252,7 +252,7 @@ def _scene_body(i: int, b: trimesh.Trimesh) -> tuple[dict, int]:
 @router.get("/{bid}/scene")
 def scene(bid: str, actor: Actor = Depends(get_actor)):
     try:
-        return editlane.run(lambda: _scene(bid, actor))
+        return editlane.run(bid, lambda: _scene(bid, actor))
     except editlane.Busy:
         raise HTTPException(503, editlane.BUSY)
 

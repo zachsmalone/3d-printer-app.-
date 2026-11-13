@@ -864,8 +864,44 @@ const TOOL_PANELS = {
 };
 
 /* ---------------------------------------------------------------- server round trips */
-async function load(keepCam) {
+/* Several callers refresh the scene and the slot list after one step. Keep the
+   latest request and drop the ones still waiting, so a drag does not fire all of them. */
+function coalesceLatest(run) {
+  let queue = [];
+  let pumping = false;
+  async function pump() {
+    if (pumping) return;
+    pumping = true;
+    try {
+      while (queue.length) {
+        const batch = queue.splice(0, queue.length);
+        const last = batch[batch.length - 1];
+        try {
+          await run(...last.args);
+          batch.forEach(item => item.resolve());
+        } catch (e) {
+          batch.forEach(item => item.reject(e));
+        }
+      }
+    } finally {
+      pumping = false;
+      if (queue.length) pump();
+    }
+  }
+  return function queued(...args) {
+    let resolve, reject;
+    const gate = new Promise((res, rej) => { resolve = res; reject = rej; });
+    queue.push({ resolve, reject, args });
+    pump();
+    return gate;
+  };
+}
+function load(keepCam) {
   hideCtx();
+  return loadQueued(keepCam);
+}
+const loadQueued = coalesceLatest((keepCam) => loadScene(keepCam));
+async function loadScene(keepCam) {
   if (!S.bid) { S.scene = null; buildWorld(); renderHist(); if (S.mode !== "sketch") renderRail(); paintCadChrome(); return; }
   try { S.scene = await api(`/api/cad/${S.bid}/scene`); }
   catch (e) { if (e.status === 413 && e.info?.keep_ratio) { bigModel(e); return; } throw e; }
@@ -1034,7 +1070,8 @@ document.addEventListener("zeim:printer", () => {
   if (!S.bid) return;
   syncCadSlots().then(() => { if ($("#cwItems")) renderItems(); }).catch(() => { });
 });
-async function syncCadSlots() {
+const syncCadSlots = coalesceLatest(() => syncCadSlotsNow());
+async function syncCadSlotsNow() {
   if (!S.bid || !S.scene) return;
   if (!S.printer) S.printer = await printerForImport();
   S.slotColours = coloursForPrinter(S.printer);
